@@ -451,6 +451,7 @@ All specifications in this repository are authored by **Md. Alim Ul Karim** — 
 | App Spec Remediation v2 | `../../.lovable/plans/completed/13-spec-remediation-completed.md` |
 | App Spec Audit v1 (Resolved) | `../../.lovable/plans/completed/01-audit-2026-09-10-v1.md-resolved` |
 | App Spec Audit v2 (Resolved) | `../../.lovable/plans/completed/02-audit-2026-09-10-v2.md-resolved` |
+| App Spec Audit (Active) | `../25-app-spec-audit/01-audit-2026-09-10-v1.md` |
 
 ---
 

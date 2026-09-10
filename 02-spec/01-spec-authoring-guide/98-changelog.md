@@ -5,6 +5,8 @@
 
 ---
 
+## [2026-09-10] v2.2.0 — Application Specification Blind-AI Audit v1 generated in `02-spec/25-app-spec-audit/01-audit-2026-09-10-v1.md` (Score: 89/100, Band B)
+ 
 ## [2026-09-10] v2.1.0 — Application Specification Blind-AI Audit v2 remediated (100% closed, archived to `.lovable/plans/completed/13-spec-remediation-completed.md`)
  
 ## [2026-09-10] v2.0.0 — Application Specification Blind-AI Audit v2 generated in `02-spec/25-app-spec-audit/02-audit-2026-09-10-v2.md`
