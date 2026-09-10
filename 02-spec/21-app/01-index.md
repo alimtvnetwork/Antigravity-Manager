@@ -125,13 +125,36 @@ The complete reverse-engineered architecture is documented across the following 
 
 All development, maintenance, and refactoring across the Antigravity-Manager codebase are bound to the following normative engineering standards and coding guidelines:
 
-| Domain / Subsystem | Normative Specification | Key Enforced Standards |
-|---|---|---|
-| **Rust Backend & Native Engine** | [`02-spec/02-coding-guidelines/05-rust/`](../02-coding-guidelines/05-rust/01-index.md) | Idiomatic Rust conventions, explicit typed errors, memory safety, async Tokio patterns, zero unsafe blocks |
-| **TypeScript Frontend** | [`02-spec/02-coding-guidelines/02-typescript/`](../02-coding-guidelines/02-typescript/01-index.md) | Strict TypeScript typing, discriminated unions, exhaustive type narrowing, zero unconstrained `any`, Zustand stores |
-| **Error Management Architecture** | [`02-spec/03-error-manage/`](../03-error-manage/01-index.md) | Universal structured error envelopes, centralized error codes, structured domain error propagation without panics |
-| **Database & Persistence Conventions** | [`02-spec/04-database-conventions/`](../04-database-conventions/01-index.md) | Parameterized Rusqlite queries, SQLite WAL journal mode, explicit busy timeouts, lowercase schema naming |
-| **Global Agent Directives** | [`AGENTS.md`](../../AGENTS.md) | Strict lowercase filenames, strict relative git paths mandate, implicit boolean evaluation, no mixed polarity |
+| # | Topic | Authority Specification | Key Enforced Standards |
+|---|---|---|---|
+| 1 | Canonical size tier | [`02-canonical-size-tier.md`](../02-coding-guidelines/02-canonical-size-tier.md) | Standard file line limits ($\le 300$ lines), micro-task isolation boundaries ($\le 100$ lines) |
+| 2 | Boolean naming prefixes | [`02-naming-prefixes.md`](../02-coding-guidelines/01-cross-language/02-boolean-principles/02-naming-prefixes.md) | Mandatory `is_`, `has_`, `can_`, `should_` prefixes for all boolean variables, flags, and fields |
+| 3 | Boolean guards + extraction | [`03-guards-and-extraction.md`](../02-coding-guidelines/01-cross-language/02-boolean-principles/03-guards-and-extraction.md) | Guard clauses with early returns for preconditions; compound condition extraction to booleans |
+| 4 | Boolean params + conditions | [`04-parameters-and-conditions.md`](../02-coding-guidelines/01-cross-language/02-boolean-principles/04-parameters-and-conditions.md) | Implicit boolean evaluation; ban on explicit true comparisons and mixed-polarity `if` conditions |
+| 5 | Boolean quick reference | [`05-quick-reference.md`](../02-coding-guidelines/01-cross-language/02-boolean-principles/05-quick-reference.md) | Standard reference matrix for positive boolean semantics and affirmative expression structure |
+| 6 | Boolean exemptions + API | [`06-exemptions-and-api.md`](../02-coding-guidelines/01-cross-language/02-boolean-principles/06-exemptions-and-api.md) | Serialization and external SDK interop boundaries; internal mapping of wire boolean contracts |
+| 7 | Boolean flag methods | [`24-boolean-flag-methods.md`](../02-coding-guidelines/01-cross-language/24-boolean-flag-methods.md) | Total ban on boolean flag parameters; split functions into semantic single-purpose procedures |
+| 8 | No negatives | [`12-no-negatives.md`](../02-coding-guidelines/01-cross-language/12-no-negatives.md) | Positive naming conventions; ban on double-negative identifiers and negative boolean prefixes |
+| 9 | Braces + nesting | [`02-braces-and-nesting.md`](../02-coding-guidelines/01-cross-language/04-code-style/02-braces-and-nesting.md) | Mandatory braces for control flow statements; limit nesting depth to maximum 1 indentation level |
+| 10 | Conditions + extraction (style) | [`03-conditions-and-extraction.md`](../02-coding-guidelines/01-cross-language/04-code-style/03-conditions-and-extraction.md) | Extraction of complex inline conditional logic into self-documenting descriptive constants |
+| 11 | Blank lines + spacing | [`04-blank-lines-and-spacing.md`](../02-coding-guidelines/01-cross-language/04-code-style/04-blank-lines-and-spacing.md) | Blank line preceding return statements in multi-line blocks; ban on consecutive empty lines |
+| 12 | Function + type size | [`05-function-and-type-size.md`](../02-coding-guidelines/01-cross-language/04-code-style/05-function-and-type-size.md) | Compact single-responsibility functions ($\le 25$ lines); modular struct and type definitions |
+| 13 | Multi-line formatting | [`06-multi-line-formatting.md`](../02-coding-guidelines/01-cross-language/04-code-style/06-multi-line-formatting.md) | Deterministic parameter wrapping, trailing commas in multiline structs, clean indent alignment |
+| 14 | Code-style checklist | [`08-checklist.md`](../02-coding-guidelines/01-cross-language/04-code-style/08-checklist.md) | Pre-commit validation checklist covering braces, nesting, blank lines, and identifier naming |
+| 15 | Nesting resolution | [`20-nesting-resolution-patterns.md`](../02-coding-guidelines/01-cross-language/20-nesting-resolution-patterns.md) | Inversion pattern, guard returns, table lookups, and sub-procedure decomposition techniques |
+| 16 | Cyclomatic complexity | [`06-cyclomatic-complexity.md`](../02-coding-guidelines/01-cross-language/06-cyclomatic-complexity.md) | Strict ceiling on function cyclomatic complexity ($\le 10$); decompose nested branching logic |
+| 17 | Code mutation avoidance | [`18-code-mutation-avoidance.md`](../02-coding-guidelines/01-cross-language/18-code-mutation-avoidance.md) | Immutable data transformations; construct-once objects; thread-safe atomic state transitions |
+| 18 | Strict typing | [`13-strict-typing.md`](../02-coding-guidelines/01-cross-language/13-strict-typing.md) | Total ban on `any` in TypeScript; exhaustive pattern matching; strong type safety in Rust |
+| 19 | Null-pointer safety | [`19-null-pointer-safety.md`](../02-coding-guidelines/01-cross-language/19-null-pointer-safety.md) | Safe optional unwrapping; explicit `Option<T>` matching in Rust; optional chaining in TypeScript |
+| 20 | Key naming PascalCase | [`11-key-naming-pascalcase.md`](../02-coding-guidelines/01-cross-language/11-key-naming-pascalcase.md) | Standard PascalCase dictionary/DTO serialization keys across cross-language message boundaries |
+| 21 | Test naming + structure | [`14-test-naming-and-structure.md`](../02-coding-guidelines/01-cross-language/14-test-naming-and-structure.md) | AAA structure (Arrange-Act-Assert); semantic test naming `should_behavior_when_condition` |
+| 22 | File/folder naming | [`06-rust-csharp.md`](../02-coding-guidelines/08-file-folder-naming/06-rust-csharp.md) | Strictly lowercase repository filenames; kebab-case folders; snake_case Rust source files |
+| 23 | Language rules (Rust / TS) | [`05-rust/`](../02-coding-guidelines/05-rust/01-index.md) & [`02-typescript/`](../02-coding-guidelines/02-typescript/01-index.md) | Native Tokio async idioms, Tauri IPC command contracts, React 19 Zustand store architectures |
+| 24 | Error architecture | [`01-index.md`](../03-error-manage/01-index.md) | Structured error envelopes; domain error enums; prohibition of silent panics or swallowed errors |
+| 25 | Error code registry | [`01-index.md`](../03-error-manage/03-error-code-registry/01-index.md) | Centralized error code taxonomy; machine-readable payload error codes across reverse proxy |
+| 26 | Database conventions | [`01-index.md`](../04-database-conventions/01-index.md) | Parameterized queries; WAL journal mode; explicit 5000ms busy timeouts; foreign key integrity |
+| 27 | CI pipeline + guards | [`02-ci-pipeline.md`](../12-cicd-pipeline-workflows/02-ci-pipeline.md) | Mandatory pre-flight linters, automated test suites, quality gates, and zero-bypass enforcement |
+| — | Global Agent Directives | [`agents.md`](../../agents.md) | Strict lowercase filenames, relative git paths mandate, implicit boolean evaluation, no mixed polarity |
 
 ---
 
@@ -139,6 +162,6 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 
 - **AC-APP-001 (IPC Conformance):** All frontend service calls in `src/services/` map directly to declared backend commands in `src-tauri/src/commands/mod.rs`.
 - **AC-APP-002 (Proxy Conformance):** Endpoints `/v1/chat/completions`, `/v1/messages`, and `/v1beta/models/*` return valid OpenAI/Anthropic/Gemini compliant responses or structured error envelopes.
-- **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL` and `PRAGMA busy_timeout = 5000`.
+- **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`.
 - **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
 

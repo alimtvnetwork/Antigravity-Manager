@@ -97,7 +97,7 @@ Global reactive state is partitioned strictly across 5 stores (there is no `useP
 Due to rich operational parameters, `src/pages/ApiProxy.tsx` encapsulates 187 KB of component-local state using React `useState` hooks rather than polluting global stores:
 - **Proxy Engine State:** `status: ProxyStatus` (running, port, base_url, active_accounts), `loading`, `copied`.
 - **Model Routing & Presets:** `selectedProtocol`, `selectedModelId`, `zaiAvailableModels`, `customPresets`, `selectedPreset`, inline model mapping editor states (`editingKey`, `editingValue`).
-- **Security & Tokens:** API key editing toggles (`isEditingApiKey`, `tempApiKey`), admin password dialogs (`isEditingAdminPassword`, `tempAdminPassword`).
+- **Security & Tokens:** API key editing toggles (`isEditingApiKey`, `draftApiKey`), admin password dialogs (`isEditingAdminPassword`, `draftAdminPassword`).
 - **Operational Modals:** Reset confirmation, key regeneration, rate-limit clearance, and session binding eviction dialogs.
 - **Account Affinity:** `preferredAccountId`, `availableAccounts` for fixed single-account routing.
 - **Tunneling:** Cloudflare tunnel daemon installation, status, and domain configuration.
@@ -123,21 +123,31 @@ The frontend operates transparently in both desktop native and web browser envir
    - Handles HTTP query string construction for GET/DELETE and JSON request bodies for POST/PATCH.
    - Dispatches debounced `abv-unauthorized` events on 401 responses to prompt authentication.
 
+### 4.1 Runtime Capability Matrix
+
+| Runtime Mode | Endpoints / Commands | Supported Domains & Capabilities | Desktop Exclusivity & Fallback |
+|---|---|---|---|
+| **Web HTTP Mode** | 127 Endpoints via Axum REST Bridge | Accounts, Device Fingerprints, Quota sweeps, OAuth URL/client management, DB migration/import, Proxy controls, Proxy request logs/filters, Model routing & presets, Sticky session scheduling, Proxy pool bindings, Token statistics/analytics, CLI/OpenCode/Droid sync configuration, Security IP access logs, Blacklist/Whitelist firewall rules, Cloudflared tunnel status/control, Multi-tenant User Tokens. | Unsupported host-only desktop operations return 404/501 or prompt the user with Web fallback notifications. |
+| **Desktop Native Mode** | 153 Commands (127 Web + 26 Tauri Desktop-Only) | All 127 Web endpoints plus 26 Tauri-exclusive desktop commands: OS/window management (`show_main_window`, `set_window_theme`, `open_data_folder`, `open_device_folder`, `get_antigravity_path`, `get_antigravity_cli_path`, `get_antigravity_args`, `save_text_file`, `read_text_file`), OS autostart (`toggle_auto_launch`, `is_auto_launch_enabled`), native package upgrades (`check_homebrew_installation`, `check_appimage_installation`, `brew_upgrade_cask`), binary patching (`patch_agy_binary`), local loopback OAuth callback listener (`start_oauth_login`, `complete_oauth_login`, `cancel_oauth_login`, `submit_oauth_code`), and host diagnostics (`greet`, `get_antigravity_cache_paths`, `clear_antigravity_cache`, `clear_log_cache`, `get_data_dir_path`, `query_transit_info`). | Full access via `@tauri-apps/api/core` native IPC bridge without network serialization overhead. |
+
 ---
 
 ## 5. Verification & Acceptance Criteria
 
 ### AC-UI-001: Route & Navigation Coverage
+- **Executable Test:** `tests::test_navbar_route_dispatch`
 - **Given** The React Router hierarchy defined in `src/App.tsx`.
 - **When** A user navigates across all 9 application routes (`/`, `/accounts`, `/api-proxy`, `/monitor`, `/token-stats`, `/user-token`, `/apikey-fun`, `/security`, `/settings`).
 - **Then** Every route renders within `Layout.tsx`, mounts its page component, and is accessible from `Navbar.tsx` or `NavDropdowns.tsx` without runtime errors.
 
-### AC-UI-002: Store State Hygiene
+### AC-UI-002: Store State Hygiene & Immutable Updates
+- **Executable Test:** `tests::test_zustand_store_immutable_updates`
 - **Given** The frontend state layer in `src/stores/`.
-- **When** Auditing all import statements across `src/`.
-- **Then** All global state is sourced exclusively from the 5 canonical stores (`useAccountStore`, `useConfigStore`, `useViewStore`, `networkMonitorStore`, `useDebugConsole`). Zero references to `Sidebar.tsx` or `useProxyStore.ts` exist.
+- **When** Auditing all import statements across `src/` and evaluating state updates.
+- **Then** All global state is sourced exclusively from the 5 canonical stores (`useAccountStore`, `useConfigStore`, `useViewStore`, `networkMonitorStore`, `useDebugConsole`) using immutable updates; zero references to `Sidebar.tsx` or `useProxyStore.ts` exist.
 
 ### AC-UI-003: Dual-Mode Request Bridge Conformance
-- **Given** The IPC abstraction in `src/utils/request.ts`.
+- **Executable Test:** `tests::test_dual_mode_bridge_dispatch`
+- **Given** The IPC abstraction in `src/utils/request.ts` and the Runtime Capability Matrix.
 - **When** Executing commands under Tauri desktop or browser web mode.
-- **Then** In Tauri mode, calls invoke native IPC handlers; in Web mode, calls resolve via `COMMAND_MAPPING` to HTTP endpoints with authentication headers and 204/JSON response handling.
+- **Then** In Tauri mode, calls invoke native IPC handlers across all 153 commands; in Web mode, 127 supported endpoints resolve via `COMMAND_MAPPING` to HTTP endpoints with authentication headers and 204/JSON response handling, while the 26 desktop-exclusive commands are guarded.

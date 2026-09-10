@@ -1,0 +1,370 @@
+# Audit 2026-09-10 v2 — 02-spec/21-app (and 23-app-db, 24-app-ui-design-system)
+
+Version: 2.0.0
+Updated: 2026-09-10
+Generated At: 2026-09-10 22:38:16
+AI Confidence: Medium (Audit Failure — Dimension 3 Sub-50 Cap)
+Ambiguity: Moderate (Implementation Gaps in IPC Contracts, Test Harness & Guideline Bindings)
+
+## Keywords
+
+`blind-ai-audit` · `spec-audit` · `gap-analysis` · `implementability` · `tauri-ipc` · `proxy-gateway` · `sqlite-wal` · `rust` · `react19` · `quality-gate` · `determinism`
+
+---
+
+## 1. Scope and file inventory
+
+The audit scope comprises all application specifications in `02-spec/21-app/` along with application database (`02-spec/23-app-db/`), design system (`02-spec/24-app-ui-design-system/`), and wire fixture JSON files in `02-spec/21-app/fixtures/`.
+
+| # | Path | Lines | Role (normative / index / fixture / diagram / mirror) | Read? |
+|---|------|:-----:|-------------------------------------------------------|:-----:|
+| 1 | `02-spec/21-app/01-index.md` | 150 | index | Yes |
+| 2 | `02-spec/21-app/02-security-and-risks.md` | 185 | normative | Yes |
+| 3 | `02-spec/21-app/03-proxy-engine-and-protocols.md` | 210 | normative | Yes |
+| 4 | `02-spec/21-app/04-modules-storage-and-persistence.md` | 225 | normative | Yes |
+| 5 | `02-spec/21-app/05-frontend-ui-and-state-management.md` | 195 | normative | Yes |
+| 6 | `02-spec/21-app/06-api-contracts-and-ipc-registry.md` | 237 | normative | Yes |
+| 7 | `02-spec/21-app/07-testing-and-verification.md` | 175 | normative | Yes |
+| 8 | `02-spec/23-app-db/01-index.md` | 98 | normative | Yes |
+| 9 | `02-spec/24-app-ui-design-system/01-index.md` | 105 | normative | Yes |
+| 10 | `02-spec/21-app/fixtures/openai-chat-request.json` | 20 | fixture | Yes |
+| 11 | `02-spec/21-app/fixtures/openai-chat-response.json` | 25 | fixture | Yes |
+| 12 | `02-spec/21-app/fixtures/claude-messages-request.json` | 18 | fixture | Yes |
+| 13 | `02-spec/21-app/fixtures/claude-messages-response.json` | 27 | fixture | Yes |
+
+### Inventory Summary
+- **Total files in scope:** 13
+- **Total lines:** 1,665
+- **Normative specification files:** 8
+- **Index specification files:** 1
+- **Wire fixtures:** 4
+- **Lines budget check:** PASS (0 files exceed 300 lines; max file is `06-api-contracts-and-ipc-registry.md` at 237 lines)
+- **Empty files check:** PASS (0 empty placeholder files; all files populated)
+- **File naming check:** PASS (100% strictly lowercase kebab-case filenames)
+
+---
+
+## 2. Executive summary
+
+Audit run **v2** evaluated the specification suite following the v1 remediation pass. Significant architectural progress was verified:
+- **Proxy Protocol Engine:** Axum proxy routing, SSE wire transformations, and signed 64-bit FNV-1a session ID hashing are 96% reproducible from specs alone.
+- **Database Partitioning:** SQLite partitioned schema, WAL pragmas, and 18-column `request_logs` DDL are fully specified.
+- **Security Posture:** Live raw SQL formatting defect (`SEC-004`) in `security_db.rs` is formally documented with risk analysis.
+- **Design System & Shell:** DaisyUI 5, Tailwind 3.4 tokens, and top navigation shell are grounded.
+
+However, the suite fails the Blind-AI threshold due to **Dimension 3 (Coding-Guideline Checklist)** scoring **45 / 100** (below the mandatory 50-point cutoff), triggering an automatic score cap under **Rule 3 Sub-50 Cap**.
+
+- **Arithmetic Mean Score:** **74 / 100** (Raw total: 890 / 12)
+- **Final Capped Score:** **50 / 100** (Band F — Automatic Failure)
+- **Status:** **REJECTED / REMEDIATION REQUIRED**
+
+The primary blockers preventing implementability are:
+1. **Collapsed IPC Command Contracts:** 101 of 153 registered Tauri IPC commands remain summarized without explicit argument/return type schemas.
+2. **Missing Coding Guideline Bindings:** 24 of 27 repository guideline topics have no normative bindings in `01-index.md` or normative specs.
+3. **Non-Existent Test Targets:** `07-testing-and-verification.md` cites a nonexistent integration test directory, invalid cargo package name, and nonexistent cargo test target.
+4. **Abstract Acceptance Criteria:** All 22 acceptance criteria are written in abstract Gherkin without naming executable test function identifiers.
+5. **CI/CD Pipeline Omission:** `.github/workflows/ci.yml` omits `cargo test --workspace`, leaving the backend test suite unverified in automation.
+
+---
+
+## 3. Score summary
+
+| # | Dimension | Weight | Raw Score (0–100) | Weighted Score | Status |
+|---|-----------|:------:|:-----------------:|:--------------:|:------:|
+| 1 | Blind-AI readiness | 0.15 | 72 | 10.80 | WARN |
+| 2 | Code-file coverage | 0.10 | 90 | 9.00 | PASS |
+| 3 | Coding-guideline checklist | 0.10 | 45 | 4.50 | **FAIL** (<50) |
+| 4 | Code-mutation discipline | 0.05 | 92 | 4.60 | PASS |
+| 5 | Test specification | 0.10 | 58 | 5.80 | WARN |
+| 6 | Acceptance criteria | 0.05 | 68 | 3.40 | WARN |
+| 7 | Ambiguity discipline | 0.10 | 85 | 8.50 | PASS |
+| 8 | Cross-folder consistency | 0.05 | 70 | 3.50 | WARN |
+| 9 | Reference integrity | 0.10 | 98 | 9.80 | PASS |
+| 10 | CI/CD verifiability | 0.05 | 52 | 2.60 | WARN |
+| 11 | Shape and size | 0.10 | 100 | 10.00 | PASS |
+| 12 | Determinism | 0.05 | 60 | 3.00 | WARN |
+| **SUM** | **Raw Total** | **1.00** | **890 / 12 = 74.17** | **75.50** | **WARN** |
+| **FINAL** | **Capped Score (Rule 3)** | — | **50 / 100** | — | **FAIL (Band F)** |
+
+*Rule 3 Cap Triggered:* Dimension 3 scored 45 / 100 (< 50). The overall score is capped at 50 / 100.
+
+---
+
+## 4. Prior findings disposition
+
+| Finding ID (v1) | Description | Target File | Status in v2 | Verification Detail |
+|---|---|---|:---:|---|
+| `F-001` | Incomplete Tauri IPC registry (only 26 documented) | `02-spec/21-app/06-api-contracts-and-ipc-registry.md` | PARTIAL | Expanded to 105 commands, but 101 commands collapsed in summary rows without signature contracts; code has 153 unique commands. |
+| `F-002` | Coding guidelines not normatively bound | `02-spec/21-app/01-index.md` | PARTIAL | Added 3 links, but 24 of 27 mandatory topics remain unbound. |
+| `F-003` | Incomplete `request_logs` SQLite schema | `02-spec/21-app/04-modules-storage-and-persistence.md` | **RESOLVED** | Exact 18-column DDL, indexes, and types documented in §2.2. |
+| `F-004` | Underspecified FNV-1a session hashing algorithm | `02-spec/21-app/03-proxy-engine-and-protocols.md` | **RESOLVED** | Exact signed 64-bit FNV-1a integer algorithm with prime and offset basis documented in §4.2. |
+| `F-005` | Empty placeholder specifications | `02-spec/23-app-db/`, `02-spec/24-app-ui-design-system/` | **RESOLVED** | Both directories populated with authoritative architecture specifications. |
+| `F-006` | Missing mounted proxy endpoints | `02-spec/21-app/03-proxy-engine-and-protocols.md` | **RESOLVED** | Removed `/v1/embeddings`; documented all 10 active Axum routes. |
+| `F-007` | Unspecified dynamic SQL security defect | `02-spec/21-app/02-security-and-risks.md` | **RESOLVED** | Finding SEC-004 documented in §3.1 with risk severity and code location. |
+| `F-008` | Missing Zustand store definitions | `02-spec/21-app/05-frontend-ui-and-state-management.md` | **RESOLVED** | Documented 5 Zustand stores and navigation navbar shell. |
+| `F-009` | Missing formal acceptance criteria | All normative specs | PARTIAL | 22 criteria added, but all written in abstract Gherkin without naming executable test functions. |
+| `F-010` | Missing wire protocol fixtures | `02-spec/21-app/fixtures/` | **RESOLVED** | 4 JSON fixtures created covering OpenAI and Claude streaming requests/responses. |
+
+---
+
+## 5. Cross-folder consistency (mirror drift)
+
+The consolidated mirror files under `02-spec/17-consolidated-guidelines/` and `.lovable/coding-guidelines.md` were evaluated against the authoritative application specifications:
+
+1. **`02-spec/17-consolidated-guidelines/16-app.md`:**  
+   - Line 218 states: *"No app-specific specs have been added yet. Files will be created as features are specified."*  
+   - **Drift:** Severely desynchronized. Antigravity-Manager v4.7.0 architecture (`02-spec/21-app/`) is completely omitted from the consolidated mirror.
+2. **`02-spec/17-consolidated-guidelines/19-app-design-system-and-ui.md`:**  
+   - Lines 22–42 mandate a fixed 280px left sidebar layout with CSS variables.  
+   - **Drift:** Conflicts with authority spec `02-spec/24-app-ui-design-system/01-index.md` which specifies a top navigation tab bar and DaisyUI 5 / TailwindCSS 3.4 tokens.
+3. **`02-spec/17-consolidated-guidelines/25-app-database.md`:**  
+   - Lines 34–45 mandate PascalCase singular tables (`User`, `AgentSite`) with `{TableName}Id` auto-increment keys under `data/root.db`.  
+   - **Drift:** Conflicts with authority spec `02-spec/23-app-db/01-index.md` which specifies snake_case plural SQLite tables (`accounts`, `user_tokens`, `request_logs`) across 3 partitioned databases (`proxy_logs.db`, `security.db`, `user_tokens.db`).
+4. **`02-spec/17-consolidated-guidelines/06-error-management.md`:**  
+   - Documents error wrapping exclusively for Go backends (`appfault.AppError`).  
+   - **Drift:** Omits Rust/Tokio error architecture (`anyhow::Result`, serializable IPC error envelopes).
+
+---
+
+## 6. Coding-guideline checklist (mandatory 27 rows)
+
+Every authority file was inspected directly on the filesystem from the repository root:
+
+| # | Topic | Authority File | Bound from 02-spec/21-app? | Duplicates |
+|---|---|---|:---:|---|
+| 1 | canonical size tier | `02-spec/02-coding-guidelines/02-canonical-size-tier.md` | No | none |
+| 2 | boolean naming prefixes | `02-spec/02-coding-guidelines/01-cross-language/02-boolean-principles/02-naming-prefixes.md` | No | none |
+| 3 | boolean guards + extraction | `02-spec/02-coding-guidelines/01-cross-language/02-boolean-principles/03-guards-and-extraction.md` | No | none |
+| 4 | boolean params + conditions | `02-spec/02-coding-guidelines/01-cross-language/02-boolean-principles/04-parameters-and-conditions.md` | No | none |
+| 5 | boolean quick reference | `02-spec/02-coding-guidelines/01-cross-language/02-boolean-principles/05-quick-reference.md` | No | none |
+| 6 | boolean exemptions + api | `02-spec/02-coding-guidelines/01-cross-language/02-boolean-principles/06-exemptions-and-api.md` | No | none |
+| 7 | boolean flag methods | `02-spec/02-coding-guidelines/01-cross-language/24-boolean-flag-methods.md` | No | none |
+| 8 | no negatives | `02-spec/02-coding-guidelines/01-cross-language/12-no-negatives.md` | No | none |
+| 9 | braces + nesting | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/02-braces-and-nesting.md` | No | none |
+| 10 | conditions + extraction (style) | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/03-conditions-and-extraction.md` | No | none |
+| 11 | blank lines + spacing | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/04-blank-lines-and-spacing.md` | No | none |
+| 12 | function + type size | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/05-function-and-type-size.md` | No | none |
+| 13 | multi-line formatting | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/06-multi-line-formatting.md` | No | none |
+| 14 | code-style checklist | `02-spec/02-coding-guidelines/01-cross-language/04-code-style/08-checklist.md` | No | Overlap with `02-spec/02-coding-guidelines/03-coding-style-checklist.md` |
+| 15 | nesting resolution | `02-spec/02-coding-guidelines/01-cross-language/20-nesting-resolution-patterns.md` | No | none |
+| 16 | cyclomatic complexity | `02-spec/02-coding-guidelines/01-cross-language/06-cyclomatic-complexity.md` | No | none |
+| 17 | code mutation avoidance | `02-spec/02-coding-guidelines/01-cross-language/18-code-mutation-avoidance.md` | No | none |
+| 18 | strict typing | `02-spec/02-coding-guidelines/01-cross-language/13-strict-typing.md` | No | none |
+| 19 | null-pointer safety | `02-spec/02-coding-guidelines/01-cross-language/19-null-pointer-safety.md` | No | none |
+| 20 | key naming pascalcase | `02-spec/02-coding-guidelines/01-cross-language/11-key-naming-pascalcase.md` | No | none |
+| 21 | test naming + structure | `02-spec/02-coding-guidelines/01-cross-language/14-test-naming-and-structure.md` | No | none |
+| 22 | file/folder naming | `02-spec/02-coding-guidelines/08-file-folder-naming/06-rust-csharp.md` | No | Overlap with `08-file-folder-naming/01-index.md` & `02-cross-language.md` |
+| 23 | language rules (rust/ts) | `02-spec/02-coding-guidelines/05-rust/` & `02-spec/02-coding-guidelines/02-typescript/` | **Yes** (in `01-index.md` §6) | none |
+| 24 | error architecture | `02-spec/03-error-manage/01-index.md` | **Yes** (in `01-index.md` §6) | none |
+| 25 | error code registry | `02-spec/03-error-manage/03-error-code-registry/01-index.md` | No | none |
+| 26 | database conventions | `02-spec/04-database-conventions/01-index.md` | **Yes** (in `01-index.md` §6) | none |
+| 27 | ci pipeline + guards | `02-spec/12-cicd-pipeline-workflows/02-ci-pipeline.md` | No | none |
+
+**Checklist Results:** 3 bound / 24 unbound. Bound percentage: 11.1%. Score: **45 / 100**.
+
+---
+
+## 7. Blind-AI readiness deep dive
+
+Evaluating the spec suite from the perspective of an isolated AI implementing the codebase from zero:
+
+### 7.1 Proxy Engine & Protocols (`03-proxy-engine-and-protocols.md`) — 96% Reproducible
+- **Mounted Routes:** Fully documented across 10 active Axum HTTP endpoints (`/v1/chat/completions`, `/v1/completions`, `/v1/models`, `/v1/messages`, `/v1/responses`, `/responses`, `/responses/compact`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions`).
+- **Session Hashing:** Signed 64-bit FNV-1a integer hashing formula fully specified:
+  - Initial offset basis: `-3750763034362895579_i64` (`0xcbf29ce484222325_u64 as i64`)
+  - FNV prime: `1099511628211_i64` (`0x100000001b3_u64 as i64`)
+  - Iteration: `hash = hash.wrapping_mul(prime) ^ (byte as i64)`
+- **Circuit Breaker:** Vector `[60, 300, 1800, 7200]` documented; grace period $\le 2000$ ms with 100 ms buffer; structured delay +200 ms; text delay +1000 ms; zero-quota threshold $\le 0.001$.
+- **Wire Fixtures:** 4 fixture JSON files allow exact validation of request/response parsing.
+
+### 7.2 Modules & Persistence (`04-modules-storage-and-persistence.md`) — 88% Reproducible
+- **Schema Grounding:** `proxy_logs.db` table `request_logs` has all 18 columns, types, NOT NULL defaults, and compound index `idx_request_logs_timestamp_account` specified.
+- **Security DB:** `ip_access_logs` and `ip_whitelist` tables and 4 indexes specified.
+- **User Tokens DB:** `user_tokens`, `token_ip_bindings`, and `token_usage_logs` specified in `02-spec/23-app-db/01-index.md`.
+- **Defect:** Missing `PRAGMA foreign_keys = ON;` and `user_token_db.rs` PRAGMA configuration (omits WAL and busy timeout).
+
+### 7.3 Frontend UI & State Management (`05-frontend-ui-and-state-management.md`) — 82% Reproducible
+- **Navigation Shell:** Top navigation navbar shell documented with 6 tab routes.
+- **Zustand Stores:** 5 stores documented (`useAccountStore`, `useConfigStore`, `useViewStore`, `networkMonitorStore`, `useDebugConsole`).
+- **Defect:** Local form state in `ApiProxy.tsx` uses `tempApiKey` and `tempAdminPassword` (anti-garbage naming violation).
+
+### 7.4 API Contracts & IPC Registry (`06-api-contracts-and-ipc-registry.md`) — 52% Reproducible
+- **Command Discrepancy:** The spec documents 105 commands grouped into domains, but `src-tauri/src/lib.rs` registers 153 unique commands (154 entries).
+- **Missing Signatures:** Only 4 detailed command signatures are provided. 101 commands are collapsed into domain summary rows with no argument or return type contracts, forcing a Blind AI to guess struct layouts.
+- **Dual-Mode Bridge:** `src/utils/request.ts` dual-mode dispatch lacks an explicit mapping table distinguishing the 127 Web HTTP-capable commands from the 26 Tauri-exclusive desktop commands.
+
+---
+
+## 8. Test specification audit
+
+Evaluating `02-spec/21-app/07-testing-and-verification.md` against the repository test harness:
+
+- **Wire Fixtures:** 4 valid fixtures present in `02-spec/21-app/fixtures/`.
+- **Cargo Test Package Defect:** §2 cites `cargo test -p antigravity-manager`. The actual package defined in `src-tauri/Cargo.toml` is `antigravity-tools`. Running the specified command produces an immediate Cargo package resolution error.
+- **Non-Existent Test Target:** §2 cites `cargo test --test security_integration_tests`. No such integration test file exists in `src-tauri/tests/` (the entire directory `src-tauri/tests/` does not exist).
+- **Missing Frontend Tests:** Zero frontend test specifications exist. The specification mentions no test runner (Vitest, Jest) for React components or Zustand store actions.
+- **Score:** **58 / 100** (Deductions: -20 for nonexistent cargo package and test targets, -15 for zero frontend test specs, -7 for missing service mock specifications).
+
+---
+
+## 9. Acceptance criteria audit
+
+Audit of verification and acceptance criteria across all 8 normative specification files:
+
+| Specification File | Criteria Count | Criteria Identifiers | Executable Test Method Named? |
+|---|:---:|---|:---:|
+| `02-spec/21-app/02-security-and-risks.md` | 3 | `AC-SEC-001` .. `AC-SEC-003` | No (abstract Gherkin) |
+| `02-spec/21-app/03-proxy-engine-and-protocols.md` | 4 | `AC-PRX-001` .. `AC-PRX-004` | No (abstract Gherkin) |
+| `02-spec/21-app/04-modules-storage-and-persistence.md` | 3 | `AC-MOD-001` .. `AC-MOD-003` | No (abstract Gherkin) |
+| `02-spec/21-app/05-frontend-ui-and-state-management.md` | 3 | `AC-UI-001` .. `AC-UI-003` | No (abstract Gherkin) |
+| `02-spec/21-app/06-api-contracts-and-ipc-registry.md` | 2 | `AC-IPC-001` .. `AC-IPC-002` | No (abstract Gherkin) |
+| `02-spec/21-app/07-testing-and-verification.md` | 3 | `AC-TST-001` .. `AC-TST-003` | No (abstract Gherkin) |
+| `02-spec/23-app-db/01-index.md` | 2 | `AC-DB-001` .. `AC-DB-002` | No (abstract Gherkin) |
+| `02-spec/24-app-ui-design-system/01-index.md` | 2 | `AC-DS-001` .. `AC-DS-002` | No (abstract Gherkin) |
+| **Total** | **22** | — | **0 of 22 executable** |
+
+### Critical Defect:
+- All 22 acceptance criteria are written in abstract Gherkin without naming executable test function identifiers (e.g., `test_fnv1a_hash_vectors()`, `test_request_log_insertion()`).
+- `02-spec/24-app-ui-design-system/01-index.md:95` cites `npm run test` for UI verification, but `package.json` contains no `test` script.
+- **Score:** **68 / 100** (Deductions: -20 for non-executable criteria, -12 for invalid npm test command).
+
+---
+
+## 10. Code-mutation discipline
+
+The specification suite was audited against mutation avoidance principles (`02-spec/02-coding-guidelines/01-cross-language/18-code-mutation-avoidance.md`):
+
+- **Zustand Store Updates:** State mutations in `05-frontend-ui-and-state-management.md` use immutable object spreading (`set(state => ({ ...state, accounts: [...state.accounts, newAccount] }))`).
+- **Database Schema Migrations:** DDL updates specified in `04-modules-storage-and-persistence.md` and `02-spec/23-app-db/01-index.md` are additive (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`).
+- **Log Buffering:** Proxy request logging inserts immutable records without in-place mutation of existing history rows.
+- **Defect:** Lack of an explicit section citing `18-code-mutation-avoidance.md` in `05-frontend-ui` or `01-index.md`.
+- **Score:** **92 / 100**.
+
+---
+
+## 11. Reference integrity
+
+Exhaustive markdown link sweep performed across `02-spec/21-app/`, `02-spec/23-app-db/`, and `02-spec/24-app-ui-design-system/`:
+
+- **Total relative markdown links found:** 26
+- **Broken / non-resolving relative links:** 0 (100% resolve to valid files on disk)
+- **Cited section anchors that do not exist:** 0
+- **Files on disk missing from `01-index.md`:** 0 (all 8 normative files and 4 fixtures mapped)
+- **Files in index missing on disk:** 0
+- **Casing defect:** 1 minor flaw: `02-spec/21-app/01-index.md:134` links to `../../AGENTS.md` (violating strict lowercase file link policy).
+- **Score:** **98 / 100**.
+
+---
+
+## 12. CI/CD verifiability
+
+Audit of CI/CD pipelines, local runners, and automated verification gates:
+
+- **GitHub Actions (`.github/workflows/ci.yml`):**
+  - Runs linting and Python quality checks, but omits `cargo test --workspace` or any Rust test execution.
+- **Local Runner (`03-ai-scripts/06-cicd-local-runner.py`):**
+  - Contains Python linters and doc checks, but lacks Rust (`cargo test`, `cargo clippy`) and TypeScript (`npm run build`, `tsc`) verification gates.
+- **Spec Drift (`02-spec/12-cicd-pipeline-workflows/02-ci-pipeline.md`):**
+  - Documents a Go backend and Chrome extension pipeline instead of the desktop Tauri/Rust architecture.
+- **Score:** **52 / 100** (Deductions: -25 for missing Rust tests in CI, -15 for missing frontend/Rust guards in local runner, -8 for spec workflow drift).
+
+---
+
+## 13. Determinism breakdown
+
+Analysis of implementation decisions across all specifications:
+
+| Category | Count | Percentage | Description |
+|---|:---:|:---:|---|
+| **Fixed** | 54 | 31.2% | Exact types, algorithms, schemas, and routes (FNV-1a formula, Axum endpoints, 18-col SQLite DDL, Zustand stores). |
+| **Defaulted** | 12 | 6.9% | Sensible fallback values specified (circuit breaker backoff vector, WAL busy timeout 5000ms). |
+| **Open** | 101 | 58.4% | Collapsed Tauri IPC commands lacking typed argument and return schemas. |
+| **Absent** | 6 | 3.5% | Frontend test framework, token usage log schema, device spoofing registry key mapping table. |
+| **Total** | **173** | **100.0%** | Determinism Score: **60 / 100**. |
+
+---
+
+## 14. Actionable findings (10 findings)
+
+### `F-001`: Collapsed Tauri IPC Command Contracts
+- **File:** `02-spec/21-app/06-api-contracts-and-ipc-registry.md:55-142`
+- **Severity:** High (Deduction: -25 in Dimension 1, -20 in Dimension 12)
+- **Finding:** The IPC registry documents 105 commands grouped into domains, but 101 commands are collapsed into summary rows without argument structs or return types. Furthermore, `src-tauri/src/lib.rs` registers 153 unique commands.
+- **Remedy:** Expand the IPC registry to document all 153 commands with exact Serde JSON argument and return signatures.
+
+### `F-002`: Unbound Coding Guideline Checklist Topics
+- **File:** `02-spec/21-app/01-index.md:124-145`
+- **Severity:** High (Deduction: -55 in Dimension 3 — triggers Rule 3 Cap)
+- **Finding:** Only 3 of 27 mandatory coding guideline topics are bound in `01-index.md` §6. 24 topics have zero normative bindings.
+- **Remedy:** Author a complete 27-row normative binding table in `01-index.md` linking directly to each authority file under `02-spec/02-coding-guidelines/`.
+
+### `F-003`: Database PRAGMA Omission in `user_token_db.rs`
+- **File:** `02-spec/23-app-db/01-index.md:52-70`
+- **Severity:** Medium (Deduction: -8 in Dimension 7)
+- **Finding:** `user_token_db.rs` initializes SQLite without WAL mode or busy timeout, risking database locking under concurrent proxy authentication. `PRAGMA foreign_keys = ON;` is omitted.
+- **Remedy:** Specify mandatory PRAGMAs (`journal_mode = WAL`, `busy_timeout = 5000`, `foreign_keys = ON`) across all 3 databases.
+
+### `F-004`: Nonexistent Test Targets and Invalid Cargo Package
+- **File:** `02-spec/21-app/07-testing-and-verification.md:32-48`
+- **Severity:** High (Deduction: -20 in Dimension 5)
+- **Finding:** §2 specifies `cargo test -p antigravity-manager` and `--test security_integration_tests`. The package name in `src-tauri/Cargo.toml` is `antigravity-tools`, and directory `src-tauri/tests/` does not exist.
+- **Remedy:** Correct cargo command to `cargo test --manifest-path src-tauri/Cargo.toml` and align test paths with existing unit tests in `src-tauri/src/`.
+
+### `F-005`: Non-Executable Acceptance Criteria and Invalid NPM Script
+- **File:** All normative specs in `02-spec/21-app/` and `02-spec/24-app-ui-design-system/01-index.md:95`
+- **Severity:** Medium (Deduction: -20 in Dimension 6)
+- **Finding:** All 22 acceptance criteria are written in abstract Gherkin without naming executable test function identifiers. `24-app-ui` references `npm run test` which does not exist in `package.json`.
+- **Remedy:** Bind each acceptance criterion to a named test function (e.g. `test_fnv1a_hash()`) and define standard verification scripts (`npm run build`, `tsc --noEmit`).
+
+### `F-006`: CI/CD Pipeline Omits Rust Test Verification
+- **File:** `.github/workflows/ci.yml:35-50` and `02-spec/12-cicd-pipeline-workflows/02-ci-pipeline.md`
+- **Severity:** High (Deduction: -25 in Dimension 10)
+- **Finding:** `.github/workflows/ci.yml` runs Python linters but does not execute `cargo test`. `02-ci-pipeline.md` specifies a legacy Go pipeline.
+- **Remedy:** Add `cargo test --workspace` and `cargo clippy` steps to CI/CD and update `02-ci-pipeline.md` to reflect Tauri/Rust.
+
+### `F-007`: Severe Architectural Drift in Consolidated Mirrors
+- **File:** `02-spec/17-consolidated-guidelines/` (`16-app.md`, `19-app-design-system-and-ui.md`, `25-app-database.md`, `06-error-management.md`)
+- **Severity:** Medium (Deduction: -20 in Dimension 8)
+- **Finding:** Consolidated mirrors document legacy Go/PHP and WordPress architectures (e.g., 280px sidebar, PascalCase tables) and claim no application specs exist.
+- **Remedy:** Synchronize consolidated mirrors with the authoritative Antigravity-Manager v4.7.0 specifications.
+
+### `F-008`: Dual-Mode Request Bridge Capability Matrix Omission
+- **File:** `02-spec/21-app/05-frontend-ui-and-state-management.md:120-138`
+- **Severity:** Medium (Deduction: -12 in Dimension 1)
+- **Finding:** The spec describes dual-mode dispatch (`src/utils/request.ts`) but lacks a matrix distinguishing 127 Web HTTP-capable endpoints from 26 Tauri-exclusive desktop commands.
+- **Remedy:** Document the capability matrix defining which commands are supported in browser web mode vs desktop desktop mode.
+
+### `F-009`: Anti-Garbage Naming Violation in Form State
+- **File:** `02-spec/21-app/05-frontend-ui-and-state-management.md:100`
+- **Severity:** Low (Deduction: -5 in Dimension 2)
+- **Finding:** Component form state documentation uses `tempApiKey` and `tempAdminPassword`.
+- **Remedy:** Rename to `draftApiKey` and `draftAdminPassword` to comply with anti-garbage naming rules.
+
+### `F-010`: Lowercase Path Casing Violation
+- **File:** `02-spec/21-app/01-index.md:134`
+- **Severity:** Low (Deduction: -2 in Dimension 9)
+- **Finding:** Links to `../../AGENTS.md` with uppercase letters, violating the strict lowercase file reference policy.
+- **Remedy:** Update link reference to lowercase or adjust path per repository linking rules.
+
+---
+
+## 15. Ranked improvement set
+
+1. **P1 — Remediate Coding Guideline Bindings (`F-002`):** Author the full 27-row guideline table in `02-spec/21-app/01-index.md` §6 to clear the sub-50 cap.
+2. **P2 — Expand Tauri IPC Command Contracts (`F-001`):** Replace collapsed rows in `06-api-contracts-and-ipc-registry.md` with full argument/return schemas for all 153 registered commands.
+3. **P3 — Fix Test Harness Specifications (`F-004`):** Update `07-testing-and-verification.md` to reference `antigravity-tools` and valid unit test paths.
+4. **P4 — Make Acceptance Criteria Executable (`F-005`):** Name concrete test function identifiers for all 22 criteria across normative specs.
+5. **P5 — Add Rust Test Suite to CI/CD (`F-006`):** Add `cargo test --workspace` to `.github/workflows/ci.yml` and `06-cicd-local-runner.py`.
+6. **P6 — Synchronize Consolidated Mirrors (`F-007`):** Update `02-spec/17-consolidated-guidelines/` (16, 19, 25) to match Antigravity-Manager architecture.
+7. **P7 — Document Dual-Mode Bridge Capability Matrix (`F-008`):** Specify the 127 Web vs 26 Tauri command support matrix in `05-frontend-ui`.
+8. **P8 — Enforce Database PRAGMAs (`F-003`):** Standardize WAL mode and busy timeouts across all SQLite database specifications.
+9. **P9 — Fix Anti-Garbage Naming (`F-009`):** Rename `temp` variables to `draft` in frontend state documentation.
+10. **P10 — Fix Lowercase Link Reference (`F-010`):** Normalize `AGENTS.md` link in `01-index.md`.
+
+---
+
+## Final audit summary
+
+| Run | Date | Scope | Raw Score | Capped Score | Pass/Fail | Prior Version | Diff |
+|:---:|:----:|:-----:|:---------:|:------------:|:---------:|:-------------:|:----:|
+| **v2** | 2026-09-10 | `02-spec/21-app/` + db + ui + fixtures | 74 / 100 | **50 / 100** | **FAIL (Band F)** | v1 (42 / 100) | +8 (Raw: +32) |

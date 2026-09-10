@@ -81,6 +81,9 @@ jobs:
           cd src-tauri
           cargo check
 
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
   # Tauri 构建测试（不打包）
   build-tauri:
     name: Build Tauri App

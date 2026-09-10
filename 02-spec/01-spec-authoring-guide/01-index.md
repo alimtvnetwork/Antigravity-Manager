@@ -447,9 +447,10 @@ All specifications in this repository are authored by **Md. Alim Ul Karim** — 
 | Master Index | `../01-index.md` |
 | Coding Guidelines | `../02-coding-guidelines/01-index.md` |
 | Memory Index | `../../.lovable/memories/00-memory-index.md` |
-| Reliability Reports | `../validation-reports/` |
-| Cross-Reference Rules | `./10-cross-references.md` |
-| App Spec Remediation | `../../.lovable/plans/completed/12-spec-remediation-completed.md` |
+| App Spec Remediation v1 | `../../.lovable/plans/completed/12-spec-remediation-completed.md` |
+| App Spec Remediation v2 | `../../.lovable/plans/completed/13-spec-remediation-completed.md` |
+| App Spec Audit v1 (Resolved) | `../../.lovable/plans/completed/01-audit-2026-09-10-v1.md-resolved` |
+| App Spec Audit v2 (Resolved) | `../../.lovable/plans/completed/02-audit-2026-09-10-v2.md-resolved` |
 
 ---
 

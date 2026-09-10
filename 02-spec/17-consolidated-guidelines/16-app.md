@@ -214,10 +214,35 @@ Features in `21-app/` drive work in the other three folders. Not the reverse.
 
 ---
 
-## Current Status
+## Antigravity-Manager v4.7.0 Architecture Summary
 
-No app-specific specs have been added yet. Files will be created as features are specified.
+The authoritative application-specific specifications for **Antigravity-Manager** are fully detailed in `02-spec/21-app/` and implemented across the following core architectural pillars:
+
+### 1. Axum Reverse Proxy Engine
+- **Gateway Server:** High-throughput async HTTP/SSE server (`127.0.0.1:8045`) powered by Tokio, Axum 0.7, Hyper 1.x, and Tower.
+- **Protocol Translation:** Transparent bidirectional translation between external AI assistant APIs (OpenAI `/v1/chat/completions`, Anthropic Claude `/v1/messages`, Google Gemini `/v1beta/models/*`) and upstream Antigravity Cloud RPC.
+- **Session Scoping & 1M Token Guard:** Fingerprints conversation sessions and increments generation counters to overcome upstream token accumulation limits.
+- **Circuit Breaker & Rotation:** Intercepts 429/503 responses, parses `Retry-After`, and balances traffic across account pools.
+
+### 2. SQLite WAL Local Persistence
+- **Partitioned Topology:** Separates high-frequency telemetry from firewall rules and credentials across three isolated databases: `proxy_logs.db`, `security.db`, and `user_tokens.db`.
+- **Mandatory PRAGMAs:** All connections enforce `journal_mode = WAL`, `busy_timeout = 5000`, `synchronous = NORMAL`, and `foreign_keys = ON` to prevent lock starvation and ensure referential integrity.
+
+### 3. React 19 UI & Styling
+- **Runtime:** React 19.1.0, React Router DOM 7.10, and TypeScript 5.8 built with Vite.
+- **Design System:** Responsive desktop window layout styled with TailwindCSS 3.4 and DaisyUI 5 tokens, Ant Design components, and Recharts analytics.
+
+### 4. Zustand Reactive State
+- **Stores:** Decoupled stores (`useAccountStore`, `useProxyStore`, `useLogStore`, `useConfigStore`, `useViewStore`) providing optimistic UI updates, auto-refresh intervals, and persistent local storage caching.
+
+### 5. Tauri IPC Command Registry
+- **Type-Safe Bridge:** 153 IPC command handlers declared in `src-tauri/src/commands/mod.rs` and registered via `tauri::generate_handler!`.
+- **Serialization:** Full serde serialization with camelCase mapping between Rust models and TypeScript client interfaces.
+
+### 6. Verification & Test Harness
+- **Automated Verification:** Rust backend test suites executed via `cargo test --manifest-path src-tauri/Cargo.toml`.
+- **Frontend Verification:** Static type analysis (`npx tsc --noEmit`) and bundle verification (`npm run build`) enforced in CI.
 
 ---
 
-*Consolidated app specs — v3.3.0 — 2026-04-16*
+*Consolidated app specs — Antigravity-Manager v4.7.0*

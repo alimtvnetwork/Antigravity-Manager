@@ -102,18 +102,21 @@ The project is structurally secure against remote network attacks when bound to 
 
 ## 5. Verification & Acceptance Criteria
 
-- **AC-SEC-001 (SQL Injection Parameterization):**
-  - **Given** an IP filter string containing SQL metacharacters (e.g. `' OR '1'='1' --`) supplied to `get_ip_access_logs`
-  - **When** the query executes against SQLite database `security.db`
-  - **Then** the database engine executes the query using positional parameter bindings without SQL syntax errors or logic alteration, treating the filter strictly as literal string content.
+### AC-SEC-001: SQL Injection Parameterization
+- **Executable Test:** `tests::test_security_db_parameterized_queries`
+- **Given** an IP filter string containing SQL metacharacters (e.g. `' OR '1'='1' --`) supplied to `get_ip_access_logs`.
+- **When** the query executes against SQLite database `security.db`.
+- **Then** the database engine executes the query using positional parameter bindings without SQL syntax errors or logic alteration, treating the filter strictly as literal string content.
 
-- **AC-SEC-002 (CORS Origin Validation & API Key Guard):**
-  - **Given** an incoming HTTP request to the local reverse proxy (`http://127.0.0.1:8045/v1/*`) containing an external or untrusted browser `Origin` header
-  - **When** no valid authorization header or master API key is supplied
-  - **Then** the proxy server rejects the request with HTTP 401 Unauthorized / 403 Forbidden, preventing unauthorized cross-origin quota consumption.
+### AC-SEC-002: CORS Origin Validation & API Key Guard
+- **Executable Test:** `tests::test_proxy_cors_and_api_key_guard`
+- **Given** an incoming HTTP request to the local reverse proxy (`http://127.0.0.1:8045/v1/*`) containing an external or untrusted browser `Origin` header.
+- **When** no valid authorization header or master API key is supplied.
+- **Then** the proxy server rejects the request with HTTP 401 Unauthorized / 403 Forbidden, preventing unauthorized cross-origin quota consumption.
 
-- **AC-SEC-003 (Credential Storage Protection):**
-  - **Given** user OAuth tokens (`access_token`, `refresh_token`) and session secrets persisted to disk
-  - **When** written to the local configuration directory
-  - **Then** credentials must not be stored in unencrypted cleartext JSON; storage must utilize platform-native protection (DPAPI on Windows, Keychain on macOS, Secret Service on Linux) with user-restricted filesystem ACLs.
+### AC-SEC-003: Credential Storage Protection
+- **Executable Test:** `tests::test_credential_storage_dpapi`
+- **Given** user OAuth tokens (`access_token`, `refresh_token`) and session secrets persisted to disk.
+- **When** written to the local configuration directory.
+- **Then** credentials must not be stored in unencrypted cleartext JSON; storage must utilize platform-native protection (DPAPI on Windows, Keychain on macOS, Secret Service on Linux) with user-restricted filesystem ACLs.
 

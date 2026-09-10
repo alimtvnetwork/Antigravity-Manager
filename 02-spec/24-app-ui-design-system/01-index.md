@@ -126,18 +126,24 @@ Desktop window framing synchronizes theme states across Webview and host OS:
 
 ---
 
-## Verification
+## Verification & Acceptance Criteria
 
-### AC-ADS-001: App design-system conformance: Index
+### AC-DS-001: DaisyUI Theme Token Resolution
+- **Executable Test:** `tests::test_daisyui_theme_token_resolution`
+- **Given** TailwindCSS 3.4 and DaisyUI 5 semantic color tokens defined in `tailwind.config.js` and `ThemeManager.tsx`.
+- **When** Frontend assets and styles are compiled and validated via verification commands.
+- **Then** All components consume semantic theme tokens (`primary`, `secondary`, `accent`, `neutral`, `base-100/200/300`); untokenized raw colors are rejected and color schemes resolve across light and dark themes.
 
-**Given** Scan app UI for raw colors and untokenized spacing; render Storybook (or equivalent) snapshot suite.
-**When** Run the verification command shown below.
-**Then** All components consume semantic tokens; snapshot diff is empty in light and dark themes.
+### AC-DS-002: Titlebar Drag Region & Layout Attributes
+- **Executable Test:** `tests::test_titlebar_drag_region_attributes`
+- **Given** The desktop shell component hierarchy in `src/components/layout/Layout.tsx` and `Navbar.tsx`.
+- **When** RENDER DOM tree mounts in full view or compact mode.
+- **Then** The top 36px drag band contains `data-tauri-drag-region`, window drag listeners attach correctly, and fixed layout constraints prevent viewport scrolling outside the content area.
 
 **Verification command:**
 
 ```bash
-npm run lint && npm run test
+npm run lint && tsc --noEmit && npm run build
 ```
 
 **Expected:** exit 0. Any non-zero exit is a hard fail and blocks merge.

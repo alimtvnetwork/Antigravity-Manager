@@ -61,11 +61,13 @@ All SQLite connections instantiated across `proxy_db.rs`, `security_db.rs`, and 
 PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 5000;
 PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
 ```
 
 - **`journal_mode = WAL`:** Write-Ahead Logging allows concurrent readers to query logs without blocking active write transactions from proxy workers.
 - **`busy_timeout = 5000`:** Sets a 5000ms driver retry window to eliminate immediate `SQLITE_BUSY` contention during parallel burst traffic.
 - **`synchronous = NORMAL`:** Avoids full disk syncs on every commit in WAL mode while preserving crash safety against power loss.
+- **`foreign_keys = ON`:** Enforces relational integrity and cascading deletes across all 3 databases (`proxy_logs.db`, `security.db`, and `user_tokens.db`), guaranteeing that operations such as `ON DELETE CASCADE` in `token_ip_bindings` and `token_usage_logs` referencing `user_tokens(id)` are strictly honored by SQLite.
 
 ---
 
@@ -221,16 +223,13 @@ CREATE INDEX IF NOT EXISTS idx_token_usage_logs_request_time ON token_usage_logs
 ## Verification & Acceptance Criteria
 
 ### AC-ADB-001: App Database Concurrency & Pragma Configuration
+- **Executable Test:** `tests::test_database_pragma_standards`
 - **Given:** SQLite connections opened for `proxy_logs.db`, `security.db`, or `user_tokens.db`.
 - **When:** `connect_db()` initializes SQLite handles via `rusqlite`.
-- **Then:** Connections execute `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, and `PRAGMA synchronous = NORMAL`.
+- **Then:** Connections execute `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`.
 
-### AC-ADB-002: Forward Migration & Idempotent DDL Execution
-- **Given:** An existing SQLite database from an earlier application version.
-- **When:** `init_db()` is invoked during application startup.
-- **Then:** All DDL migrations execute forward-only without data loss, newly introduced columns default safely without runtime panic, and indices are created idempotently (`IF NOT EXISTS`).
-
-### AC-ADB-003: Multi-Tenant Token Referential Integrity & Cascade Deletion
-- **Given:** User tokens stored in `user_tokens.db` with associated `token_ip_bindings` and `token_usage_logs`.
-- **When:** A user token record is deleted from `user_tokens`.
-- **Then:** Foreign key cascade deletion removes all dependent IP bindings and usage records, preventing orphaned database artifacts.
+### AC-ADB-002: Partitioned Database Schemas & Forward Migration
+- **Executable Test:** `tests::test_partitioned_database_schemas`
+- **Given:** Partitioned SQLite database schemas across `proxy_logs.db`, `security.db`, and `user_tokens.db`.
+- **When:** `init_db()` is invoked during application startup and migration cycles execute.
+- **Then:** All DDL migrations execute forward-only without data loss, newly introduced columns default safely without runtime panic, indices are created idempotently (`IF NOT EXISTS`), and foreign key constraints preserve referential integrity with cascade deletions.

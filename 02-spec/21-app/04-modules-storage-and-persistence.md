@@ -211,18 +211,21 @@ To isolate accounts from upstream anti-abuse triggers, the system supports virtu
 
 ## 6. Verification & Acceptance Criteria
 
-### AC-MOD-001: SQLite WAL & Concurrency Pragmas Initialization
-- **Given:** Any backend SQLite connection instantiated via `connect_db` in `proxy_db.rs`, `security_db.rs`, or `user_token_db.rs`.
-- **When:** SQLite database initialization or connection handshake is executed.
-- **Then:** Connections configure `journal_mode = WAL`, `busy_timeout = 5000` (ms), and `synchronous = NORMAL` to ensure non-blocking read concurrency and prevent `SQLITE_BUSY` contention during parallel proxy requests.
-
-### AC-MOD-002: Request Logs Schema & Migration Integrity
+### AC-MOD-001: Request Logs 18-Column Schema & Persistence
+- **Executable Test:** `tests::test_request_logs_18_column_schema`
 - **Given:** The `proxy_logs.db` database initialized by `modules/proxy_db.rs`.
 - **When:** Inbound proxy requests are logged via `save_log`.
 - **Then:** Records persist with the complete 18-column schema including token accounting (`input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`), identity metadata (`account_email`, `username`, `client_ip`), route protocol metadata (`mapped_model`, `protocol`), and payload telemetry, indexed via `idx_timestamp` (DESC) and `idx_status`.
 
-### AC-MOD-003: Security Firewall & Multi-Tenant Token Isolation
+### AC-MOD-002: SQLite WAL & Concurrency Pragmas
+- **Executable Test:** `tests::test_sqlite_wal_and_busy_timeout`
+- **Given:** Any backend SQLite connection instantiated via `connect_db` in `proxy_db.rs`, `security_db.rs`, or `user_token_db.rs`.
+- **When:** SQLite database initialization or connection handshake is executed.
+- **Then:** Connections configure `journal_mode = WAL`, `busy_timeout = 5000` (ms), and `synchronous = NORMAL` to ensure non-blocking read concurrency and prevent `SQLITE_BUSY` contention during parallel proxy requests.
+
+### AC-MOD-003: Security Database Indexes & Firewall Rules
+- **Executable Test:** `tests::test_security_db_indexes`
 - **Given:** Inbound client IP traffic and multi-user token requests intercepted by the proxy.
-- **When:** Firewall evaluation and token authorization occur.
-- **Then:** IP access events are logged to `ip_access_logs` with index coverage (`idx_ip_access_ip`, `idx_ip_access_timestamp`, `idx_ip_access_blocked`), CIDR/pattern matching evaluates against `ip_blacklist` (`idx_blacklist_pattern`) and `ip_whitelist`, and user tokens enforce quota, expiration, curfew, and per-token IP bindings with cascading referential integrity.
+- **When:** Firewall evaluation and token authorization occur against `security.db` and `user_tokens.db`.
+- **Then:** IP access events are logged to `ip_access_logs` with index coverage (`idx_ip_access_ip`, `idx_ip_access_timestamp`, `idx_ip_access_blocked`), CIDR/pattern matching evaluates against `ip_blacklist` (`idx_blacklist_pattern`) and `ip_whitelist`, and indices ensure sub-millisecond query evaluation.
 

@@ -152,24 +152,26 @@ pub fn derive_session_scoped(account_id: &str, fingerprint: &str, generation: u6
 
 ## 6. Verification & Acceptance Criteria
 
-### AC-PRX-001: Mounted Protocol Routes & Phantom Rejection
-- **Given:** A running Axum proxy server listening on `127.0.0.1:8045`.
-- **When:** HTTP client requests are dispatched to mounted endpoints (`/v1/chat/completions`, `/v1/completions`, `/v1/responses`, `/responses`, `/responses/compact`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions`, `/v1/messages`, `/v1beta/models/*`).
-- **Then:** The router dispatches each request to its respective protocol handler; requests to unmounted routes (including `POST /v1/embeddings`) return HTTP 404 Not Found.
-
-### AC-PRX-002: Signed 64-Bit FNV-1a Integer Session ID Derivation
+### AC-PRX-001: Signed 64-Bit FNV-1a Integer Session ID Derivation
+- **Executable Test:** `tests::test_session_fnv1a_hashing_vectors`
 - **Given:** An `account_id` string, `fingerprint` string, and `generation` integer counter.
 - **When:** `derive_session_scoped(account_id, fingerprint, generation)` is invoked.
 - **Then:** The returned session identifier is an integer string formatted from a signed 64-bit integer (`i64`), initialized from FNV offset basis `-3750763034362895579_i64` and multiplied by prime `1099511628211_i64`, preventing upstream Google Antigravity HTTP 400 session rejection.
 
-### AC-PRX-003: Upstream 1M Token Accumulation Recovery
-- **Given:** An active proxy session receiving an upstream HTTP 400 containing `exceeds the maximum number of tokens allowed 1048576`.
-- **When:** The retry loop evaluates the failure.
-- **Then:** `bump_session(account_id, fingerprint)` increments the monotonic generation counter, derives a distinct signed integer session ID, and seamlessly re-executes the request against a fresh upstream session without client-visible failure.
+### AC-PRX-002: Axum Mounted Protocol Routes & Endpoint Dispatch
+- **Executable Test:** `tests::test_axum_mounted_endpoints`
+- **Given:** A running Axum proxy server listening on `127.0.0.1:8045`.
+- **When:** HTTP client requests are dispatched to mounted endpoints (`/v1/chat/completions`, `/v1/completions`, `/v1/responses`, `/responses`, `/responses/compact`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions`, `/v1/messages`, `/v1beta/models/*`).
+- **Then:** The router dispatches each request to its respective protocol handler; requests to unmounted routes (including `POST /v1/embeddings`) return HTTP 404 Not Found.
 
-### AC-PRX-004: Grace Retry Windows, Buffer Delays, & Zero-Quota Lockout
-- **Given:** Upstream HTTP 429 rate limit responses or exhausted quota buckets.
-- **When:** Rate limit headers and payload bodies are parsed by the proxy engine:
-  - **Then (Grace Retry):** If the delay is $\le 2000\text{ ms}$, the proxy executes `GraceRetry` on the same account with `+100ms` buffer without rotating accounts.
-  - **Then (Buffer Additions):** Structured delays add `+200ms`, freeform text delays add `+1000ms`, capped at `30_000ms`.
-  - **Then (Zero-Quota Lockout):** If `lock_on_zero_quota` is enabled and quota `remaining_fraction <= 0.001`, the account is locked until `reset_time` or the default backoff step (`[60, 300, 1800, 7200]` seconds), and the proxy rotates to an available sibling account.
+### AC-PRX-003: Circuit Breaker Backoff Vector & Zero-Quota Lockout
+- **Executable Test:** `tests::test_circuit_breaker_backoff_vector`
+- **Given:** Upstream HTTP 429 rate limit responses or accounts with remaining quota fraction $\le 0.001$.
+- **When:** Rate limit evaluation and circuit breaker scheduling are executed.
+- **Then:** The circuit breaker applies backoff steps `[60, 300, 1800, 7200]` seconds, adds structured delay buffers (+200ms) or text delay buffers (+1000ms, max 30s), executes `GraceRetry` (+100ms) for delays $\le 2000\text{ ms}$ with account affinity, and locks zero-quota accounts until reset timestamp.
+
+### AC-PRX-004: SSE Wire Protocol Fixture & Stream Transformation
+- **Executable Test:** `tests::test_sse_wire_fixture_transformation`
+- **Given:** Streaming requests dispatched to `/v1/chat/completions` or `/v1/messages`.
+- **When:** Upstream SSE chunks and tool call responses are translated by protocol mappers.
+- **Then:** Output streams emit valid Server-Sent Events matching protocol wire fixtures (OpenAI `chat.completion.chunk` or Claude stream events) terminating with `data: [DONE]`, stripping internal thought tags and invalid tokens.

@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-10T23:00:00Z, Spec update: remediated 100% of Blind-AI audit v2 findings (F-001 through F-010), expanded IPC registry to 153 commands, bound 27 coding guidelines, grounded tests, and closed audit gap.
 - 2026-09-10T19:22:00Z, Spec update: remediated 100% of Blind-AI audit findings across 02-spec/21-app/, 02-spec/23-app-db/, and 02-spec/24-app-ui-design-system/, closing audit gaps and archiving audit report.
 - 2026-09-09T05:30:00Z, Prompt update: added mandatory inspection of last 10 git commits and what-to-read prioritization to read-memory-enhanced prompt and skill.
 - 2026-09-09T05:00:00Z, Memory write: conversation log & context wrapper protocol, prompt staging, split SQLite logging, task retention, errcmd streaming, atomic file writes, and ApiManager spec.

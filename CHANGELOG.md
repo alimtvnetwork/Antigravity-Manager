@@ -1500,7 +1500,6 @@
             -   **问题背景**: 之前版本在 429/503 等严重错误（如账号耗尽）发生时，日志记录中遗漏了 `mapped_model` 和 `account_email` 字段，导致无法定位出错的具体模型和账号。
             -   **修复内容**: 在 OpenAI 和 Claude 协议的所有错误退出路径（包括 Token 获取失败、转换异常、重试耗尽）中强制注入了元数据 Header。现在即使请求失败，流量日志也能准确显示目标模型和上下文信息，极大提升了排查效率。
 
-
     *   **v4.0.0 (2026-01-25)**:
         -   **[核心功能] 后台任务模型可配置 (Background Model Configuration)**:
             -   **功能增强**: 允许用户自定义“后台任务”（如标题生成、摘要压缩）使用的模型。不再强制绑定 `gemini-2.5-flash`。
@@ -2145,7 +2144,6 @@
             - **SSE 错误事件**: 实现了标准的 SSE 错误事件传播,前端可捕获并优雅展示错误,包含详细的解决建议(如检查网络、代理等)。
             - **多语言错误消息 (i18n)**: 错误消息已集成 i18n 系统,支持所有 6 种语言(zh, en, zh-TW, ja, tr, vi)。非浏览器客户端自动回退到英文提示。
         - **影响范围**: 此更新显著提升了 Claude 4.5 Opus、Gemini 3 Pro 等 thinking 模型的多轮对话稳定性,特别是在使用 MCP 工具和长会话场景下。
-
 
     *   **v3.3.24 (2026-01-12)**:
         - **UI 交互改进 (UI Interaction Improvements)**:
@@ -4800,7 +4798,6 @@
             - **SSE Error Events**: Implemented standard SSE error event propagation, allowing the frontend to gracefully display errors with detailed suggestions (check network, proxy, etc.).
             - **Multi-language Error Messages (i18n)**: Error messages are now integrated with the i18n system, supporting all 6 languages (zh, en, zh-TW, ja, tr, vi). Non-browser clients automatically fallback to English messages.
         - **Impact**: This update significantly improves multi-turn conversation stability for thinking models like Claude 4.5 Opus and Gemini 3 Pro, especially in scenarios using MCP tools and long sessions.
-
 
     *   **v3.3.24 (2026-01-12)**:
         - **UI Interaction Improvements**:
