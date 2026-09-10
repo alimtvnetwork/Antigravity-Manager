@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-10T19:22:00Z, Spec update: remediated 100% of Blind-AI audit findings across 02-spec/21-app/, 02-spec/23-app-db/, and 02-spec/24-app-ui-design-system/, closing audit gaps and archiving audit report.
 - 2026-09-09T05:30:00Z, Prompt update: added mandatory inspection of last 10 git commits and what-to-read prioritization to read-memory-enhanced prompt and skill.
 - 2026-09-09T05:00:00Z, Memory write: conversation log & context wrapper protocol, prompt staging, split SQLite logging, task retention, errcmd streaming, atomic file writes, and ApiManager spec.
 - 2026-09-04T17:39:00Z, Memory write: parallel multi-worker CI/CD local runner, selective log filtering, streamwriter contracts, and naming standards.
@@ -35,6 +36,7 @@
 
 ## Before writing code
 
+- `02-spec/21-app/`, why: complete reverse-engineered and remediated application architecture, proxy protocols, SQLite schemas, and frontend UI specs
 - `spec/`, why: understand feature specifications
 
 ## Before adding a feature
@@ -65,3 +67,4 @@
 - .lovable/plans/completed/06-enum-architecture-generator-and-baseenumer.md
 - .lovable/plans/completed/07-applogger-taxonomy-streaming-and-task-db.md
 - .lovable/plans/completed/08-completed-plans-consolidation.md
+- .lovable/plans/completed/12-spec-remediation-completed.md

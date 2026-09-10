@@ -1,0 +1,16 @@
+{
+  "model": "gpt-4o",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello, please generate a hello world function."
+    }
+  ],
+  "stream": true,
+  "temperature": 0.7,
+  "max_tokens": 2048
+}

@@ -102,7 +102,7 @@ flowchart TB
 - **Concurrency & Resource Management (9.0 / 10):** Effective use of Tokio tasks, atomic Arc/RwLock state management, and SQLite WAL mode with 5-second busy timeouts to prevent lock starvation.
 - **Error Handling & Fault Tolerance (8.8 / 10):** Upstream errors (429, 503, 400 token accumulation) are intercepted and translated into actionable downstream responses with `Retry-After` headers and automatic session generation increments.
 - **Type Safety & Data Integrity (9.0 / 10):** Comprehensive Rust structs (`serde`) and TypeScript interfaces across the IPC boundary.
-- **Security Posture (7.8 / 10):** Solid localhost binding and parameterized SQL queries, offset by embedded Google OAuth client secrets and optional proxy API key authentication (detailed in `02-security-and-risks.md`).
+- **Security Posture (7.8 / 10):** Solid localhost binding and predominantly parameterized SQL queries (with dynamic SQL formatting identified in `security_db.rs`), offset by embedded Google OAuth client secrets and optional proxy API key authentication (detailed in `02-security-and-risks.md`).
 
 ---
 
@@ -117,11 +117,28 @@ The complete reverse-engineered architecture is documented across the following 
 | [04-modules-storage-and-persistence.md](04-modules-storage-and-persistence.md) | Backend Modules & Database | Rusqlite WAL schemas, account pool rotation, OAuth lifecycle, and device profiles |
 | [05-frontend-ui-and-state-management.md](05-frontend-ui-and-state-management.md) | Frontend UI & Design System | React 19 architecture, Tailwind components, Zustand stores, and Recharts |
 | [06-api-contracts-and-ipc-registry.md](06-api-contracts-and-ipc-registry.md) | API Contracts & IPC Registry | Complete Tauri IPC command tables, HTTP gateway routes, and payload shapes |
+| [07-testing-and-verification.md](07-testing-and-verification.md) | Testing & Fixture Specs | Automated test suites, sample wire fixtures, and CI execution targets |
 
 ---
 
-## 6. Verification & Conformance Criteria
+## 6. Normative Coding Guideline Bindings
+
+All development, maintenance, and refactoring across the Antigravity-Manager codebase are bound to the following normative engineering standards and coding guidelines:
+
+| Domain / Subsystem | Normative Specification | Key Enforced Standards |
+|---|---|---|
+| **Rust Backend & Native Engine** | [`02-spec/02-coding-guidelines/05-rust/`](../02-coding-guidelines/05-rust/01-index.md) | Idiomatic Rust conventions, explicit typed errors, memory safety, async Tokio patterns, zero unsafe blocks |
+| **TypeScript Frontend** | [`02-spec/02-coding-guidelines/02-typescript/`](../02-coding-guidelines/02-typescript/01-index.md) | Strict TypeScript typing, discriminated unions, exhaustive type narrowing, zero unconstrained `any`, Zustand stores |
+| **Error Management Architecture** | [`02-spec/03-error-manage/`](../03-error-manage/01-index.md) | Universal structured error envelopes, centralized error codes, structured domain error propagation without panics |
+| **Database & Persistence Conventions** | [`02-spec/04-database-conventions/`](../04-database-conventions/01-index.md) | Parameterized Rusqlite queries, SQLite WAL journal mode, explicit busy timeouts, lowercase schema naming |
+| **Global Agent Directives** | [`AGENTS.md`](../../AGENTS.md) | Strict lowercase filenames, strict relative git paths mandate, implicit boolean evaluation, no mixed polarity |
+
+---
+
+## 7. Verification & Conformance Criteria
 
 - **AC-APP-001 (IPC Conformance):** All frontend service calls in `src/services/` map directly to declared backend commands in `src-tauri/src/commands/mod.rs`.
 - **AC-APP-002 (Proxy Conformance):** Endpoints `/v1/chat/completions`, `/v1/messages`, and `/v1beta/models/*` return valid OpenAI/Anthropic/Gemini compliant responses or structured error envelopes.
 - **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL` and `PRAGMA busy_timeout = 5000`.
+- **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
+

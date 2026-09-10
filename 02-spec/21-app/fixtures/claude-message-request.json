@@ -1,0 +1,12 @@
+{
+  "model": "claude-3-5-sonnet-20241022",
+  "max_tokens": 1024,
+  "system": "You are an expert software engineer.",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Explain Rust ownership in one sentence."
+    }
+  ],
+  "stream": true
+}

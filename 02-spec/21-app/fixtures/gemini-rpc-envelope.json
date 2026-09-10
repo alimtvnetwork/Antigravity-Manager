@@ -1,0 +1,42 @@
+{
+  "project": "antigravity-prod-1",
+  "request": {
+    "systemInstruction": {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a helpful assistant."
+        }
+      ]
+    },
+    "tools": [],
+    "toolConfig": {
+      "functionCallingConfig": {
+        "mode": "VALIDATED"
+      },
+      "includeServerSideToolInvocations": true
+    },
+    "generationConfig": {
+      "temperature": 0.7,
+      "maxOutputTokens": 2048
+    },
+    "sessionId": "-3750763034362895579",
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Hello, please generate a hello world function."
+          }
+        ]
+      }
+    ]
+  },
+  "model": "gemini-2.0-flash-exp",
+  "userAgent": "antigravity",
+  "requestType": "agent",
+  "requestId": "agent/1725960000000/0123456789abcdef",
+  "enabledCreditTypes": [
+    "GOOGLE_ONE_AI"
+  ]
+}

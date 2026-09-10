@@ -50,10 +50,21 @@ Antigravity-Manager operates as a high-privilege local proxy service and account
     - Linux: Freedesktop Secret Service (`secret-tool` / libsecret).
 
 ### 2.4 SQL Injection & Database Posture
-- **Finding SEC-004 (Passed / Low Risk):** Clean Parameterized Queries
-  - **Location:** `src-tauri/src/modules/proxy_db.rs`, `security_db.rs`, `user_token_db.rs`
-  - **Analysis:** Zero instances of string interpolation or dynamic SQL formatting (`format!("SELECT...")`) were detected. All SQLite queries use `rusqlite::params![]` or prepared statements with positional parameters.
-  - **Rating:** PASSED (No vulnerability detected).
+- **Finding SEC-004 (Medium Risk):** Dynamic SQL Formatting in Security DB
+  - **Location:** `src-tauri/src/modules/security_db.rs:215-222` (and lines 233-248)
+  - **Code:**
+    ```rust
+    format!(
+        "SELECT id, client_ip, timestamp, method, path, user_agent, status, duration, api_key_hash, blocked, block_reason, username
+         FROM ip_access_logs
+         WHERE blocked = 1 AND client_ip LIKE '%{}%'
+         ORDER BY timestamp DESC
+         LIMIT {} OFFSET {}",
+        ip, limit, offset
+    )
+    ```
+  - **Analysis:** Dynamic raw string interpolation is used inside `get_ip_access_logs` instead of SQLite parameterized queries. The `ip` filter input is concatenated directly into the query string (`client_ip LIKE '%{}%'`). While other database modules (`proxy_db.rs`, `user_token_db.rs`) leverage `rusqlite::params![]` or prepared statements, this pattern introduces an active SQL injection vulnerability if an unescaped or malicious IP string containing single quotes or SQLite operators is passed through the IPC interface.
+  - **Remediation:** Refactor `get_ip_access_logs` to use positional SQLite parameter bindings (`WHERE client_ip LIKE '%' || ? || '%'`) and pass `ip`, `limit`, and `offset` as parameters to `conn.prepare()` or `query_map()`.
 
 ### 2.5 Subprocess Command Execution
 - **Finding SEC-005 (Low Risk):** Process Management & System Tool Invocations
@@ -81,8 +92,28 @@ Antigravity-Manager operates as a high-privilege local proxy service and account
 | Hardcoded OAuth Client Secret | MEDIUM | Public client scope | Transition to pure PKCE flow or environment injection |
 | Browser CORS Drive-by Execution | MEDIUM | Localhost binding | Enforce Master API Key or filter incoming browser Origin headers |
 | Token Storage in Plaintext | MEDIUM | User data directory ACL | Encrypt credentials via DPAPI / OS Keychain |
-| SQL Injection | NONE | 100% Parameterized queries | Maintain parameterized query standards |
+| SQL Injection | MEDIUM | Parameterized queries in proxy_db; dynamic string formatting in security_db | Refactor `security_db.rs:215-222` to use `rusqlite::params![]` with positional bindings |
 | Subprocess Injection | LOW | Vectorized arguments | Maintain explicit argument vectors |
 
 **Overall Project Risk Classification:** **MEDIUM**
-The project is structurally secure against remote network attacks when bound to `127.0.0.1`, with primary residual risks concentrated around local workstation credential storage and cross-origin browser requests.
+The project is structurally secure against remote network attacks when bound to `127.0.0.1`, with primary residual risks concentrated around local workstation credential storage, dynamic SQL formatting in security logs, and cross-origin browser requests.
+
+---
+
+## 5. Verification & Acceptance Criteria
+
+- **AC-SEC-001 (SQL Injection Parameterization):**
+  - **Given** an IP filter string containing SQL metacharacters (e.g. `' OR '1'='1' --`) supplied to `get_ip_access_logs`
+  - **When** the query executes against SQLite database `security.db`
+  - **Then** the database engine executes the query using positional parameter bindings without SQL syntax errors or logic alteration, treating the filter strictly as literal string content.
+
+- **AC-SEC-002 (CORS Origin Validation & API Key Guard):**
+  - **Given** an incoming HTTP request to the local reverse proxy (`http://127.0.0.1:8045/v1/*`) containing an external or untrusted browser `Origin` header
+  - **When** no valid authorization header or master API key is supplied
+  - **Then** the proxy server rejects the request with HTTP 401 Unauthorized / 403 Forbidden, preventing unauthorized cross-origin quota consumption.
+
+- **AC-SEC-003 (Credential Storage Protection):**
+  - **Given** user OAuth tokens (`access_token`, `refresh_token`) and session secrets persisted to disk
+  - **When** written to the local configuration directory
+  - **Then** credentials must not be stored in unencrypted cleartext JSON; storage must utilize platform-native protection (DPAPI on Windows, Keychain on macOS, Secret Service on Linux) with user-restricted filesystem ACLs.
+

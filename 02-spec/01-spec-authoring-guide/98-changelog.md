@@ -5,6 +5,8 @@
 
 ---
 
+## [2026-09-10] v1.1.0 — Application Specification Blind-AI Audit remediated (100% closed, archived to `.lovable/plans/completed/12-spec-remediation-completed.md`)
+
 ## [2026-03-30] v2.0.0 Compliance Rollout
 
 **Scope:** Project-wide sub-folder `01-index.md` upgrade

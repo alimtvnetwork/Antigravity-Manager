@@ -448,8 +448,8 @@ All specifications in this repository are authored by **Md. Alim Ul Karim** — 
 | Coding Guidelines | `../02-coding-guidelines/01-index.md` |
 | Memory Index | `../../.lovable/memories/00-memory-index.md` |
 | Reliability Reports | `../validation-reports/` |
-| Required Files | `./04-required-files.md` |
 | Cross-Reference Rules | `./10-cross-references.md` |
+| App Spec Remediation | `../../.lovable/plans/completed/12-spec-remediation-completed.md` |
 
 ---
 
