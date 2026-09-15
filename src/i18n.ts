@@ -84,6 +84,7 @@ i18n
                 translation: my,
             },
         },
+        lng: "en",
         fallbackLng: "en",
         debug: false, // Set to true for development
 

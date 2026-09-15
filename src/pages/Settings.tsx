@@ -27,7 +27,7 @@ function Settings() {
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'advanced' | 'debug' | 'about'>('general');
     const [appVersion, setAppVersion] = useState<string>('4.10.0');
     const [formData, setFormData] = useState<AppConfig>({
-        language: 'zh',
+        language: 'en',
         theme: 'system',
         auto_refresh: false,
         refresh_interval: 15,

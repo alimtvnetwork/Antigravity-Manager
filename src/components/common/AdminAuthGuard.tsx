@@ -99,9 +99,9 @@ export const AdminAuthGuard: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const languages = [
+        { code: 'en', name: 'English' },
         { code: 'zh', name: '简体中文' },
         { code: 'zh-TW', name: '繁體中文' },
-        { code: 'en', name: 'English' },
         { code: 'ja', name: '日本語' },
         { code: 'ko', name: '한국어' },
         { code: 'ru', name: 'Русский' },

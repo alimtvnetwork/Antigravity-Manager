@@ -1,10 +1,10 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// Choose the first supported OS language when creating a new configuration.
-/// Saved configurations keep their explicit language selection.
+/// Choose the default language when creating a new configuration.
+/// Defaults to English ("en"). Saved configurations keep their explicit language selection.
 pub fn default_language() -> String {
-    language_from_locales(sys_locale::get_locales()).to_string()
+    "en".to_string()
 }
 
 fn language_from_locales(locales: impl IntoIterator<Item = impl AsRef<str>>) -> &'static str {
@@ -203,5 +203,10 @@ mod tests {
         let russian: serde_json::Value =
             serde_json::from_str(include_str!("../../../src/locales/ru.json")).unwrap();
         assert_eq!(texts.quit, russian["tray"]["quit"].as_str().unwrap());
+    }
+
+    #[test]
+    fn default_language_is_english() {
+        assert_eq!(super::default_language(), "en");
     }
 }

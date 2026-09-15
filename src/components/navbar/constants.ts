@@ -16,9 +16,9 @@ export interface Language {
 
 // 语言配置
 export const LANGUAGES: Language[] = [
+    { code: 'en', label: 'English', short: 'EN' },
     { code: 'zh', label: '简体中文', short: 'ZH' },
     { code: 'zh-TW', label: '繁體中文', short: 'TW' },
-    { code: 'en', label: 'English', short: 'EN' },
     { code: 'ja', label: '日本語', short: 'JA' },
     { code: 'tr', label: 'Türkçe', short: 'TR' },
     { code: 'vi', label: 'Tiếng Việt', short: 'VI' },
