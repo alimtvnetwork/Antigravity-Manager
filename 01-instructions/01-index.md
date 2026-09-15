@@ -12,6 +12,8 @@ This directory contains authoritative technical specifications, implementation b
 | [03-multi-instance-profile-isolation.md](03-multi-instance-profile-isolation.md) | Multi-instance Antigravity execution, `--user-data-dir` partitioning, and keyring conflict resolution | AI Agents, Systems Architects |
 | [04-window-username-overlay-guide.md](04-window-username-overlay-guide.md) | Displaying active account/username on Antigravity window titlebar via native settings, Win32 hooks, and overlays | AI Agents, UI/Frontend Engineers |
 | [05-portable-folder-copy-multi-user-guide.md](05-portable-folder-copy-multi-user-guide.md) | Practical guide to copying Antigravity folders, portable mode (`data/`), and running independent instances | Developers, Power Users, AI Agents |
+| [06-multi-instance-manager-and-ui-specification.md](06-multi-instance-manager-and-ui-specification.md) | Architecture for multi-instance dropdown, instance tab, instance duplication, and per-account dispatch | Frontend & Backend Engineers |
+| [07-ubuntu-linux-parallel-instance-architecture.md](07-ubuntu-linux-parallel-instance-architecture.md) | Linux/Ubuntu parallel multi-instance execution, selective process termination, and AppImage sanitization | DevOps, Systems Engineers |
 
 ---
 
