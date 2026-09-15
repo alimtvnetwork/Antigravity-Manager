@@ -9,7 +9,7 @@ use std::os::windows::process::CommandExt;
 
 /// Get base directory for storing instance profiles
 pub fn get_instances_dir() -> Result<PathBuf, String> {
-    let base_dir = crate::modules::config::get_config_dir()
+    let base_dir = crate::modules::account::get_data_dir()
         .map_err(|e| format!("Failed to get config dir: {}", e))?;
     let instances_dir = base_dir.join("instances");
     if !instances_dir.exists() {
