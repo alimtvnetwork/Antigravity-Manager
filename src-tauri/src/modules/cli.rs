@@ -1,5 +1,17 @@
 use crate::modules::instance;
 
+#[cfg(target_os = "windows")]
+fn attach_parent_console() {
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn AttachConsole(dw_process_id: u32) -> i32;
+    }
+    const ATTACH_PARENT_PROCESS: u32 = 0xFFFFFFFF;
+    unsafe {
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+}
+
 /// Check and handle CLI arguments passed from terminal.
 /// Returns true if a CLI command was handled (caller should exit).
 pub fn handle_cli_arguments() -> bool {
@@ -7,6 +19,9 @@ pub fn handle_cli_arguments() -> bool {
     if args.len() <= 1 {
         return false;
     }
+
+    #[cfg(target_os = "windows")]
+    attach_parent_console();
 
     let cmd = args[1].as_str();
 
