@@ -7,7 +7,6 @@ import {
     Trash2,
     RotateCcw,
     Plus,
-    Check,
     Folder,
     Search,
     AlertCircle,

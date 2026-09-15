@@ -1,0 +1,32 @@
+name: Rust Format
+
+on:
+  workflow_dispatch:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Run Cargo Format
+        run: |
+          cd src-tauri
+          cargo fmt --all
+
+      - name: Generate Patch
+        run: |
+          git diff > rustfmt.patch
+          cat rustfmt.patch | head -n 30
+
+      - name: Upload Patch Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-patch
+          path: rustfmt.patch
