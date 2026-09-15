@@ -19,6 +19,10 @@ pub mod user_token;
 // 导出 patch 命令
 pub mod patch;
 pub use patch::*;
+// 导出 instance 命令
+pub mod instance;
+pub use instance::*;
+
 
 /// 列出所有账号
 #[tauri::command]
@@ -157,13 +161,30 @@ pub async fn switch_account(
     account_id: String,
     target_ide: Option<String>,
 ) -> Result<(), String> {
-    let service = modules::account_service::AccountService::new(
-        crate::modules::integration::SystemManager::Desktop(app.clone()),
-    );
+    let active_instance = modules::instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    let instance_target = if let Some(ref target) = target_ide {
+        if target.starts_with("instance:") {
+            Some(target.trim_start_matches("instance:").to_string())
+        } else {
+            None
+        }
+    } else if active_instance != "default" {
+        Some(active_instance)
+    } else {
+        None
+    };
 
-    service
-        .switch_account(&account_id, target_ide.as_deref())
-        .await?;
+    if let Some(inst_id) = instance_target {
+        modules::instance::switch_account_to_instance(&account_id, Some(&inst_id)).await?;
+    } else {
+        let service = modules::account_service::AccountService::new(
+            crate::modules::integration::SystemManager::Desktop(app.clone()),
+        );
+
+        service
+            .switch_account(&account_id, target_ide.as_deref())
+            .await?;
+    }
 
     // 同步托盘
     crate::modules::tray::update_tray_menus(&app);
@@ -173,6 +194,7 @@ pub async fn switch_account(
 
     Ok(())
 }
+
 
 /// 获取当前账号
 #[tauri::command]

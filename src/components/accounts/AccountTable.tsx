@@ -2,7 +2,9 @@
  * 账号表格组件
  * 支持拖拽排序功能，用户可以通过拖拽行来调整账号顺序
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { useInstanceStore } from '../../stores/useInstanceStore';
+
 import {
     DndContext,
     closestCenter,
@@ -328,6 +330,20 @@ function AccountRowContent({
     // 自定义标签编辑状态
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [labelInput, setLabelInput] = useState(account.custom_label || '');
+    const [showInstanceMenu, setShowInstanceMenu] = useState(false);
+    const { instances, activeInstanceId } = useInstanceStore();
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowInstanceMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
 
     const handleSaveLabel = () => {
         if (onUpdateLabel) {
@@ -666,14 +682,49 @@ function AccountRowContent({
                             <Tag className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', '切换到 Antigravity (经典版)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="relative inline-flex items-center" ref={menuRef}>
+                        <button
+                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            onClick={(e) => { e.stopPropagation(); onSwitch(); }}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowInstanceMenu(!showInstanceMenu);
+                            }}
+                            title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : `${t('accounts.switch_to_classic', '切换到 Antigravity')} (右键选择实例)`)}
+                            disabled={isSwitching || isDisabled}
+                        >
+                            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                        </button>
+
+                        {showInstanceMenu && (
+                            <div className="absolute top-full left-0 mt-1 w-52 rounded-xl shadow-xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                                <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                    目标实例 / Target Instance
+                                </div>
+                                {instances.map((inst) => (
+                                    <button
+                                        key={inst.config.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowInstanceMenu(false);
+                                            onSwitch(`instance:${inst.config.id}`);
+                                        }}
+                                        className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-base-100 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <div className="flex items-center gap-1.5 truncate">
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="truncate">{inst.config.name}</span>
+                                        </div>
+                                        {inst.config.id === activeInstanceId && (
+                                            <span className="text-[10px] text-blue-600 font-medium">Active</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <button
                         className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}

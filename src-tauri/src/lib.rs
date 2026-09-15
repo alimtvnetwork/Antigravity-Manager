@@ -231,6 +231,11 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Check for terminal CLI profile management arguments
+    if modules::cli::handle_cli_arguments() {
+        return;
+    }
+
     // Disable Windows background throttling/EcoQoS
     #[cfg(target_os = "windows")]
     windows_api::disable_efficiency_mode();
@@ -238,6 +243,7 @@ pub fn run() {
     // Check for headless mode
     let args: Vec<String> = std::env::args().collect();
     let is_headless = args.iter().any(|arg| arg == "--headless");
+
 
     // Increase file descriptor limit (macOS only)
     #[cfg(target_os = "macos")]
@@ -737,10 +743,22 @@ pub fn run() {
             commands::user_token::renew_user_token,
             commands::user_token::get_token_ip_bindings,
             commands::user_token::get_user_token_summary,
-            commands::query_transit_info,
             // Patch commands
             commands::patch_agy_binary,
+            // Multi-Instance Profile commands
+            commands::list_instances,
+            commands::create_instance,
+            commands::copy_instance,
+            commands::delete_instance,
+            commands::wipe_instance_session,
+            commands::launch_instance,
+            commands::close_instance,
+            commands::get_active_instance,
+            commands::set_active_instance,
+            commands::switch_account_to_instance,
         ])
+
+
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {

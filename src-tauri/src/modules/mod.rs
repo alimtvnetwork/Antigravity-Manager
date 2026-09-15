@@ -1,10 +1,13 @@
 pub mod account;
 pub mod account_service;
 pub mod cache;
+pub mod cli;
 pub mod cloudflared;
 pub mod config;
 pub mod db;
 pub mod device;
+pub mod instance;
+
 #[allow(dead_code)]
 pub mod http_api;
 pub mod i18n;

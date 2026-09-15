@@ -1,5 +1,6 @@
 pub mod account;
 pub mod config;
+pub mod instance;
 pub mod quota;
 pub mod token;
 
@@ -8,5 +9,7 @@ pub use account::{
     DeviceProfileVersion,
 };
 pub use config::{AppConfig, CircuitBreakerConfig, QuotaProtectionConfig};
+pub use instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use quota::{QuotaBucket, QuotaData, QuotaGroup};
 pub use token::TokenData;
+

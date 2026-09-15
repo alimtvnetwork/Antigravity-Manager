@@ -1,10 +1,11 @@
-import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { isTauri, isLinux } from '../../utils/env';
 import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
+import { InstanceSelector } from './InstanceSelector';
 import type { NavItem } from './constants';
 
 /**
@@ -21,6 +22,7 @@ function Navbar() {
     const navItems: NavItem[] = [
         { path: '/', label: t('nav.dashboard'), icon: LayoutDashboard, priority: 'high' },
         { path: '/accounts', label: t('nav.accounts'), icon: Users, priority: 'high' },
+        { path: '/instances', label: t('nav.instances', '多实例'), icon: Laptop, priority: 'high' },
         { path: '/api-proxy', label: t('nav.proxy'), icon: Network, priority: 'high' },
         { path: '/apikey-fun', label: t('nav.apikey_fun', '中转站'), icon: KeyRound, priority: 'high' },
         { path: '/monitor', label: t('nav.call_records'), icon: Activity, priority: 'medium' },
@@ -29,6 +31,7 @@ function Navbar() {
         { path: '/security', label: t('nav.security'), icon: Lock, priority: 'low' },
         { path: '/settings', label: t('nav.settings'), icon: Settings, priority: 'high' },
     ];
+
 
     // 主题切换逻辑(带 View Transition 动画)
     const toggleTheme = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -120,13 +123,17 @@ function Navbar() {
                         <NavMenu navItems={navItems} />
                     </div>
 
-                    {/* 设置按钮 - 自己处理响应式 */}
-                    <NavSettings
-                        theme={(config?.theme as 'light' | 'dark') || 'light'}
-                        currentLanguage={config?.language || 'en'}
-                        onThemeToggle={toggleTheme}
-                        onLanguageChange={handleLanguageChange}
-                    />
+                    {/* 实例选择器与设置按钮 */}
+                    <div className="flex items-center gap-2">
+                        <InstanceSelector />
+                        <NavSettings
+                            theme={(config?.theme as 'light' | 'dark') || 'light'}
+                            currentLanguage={config?.language || 'en'}
+                            onThemeToggle={toggleTheme}
+                            onLanguageChange={handleLanguageChange}
+                        />
+                    </div>
+
                 </div>
             </div>
         </nav>

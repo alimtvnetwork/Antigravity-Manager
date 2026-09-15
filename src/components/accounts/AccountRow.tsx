@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, Diamond, Gem, Circle, Clock, ToggleLeft, ToggleRight, Fingerprint } from 'lucide-react';
 import { Account } from '../../types/account';
 import { getQuotaColor, formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
@@ -5,6 +6,8 @@ import { cn } from '../../utils/cn';
 import { useTranslation } from 'react-i18next';
 import { formatCompactDuration, getLiveLimitForModel, getLiveLimitState } from '../../utils/liveLimit';
 import { getModelProtectionKey, findQuotaModel, findImageQuotaModel } from '../../config/modelConfig';
+import { useInstanceStore } from '../../stores/useInstanceStore';
+
 
 interface AccountRowProps {
     account: Account;
@@ -13,7 +16,7 @@ interface AccountRowProps {
     isCurrent: boolean;
     isRefreshing: boolean;
     isSwitching?: boolean;
-    onSwitch: () => void;
+    onSwitch: (targetInstanceId?: string) => void;
     onRefresh: () => void;
     onViewDevice: () => void;
     onViewDetails: () => void;
@@ -24,10 +27,26 @@ interface AccountRowProps {
 
 
 
+
 function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice }: AccountRowProps) {
     const { t } = useTranslation();
+    const [showInstanceMenu, setShowInstanceMenu] = useState(false);
+    const { instances, activeInstanceId } = useInstanceStore();
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowInstanceMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // [重构] 按优先级查找配额模型
     const geminiProModel = findQuotaModel(account.quota?.models, 'gemini-pro');
+
     const geminiFlashModel = findQuotaModel(account.quota?.models, 'gemini-flash');
 
     const geminiImageModel = findImageQuotaModel(account.quota?.models);
@@ -327,22 +346,57 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         title={t('common.details')}
                     >
                         <Info className="w-3.5 h-3.5" />
-                        <button
-                            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
-                            onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                            title={t('accounts.device_fingerprint')}
-                        >
-                            <Fingerprint className="w-3.5 h-3.5" />
-                        </button>
                     </button>
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to'))}
-                        disabled={isSwitching || isDisabled}
+                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
+                        title={t('accounts.device_fingerprint')}
                     >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                        <Fingerprint className="w-3.5 h-3.5" />
                     </button>
+                    <div className="relative inline-flex items-center" ref={menuRef}>
+                        <button
+                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            onClick={(e) => { e.stopPropagation(); onSwitch(); }}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowInstanceMenu(!showInstanceMenu);
+                            }}
+                            title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : `${t('accounts.switch_to')} (Right-click to select instance)`)}
+                            disabled={isSwitching || isDisabled}
+                        >
+                            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                        </button>
+
+                        {showInstanceMenu && (
+                            <div className="absolute top-full left-0 mt-1 w-52 rounded-xl shadow-xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                                <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                    Target Instance
+                                </div>
+                                {instances.map((inst) => (
+                                    <button
+                                        key={inst.config.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowInstanceMenu(false);
+                                            onSwitch(`instance:${inst.config.id}`);
+                                        }}
+                                        className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-base-100 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <div className="flex items-center gap-1.5 truncate">
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="truncate">{inst.config.name}</span>
+                                        </div>
+                                        {inst.config.id === activeInstanceId && (
+                                            <span className="text-[10px] text-blue-600 font-medium">Active</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <button
                         className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
