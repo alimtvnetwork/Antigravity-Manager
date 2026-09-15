@@ -289,9 +289,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_content = changelog_zh.read_text(encoding="utf-8")
         zh_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[架构与代码规范] Go CLI AppError 规范与 DRY 帮助检查统一体系**:\n"
-            f"            -   **全面取缔标准 Go error**: 所有 Go 命令处理函数与工具包严禁返回原生 error，统一采用 *appfault.AppError 结构化错误类型，确保错误码、严重级别、领域边界与跨语言信封序列化一致性。\n"
-            f"            -   **中央 DRY 帮助与参数校验函数**: 引入 CheckHelpOrEmpty 统一拦截 --help / -h 并校验最小位置参数，彻底消除各命令中重复冗余的 if len(args) == 0 || hasHelpFlag(args) 模板代码。\n"
+            f"        -   **[架构重构与安装体系] 规范目录结构、多实例并发、配额自动轮换与免安装便携脚本体系**:\n"
+            f"            -   **规范化根目录架构**: 确立 01-prompts / 02-spec / 03-ai-scripts 标准分层，将所有技术指令全面归集并入 02-spec/21-app/ 体系，对齐 master 计划与 completed 归档。\n"
+            f"            -   **多实例隔离与终端 CLI**: 支持多 Profile 独立数据与扩展隔离运行，提供 --create-profile / --list-profiles / --run-profile 等全套命令行接口。\n"
+            f"            -   **配额低位定时轮询与任务无损恢复**: 异步 Tokio 监督器按指定时间轮询活跃 Profile 实时配额，低于阈值时自动优雅轮换并持久化未完成任务快照自愈。\n"
+            f"            -   **免安装独立便携包与极速脚本**: 发布便携式独立 ZIP 产物包与 SHA-256 校验，提供 install.ps1 与 install.sh 一键免安装部署至用户目录并自动配置 PATH。\n"
         )
         if "*   **版本演进**:\n" in cl_content:
             cl_content = cl_content.replace("*   **版本演进**:\n", f"*   **版本演进**:\n{zh_entry}", 1)
@@ -302,9 +304,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_en_content = changelog_en.read_text(encoding="utf-8")
         en_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Architecture & Code Quality] Go CLI AppError Enforcement & Centralized DRY Help Checking**:\n"
-            f"            -   **Total Ban on Standard Go error**: Enforce *appfault.AppError return types across all Go command runners and packages; ban bare error to ensure structured error metadata and serializable response envelopes.\n"
-            f"            -   **Centralized DRY Help & Argument Validation**: Introduce CheckHelpOrEmpty helper to intercept --help / -h and enforce minimum argument bounds, eliminating duplicate boilerplate across command handlers.\n"
+            f"        -   **[Architecture & Installer Infrastructure] Standardized Folders, Multi-Instance, Auto-Quota Switcher & Portable Installers**:\n"
+            f"            -   **Standardized Root Architecture**: Realigned repository hierarchy to 01-prompts / 02-spec / 03-ai-scripts, relocating all specifications to 02-spec/21-app/ with completed plan synchronization.\n"
+            f"            -   **Multi-Instance Isolation & CLI**: Full multi-profile concurrent execution with isolated directories and terminal CLI flags (--create-profile, --list-profiles, --run-profile).\n"
+            f"            -   **Auto-Quota Polling & Task Recovery**: Background Tokio supervisor polling active quota on configurable timer, auto-rotating on low quota (<10%) with task snapshot recovery.\n"
+            f"            -   **Portable ZIP Release Assets & One-Liner Installers**: Published standalone portable ZIP assets with SHA-256 checksums, and streamlined install.ps1 and install.sh scripts.\n"
         )
         if "*   **Version Evolution**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)

@@ -5,7 +5,8 @@
 
 ## Changelog
 
-- 2026-09-15T11:15:00Z, Documentation & Plan write: authored 01-instructions/06 and 07 for Multi-Instance UI, instance dropdown, duplication, and Ubuntu/Linux parallel process isolation; created pending plan 14 and subtasks.
+- 2026-09-15T15:30:00Z, Architecture Realignment & Release: consolidated canonical prompts to 01-prompts/, migrated technical specs to 02-spec/21-app/ (08 through 14), implemented standalone portable installers (install.ps1, install.sh), and released v4.9.0.
+- 2026-09-15T11:15:00Z, Documentation & Plan write: authored multi-instance and UI specifications; created pending plans.
 - 2026-09-15T11:00:00Z, Documentation & Memory write: authored 01-instructions/ architecture guides and Mermaid diagrams for token capture, multi-instance isolation, and window customization; recorded learned memory in learned/13-refresh-token-capture-multi-instance-and-window-specs.md.
 - 2026-09-15T10:50:00Z, Memory write: Go CLI AppError return type enforcement and centralized DRY help/argument checking architecture recorded in learned/12-go-cli-apperror-and-dry-help-handling.md, strictly-avoid.md updated, specs updated, and minor version bump to 4.8.0.
 - 2026-09-10T23:00:00Z, Spec update: remediated 100% of Blind-AI audit v2 findings (F-001 through F-010), expanded IPC registry to 153 commands, bound 27 coding guidelines, grounded tests, and closed audit gap.
@@ -32,7 +33,7 @@
 - .lovable/memory/learned/11-antigravity-manager-workspace-onboarding.md, why: Antigravity-Manager workspace onboarding, proxy architecture, and recent commit history
 - .lovable/memory/learned/12-go-cli-apperror-and-dry-help-handling.md, why: Go CLI AppError enforcement (*appfault.AppError) and centralized DRY help checking
 - .lovable/memory/learned/13-refresh-token-capture-multi-instance-and-window-specs.md, why: authoritative token capture pathways, multi-instance profile isolation, and window customization specs
-- `01-instructions/01-index.md`, why: master index of architecture guides, token capture sequences, and multi-instance blueprints
+- `02-spec/21-app/01-index.md`, why: master index of application specifications, architecture guides, token capture sequences, and multi-instance blueprints
 - `.lovable/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.lovable/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony
 - `.lovable/coding-guidelines.md`, why: baseline rules and coding standards
@@ -75,3 +76,4 @@
 - .lovable/plans/completed/07-applogger-taxonomy-streaming-and-task-db.md
 - .lovable/plans/completed/08-completed-plans-consolidation.md
 - .lovable/plans/completed/12-spec-remediation-completed.md
+- .lovable/plans/completed/16-repo-structure-installers-and-release.md

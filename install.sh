@@ -15,10 +15,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-REPO="lbjlaq/Antigravity-Manager"
+REPO="alimtvnetwork/Antigravity-Manager"
+UPSTREAM_REPO="lbjlaq/Antigravity-Manager"
 APP_NAME="Antigravity Tools"
 APP_ID="com.lbjlaq.antigravity-tools"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases"
+UPSTREAM_API="https://api.github.com/repos/${UPSTREAM_REPO}/releases"
 
 # Helper functions
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -132,7 +134,18 @@ get_version() {
         RELEASE_VERSION=""
     fi
 
-    # Method 2: Fallback - follow redirect and extract version from final URL
+    # Method 2: Fallback - try upstream API
+    if [[ -z "${RELEASE_VERSION:-}" ]]; then
+        if response=$(curl -fsSL --max-time 10 -H "User-Agent: Antigravity-Installer" "${UPSTREAM_API}/latest" 2>/dev/null); then
+            RELEASE_VERSION=$(echo "$response" | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
+            if _is_valid_version "${RELEASE_VERSION:-}"; then
+                info "Latest version (from upstream): v$RELEASE_VERSION"
+                return
+            fi
+        fi
+    fi
+
+    # Method 3: Fallback - follow redirect and extract version from final URL
     info "Using fallback method (redirect URL)..."
     local final_url
     final_url=$(curl -fsSL --max-time 10 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null | tr -d '[:space:]\r\n')

@@ -118,6 +118,13 @@ The complete reverse-engineered architecture is documented across the following 
 | [05-frontend-ui-and-state-management.md](05-frontend-ui-and-state-management.md) | Frontend UI & Design System | React 19 architecture, Tailwind components, Zustand stores, and Recharts |
 | [06-api-contracts-and-ipc-registry.md](06-api-contracts-and-ipc-registry.md) | API Contracts & IPC Registry | Complete Tauri IPC command tables, HTTP gateway routes, and payload shapes |
 | [07-testing-and-verification.md](07-testing-and-verification.md) | Testing & Fixture Specs | Automated test suites, sample wire fixtures, and CI execution targets |
+| [08-refresh-token-capture-architecture.md](08-refresh-token-capture-architecture.md) | Token Capture & Discovery | 4 discovery pathways, SQLite protobuf extraction, OS keyring protocols, OAuth exchange |
+| [09-multi-instance-profile-isolation.md](09-multi-instance-profile-isolation.md) | Multi-Instance Architecture | Process isolation, `--user-data-dir` partitioning, `--password-store=basic` keyring bypass |
+| [10-window-username-overlay-guide.md](10-window-username-overlay-guide.md) | Window & Identity Customization | Displaying active account/username on IDE window titlebar via native settings and Win32 hooks |
+| [11-portable-folder-copy-multi-user-guide.md](11-portable-folder-copy-multi-user-guide.md) | Portable Folder Copy & Multi-User | Copying Antigravity directories, portable mode (`data/`), independent instances |
+| [12-multi-instance-manager-and-ui-specification.md](12-multi-instance-manager-and-ui-specification.md) | Multi-Instance UI Specification | Top navbar instance selector, `/instances` page, instance duplication, per-account dispatch |
+| [13-ubuntu-linux-parallel-instance-architecture.md](13-ubuntu-linux-parallel-instance-architecture.md) | Ubuntu & Linux Parallelism | Linux multi-window execution, selective PID tree termination, AppImage environment sanitization |
+| [14-automated-quota-polling-profile-switching-and-task-resumption.md](14-automated-quota-polling-profile-switching-and-task-resumption.md) | Auto Quota Polling & Task Recovery | Tokio polling daemon (15s–600s), low-quota threshold (<10%), best profile selection, task snapshot recovery |
 
 ---
 
