@@ -1,0 +1,2056 @@
+{
+  "total_files": 339,
+  "languages": {
+    "Other": 18,
+    "Markdown": 31,
+    "HTML": 3,
+    "PowerShell": 1,
+    "Shell": 5,
+    "JSON": 20,
+    "JavaScript": 1,
+    "TypeScript": 25,
+    "YAML": 9,
+    "Ruby": 1,
+    "CSS": 1,
+    "TypeScript (React)": 68,
+    "Rust": 154,
+    "TOML": 1,
+    "Python": 1
+  },
+  "files": [
+    {
+      "path": ".dockerignore",
+      "language": "Other",
+      "lines": 12,
+      "size_bytes": 111
+    },
+    {
+      "path": ".gitattributes",
+      "language": "Other",
+      "lines": 39,
+      "size_bytes": 619
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "language": "YAML",
+      "lines": 135,
+      "size_bytes": 3985
+    },
+    {
+      "path": ".github/workflows/deploy-pages.yml",
+      "language": "YAML",
+      "lines": 47,
+      "size_bytes": 1225
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "language": "YAML",
+      "lines": 366,
+      "size_bytes": 14482
+    },
+    {
+      "path": ".gitignore",
+      "language": "Other",
+      "lines": 76,
+      "size_bytes": 974
+    },
+    {
+      "path": "CHANGELOG.md",
+      "language": "Markdown",
+      "lines": 5191,
+      "size_bytes": 756919
+    },
+    {
+      "path": "CHANGELOG_EN.md",
+      "language": "Markdown",
+      "lines": 163,
+      "size_bytes": 32595
+    },
+    {
+      "path": "Casks/antigravity-tools.rb",
+      "language": "Ruby",
+      "lines": 43,
+      "size_bytes": 1394
+    },
+    {
+      "path": "LICENSE",
+      "language": "Other",
+      "lines": 416,
+      "size_bytes": 19643
+    },
+    {
+      "path": "README_EN.md",
+      "language": "Markdown",
+      "lines": 512,
+      "size_bytes": 29368
+    },
+    {
+      "path": "agents.md",
+      "language": "Markdown",
+      "lines": 52,
+      "size_bytes": 4719
+    },
+    {
+      "path": "deploy/arch/PKGBUILD.template",
+      "language": "Other",
+      "lines": 35,
+      "size_bytes": 1273
+    },
+    {
+      "path": "deploy/arch/install.sh",
+      "language": "Shell",
+      "lines": 55,
+      "size_bytes": 1777
+    },
+    {
+      "path": "diff_output.txt",
+      "language": "Other",
+      "lines": 2992,
+      "size_bytes": 134976
+    },
+    {
+      "path": "docker/Dockerfile",
+      "language": "Other",
+      "lines": 129,
+      "size_bytes": 4335
+    },
+    {
+      "path": "docker/Dockerfile.backend",
+      "language": "Other",
+      "lines": 106,
+      "size_bytes": 3575
+    },
+    {
+      "path": "docker/Dockerfile.backend.localdist",
+      "language": "Other",
+      "lines": 103,
+      "size_bytes": 3368
+    },
+    {
+      "path": "docker/README.md",
+      "language": "Markdown",
+      "lines": 132,
+      "size_bytes": 6279
+    },
+    {
+      "path": "docker/docker-compose.backend.yml",
+      "language": "YAML",
+      "lines": 6,
+      "size_bytes": 151
+    },
+    {
+      "path": "docker/docker-compose.localdist.yml",
+      "language": "YAML",
+      "lines": 5,
+      "size_bytes": 116
+    },
+    {
+      "path": "docker/docker-compose.yml",
+      "language": "YAML",
+      "lines": 17,
+      "size_bytes": 678
+    },
+    {
+      "path": "docs/API_REFERENCE.md",
+      "language": "Markdown",
+      "lines": 104,
+      "size_bytes": 4839
+    },
+    {
+      "path": "docs/CLAUDE_OPUS_46_INTEGRATION.md",
+      "language": "Markdown",
+      "lines": 44,
+      "size_bytes": 1120
+    },
+    {
+      "path": "docs/README.md",
+      "language": "Markdown",
+      "lines": 14,
+      "size_bytes": 1058
+    },
+    {
+      "path": "docs/adaptive_mode_test_examples.md",
+      "language": "Markdown",
+      "lines": 94,
+      "size_bytes": 4208
+    },
+    {
+      "path": "docs/advanced_configuration.md",
+      "language": "Markdown",
+      "lines": 39,
+      "size_bytes": 2186
+    },
+    {
+      "path": "docs/client_test_examples.md",
+      "language": "Markdown",
+      "lines": 347,
+      "size_bytes": 18841
+    },
+    {
+      "path": "docs/fix-opus-ultra-priority.md",
+      "language": "Markdown",
+      "lines": 49,
+      "size_bytes": 1434
+    },
+    {
+      "path": "docs/fix_claude_code_tool_use.md",
+      "language": "Markdown",
+      "lines": 68,
+      "size_bytes": 3104
+    },
+    {
+      "path": "docs/gemini-3-image-guide.md",
+      "language": "Markdown",
+      "lines": 171,
+      "size_bytes": 7396
+    },
+    {
+      "path": "docs/model-remapping-logic.md",
+      "language": "Markdown",
+      "lines": 114,
+      "size_bytes": 3791
+    },
+    {
+      "path": "docs/proxy-invalid-grant.md",
+      "language": "Markdown",
+      "lines": 51,
+      "size_bytes": 2594
+    },
+    {
+      "path": "docs/proxy-monitor-technical.md",
+      "language": "Markdown",
+      "lines": 52,
+      "size_bytes": 2380
+    },
+    {
+      "path": "docs/proxy/accounts.md",
+      "language": "Markdown",
+      "lines": 54,
+      "size_bytes": 3145
+    },
+    {
+      "path": "docs/proxy/auth.md",
+      "language": "Markdown",
+      "lines": 44,
+      "size_bytes": 2290
+    },
+    {
+      "path": "docs/test_503_issue.md",
+      "language": "Markdown",
+      "lines": 76,
+      "size_bytes": 3170
+    },
+    {
+      "path": "docs/testing/context_compression_test_plan.md",
+      "language": "Markdown",
+      "lines": 344,
+      "size_bytes": 7765
+    },
+    {
+      "path": "docs/testing/ip_security_test_report.md",
+      "language": "Markdown",
+      "lines": 222,
+      "size_bytes": 8446
+    },
+    {
+      "path": "docs/testing/opencode_sync_verification_checklist.md",
+      "language": "Markdown",
+      "lines": 174,
+      "size_bytes": 5735
+    },
+    {
+      "path": "docs/zai/implementation.md",
+      "language": "Markdown",
+      "lines": 197,
+      "size_bytes": 9019
+    },
+    {
+      "path": "docs/zai/mcp.md",
+      "language": "Markdown",
+      "lines": 56,
+      "size_bytes": 2172
+    },
+    {
+      "path": "docs/zai/notes.md",
+      "language": "Markdown",
+      "lines": 189,
+      "size_bytes": 10478
+    },
+    {
+      "path": "docs/zai/provider.md",
+      "language": "Markdown",
+      "lines": 48,
+      "size_bytes": 2236
+    },
+    {
+      "path": "docs/zai/vision-mcp.md",
+      "language": "Markdown",
+      "lines": 86,
+      "size_bytes": 3589
+    },
+    {
+      "path": "exe_build.txt",
+      "language": "Other",
+      "lines": 3,
+      "size_bytes": 88
+    },
+    {
+      "path": "index.html",
+      "language": "HTML",
+      "lines": 59,
+      "size_bytes": 1861
+    },
+    {
+      "path": "install.ps1",
+      "language": "PowerShell",
+      "lines": 182,
+      "size_bytes": 5742
+    },
+    {
+      "path": "install.sh",
+      "language": "Shell",
+      "lines": 340,
+      "size_bytes": 11079
+    },
+    {
+      "path": "package-lock.json",
+      "language": "JSON",
+      "lines": 12445,
+      "size_bytes": 460539
+    },
+    {
+      "path": "package.json",
+      "language": "JSON",
+      "lines": 65,
+      "size_bytes": 1891
+    },
+    {
+      "path": "postcss.config.cjs",
+      "language": "Other",
+      "lines": 6,
+      "size_bytes": 94
+    },
+    {
+      "path": "readme.md",
+      "language": "Markdown",
+      "lines": 523,
+      "size_bytes": 29401
+    },
+    {
+      "path": "request_transform.md",
+      "language": "Markdown",
+      "lines": 52,
+      "size_bytes": 4718
+    },
+    {
+      "path": "scripts/Fix_Damaged.command",
+      "language": "Other",
+      "lines": 44,
+      "size_bytes": 1453
+    },
+    {
+      "path": "scripts/MANUAL_PR_CLOSE_GUIDE.md",
+      "language": "Markdown",
+      "lines": 74,
+      "size_bytes": 1830
+    },
+    {
+      "path": "scripts/close_integrated_prs.sh",
+      "language": "Shell",
+      "lines": 115,
+      "size_bytes": 3231
+    },
+    {
+      "path": "scripts/fix_app.sh",
+      "language": "Shell",
+      "lines": 21,
+      "size_bytes": 753
+    },
+    {
+      "path": "scripts/package_dmg.sh",
+      "language": "Shell",
+      "lines": 43,
+      "size_bytes": 1139
+    },
+    {
+      "path": "src-tauri/.gitignore",
+      "language": "Other",
+      "lines": 7,
+      "size_bytes": 166
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "language": "TOML",
+      "lines": 88,
+      "size_bytes": 2990
+    },
+    {
+      "path": "src-tauri/Entitlements.plist",
+      "language": "Other",
+      "lines": 18,
+      "size_bytes": 605
+    },
+    {
+      "path": "src-tauri/build.bat",
+      "language": "Other",
+      "lines": 1,
+      "size_bytes": 46
+    },
+    {
+      "path": "src-tauri/build.rs",
+      "language": "Rust",
+      "lines": 3,
+      "size_bytes": 39
+    },
+    {
+      "path": "src-tauri/capabilities/default.json",
+      "language": "JSON",
+      "lines": 33,
+      "size_bytes": 887
+    },
+    {
+      "path": "src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml",
+      "language": "Other",
+      "lines": 5,
+      "size_bytes": 261
+    },
+    {
+      "path": "src-tauri/icons/android/values/ic_launcher_background.xml",
+      "language": "Other",
+      "lines": 4,
+      "size_bytes": 115
+    },
+    {
+      "path": "src-tauri/icons/icon.icns",
+      "language": "Other",
+      "lines": 7615,
+      "size_bytes": 1138439
+    },
+    {
+      "path": "src-tauri/resources/model_specs.json",
+      "language": "JSON",
+      "lines": 50,
+      "size_bytes": 1467
+    },
+    {
+      "path": "src-tauri/src/commands/autostart.rs",
+      "language": "Rust",
+      "lines": 38,
+      "size_bytes": 1426
+    },
+    {
+      "path": "src-tauri/src/commands/cloudflared.rs",
+      "language": "Rust",
+      "lines": 119,
+      "size_bytes": 3214
+    },
+    {
+      "path": "src-tauri/src/commands/mod.rs",
+      "language": "Rust",
+      "lines": 1233,
+      "size_bytes": 41389
+    },
+    {
+      "path": "src-tauri/src/commands/patch.rs",
+      "language": "Rust",
+      "lines": 193,
+      "size_bytes": 7444
+    },
+    {
+      "path": "src-tauri/src/commands/proxy.rs",
+      "language": "Rust",
+      "lines": 800,
+      "size_bytes": 26398
+    },
+    {
+      "path": "src-tauri/src/commands/proxy_pool.rs",
+      "language": "Rust",
+      "lines": 76,
+      "size_bytes": 2310
+    },
+    {
+      "path": "src-tauri/src/commands/security.rs",
+      "language": "Rust",
+      "lines": 322,
+      "size_bytes": 9837
+    },
+    {
+      "path": "src-tauri/src/commands/user_token.rs",
+      "language": "Rust",
+      "lines": 108,
+      "size_bytes": 3056
+    },
+    {
+      "path": "src-tauri/src/constants.rs",
+      "language": "Rust",
+      "lines": 311,
+      "size_bytes": 11430
+    },
+    {
+      "path": "src-tauri/src/error.rs",
+      "language": "Rust",
+      "lines": 56,
+      "size_bytes": 1377
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "language": "Rust",
+      "lines": 794,
+      "size_bytes": 34113
+    },
+    {
+      "path": "src-tauri/src/linux_graphics.rs",
+      "language": "Rust",
+      "lines": 143,
+      "size_bytes": 4166
+    },
+    {
+      "path": "src-tauri/src/main.rs",
+      "language": "Rust",
+      "lines": 13,
+      "size_bytes": 459
+    },
+    {
+      "path": "src-tauri/src/models/account.rs",
+      "language": "Rust",
+      "lines": 199,
+      "size_bytes": 6638
+    },
+    {
+      "path": "src-tauri/src/models/config.rs",
+      "language": "Rust",
+      "lines": 228,
+      "size_bytes": 6658
+    },
+    {
+      "path": "src-tauri/src/models/mod.rs",
+      "language": "Rust",
+      "lines": 12,
+      "size_bytes": 365
+    },
+    {
+      "path": "src-tauri/src/models/quota.rs",
+      "language": "Rust",
+      "lines": 98,
+      "size_bytes": 3271
+    },
+    {
+      "path": "src-tauri/src/models/token.rs",
+      "language": "Rust",
+      "lines": 60,
+      "size_bytes": 1803
+    },
+    {
+      "path": "src-tauri/src/modules/account.rs",
+      "language": "Rust",
+      "lines": 2265,
+      "size_bytes": 81642
+    },
+    {
+      "path": "src-tauri/src/modules/account_service.rs",
+      "language": "Rust",
+      "lines": 198,
+      "size_bytes": 7046
+    },
+    {
+      "path": "src-tauri/src/modules/cache.rs",
+      "language": "Rust",
+      "lines": 220,
+      "size_bytes": 6751
+    },
+    {
+      "path": "src-tauri/src/modules/cloudflared.rs",
+      "language": "Rust",
+      "lines": 474,
+      "size_bytes": 15842
+    },
+    {
+      "path": "src-tauri/src/modules/config.rs",
+      "language": "Rust",
+      "lines": 110,
+      "size_bytes": 3817
+    },
+    {
+      "path": "src-tauri/src/modules/db.rs",
+      "language": "Rust",
+      "lines": 279,
+      "size_bytes": 8834
+    },
+    {
+      "path": "src-tauri/src/modules/device.rs",
+      "language": "Rust",
+      "lines": 446,
+      "size_bytes": 15480
+    },
+    {
+      "path": "src-tauri/src/modules/http_api.rs",
+      "language": "Rust",
+      "lines": 516,
+      "size_bytes": 14842
+    },
+    {
+      "path": "src-tauri/src/modules/i18n.rs",
+      "language": "Rust",
+      "lines": 207,
+      "size_bytes": 7097
+    },
+    {
+      "path": "src-tauri/src/modules/integration.rs",
+      "language": "Rust",
+      "lines": 767,
+      "size_bytes": 27357
+    },
+    {
+      "path": "src-tauri/src/modules/log_bridge.rs",
+      "language": "Rust",
+      "lines": 247,
+      "size_bytes": 7142
+    },
+    {
+      "path": "src-tauri/src/modules/logger.rs",
+      "language": "Rust",
+      "lines": 228,
+      "size_bytes": 7622
+    },
+    {
+      "path": "src-tauri/src/modules/migration.rs",
+      "language": "Rust",
+      "lines": 522,
+      "size_bytes": 20917
+    },
+    {
+      "path": "src-tauri/src/modules/mod.rs",
+      "language": "Rust",
+      "lines": 45,
+      "size_bytes": 980
+    },
+    {
+      "path": "src-tauri/src/modules/oauth.rs",
+      "language": "Rust",
+      "lines": 761,
+      "size_bytes": 26066
+    },
+    {
+      "path": "src-tauri/src/modules/oauth_server.rs",
+      "language": "Rust",
+      "lines": 553,
+      "size_bytes": 21351
+    },
+    {
+      "path": "src-tauri/src/modules/process.rs",
+      "language": "Rust",
+      "lines": 1297,
+      "size_bytes": 49592
+    },
+    {
+      "path": "src-tauri/src/modules/proxy_db.rs",
+      "language": "Rust",
+      "lines": 567,
+      "size_bytes": 20794
+    },
+    {
+      "path": "src-tauri/src/modules/quota.rs",
+      "language": "Rust",
+      "lines": 921,
+      "size_bytes": 35831
+    },
+    {
+      "path": "src-tauri/src/modules/scheduler.rs",
+      "language": "Rust",
+      "lines": 335,
+      "size_bytes": 13158
+    },
+    {
+      "path": "src-tauri/src/modules/security_db.rs",
+      "language": "Rust",
+      "lines": 687,
+      "size_bytes": 19686
+    },
+    {
+      "path": "src-tauri/src/modules/token_stats.rs",
+      "language": "Rust",
+      "lines": 614,
+      "size_bytes": 19925
+    },
+    {
+      "path": "src-tauri/src/modules/tray.rs",
+      "language": "Rust",
+      "lines": 339,
+      "size_bytes": 13630
+    },
+    {
+      "path": "src-tauri/src/modules/update_checker.rs",
+      "language": "Rust",
+      "lines": 539,
+      "size_bytes": 17708
+    },
+    {
+      "path": "src-tauri/src/modules/user_token_db.rs",
+      "language": "Rust",
+      "lines": 746,
+      "size_bytes": 25606
+    },
+    {
+      "path": "src-tauri/src/modules/version.rs",
+      "language": "Rust",
+      "lines": 265,
+      "size_bytes": 8521
+    },
+    {
+      "path": "src-tauri/src/proxy/adapters/apply_patch_preflight.rs",
+      "language": "Rust",
+      "lines": 2587,
+      "size_bytes": 116115
+    },
+    {
+      "path": "src-tauri/src/proxy/adapters/apply_patch_trace.rs",
+      "language": "Rust",
+      "lines": 790,
+      "size_bytes": 33033
+    },
+    {
+      "path": "src-tauri/src/proxy/adapters/artifact_store.rs",
+      "language": "Rust",
+      "lines": 568,
+      "size_bytes": 21018
+    },
+    {
+      "path": "src-tauri/src/proxy/adapters/mod.rs",
+      "language": "Rust",
+      "lines": 3,
+      "size_bytes": 82
+    },
+    {
+      "path": "src-tauri/src/proxy/audio/mod.rs",
+      "language": "Rust",
+      "lines": 206,
+      "size_bytes": 7577
+    },
+    {
+      "path": "src-tauri/src/proxy/cache_manager.rs",
+      "language": "Rust",
+      "lines": 994,
+      "size_bytes": 31929
+    },
+    {
+      "path": "src-tauri/src/proxy/cli_sync.rs",
+      "language": "Rust",
+      "lines": 905,
+      "size_bytes": 34968
+    },
+    {
+      "path": "src-tauri/src/proxy/common/client_adapter.rs",
+      "language": "Rust",
+      "lines": 151,
+      "size_bytes": 4371
+    },
+    {
+      "path": "src-tauri/src/proxy/common/client_adapters/mod.rs",
+      "language": "Rust",
+      "lines": 6,
+      "size_bytes": 124
+    },
+    {
+      "path": "src-tauri/src/proxy/common/client_adapters/opencode.rs",
+      "language": "Rust",
+      "lines": 128,
+      "size_bytes": 3657
+    },
+    {
+      "path": "src-tauri/src/proxy/common/error.rs",
+      "language": "Rust",
+      "lines": 41,
+      "size_bytes": 1108
+    },
+    {
+      "path": "src-tauri/src/proxy/common/json_schema.rs",
+      "language": "Rust",
+      "lines": 1832,
+      "size_bytes": 68450
+    },
+    {
+      "path": "src-tauri/src/proxy/common/mod.rs",
+      "language": "Rust",
+      "lines": 14,
+      "size_bytes": 414
+    },
+    {
+      "path": "src-tauri/src/proxy/common/model_mapping.rs",
+      "language": "Rust",
+      "lines": 563,
+      "size_bytes": 21306
+    },
+    {
+      "path": "src-tauri/src/proxy/common/rate_limiter.rs",
+      "language": "Rust",
+      "lines": 51,
+      "size_bytes": 1339
+    },
+    {
+      "path": "src-tauri/src/proxy/common/schema_cache.rs",
+      "language": "Rust",
+      "lines": 248,
+      "size_bytes": 6498
+    },
+    {
+      "path": "src-tauri/src/proxy/common/session.rs",
+      "language": "Rust",
+      "lines": 117,
+      "size_bytes": 4563
+    },
+    {
+      "path": "src-tauri/src/proxy/common/tool_adapter.rs",
+      "language": "Rust",
+      "lines": 95,
+      "size_bytes": 2753
+    },
+    {
+      "path": "src-tauri/src/proxy/common/tool_adapters/mod.rs",
+      "language": "Rust",
+      "lines": 3,
+      "size_bytes": 48
+    },
+    {
+      "path": "src-tauri/src/proxy/common/tool_adapters/pencil.rs",
+      "language": "Rust",
+      "lines": 157,
+      "size_bytes": 5506
+    },
+    {
+      "path": "src-tauri/src/proxy/common/utils.rs",
+      "language": "Rust",
+      "lines": 20,
+      "size_bytes": 543
+    },
+    {
+      "path": "src-tauri/src/proxy/common/variant_mapping.rs",
+      "language": "Rust",
+      "lines": 945,
+      "size_bytes": 31220
+    },
+    {
+      "path": "src-tauri/src/proxy/config.rs",
+      "language": "Rust",
+      "lines": 880,
+      "size_bytes": 26470
+    },
+    {
+      "path": "src-tauri/src/proxy/debug_logger.rs",
+      "language": "Rust",
+      "lines": 334,
+      "size_bytes": 10978
+    },
+    {
+      "path": "src-tauri/src/proxy/droid_sync.rs",
+      "language": "Rust",
+      "lines": 359,
+      "size_bytes": 11225
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/audio.rs",
+      "language": "Rust",
+      "lines": 170,
+      "size_bytes": 5270
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/claude.rs",
+      "language": "Rust",
+      "lines": 2584,
+      "size_bytes": 104374
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/common.rs",
+      "language": "Rust",
+      "lines": 524,
+      "size_bytes": 17673
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/gemini.rs",
+      "language": "Rust",
+      "lines": 1089,
+      "size_bytes": 44241
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/mcp.rs",
+      "language": "Rust",
+      "lines": 419,
+      "size_bytes": 12684
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/mod.rs",
+      "language": "Rust",
+      "lines": 10,
+      "size_bytes": 225
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/openai.rs",
+      "language": "Rust",
+      "lines": 7153,
+      "size_bytes": 292788
+    },
+    {
+      "path": "src-tauri/src/proxy/handlers/warmup.rs",
+      "language": "Rust",
+      "lines": 370,
+      "size_bytes": 13346
+    },
+    {
+      "path": "src-tauri/src/proxy/http_session_store.rs",
+      "language": "Rust",
+      "lines": 625,
+      "size_bytes": 22425
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/caveman_cleaner.rs",
+      "language": "Rust",
+      "lines": 147,
+      "size_bytes": 6743
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/collector.rs",
+      "language": "Rust",
+      "lines": 360,
+      "size_bytes": 15105
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/mod.rs",
+      "language": "Rust",
+      "lines": 613,
+      "size_bytes": 22584
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/models.rs",
+      "language": "Rust",
+      "lines": 427,
+      "size_bytes": 13481
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/request.rs",
+      "language": "Rust",
+      "lines": 3363,
+      "size_bytes": 141357
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/response.rs",
+      "language": "Rust",
+      "lines": 770,
+      "size_bytes": 30692
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/serde_leak_test.rs",
+      "language": "Rust",
+      "lines": 33,
+      "size_bytes": 1235
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/streaming.rs",
+      "language": "Rust",
+      "lines": 1903,
+      "size_bytes": 70836
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/thinking_utils.rs",
+      "language": "Rust",
+      "lines": 244,
+      "size_bytes": 10011
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/claude/utils.rs",
+      "language": "Rust",
+      "lines": 175,
+      "size_bytes": 6627
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/common_utils.rs",
+      "language": "Rust",
+      "lines": 1141,
+      "size_bytes": 43079
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/common_utils_test_probe.rs",
+      "language": "Rust",
+      "lines": 23,
+      "size_bytes": 1054
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/context_manager.rs",
+      "language": "Rust",
+      "lines": 1379,
+      "size_bytes": 54759
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/error_classifier.rs",
+      "language": "Rust",
+      "lines": 108,
+      "size_bytes": 3824
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/estimation_calibrator.rs",
+      "language": "Rust",
+      "lines": 159,
+      "size_bytes": 5159
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/gemini/collector.rs",
+      "language": "Rust",
+      "lines": 136,
+      "size_bytes": 6235
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/gemini/mod.rs",
+      "language": "Rust",
+      "lines": 9,
+      "size_bytes": 185
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/gemini/models.rs",
+      "language": "Rust",
+      "lines": 16,
+      "size_bytes": 450
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/gemini/wrapper.rs",
+      "language": "Rust",
+      "lines": 1819,
+      "size_bytes": 75165
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/mod.rs",
+      "language": "Rust",
+      "lines": 15,
+      "size_bytes": 339
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/model_limits.rs",
+      "language": "Rust",
+      "lines": 19,
+      "size_bytes": 761
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/analyze_request.py",
+      "language": "Python",
+      "lines": 37,
+      "size_bytes": 1399
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/collector.rs",
+      "language": "Rust",
+      "lines": 223,
+      "size_bytes": 10151
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/context_blocks.rs",
+      "language": "Rust",
+      "lines": 276,
+      "size_bytes": 8237
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/interaction_ledger.rs",
+      "language": "Rust",
+      "lines": 309,
+      "size_bytes": 9533
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/mod.rs",
+      "language": "Rust",
+      "lines": 15,
+      "size_bytes": 304
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/models.rs",
+      "language": "Rust",
+      "lines": 289,
+      "size_bytes": 9483
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/request.rs",
+      "language": "Rust",
+      "lines": 2390,
+      "size_bytes": 104156
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/response.rs",
+      "language": "Rust",
+      "lines": 565,
+      "size_bytes": 23105
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/streaming.rs",
+      "language": "Rust",
+      "lines": 1767,
+      "size_bytes": 103401
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/openai/thinking_recovery.rs",
+      "language": "Rust",
+      "lines": 51,
+      "size_bytes": 1466
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/rtk_cleaner.rs",
+      "language": "Rust",
+      "lines": 260,
+      "size_bytes": 8518
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/signature_store.rs",
+      "language": "Rust",
+      "lines": 110,
+      "size_bytes": 3372
+    },
+    {
+      "path": "src-tauri/src/proxy/mappers/tool_result_compressor.rs",
+      "language": "Rust",
+      "lines": 409,
+      "size_bytes": 13419
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/auth.rs",
+      "language": "Rust",
+      "lines": 280,
+      "size_bytes": 10243
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/cors.rs",
+      "language": "Rust",
+      "lines": 33,
+      "size_bytes": 718
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/ip_filter.rs",
+      "language": "Rust",
+      "lines": 193,
+      "size_bytes": 7620
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/logging.rs",
+      "language": "Rust",
+      "lines": 11,
+      "size_bytes": 294
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/mod.rs",
+      "language": "Rust",
+      "lines": 15,
+      "size_bytes": 357
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/monitor.rs",
+      "language": "Rust",
+      "lines": 1093,
+      "size_bytes": 46524
+    },
+    {
+      "path": "src-tauri/src/proxy/middleware/service_status.rs",
+      "language": "Rust",
+      "lines": 35,
+      "size_bytes": 873
+    },
+    {
+      "path": "src-tauri/src/proxy/mod.rs",
+      "language": "Rust",
+      "lines": 51,
+      "size_bytes": 1763
+    },
+    {
+      "path": "src-tauri/src/proxy/model_specs.rs",
+      "language": "Rust",
+      "lines": 90,
+      "size_bytes": 2677
+    },
+    {
+      "path": "src-tauri/src/proxy/monitor.rs",
+      "language": "Rust",
+      "lines": 250,
+      "size_bytes": 9135
+    },
+    {
+      "path": "src-tauri/src/proxy/opencode_sync.rs",
+      "language": "Rust",
+      "lines": 3230,
+      "size_bytes": 114121
+    },
+    {
+      "path": "src-tauri/src/proxy/project_resolver.rs",
+      "language": "Rust",
+      "lines": 45,
+      "size_bytes": 1723
+    },
+    {
+      "path": "src-tauri/src/proxy/providers/mod.rs",
+      "language": "Rust",
+      "lines": 1,
+      "size_bytes": 23
+    },
+    {
+      "path": "src-tauri/src/proxy/providers/zai_anthropic.rs",
+      "language": "Rust",
+      "lines": 249,
+      "size_bytes": 8263
+    },
+    {
+      "path": "src-tauri/src/proxy/proxy_pool.rs",
+      "language": "Rust",
+      "lines": 701,
+      "size_bytes": 25399
+    },
+    {
+      "path": "src-tauri/src/proxy/rate_limit.rs",
+      "language": "Rust",
+      "lines": 1069,
+      "size_bytes": 39381
+    },
+    {
+      "path": "src-tauri/src/proxy/security.rs",
+      "language": "Rust",
+      "lines": 71,
+      "size_bytes": 2148
+    },
+    {
+      "path": "src-tauri/src/proxy/server.rs",
+      "language": "Rust",
+      "lines": 4172,
+      "size_bytes": 141795
+    },
+    {
+      "path": "src-tauri/src/proxy/session_manager.rs",
+      "language": "Rust",
+      "lines": 171,
+      "size_bytes": 6563
+    },
+    {
+      "path": "src-tauri/src/proxy/signature_cache.rs",
+      "language": "Rust",
+      "lines": 499,
+      "size_bytes": 18343
+    },
+    {
+      "path": "src-tauri/src/proxy/sticky_config.rs",
+      "language": "Rust",
+      "lines": 37,
+      "size_bytes": 1106
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/comprehensive.rs",
+      "language": "Rust",
+      "lines": 140,
+      "size_bytes": 6082
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/mod.rs",
+      "language": "Rust",
+      "lines": 7,
+      "size_bytes": 202
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/quota_protection.rs",
+      "language": "Rust",
+      "lines": 1112,
+      "size_bytes": 44790
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/rate_limit_404_tests.rs",
+      "language": "Rust",
+      "lines": 79,
+      "size_bytes": 2334
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/retry_strategy_tests.rs",
+      "language": "Rust",
+      "lines": 148,
+      "size_bytes": 4138
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/security_integration_tests.rs",
+      "language": "Rust",
+      "lines": 500,
+      "size_bytes": 16863
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/security_ip_tests.rs",
+      "language": "Rust",
+      "lines": 806,
+      "size_bytes": 25642
+    },
+    {
+      "path": "src-tauri/src/proxy/tests/ultra_priority_tests.rs",
+      "language": "Rust",
+      "lines": 362,
+      "size_bytes": 11497
+    },
+    {
+      "path": "src-tauri/src/proxy/token_manager.rs",
+      "language": "Rust",
+      "lines": 5281,
+      "size_bytes": 214058
+    },
+    {
+      "path": "src-tauri/src/proxy/upstream/client.rs",
+      "language": "Rust",
+      "lines": 601,
+      "size_bytes": 24924
+    },
+    {
+      "path": "src-tauri/src/proxy/upstream/mod.rs",
+      "language": "Rust",
+      "lines": 6,
+      "size_bytes": 113
+    },
+    {
+      "path": "src-tauri/src/proxy/upstream/models.rs",
+      "language": "Rust",
+      "lines": 5,
+      "size_bytes": 92
+    },
+    {
+      "path": "src-tauri/src/proxy/upstream/retry.rs",
+      "language": "Rust",
+      "lines": 314,
+      "size_bytes": 10658
+    },
+    {
+      "path": "src-tauri/src/proxy/video/mod.rs",
+      "language": "Rust",
+      "lines": 163,
+      "size_bytes": 6276
+    },
+    {
+      "path": "src-tauri/src/proxy/zai_vision_mcp.rs",
+      "language": "Rust",
+      "lines": 42,
+      "size_bytes": 1083
+    },
+    {
+      "path": "src-tauri/src/proxy/zai_vision_tools.rs",
+      "language": "Rust",
+      "lines": 457,
+      "size_bytes": 17623
+    },
+    {
+      "path": "src-tauri/src/utils/command.rs",
+      "language": "Rust",
+      "lines": 32,
+      "size_bytes": 903
+    },
+    {
+      "path": "src-tauri/src/utils/crypto.rs",
+      "language": "Rust",
+      "lines": 173,
+      "size_bytes": 5736
+    },
+    {
+      "path": "src-tauri/src/utils/http.rs",
+      "language": "Rust",
+      "lines": 93,
+      "size_bytes": 3482
+    },
+    {
+      "path": "src-tauri/src/utils/mod.rs",
+      "language": "Rust",
+      "lines": 4,
+      "size_bytes": 65
+    },
+    {
+      "path": "src-tauri/src/utils/protobuf.rs",
+      "language": "Rust",
+      "lines": 462,
+      "size_bytes": 15294
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "language": "JSON",
+      "lines": 59,
+      "size_bytes": 1614
+    },
+    {
+      "path": "src/App.css",
+      "language": "CSS",
+      "lines": 159,
+      "size_bytes": 3205
+    },
+    {
+      "path": "src/App.tsx",
+      "language": "TypeScript (React)",
+      "lines": 172,
+      "size_bytes": 5017
+    },
+    {
+      "path": "src/components/UpdateNotification.tsx",
+      "language": "TypeScript (React)",
+      "lines": 328,
+      "size_bytes": 12352
+    },
+    {
+      "path": "src/components/accounts/AccountCard.tsx",
+      "language": "TypeScript (React)",
+      "lines": 459,
+      "size_bytes": 27174
+    },
+    {
+      "path": "src/components/accounts/AccountDetailsDialog.tsx",
+      "language": "TypeScript (React)",
+      "lines": 223,
+      "size_bytes": 16208
+    },
+    {
+      "path": "src/components/accounts/AccountErrorDialog.tsx",
+      "language": "TypeScript (React)",
+      "lines": 312,
+      "size_bytes": 19724
+    },
+    {
+      "path": "src/components/accounts/AccountGrid.tsx",
+      "language": "TypeScript (React)",
+      "lines": 65,
+      "size_bytes": 3033
+    },
+    {
+      "path": "src/components/accounts/AccountRow.tsx",
+      "language": "TypeScript (React)",
+      "lines": 390,
+      "size_bytes": 26409
+    },
+    {
+      "path": "src/components/accounts/AccountTable.tsx",
+      "language": "TypeScript (React)",
+      "lines": 1012,
+      "size_bytes": 50265
+    },
+    {
+      "path": "src/components/accounts/AddAccountDialog.tsx",
+      "language": "TypeScript (React)",
+      "lines": 731,
+      "size_bytes": 37219
+    },
+    {
+      "path": "src/components/accounts/DeviceFingerprintDialog.tsx",
+      "language": "TypeScript (React)",
+      "lines": 333,
+      "size_bytes": 19493
+    },
+    {
+      "path": "src/components/accounts/QuotaItem.tsx",
+      "language": "TypeScript (React)",
+      "lines": 141,
+      "size_bytes": 6587
+    },
+    {
+      "path": "src/components/accounts/accountValidationStatus.ts",
+      "language": "TypeScript",
+      "lines": 43,
+      "size_bytes": 1110
+    },
+    {
+      "path": "src/components/common/AdminAuthGuard.tsx",
+      "language": "TypeScript (React)",
+      "lines": 206,
+      "size_bytes": 9499
+    },
+    {
+      "path": "src/components/common/BackgroundTaskRunner.tsx",
+      "language": "TypeScript (React)",
+      "lines": 78,
+      "size_bytes": 2889
+    },
+    {
+      "path": "src/components/common/DebouncedSlider.tsx",
+      "language": "TypeScript (React)",
+      "lines": 59,
+      "size_bytes": 1969
+    },
+    {
+      "path": "src/components/common/GroupedSelect.tsx",
+      "language": "TypeScript (React)",
+      "lines": 249,
+      "size_bytes": 11059
+    },
+    {
+      "path": "src/components/common/HelpTooltip.tsx",
+      "language": "TypeScript (React)",
+      "lines": 53,
+      "size_bytes": 1898
+    },
+    {
+      "path": "src/components/common/ModalDialog.tsx",
+      "language": "TypeScript (React)",
+      "lines": 109,
+      "size_bytes": 4578
+    },
+    {
+      "path": "src/components/common/NetworkMonitor.tsx",
+      "language": "TypeScript (React)",
+      "lines": 204,
+      "size_bytes": 11480
+    },
+    {
+      "path": "src/components/common/Pagination.tsx",
+      "language": "TypeScript (React)",
+      "lines": 168,
+      "size_bytes": 9062
+    },
+    {
+      "path": "src/components/common/ThemeManager.tsx",
+      "language": "TypeScript (React)",
+      "lines": 92,
+      "size_bytes": 3374
+    },
+    {
+      "path": "src/components/common/Toast.tsx",
+      "language": "TypeScript (React)",
+      "lines": 65,
+      "size_bytes": 2575
+    },
+    {
+      "path": "src/components/common/ToastContainer.tsx",
+      "language": "TypeScript (React)",
+      "lines": 58,
+      "size_bytes": 1756
+    },
+    {
+      "path": "src/components/dashboard/BestAccounts.tsx",
+      "language": "TypeScript (React)",
+      "lines": 227,
+      "size_bytes": 9824
+    },
+    {
+      "path": "src/components/dashboard/CurrentAccount.tsx",
+      "language": "TypeScript (React)",
+      "lines": 229,
+      "size_bytes": 14861
+    },
+    {
+      "path": "src/components/dashboard/StatsCard.tsx",
+      "language": "TypeScript (React)",
+      "lines": 24,
+      "size_bytes": 755
+    },
+    {
+      "path": "src/components/debug/DebugConsole.tsx",
+      "language": "TypeScript (React)",
+      "lines": 362,
+      "size_bytes": 17540
+    },
+    {
+      "path": "src/components/debug/DebugConsoleButton.tsx",
+      "language": "TypeScript (React)",
+      "lines": 52,
+      "size_bytes": 2065
+    },
+    {
+      "path": "src/components/layout/Layout.tsx",
+      "language": "TypeScript (React)",
+      "lines": 61,
+      "size_bytes": 2102
+    },
+    {
+      "path": "src/components/layout/MiniView.tsx",
+      "language": "TypeScript (React)",
+      "lines": 328,
+      "size_bytes": 16057
+    },
+    {
+      "path": "src/components/navbar/NavDropdowns.tsx",
+      "language": "TypeScript (React)",
+      "lines": 280,
+      "size_bytes": 12005
+    },
+    {
+      "path": "src/components/navbar/NavLogo.tsx",
+      "language": "TypeScript (React)",
+      "lines": 23,
+      "size_bytes": 915
+    },
+    {
+      "path": "src/components/navbar/NavMenu.tsx",
+      "language": "TypeScript (React)",
+      "lines": 147,
+      "size_bytes": 6442
+    },
+    {
+      "path": "src/components/navbar/NavSettings.tsx",
+      "language": "TypeScript (React)",
+      "lines": 94,
+      "size_bytes": 3667
+    },
+    {
+      "path": "src/components/navbar/Navbar.tsx",
+      "language": "TypeScript (React)",
+      "lines": 136,
+      "size_bytes": 5528
+    },
+    {
+      "path": "src/components/navbar/constants.ts",
+      "language": "TypeScript",
+      "lines": 43,
+      "size_bytes": 1376
+    },
+    {
+      "path": "src/components/proxy/CliSyncCard.tsx",
+      "language": "TypeScript (React)",
+      "lines": 550,
+      "size_bytes": 27112
+    },
+    {
+      "path": "src/components/proxy/DroidSyncModal.tsx",
+      "language": "TypeScript (React)",
+      "lines": 346,
+      "size_bytes": 18092
+    },
+    {
+      "path": "src/components/proxy/OpenCodeSyncModal.tsx",
+      "language": "TypeScript (React)",
+      "lines": 340,
+      "size_bytes": 18508
+    },
+    {
+      "path": "src/components/proxy/ProxyMonitor.tsx",
+      "language": "TypeScript (React)",
+      "lines": 733,
+      "size_bytes": 39550
+    },
+    {
+      "path": "src/components/proxy/SortableModelItem.tsx",
+      "language": "TypeScript (React)",
+      "lines": 66,
+      "size_bytes": 3077
+    },
+    {
+      "path": "src/components/security/BlacklistManager.tsx",
+      "language": "TypeScript (React)",
+      "lines": 224,
+      "size_bytes": 10719
+    },
+    {
+      "path": "src/components/security/IpAccessLogs.tsx",
+      "language": "TypeScript (React)",
+      "lines": 182,
+      "size_bytes": 8310
+    },
+    {
+      "path": "src/components/security/IpStatistics.tsx",
+      "language": "TypeScript (React)",
+      "lines": 213,
+      "size_bytes": 11693
+    },
+    {
+      "path": "src/components/security/SecurityConfig.tsx",
+      "language": "TypeScript (React)",
+      "lines": 175,
+      "size_bytes": 7838
+    },
+    {
+      "path": "src/components/security/WhitelistManager.tsx",
+      "language": "TypeScript (React)",
+      "lines": 194,
+      "size_bytes": 9210
+    },
+    {
+      "path": "src/components/settings/AdvancedThinking.tsx",
+      "language": "TypeScript (React)",
+      "lines": 64,
+      "size_bytes": 2970
+    },
+    {
+      "path": "src/components/settings/CircuitBreaker.tsx",
+      "language": "TypeScript (React)",
+      "lines": 155,
+      "size_bytes": 8985
+    },
+    {
+      "path": "src/components/settings/GlobalSystemPrompt.tsx",
+      "language": "TypeScript (React)",
+      "lines": 82,
+      "size_bytes": 4672
+    },
+    {
+      "path": "src/components/settings/ImageThinkingMode.tsx",
+      "language": "TypeScript (React)",
+      "lines": 65,
+      "size_bytes": 3226
+    },
+    {
+      "path": "src/components/settings/PinnedQuotaModels.tsx",
+      "language": "TypeScript (React)",
+      "lines": 153,
+      "size_bytes": 6927
+    },
+    {
+      "path": "src/components/settings/ProxyPoolSettings.tsx",
+      "language": "TypeScript (React)",
+      "lines": 360,
+      "size_bytes": 20372
+    },
+    {
+      "path": "src/components/settings/QuotaProtection.tsx",
+      "language": "TypeScript (React)",
+      "lines": 176,
+      "size_bytes": 9450
+    },
+    {
+      "path": "src/components/settings/SmartWarmup.tsx",
+      "language": "TypeScript (React)",
+      "lines": 128,
+      "size_bytes": 6964
+    },
+    {
+      "path": "src/components/settings/ThinkingBudget.tsx",
+      "language": "TypeScript (React)",
+      "lines": 160,
+      "size_bytes": 7659
+    },
+    {
+      "path": "src/components/settings/proxy/BatchImportModal.tsx",
+      "language": "TypeScript (React)",
+      "lines": 206,
+      "size_bytes": 10400
+    },
+    {
+      "path": "src/components/settings/proxy/ProxyBindingManager.tsx",
+      "language": "TypeScript (React)",
+      "lines": 174,
+      "size_bytes": 9819
+    },
+    {
+      "path": "src/components/settings/proxy/ProxyEditModal.tsx",
+      "language": "TypeScript (React)",
+      "lines": 251,
+      "size_bytes": 12752
+    },
+    {
+      "path": "src/components/settings/proxy/ProxyList.tsx",
+      "language": "TypeScript (React)",
+      "lines": 270,
+      "size_bytes": 17892
+    },
+    {
+      "path": "src/config/__tests__/modelConfig.test.ts",
+      "language": "TypeScript",
+      "lines": 262,
+      "size_bytes": 11026
+    },
+    {
+      "path": "src/config/modelConfig.ts",
+      "language": "TypeScript",
+      "lines": 381,
+      "size_bytes": 11454
+    },
+    {
+      "path": "src/hooks/useProxyModels.tsx",
+      "language": "TypeScript (React)",
+      "lines": 171,
+      "size_bytes": 10127
+    },
+    {
+      "path": "src/i18n.ts",
+      "language": "TypeScript",
+      "lines": 95,
+      "size_bytes": 2505
+    },
+    {
+      "path": "src/locales/ar.json",
+      "language": "JSON",
+      "lines": 1240,
+      "size_bytes": 77702
+    },
+    {
+      "path": "src/locales/en.json",
+      "language": "JSON",
+      "lines": 1468,
+      "size_bytes": 72922
+    },
+    {
+      "path": "src/locales/es.json",
+      "language": "JSON",
+      "lines": 1466,
+      "size_bytes": 81575
+    },
+    {
+      "path": "src/locales/ja.json",
+      "language": "JSON",
+      "lines": 1466,
+      "size_bytes": 88152
+    },
+    {
+      "path": "src/locales/ko.json",
+      "language": "JSON",
+      "lines": 1466,
+      "size_bytes": 81656
+    },
+    {
+      "path": "src/locales/my.json",
+      "language": "JSON",
+      "lines": 1138,
+      "size_bytes": 62816
+    },
+    {
+      "path": "src/locales/pt.json",
+      "language": "JSON",
+      "lines": 1547,
+      "size_bytes": 83139
+    },
+    {
+      "path": "src/locales/ru.json",
+      "language": "JSON",
+      "lines": 1466,
+      "size_bytes": 109480
+    },
+    {
+      "path": "src/locales/tr.json",
+      "language": "JSON",
+      "lines": 1201,
+      "size_bytes": 64081
+    },
+    {
+      "path": "src/locales/vi.json",
+      "language": "JSON",
+      "lines": 1250,
+      "size_bytes": 70360
+    },
+    {
+      "path": "src/locales/zh-TW.json",
+      "language": "JSON",
+      "lines": 1271,
+      "size_bytes": 62172
+    },
+    {
+      "path": "src/locales/zh.json",
+      "language": "JSON",
+      "lines": 1433,
+      "size_bytes": 71752
+    },
+    {
+      "path": "src/main.tsx",
+      "language": "TypeScript (React)",
+      "lines": 21,
+      "size_bytes": 570
+    },
+    {
+      "path": "src/pages/Accounts.tsx",
+      "language": "TypeScript (React)",
+      "lines": 1286,
+      "size_bytes": 46278
+    },
+    {
+      "path": "src/pages/ApiKeyFun.tsx",
+      "language": "TypeScript (React)",
+      "lines": 777,
+      "size_bytes": 45682
+    },
+    {
+      "path": "src/pages/ApiProxy.tsx",
+      "language": "TypeScript (React)",
+      "lines": 2865,
+      "size_bytes": 187080
+    },
+    {
+      "path": "src/pages/Dashboard.tsx",
+      "language": "TypeScript (React)",
+      "lines": 312,
+      "size_bytes": 15915
+    },
+    {
+      "path": "src/pages/Monitor.tsx",
+      "language": "TypeScript (React)",
+      "lines": 12,
+      "size_bytes": 319
+    },
+    {
+      "path": "src/pages/Security.tsx",
+      "language": "TypeScript (React)",
+      "lines": 94,
+      "size_bytes": 4334
+    },
+    {
+      "path": "src/pages/Settings.tsx",
+      "language": "TypeScript (React)",
+      "lines": 1747,
+      "size_bytes": 119593
+    },
+    {
+      "path": "src/pages/TokenStats.tsx",
+      "language": "TypeScript (React)",
+      "lines": 822,
+      "size_bytes": 49842
+    },
+    {
+      "path": "src/pages/UserToken.tsx",
+      "language": "TypeScript (React)",
+      "lines": 678,
+      "size_bytes": 39157
+    },
+    {
+      "path": "src/services/accountService.ts",
+      "language": "TypeScript",
+      "lines": 223,
+      "size_bytes": 7459
+    },
+    {
+      "path": "src/services/configService.ts",
+      "language": "TypeScript",
+      "lines": 10,
+      "size_bytes": 323
+    },
+    {
+      "path": "src/stores/networkMonitorStore.ts",
+      "language": "TypeScript",
+      "lines": 45,
+      "size_bytes": 1257
+    },
+    {
+      "path": "src/stores/useAccountStore.ts",
+      "language": "TypeScript",
+      "lines": 315,
+      "size_bytes": 10573
+    },
+    {
+      "path": "src/stores/useConfigStore.ts",
+      "language": "TypeScript",
+      "lines": 97,
+      "size_bytes": 3206
+    },
+    {
+      "path": "src/stores/useDebugConsole.ts",
+      "language": "TypeScript",
+      "lines": 208,
+      "size_bytes": 6195
+    },
+    {
+      "path": "src/stores/useViewStore.ts",
+      "language": "TypeScript",
+      "lines": 13,
+      "size_bytes": 384
+    },
+    {
+      "path": "src/types/account.ts",
+      "language": "TypeScript",
+      "lines": 98,
+      "size_bytes": 2511
+    },
+    {
+      "path": "src/types/config.ts",
+      "language": "TypeScript",
+      "lines": 212,
+      "size_bytes": 6503
+    },
+    {
+      "path": "src/utils/clipboard.ts",
+      "language": "TypeScript",
+      "lines": 40,
+      "size_bytes": 1365
+    },
+    {
+      "path": "src/utils/cn.ts",
+      "language": "TypeScript",
+      "lines": 6,
+      "size_bytes": 171
+    },
+    {
+      "path": "src/utils/env.ts",
+      "language": "TypeScript",
+      "lines": 14,
+      "size_bytes": 358
+    },
+    {
+      "path": "src/utils/format.ts",
+      "language": "TypeScript",
+      "lines": 100,
+      "size_bytes": 3341
+    },
+    {
+      "path": "src/utils/liveLimit.ts",
+      "language": "TypeScript",
+      "lines": 67,
+      "size_bytes": 1716
+    },
+    {
+      "path": "src/utils/modelCategory.ts",
+      "language": "TypeScript",
+      "lines": 168,
+      "size_bytes": 6301
+    },
+    {
+      "path": "src/utils/request.ts",
+      "language": "TypeScript",
+      "lines": 271,
+      "size_bytes": 14357
+    },
+    {
+      "path": "src/utils/uuid.ts",
+      "language": "TypeScript",
+      "lines": 27,
+      "size_bytes": 1054
+    },
+    {
+      "path": "src/utils/windowManager.ts",
+      "language": "TypeScript",
+      "lines": 76,
+      "size_bytes": 2537
+    },
+    {
+      "path": "src/vite-env.d.ts",
+      "language": "TypeScript",
+      "lines": 1,
+      "size_bytes": 38
+    },
+    {
+      "path": "tailwind.config.js",
+      "language": "JavaScript",
+      "lines": 48,
+      "size_bytes": 1445
+    },
+    {
+      "path": "tsconfig.json",
+      "language": "JSON",
+      "lines": 25,
+      "size_bytes": 605
+    },
+    {
+      "path": "tsconfig.node.json",
+      "language": "JSON",
+      "lines": 10,
+      "size_bytes": 213
+    },
+    {
+      "path": "version.json",
+      "language": "JSON",
+      "lines": 17,
+      "size_bytes": 1618
+    },
+    {
+      "path": "vite.config.ts",
+      "language": "TypeScript",
+      "lines": 39,
+      "size_bytes": 939
+    },
+    {
+      "path": "web_site/index.html",
+      "language": "HTML",
+      "lines": 474,
+      "size_bytes": 24926
+    },
+    {
+      "path": "web_site/qa.html",
+      "language": "HTML",
+      "lines": 408,
+      "size_bytes": 21164
+    },
+    {
+      "path": "workflows/ci.yml",
+      "language": "YAML",
+      "lines": 123,
+      "size_bytes": 3503
+    },
+    {
+      "path": "workflows/deploy-pages.yml",
+      "language": "YAML",
+      "lines": 44,
+      "size_bytes": 1176
+    },
+    {
+      "path": "workflows/release.yml",
+      "language": "YAML",
+      "lines": 330,
+      "size_bytes": 13102
+    }
+  ]
+}

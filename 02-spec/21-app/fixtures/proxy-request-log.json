@@ -1,0 +1,20 @@
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "timestamp": 1725960000000,
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "status": 200,
+  "duration": 482,
+  "account_email": "developer@example.com",
+  "mapped_model": "gemini-2.0-flash-exp",
+  "protocol": "openai",
+  "input_tokens": 128,
+  "output_tokens": 256,
+  "cached_tokens": 0,
+  "total_tokens": 384,
+  "client_ip": "127.0.0.1",
+  "username": "local_dev",
+  "request_body": "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}",
+  "response_body": "{\"id\":\"chatcmpl-123\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hi!\"}}]}",
+  "error_message": null
+}

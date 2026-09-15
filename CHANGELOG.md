@@ -2,7 +2,19 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
-*   **版本演进**:
+    *   **v4.8.1 (2026-09-15)**:
+        -   **[多实例并行隔离与 CLI 支持] 多实例多 Profile 并行隔离与终端命令行控制**:
+            -   **独立数据与扩展目录**: 每个实例拥有独立的 `--user-data-dir` 与 `--extensions-dir`，保证多 Profile 互不污染、独立登录与并行执行。
+            -   **终端 CLI 参数全套支持**: 支持 `--create-profile <name>`、`--list-profiles`、`--copy-profile`、`--delete-profile`、`--run-profile`，并针对 Windows 支持自动附加控制台输出。
+            -   **Ubuntu / Linux 进程隔离与环境清理**: 移除 AppImage 环境变量污染，采用 `--password-store="basic"` 绕过全局 GNOME Keyring 冲突，实现 Linux 环境精准 PID 独立生命周期管控。
+        -   **[智能调度与容灾] 定时配额低位轮换与无损任务快照恢复**:
+            -   **可配置后台定时轮询**: 基于 Tokio 异步监督器定期（15s–600s 可配，默认 60s）轮询活跃 IDE Profile 的实时配额剩余比例。
+            -   **配额低位自动轮换 (<10%)**: 当模型配额低于设定阈值（1%–50% 可调，默认 10%）时，自动挑选剩余配额最高的候选可用 Profile 实施优雅故障转移。
+            -   **任务状态快照与自愈**: 轮换前自动将待办任务状态、未完成清单与会话指针快照持久化至磁盘，新 Profile 启动后无损恢复任务，保障无人值守 QE / Agent 自动化任务持续执行。
+    *   **v4.8.0 (2026-09-15)**:
+        -   **[架构与代码规范] Go CLI AppError 规范与 DRY 帮助检查统一体系**:
+            -   **全面取缔标准 Go error**: 所有 Go 命令处理函数与工具包严禁返回原生 error，统一采用 *appfault.AppError 结构化错误类型，确保错误码、严重级别、领域边界与跨语言信封序列化一致性。
+            -   **中央 DRY 帮助与参数校验函数**: 引入 CheckHelpOrEmpty 统一拦截 --help / -h 并校验最小位置参数，彻底消除各命令中重复冗余的 if len(args) == 0 || hasHelpFlag(args) 模板代码。
     *   **v4.7.1 (2026-09-12)**:
         -   **[上游协议优化 & 原生对齐] 原生语言服务逆向对齐：按需切换 Agent 模式、细粒度 429 熔断分类与空响应异常自愈**:
             -   **动态按需切换 `requestType: "agent"`**: 逆向分析原生 Antigravity 语言服务客户端行为，消除以往所有请求盲目携带 `requestType: "agent"` 挤占 Google 专用 Agent 资源池导致的频繁 429 限流。仅在请求携带 `tools` 函数定义或包含历史工具交互轮次时才激活 Agent 通道；常规文本对话、代码补全均走标准 Chat 资源池，显著降低限流概率。
@@ -1535,7 +1547,6 @@
             -   **问题背景**: 之前版本在 429/503 等严重错误（如账号耗尽）发生时，日志记录中遗漏了 `mapped_model` 和 `account_email` 字段，导致无法定位出错的具体模型和账号。
             -   **修复内容**: 在 OpenAI 和 Claude 协议的所有错误退出路径（包括 Token 获取失败、转换异常、重试耗尽）中强制注入了元数据 Header。现在即使请求失败，流量日志也能准确显示目标模型和上下文信息，极大提升了排查效率。
 
-
     *   **v4.0.0 (2026-01-25)**:
         -   **[核心功能] 后台任务模型可配置 (Background Model Configuration)**:
             -   **功能增强**: 允许用户自定义“后台任务”（如标题生成、摘要压缩）使用的模型。不再强制绑定 `gemini-2.5-flash`。
@@ -2180,7 +2191,6 @@
             - **SSE 错误事件**: 实现了标准的 SSE 错误事件传播,前端可捕获并优雅展示错误,包含详细的解决建议(如检查网络、代理等)。
             - **多语言错误消息 (i18n)**: 错误消息已集成 i18n 系统,支持所有 6 种语言(zh, en, zh-TW, ja, tr, vi)。非浏览器客户端自动回退到英文提示。
         - **影响范围**: 此更新显著提升了 Claude 4.5 Opus、Gemini 3 Pro 等 thinking 模型的多轮对话稳定性,特别是在使用 MCP 工具和长会话场景下。
-
 
     *   **v3.3.24 (2026-01-12)**:
         - **UI 交互改进 (UI Interaction Improvements)**:
@@ -4835,7 +4845,6 @@
             - **SSE Error Events**: Implemented standard SSE error event propagation, allowing the frontend to gracefully display errors with detailed suggestions (check network, proxy, etc.).
             - **Multi-language Error Messages (i18n)**: Error messages are now integrated with the i18n system, supporting all 6 languages (zh, en, zh-TW, ja, tr, vi). Non-browser clients automatically fallback to English messages.
         - **Impact**: This update significantly improves multi-turn conversation stability for thinking models like Claude 4.5 Opus and Gemini 3 Pro, especially in scenarios using MCP tools and long sessions.
-
 
     *   **v3.3.24 (2026-01-12)**:
         - **UI Interaction Improvements**:
