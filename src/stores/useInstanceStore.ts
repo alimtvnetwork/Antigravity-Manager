@@ -1,14 +1,23 @@
 import { create } from 'zustand';
 import * as instanceService from '../services/instanceService';
-import type { InstanceConfig, InstanceStatus } from '../services/instanceService';
+import type {
+    InstanceConfig,
+    InstanceStatus,
+    AutoProfileSwitcherConfig,
+    AutoSwitcherStatus,
+} from '../services/instanceService';
 
 interface InstanceState {
     instances: InstanceStatus[];
     activeInstanceId: string;
+    switcherStatus: AutoSwitcherStatus | null;
     isLoading: boolean;
     error: string | null;
 
     fetchInstances: () => Promise<void>;
+    fetchSwitcherStatus: () => Promise<void>;
+    updateSwitcherConfig: (config: AutoProfileSwitcherConfig) => Promise<void>;
+    triggerManualRotation: () => Promise<string>;
     createInstance: (name: string) => Promise<InstanceConfig>;
     copyInstance: (sourceId: string, targetName: string) => Promise<InstanceConfig>;
     deleteInstance: (instanceId: string) => Promise<void>;
@@ -22,6 +31,7 @@ interface InstanceState {
 export const useInstanceStore = create<InstanceState>((set, get) => ({
     instances: [],
     activeInstanceId: 'default',
+    switcherStatus: null,
     isLoading: false,
     error: null,
 
@@ -34,6 +44,40 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             set({ instances, activeInstanceId: activeId, error: null });
         } catch (err: any) {
             set({ error: err?.toString() || 'Failed to fetch instances' });
+        }
+    },
+
+    fetchSwitcherStatus: async () => {
+        try {
+            const status = await instanceService.getAutoSwitcherStatus();
+            set({ switcherStatus: status });
+        } catch (err: any) {
+            console.error('Failed to fetch switcher status:', err);
+        }
+    },
+
+    updateSwitcherConfig: async (config: AutoProfileSwitcherConfig) => {
+        set({ isLoading: true, error: null });
+        try {
+            await instanceService.updateAutoSwitcherConfig(config);
+            await get().fetchSwitcherStatus();
+            set({ isLoading: false });
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to update switcher config' });
+            throw err;
+        }
+    },
+
+    triggerManualRotation: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const msg = await instanceService.triggerManualProfileRotation();
+            await Promise.all([get().fetchInstances(), get().fetchSwitcherStatus()]);
+            set({ isLoading: false });
+            return msg;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to trigger manual rotation' });
+            throw err;
         }
     },
 

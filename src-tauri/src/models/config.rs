@@ -32,6 +32,8 @@ pub struct AppConfig {
     pub hidden_menu_items: Vec<String>, // Hidden menu item path list
     #[serde(default)]
     pub cloudflared: CloudflaredConfig, // [NEW] Cloudflared configuration
+    #[serde(default)]
+    pub auto_profile_switcher: AutoProfileSwitcherConfig, // [NEW] Auto profile switcher configuration
 }
 
 /// Scheduled warmup configuration
@@ -201,6 +203,31 @@ impl AppConfig {
             circuit_breaker: CircuitBreakerConfig::default(),
             hidden_menu_items: Vec::new(),
             cloudflared: CloudflaredConfig::default(),
+            auto_profile_switcher: AutoProfileSwitcherConfig::default(),
+        }
+    }
+}
+
+/// Auto profile switcher configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoProfileSwitcherConfig {
+    pub is_enabled: bool,
+    pub check_interval_seconds: u32,
+    pub low_quota_threshold_percent: f64,
+    pub target_model: String,
+    pub has_auto_resume: bool,
+    pub cooldown_seconds: u32,
+}
+
+impl Default for AutoProfileSwitcherConfig {
+    fn default() -> Self {
+        Self {
+            is_enabled: false,
+            check_interval_seconds: 60,
+            low_quota_threshold_percent: 10.0,
+            target_model: "gemini-pro".to_string(),
+            has_auto_resume: true,
+            cooldown_seconds: 180,
         }
     }
 }

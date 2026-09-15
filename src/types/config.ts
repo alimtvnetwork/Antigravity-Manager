@@ -162,6 +162,16 @@ export interface AppConfig {
     circuit_breaker: CircuitBreakerConfig; // [NEW] 熔断器配置
     proxy: ProxyConfig;
     cloudflared: CloudflaredConfig; // [NEW] Cloudflared 配置
+    auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] 自动配额轮换与任务恢复配置
+}
+
+export interface AutoProfileSwitcherConfig {
+    is_enabled: boolean;
+    check_interval_seconds: number;
+    low_quota_threshold_percent: number;
+    target_model: string;
+    has_auto_resume: boolean;
+    cooldown_seconds: number;
 }
 
 // ============================================================================

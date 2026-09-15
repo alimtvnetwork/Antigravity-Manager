@@ -547,6 +547,10 @@ pub fn run() {
             modules::scheduler::start_scheduler(Some(app.handle().clone()), scheduler_state.inner().clone());
             info!("Smart scheduler (7-Day Weekly Reset Warmup) initialized.");
 
+            // Start auto profile switcher daemon
+            modules::auto_switcher::start_auto_switcher();
+            info!("Auto profile switcher daemon initialized.");
+
             // [PHASE 1] 已整合至 Axum 端口 (8045)，不再单独启动 19527 端口
             info!("Management API integrated into main proxy server (port 8045)");
 
@@ -756,6 +760,9 @@ pub fn run() {
             commands::get_active_instance,
             commands::set_active_instance,
             commands::switch_account_to_instance,
+            commands::get_auto_switcher_status,
+            commands::update_auto_switcher_config,
+            commands::trigger_manual_profile_rotation,
         ])
 
 

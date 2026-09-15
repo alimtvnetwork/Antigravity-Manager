@@ -54,3 +54,22 @@ pub async fn switch_account_to_instance(
     instance::switch_account_to_instance(&account_id, instance_id.as_deref()).await
 }
 
+#[tauri::command]
+pub fn get_auto_switcher_status() -> Result<crate::modules::auto_switcher::AutoSwitcherStatus, String> {
+    Ok(crate::modules::auto_switcher::get_status())
+}
+
+#[tauri::command]
+pub fn update_auto_switcher_config(
+    config: crate::models::config::AutoProfileSwitcherConfig,
+) -> Result<(), String> {
+    let mut app_config = crate::modules::config::load_app_config()?;
+    app_config.auto_profile_switcher = config;
+    crate::modules::config::save_app_config(&app_config)
+}
+
+#[tauri::command]
+pub async fn trigger_manual_profile_rotation() -> Result<String, String> {
+    crate::modules::auto_switcher::trigger_manual_rotation().await
+}
+

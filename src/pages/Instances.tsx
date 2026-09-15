@@ -21,7 +21,10 @@ export default function Instances() {
     const {
         instances,
         activeInstanceId,
+        switcherStatus,
         fetchInstances,
+        fetchSwitcherStatus,
+        triggerManualRotation,
         createInstance,
         copyInstance,
         deleteInstance,
@@ -41,9 +44,13 @@ export default function Instances() {
     useEffect(() => {
         if (!isTauri()) return;
         fetchInstances();
-        const timer = setInterval(fetchInstances, 3000);
+        fetchSwitcherStatus();
+        const timer = setInterval(() => {
+            fetchInstances();
+            fetchSwitcherStatus();
+        }, 3000);
         return () => clearInterval(timer);
-    }, [fetchInstances]);
+    }, [fetchInstances, fetchSwitcherStatus]);
 
     const filteredInstances = instances.filter((inst) => {
         const query = searchQuery.toLowerCase();
@@ -152,6 +159,43 @@ export default function Instances() {
                         <span>{actionError}</span>
                     </div>
                     <button onClick={() => setActionError(null)} className="text-xs font-semibold">✕</button>
+                </div>
+            )}
+
+            {/* Auto-Switcher Status Banner */}
+            {switcherStatus && switcherStatus.is_running && (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                        </span>
+                        <div>
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                {t('instances.auto_switcher_active', 'Auto Profile Switcher Active')}
+                            </span>
+                            <span className="text-gray-500 dark:text-gray-400 ml-2">
+                                {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
+                                    ? `Current Active Quota: ${switcherStatus.current_quota_percent.toFixed(0)}%`
+                                    : 'Monitoring active profile quota'}
+                                {switcherStatus.last_switch_reason && ` • Last switch: ${switcherStatus.last_switch_reason}`}
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            try {
+                                const msg = await triggerManualRotation();
+                                alert(msg);
+                            } catch (e: any) {
+                                setActionError(e?.toString() || 'Rotation failed');
+                            }
+                        }}
+                        className="btn btn-xs btn-outline btn-primary gap-1 shrink-0"
+                    >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
+                    </button>
                 </div>
             )}
 

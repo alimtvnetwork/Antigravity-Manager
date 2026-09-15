@@ -58,3 +58,34 @@ export async function setActiveInstance(instanceId: string): Promise<void> {
 export async function switchAccountToInstance(accountId: string, instanceId?: string): Promise<void> {
     return await invoke('switch_account_to_instance', { accountId, instanceId });
 }
+
+export interface AutoProfileSwitcherConfig {
+    is_enabled: boolean;
+    check_interval_seconds: number;
+    low_quota_threshold_percent: number;
+    target_model: string;
+    has_auto_resume: boolean;
+    cooldown_seconds: number;
+}
+
+export interface AutoSwitcherStatus {
+    is_running: boolean;
+    active_instance_id: string;
+    active_account_email?: string;
+    current_quota_percent?: number;
+    last_check_timestamp: number;
+    last_switch_timestamp?: number;
+    last_switch_reason?: string;
+}
+
+export async function getAutoSwitcherStatus(): Promise<AutoSwitcherStatus> {
+    return await invoke('get_auto_switcher_status');
+}
+
+export async function updateAutoSwitcherConfig(config: AutoProfileSwitcherConfig): Promise<void> {
+    return await invoke('update_auto_switcher_config', { config });
+}
+
+export async function triggerManualProfileRotation(): Promise<string> {
+    return await invoke('trigger_manual_profile_rotation');
+}

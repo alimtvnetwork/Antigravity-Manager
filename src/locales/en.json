@@ -88,6 +88,23 @@
     "apikey_fun": "Transit Station",
     "logout": "Logout"
   },
+  "instances": {
+    "title": "Instances / Profiles",
+    "page_title": "Instances & Profiles",
+    "page_desc": "Run multiple Antigravity windows in parallel with isolated credentials and extensions",
+    "running_summary": "Running: {{running}} / {{total}}",
+    "create_btn": "New Instance",
+    "create_modal_title": "Create New Profile",
+    "name_placeholder": "Profile name (e.g., Work, Personal)",
+    "copy_modal_title": "Duplicate Profile",
+    "copy_placeholder": "New profile name",
+    "duplicate": "Duplicate",
+    "search_placeholder": "Search by profile name, ID, or bound email...",
+    "auto_switcher_active": "Auto Profile Switcher Active",
+    "rotate_next_best": "Rotate to Next Best",
+    "confirm_delete": "Are you sure you want to delete this profile?",
+    "confirm_wipe": "Wipe session tokens for this profile? User preferences will be kept."
+  },
   "dashboard": {
     "hello": "Hello, User 👋",
     "refresh_quota": "Refresh Quota",
@@ -405,6 +422,14 @@
     "pinned_quota_models": {
       "title": "Pinned Quota Models",
       "desc": "Choose which model quotas to display in the account list. Unselected models are only shown in the detail popup."
+    },
+    "auto_switcher": {
+      "title": "Auto Profile Switcher & Task Resumption",
+      "desc": "Monitors the active IDE profile on a timer and automatically switches to the next best profile when quota drops below threshold, resuming pending tasks.",
+      "interval_label": "Check Interval (seconds)",
+      "threshold_label": "Low Quota Threshold (%)",
+      "target_model_label": "Primary Evaluated Model",
+      "auto_resume_label": "Snapshot and auto-resume pending tasks on restart"
     },
     "proxy": {
       "title": "Proxy Settings"

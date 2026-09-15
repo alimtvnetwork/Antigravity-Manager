@@ -9,6 +9,7 @@ import { showToast } from '../components/common/ToastContainer';
 import QuotaProtection from '../components/settings/QuotaProtection';
 import SmartWarmup from '../components/settings/SmartWarmup';
 import PinnedQuotaModels from '../components/settings/PinnedQuotaModels';
+import AutoSwitcherSettings from '../components/settings/AutoSwitcherSettings';
 import { useDebugConsole } from '../stores/useDebugConsole';
 
 import { useTranslation } from 'react-i18next';
@@ -79,7 +80,14 @@ function Settings() {
             backoff_steps: [30, 60, 120, 300, 600]
         },
         hidden_menu_items: [],  // 菜单显示设置：默认不隐藏任何菜单项
-
+        auto_profile_switcher: {
+            is_enabled: false,
+            check_interval_seconds: 60,
+            low_quota_threshold_percent: 10.0,
+            target_model: 'gemini-pro',
+            has_auto_resume: true,
+            cooldown_seconds: 180,
+        },
     });
 
     // Dialog state
@@ -811,6 +819,25 @@ function Settings() {
                                         };
                                         setFormData(newFormData);
                                         // Hot Save
+                                        try {
+                                            await saveConfig(newFormData);
+                                        } catch (error) {
+                                            showToast(`${t('common.error')}: ${error}`, 'error');
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {/* 自动配额轮换与任务恢复 (Auto Profile Switcher) */}
+                            <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm">
+                                <AutoSwitcherSettings
+                                    config={formData.auto_profile_switcher}
+                                    onChange={async (newConfig) => {
+                                        const newFormData = {
+                                            ...formData,
+                                            auto_profile_switcher: newConfig
+                                        };
+                                        setFormData(newFormData);
                                         try {
                                             await saveConfig(newFormData);
                                         } catch (error) {
