@@ -1,6 +1,6 @@
 from pathlib import Path
 
-content = """# Audit 2026-09-10 v1 — 02-spec/21-app (and 23-app-db, 24-app-ui-design-system)
+content = r"""# Audit 2026-09-10 v1 — 02-spec/21-app (and 23-app-db, 24-app-ui-design-system)
 
 Version: 1.0.0
 Updated: 2026-09-10

@@ -19,7 +19,7 @@ To ensure 100% deterministic compliance across human developers, IDE extensions,
 
 ### Automated Mirroring
 - Manual editing of `.lovable/coding-guidelines.md` or `.cursorrules` hard rules is strictly prohibited.
-- All updates originate in `34-compiled-simple-coding-guidelines.md` and are propagated via `scripts/sync-guidelines.mjs` (run via `npm run sync`).
+- All updates originate in `34-compiled-simple-coding-guidelines.md` and are propagated via guideline synchronization scripts.
 - Verified in CI via `npm run sync:check`.
 
 ---

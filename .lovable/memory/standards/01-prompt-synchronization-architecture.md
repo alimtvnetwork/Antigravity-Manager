@@ -8,8 +8,8 @@ type: standard
 
 **Authoritative Source:** `01-prompts/`
 **Compiled Output:** `01-prompts/*.md` (flat prompt files)
-**Configuration:** `scripts/prompt-sync-config.json`
-**Execution Script:** `scripts/update-prompts.ps1` / `scripts/update-prompts.sh`
+**Configuration:** `prompt-sync-config.json`
+**Execution Script:** `update-prompts.ps1` / `update-prompts.sh`
 
 ## 1. Internal, Self-Contained Source of Truth
 
@@ -55,10 +55,10 @@ or on Linux/macOS:
 ```
 
 ### Config Variable Substitution:
-`scripts/prompt-sync-config.json` defines folder prefix variables (`SOURCE_PREFIX`, `TARGET_PREFIX`) that are compiled at execution time before copying files.
+`prompt-sync-config.json` defines folder prefix variables (`SOURCE_PREFIX`, `TARGET_PREFIX`) that are compiled at execution time before copying files.
 
 ## 3. Strict Rules for AI Agents
 
 1. **Modify the Source First:** Never edit `01-prompts/*.md` directly without updating the corresponding source file in `01-prompts/`.
-2. **Compile After Edits:** Always execute `scripts/update-prompts.ps1` (or `scripts/update-prompts.sh`) to re-sync the flat prompts and run the linter validation.
+2. **Compile After Edits:** Always execute `update-prompts.ps1` (or `update-prompts.sh`) to re-sync the flat prompts and run the linter validation.
 3. **No External Clone:** Never attempt to git clone external prompt repositories to update local prompts; this repository is fully self-contained.

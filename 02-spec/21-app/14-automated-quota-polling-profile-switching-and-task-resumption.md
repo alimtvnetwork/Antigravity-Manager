@@ -1,8 +1,8 @@
 # Automated Quota Polling, Profile Auto-Switching, and Pending Task Resumption Architecture
 
-> **Document ID:** `01-instructions/08-automated-quota-polling-profile-switching-and-task-resumption.md`  
-> **Status:** Approved Architectural Specification  
-> **Target Platforms:** Ubuntu / Debian Linux, Windows 10/11, macOS  
+> **Document ID:** `01-instructions/08-automated-quota-polling-profile-switching-and-task-resumption.md`
+> **Status:** Approved Architectural Specification
+> **Target Platforms:** Ubuntu / Debian Linux, Windows 10/11, macOS
 
 ---
 

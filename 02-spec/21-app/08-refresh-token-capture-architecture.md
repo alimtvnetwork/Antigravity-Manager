@@ -11,25 +11,25 @@ Antigravity-Manager captures refresh tokens through four distinct pathways, eval
 ```mermaid
 flowchart TD
     Start["Initiate Token Capture"] --> CheckKeyring{"Query OS System Keyring<br/>(service: 'gemini', user: 'antigravity')"}
-    
+
     CheckKeyring -- "Found Token" --> ParseKeyring["Parse Keyring JSON Payload<br/>(Extract refresh_token)"]
     ParseKeyring --> Success["Token Successfully Captured"]
-    
+
     CheckKeyring -- "Keyring Empty / Unsupported" --> ScanDB{"Scan Profile Candidate DBs<br/>(state.vscdb in APPDATA / .config)"}
-    
+
     ScanDB -- "DB Found" --> QueryItemTable["Query ItemTable in SQLite<br/>(rusqlite SELECT value)"]
     QueryItemTable --> CheckVersion{"Format Detection"}
-    
+
     CheckVersion -- ">= 1.16.5 (Unified State)" --> DecodeUnified["Decode antigravityUnifiedStateSync.oauthToken<br/>Sentinel: 'oauthTokenInfoSentinelKey'<br/>Protobuf Field 3: refresh_token"]
     CheckVersion -- "< 1.16.5 (Legacy Jetski)" --> DecodeLegacy["Decode jetskiStateSync.agentManagerInitState<br/>Protobuf Field 6 -> Field 3: refresh_token"]
-    
+
     DecodeUnified --> Success
     DecodeLegacy --> Success
-    
+
     ScanDB -- "No DB Available" --> CheckInteractive{"Interactive OAuth Requested?"}
     CheckInteractive -- "Yes" --> WebOAuth["Spawn Axum Localhost Callback Server<br/>Launch Google Consent URL<br/>Exchange auth code with Google API"]
     WebOAuth --> Success
-    
+
     CheckInteractive -- "No" --> CheckV1["Inspect ~/.antigravity-agent/<br/>antigravity_accounts.json"]
     CheckV1 --> Success
 ```

@@ -4,10 +4,13 @@ Master directory of architectural and execution plans.
 
 ## Pending Plans
 
-- [02-slides-system-overhaul.md](pending/02-slides-system-overhaul.md): Full slides deck UI and system overhaul.
 - [04-guideline-prompt-and-installer-upgrade.md](pending/04-guideline-prompt-and-installer-upgrade.md): Guideline prompt and installer enhancements.
 - [09-update-prompts-and-release.md](pending/09-update-prompts-and-release.md): Update prompts and release lifecycle (deferred under WOR policy).
 - [11-code-red-refactor-remediation.md](pending/11-code-red-refactor-remediation.md): Remediate Code Red enum, boolean, and query wrapper violations across the codebase.
+
+## Archived Plans
+
+- [02-slides-system-overhaul.md](_archive/02-slides-system-overhaul.md): Full slides deck UI and system overhaul (external meta-repo archive).
 
 ## Completed Plans
 
@@ -24,3 +27,4 @@ Master directory of architectural and execution plans.
 - [14-multi-instance-orchestration-and-ubuntu-parallelism.md](completed/14-multi-instance-orchestration-and-ubuntu-parallelism.md): Multi-Instance isolated profile supervisor, terminal CLI options, Linux process selective filtering via `/proc/<pid>/cmdline`, AppImage sanitization, GNOME Keyring bypass (`--password-store=basic`), and frontend Navbar / Instances view.
 - [15-auto-quota-switcher.md](completed/15-auto-quota-switcher.md): Configurable polling timer, low-quota profile auto-switching (<10%), next-best profile ranking, pending QE task state snapshot/recovery, and UI settings / instances status controls.
 - [16-repo-structure-installers-and-release.md](completed/16-repo-structure-installers-and-release.md): Folder structure realignment, 01-prompts sync, 02-spec/21-app migration, standalone zip installer scripts, and minor release v4.9.0.
+- [17-cicd-pipeline-and-cross-platform-automation.md](completed/17-cicd-pipeline-and-cross-platform-automation.md): Ground local CI runner quality gates, fix documentation link integrity, and verify green quality gates.

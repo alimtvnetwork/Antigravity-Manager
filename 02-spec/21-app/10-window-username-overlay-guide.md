@@ -61,7 +61,7 @@ use std::path::Path;
 pub fn set_profile_window_title(user_data_dir: &Path, user_email: &str) -> Result<(), String> {
     let settings_dir = user_data_dir.join("User");
     fs::create_dir_all(&settings_dir).map_err(|e| e.to_string())?;
-    
+
     let settings_file = settings_dir.join("settings.json");
     let mut config: Value = if settings_file.exists() {
         let content = fs::read_to_string(&settings_file).unwrap_or_else(|_| "{}".to_string());

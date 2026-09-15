@@ -72,7 +72,7 @@ pub fn get_instance_pid(instance_dir: &std::path::Path) -> Option<u32> {
     for (pid, process) in system.processes() {
         let cmd = process.cmd();
         let cmd_str = cmd.iter().map(|a| a.to_string_lossy()).collect::<Vec<_>>().join(" ");
-        
+
         // Match only main processes that contain the specific instance directory argument
         if cmd_str.contains(&*target_needle) && !cmd_str.contains("--type=") {
             return Some(pid.as_u32());

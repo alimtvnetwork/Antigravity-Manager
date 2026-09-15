@@ -171,4 +171,3 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-002 (Proxy Conformance):** Endpoints `/v1/chat/completions`, `/v1/messages`, and `/v1beta/models/*` return valid OpenAI/Anthropic/Gemini compliant responses or structured error envelopes.
 - **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`.
 - **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
-

@@ -228,4 +228,3 @@ To isolate accounts from upstream anti-abuse triggers, the system supports virtu
 - **Given:** Inbound client IP traffic and multi-user token requests intercepted by the proxy.
 - **When:** Firewall evaluation and token authorization occur against `security.db` and `user_tokens.db`.
 - **Then:** IP access events are logged to `ip_access_logs` with index coverage (`idx_ip_access_ip`, `idx_ip_access_timestamp`, `idx_ip_access_blocked`), CIDR/pattern matching evaluates against `ip_blacklist` (`idx_blacklist_pattern`) and `ip_whitelist`, and indices ensure sub-millisecond query evaluation.
-

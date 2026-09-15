@@ -119,4 +119,3 @@ The project is structurally secure against remote network attacks when bound to 
 - **Given** user OAuth tokens (`access_token`, `refresh_token`) and session secrets persisted to disk.
 - **When** written to the local configuration directory.
 - **Then** credentials must not be stored in unencrypted cleartext JSON; storage must utilize platform-native protection (DPAPI on Windows, Keychain on macOS, Secret Service on Linux) with user-restricted filesystem ACLs.
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fast Boolean Naming & Code Convention Guard
-Audits and flags explicit boolean true comparisons (e.g. `== True`, `=== true`) and negative naming anti-patterns.
+Audits and flags explicit boolean true comparisons (e.g. double-equals or triple-equals true) and negative naming anti-patterns.
 Multi-folder capable, customizable extensions, and thread-safe lazy regex engine.
 
 Performance & Clean Architecture:

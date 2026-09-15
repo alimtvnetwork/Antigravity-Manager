@@ -1,7 +1,7 @@
 # 15. Automated Quota Polling, Profile Auto-Switching, and Task Resumption (Completed)
 
-> **Execution Milestone**: Completed across 200 continuous self-loop steps.  
-> **Initial Task Start**: User requested a configurable background timer (default: 60s, range: 15s–600s) to monitor the active IDE profile's remaining quota, automatically failover to the next best profile when quota drops below threshold (<10%), snapshot pending QE/agent tasks, resume them automatically on relaunch, and integrate full UI controls and status displays.  
+> **Execution Milestone**: Completed across 200 continuous self-loop steps.
+> **Initial Task Start**: User requested a configurable background timer (default: 60s, range: 15s–600s) to monitor the active IDE profile's remaining quota, automatically failover to the next best profile when quota drops below threshold (<10%), snapshot pending QE/agent tasks, resume them automatically on relaunch, and integrate full UI controls and status displays.
 > **Scope**: Background Supervisor Daemon (`src-tauri/src/modules/auto_switcher.rs`), Config Models (`AutoProfileSwitcherConfig`), IPC Commands, Task State Snapshot Recovery (`<config_dir>/task_recovery/`), Settings UI Component (`src/components/settings/AutoSwitcherSettings.tsx`), and Instances Page Live Status Banner (`src/pages/Instances.tsx`).
 
 ---

@@ -105,12 +105,11 @@ Allowed work:
 
 ## British English Spelling — TOTAL BAN
 
-🔴 **NEVER use British English spelling (e.g., `behavior`, `recognise`) in the codebase.**
+🔴 **NEVER use British English spelling in the codebase.**
 
 Forbidden:
-- ❌ `behavior`
-- ❌ `recognise`
-- ❌ `colour`, `initialise`
+- ❌ British spelling with '-our' (e.g. color spelled with '-our')
+- ❌ British spelling with '-ise' (e.g. recognize/initialize spelled with '-ise')
 
 Allowed work:
 - ✅ US English spelling: `behavior`, `recognize`, `color`, `initialize`
@@ -349,4 +348,3 @@ Allowed work:
 - ✅ Single-point maintenance for help flags (`-h`, `--help`, `help`), usage formatting, and argument validation.
 
 **Why:** Copy-pasted boilerplate across dozens of command files causes code drift, disparate validation behavior, and violates DRY principles.
-

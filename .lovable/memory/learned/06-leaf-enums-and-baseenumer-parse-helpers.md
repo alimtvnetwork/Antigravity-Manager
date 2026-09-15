@@ -1,8 +1,8 @@
 # Learned Memory 06: Leaf Enums & Baseenumer Parse Helpers
 
-> **Date:** 2026-09-09  
-> **Status:** Active  
-> **Domain:** Golang Enums & Dependency Architecture  
+> **Date:** 2026-09-09
+> **Status:** Active
+> **Domain:** Golang Enums & Dependency Architecture
 
 ---
 

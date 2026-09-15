@@ -69,7 +69,7 @@ If you do not want to duplicate the ~400MB application binaries, you can duplica
 ```mermaid
 graph TD
     Bin["Single Binary: antigravity.exe"]
-    
+
     Shortcut1["Shortcut: User Alice<br/>--user-data-dir %APPDATA%/Antigravity-Alice"]
     Shortcut2["Shortcut: User Bob<br/>--user-data-dir %APPDATA%/Antigravity-Bob"]
 

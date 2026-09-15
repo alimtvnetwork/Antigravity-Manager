@@ -105,13 +105,13 @@ To support this in Antigravity-Manager, update `src-tauri/src/modules/process.rs
 ```mermaid
 flowchart TD
     Req["Request: Launch Profile (account_id)"] --> CheckRunning{"Is instance for account_id already running?"}
-    
+
     CheckRunning -- "Yes" --> FocusWin["Find existing window for account_id and bring to foreground"]
-    
+
     CheckRunning -- "No" --> PrepareData["1. Ensure profile directory exists<br/>2. Inject Token into profile state.vscdb<br/>3. Set window title in profile settings.json"]
-    
+
     PrepareData --> LaunchProc["Spawn process::start_antigravity with args:<br/>--user-data-dir <profile_path>"]
-    
+
     LaunchProc --> TrackPID["Record PID in ActiveInstances Map<br/>[account_id -> PID]"]
 ```
 
