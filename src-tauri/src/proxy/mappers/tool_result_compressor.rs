@@ -383,11 +383,11 @@ Please read the file locally."#;
         let mut blocks = vec![
             serde_json::json!({
                 "type": "text",
-                "text": "a".repeat(100_000)
+                "text": "a".repeat(10_000)
             }),
             serde_json::json!({
                 "type": "text",
-                "text": "b".repeat(150_000)
+                "text": "b".repeat(15_000)
             }),
             serde_json::json!({
                 "type": "image",
@@ -402,8 +402,33 @@ Please read the file locally."#;
             }),
         ];
 
-        // 确认工具结果不再剔除图片
+        // 确认工具结果不再剔除图片，所有内容块保留
         sanitize_tool_result_blocks(&mut blocks);
         assert_eq!(blocks.len(), 4);
+    }
+
+    #[test]
+    fn test_sanitize_tool_result_blocks_budget_truncation() {
+        let mut blocks = vec![
+            serde_json::json!({
+                "type": "text",
+                "text": "a".repeat(100_000)
+            }),
+            serde_json::json!({
+                "type": "text",
+                "text": "b".repeat(150_000)
+            }),
+            serde_json::json!({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                }
+            }),
+        ];
+
+        // 超过 MAX_TOOL_RESULT_CHARS (200,000) 时，在第二块截断并终止后续块
+        sanitize_tool_result_blocks(&mut blocks);
+        assert_eq!(blocks.len(), 2);
     }
 }

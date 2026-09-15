@@ -73,4 +73,5 @@ obj/
 tmp/
 *.tmp
 *.cache
+.gitmap/
 

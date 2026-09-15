@@ -66,6 +66,9 @@ pub fn get_db_path() -> Result<PathBuf, String> {
 pub fn connect_db() -> Result<Connection, String> {
     let path = get_db_path()?;
     let conn = Connection::open(&path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let _ = conn.pragma_update(None, "journal_mode", "WAL");
+    let _ = conn.pragma_update(None, "busy_timeout", 5000);
+    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
     Ok(conn)
 }
 
@@ -694,8 +697,11 @@ pub fn get_username_for_ip(ip: &str) -> Result<Option<String>, String> {
 mod tests {
     use super::*;
 
+    static TEST_TOKEN_DB_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_create_and_query_token() {
+        let _lock = TEST_TOKEN_DB_MUTEX.lock().unwrap();
         let _ = init_db(); // Ensure DB is initialized
 
         // Use a random username to avoid collisions in existing DB runs during dev
@@ -722,6 +728,7 @@ mod tests {
 
     #[test]
     fn test_never_expire_token_validation() {
+        let _lock = TEST_TOKEN_DB_MUTEX.lock().unwrap();
         let _ = init_db();
         let username = format!("NeverExpireUser_{}", Uuid::new_v4());
         let token_res = create_token(

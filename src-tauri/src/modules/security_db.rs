@@ -5,6 +5,9 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[cfg(test)]
+pub static TEST_SECURITY_DB_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// IP 访问日志
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpAccessLog {

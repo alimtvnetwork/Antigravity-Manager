@@ -3178,6 +3178,14 @@ mod tests {
 
     #[test]
     fn test_claude_adaptive_global_config() {
+        struct ResetConfigOnDrop;
+        impl Drop for ResetConfigOnDrop {
+            fn drop(&mut self) {
+                crate::proxy::config::update_thinking_budget_config(ThinkingBudgetConfig::default());
+            }
+        }
+        let _guard = ResetConfigOnDrop;
+
         // Set global config to Adaptive + High effort
         let config = ThinkingBudgetConfig {
             mode: crate::proxy::config::ThinkingBudgetMode::Adaptive,
@@ -3215,18 +3223,17 @@ mod tests {
         let gen_config = result["request"]["generationConfig"].as_object().unwrap();
         let thinking_config = gen_config["thinkingConfig"].as_object().unwrap();
 
-        // Check injection
+        // Check injection per [FIX #2208]: Claude models in adaptive mode map to thinkingLevel = "high"
+        // and remove thinkingBudget to avoid conflict
         assert_eq!(thinking_config["includeThoughts"], true);
-        assert_eq!(thinking_config["thinkingBudget"], -1);
+        assert_eq!(thinking_config["thinkingLevel"], "high");
+        assert!(thinking_config.get("thinkingBudget").is_none());
         assert!(thinking_config.get("thinkingType").is_none());
         assert!(thinking_config.get("effort").is_none());
 
-        // Check maxOutputTokens default for adaptive
+        // Check maxOutputTokens default for adaptive (64000)
         let max_output_tokens = gen_config["maxOutputTokens"].as_i64().unwrap();
-        assert_eq!(max_output_tokens, 131072);
-
-        // Reset global config
-        crate::proxy::config::update_thinking_budget_config(ThinkingBudgetConfig::default());
+        assert_eq!(max_output_tokens, 64000);
     }
 
     #[test]
