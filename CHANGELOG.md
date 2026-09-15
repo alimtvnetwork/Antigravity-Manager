@@ -3,6 +3,10 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本演进**:
+    *   **v4.8.0 (2026-09-15)**:
+        -   **[架构与代码规范] Go CLI AppError 规范与 DRY 帮助检查统一体系**:
+            -   **全面取缔标准 Go error**: 所有 Go 命令处理函数与工具包严禁返回原生 error，统一采用 *appfault.AppError 结构化错误类型，确保错误码、严重级别、领域边界与跨语言信封序列化一致性。
+            -   **中央 DRY 帮助与参数校验函数**: 引入 CheckHelpOrEmpty 统一拦截 --help / -h 并校验最小位置参数，彻底消除各命令中重复冗余的 if len(args) == 0 || hasHelpFlag(args) 模板代码。
     *   **v4.7.0 (2026-09-10)**:
         -   **[会话与代理修复] 修复会话级累计 Token 突破 100 万上限导致账号瘫痪与 400 报错 (PR #3415, Issue #3411, refs #3325)**:
             -   **对话级隔离与作用域 Session ID**: 改变此前上游 `sessionId` 纯由账号 ID/邮箱哈希生成的机制（导致同账号下所有对话在服务端共享单一 Session 并在长工具调用中累计输入 Token 突破 1,048,576 限制报 400）。现将 `account_id`、对话指纹（`fingerprint`）与代数计数器（`generation`）组合派生，同一对话内保持稳定（保留上游 Prompt Cache 缓存命中收益），不同对话间相互隔离。

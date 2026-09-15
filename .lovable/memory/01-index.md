@@ -31,6 +31,7 @@ Updated: 2026-04-27
 - 🔴 Strict `Id` / `id` naming: TOTAL BAN on uppercase acronym `ID` in struct fields and variables (`UserId`, `OrderId`, `TraceId`).
 - 🔴 Strict positive boolean prefixes: ALL boolean fields and variables MUST have positive prefixes (`isActive`, `isSuccess`, `isValid`).
 - 🔴 Parallel CI/CD Local Runner: Worker group concurrency via `ThreadPoolExecutor` with selective log filtering (`--failed` suppresses noisy logs on pass; isolates failures).
+- 🔴 Go CLI AppError & DRY Help Checking: TOTAL BAN on standard Go `error` in CLI commands (must use `*appfault.AppError`). Centralized DRY helper (`CheckHelpOrEmpty`) eliminates copy-pasted `if len(args) == 0 || hasHelpFlag(args)` boilerplate across all commands.
 
 - [Project Context & Learned Guidelines](learned/01-project-context-and-guidelines.md) — Comprehensive ingestion of repo identity, CODE RED rules, coding guidelines, error philosophy, and active plans.
 - [Pluggable Logger & Uber Zap Architecture](learned/02-logger-swapping-and-uber-zap-architecture.md) — Architecture and code samples for dynamic Log Changer, Formatter/Writer pipeline, context.Context tracing, and Uber Zap integration.
@@ -113,3 +114,4 @@ Updated: 2026-04-27
 - 🔴 Install scripts dynamically inject `codingGuideline` and `promptArchitectByRiseupAsia` sections into target repository's `version.json` without overwriting the file. The `.lovable/memory` directory is packaged in bundles and transferred to target repositories during install and update phases so all downstream repos inherit memory standards.
 - [Session 2026-09-10 Memory Retrieval & Git History](learned/10-memory-retrieval-git-history-and-project-context-ingestion.md) — 20 recent commits reviewed, CODE RED rules reaffirmed, 02-spec and .lovable directories fully audited.
 - [Session 2026-09-10 Antigravity-Manager Workspace Onboarding](learned/11-antigravity-manager-workspace-onboarding.md) — Antigravity-Manager workspace onboarding, Tauri v2 backend, React frontend, proxy_logs SQLite schema, and last 10 git commits.
+- [Go CLI AppError & DRY Help Checking Architecture](learned/12-go-cli-apperror-and-dry-help-handling.md) — Universal elimination of standard Go error in favor of *appfault.AppError, and centralized DRY helper function for help and argument checking.

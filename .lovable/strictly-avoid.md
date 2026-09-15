@@ -315,3 +315,38 @@ Allowed work:
 - ✅ Root readme MUST be strictly lowercase `readme.md`.
 - ✅ If an uppercase variant is detected, rename immediately to lowercase `readme.md`.
 
+---
+
+## Standard Go `error` Return Type in CLI Commands — TOTAL BAN
+
+🔴 **NEVER return standard Go `error` from CLI command handlers or Go functions.**
+
+Forbidden:
+- ❌ `func runJoin(args []string) error`
+- ❌ `func loadFile(path string) ([]byte, error)`
+- ❌ `return fmt.Errorf(...)` or `return errors.New(...)`
+
+Allowed work:
+- ✅ Return `*appfault.AppError` in all Go functions returning failure metadata: `func runJoin(args []string) *appfault.AppError`.
+- ✅ Wrap low-level errors using `appfault.Wrap(err, "cli.command", "E1002", "contextual detail")`.
+- ✅ Construct structured validation errors via `appfault.NewValidation(...)`.
+
+**Why:** Rule 6 of `AGENTS.md` mandates structured failure metadata via `*appfault.AppError`. Standard Go `error` lacks error codes, severity levels, domains, and breaks universal response envelopes and linters.
+
+---
+
+## Repetitive Inline Help and Zero-Arg Checking Boilerplate — TOTAL BAN
+
+🔴 **NEVER copy-paste repetitive `if len(args) == 0 || hasHelpFlag(args)` or ad-hoc argument checking in individual CLI command files.**
+
+Forbidden:
+- ❌ Inline repetitive check: `if len(args) == 0 || hasHelpFlag(args) { helptext.Print("join"); return nil }` in command handlers.
+- ❌ Disparate help flag parsing loops in individual subcommand files.
+
+Allowed work:
+- ✅ Use centralized DRY helper: `handled, appErr := CheckHelpOrEmpty("command_name", args, minArgs)` in `cmd/helpcheck.go`.
+- ✅ Return structured `*appfault.AppError` if minimum arguments are not met without a help flag.
+- ✅ Single-point maintenance for help flags (`-h`, `--help`, `help`), usage formatting, and argument validation.
+
+**Why:** Copy-pasted boilerplate across dozens of command files causes code drift, disparate validation behavior, and violates DRY principles.
+

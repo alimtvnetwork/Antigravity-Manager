@@ -83,7 +83,7 @@ def read_canonical_version():
             with open(VERSION_JSON, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            raw_ver = data.get("version")
+            raw_ver = data.get("version") or data.get("Version")
             if raw_ver:
                 return str(raw_ver).strip()
         except Exception:
@@ -193,35 +193,30 @@ def execute_version_bump(next_version, scope, dry_run=False):
         print(f"[DRY RUN] Would bump version to {next_version} (scope: {scope})")
         return
 
-    # Check 1: Node bump script
-    if NODE_BUMP_SCRIPT.is_file():
-        print(f"[*] Invoking Node bump script: {NODE_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
-        run_cmd(["node", str(NODE_BUMP_SCRIPT), "--version", next_version, "--scope", scope])
-        return
-
-    # Check 2: Python bump script
+    # Optional helper bump script invocation
     if PYTHON_BUMP_SCRIPT.is_file():
         print(f"[*] Invoking Python bump script: {PYTHON_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
-        run_cmd([sys.executable, str(PYTHON_BUMP_SCRIPT), "--version", next_version, "--scope", scope])
-        return
+        try:
+            run_cmd([sys.executable, str(PYTHON_BUMP_SCRIPT), "--set", next_version])
+        except Exception as e:
+            print(f"[!] Sub-bump script notice: {e}")
 
-    # Check 3: Bootstrap and execute fallback in-place
-    print("[!] No bump script found. Executing standalone autonomous version bump...")
-    bootstrap_bump_script_if_needed()
-
+    # Check 3: Standalone autonomous version bump across all manifests and docs
+    print("[!] Executing standalone autonomous version bump across repository...")
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
-    # Update version.json
+    # 1. Update version.json
     if VERSION_JSON.is_file():
         with open(VERSION_JSON, "r", encoding="utf-8") as f:
             v_data = json.load(f)
+        v_data["Version"] = next_version
         v_data["version"] = next_version
         v_data["releaseDate"] = today_str
         with open(VERSION_JSON, "w", encoding="utf-8") as f:
             json.dump(v_data, f, indent=2)
             f.write("\n")
 
-    # Update package.json
+    # 2. Update package.json
     if PACKAGE_JSON.is_file():
         with open(PACKAGE_JSON, "r", encoding="utf-8") as f:
             p_data = json.load(f)
@@ -230,19 +225,90 @@ def execute_version_bump(next_version, scope, dry_run=False):
             json.dump(p_data, f, indent=2)
             f.write("\n")
 
-    # Update changelog.md
-    if CHANGELOG_MD.is_file():
-        with open(CHANGELOG_MD, "r", encoding="utf-8") as f:
-            cl_content = f.read()
+    # 3. Update package-lock.json
+    pkg_lock_file = REPO_ROOT / "package-lock.json"
+    if pkg_lock_file.is_file():
+        with open(pkg_lock_file, "r", encoding="utf-8") as f:
+            pl_data = json.load(f)
+        pl_data["version"] = next_version
+        if "packages" in pl_data:
+            if "" in pl_data["packages"]:
+                pl_data["packages"][""]["version"] = next_version
+        with open(pkg_lock_file, "w", encoding="utf-8") as f:
+            json.dump(pl_data, f, indent=2)
+            f.write("\n")
 
-        entry_header = f"## [v{next_version}] {today_str} {scope}\n\n- {scope}\n\n"
-        if "# Changelog\n" in cl_content:
-            cl_content = cl_content.replace("# Changelog\n", f"# Changelog\n\n{entry_header}", 1)
-        else:
-            cl_content = f"# Changelog\n\n{entry_header}{cl_content}"
+    # 4. Update src-tauri/Cargo.toml
+    cargo_file = REPO_ROOT / "src-tauri" / "Cargo.toml"
+    if cargo_file.is_file():
+        cargo_content = cargo_file.read_text(encoding="utf-8")
+        cargo_content = re.sub(r'(?m)^version\s*=\s*"[^"]+"', f'version = "{next_version}"', cargo_content, count=1)
+        cargo_file.write_text(cargo_content, encoding="utf-8")
 
-        with open(CHANGELOG_MD, "w", encoding="utf-8") as f:
-            f.write(cl_content)
+    # 5. Update src-tauri/tauri.conf.json
+    tauri_conf = REPO_ROOT / "src-tauri" / "tauri.conf.json"
+    if tauri_conf.is_file():
+        with open(tauri_conf, "r", encoding="utf-8") as f:
+            tc_data = json.load(f)
+        tc_data["version"] = next_version
+        with open(tauri_conf, "w", encoding="utf-8") as f:
+            json.dump(tc_data, f, indent=2)
+            f.write("\n")
+
+    # 6. Update Casks/antigravity-tools.rb
+    cask_file = REPO_ROOT / "Casks" / "antigravity-tools.rb"
+    if cask_file.is_file():
+        cask_content = cask_file.read_text(encoding="utf-8")
+        cask_content = re.sub(r'version\s+"[^"]+"', f'version "{next_version}"', cask_content, count=1)
+        cask_file.write_text(cask_content, encoding="utf-8")
+
+    # 7. Update UI fallback version strings in React
+    settings_tsx = REPO_ROOT / "src" / "pages" / "Settings.tsx"
+    if settings_tsx.is_file():
+        st_content = settings_tsx.read_text(encoding="utf-8")
+        st_content = re.sub(r"useState<string>\('[0-9.]+'\)", f"useState<string>('{next_version}')", st_content)
+        settings_tsx.write_text(st_content, encoding="utf-8")
+
+    miniview_tsx = REPO_ROOT / "src" / "components" / "layout" / "MiniView.tsx"
+    if miniview_tsx.is_file():
+        mv_content = miniview_tsx.read_text(encoding="utf-8")
+        mv_content = re.sub(r"setAppVersion\('[0-9.]+'\)", f"setAppVersion('{next_version}')", mv_content)
+        miniview_tsx.write_text(mv_content, encoding="utf-8")
+
+    # 8. Update README files badges and version titles
+    for readme_path in [REPO_ROOT / "readme.md", REPO_ROOT / "README.md", REPO_ROOT / "README_EN.md"]:
+        if readme_path.is_file():
+            rm_content = readme_path.read_text(encoding="utf-8")
+            rm_content = re.sub(r"\(v[0-9.]+\)", f"(v{next_version})", rm_content)
+            rm_content = re.sub(r"badge/Version-[0-9.]+-blue", f"badge/Version-{next_version}-blue", rm_content)
+            readme_path.write_text(rm_content, encoding="utf-8")
+
+    # 9. Update changelog files
+    changelog_zh = REPO_ROOT / "CHANGELOG.md"
+    if changelog_zh.is_file():
+        cl_content = changelog_zh.read_text(encoding="utf-8")
+        zh_entry = (
+            f"    *   **v{next_version} ({today_str})**:\n"
+            f"        -   **[架构与代码规范] Go CLI AppError 规范与 DRY 帮助检查统一体系**:\n"
+            f"            -   **全面取缔标准 Go error**: 所有 Go 命令处理函数与工具包严禁返回原生 error，统一采用 *appfault.AppError 结构化错误类型，确保错误码、严重级别、领域边界与跨语言信封序列化一致性。\n"
+            f"            -   **中央 DRY 帮助与参数校验函数**: 引入 CheckHelpOrEmpty 统一拦截 --help / -h 并校验最小位置参数，彻底消除各命令中重复冗余的 if len(args) == 0 || hasHelpFlag(args) 模板代码。\n"
+        )
+        if "*   **版本演进**:\n" in cl_content:
+            cl_content = cl_content.replace("*   **版本演进**:\n", f"*   **版本演进**:\n{zh_entry}", 1)
+        changelog_zh.write_text(cl_content, encoding="utf-8")
+
+    changelog_en = REPO_ROOT / "CHANGELOG_EN.md"
+    if changelog_en.is_file():
+        cl_en_content = changelog_en.read_text(encoding="utf-8")
+        en_entry = (
+            f"    *   **v{next_version} ({today_str})**:\n"
+            f"        -   **[Architecture & Code Quality] Go CLI AppError Enforcement & Centralized DRY Help Checking**:\n"
+            f"            -   **Total Ban on Standard Go error**: Enforce *appfault.AppError return types across all Go command runners and packages; ban bare error to ensure structured error metadata and serializable response envelopes.\n"
+            f"            -   **Centralized DRY Help & Argument Validation**: Introduce CheckHelpOrEmpty helper to intercept --help / -h and enforce minimum argument bounds, eliminating duplicate boilerplate across command handlers.\n"
+        )
+        if "*   **Version Evolution**:\n" in cl_en_content:
+            cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)
+        changelog_en.write_text(cl_en_content, encoding="utf-8")
 
 
 def stage_and_commit_release(next_version, scope, dry_run=False):
@@ -253,10 +319,8 @@ def stage_and_commit_release(next_version, scope, dry_run=False):
         print(f"[DRY RUN] Would stage changes and commit: '{commit_msg}'")
         return "dryrun_commit_sha"
 
-    # Stage only release-specific files
-    for vf in [VERSION_JSON, PACKAGE_JSON, CHANGELOG_MD, README_MD]:
-        if vf.is_file():
-            run_cmd(["git", "add", str(vf)])
+    # Stage all repository changes including specs and memory
+    run_cmd(["git", "add", "-A"])
 
     # Commit
     run_cmd(["git", "commit", "-m", commit_msg])
@@ -287,10 +351,10 @@ def create_release_branch_and_tag(next_version, commit_sha, dry_run=False):
     return branch_name, tag_name
 
 
-def push_release(branch_name, tag_name, dry_run=False):
-    """Pushes release branch and tag to remote repository."""
+def push_release(branch_name, tag_name, original_branch="main", dry_run=False):
+    """Pushes release branch, tag, and original branch to remote repository."""
     if dry_run:
-        print(f"[DRY RUN] Would push branch '{branch_name}' and tag '{tag_name}' to origin")
+        print(f"[DRY RUN] Would push branch '{branch_name}', tag '{tag_name}', and '{original_branch}' to origin")
         return
 
     print(f"[*] Pushing branch '{branch_name}' to origin...")
@@ -298,6 +362,10 @@ def push_release(branch_name, tag_name, dry_run=False):
 
     print(f"[*] Pushing tag '{tag_name}' to origin...")
     run_cmd(["git", "push", "origin", tag_name])
+
+    if original_branch:
+        print(f"[*] Pushing original branch '{original_branch}' to origin...")
+        run_cmd(["git", "push", "origin", original_branch])
 
 
 def revert_to_original_branch(original_branch, dry_run=False):
@@ -337,7 +405,7 @@ def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run
     print(f"[*] Version Plan: {current_ver} -> {next_ver} (Tier: {tier})")
 
     try:
-        # 3. Bump version
+        # 3. Bump version across manifests and docs
         execute_version_bump(next_ver, default_scope, dry_run=dry_run)
 
         # 4. Commit bump changes
@@ -347,9 +415,9 @@ def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run
         branch_name, tag_name = create_release_branch_and_tag(next_ver, commit_sha, dry_run=dry_run)
 
         # 7. Push branch and tag if enabled
-        is_push_enabled = push and not dry_run
-        if is_push_enabled:
-            push_release(branch_name, tag_name, dry_run=dry_run)
+        if not dry_run:
+            if push:
+                push_release(branch_name, tag_name, original_branch=original_branch, dry_run=dry_run)
 
     finally:
         # 8. Always revert back to the exact starting branch

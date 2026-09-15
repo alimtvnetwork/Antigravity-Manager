@@ -86,11 +86,16 @@ Every subcommand handler:
 
 ```go
 // cmd/scan.go
-func runScan(args []string) {
-    checkHelp("scan", args)
+func runScan(args []string) *appfault.AppError {
+    handled, appErr := CheckHelpOrEmpty("scan", args, 1)
+    if handled {
+        return appErr
+    }
+
     dir, cfg := parseScanFlags(args)
     records := scanner.Scan(dir, cfg)
     formatter.WriteTerminal(os.Stdout, records)
+    return nil
 }
 ```
 

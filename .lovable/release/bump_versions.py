@@ -26,7 +26,7 @@ FILES_TO_BUMP = [
 def get_current_version():
     with open("version.json", "r", encoding="utf-8") as f:
         data = json.load(f)
-        return data.get("version", "1.0.0")
+        return data.get("version") or data.get("Version") or "1.0.0"
 
 def set_current_version(new_version):
     with open("version.json", "r+", encoding="utf-8") as f:

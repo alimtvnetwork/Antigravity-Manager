@@ -71,30 +71,31 @@ if failed > 0 {
 
 ## Error Handling in Functions
 
-- Always check errors immediately after the call.
-- Return errors up the stack; let the caller decide.
-- In `cmd` package handlers, print the error and `os.Exit(1)`.
+- All Go functions returning failure metadata MUST use `*appfault.AppError` (never standard Go `error`).
+- Always check errors immediately after the call (`if appErr != nil`).
+- Return errors up the stack using `*appfault.AppError`; let the caller or CLI runner decide how to render.
+- In `cmd` package entrypoints, format the `*appfault.AppError` to stderr and exit with the appropriate exit code.
 - Never use `panic` for expected error conditions.
 
 ```go
-// ✅ Correct — return error up
-func loadFile(path string) ([]byte, error) {
+// ✅ Correct — return *appfault.AppError up the stack
+func loadFile(path string) ([]byte, *appfault.AppError) {
     data, err := os.ReadFile(path)
     if err != nil {
-        return nil, fmt.Errorf("reading %s: %w", path, err)
+        return nil, appfault.Wrap(err, "file.load", "E1002", "failed to read file: "+path)
     }
 
     return data, nil
 }
 
-// ✅ Correct — handler prints and exits
-func runImport(args []string) {
-    data, err := loadFile(args[0])
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        os.Exit(1)
+// ✅ Correct — handler dispatches domain logic and returns *appfault.AppError
+func runImport(args []string) *appfault.AppError {
+    data, appErr := loadFile(args[0])
+    if appErr != nil {
+        return appErr
     }
     // process data
+    return nil
 }
 ```
 
