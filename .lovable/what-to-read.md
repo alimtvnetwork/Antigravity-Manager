@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-15T11:00:00Z, Documentation & Memory write: authored 01-instructions/ architecture guides and Mermaid diagrams for token capture, multi-instance isolation, and window customization; recorded learned memory in learned/13-refresh-token-capture-multi-instance-and-window-specs.md.
 - 2026-09-15T10:50:00Z, Memory write: Go CLI AppError return type enforcement and centralized DRY help/argument checking architecture recorded in learned/12-go-cli-apperror-and-dry-help-handling.md, strictly-avoid.md updated, specs updated, and minor version bump to 4.8.0.
 - 2026-09-10T23:00:00Z, Spec update: remediated 100% of Blind-AI audit v2 findings (F-001 through F-010), expanded IPC registry to 153 commands, bound 27 coding guidelines, grounded tests, and closed audit gap.
 - 2026-09-10T19:22:00Z, Spec update: remediated 100% of Blind-AI audit findings across 02-spec/21-app/, 02-spec/23-app-db/, and 02-spec/24-app-ui-design-system/, closing audit gaps and archiving audit report.
@@ -29,6 +30,8 @@
 - `.lovable/memory/learned/09-conversation-log-and-context-wrapper-protocol.md`, why: conversation log persistence protocol and prompt staging boundary
 - .lovable/memory/learned/11-antigravity-manager-workspace-onboarding.md, why: Antigravity-Manager workspace onboarding, proxy architecture, and recent commit history
 - .lovable/memory/learned/12-go-cli-apperror-and-dry-help-handling.md, why: Go CLI AppError enforcement (*appfault.AppError) and centralized DRY help checking
+- .lovable/memory/learned/13-refresh-token-capture-multi-instance-and-window-specs.md, why: authoritative token capture pathways, multi-instance profile isolation, and window customization specs
+- `01-instructions/01-index.md`, why: master index of architecture guides, token capture sequences, and multi-instance blueprints
 - `.lovable/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.lovable/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony
 - `.lovable/coding-guidelines.md`, why: baseline rules and coding standards
