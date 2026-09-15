@@ -4197,7 +4197,8 @@ mod image_scheduler_tests {
     #[test]
     fn test_switch_request_deserialization_with_and_without_target_ide() {
         use super::SwitchRequest;
-        let with_ide: SwitchRequest = serde_json::from_str(r#"{"accountId": "acc_1", "targetIde": "agy"}"#).unwrap();
+        let with_ide: SwitchRequest =
+            serde_json::from_str(r#"{"accountId": "acc_1", "targetIde": "agy"}"#).unwrap();
         assert_eq!(with_ide.account_id, "acc_1");
         assert_eq!(with_ide.target_ide.as_deref(), Some("agy"));
 

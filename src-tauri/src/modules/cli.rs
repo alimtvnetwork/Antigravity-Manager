@@ -50,37 +50,40 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
-        "--list-profiles" | "-lp" | "list-profiles" => {
-            match instance::list_instances() {
-                Ok(instances) => {
-                    println!("\nRegistered Profiles ({} total):", instances.len());
-                    println!("{:<16} {:<18} {:<16} {:<24} {}", "ID", "NAME", "STATUS", "BOUND EMAIL", "DATA DIR");
-                    println!("{}", "-".repeat(95));
-                    for inst in instances {
-                        let status_str = if inst.is_running {
-                            format!("Running (PID: {})", inst.pid.unwrap_or(0))
-                        } else {
-                            "Idle".to_string()
-                        };
-                        let email = inst.config.bound_email.unwrap_or_else(|| "-".to_string());
-                        println!(
-                            "{:<16} {:<18} {:<16} {:<24} {}",
-                            inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
-                        );
-                    }
-                    println!();
-                    std::process::exit(0);
+        "--list-profiles" | "-lp" | "list-profiles" => match instance::list_instances() {
+            Ok(instances) => {
+                println!("\nRegistered Profiles ({} total):", instances.len());
+                println!(
+                    "{:<16} {:<18} {:<16} {:<24} {}",
+                    "ID", "NAME", "STATUS", "BOUND EMAIL", "DATA DIR"
+                );
+                println!("{}", "-".repeat(95));
+                for inst in instances {
+                    let status_str = if inst.is_running {
+                        format!("Running (PID: {})", inst.pid.unwrap_or(0))
+                    } else {
+                        "Idle".to_string()
+                    };
+                    let email = inst.config.bound_email.unwrap_or_else(|| "-".to_string());
+                    println!(
+                        "{:<16} {:<18} {:<16} {:<24} {}",
+                        inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
+                    );
                 }
-                Err(e) => {
-                    eprintln!("Error listing profiles: {}", e);
-                    std::process::exit(1);
-                }
+                println!();
+                std::process::exit(0);
             }
-        }
+            Err(e) => {
+                eprintln!("Error listing profiles: {}", e);
+                std::process::exit(1);
+            }
+        },
 
         "--copy-profile" | "-dp" | "copy-profile" => {
             if args.len() < 4 {
-                eprintln!("Error: Usage: antigravity-manager --copy-profile <source_id> <new_name>");
+                eprintln!(
+                    "Error: Usage: antigravity-manager --copy-profile <source_id> <new_name>"
+                );
                 std::process::exit(1);
             }
             let source_id = &args[2];
@@ -140,9 +143,13 @@ pub fn handle_cli_arguments() -> bool {
         "--profile-help" | "--help-profile" => {
             println!("Antigravity Multi-Profile CLI Commands:");
             println!("  --create-profile <name>           Create a new isolated profile");
-            println!("  --list-profiles                   List all registered profiles and running PIDs");
+            println!(
+                "  --list-profiles                   List all registered profiles and running PIDs"
+            );
             println!("  --copy-profile <src_id> <name>    Clone an existing profile to a new one");
-            println!("  --delete-profile <id>             Delete a profile directory and registry entry");
+            println!(
+                "  --delete-profile <id>             Delete a profile directory and registry entry"
+            );
             println!("  --run-profile <id>                Launch Antigravity using the specified profile");
             std::process::exit(0);
         }

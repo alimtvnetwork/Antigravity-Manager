@@ -23,7 +23,6 @@ pub use patch::*;
 pub mod instance;
 pub use instance::*;
 
-
 /// 列出所有账号
 #[tauri::command]
 pub async fn list_accounts(
@@ -161,7 +160,8 @@ pub async fn switch_account(
     account_id: String,
     target_ide: Option<String>,
 ) -> Result<(), String> {
-    let active_instance = modules::instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    let active_instance =
+        modules::instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
     let instance_target = if let Some(ref target) = target_ide {
         if target.starts_with("instance:") {
             Some(target.trim_start_matches("instance:").to_string())
@@ -194,7 +194,6 @@ pub async fn switch_account(
 
     Ok(())
 }
-
 
 /// 获取当前账号
 #[tauri::command]

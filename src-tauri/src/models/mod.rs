@@ -8,8 +8,9 @@ pub use account::{
     Account, AccountExportItem, AccountExportResponse, AccountIndex, AccountSummary, DeviceProfile,
     DeviceProfileVersion,
 };
-pub use config::{AppConfig, AutoProfileSwitcherConfig, CircuitBreakerConfig, QuotaProtectionConfig};
+pub use config::{
+    AppConfig, AutoProfileSwitcherConfig, CircuitBreakerConfig, QuotaProtectionConfig,
+};
 pub use instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use quota::{QuotaBucket, QuotaData, QuotaGroup};
 pub use token::TokenData;
-

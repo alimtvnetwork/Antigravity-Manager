@@ -244,7 +244,6 @@ pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     let is_headless = args.iter().any(|arg| arg == "--headless");
 
-
     // Increase file descriptor limit (macOS only)
     #[cfg(target_os = "macos")]
     increase_nofile_limit();

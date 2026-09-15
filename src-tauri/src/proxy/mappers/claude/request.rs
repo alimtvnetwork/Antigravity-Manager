@@ -700,8 +700,11 @@ pub fn transform_claude_request_in(
     // [FIX session-1M] 混入对话指纹与代数,不同对话隔离服务端会话,1M 累计报错后 bump 自愈
     if let Some(account_id) = account_id {
         let generation = crate::proxy::common::session::current_bump(account_id, &session_id);
-        inner_request["sessionId"] =
-            json!(crate::proxy::common::session::derive_session_scoped(account_id, &session_id, generation));
+        inner_request["sessionId"] = json!(crate::proxy::common::session::derive_session_scoped(
+            account_id,
+            &session_id,
+            generation
+        ));
     }
 
     // 生成 requestId
@@ -722,7 +725,8 @@ pub fn transform_claude_request_in(
         .get("contents")
         .map(super::super::common_utils::contents_has_tool_interactions)
         .unwrap_or(false);
-    let is_agent_request = config.request_type != "image_gen" && (has_tools || has_tool_interactions);
+    let is_agent_request =
+        config.request_type != "image_gen" && (has_tools || has_tool_interactions);
 
     // 构建最终请求体
     let mut body = json!({
@@ -3280,10 +3284,7 @@ mod tests {
             !has_google_search,
             "v1internal should avoid mixed Google Search when functionDeclarations present"
         );
-        assert!(
-            has_functions,
-            "Should have function declarations"
-        );
+        assert!(has_functions, "Should have function declarations");
     }
 
     #[test]
@@ -3365,11 +3366,15 @@ mod tests {
     fn test_model_keeps_thinking_without_signature() {
         assert!(model_keeps_thinking_without_signature("gemini-3-flash"));
         assert!(model_keeps_thinking_without_signature("gemini-3.1-flash"));
-        assert!(model_keeps_thinking_without_signature("gemini-3.7-flash-high"));
+        assert!(model_keeps_thinking_without_signature(
+            "gemini-3.7-flash-high"
+        ));
         assert!(model_keeps_thinking_without_signature(
             "gemini-3.6-flash-medium"
         ));
-        assert!(model_keeps_thinking_without_signature("gemini-3.5-flash-low"));
+        assert!(model_keeps_thinking_without_signature(
+            "gemini-3.5-flash-low"
+        ));
         assert!(model_keeps_thinking_without_signature("gemini-pro-agent"));
         assert!(!model_keeps_thinking_without_signature("gemini-3.1-pro"));
         assert!(!model_keeps_thinking_without_signature(

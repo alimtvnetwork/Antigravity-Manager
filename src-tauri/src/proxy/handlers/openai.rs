@@ -3828,7 +3828,7 @@ pub async fn handle_completions(
                             headers,
                             format!("Token error: {}", e),
                         )
-                            .into_response()
+                            .into_response();
                     }
                 }
             };

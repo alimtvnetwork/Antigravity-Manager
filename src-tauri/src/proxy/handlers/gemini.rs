@@ -763,7 +763,12 @@ pub async fn handle_generate(
         // [FIX] 429 时立即解绑当前会话，确保换号重试与后续请求不会死锁在受限账号上
         if status_code == 429 || status_code == 529 {
             token_manager.clear_session_binding(&session_id);
-            tracing::debug!("[Gemini] Unbound session {} from account {} due to status {}", session_id, email, status_code);
+            tracing::debug!(
+                "[Gemini] Unbound session {} from account {} due to status {}",
+                session_id,
+                email,
+                status_code
+            );
         }
 
         // 确定重试策略
@@ -960,11 +965,7 @@ pub async fn handle_count_tokens(
 ///
 /// 获取有效 OAuth Token，将标准 Gemini 请求体包装为 v1internal 格式后转发，
 /// 返回真实的 token 计数，而不是硬编码的 0
-pub async fn execute_count_tokens(
-    state: AppState,
-    model_name: String,
-    body: Value,
-) -> Response {
+pub async fn execute_count_tokens(state: AppState, model_name: String, body: Value) -> Response {
     // 1. 模型路由解析
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
         &model_name,
@@ -996,11 +997,7 @@ pub async fn execute_count_tokens(
     {
         Ok(t) => t,
         Err(e) => {
-            let headers = build_token_error_headers(
-                Some(mapped_model.as_str()),
-                None,
-                &e,
-            );
+            let headers = build_token_error_headers(Some(mapped_model.as_str()), None, &e);
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 headers,

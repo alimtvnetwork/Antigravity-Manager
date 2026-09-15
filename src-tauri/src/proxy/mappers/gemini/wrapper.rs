@@ -786,7 +786,10 @@ pub fn wrap_request_v2(
         // 2. snake_case
         if let Some(tool_config_snake) = inner_request.get_mut("tool_config") {
             if let Some(obj) = tool_config_snake.as_object_mut() {
-                obj.insert("include_server_side_tool_invocations".to_string(), json!(true));
+                obj.insert(
+                    "include_server_side_tool_invocations".to_string(),
+                    json!(true),
+                );
             }
         } else {
             inner_request["tool_config"] = json!({
@@ -800,8 +803,7 @@ pub fn wrap_request_v2(
     // [FIX session-1M] 混入对话指纹与代数,不同对话隔离服务端会话,1M 累计报错后 bump 自愈
     if let Some(account_id_str) = account_id {
         let fingerprint = session_id.unwrap_or("default");
-        let generation =
-            crate::proxy::common::session::current_bump(account_id_str, fingerprint);
+        let generation = crate::proxy::common::session::current_bump(account_id_str, fingerprint);
         inner_request["sessionId"] = json!(crate::proxy::common::session::derive_session_scoped(
             account_id_str,
             fingerprint,
@@ -864,7 +866,8 @@ pub fn wrap_request_v2(
         .map(crate::proxy::mappers::common_utils::contents_has_tool_interactions)
         .unwrap_or(false);
 
-    let is_agent_request = config.request_type != "image_gen" && (has_tools || has_tool_interactions);
+    let is_agent_request =
+        config.request_type != "image_gen" && (has_tools || has_tool_interactions);
 
     // [CACHE] 重建 inner_request 字段顺序——稳定前缀在前，动态内容在后
     // 遵循 Google 官方建议："将较大且常见的内容放置在提示的开头"

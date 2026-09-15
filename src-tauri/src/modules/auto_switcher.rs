@@ -56,7 +56,11 @@ pub fn get_recovery_dir() -> Result<PathBuf, String> {
 }
 
 /// Snapshot current task and active instance before switching
-pub fn snapshot_task_state(instance_id: &str, account_id: &str, reason: &str) -> Result<(), String> {
+pub fn snapshot_task_state(
+    instance_id: &str,
+    account_id: &str,
+    reason: &str,
+) -> Result<(), String> {
     let dir = get_recovery_dir()?;
     let now = chrono::Utc::now().timestamp();
     let snapshot = TaskRecoverySnapshot {
@@ -169,9 +173,7 @@ fn select_next_best_profile(
         }
     }
 
-    account_candidates.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-    });
+    account_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
     if let Some((best_acc, quota)) = account_candidates.into_iter().next() {
         return Ok(Some(ProfileCandidate {
@@ -232,8 +234,8 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
     };
 
     let bound_acc = account::load_account(bound_acc_id)?;
-    let quota_percent = calculate_account_quota(&bound_acc, &switcher_cfg.target_model)
-        .unwrap_or(100.0);
+    let quota_percent =
+        calculate_account_quota(&bound_acc, &switcher_cfg.target_model).unwrap_or(100.0);
 
     let now = chrono::Utc::now().timestamp();
     {

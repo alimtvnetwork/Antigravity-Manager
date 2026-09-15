@@ -55,7 +55,8 @@ pub async fn switch_account_to_instance(
 }
 
 #[tauri::command]
-pub fn get_auto_switcher_status() -> Result<crate::modules::auto_switcher::AutoSwitcherStatus, String> {
+pub fn get_auto_switcher_status(
+) -> Result<crate::modules::auto_switcher::AutoSwitcherStatus, String> {
     Ok(crate::modules::auto_switcher::get_status())
 }
 
@@ -72,4 +73,3 @@ pub fn update_auto_switcher_config(
 pub async fn trigger_manual_profile_rotation() -> Result<String, String> {
     crate::modules::auto_switcher::trigger_manual_rotation().await
 }
-

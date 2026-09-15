@@ -144,9 +144,8 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             .collect::<Vec<String>>()
             .join(" ");
 
-        let is_helper = args_str.contains("--type=")
-            || name.contains("helper")
-            || name.contains("crashpad");
+        let is_helper =
+            args_str.contains("--type=") || name.contains("helper") || name.contains("crashpad");
         if is_helper {
             continue;
         }
@@ -525,4 +524,3 @@ pub async fn switch_account_to_instance(
 
     Ok(())
 }
-
