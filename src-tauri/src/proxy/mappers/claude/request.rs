@@ -2985,9 +2985,12 @@ mod tests {
     }
     #[test]
     fn test_claude_flash_thinking_budget_capping() {
-        // Use full path or ensure import of ThinkingConfig
-        // transform_claude_request and models are needed.
-        // Assuming models are available via super imports, but let's be explicit if needed.
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig::default(),
+        );
 
         // Setup request with high budget
         let req = ClaudeRequest {
@@ -3178,6 +3181,9 @@ mod tests {
 
     #[test]
     fn test_claude_adaptive_global_config() {
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         struct ResetConfigOnDrop;
         impl Drop for ResetConfigOnDrop {
             fn drop(&mut self) {

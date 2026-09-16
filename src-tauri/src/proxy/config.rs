@@ -26,6 +26,9 @@ pub fn normalize_proxy_url(url: &str) -> String {
 // ============================================================================
 static GLOBAL_THINKING_BUDGET_CONFIG: OnceLock<RwLock<ThinkingBudgetConfig>> = OnceLock::new();
 
+#[cfg(test)]
+pub static TEST_THINKING_BUDGET_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// 获取当前 Thinking Budget 配置
 pub fn get_thinking_budget_config() -> ThinkingBudgetConfig {
     GLOBAL_THINKING_BUDGET_CONFIG

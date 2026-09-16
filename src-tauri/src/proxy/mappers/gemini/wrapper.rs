@@ -1272,7 +1272,8 @@ pub fn wrap_request(
         None,
     )
 }
-static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+#[cfg(test)]
+use crate::proxy::config::TEST_THINKING_BUDGET_MUTEX as TEST_MUTEX;
 
 #[cfg(test)]
 mod tests {

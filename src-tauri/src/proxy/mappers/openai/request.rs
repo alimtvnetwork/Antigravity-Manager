@@ -1730,6 +1730,9 @@ mod tests {
 
     #[test]
     fn test_issue_1602_custom_mode_gemini_capping() {
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // [FIX #1602] Regression test for custom mode capping
         use crate::proxy::config::{
             update_thinking_budget_config, ThinkingBudgetConfig, ThinkingBudgetMode,
@@ -1876,6 +1879,9 @@ mod tests {
 
     #[test]
     fn test_gemini_pro_thinking_injection() {
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let req = OpenAIRequest {
             model: "gemini-3-pro-preview".to_string(),
             messages: vec![OpenAIMessage {
@@ -2012,6 +2018,9 @@ mod tests {
 
     #[test]
     fn test_flash_thinking_budget_capping() {
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         crate::proxy::config::update_thinking_budget_config(
             crate::proxy::config::ThinkingBudgetConfig::default(),
         );
