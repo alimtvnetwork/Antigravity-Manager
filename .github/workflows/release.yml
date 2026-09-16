@@ -188,41 +188,35 @@ jobs:
           merge-multiple: true
 
       - name: Extract Release Notes
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          VERSION="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
           echo "Extracting release notes for version $VERSION"
-
-          # 1. Generate Quick Install One-Liners Header
-          cat << EOF > release_notes.md
-## Quick Install ${VERSION}
-
-### Windows (PowerShell 5.1+)
-\`\`\`powershell
-irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex
-# Or pinned version:
-irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex
-\`\`\`
-
-### Linux / macOS (Bash)
-\`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash
-# Or pinned version:
-curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash
-\`\`\`
-
----
-
-EOF
-
-          # 2. Extract version changelog body and append
+          echo "## Quick Install ${VERSION}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Windows (PowerShell 5.1+)" >> release_notes.md
+          echo '```powershell' >> release_notes.md
+          echo "irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" >> release_notes.md
+          echo "# Or pinned version:" >> release_notes.md
+          echo "irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Linux / macOS (Bash)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
+          echo "# Or pinned version:" >> release_notes.md
+          echo "curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "---" >> release_notes.md
+          echo "" >> release_notes.md
           awk -v ver="$VERSION" '
             BEGIN { capture=0 }
             $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*" ver { capture=1; next }
             capture && $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*v" { capture=0; exit }
             capture { print }
           ' CHANGELOG.md | sed 's/^[[:space:]]\{8\}//' >> release_notes.md
-
           if [ ! -s release_notes.md ]; then
             echo "See the assets to download this version and install." >> release_notes.md
           fi
