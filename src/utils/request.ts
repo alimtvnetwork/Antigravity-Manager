@@ -1,3 +1,5 @@
+import { useErrorStore } from '../stores/error-store';
+
 // 探测环境
 const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
 
@@ -174,6 +176,14 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
       return await invoke<T>(cmd, args);
     } catch (error) {
       console.error(`Tauri Invoke Error [${cmd}]:`, error);
+      if (!args?._suppressGlobalModal) {
+        useErrorStore.getState().captureError(error, {
+          source: `tauri.${cmd}`,
+          endpoint: cmd,
+          method: 'INVOKE',
+          triggerAction: 'tauri_invoke',
+        });
+      }
       throw error;
     }
   }
@@ -267,6 +277,14 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     }
   } catch (error) {
     console.error(`Web Fetch Error [${cmd}]:`, error);
+    if (!args?._suppressGlobalModal) {
+      useErrorStore.getState().captureError(error, {
+        source: `web.${cmd}`,
+        endpoint: url,
+        method: mapping.method,
+        triggerAction: 'web_fetch',
+      });
+    }
     throw error;
   }
 }

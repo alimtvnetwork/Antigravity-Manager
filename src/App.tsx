@@ -23,6 +23,8 @@ import { listen } from '@tauri-apps/api/event';
 import { isTauri } from './utils/env';
 import { request as invoke } from './utils/request';
 import { AdminAuthGuard } from './components/common/AdminAuthGuard';
+import { ErrorModal } from './components/errors/error-modal';
+import { initGlobalErrorListeners } from './lib/error-listener';
 
 const router = createBrowserRouter([
   {
@@ -164,10 +166,17 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Initialize global error, unhandled rejection, and click-trail listeners
+  useEffect(() => {
+    const cleanup = initGlobalErrorListeners();
+    return cleanup;
+  }, []);
+
   return (
     <AdminAuthGuard>
       <ThemeManager />
       <DebugConsole />
+      <ErrorModal />
       {showUpdateNotification && (
         <UpdateNotification onClose={() => setShowUpdateNotification(false)} />
       )}
