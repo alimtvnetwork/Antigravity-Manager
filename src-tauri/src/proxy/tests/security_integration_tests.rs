@@ -359,6 +359,16 @@ mod stress_tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
+    /// 辅助函数：初始化测试并加锁隔离
+    fn setup_test() -> std::sync::MutexGuard<'static, ()> {
+        let lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
+            .lock()
+            .unwrap();
+        let _ = init_db();
+        cleanup_test_data();
+        lock
+    }
+
     /// 辅助函数：清理测试环境
     fn cleanup_test_data() {
         if let Ok(entries) = get_blacklist() {
@@ -415,11 +425,7 @@ mod stress_tests {
     /// 压力测试：大量访问日志
     #[test]
     fn stress_test_access_logging() {
-        let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
-            .lock()
-            .unwrap();
-        let _ = init_db();
-        let _ = clear_ip_access_logs();
+        let _lock = setup_test();
 
         let count = 1000;
         let now = std::time::SystemTime::now()
