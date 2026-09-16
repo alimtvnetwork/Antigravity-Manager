@@ -63,7 +63,7 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
 
                         if (hasChanges) {
                             // Only update volatile status, DO NOT trigger heavy onChange which saves to disk
-                            // This internal change will eventually be captured by next manual save or 
+                            // This internal change will eventually be captured by next manual save or
                             // simply keep the UI fresh without risking rolling back user's structural changes (add/delete)
                             onChange({ ...config, proxies: updatedProxies }, true); // Pass 'true' as silent flag if onChange supports it, or use a separate state
                         }

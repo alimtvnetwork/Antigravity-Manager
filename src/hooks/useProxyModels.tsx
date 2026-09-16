@@ -95,12 +95,12 @@ export const useProxyModels = () => {
         for (const account of accounts) {
             for (const m of account.quota?.models ?? []) {
                 const rawKey = m.name.toLowerCase();
-                
+
                 // Map sub-tier and legacy aliases to the primary canonical model
                 const mapped = ALIAS_TO_CANONICAL[rawKey];
                 const canonicalId = mapped ? mapped.id : (m.name || rawKey);
                 const canonicalName = mapped ? mapped.name : (m.display_name || m.name);
-                
+
                 let group = mapped ? mapped.group : 'Dynamic';
                 if (!mapped) {
                     if (canonicalName.toLowerCase().startsWith('gemini 3')) group = 'Gemini 3';
@@ -150,7 +150,7 @@ export const useProxyModels = () => {
 
         // 3. Order groups and models cleanly
         const groupOrder = ['Gemini 3', 'Gemini 2.5', 'Claude', 'Dynamic', 'Other'];
-        
+
         return Array.from(uniqueModelsMap.values())
             .map(m => ({
                 id: m.id,

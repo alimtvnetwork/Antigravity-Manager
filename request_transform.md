@@ -36,10 +36,10 @@ outer body:                                       outer body:
 ├─ stream                ── handler 控制 ──────────→ streamGenerateContent / generateContent
 │
 └─ prompt_cache_key (Codex)── 未使用
-                                                    
+
                                                     outer body (续):
                                                     ├─ project
-                                                    ├─ userAgent: "antigravity"  
+                                                    ├─ userAgent: "antigravity"
                                                     └─ requestId ← [末尾]
 ```
 

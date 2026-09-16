@@ -344,4 +344,3 @@ Error: compilation failed at src/main.rs:25
         *   超出 L1 阈值：触发 `[Layer-1] Tool trimming` 裁剪老旧工具包。
         *   超出 L2 阈值：触发 `[Layer-2] Thinking compression` 压缩历史思考，同时重播并保护签名。
         *   超出 L3 阈值：触发 `[Layer-3] Fork+Summary` 终极重置，控制台将显示重开会话以及摘要的生成，同时首条摘要的 payload 中将显示注入的 `cache_control: {"type": "ephemeral"}` 标记（在后续聊天中，您会在客户端观察到 Prompt Cache 命中率呈几何级飙升，极速响应）。
-

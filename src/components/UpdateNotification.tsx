@@ -176,7 +176,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
               <button
                 onClick={handleClose}
                 className="
-                  p-1 rounded-full 
+                  p-1 rounded-full
                   text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300
                   hover:bg-black/5 dark:hover:bg-white/10
                   transition-all duration-200

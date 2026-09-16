@@ -9,7 +9,7 @@ interface NavMenuProps {
 
 /**
  * 导航菜单组件 - 独立处理响应式
- * 
+ *
  * 响应式策略:
  * - ≥ 768px (md): 文字胶囊
  * - 640px - 768px: 图标胶囊 (Logo 显示文字)
@@ -35,11 +35,11 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         draggable="false"
                         className={`
                             px-4 xl:px-6
-                            py-2 
-                            rounded-full 
-                            text-sm 
-                            font-medium 
-                            transition-all 
+                            py-2
+                            rounded-full
+                            text-sm
+                            font-medium
+                            transition-all
                             whitespace-nowrap
                             ${isActive(location.pathname, item.path)
                                 ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'

@@ -1,6 +1,6 @@
 /**
  * 健壮的剪贴板复制工具函数
- * 
+ *
  * 浏览器限制：在非安全上下文（非 HTTPS 或 localhost）下，navigator.clipboard 是 undefined。
  * 本函数通过 execCommand('copy') 提供回退方案，确保在 HTTP 环境（如 Docker IP 访问）下也能正常工作。
  */

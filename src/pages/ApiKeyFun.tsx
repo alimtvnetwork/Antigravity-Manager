@@ -69,11 +69,11 @@ function formatDate(ts: number | undefined): string {
 
 export const ApiKeyFun: React.FC = () => {
     const { t } = useTranslation();
-    
+
     const [apiKey, setApiKey] = useState('');
     const [baseUrl, setBaseUrl] = useState(DEFAULT_ENDPOINT);
     const [showApiKey, setShowApiKey] = useState(false);
-    
+
     // Querying states
     const [querying, setQuerying] = useState(false);
     const [usage, setUsage] = useState<UsageSummary | null>(null);
@@ -82,7 +82,7 @@ export const ApiKeyFun: React.FC = () => {
     const [syncingOpenCode, setSyncingOpenCode] = useState(false);
     const [queryError, setQueryError] = useState<string | null>(null);
     const [modelsError, setModelsError] = useState<string | null>(null);
-    
+
     // Key Management
     const [managedKeys, setManagedKeys] = useState<ManagedApiKey[]>(() => {
         try {
@@ -92,7 +92,7 @@ export const ApiKeyFun: React.FC = () => {
             return [];
         }
     });
-    
+
     // Inline Rename state
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState('');
@@ -151,20 +151,20 @@ export const ApiKeyFun: React.FC = () => {
 
             // 2. Fetch balance (Try sub2api /usage first, then New API billing)
             let usageSummary: UsageSummary | null = null;
-            
+
             try {
                 const usageText = await request<string>('query_transit_info', {
                     url: `${endpoint}/usage`,
                     key
                 });
                 const data = JSON.parse(usageText);
-                
+
                 const unit = data.unit || data.quota?.unit || 'USD';
-                const remaining = typeof data.remaining === 'number' ? data.remaining.toFixed(2) : 
+                const remaining = typeof data.remaining === 'number' ? data.remaining.toFixed(2) :
                                   typeof data.balance === 'number' ? data.balance.toFixed(2) : '--';
                 const usedRaw = data.quota?.used ?? data.usage?.total?.actual_cost ?? data.usage?.total?.cost;
                 const used = typeof usedRaw === 'number' ? usedRaw.toFixed(2) : '--';
-                
+
                 usageSummary = {
                     remaining: remaining !== '--' ? (unit === 'USD' ? `$${remaining}` : `${remaining} ${unit}`) : '--',
                     used: used !== '--' ? (unit === 'USD' ? `$${used}` : `${used} ${unit}`) : '--',
@@ -187,7 +187,7 @@ export const ApiKeyFun: React.FC = () => {
                         key
                     });
                     const subData = JSON.parse(subText);
-                    
+
                     const start = new Date(Date.now() - 100 * 24 * 3600 * 1000).toISOString().split('T')[0];
                     const end = new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0];
                     const usageText = await request<string>('query_transit_info', {
@@ -195,11 +195,11 @@ export const ApiKeyFun: React.FC = () => {
                         key
                     });
                     const usageData = JSON.parse(usageText);
-                    
+
                     const totalUsageUSD = (usageData.total_usage ?? 0) / 100;
                     const limitUSD = subData.hard_limit_usd ?? 0;
                     const remainingUSD = (limitUSD - totalUsageUSD).toFixed(4);
-                    
+
                     usageSummary = {
                         remaining: `$${remainingUSD}`,
                         used: `$${totalUsageUSD.toFixed(4)}`,
@@ -287,10 +287,10 @@ export const ApiKeyFun: React.FC = () => {
             initialKeyLoaded.current = true;
             const initialKey = managedKeys[0].key;
             const initialUrl = managedKeys[0].baseUrl || DEFAULT_ENDPOINT;
-            
+
             setApiKey(initialKey);
             setBaseUrl(initialUrl);
-            
+
             // Auto fetch immediately!
             runQuery(initialKey, initialUrl);
         }
@@ -302,7 +302,7 @@ export const ApiKeyFun: React.FC = () => {
         if (!apiKey) return;
         const rawKey = apiKey.trim();
         const url = baseUrl.trim();
-        
+
         let proxyUrl = url;
         let syncKey = rawKey;
 
@@ -315,9 +315,9 @@ export const ApiKeyFun: React.FC = () => {
         }
 
         try {
-            await request('execute_cli_sync', { 
-                appType: app, 
-                proxyUrl: proxyUrl, 
+            await request('execute_cli_sync', {
+                appType: app,
+                proxyUrl: proxyUrl,
                 apiKey: syncKey
             });
             showToast(t('apiKeyFun.syncSuccess', { defaultValue: 'Successfully synced to {{app}}', app }), 'success');
@@ -544,7 +544,7 @@ export const ApiKeyFun: React.FC = () => {
 
             {/* Bottom Section Layout */}
             <div className="grid grid-cols-1 xl:grid-cols-12 lg:grid-cols-12 gap-6 items-start mt-2 pb-8">
-                
+
                 {/* Left Sidebar: Saved Keys List */}
                 <div className="xl:col-span-4 lg:col-span-4 bg-white dark:bg-base-100 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-base-200 sticky top-5">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
@@ -559,7 +559,7 @@ export const ApiKeyFun: React.FC = () => {
                         {managedKeys.map(item => {
                             const isActive = apiKey === item.key;
                             const isEditing = editingId === item.id;
-                            
+
                             return (
                                 <div
                                     key={item.id}
@@ -587,7 +587,7 @@ export const ApiKeyFun: React.FC = () => {
                                                 {item.name}
                                             </span>
                                         )}
-                                        
+
                                         <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-gray-400 font-medium">
                                             <span>
                                                 {t('apiKeyFun.keyManager.lastRemainingLabel', { defaultValue: '上次余额' })} {item.lastRemaining ? item.lastRemaining : '--'}
@@ -596,7 +596,7 @@ export const ApiKeyFun: React.FC = () => {
                                                 <span className={`w-1.5 h-1.5 rounded-full ${item.lastStatus === 'ok' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} />
                                             )}
                                         </div>
-                                        
+
                                         <span className="text-[10px] text-slate-400 dark:text-gray-500 font-normal">
                                             {t('apiKeyFun.keyManager.addedAt', { defaultValue: '添加于' })} {formatDate(item.createdAt)}
                                         </span>
@@ -709,14 +709,14 @@ export const ApiKeyFun: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* Premium CLI Actions Banner */}
                             <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 to-purple-50/80 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-500/20 shadow-sm relative overflow-hidden group/banner transition-all hover:shadow-md">
                                 {/* Subtle Background Effect */}
                                 <div className="absolute -right-6 -top-6 text-purple-500/10 dark:text-purple-400/5 rotate-12 transition-transform group-hover/banner:rotate-45 duration-700">
                                     <Wand2 size={80} />
                                 </div>
-                                
+
                                 <div className="flex items-center gap-3 z-10 mb-3 sm:mb-0">
                                     <div className="p-2 rounded-lg bg-base-100/80 shadow-sm border border-base-300 backdrop-blur-sm">
                                         <Zap size={16} className="text-amber-500" />
@@ -738,7 +738,7 @@ export const ApiKeyFun: React.FC = () => {
                                         return lower.includes('gpt') || lower.includes('o1') || lower.includes('o3') || lower.includes('deepseek') || lower.includes('qwen');
                                     });
                                     const hasClaude = models.some(m => m.toLowerCase().includes('claude'));
-                                    
+
                                     // 默认都显示，除非明确检测到只支持其中一种
                                     const showCodex = !hasModels || hasGpt || (!hasGpt && !hasClaude);
                                     const showClaude = !hasModels || hasClaude || (!hasGpt && !hasClaude);
@@ -746,7 +746,7 @@ export const ApiKeyFun: React.FC = () => {
                                     return (
                                         <div className="flex items-center gap-2 w-full sm:w-auto z-10 pl-11 sm:pl-0">
                                             {showCodex && (
-                                                <button 
+                                                <button
                                                     onClick={() => handleSyncCli('Codex')}
                                                     className="flex-1 sm:flex-none btn btn-sm px-5 font-medium rounded-full bg-blue-500 hover:bg-blue-600 text-white border-none shadow-md shadow-blue-500/20 transition-all group"
                                                     disabled={!apiKey}
@@ -757,7 +757,7 @@ export const ApiKeyFun: React.FC = () => {
                                                 </button>
                                             )}
                                             {showClaude && (
-                                                <button 
+                                                <button
                                                     onClick={() => handleSyncCli('Claude')}
                                                     className="flex-1 sm:flex-none btn btn-sm px-5 font-medium rounded-full bg-purple-500 hover:bg-purple-600 text-white border-none shadow-md shadow-purple-500/20 transition-all group"
                                                     disabled={!apiKey}
@@ -796,14 +796,14 @@ export const ApiKeyFun: React.FC = () => {
                             {t('apiKeyFun.models.title', { defaultValue: 'Available Models' })}
                             {models.length > 0 && <span className="text-xs font-normal text-gray-400">({models.length})</span>}
                         </h2>
-                        
+
                         {modelsError ? (
                             <div className="bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 p-3 rounded-lg border border-red-100 dark:border-red-900/30 text-xs mt-2">
                                 {modelsError}
                             </div>
                         ) : models.length === 0 ? (
                             <p className="text-xs text-gray-400 mt-2">
-                                {apiKey ? t('apiKeyFun.models.emptyFromKey', { defaultValue: 'No models returned yet. Query to fetch models.' }) 
+                                {apiKey ? t('apiKeyFun.models.emptyFromKey', { defaultValue: 'No models returned yet. Query to fetch models.' })
                                        : t('apiKeyFun.models.empty', { defaultValue: 'Enter key and query to load available models.' })}
                             </p>
                         ) : (

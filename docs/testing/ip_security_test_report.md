@@ -74,8 +74,8 @@ cargo test --package antigravity-manager --lib stress -- --nocapture
 ### 测试环境
 - **OS**: Windows 11
 - **Rust**: 1.XX.X
-- **CPU**: 
-- **RAM**: 
+- **CPU**:
+- **RAM**:
 
 ### 结果摘要
 

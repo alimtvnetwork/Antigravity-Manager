@@ -91,25 +91,25 @@ jobs:
           else
             ARCH="unknown"
           fi
-          
+
           echo "Detected architecture: $ARCH"
-          
+
           # 进入产物目录
           cd src-tauri/target/*/release/bundle/macos/
-          
+
           # 重命名 .app.tar.gz 和 .sig
           if [ -f "Antigravity Tools.app.tar.gz" ]; then
             mv "Antigravity Tools.app.tar.gz" "Antigravity Tools_${ARCH}.app.tar.gz"
             mv "Antigravity Tools.app.tar.gz.sig" "Antigravity Tools_${ARCH}.app.tar.gz.sig"
             echo "Renamed assets to append Arch: $ARCH"
           fi
-          
+
           # 更新对应的 updater.json (指向重命名后的文件)
           UPDATER_JSON="../../../updater/install.json"
           if [ ! -f "$UPDATER_JSON" ]; then
              UPDATER_JSON=$(find ../../../updater -name "*.json" | head -n 1)
           fi
-          
+
           if [ -f "$UPDATER_JSON" ]; then
             echo "Updating $UPDATER_JSON to use renamed assets..."
             sed -i '' "s/Antigravity%20Tools.app.tar.gz/Antigravity%20Tools_${ARCH}.app.tar.gz/g" "$UPDATER_JSON"
@@ -190,15 +190,41 @@ jobs:
       - name: Extract Release Notes
         run: |
           VERSION="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
           echo "Extracting release notes for version $VERSION"
+
+          # 1. Generate Quick Install One-Liners Header
+          cat << EOF > release_notes.md
+## Quick Install ${VERSION}
+
+### Windows (PowerShell 5.1+)
+\`\`\`powershell
+irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex
+# Or pinned version:
+irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex
+\`\`\`
+
+### Linux / macOS (Bash)
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash
+# Or pinned version:
+curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash
+\`\`\`
+
+---
+
+EOF
+
+          # 2. Extract version changelog body and append
           awk -v ver="$VERSION" '
             BEGIN { capture=0 }
             $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*" ver { capture=1; next }
             capture && $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*v" { capture=0; exit }
             capture { print }
-          ' CHANGELOG.md | sed 's/^[[:space:]]\{8\}//' > release_notes.md
+          ' CHANGELOG.md | sed 's/^[[:space:]]\{8\}//' >> release_notes.md
+
           if [ ! -s release_notes.md ]; then
-            echo "See the assets to download this version and install." > release_notes.md
+            echo "See the assets to download this version and install." >> release_notes.md
           fi
 
       - name: Build updater.json from signatures
@@ -296,6 +322,14 @@ jobs:
           \) -print0 | while IFS= read -r -d '' file; do
             cp "$file" release-files/
           done
+          # Copy standalone installer scripts so they are published as release assets
+          if [ -f install.ps1 ]; then
+            cp install.ps1 release-files/
+          fi
+          if [ -f install.sh ]; then
+            cp install.sh release-files/
+            chmod +x release-files/install.sh
+          fi
           # Generate SHA-256 checksums
           cd release-files
           sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true

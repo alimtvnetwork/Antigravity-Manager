@@ -145,7 +145,19 @@ Write-Host ""
 
 # Step 1: Resolve Release Version
 $TargetVersion = $Version
-if (-not $TargetVersion) {
+if ($TargetVersion) {
+    $TargetVersion = $TargetVersion -replace "^v", ""
+    # Attempt to resolve asset metadata for explicitly pinned version
+    try {
+        $tagEndpoint = "https://api.github.com/repos/$Repo/releases/tags/v$TargetVersion"
+        $releaseData = Invoke-RestMethod -Uri $tagEndpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+    } catch {
+        try {
+            $tagEndpoint = "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$TargetVersion"
+            $releaseData = Invoke-RestMethod -Uri $tagEndpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+        } catch {}
+    }
+} else {
     Write-Step "Discovering latest release version from GitHub..."
     $apiEndpoints = @(
         "https://api.github.com/repos/$Repo/releases/latest",
@@ -183,7 +195,7 @@ if (-not $TargetVersion) {
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.9.0"
+        $TargetVersion = "4.10.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }
@@ -231,8 +243,15 @@ try {
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls13
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $DownloadedFile -UseBasicParsing
 } catch {
-    Write-Err "Download failed: $_"
-    exit 1
+    Write-Warn "Primary download failed: $_. Attempting upstream fallback..."
+    $UpstreamDownloadUrl = $DownloadUrl -replace [regex]::Escape($Repo), $UpstreamRepo
+    try {
+        Invoke-WebRequest -Uri $UpstreamDownloadUrl -OutFile $DownloadedFile -UseBasicParsing
+        Write-Success "Downloaded successfully from upstream: $UpstreamDownloadUrl"
+    } catch {
+        Write-Err "Upstream fallback download also failed: $_"
+        exit 1
+    }
 }
 
 if (-not (Test-Path $DownloadedFile)) {

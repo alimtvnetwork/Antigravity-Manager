@@ -137,28 +137,28 @@ opencode run "test" --model google/antigravity-claude-sonnet-4-6-thinking --vari
 ## 7. Troubleshooting Notes
 
 ### Issue: Sync fails with "Failed to get OpenCode config directory"
-**Cause:** Cannot determine home directory  
+**Cause:** Cannot determine home directory
 **Fix:** Ensure `HOME` (Unix) or `USERPROFILE` (Windows) env var is set
 
 ### Issue: Variant not applied
-**Cause:** Model ID mismatch or variant type not defined  
+**Cause:** Model ID mismatch or variant type not defined
 **Fix:** Check model ID in catalog matches request; verify `variant_type` in `build_model_catalog()`
 
 ### Issue: Backup not created
-**Cause:** Backup file already exists (idempotent)  
+**Cause:** Backup file already exists (idempotent)
 **Fix:** Delete existing `.bak` files manually if you need fresh backup
 
 ### Issue: Accounts not exported
-**Cause:** All accounts disabled or `sync_accounts` not checked  
+**Cause:** All accounts disabled or `sync_accounts` not checked
 **Fix:** Enable at least one account; check "Sync accounts" option in UI
 
 ### Issue: Plugin conflicts with manager provider
-**Cause:** Both using same model IDs  
+**Cause:** Both using same model IDs
 **Fix:** Use different model IDs or disable one provider
 
 ### Issue: Restore fails
-**Cause:** Backup files missing or permissions  
-**Check:** 
+**Cause:** Backup files missing or permissions
+**Check:**
 ```bash
 ls -la ~/.config/opencode/*.bak
 ```
@@ -198,8 +198,8 @@ cargo test --lib opencode_sync
 
 ## Test Environment
 
-- **OS**: 
-- **OpenCode Version**: 
-- **Antigravity Manager Version**: 
-- **Test Date**: 
-- **Tester**: 
+- **OS**:
+- **OpenCode Version**:
+- **Antigravity Manager Version**:
+- **Test Date**:
+- **Tester**:

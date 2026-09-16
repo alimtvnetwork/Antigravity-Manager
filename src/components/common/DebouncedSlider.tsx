@@ -34,8 +34,8 @@ export default function DebouncedSlider({ value, onChange, min, max, step, class
         onChange(newValue);
     };
 
-    // Also handle onMouseUp/onTouchEnd as backup if Pointer events behave oddly in some envs, 
-    // but Pointer events are standard now. 
+    // Also handle onMouseUp/onTouchEnd as backup if Pointer events behave oddly in some envs,
+    // but Pointer events are standard now.
     // Actually, simple onChange + onMouseUp is robust enough for standard ranges.
 
     return (

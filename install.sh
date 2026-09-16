@@ -115,7 +115,7 @@ get_version() {
     _is_valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; }
 
     if [[ -n "${VERSION:-}" ]]; then
-        RELEASE_VERSION="$VERSION"
+        RELEASE_VERSION="${VERSION#v}"
         info "Using specified version: v$RELEASE_VERSION"
         return
     fi
@@ -155,7 +155,8 @@ get_version() {
     fi
 
     if ! _is_valid_version "${RELEASE_VERSION:-}"; then
-        error "Failed to fetch a valid version (got: '${RELEASE_VERSION:-empty}'). Try specifying: VERSION=x.x.x bash install.sh"
+        warn "Could not resolve latest release, falling back to v4.10.0"
+        RELEASE_VERSION="4.10.0"
     fi
 
     info "Latest version: v$RELEASE_VERSION"
@@ -212,7 +213,11 @@ download_installer() {
     DOWNLOAD_PATH="${TEMP_DIR}/${FILENAME}"
 
     info "Downloading ${APP_NAME} v${RELEASE_VERSION}..."
-    run curl -fSL --progress-bar -o "$DOWNLOAD_PATH" "$DOWNLOAD_URL"
+    if ! curl -fSL --progress-bar -o "$DOWNLOAD_PATH" "$DOWNLOAD_URL"; then
+        warn "Primary repository download failed. Attempting upstream fallback..."
+        local upstream_download_url="${DOWNLOAD_URL//$REPO/$UPSTREAM_REPO}"
+        run curl -fSL --progress-bar -o "$DOWNLOAD_PATH" "$upstream_download_url"
+    fi
 
     if [[ "${DRY_RUN:-0}" != "1" ]] && [[ ! -f "$DOWNLOAD_PATH" ]]; then
         error "Download failed. Check your network or try a different version."

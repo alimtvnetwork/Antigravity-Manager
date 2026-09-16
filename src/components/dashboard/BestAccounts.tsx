@@ -43,7 +43,7 @@ function getBucketPercentage(
     return null;
 }
 
-/** 
+/**
  * 计算模型综合有效配额
  * 自动识别：双桶 (取 min 短板) / 免费账号仅周桶 (取周) / 仅 5h 桶 (取 5h)
  */

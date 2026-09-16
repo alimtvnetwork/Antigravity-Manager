@@ -1,10 +1,10 @@
 /**
  * Generates a UUID (Universally Unique Identifier) v4.
- * 
+ *
  * This function attempts to use the native `crypto.randomUUID()` API first.
  * If that API is unavailable (e.g., in non-secure contexts like HTTP),
  * it falls back to a custom implementation using checksum-based random generation.
- * 
+ *
  * @returns {string} A valid UUID v4 string.
  */
 export const generateUUID = (): string => {

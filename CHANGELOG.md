@@ -498,7 +498,7 @@
         -   **[核心修复] 解决 HTTP/429 报错导致的重试中断及额度显示不同步问题 (HTTP/429 Exhaustion Handling & Quota Display Sync)**:
             -   **重试逻辑修复**: 修复了代理处理 429 错误时 `force_rotate` 状态作用域错误的问题。现在当代理端遇到 `429 Too Many Requests` (或 `INSUFFICIENT_G1_CREDITS_BALANCE`) 时，能快速阻断降级策略，并在全局重试循环中立刻触发账号轮换，避免在不可用节点上进行无效耗时等待。
             -   **额度实时同步**: 修复了部分 API 渠道耗尽文本生成配额（429）但 Google 官方查询接口仍返回 100% 额度的问题。现在系统会在返回前端的额度数据中，动态融合底层 `TokenManager` 拦截的 429 封锁状态，使得此类耗尽状态能在仪表盘中精准显示为 0% 额度。
-          
+
     *   **v4.2.7 (2026-06-22)**:
         -   **[核心修复] 修复了 Gemini 函数调用在多轮对话中缺失 thought_signature 报错 400 的 Bug (Gemini Tool Calling Fix)**:
             -   **问题修复**: 修复了在使用工具调用（Function Calling）功能时，由于代理在第二轮请求中向 `/v1internal` 接口发送驼峰命名的 `thoughtSignature` 字段，而接口实际校验蛇形命名的 `thought_signature`，导致 API 返回 `400 INVALID_ARGUMENT` 报错（`Function call is missing a thought_signature`）的问题。
@@ -1475,13 +1475,13 @@
                 - 实现基于 SHA-256 哈希的 Schema 缓存机制，避免重复清洗相同的 Schema。
                 - 采用 LRU 淘汰策略，最大缓存 1000 条，内存占用 < 10MB。
                 - 提供 `clean_json_schema_cached` 函数和缓存统计功能，预计性能提升 60%+。
-            - **影响范围**: 
+            - **影响范围**:
                 - ✅ 显著提升 MCP 工具(如 Pencil)的 Schema 兼容性和模型理解能力
                 - ✅ 为未来添加更多 MCP 工具(filesystem, database 等)奠定了插件化基础
                 - ✅ 完全向后兼容，所有 25 项测试通过
         -   **[安全增强] Web UI 管理后台密码与 API Key 分离 (Fix Issue #1139)**:
             - **独立密码配置**: 支持通过 `ABV_WEB_PASSWORD` 或 `WEB_PASSWORD` 环境变量设置独立的管理后台登录密码。
-            - **智能鉴权逻辑**: 
+            - **智能鉴权逻辑**:
                 - 管理接口优先验证独立密码，未设置时自动回退验证 `API_KEY`（确保向后兼容）。
                 - AI 代理接口严格仅允许使用 `API_KEY` 进行认证，实现权限隔离。
             - **配置 UI 支持**: 在“仪表盘-服务配置”中新增管理密码编辑项，支持一键找回或修改。
@@ -1715,7 +1715,7 @@
             -   **修复内容**:
                 - **后端配置**: 在 `config.rs` 的 `default_monitored_models()` 中添加 `gemini-3-pro-image`，与智能预热和配额关注列表保持一致
                 - **前端 UI**: 在 `QuotaProtection.tsx` 中添加画图模型选项，调整布局为一行4个模型（与智能预热保持一致）
-            -   **影响范围**: 
+            -   **影响范围**:
                 - ✅ 向后兼容：已有配置不受影响，新用户或重置配置后会自动包含画图模型
                 - ✅ 完整保护：现在所有4个核心模型（Gemini 3 Flash、Gemini 3 Pro High、Claude 4.5 Sonnet、Gemini 3 Pro Image）都受配额保护监控
                 - ✅ 自动触发：当画图模型配额低于阈值时，账号会自动加入保护列表，避免继续消耗
@@ -1736,14 +1736,14 @@
                 - **Gemini 协议实现**: 新增 400 签名错误检测和修复提示词注入逻辑
             -   **修复提示词**:
                 ```
-                [System Recovery] Your previous output contained an invalid signature. 
+                [System Recovery] Your previous output contained an invalid signature.
                 Please regenerate the response without the corrupted signature block.
                 ```
             -   **技术细节**:
                 - Claude: `claude.rs:L1012-1030` - 增强现有逻辑，支持 String 和 Array 消息格式
                 - OpenAI: `openai.rs:L391-427` - 完整实现，使用 `OpenAIContentBlock::Text` 类型
                 - Gemini: `gemini.rs:L17, L299-329` - 修改函数签名支持可变 body，注入修复提示词
-            -   **影响**: 
+            -   **影响**:
                 - ✅ 提升错误恢复成功率：模型收到明确指令，避免生成无意义响应
                 - ✅ 多协议一致性：所有 3 个协议具有相同的错误恢复能力
                 - ✅ 用户体验改善：减少因签名错误导致的对话中断
@@ -1937,10 +1937,10 @@
             - **图表与显示优化**: 优化了恢复按钮图标 (RotateCcw)；精简了状态标签文案并强制不换行，解决了高分屏或窄窗口下的布局错位问题。
             - **版本号精简**: 改进了 CLI 版本号提取逻辑，界面仅保留纯数字版本（如 v0.86.0），视觉更加清爽。
         - **Claude 思考签名持久化修复 (Fix Issue #752)**:
-            - **问题根源**: 
+            - **问题根源**:
                 - **响应收集侧**：v3.3.34 中流式响应收集器 (`collector.rs`) 在处理 `content_block_start` 事件时遗漏了 `thinking` 块的 `signature` 字段，导致签名丢失。
                 - **请求转换侧**：历史消息中的签名未经验证直接发送给 Gemini，导致跨模型切换或冷启动时出现 `Invalid signature in thinking block` 错误。
-            - **修复内容**: 
+            - **修复内容**:
                 - **响应收集器**：在 `collector.rs` 中添加了 `signature` 字段的提取和持久化逻辑，并补充了单元测试 `test_collect_thinking_response_with_signature`。
                 - **请求转换器**：在 `request.rs` 中实施严格签名验证，只使用已缓存且兼容的签名。未知或不兼容的签名会导致 thinking 块自动降级为普通文本，避免发送无效签名。
                 - **回退机制**：实现智能回退重试逻辑。如果签名验证失效或上游 API 拒绝（400错误），系统会自动清除所有 thinking 块并强制重试，确保用户请求总是成功。
@@ -1983,7 +1983,7 @@
                 - **全链路映射**: 实现了从流式 (SSE) 和非流式响应中提取并映射 `prompt_tokens`、`completion_tokens` 及 `total_tokens` 的逻辑。
             - **影响范围**: 解决了 Kilo Editor、Claude Code 等工具在使用 OpenAI 协议时无法统计 Token 用量的问题。
         - **Linux 主题切换崩溃修复 (Pull Request #750, Thanks to @infinitete)**:
-            - **修复内容**: 
+            - **修复内容**:
                 - 在 Linux 平台禁用不兼容的 `setBackgroundColor` 调用。
                 - 针对 WebKitGTK 环境禁用 View Transition API 以防止透明窗口崩溃。
                 - 启动时自动调整 GTK 窗口 alpha 通道以增强稳定性。
@@ -2086,10 +2086,10 @@
         - **Playwright MCP 连通性与稳定性增强 (参考 [Antigravity2Api](https://github.com/znlsl/Antigravity2Api)) - 解决 Issue #616**:
             - **SSE 心跳保活**: 引入 15 秒定时心跳 (`: ping`)，解决长耗时工具调用导致的连接超时断开问题。
             - **MCP XML Bridge**: 实现双向协议转换逻辑（指令注入 + 标签拦截），显著提升 MCP 工具（如 Playwright）在不稳定链路下的连通性。
-            - **上下文激进瘦身**: 
+            - **上下文激进瘦身**:
                 - **指令过滤**: 自动识别并移除 Claude Code 注入的冗余系统说明（~1-2k tokens）。
                 - **任务去重**: 剔除 tool_result 后重复的任务回显文本，物理减少 Context 占用。
-            - **智能 HTML 清理与截断**: 
+            - **智能 HTML 清理与截断**:
                 - **深度剥离**: 针对浏览器快照自动移除 `<style>`、`<script>` 及内联 Base64 资源。
                 - **结构化截断**: 优化截断算法，确保不在 HTML 标签或 JSON 中间切断，避免产生破坏性的 400 结构错误。
         - **账号索引加载容错修复 (Fix Issue #619)**:
@@ -2109,7 +2109,7 @@
             - **分离刷新和预热**: 移除配额刷新时的自动预热触发,预热仅通过定时调度器(每10分钟)或手动按钮触发,避免用户刷新配额时意外消耗预热额度。
             - **延长冷却期**: 冷却期从30分钟延长至4小时(14400秒),匹配 Pro 账号5小时重置周期,解决同一周期内重复预热问题。
             - **持久化历史记录**: 预热历史保存至 `~/.antigravity_tools/warmup_history.json`,程序重启后冷却期仍然有效,解决状态丢失问题。
-            - **并发执行优化**: 
+            - **并发执行优化**:
                 - 筛选阶段: 每批5个账号并发获取配额,10个账号从~15秒降至~3秒 (5倍提升)
                 - 预热阶段: 每批3个任务并发执行,批次间隔2秒,40个任务从~80秒降至~28秒 (2.9倍提升)
             - **白名单过滤**: 仅记录和预热4个核心模型组(`gemini-3-flash`、`claude-sonnet-4-5`、`gemini-3-pro-high`、`gemini-3-pro-image`),避免历史记录臃肿。
@@ -2327,7 +2327,7 @@
             - **Gemini Token 统计兼容**: 增强了监控中间件对 Gemini API 方言的支持，能够自动识别 `usageMetadata` 节点并映射 `promptTokenCount` 等原生字段。
             - **影响范围**: 显著提升了监控面板在故障排查时的准确性，确保了跨协议 Token 统计的一致性。
         - **Claude 协议核心增强 (Claude Protocol Enhancement)**:
-            - **弹性恢复引擎 (Elastic Recovery Engine)**: 
+            - **弹性恢复引擎 (Elastic Recovery Engine)**:
                 - **空流重试**: 智能识别并自动重试上游返回的空数据流，解决网络抖动导致的请求失败。
                 - **断点自愈**: 自动检测工具调用链的断裂状态（Missing ToolResult），并实施主动修复，防止因客户端中断导致的上下文同步错误 (400)。
             - **智能上下文优化 (Smart Context Optimization)**:
@@ -2774,11 +2774,11 @@
                 - **精准意图识别**: 新增对标题生成、摘要提取以及系统 Warmup/Reminder 等后台低价值请求的深度识别。
                 - **无感降级转发**: 自动将后台流量重定向至 **gemini-2.5-flash**，确保顶配模型（Sonnet/Opus）的额度仅用于核心对话。
                 - **显著节流**: 单次长会话预计可省下 1.7k - 17k+ 的高价值 Token。
-        - **稳定性增强**: 
+        - **稳定性增强**:
             - 修复了由于模型字段定义更新导致的 Rust 编译与测试用例报错，加固了数据模型层（models.rs）的鲁棒性。
     *   **v3.3.0 (2025-12-27)**:
         - **重大更新 (Major Updates)**:
-            - **Codex CLI & Claude CLI 深度适配 (核心致谢 @llsenyue PR #93)**: 
+            - **Codex CLI & Claude CLI 深度适配 (核心致谢 @llsenyue PR #93)**:
                 - **全面兼容 Coding Agent**: 实现了对 Codex CLI 的完美支持，包括 `/v1/responses` 端点的深度适配与 shell 工具调用指令的智能转换 (SSOP)。
                 - **Claude CLI 推理增强**: 引入了全局 `thoughtSignature` 存储与回填逻辑，解决了 Claude CLI 使用 Gemini 3 系列模型时的签名校验报错。
             - **OpenAI 协议栈重构**:
@@ -2788,7 +2788,7 @@
                 - **默认本地回环**: 反代服务器默认监听 `127.0.0.1`，仅允许本机访问，保障隐私安全。
                 - **可选 LAN 访问**: 新增 `allow_lan_access` 配置开关，开启后监听 `0.0.0.0` 以允许局域网设备访问。
                 - **安全提示**: 前端 UI 提供明确的安全警告及状态提示。
-        - **前端体验升级**: 
+        - **前端体验升级**:
             - **多协议端点可视化**: 在 API 反代页面新增端点详情展示，支持对 Chat/Completions/Responses 不同端点的独立快捷复制。
     *   **v3.2.8 (2025-12-26)**:
         - **Bug 修复 (Bug Fixes)**:
@@ -2816,14 +2816,14 @@
                 - **工具空输出补偿**: 针对 `mkdir` 等静默命令，自动将空输出映射为显式成功信号，解决 Claude CLI 任务流中断与幻觉问题。
                 - **全局停止序列配置**: 针对反代链路优化了 `stopSequences`，精准切断流式输出，解决响应尾部冗余导致的解析报错。
                 - **智能 Payload 净化 (Smart Panic Fix)**: 引入了 `GoogleSearch` 与 `FunctionCall` 的互斥检查，并在后台任务（Token Saver）重定向时自动剥离工具负载，根除了 **400 工具冲突 (Multiple tools)** 错误。
-                - **反代稳定性增强 (核心致谢 @salacoste PR #79)**: 
+                - **反代稳定性增强 (核心致谢 @salacoste PR #79)**:
                     - **429 智能退避**: 支持解析上游 `RetryInfo`，在触发限流时自动等待并重试，显著减少账号无效轮换。
                     - **Resume 兜底机制**: 针对 `/resume` 可能出现的签名失效报错，实现了自动剥离 Thinking 块的二次重试，提升会话恢复成功率。
                     - **Schema 模式增强**: 增强了 JSON Schema 递归清理逻辑，并增加了对 `enumCaseInsensitive` 等扩展字段的过滤。
             - **测试套件加固**: 修复了 `mappers` 测试模块中缺失的导入及重复属性错误，并新增了内容块合并与空输出补全测试。
     *   **v3.2.3 (2025-12-25)**:
         - **核心增强 (Core Enhancements)**:
-            - **进程管理架构优化 (核心致谢 @Gaq152 PR #70)**: 
+            - **进程管理架构优化 (核心致谢 @Gaq152 PR #70)**:
                 - **精确路径识别**: 引入了基于可执行文件绝对路径的进程匹配机制。在启动、关闭及枚举 PID 时，系统会通过规范化路径 (`canonicalize`) 进行比对。
                 - **管理进程自排除**: 在 Linux 等环境下，系统现能通过对比 `std::env::current_exe()` 路径，杜绝了 Antigravity-Manager 将自身误识别为核心进程而发生的“自杀”现象。
                 - **手动路径自定义**: 在“设置 -> 高级”页面新增了手动指定反重力程序路径的功能。支持 MacOS (.app 目录) 和各平台可执行文件。
@@ -2837,7 +2837,7 @@
             - **Project ID 获取逻辑容错增强**: 引入了随机 `project_id` 兜底机制。针对部分无 Google Cloud 项目权限的账号，系统现在会自动生成随机 ID 以确保反代服务及配额查询能正常运行，解决了“账号无资格获取 cloudaicompanionProject”导致的报错中断。
             - **全场景稳定性加固**: 引入 `try_init` 模式修复了由于日志订阅器重复初始化导致的系统 Panic 崩溃，显著提升了在不同运行环境下的兼容性。
             - **平滑日志清理**: 优化了日志清理逻辑，采用“原地截断”技术。现在点击“清理日志”后，后续的操作记录依然能无缝地继续保存，解决了旧版本清理后记录失效的问题。
-            - **Google 免费额度智能路由 (Token Saver):** 
+            - **Google 免费额度智能路由 (Token Saver):**
                 - **后台任务拦截**: 独家首创针对 Claude Code 客户端后台任务的深度报文识别技术。系统能精准识别标题生成、摘要提取以及 **Next Prompt Suggestions** 等非核心交互请求 (`write a 5-10 word title`, `Concise summary`, `prompt suggestion generator`)。
                 - **无感熔断重定向**: 自动将上述高频低价值请求（Haiku 模型）路由至 **gemini-2.5-flash** 免费节点，杜绝了后台轮询对核心付费/高价值账号配额的隐形消耗，同时保留了完整的产品功能体验。
                 - **双轨日志审计**: 终端与日志文件中新增请求类型标记。正常对话请求显示为 `检测到正常用户请求`（保留原映射），后台任务显示为 `检测到后台自动任务`（重定向），消耗去向一目了然。
@@ -4140,13 +4140,13 @@
                 - Implemented SHA-256 hash-based Schema caching mechanism to avoid redundant cleaning of identical schemas.
                 - Uses LRU eviction strategy with max 1000 entries, memory usage < 10MB.
                 - Provides `clean_json_schema_cached` function and cache statistics, expected 60%+ performance improvement.
-            - **Impact**: 
+            - **Impact**:
                 - ✅ Significantly improves Schema compatibility and model understanding for MCP tools (e.g., Pencil)
                 - ✅ Establishes pluggable foundation for adding more MCP tools (filesystem, database, etc.) in the future
                 - ✅ Fully backward compatible, all 25 tests passing
         -   **[Security Enhancement] Web UI Management Password & API Key Separation (Fix Issue #1139)**:
             - **Independent Password Configuration**: Support setting a separate management console login password via `ABV_WEB_PASSWORD` or `WEB_PASSWORD` environment variables.
-            - **Intelligent Authentication Logic**: 
+            - **Intelligent Authentication Logic**:
                 - Management interfaces prioritize validating the independent password, automatically falling back to `API_KEY` if not set (ensuring backward compatibility).
                 - AI Proxy interfaces strictly only allow `API_KEY` for authentication, achieving permission isolation.
             - **Configuration UI Support**: Added a management password editing item in "Dashboard - Service Config," supporting one-click retrieval or modification.
@@ -4374,7 +4374,7 @@
             -   **Fix Details**:
                 - **Backend Configuration**: Added `gemini-3-pro-image` to `default_monitored_models()` in `config.rs`, aligning with Smart Warmup and Pinned Quota Models lists
                 - **Frontend UI**: Added image model option in `QuotaProtection.tsx`, adjusted layout to 4 models per row (consistent with Smart Warmup)
-            -   **Impact**: 
+            -   **Impact**:
                 - ✅ Backward Compatible: Existing configurations unaffected; new users or config resets will automatically include the image model
                 - ✅ Complete Protection: All 4 core models (Gemini 3 Flash, Gemini 3 Pro High, Claude 4.5 Sonnet, Gemini 3 Pro Image) are now monitored by quota protection
                 - ✅ Auto-trigger: When image model quota falls below threshold, accounts are automatically added to the protection list, preventing further consumption
@@ -4395,14 +4395,14 @@
                 - **Gemini Protocol Implementation**: Added 400 signature error detection and repair prompt injection logic
             -   **Repair Prompt**:
                 ```
-                [System Recovery] Your previous output contained an invalid signature. 
+                [System Recovery] Your previous output contained an invalid signature.
                 Please regenerate the response without the corrupted signature block.
                 ```
             -   **Technical Details**:
                 - Claude: `claude.rs:L1012-1030` - Enhanced existing logic, supports String and Array message formats
                 - OpenAI: `openai.rs:L391-427` - Complete implementation, uses `OpenAIContentBlock::Text` type
                 - Gemini: `gemini.rs:L17, L299-329` - Modified function signature to support mutable body, injects repair prompts
-            -   **Impact**: 
+            -   **Impact**:
                 - ✅ Improved error recovery success rate: Model receives clear instructions, avoiding meaningless responses
                 - ✅ Multi-protocol consistency: All 3 protocols have the same error recovery capability
                 - ✅ Better user experience: Reduces conversation interruptions caused by signature errors
@@ -4591,10 +4591,10 @@
             - **Icon & Badge Optimization**: Updated the restore button icon to `RotateCcw`, and streamlined status badge text with `whitespace-nowrap` to prevent layout breaks in tight spaces.
             - **Condensed Version Display**: Improved version extraction to display only pure numeric versions (e.g., v0.86.0) for a cleaner UI.
         - **Claude Thinking Signature Persistence Fix (Fix Issue #752)**:
-            - **Root Cause**: 
+            - **Root Cause**:
                 - **Response Collection**: The streaming response collector (`collector.rs`) in v3.3.34 missed the `signature` field of `thinking` blocks when processing `content_block_start` events, causing signature loss.
                 - **Request Transformation**: Historical message signatures were sent to Gemini without validation, causing `Invalid signature in thinking block` errors during cross-model switches or cold starts.
-            - **Fix Details**: 
+            - **Fix Details**:
                 - **Response Collector**: Added logic to extract and persist the `signature` field in `collector.rs`, with unit test `test_collect_thinking_response_with_signature`.
                 - **Request Transformer**: Implemented strict signature validation in `request.rs`. Only cached and compatible signatures are used. Unknown or incompatible signatures cause thinking blocks to downgrade to plain text, preventing invalid signatures from being sent.
                 - **Fallback Mechanism**: Implemented intelligent fallback retry logic. If signature validation fails or the upstream API rejects the request (400 error), the system automatically clears all thinking blocks and forces a retry, ensuring the user's request always succeeds.
@@ -4763,7 +4763,7 @@
             - **Separated Refresh and Warmup**: Removed automatic warmup trigger during quota refresh. Warmup now only triggers via scheduler (every 10 minutes) or manual button, avoiding accidental quota consumption when users refresh quotas.
             - **Extended Cooldown Period**: Cooldown period extended from 30 minutes to 4 hours (14400 seconds), matching Pro account 5-hour reset cycle, completely resolving repeated warmup within the same cycle.
             - **Persistent History Records**: Warmup history saved to `~/.antigravity_tools/warmup_history.json`, cooldown period remains effective after program restart, resolving state loss issue.
-            - **Concurrent Execution Optimization**: 
+            - **Concurrent Execution Optimization**:
                 - Filtering phase: 5 accounts per batch concurrent quota fetching, 10 accounts from ~15s to ~3s (5x improvement)
                 - Warmup phase: 3 tasks per batch concurrent execution with 2s interval, 40 tasks from ~80s to ~28s (2.9x improvement)
             - **Whitelist Filtering**: Only records and warms up 4 core model groups (`gemini-3-flash`, `claude-sonnet-4-5`, `gemini-3-pro-high`, `gemini-3-pro-image`), avoiding bloated history records.
@@ -5145,7 +5145,7 @@
                 - **Resolved Cache Control Conflicts (cache_control Fix)**: Fully address the upstream validation errors caused by `cache_control` tags or `thought: true` fields in historical messages. Optimized with a "historical message de-thinking" strategy to bypass parsing bugs in the Google API compatibility layer.
                 - **Deep JSON Schema Cleaning Engine**: Optimized the conversion of MCP tool definitions. Complex validation constraints unsupported by Google (e.g., `pattern`, `minLength`, `maximum`) are now automatically migrated to description fields, ensuring compliance while preserving semantic hints.
                 - **Protocol Header Compliance**: Removed non-standard `role` tags from system instructions and enhanced explicit filtering for `cache_control` to guarantee maximum payload compatibility.
-            - **Enhanced Connectivity & Web Search Compatibility**: 
+            - **Enhanced Connectivity & Web Search Compatibility**:
                 - **Search Compatibility**: Added support for `googleSearchRetrieval` and other next-gen tool definitions. Now provides standardized `googleSearch` payload mapping, ensuring seamless integration with Cherry Studio's built-in search toggle.
                 - **Automated Client Data Purification**: Introduced deep recursive cleaning to physically strip `[undefined]` properties injected by clients like Cherry Studio, resolving `400 INVALID_ARGUMENT` errors at the source.
                 - **High-Quality Virtual Model Auto-Networking**: Expanded the high-performance model whitelist (including Claude Thinking variants), ensuring all premium models trigger native networking search by default.
@@ -5158,7 +5158,7 @@
                 - **Intelligent Intent Recognition**: Enhanced detection for low-value requests like title generation, summaries, and system Warmups/Reminders.
                 - **Seamless Downgrade Redirect**: Automatically routes background traffic to **gemini-2.5-flash**, ensuring top-tier model (Sonnet/Opus) quotas are reserved for core tasks.
                 - **Significant Token Saving**: Saves 1.7k - 17k+ high-value tokens per long session.
-        - **Stability Enhancements**: 
+        - **Stability Enhancements**:
             - Resolved Rust compilation and test case errors caused by the latest model field updates, hardening the data model layer (models.rs).
     *   **v3.3.0 (2025-12-27)**:
         - **Major Updates**:
@@ -5200,7 +5200,7 @@
                 - **Tool Empty Output Compensation**: Specifically for silent commands like `mkdir`, automatically maps empty outputs to explicit success signals, resolving task flow interruptions and hallucinations in Claude CLI.
                 - **Global Stop Sequence Configuration**: Optimized `stopSequences` for proxy links, precisely cutting off streaming output and completely resolving parsing errors caused by trailing redundancy.
                 - **Smart Payload Cleaning (Smart Panic Fix)**: Introduced mutual exclusion checks for `GoogleSearch` and `FunctionCall`, and implemented automatic tool stripping during background task redirection (Token Saver), completely eliminating **400 Tool Conflict (Multiple tools)** errors.
-                - **Proxy Reliability Enhancement (Core Thanks to @salacoste PR #79)**: 
+                - **Proxy Reliability Enhancement (Core Thanks to @salacoste PR #79)**:
                     - **Smart 429 Backoff**: Support parsing upstream `RetryInfo` to wait and retry automatically when rate-limited, reducing unnecessary account rotation.
                     - **Resume Fallback**: Implemented auto-stripping of Thinking blocks for `/resume` 400 signature errors, improving session recovery success.
                     - **Extended Schema Support**: Improved recursive JSON Schema cleaning and added filtering for `enumCaseInsensitive` and other extension fields.

@@ -314,6 +314,30 @@ def execute_version_bump(next_version, scope, dry_run=False):
             cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)
         changelog_en.write_text(cl_en_content, encoding="utf-8")
 
+    # 10. Generate release notes file with Quick Install one-liners
+    release_notes_dir = REPO_ROOT / ".lovable" / "release"
+    release_notes_dir.mkdir(parents=True, exist_ok=True)
+    notes_file = release_notes_dir / f"release-notes-v{next_version}.md"
+    notes_content = (
+        f"## Quick Install v{next_version}\n\n"
+        f"### Windows (PowerShell 5.1+)\n"
+        f"```powershell\n"
+        f"irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex\n"
+        f"# Or pinned version:\n"
+        f"irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.ps1 | iex\n"
+        f"```\n\n"
+        f"### Linux / macOS (Bash)\n"
+        f"```bash\n"
+        f"curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash\n"
+        f"# Or pinned version:\n"
+        f"curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.sh | bash\n"
+        f"```\n\n"
+        f"---\n\n"
+        f"## What's Changed in v{next_version}\n\n"
+        f"- {default_scope}\n"
+    )
+    notes_file.write_text(notes_content, encoding="utf-8")
+
 
 def stage_and_commit_release(next_version, scope, dry_run=False):
     """Stages release files and commits on the current branch."""

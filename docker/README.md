@@ -91,7 +91,7 @@ docker build -t antigravity-manager:latest -f docker/Dockerfile .
 
 #### 💡 構建參數
 本鏡像支持自動鏡像源切換，以提升国内構建速度：
-*   `USE_MIRROR`: 
+*   `USE_MIRROR`:
     *   `auto` (默認): 自動檢測網絡環境，若無法訪問 Google 則切換至国内镜像（阿里云/NPM Mirror）。
     *   `true`: 強制使用国内镜像源。
     *   `false`: 強制使用官方默認源。

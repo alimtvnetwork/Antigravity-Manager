@@ -76,33 +76,33 @@ for item in "${PRS_LIST[@]}"; do
     PR_NUM=$(echo "$item" | cut -d'|' -f1)
     AUTHOR=$(echo "$item" | cut -d'|' -f2)
     TITLE=$(echo "$item" | cut -d'|' -f3)
-    
+
     echo "----------------------------------------"
     echo "处理 PR #${PR_NUM}: ${TITLE}"
     echo "作者: @${AUTHOR}"
     echo "----------------------------------------"
-    
+
     # 添加感谢评论
     echo "📝 添加感谢评论..."
     gh pr comment ${PR_NUM} --repo ${REPO} --body "${THANK_YOU_MESSAGE}"
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ 评论已添加"
     else
         echo "❌ 评论添加失败"
         continue
     fi
-    
+
     # 关闭 PR
     echo "🔒 关闭 PR..."
     gh pr close ${PR_NUM} --repo ${REPO} --comment "已集成到 ${VERSION}，关闭此 PR。"
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ PR #${PR_NUM} 已关闭"
     else
         echo "❌ PR #${PR_NUM} 关闭失败"
     fi
-    
+
     echo ""
     sleep 2  # 避免 API 限流
 done

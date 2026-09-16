@@ -10,7 +10,7 @@ import type { NavItem } from './constants';
 
 /**
  * Navbar 主组件
- * 
+ *
  * 职责: 只负责布局 and 状态管理,不处理响应式细节
  * 响应式逻辑由各个子组件独立处理
  */

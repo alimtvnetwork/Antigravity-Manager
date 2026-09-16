@@ -7,9 +7,9 @@ echo "🛠️  修复 'Antigravity Tools' 已损坏问题..."
 if [ -d "$APP_PATH" ]; then
     echo "📍 找到应用: $APP_PATH"
     echo "🔑 需要管理员权限来移除隔离属性 (Quarantine Attribute)..."
-    
+
     sudo xattr -rd com.apple.quarantine "$APP_PATH"
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ 修复成功！现在应该可以正常打开应用了。"
     else

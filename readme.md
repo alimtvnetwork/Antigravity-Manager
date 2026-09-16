@@ -5,7 +5,7 @@
 
   <h3>您的个人高性能 AI 调度网关</h3>
   <p>不仅仅是账号管理，更是打破 API 调用壁垒的终极解决方案。</p>
-  
+
   <p>
     <a href="https://github.com/lbjlaq/Antigravity-Manager">
       <img src="https://img.shields.io/badge/Version-4.10.0-blue?style=flat-square" alt="Version">
@@ -21,15 +21,15 @@
   </a>
 
   <p>
-    <a href="#-核心功能">核心功能</a> • 
-    <a href="#-界面导览">界面导览</a> • 
-    <a href="#-技术架构">技术架构</a> • 
-    <a href="#-安装指南">安装指南</a> • 
+    <a href="#-核心功能">核心功能</a> •
+    <a href="#-界面导览">界面导览</a> •
+    <a href="#-技术架构">技术架构</a> •
+    <a href="#-安装指南">安装指南</a> •
     <a href="#-快速接入">快速接入</a>
   </p>
 
   <p>
-    <strong>简体中文</strong> | 
+    <strong>简体中文</strong> |
     <a href="./README_EN.md">English</a>
   </p>
 </div>
@@ -133,12 +133,12 @@ graph TD
 
 **Linux / macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
 > **支持的格式**: Linux (`.deb` / `.rpm` / `.AppImage`) | macOS (`.dmg`) | Windows (NSIS `.exe`)
@@ -301,7 +301,7 @@ opencode run "test" --model google/antigravity-claude-sonnet-4-5-thinking --vari
 ### 如何接入 Kilo Code?
 1.  **协议选择**: 建议优先使用 **Gemini 协议**。
 2.  **Base URL**: 填写 `http://127.0.0.1:8045`。
-3.  **注意**: 
+3.  **注意**:
     - **OpenAI 协议限制**: Kilo Code 在使用 OpenAI 模式时，其请求路径会叠加产生 `/v1/chat/completions/responses` 这种非标准路径，导致 Antigravity 返回 404。因此请务必填入 Base URL 后选择 Gemini 模式。
     - **模型映射**: Kilo Code 中的模型名称可能与 Antigravity 默认设置不一致，如遇到无法连接，请在“模型映射”页面设置自定义映射，并查看**日志文件**进行调试。
 
@@ -351,7 +351,7 @@ with open("output.png", "wb") as f:
 
 **支持的参数**：
 - **`size`**: 任意 `WIDTHxHEIGHT` 格式（如 `1280x720`, `1024x1024`, `1920x1080`），自动计算并映射到标准宽高比（21:9, 16:9, 9:16, 4:3, 3:4, 1:1）
-- **`quality`**: 
+- **`quality`**:
   - `"hd"` → 4K 分辨率（高质量）
   - `"medium"` → 2K 分辨率（中等质量）
   - `"standard"` → 默认分辨率（标准质量）
