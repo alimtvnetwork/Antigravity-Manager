@@ -30,7 +30,7 @@ mod security_db_tests {
     fn setup_test() -> std::sync::MutexGuard<'static, ()> {
         let lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         let _ = init_db();
         cleanup_test_data();
         lock
@@ -62,7 +62,7 @@ mod security_db_tests {
     fn test_db_initialization() {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         // 验证数据库初始化不会 panic
         let result = init_db();
         assert!(
@@ -76,7 +76,7 @@ mod security_db_tests {
     fn test_db_multiple_initializations() {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         // 验证多次初始化不会出错 (幂等性)
         for _ in 0..3 {
             let result = init_db();
@@ -718,7 +718,7 @@ mod performance_benchmarks {
     fn benchmark_blacklist_lookup() {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         let _ = init_db();
 
         // 清理并添加 100 个黑名单条目
@@ -761,7 +761,7 @@ mod performance_benchmarks {
     fn benchmark_cidr_matching() {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         let _ = init_db();
 
         // 清理并添加 CIDR 规则
