@@ -1,7 +1,6 @@
 import {
   useErrorStore,
   recordClickEvent,
-  buildCapturedError,
 } from '../stores/error-store';
 
 let isInitialized = false;
@@ -33,7 +32,6 @@ function handleWindowError(event: ErrorEvent): void {
   }
 
   const err = event.error || new Error(event.message);
-  const route = typeof window !== 'undefined' ? window.location.pathname : '/';
 
   useErrorStore.getState().captureError(err, {
     source: 'window.onerror',

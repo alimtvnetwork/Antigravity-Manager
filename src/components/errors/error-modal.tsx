@@ -24,7 +24,7 @@ import { cn } from '../../utils/cn';
 
 type ActiveTab = 'overview' | 'backend' | 'stack' | 'context';
 
-export function ErrorModal(): JSX.Element | null {
+export function ErrorModal(): React.ReactNode {
   const {
     selectedError,
     isModalOpen,
@@ -103,7 +103,7 @@ function ModalHeader({
   queueIndex,
   onNavigate,
   onClose,
-}: ModalHeaderProps): JSX.Element {
+}: ModalHeaderProps): React.ReactNode {
   const isErr = error.level === 'error';
   const isWarn = error.level === 'warn';
 
@@ -167,7 +167,7 @@ interface TabNavProps {
   onSelect: (tab: ActiveTab) => void;
 }
 
-function TabNav({ activeTab, onSelect }: TabNavProps): JSX.Element {
+function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
   const tabs: Array<{ id: ActiveTab; label: string; icon: React.ReactNode }> = [
     { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'backend', label: 'Backend Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
@@ -199,7 +199,7 @@ function TabNav({ activeTab, onSelect }: TabNavProps): JSX.Element {
   );
 }
 
-function OverviewTab({ error }: { error: CapturedError }): JSX.Element {
+function OverviewTab({ error }: { error: CapturedError }): React.ReactNode {
   const fixes = getSuggestedFixes(error.code);
 
   return (
@@ -248,7 +248,7 @@ function OverviewTab({ error }: { error: CapturedError }): JSX.Element {
   );
 }
 
-function BackendTab({ error }: { error: CapturedError }): JSX.Element {
+function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
   const backendMsg = error.envelopeErrors?.BackendMessage || error.backendStackTrace;
   const backendStack = error.envelopeErrors?.Backend || [];
 
@@ -289,7 +289,7 @@ function BackendTab({ error }: { error: CapturedError }): JSX.Element {
   );
 }
 
-function StackTab({ error }: { error: CapturedError }): JSX.Element {
+function StackTab({ error }: { error: CapturedError }): React.ReactNode {
   const [showRaw, setShowRaw] = useState(false);
   const frames = error.parsedFrames || [];
 
@@ -339,7 +339,7 @@ function StackTab({ error }: { error: CapturedError }): JSX.Element {
   );
 }
 
-function ContextTab({ error }: { error: CapturedError }): JSX.Element {
+function ContextTab({ error }: { error: CapturedError }): React.ReactNode {
   const json = JSON.stringify(
     {
       context: error.context,
@@ -372,7 +372,7 @@ function ModalFooter({
   onCopyAi,
   onCopyJson,
   onClose,
-}: ModalFooterProps): JSX.Element {
+}: ModalFooterProps): React.ReactNode {
   return (
     <div className="px-6 py-4 border-t border-gray-200 dark:border-base-300 flex items-center justify-between bg-gray-50/50 dark:bg-base-200/50">
       <div className="flex items-center gap-2">
