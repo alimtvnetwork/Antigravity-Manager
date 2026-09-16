@@ -333,6 +333,9 @@ mod tests {
     #[test]
     fn test_set_current_account_id_with_target() {
         let _guard = TEST_MUTEX.lock().unwrap();
+        let _env_guard = TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
         std::env::set_var("ABV_DATA_DIR", dir.path());
 
@@ -457,6 +460,9 @@ mod tests {
     #[test]
     fn task_quota_refresh_keeps_unexpired_live_limit() {
         let _guard = TEST_MUTEX.lock().unwrap();
+        let _env_guard = TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
         let account_id = "live-limit-account";
         create_account_file(dir.path(), account_id, "live-limit@example.com");
@@ -524,6 +530,9 @@ mod tests {
         std::env::remove_var("ABV_DATA_DIR");
     }
 }
+
+#[cfg(test)]
+pub static TEST_DATA_DIR_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Global account write lock to prevent corruption during concurrent operations
 static ACCOUNT_INDEX_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));

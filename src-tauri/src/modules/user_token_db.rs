@@ -697,12 +697,35 @@ pub fn get_username_for_ip(ip: &str) -> Result<Option<String>, String> {
 mod tests {
     use super::*;
 
-    static TEST_TOKEN_DB_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    struct EnvDataDirGuard {
+        _temp_dir: tempfile::TempDir,
+    }
+
+    impl EnvDataDirGuard {
+        fn new() -> Self {
+            let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+            std::env::set_var("ABV_DATA_DIR", temp_dir.path());
+            Self {
+                _temp_dir: temp_dir,
+            }
+        }
+    }
+
+    impl Drop for EnvDataDirGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("ABV_DATA_DIR");
+        }
+    }
 
     #[test]
     fn test_create_and_query_token() {
-        let _lock = TEST_TOKEN_DB_MUTEX.lock().unwrap();
-        let _ = init_db(); // Ensure DB is initialized
+        let _lock = crate::modules::account::TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _env_guard = EnvDataDirGuard::new();
+
+        let init_res = init_db();
+        assert!(init_res.is_ok(), "init_db failed: {:?}", init_res.err());
 
         // Use a random username to avoid collisions in existing DB runs during dev
         let username = format!("TestUser_{}", Uuid::new_v4());
@@ -715,7 +738,11 @@ mod tests {
             None,
             None,
         );
-        assert!(token_res.is_ok());
+        assert!(
+            token_res.is_ok(),
+            "create_token failed: {:?}",
+            token_res.err()
+        );
 
         let token = token_res.unwrap();
         assert_eq!(token.username, username);
@@ -728,8 +755,14 @@ mod tests {
 
     #[test]
     fn test_never_expire_token_validation() {
-        let _lock = TEST_TOKEN_DB_MUTEX.lock().unwrap();
-        let _ = init_db();
+        let _lock = crate::modules::account::TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _env_guard = EnvDataDirGuard::new();
+
+        let init_res = init_db();
+        assert!(init_res.is_ok(), "init_db failed: {:?}", init_res.err());
+
         let username = format!("NeverExpireUser_{}", Uuid::new_v4());
         let token_res = create_token(
             username.clone(),
@@ -740,7 +773,11 @@ mod tests {
             None,
             None,
         );
-        assert!(token_res.is_ok());
+        assert!(
+            token_res.is_ok(),
+            "create_token failed: {:?}",
+            token_res.err()
+        );
         let token = token_res.unwrap();
         let (valid, reason) =
             validate_token(&token.token, "127.0.0.1").expect("validation must succeed");
