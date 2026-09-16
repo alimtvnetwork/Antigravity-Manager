@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.12.0 (2026-09-16)**:
+        -   **[Architecture Decoupling & Gitmap Pipeline Isolation] Complete Fork Independence and Centralized Gitmap Pipeline Database Storage**:
+            -   **Complete Migration to alimtvnetwork Repository**: Retargeted all update check endpoints (`updater.json`), download sources, quick install one-liners (`install.ps1`, `install.sh`), Homebrew Cask formulas, and documentation to `alimtvnetwork/Antigravity-Manager`, fully eliminating upstream fallbacks and coupling.
+            -   **Centralized Gitmap Pipeline DB Isolation**: Re-architected Gitmap pipeline database storage into the CLI application data directory (`AppData/Local/gitmap-cli/data/pipeline/pipeline_<slug>.db`), preventing rogue `.gitmap` directory pollution within user workspaces.
+            -   **Settings UI and Web Portal Realignment**: Updated in-app Settings links, application web portal, and issue tracker references to the active repository.
     *   **v4.11.0 (2026-09-16)**:
         -   **[i18n & Architecture Stability] Default English Language, Cross-Platform Test Mutex Synchronization & Hardened Release Pipeline**:
             -   **Default Application Language Set to English**: Initialized default application interface to English (`en`) while preserving full multilingual support (13+ languages).

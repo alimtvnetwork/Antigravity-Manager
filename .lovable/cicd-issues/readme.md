@@ -9,3 +9,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [05-windows-stress-test-io-timeout-rca.md](.lovable/cicd-issues/05-windows-stress-test-io-timeout-rca.md)
 - [06-thinking-budget-concurrency-rca.md](.lovable/cicd-issues/06-thinking-budget-concurrency-rca.md)
 - [07-release-workflow-heredoc-syntax-rca.md](.lovable/cicd-issues/07-release-workflow-heredoc-syntax-rca.md)
+- [08-gitmap-pipeline-db-isolation-and-fork-urls-rca.md](.lovable/cicd-issues/08-gitmap-pipeline-db-isolation-and-fork-urls-rca.md)

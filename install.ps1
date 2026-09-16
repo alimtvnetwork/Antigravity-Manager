@@ -48,7 +48,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
-$UpstreamRepo = "lbjlaq/Antigravity-Manager"
 $AppName = "Antigravity Tools"
 $BinaryName = "Antigravity Tools.exe"
 
@@ -183,19 +182,11 @@ if ($TargetVersion) {
             if ($updater -and $updater.version) {
                 $TargetVersion = $updater.version -replace "^v", ""
             }
-        } catch {
-            # Try upstream updater
-            try {
-                $updater = Invoke-RestMethod -Uri "https://github.com/$UpstreamRepo/releases/latest/download/updater.json" -TimeoutSec 6
-                if ($updater -and $updater.version) {
-                    $TargetVersion = $updater.version -replace "^v", ""
-                }
-            } catch {}
-        }
+        } catch {}
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.11.0"
+        $TargetVersion = "4.12.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }

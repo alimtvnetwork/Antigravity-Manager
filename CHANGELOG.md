@@ -2,6 +2,12 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.12.0 (2026-09-16)**:
+        -   **[架构解耦 & Gitmap 流水线隔离] 全面解耦上游仓库依赖与 Gitmap 流水线数据库中央存储隔离**:
+            -   **全面迁移至 alimtvnetwork 仓库**: 彻底替换所有更新检测接口 (`updater.json`)、下载源、快速安装脚本 (`install.ps1`, `install.sh`)、Homebrew Cask 以及文档链接至 `alimtvnetwork/Antigravity-Manager`，彻底消除对上游仓库的依赖与回退。
+            -   **Gitmap 流水线数据库集中隔离**: 将 Gitmap 运行流水线数据库由用户仓库目录迁移至 CLI 安装目录下的独立数据目录 (`AppData/Local/gitmap-cli/data/pipeline/pipeline_<slug>.db`)，杜绝污染项目工作区。
+            -   **应用设置与静态站点同步**: 更新设置页面、应用界面和官方文档站点中所有项目链接与 Issue 报告地址。
+
     *   **v4.11.0 (2026-09-16)**:
         -   **[i18n & 架构稳定性] 默认语言 English、测试套件跨平台互斥隔离与发布流水线加固**:
             -   **默认语言统一设为 English**: 将应用初始界面与核心配置默认语言调整为 English (`en`)，兼具完整 13+ 语言本地化支持。

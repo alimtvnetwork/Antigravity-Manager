@@ -1,15 +1,15 @@
 cask "antigravity-tools" do
-  version "4.11.0"
+  version "4.12.0"
   sha256 :no_check
 
   name "Antigravity Tools"
   desc "Professional Account Management for AI Services"
-  homepage "https://github.com/lbjlaq/Antigravity-Manager"
+  homepage "https://github.com/alimtvnetwork/Antigravity-Manager"
 
   on_macos do
     arch intel: "x64", arm: "aarch64"
 
-    url "https://github.com/lbjlaq/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.dmg"
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.dmg"
 
     app "Antigravity Tools.app"
 
@@ -30,7 +30,7 @@ cask "antigravity-tools" do
   on_linux do
     arch arm: "aarch64", intel: "amd64"
 
-    url "https://github.com/lbjlaq/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.AppImage"
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.AppImage"
     binary "Antigravity.Tools_#{version}_#{arch}.AppImage", target: "antigravity-tools"
 
     preflight_steps do

@@ -309,11 +309,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_content = changelog_zh.read_text(encoding="utf-8")
         zh_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[i18n & 架构稳定性] 默认语言 English、测试套件跨平台互斥隔离与发布流水线加固**:\n"
-            f"            -   **默认语言统一设为 English**: 将应用初始界面与核心配置默认语言调整为 English (`en`)，兼具完整 13+ 语言本地化支持。\n"
-            f"            -   **跨平台测试互斥同步**: 引入 TEST_THINKING_BUDGET_MUTEX 消除多线程并发测试冲突，彻底隔离 user_token_db 与 SECURITY_DB_MUTEX。\n"
-            f"            -   **Windows 压测与基准校准**: 针对 Windows CI 磁盘 I/O 延迟优化循环批次与耗时断言，消除偶发超时断言失败。\n"
-            f"            -   **免安装独立脚本与发布流水线加固**: 提供 Windows PowerShell (`install.ps1`) 与 Unix Bash (`install.sh`) 极速单行安装脚本并发布为 release assets，彻底修复 release workflow 多行 markdown 解析格式。\n"
+            f"        -   **[架构解耦 & Gitmap 流水线隔离] 全面解耦上游仓库依赖与 Gitmap 流水线数据库中央存储隔离**:\n"
+            f"            -   **全面迁移至 alimtvnetwork 仓库**: 彻底替换所有更新检测接口 (`updater.json`)、下载源、快速安装脚本 (`install.ps1`, `install.sh`)、Homebrew Cask 以及文档链接至 `alimtvnetwork/Antigravity-Manager`，彻底消除对上游仓库的依赖与回退。\n"
+            f"            -   **Gitmap 流水线数据库集中隔离**: 将 Gitmap 运行流水线数据库由用户仓库目录迁移至 CLI 安装目录下的独立数据目录 (`AppData/Local/gitmap-cli/data/pipeline/pipeline_<slug>.db`)，杜绝污染项目工作区。\n"
+            f"            -   **应用设置与静态站点同步**: 更新设置页面、应用界面和官方文档站点中所有项目链接与 Issue 报告地址。\n"
         )
         marker_zh = "[English Changelog](CHANGELOG_EN.md)。"
         if marker_zh in cl_content:
@@ -330,11 +329,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_en_content = changelog_en.read_text(encoding="utf-8")
         en_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[i18n & Architecture Stability] Default English Language, Cross-Platform Test Mutex Synchronization & Hardened Release Pipeline**:\n"
-            f"            -   **Default Application Language Set to English**: Initialized default application interface to English (`en`) while preserving full multilingual support (13+ languages).\n"
-            f"            -   **Cross-Platform Test Mutex Isolation**: Introduced TEST_THINKING_BUDGET_MUTEX to eliminate cross-mapper race conditions in parallel cargo test runs, and synchronized user_token_db mutations.\n"
-            f"            -   **Windows Stress & Benchmark Calibration**: Calibrated test iterations and disk I/O latency tolerance in Windows stress test modules to eliminate false timeouts on CI runners.\n"
-            f"            -   **Standalone Portable Installers & Release Hardening**: Published install.ps1 and install.sh one-liners as release assets, and resolved release workflow markdown parsing errors.\n"
+            f"        -   **[Architecture Decoupling & Gitmap Pipeline Isolation] Complete Fork Independence and Centralized Gitmap Pipeline Database Storage**:\n"
+            f"            -   **Complete Migration to alimtvnetwork Repository**: Retargeted all update check endpoints (`updater.json`), download sources, quick install one-liners (`install.ps1`, `install.sh`), Homebrew Cask formulas, and documentation to `alimtvnetwork/Antigravity-Manager`, fully eliminating upstream fallbacks and coupling.\n"
+            f"            -   **Centralized Gitmap Pipeline DB Isolation**: Re-architected Gitmap pipeline database storage into the CLI application data directory (`AppData/Local/gitmap-cli/data/pipeline/pipeline_<slug>.db`), preventing rogue `.gitmap` directory pollution within user workspaces.\n"
+            f"            -   **Settings UI and Web Portal Realignment**: Updated in-app Settings links, application web portal, and issue tracker references to the active repository.\n"
         )
         if "*   **Version History**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{en_entry}", 1)
@@ -362,7 +360,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- {scope}\n"
+        f"- **Fork Independence & URL Migration**: Full decoupling from upstream repository. All updater endpoints, installer scripts (`install.ps1`, `install.sh`), and cask recipes now directly target `alimtvnetwork/Antigravity-Manager`.\n"
+        f"- **Gitmap Pipeline DB Central Isolation**: Re-routed Gitmap pipeline database to CLI binary data directory (`pipeline/`), preventing repo workspace pollution.\n"
+        f"- **Settings & Web Portal Realignment**: Updated documentation, issue links, and UI cards.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8")
 
