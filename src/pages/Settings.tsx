@@ -25,7 +25,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>('4.10.0');
+    const [appVersion, setAppVersion] = useState<string>('4.11.0');
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
         theme: 'system',

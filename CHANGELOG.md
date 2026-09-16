@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.11.0 (2026-09-16)**:
+        -   **[i18n & 架构稳定性] 默认语言 English、测试套件跨平台互斥隔离与发布流水线加固**:
+            -   **默认语言统一设为 English**: 将应用初始界面与核心配置默认语言调整为 English (`en`)，兼具完整 13+ 语言本地化支持。
+            -   **跨平台测试互斥同步**: 引入 TEST_THINKING_BUDGET_MUTEX 消除多线程并发测试冲突，彻底隔离 user_token_db 与 SECURITY_DB_MUTEX。
+            -   **Windows 压测与基准校准**: 针对 Windows CI 磁盘 I/O 延迟优化循环批次与耗时断言，消除偶发超时断言失败。
+            -   **免安装独立脚本与发布流水线加固**: 提供 Windows PowerShell (`install.ps1`) 与 Unix Bash (`install.sh`) 极速单行安装脚本并发布为 release assets，彻底修复 release workflow 多行 markdown 解析格式。
+
     *   **v4.8.1 (2026-09-15)**:
         -   **[多实例并行隔离与 CLI 支持] 多实例多 Profile 并行隔离与终端命令行控制**:
             -   **独立数据与扩展目录**: 每个实例拥有独立的 `--user-data-dir` 与 `--extensions-dir`，保证多 Profile 互不污染、独立登录与并行执行。

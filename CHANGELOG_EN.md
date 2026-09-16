@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.11.0 (2026-09-16)**:
+        -   **[i18n & Architecture Stability] Default English Language, Cross-Platform Test Mutex Synchronization & Hardened Release Pipeline**:
+            -   **Default Application Language Set to English**: Initialized default application interface to English (`en`) while preserving full multilingual support (13+ languages).
+            -   **Cross-Platform Test Mutex Isolation**: Introduced TEST_THINKING_BUDGET_MUTEX to eliminate cross-mapper race conditions in parallel cargo test runs, and synchronized user_token_db mutations.
+            -   **Windows Stress & Benchmark Calibration**: Calibrated test iterations and disk I/O latency tolerance in Windows stress test modules to eliminate false timeouts on CI runners.
+            -   **Standalone Portable Installers & Release Hardening**: Published install.ps1 and install.sh one-liners as release assets, and resolved release workflow markdown parsing errors.
     *   **v4.7.1 (2026-09-12)**:
         -   **[Upstream Protocol Optimization & Native Alignment] Native Language Server Alignment: Dynamic Agent RequestType, Fine-Grained 429 Classification & Malformed Call Fallback**:
             -   **Dynamic On-Demand `requestType: "agent"`**: Reverse-engineered native Antigravity language server behavior to eliminate unnecessary `"requestType": "agent"` flags on every prompt. Now, Agent mode is only activated when tool declarations exist or messages contain tool turns. Normal chat and code completions flow through the standard Chat pool, drastically reducing 429 rate limit contention on Google's Agent pool.

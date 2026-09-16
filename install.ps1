@@ -195,7 +195,7 @@ if ($TargetVersion) {
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.10.0"
+        $TargetVersion = "4.11.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }

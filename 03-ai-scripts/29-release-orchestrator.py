@@ -238,12 +238,23 @@ def execute_version_bump(next_version, scope, dry_run=False):
             json.dump(pl_data, f, indent=2)
             f.write("\n")
 
-    # 4. Update src-tauri/Cargo.toml
+    # 4. Update src-tauri/Cargo.toml & Cargo.lock
     cargo_file = REPO_ROOT / "src-tauri" / "Cargo.toml"
     if cargo_file.is_file():
         cargo_content = cargo_file.read_text(encoding="utf-8")
         cargo_content = re.sub(r'(?m)^version\s*=\s*"[^"]+"', f'version = "{next_version}"', cargo_content, count=1)
         cargo_file.write_text(cargo_content, encoding="utf-8")
+
+    cargo_lock = REPO_ROOT / "src-tauri" / "Cargo.lock"
+    if cargo_lock.is_file():
+        lock_content = cargo_lock.read_text(encoding="utf-8")
+        lock_content = re.sub(
+            r'(\[\[package\]\]\r?\nname\s*=\s*"antigravity-tools"\r?\nversion\s*=\s*)"[^"]+"',
+            f'\\g<1>"{next_version}"',
+            lock_content,
+            count=1,
+        )
+        cargo_lock.write_text(lock_content, encoding="utf-8")
 
     # 5. Update src-tauri/tauri.conf.json
     tauri_conf = REPO_ROOT / "src-tauri" / "tauri.conf.json"
@@ -283,19 +294,34 @@ def execute_version_bump(next_version, scope, dry_run=False):
             rm_content = re.sub(r"badge/Version-[0-9.]+-blue", f"badge/Version-{next_version}-blue", rm_content)
             readme_path.write_text(rm_content, encoding="utf-8")
 
-    # 9. Update changelog files
+    # 9. Update fallback version in standalone install scripts
+    for installer_path in [REPO_ROOT / "install.ps1", REPO_ROOT / "install.sh"]:
+        if installer_path.is_file():
+            inst_content = installer_path.read_text(encoding="utf-8")
+            inst_content = re.sub(r'(\$TargetVersion\s*=\s*)"[0-9.]+"', f'\\g<1>"{next_version}"', inst_content)
+            inst_content = re.sub(r'(RELEASE_VERSION\s*=\s*)"[0-9.]+"', f'\\g<1>"{next_version}"', inst_content)
+            inst_content = re.sub(r'falling back to v[0-9.]+', f'falling back to v{next_version}', inst_content)
+            installer_path.write_text(inst_content, encoding="utf-8")
+
+    # 10. Update changelog files
     changelog_zh = REPO_ROOT / "CHANGELOG.md"
     if changelog_zh.is_file():
         cl_content = changelog_zh.read_text(encoding="utf-8")
         zh_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[架构重构与安装体系] 规范目录结构、多实例并发、配额自动轮换与免安装便携脚本体系**:\n"
-            f"            -   **规范化根目录架构**: 确立 01-prompts / 02-spec / 03-ai-scripts 标准分层，将所有技术指令全面归集并入 02-spec/21-app/ 体系，对齐 master 计划与 completed 归档。\n"
-            f"            -   **多实例隔离与终端 CLI**: 支持多 Profile 独立数据与扩展隔离运行，提供 --create-profile / --list-profiles / --run-profile 等全套命令行接口。\n"
-            f"            -   **配额低位定时轮询与任务无损恢复**: 异步 Tokio 监督器按指定时间轮询活跃 Profile 实时配额，低于阈值时自动优雅轮换并持久化未完成任务快照自愈。\n"
-            f"            -   **免安装独立便携包与极速脚本**: 发布便携式独立 ZIP 产物包与 SHA-256 校验，提供 install.ps1 与 install.sh 一键免安装部署至用户目录并自动配置 PATH。\n"
+            f"        -   **[i18n & 架构稳定性] 默认语言 English、测试套件跨平台互斥隔离与发布流水线加固**:\n"
+            f"            -   **默认语言统一设为 English**: 将应用初始界面与核心配置默认语言调整为 English (`en`)，兼具完整 13+ 语言本地化支持。\n"
+            f"            -   **跨平台测试互斥同步**: 引入 TEST_THINKING_BUDGET_MUTEX 消除多线程并发测试冲突，彻底隔离 user_token_db 与 SECURITY_DB_MUTEX。\n"
+            f"            -   **Windows 压测与基准校准**: 针对 Windows CI 磁盘 I/O 延迟优化循环批次与耗时断言，消除偶发超时断言失败。\n"
+            f"            -   **免安装独立脚本与发布流水线加固**: 提供 Windows PowerShell (`install.ps1`) 与 Unix Bash (`install.sh`) 极速单行安装脚本并发布为 release assets，彻底修复 release workflow 多行 markdown 解析格式。\n"
         )
-        if "*   **版本演进**:\n" in cl_content:
+        marker_zh = "[English Changelog](CHANGELOG_EN.md)。"
+        if marker_zh in cl_content:
+            idx = cl_content.find(marker_zh) + len(marker_zh)
+            nl_idx = cl_content.find("\n", idx)
+            if nl_idx != -1:
+                cl_content = cl_content[:nl_idx] + "\n\n" + zh_entry + cl_content[nl_idx+1:]
+        elif "*   **版本演进**:\n" in cl_content:
             cl_content = cl_content.replace("*   **版本演进**:\n", f"*   **版本演进**:\n{zh_entry}", 1)
         changelog_zh.write_text(cl_content, encoding="utf-8")
 
@@ -304,17 +330,19 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_en_content = changelog_en.read_text(encoding="utf-8")
         en_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Architecture & Installer Infrastructure] Standardized Folders, Multi-Instance, Auto-Quota Switcher & Portable Installers**:\n"
-            f"            -   **Standardized Root Architecture**: Realigned repository hierarchy to 01-prompts / 02-spec / 03-ai-scripts, relocating all specifications to 02-spec/21-app/ with completed plan synchronization.\n"
-            f"            -   **Multi-Instance Isolation & CLI**: Full multi-profile concurrent execution with isolated directories and terminal CLI flags (--create-profile, --list-profiles, --run-profile).\n"
-            f"            -   **Auto-Quota Polling & Task Recovery**: Background Tokio supervisor polling active quota on configurable timer, auto-rotating on low quota (<10%) with task snapshot recovery.\n"
-            f"            -   **Portable ZIP Release Assets & One-Liner Installers**: Published standalone portable ZIP assets with SHA-256 checksums, and streamlined install.ps1 and install.sh scripts.\n"
+            f"        -   **[i18n & Architecture Stability] Default English Language, Cross-Platform Test Mutex Synchronization & Hardened Release Pipeline**:\n"
+            f"            -   **Default Application Language Set to English**: Initialized default application interface to English (`en`) while preserving full multilingual support (13+ languages).\n"
+            f"            -   **Cross-Platform Test Mutex Isolation**: Introduced TEST_THINKING_BUDGET_MUTEX to eliminate cross-mapper race conditions in parallel cargo test runs, and synchronized user_token_db mutations.\n"
+            f"            -   **Windows Stress & Benchmark Calibration**: Calibrated test iterations and disk I/O latency tolerance in Windows stress test modules to eliminate false timeouts on CI runners.\n"
+            f"            -   **Standalone Portable Installers & Release Hardening**: Published install.ps1 and install.sh one-liners as release assets, and resolved release workflow markdown parsing errors.\n"
         )
-        if "*   **Version Evolution**:\n" in cl_en_content:
+        if "*   **Version History**:\n" in cl_en_content:
+            cl_en_content = cl_en_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{en_entry}", 1)
+        elif "*   **Version Evolution**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)
         changelog_en.write_text(cl_en_content, encoding="utf-8")
 
-    # 10. Generate release notes file with Quick Install one-liners
+    # 11. Generate release notes file with Quick Install one-liners
     release_notes_dir = REPO_ROOT / ".lovable" / "release"
     release_notes_dir.mkdir(parents=True, exist_ok=True)
     notes_file = release_notes_dir / f"release-notes-v{next_version}.md"
@@ -334,7 +362,7 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- {default_scope}\n"
+        f"- {scope}\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8")
 
