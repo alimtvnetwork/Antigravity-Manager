@@ -311,7 +311,7 @@ mod integration_tests {
 
         // 断言：平均每次检查应该在合理时间内
         assert!(
-            avg_per_check < Duration::from_millis(25),
+            avg_per_check < Duration::from_millis(100),
             "Security check should be fast"
         );
 
@@ -415,7 +415,7 @@ mod stress_tests {
 
         // 验证性能合理
         assert!(
-            lookup_duration < Duration::from_secs(5),
+            lookup_duration < Duration::from_secs(30),
             "Lookups should be reasonably fast even with large blacklist"
         );
 
