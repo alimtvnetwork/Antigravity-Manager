@@ -12,7 +12,10 @@ mod integration_tests {
     use std::time::Duration;
 
     /// 辅助函数：初始化测试并加锁隔离
-    fn setup_test() -> (std::sync::MutexGuard<'static, ()>, std::sync::MutexGuard<'static, ()>) {
+    fn setup_test() -> (
+        std::sync::MutexGuard<'static, ()>,
+        std::sync::MutexGuard<'static, ()>,
+    ) {
         let env_lock = crate::modules::account::TEST_DATA_DIR_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
@@ -363,7 +366,10 @@ mod stress_tests {
     use std::time::{Duration, Instant};
 
     /// 辅助函数：初始化测试并加锁隔离
-    fn setup_test() -> (std::sync::MutexGuard<'static, ()>, std::sync::MutexGuard<'static, ()>) {
+    fn setup_test() -> (
+        std::sync::MutexGuard<'static, ()>,
+        std::sync::MutexGuard<'static, ()>,
+    ) {
         let env_lock = crate::modules::account::TEST_DATA_DIR_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
