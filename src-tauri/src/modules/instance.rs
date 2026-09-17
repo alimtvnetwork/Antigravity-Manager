@@ -681,7 +681,7 @@ pub async fn switch_account_to_instance(
     let _ = crate::modules::account::save_account(&account);
 
     // Launch instance
-    launch_instance(&instance.id)?;
+    launch_instance(&instance.id).map_err(|e| e.to_string())?;
 
     Ok(())
 }

@@ -2189,7 +2189,9 @@ async fn admin_get_antigravity_path() -> Result<impl IntoResponse, (StatusCode, 
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse { error: e }),
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
             )
         })?;
     Ok(Json(path))

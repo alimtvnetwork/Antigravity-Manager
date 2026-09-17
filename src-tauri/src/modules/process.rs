@@ -1342,8 +1342,8 @@ fn clean_desktop_exec_command(exec_cmd: &str) -> Option<String> {
     }
 
     // Handle quotes: e.g. "/opt/Antigravity/antigravity" %U or '...'
-    let unquoted = if (trimmed.starts_with('"') && trimmed.contains('"', 1))
-        || (trimmed.starts_with('\'') && trimmed.contains('\'', 1))
+    let unquoted = if (trimmed.starts_with('"') && trimmed[1..].contains('"'))
+        || (trimmed.starts_with('\'') && trimmed[1..].contains('\''))
     {
         let quote_char = trimmed.chars().next().unwrap();
         let end_idx = trimmed[1..]
