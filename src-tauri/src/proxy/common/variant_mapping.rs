@@ -132,11 +132,19 @@ pub fn resolve_real_model(canonical: &str, tier: VariantTier) -> Option<RealMode
             continue;
         };
 
-        return family
+        let mut spec = family
             .tiers
             .iter()
             .find(|(candidate_tier, _)| *candidate_tier == resolved_tier)
-            .map(|(_, spec)| *spec);
+            .map(|(_, spec)| *spec)?;
+
+        if is_canonical {
+            if family.canonical_id == "gemini-3.7-flash" {
+                spec.id = family.canonical_id;
+            }
+        }
+
+        return Some(spec);
     }
 
     None

@@ -45,7 +45,7 @@ pub(crate) mod prompt_log_tests {
         serde_json::from_value(serde_json::json!({
             "id": id, "timestamp": chrono::Utc::now().timestamp_millis(),
             "method": "POST", "url": "/v1/chat/completions", "status": 500, "duration": 10,
-            "request_body": "q".repeat(bytes), "response_body": "err".repeat(bytes),
+            "request_body": "q".repeat(bytes), "response_body": "e".repeat(bytes),
             "error": "err".repeat(2048)
         }))
         .unwrap()

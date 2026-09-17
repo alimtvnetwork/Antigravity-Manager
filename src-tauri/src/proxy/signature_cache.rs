@@ -417,6 +417,7 @@ impl SignatureCache {
         if let Ok(mut cache) = self.session_reasonings.lock() {
             cache.clear();
         }
+        let _ = crate::modules::proxy_db::clear_tool_signatures();
     }
 }
 
@@ -426,6 +427,8 @@ mod tests {
 
     #[test]
     fn test_tool_signature_cache() {
+        let _dir = crate::proxy::monitor::prompt_log_tests::TestDataDir::new();
+        let _ = crate::modules::proxy_db::init_db();
         let cache = SignatureCache::new();
         let sig = "x".repeat(60); // Valid length
 
@@ -498,6 +501,8 @@ mod tests {
 
     #[test]
     fn test_clear_all_caches() {
+        let _dir = crate::proxy::monitor::prompt_log_tests::TestDataDir::new();
+        let _ = crate::modules::proxy_db::init_db();
         let cache = SignatureCache::new();
         let sig = "x".repeat(60);
 
@@ -518,15 +523,13 @@ mod tests {
 
     #[test]
     fn test_tool_signature_sqlite_recovery() {
+        let _dir = crate::proxy::monitor::prompt_log_tests::TestDataDir::new();
+        let _ = crate::modules::proxy_db::init_db();
         let tool_id = "call_sig_sqlite_recovery_unique";
         let sig = "s".repeat(60);
 
         // 1. Direct save to SQLite
-        let db_res = crate::modules::proxy_db::save_tool_signature(tool_id, &sig);
-        if let Err(e) = db_res {
-            eprintln!("Skipping DB test if DB not initialized: {}", e);
-            return;
-        }
+        crate::modules::proxy_db::save_tool_signature(tool_id, &sig).unwrap();
 
         // 2. New in-memory cache (simulating proxy restart)
         let cache = SignatureCache::new();

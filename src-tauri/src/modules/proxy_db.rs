@@ -481,6 +481,18 @@ pub fn load_tool_signature(tool_id: &str) -> Result<Option<String>, String> {
     }
 }
 
+pub fn clear_tool_signatures() -> Result<(), String> {
+    let conn = connect_db()?;
+    conn.execute("DELETE FROM tool_signatures", [])
+        .map_err(|e| e.to_string())?;
+    if let Some(lock) = TOOL_SIGNATURE_DB.get() {
+        if let Ok(mut db) = lock.lock() {
+            *db = None;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct PersistedThinkingRecord {
     pub fingerprint: String,

@@ -18,3 +18,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [14-rust-tests-isolation-and-spec-alignment-rca.md](.lovable/cicd-issues/14-rust-tests-isolation-and-spec-alignment-rca.md)
 - [15-test-isolation-data-dir-env-concurrency-rca.md](.lovable/cicd-issues/15-test-isolation-data-dir-env-concurrency-rca.md)
 - [16-security-test-setup-rustfmt-rca.md](.lovable/cicd-issues/16-security-test-setup-rustfmt-rca.md)
+- [17-signature-cache-and-payload-audit-test-isolation-rca.md](.lovable/cicd-issues/17-signature-cache-and-payload-audit-test-isolation-rca.md)
