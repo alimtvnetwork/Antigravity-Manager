@@ -3063,13 +3063,13 @@ mod tests {
             quality: None,
         };
 
-        // Should cap
+        // Pro models have 49152 limit, so 32000 budget is preserved (not capped to 24576)
         let result_pro =
             transform_claude_request_in(&req_pro, "proj", false, None, "test_session", None)
                 .unwrap();
         assert_eq!(
             result_pro["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            24576
+            32000
         );
     }
 

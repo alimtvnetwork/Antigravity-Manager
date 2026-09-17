@@ -1125,7 +1125,7 @@ data: {"type":"response.failed","response":{"status":"failed","error":{"code":"u
                     "call_id": "call_image",
                     "output": [
                         {"type": "input_text", "text": "image generated"},
-                        {"type": "input_image", "image_url": "data:image/png;base64,AQ=="}
+                        {"type": "input_image", "image_url": "data:image/png;base64,iVBORw0KGgo="}
                     ]
                 }
             ]
@@ -1157,7 +1157,7 @@ data: {"type":"response.failed","response":{"status":"failed","error":{"code":"u
         );
         assert!(!function_response.to_string().contains("data:image/"));
         assert_eq!(inline_data["inlineData"]["mimeType"], "image/png");
-        assert_eq!(inline_data["inlineData"]["data"], "AQ==");
+        assert_eq!(inline_data["inlineData"]["data"], "iVBORw0KGgo=");
     }
 
     #[test]

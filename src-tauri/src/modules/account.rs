@@ -34,6 +34,7 @@ mod tests {
 
     // Global mutex to prevent concurrent test execution
     static TEST_MUTEX: Lazy<StdMutex<()>> = Lazy::new(|| StdMutex::new(()));
+    static TEST_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     struct TestDataDir {
         path: PathBuf,
@@ -41,13 +42,15 @@ mod tests {
 
     impl TestDataDir {
         fn new() -> Self {
+            let count = TEST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let temp_path = std::env::temp_dir().join(format!(
-                "antigravity_test_{}_{}",
+                "antigravity_test_{}_{}_{}",
                 std::process::id(),
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_millis()
+                    .as_nanos(),
+                count
             ));
             fs::create_dir_all(&temp_path).expect("Failed to create temp dir");
 
@@ -116,7 +119,8 @@ mod tests {
 
     #[test]
     fn test_migrate_data_dir_rename_and_copy() {
-        let _guard = TEST_MUTEX.lock().unwrap();
+        let _data_dir_guard = TEST_DATA_DIR_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let pointer_path = dirs::home_dir()
             .expect("home")
             .join(".antigravity_tools_location");
@@ -279,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_missing_index_with_existing_accounts() {
-        let _guard = TEST_MUTEX.lock().unwrap();
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
 
         // Create accounts directory with account files but NO accounts.json index
@@ -326,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_save_account_index_roundtrip() {
-        let _guard = TEST_MUTEX.lock().unwrap();
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
 
         // Build an AccountIndex with 2 accounts
@@ -403,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_set_current_account_id_with_target() {
-        let _guard = TEST_MUTEX.lock().unwrap();
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let _env_guard = TEST_DATA_DIR_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
