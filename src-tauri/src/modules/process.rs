@@ -942,10 +942,7 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                 Ok(())
             }
             Err(diag_err) => {
-                crate::modules::logger::log_error(&format!(
-                    "[IDE Discovery Failed] {}",
-                    diag_err
-                ));
+                crate::modules::logger::log_error(&format!("[IDE Discovery Failed] {}", diag_err));
                 Err(format!("{}", diag_err))
             }
         }
@@ -1157,7 +1154,10 @@ pub fn detect_antigravity_with_diagnostics(
                 ));
                 return Ok(path);
             }
-            audit_log.push(format!("Configured path '{:?}' does not exist on disk", path));
+            audit_log.push(format!(
+                "Configured path '{:?}' does not exist on disk",
+                path
+            ));
         } else {
             audit_log.push("No custom executable path configured in Settings".to_string());
         }
@@ -1198,9 +1198,7 @@ pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::
 }
 
 /// Audit standard installation locations and collect diagnostics
-fn audit_standard_locations(
-    target_ide: Option<&str>,
-) -> (Option<std::path::PathBuf>, Vec<String>) {
+fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Vec<String>) {
     let mut checked = Vec::new();
 
     let folder_names: &[&str] = if target_ide == Some("ide") {
@@ -1348,7 +1346,10 @@ fn clean_desktop_exec_command(exec_cmd: &str) -> Option<String> {
         || (trimmed.starts_with('\'') && trimmed.contains('\'', 1))
     {
         let quote_char = trimmed.chars().next().unwrap();
-        let end_idx = trimmed[1..].find(quote_char).map(|i| i + 1).unwrap_or(trimmed.len());
+        let end_idx = trimmed[1..]
+            .find(quote_char)
+            .map(|i| i + 1)
+            .unwrap_or(trimmed.len());
         &trimmed[1..end_idx]
     } else {
         trimmed.split_whitespace().next().unwrap_or("")
@@ -1422,7 +1423,9 @@ fn resolve_linux_desktop_entry(
                 continue;
             }
 
-            let matches_target = exe_names.iter().any(|name| file_name.contains(&name.to_lowercase()));
+            let matches_target = exe_names
+                .iter()
+                .any(|name| file_name.contains(&name.to_lowercase()));
             if matches_target {
                 checked.push(format!(".desktop: {}", path.to_string_lossy()));
                 if let Ok(content) = std::fs::read_to_string(&path) {
@@ -1436,7 +1439,8 @@ fn resolve_linux_desktop_entry(
                                     return Some(binary_path);
                                 }
                                 // If relative or bare command, check PATH
-                                if let Some(found) = resolve_linux_path_env(&[&clean_cmd], checked) {
+                                if let Some(found) = resolve_linux_path_env(&[&clean_cmd], checked)
+                                {
                                     return Some(found);
                                 }
                             }

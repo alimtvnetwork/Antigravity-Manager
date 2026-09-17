@@ -355,7 +355,9 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         .instances
         .iter()
         .position(|i| i.id == instance_id)
-        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
+        .ok_or_else(|| {
+            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
+        })?;
 
     let config = &mut registry.instances[pos];
     config.last_used = chrono::Utc::now().timestamp();
@@ -396,7 +398,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         cmd.arg("--new-window");
 
         cmd.spawn().map_err(|e| {
-            crate::error::AppError::Process(format!("Failed to spawn macOS instance process: {}", e))
+            crate::error::AppError::Process(format!(
+                "Failed to spawn macOS instance process: {}",
+                e
+            ))
         })?;
 
         return Ok(());
@@ -441,7 +446,9 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
         .instances
         .iter()
         .position(|i| i.id == instance_id)
-        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
+        .ok_or_else(|| {
+            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
+        })?;
 
     // 1. Locate base executable
     let base_exe = crate::modules::process::detect_antigravity_with_diagnostics(None)?;
@@ -450,8 +457,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let instances_dir = get_instances_dir().map_err(crate::error::AppError::Config)?;
     let instance_bin_dir = instances_dir.join(instance_id).join("bin");
     if !instance_bin_dir.exists() {
-        fs::create_dir_all(&instance_bin_dir)
-            .map_err(|e| crate::error::AppError::Io(e))?;
+        fs::create_dir_all(&instance_bin_dir).map_err(|e| crate::error::AppError::Io(e))?;
     }
 
     // 3. Platform-specific cloning logic
@@ -470,8 +476,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
                 "@echo off\r\nstart \"\" \"{}\" %*\r\n",
                 base_exe.to_string_lossy()
             );
-            fs::write(&launcher_cmd, script_content)
-                .map_err(|e| crate::error::AppError::Io(e))?;
+            fs::write(&launcher_cmd, script_content).map_err(|e| crate::error::AppError::Io(e))?;
             launcher_cmd
         }
     };
@@ -481,15 +486,13 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
         let launcher_sh = instance_bin_dir.join(format!("antigravity-{}", instance_id));
         let base_str = base_exe.to_string_lossy();
         if base_str.ends_with(".AppImage") {
-            let appimage_target = instance_bin_dir.join(format!("antigravity-{}.AppImage", instance_id));
+            let appimage_target =
+                instance_bin_dir.join(format!("antigravity-{}.AppImage", instance_id));
             let _ = std::os::unix::fs::symlink(&base_exe, &appimage_target);
             if appimage_target.exists() {
                 appimage_target
             } else {
-                let script_content = format!(
-                    "#!/bin/sh\nexec \"{}\" \"$@\"\n",
-                    base_str
-                );
+                let script_content = format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str);
                 fs::write(&launcher_sh, script_content)
                     .map_err(|e| crate::error::AppError::Io(e))?;
                 use std::os::unix::fs::PermissionsExt;
@@ -497,12 +500,8 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
                 launcher_sh
             }
         } else {
-            let script_content = format!(
-                "#!/bin/sh\nexec \"{}\" \"$@\"\n",
-                base_str
-            );
-            fs::write(&launcher_sh, script_content)
-                .map_err(|e| crate::error::AppError::Io(e))?;
+            let script_content = format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str);
+            fs::write(&launcher_sh, script_content).map_err(|e| crate::error::AppError::Io(e))?;
             use std::os::unix::fs::PermissionsExt;
             let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
             launcher_sh
@@ -513,12 +512,8 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let cloned_path = {
         let launcher_sh = instance_bin_dir.join(format!("antigravity-{}", instance_id));
         let base_str = base_exe.to_string_lossy();
-        let script_content = format!(
-            "#!/bin/sh\nopen -n -a \"{}\" --args \"$@\"\n",
-            base_str
-        );
-        fs::write(&launcher_sh, script_content)
-            .map_err(|e| crate::error::AppError::Io(e))?;
+        let script_content = format!("#!/bin/sh\nopen -n -a \"{}\" --args \"$@\"\n", base_str);
+        fs::write(&launcher_sh, script_content).map_err(|e| crate::error::AppError::Io(e))?;
         use std::os::unix::fs::PermissionsExt;
         let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
         launcher_sh
@@ -546,7 +541,9 @@ pub fn set_instance_executable(
         .instances
         .iter()
         .position(|i| i.id == instance_id)
-        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
+        .ok_or_else(|| {
+            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
+        })?;
 
     registry.instances[pos].executable_path = executable_path;
     save_registry(&registry).map_err(crate::error::AppError::Config)?;

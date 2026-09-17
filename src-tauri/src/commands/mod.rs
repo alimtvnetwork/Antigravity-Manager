@@ -888,7 +888,9 @@ pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<()
 
 /// 获取 Antigravity 可执行文件路径
 #[tauri::command]
-pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String, crate::error::AppError> {
+pub async fn get_antigravity_path(
+    bypass_config: Option<bool>,
+) -> Result<String, crate::error::AppError> {
     // 1. 优先从配置查询 (除非明确要求绕过)
     if bypass_config != Some(true) {
         if let Ok(config) = crate::modules::config::load_app_config() {

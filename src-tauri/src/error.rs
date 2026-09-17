@@ -175,11 +175,7 @@ impl AppError {
                     ],
                 )
             }
-            _ => (
-                None,
-                None,
-                vec![format!("{} [{}]", msg, code_str)],
-            ),
+            _ => (None, None, vec![format!("{} [{}]", msg, code_str)]),
         };
 
         AppErrorPayload {
