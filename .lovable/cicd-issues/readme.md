@@ -13,3 +13,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [09-ts-jsx-namespace-and-unused-vars-rca.md](.lovable/cicd-issues/09-ts-jsx-namespace-and-unused-vars-rca.md)
 - [10-local-quality-gates-and-version-sync-rca.md](.lovable/cicd-issues/10-local-quality-gates-and-version-sync-rca.md)
 - [11-autoswitchersettings-jsx-syntax-error-rca.md](.lovable/cicd-issues/11-autoswitchersettings-jsx-syntax-error-rca.md)
+- [12-release-v4-16-0-ts-and-rustfmt-rca.md](.lovable/cicd-issues/12-release-v4-16-0-ts-and-rustfmt-rca.md)

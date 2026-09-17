@@ -902,7 +902,9 @@ pub async fn set_data_dir(
     {
         let instance = proxy_state.instance.read().await;
         if instance.is_some() {
-            return Err("Please stop the API proxy service before migrating the data directory".to_string());
+            return Err(
+                "Please stop the API proxy service before migrating the data directory".to_string(),
+            );
         }
     }
     {
@@ -910,7 +912,10 @@ pub async fn set_data_dir(
         if let Some(manager) = lock.as_ref() {
             let status = manager.get_status().await;
             if status.running {
-                return Err("Please stop the Cloudflared tunnel before migrating the data directory".to_string());
+                return Err(
+                    "Please stop the Cloudflared tunnel before migrating the data directory"
+                        .to_string(),
+                );
             }
         }
     }
@@ -970,11 +975,14 @@ pub async fn migrate_data_dir(new_path: String, clean_source: bool) -> Result<()
 
     // Check if target directory is nested inside source directory
     if canonical_target.starts_with(&canonical_source) {
-        return Err("Target directory cannot be located inside the current data directory".to_string());
+        return Err(
+            "Target directory cannot be located inside the current data directory".to_string(),
+        );
     }
 
     // Ensure target directory exists
-    std::fs::create_dir_all(&target_dir).map_err(|e| format!("Failed to create target directory: {}", e))?;
+    std::fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create target directory: {}", e))?;
 
     // Execute recursive directory copy
     copy_dir_all_recursive(&source_dir, &target_dir)

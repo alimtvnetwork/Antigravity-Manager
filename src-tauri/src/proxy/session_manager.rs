@@ -582,8 +582,7 @@ mod tests {
         assert!(sid_gemini.starts_with("sid-"));
 
         // 4. Real User Prompt reported in issue
-        let user_prompt =
-            "You are a remote server operations expert....".repeat(20);
+        let user_prompt = "You are a remote server operations expert....".repeat(20);
         let claude_user_req = ClaudeRequest {
             model: "claude-3-7-sonnet".to_string(),
             messages: vec![Message {

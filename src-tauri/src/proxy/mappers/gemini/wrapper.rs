@@ -240,9 +240,7 @@ pub fn wrap_request_v2(
         crate::proxy::model_specs::is_gemini_v3_or_above(final_model_name)
     };
     let should_inject = !is_under_v3
-        && (force_server_thinking
-            || lower_model.contains("thinking")
-            || is_v3_non_preview);
+        && (force_server_thinking || lower_model.contains("thinking") || is_v3_non_preview);
 
     let has_explicit_thinking = inner_request
         .get("generationConfig")

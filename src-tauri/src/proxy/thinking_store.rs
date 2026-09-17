@@ -605,16 +605,14 @@ impl ThinkingStore {
                 continue;
             };
 
-            let has_unvalidated_function_call = parts
-                .iter()
-                .any(|p| {
-                    if p.get("functionCall").is_some() {
-                        if !part_has_signature(p) {
-                            return true;
-                        }
+            let has_unvalidated_function_call = parts.iter().any(|p| {
+                if p.get("functionCall").is_some() {
+                    if !part_has_signature(p) {
+                        return true;
                     }
-                    false
-                });
+                }
+                false
+            });
 
             let missing_signature = if rec.signature.is_some() {
                 !parts.iter().any(|p| part_has_signature(p))

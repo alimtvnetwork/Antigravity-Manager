@@ -1134,8 +1134,12 @@ fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, S
         .map_err(|e| format!("Failed to listen on address {}: {}", addr_str, e))?;
 
     let std_listener: std::net::TcpListener = socket.into();
-    tokio::net::TcpListener::from_std(std_listener)
-        .map_err(|e| format!("Failed to convert to Tokio TcpListener ({}): {}", addr_str, e))
+    tokio::net::TcpListener::from_std(std_listener).map_err(|e| {
+        format!(
+            "Failed to convert to Tokio TcpListener ({}): {}",
+            addr_str, e
+        )
+    })
 }
 
 // ===== API 处理器 (旧代码已移除，由 src/proxy/handlers/* 接管) =====

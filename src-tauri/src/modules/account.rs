@@ -763,8 +763,11 @@ fn is_default_data_dir(dir: &Path) -> bool {
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
-    fs::create_dir_all(dst).map_err(|e| format!("Failed to create target data directory: {}", e))?;
-    for entry in fs::read_dir(src).map_err(|e| format!("Failed to read source data directory: {}", e))? {
+    fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create target data directory: {}", e))?;
+    for entry in
+        fs::read_dir(src).map_err(|e| format!("Failed to read source data directory: {}", e))?
+    {
         let entry = entry.map_err(|e| format!("Failed to read data directory entry: {}", e))?;
         let from = entry.path();
         let to = dst.join(entry.file_name());
@@ -775,16 +778,19 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
             copy_dir_recursive(&from, &to)?;
         } else {
             if let Some(parent) = to.parent() {
-                fs::create_dir_all(parent).map_err(|e| format!("Failed to create target subdirectory: {}", e))?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create target subdirectory: {}", e))?;
             }
-            fs::copy(&from, &to).map_err(|e| format!("Failed to copy file {}: {}", from.display(), e))?;
+            fs::copy(&from, &to)
+                .map_err(|e| format!("Failed to copy file {}: {}", from.display(), e))?;
         }
     }
     Ok(())
 }
 
 fn dir_is_empty(path: &Path) -> Result<bool, String> {
-    let mut entries = fs::read_dir(path).map_err(|e| format!("Failed to read target directory: {}", e))?;
+    let mut entries =
+        fs::read_dir(path).map_err(|e| format!("Failed to read target directory: {}", e))?;
     Ok(entries.next().is_none())
 }
 
@@ -871,12 +877,16 @@ pub fn migrate_data_dir(new_dir: PathBuf) -> Result<PathBuf, String> {
             return Err("Target path already exists and is not a directory".to_string());
         }
         if !dir_is_empty(&new_dir)? {
-            return Err("Target directory is not empty, please select an empty directory or new path".to_string());
+            return Err(
+                "Target directory is not empty, please select an empty directory or new path"
+                    .to_string(),
+            );
         }
         copy_dir_recursive(&old_dir, &new_dir)?;
         let _ = fs::remove_dir_all(&old_dir);
     } else if let Some(parent) = new_dir.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create target parent directory: {}", e))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create target parent directory: {}", e))?;
         match fs::rename(&old_dir, &new_dir) {
             Ok(()) => {}
             Err(_) => {
