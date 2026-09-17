@@ -409,11 +409,12 @@ mod tests {
 
     #[test]
     fn test_set_current_account_id_with_target() {
-        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let _env_guard = TEST_DATA_DIR_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
+        let previous = std::env::var_os("ABV_DATA_DIR");
         std::env::set_var("ABV_DATA_DIR", dir.path());
 
         // Create a dummy account index with some accounts
@@ -452,7 +453,11 @@ mod tests {
         assert_eq!(index.current_target_ide, None);
 
         // Clean up environment variable
-        std::env::remove_var("ABV_DATA_DIR");
+        if let Some(previous) = previous {
+            std::env::set_var("ABV_DATA_DIR", previous);
+        } else {
+            std::env::remove_var("ABV_DATA_DIR");
+        }
     }
 
     #[test]
@@ -536,13 +541,14 @@ mod tests {
 
     #[test]
     fn task_quota_refresh_keeps_unexpired_live_limit() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let _env_guard = TEST_DATA_DIR_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = TestDataDir::new();
         let account_id = "live-limit-account";
         create_account_file(dir.path(), account_id, "live-limit@example.com");
+        let previous = std::env::var_os("ABV_DATA_DIR");
         std::env::set_var("ABV_DATA_DIR", dir.path());
 
         let now = chrono::Utc::now().timestamp();
@@ -604,7 +610,11 @@ mod tests {
             .live_limited_models
             .contains_key("gemini-3.1-flash-image"));
         assert!(!updated.live_limited_models.contains_key("gemini-2.5-pro"));
-        std::env::remove_var("ABV_DATA_DIR");
+        if let Some(previous) = previous {
+            std::env::set_var("ABV_DATA_DIR", previous);
+        } else {
+            std::env::remove_var("ABV_DATA_DIR");
+        }
     }
 }
 

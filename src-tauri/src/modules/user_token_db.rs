@@ -700,21 +700,28 @@ mod tests {
 
     struct EnvDataDirGuard {
         _temp_dir: tempfile::TempDir,
+        previous: Option<std::ffi::OsString>,
     }
 
     impl EnvDataDirGuard {
         fn new() -> Self {
             let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+            let previous = std::env::var_os("ABV_DATA_DIR");
             std::env::set_var("ABV_DATA_DIR", temp_dir.path());
             Self {
                 _temp_dir: temp_dir,
+                previous,
             }
         }
     }
 
     impl Drop for EnvDataDirGuard {
         fn drop(&mut self) {
-            std::env::remove_var("ABV_DATA_DIR");
+            if let Some(previous) = &self.previous {
+                std::env::set_var("ABV_DATA_DIR", previous);
+            } else {
+                std::env::remove_var("ABV_DATA_DIR");
+            }
         }
     }
 

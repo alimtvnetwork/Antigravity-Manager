@@ -166,7 +166,7 @@ pub struct TokenManager {
 
 impl TokenManager {
     fn resolved_data_dir(&self) -> PathBuf {
-        crate::modules::account::get_data_dir().unwrap_or_else(|_| self.data_dir.clone())
+        self.data_dir.clone()
     }
 
     /// 创建新的 TokenManager

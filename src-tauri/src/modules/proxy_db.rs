@@ -1111,7 +1111,7 @@ mod tool_signature_tests {
             Some(replacement.clone())
         );
         {
-            let _other_dir = TestDataDir::new();
+            let _other_dir = TestDataDir::new_nested();
             assert!(load_tool_signature("tool").is_err());
             init_db().unwrap();
             assert_eq!(load_tool_signature("tool").unwrap(), None);

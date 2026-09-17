@@ -16,3 +16,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [12-release-v4-16-0-ts-and-rustfmt-rca.md](.lovable/cicd-issues/12-release-v4-16-0-ts-and-rustfmt-rca.md)
 - [13-rust-compile-errors-release-v4-16-0-rca.md](.lovable/cicd-issues/13-rust-compile-errors-release-v4-16-0-rca.md)
 - [14-rust-tests-isolation-and-spec-alignment-rca.md](.lovable/cicd-issues/14-rust-tests-isolation-and-spec-alignment-rca.md)
+- [15-test-isolation-data-dir-env-concurrency-rca.md](.lovable/cicd-issues/15-test-isolation-data-dir-env-concurrency-rca.md)

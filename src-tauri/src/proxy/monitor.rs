@@ -55,16 +55,30 @@ pub(crate) mod prompt_log_tests {
     pub(crate) struct TestDataDir {
         _dir: tempfile::TempDir,
         previous: Option<std::ffi::OsString>,
+        _guard: Option<std::sync::MutexGuard<'static, ()>>,
     }
     impl TestDataDir {
         pub(crate) fn new() -> Self {
+            let guard = crate::modules::account::TEST_DATA_DIR_MUTEX
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            Self::new_with_guard(Some(guard))
+        }
+        pub(crate) fn new_nested() -> Self {
+            Self::new_with_guard(None)
+        }
+        fn new_with_guard(guard: Option<std::sync::MutexGuard<'static, ()>>) -> Self {
             let dir = tempfile::tempdir().unwrap();
             let previous = std::env::var_os("ABV_DATA_DIR");
             std::env::set_var("ABV_DATA_DIR", dir.path());
             Self {
                 _dir: dir,
                 previous,
+                _guard: guard,
             }
+        }
+        pub(crate) fn path(&self) -> &std::path::Path {
+            self._dir.path()
         }
     }
     impl Drop for TestDataDir {
@@ -78,6 +92,7 @@ pub(crate) mod prompt_log_tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn prompt_log_memory_summary_and_database_detail() {
         let _dir = TestDataDir::new();
         crate::modules::proxy_db::init_db().unwrap();
