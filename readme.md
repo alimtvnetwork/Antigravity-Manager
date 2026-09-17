@@ -358,7 +358,12 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
-- **v4.17.0** (2026-09-17):
+- **v4.17.0** (2026-09-18):
+  - **Test Suite Resilience & SQLite Persistence**: Dual-tier tool signature persistence (`clear_tool_signatures`) in `proxy_db` and nanosecond-precision test isolation.
+  - **Canonical Model Resolution**: Preserved canonical `gemini-3.7-flash` model identifier across dynamic variant mappings.
+  - **Payload Audit Sizing**: Harmonized payload audit threshold with disk budget quotas to prevent unexpected truncation.
+  - **Strict Lint & Rustfmt Compliance**: Multi-line tuple return formatting and universal response envelope standards.
+- **v4.16.0** (2026-09-17):
   - **Unified Pipeline Architecture**: Upstream synchronization introducing canonical Inbound/Outbound pipeline for OpenAI, Claude, Responses, and Gemini Native protocols.
   - **Thinking Store & Cryptographic Signatures**: Integrated server-authoritative Thinking Store with Gzip compression and cryptographic signature healing.
   - **SQLite Performance & Bounded Logs**: Read-only connection caching for sub-second tool queries and configurable disk quota bounds.
