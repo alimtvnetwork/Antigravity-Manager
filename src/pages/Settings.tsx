@@ -1438,7 +1438,7 @@ function Settings() {
                                     </div>
 
                                     <div>
-                                        <h3 className="text-3xl font-black text-gray-900 dark:text-base-content tracking-tight mb-2">{t('common.app_name', 'Antigravity Tools')}</h3>
+                                        <h3 className="text-3xl font-black text-gray-900 dark:text-base-content tracking-tight mb-2">{t('common.app_name', 'AGM by Alim')}</h3>
                                         <div className="flex items-center justify-center gap-2 text-sm">
                                             v{appVersion}
                                             <span className="text-gray-400 dark:text-gray-600">•</span>
@@ -1455,19 +1455,21 @@ function Settings() {
                                             <User className="w-6 h-6 text-blue-500" />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author')}</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content">Ctrler</div>
+                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author', 'Maintainer')}</div>
+                                            <div className="font-bold text-gray-900 dark:text-base-content text-xs sm:text-sm">Md. Alim Ul Karim</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Managed & Enhanced</div>
                                         </div>
                                     </div>
 
-                                    {/* WeChat Card */}
-                                    <div className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-green-200 dark:hover:border-green-800 transition-all group flex flex-col items-center text-center gap-3">
-                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <MessageCircle className="w-6 h-6 text-green-500" />
+                                    {/* Upstream Genesis Card */}
+                                    <div className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group flex flex-col items-center text-center gap-3">
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                            <Sparkles className="w-6 h-6 text-emerald-500" />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.wechat')}</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content">Ctrler</div>
+                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Upstream Genesis</div>
+                                            <div className="font-bold text-gray-900 dark:text-base-content">lbjlaq</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Original Creator</div>
                                         </div>
                                     </div>
 

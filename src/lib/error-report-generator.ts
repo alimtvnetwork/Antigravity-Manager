@@ -5,8 +5,8 @@ interface SuggestedFixMap {
 }
 
 const APP_INFO = {
-  name: 'Antigravity Manager',
-  version: 'v4.12.0',
+  name: 'AGM by Alim',
+  version: 'v4.15.0',
 };
 
 const SUGGESTED_FIXES: SuggestedFixMap = {

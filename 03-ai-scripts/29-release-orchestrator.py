@@ -321,8 +321,8 @@ def execute_version_bump(next_version, scope, dry_run=False):
             nl_idx = cl_content.find("\n", idx)
             if nl_idx != -1:
                 cl_content = cl_content[:nl_idx] + "\n\n" + zh_entry + cl_content[nl_idx+1:]
-        elif "*   **版本演进**:\n" in cl_content:
-            cl_content = cl_content.replace("*   **版本演进**:\n", f"*   **版本演进**:\n{zh_entry}", 1)
+        elif "*   **Version History**:\n" in cl_content:
+            cl_content = cl_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{zh_entry}", 1)
         changelog_zh.write_text(cl_content, encoding="utf-8")
 
     changelog_en = REPO_ROOT / "CHANGELOG_EN.md"
