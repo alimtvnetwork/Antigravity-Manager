@@ -373,10 +373,10 @@ pub fn transform_openai_request_with_session(
             }
         });
 
-    if _user_enabled_thinking || _user_thinking_budget.is_some() {
+    if user_enabled_thinking || _user_thinking_budget.is_some() {
         tracing::debug!(
             "[OpenAI-Thinking] Ignoring client thinking enable/budget (enabled={}, budget={:?}); server model heuristics decide fill",
-            _user_enabled_thinking,
+            user_enabled_thinking,
             _user_thinking_budget
         );
     }

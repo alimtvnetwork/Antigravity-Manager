@@ -61,12 +61,17 @@ error[E0308]: mismatched types
 2. **Restored Variant Spec Constants:**
    - Defined `SPEC_37_FLASH_LOW`, `SPEC_37_FLASH_MEDIUM`, and `SPEC_37_FLASH_HIGH` with appropriate token limits and thinking budgets in `src/proxy/common/variant_mapping.rs`.
 3. **OpenAI Mapper Variable Bindings:**
-   - Declared `let is_claude_model = mapped_model_lower.contains("claude");` and renamed `_user_enabled_thinking` to `user_enabled_thinking` in `src/proxy/mappers/openai/request.rs`.
+   - Declared `let is_claude_model = mapped_model_lower.contains("claude");` and renamed all occurrences of `_user_enabled_thinking` to `user_enabled_thinking` (including lines 376 and 379) in `src/proxy/mappers/openai/request.rs`.
 4. **Test Type Rectification:**
    - Wrapped `media_type` and `data` in `Some(...)` in `test_deep_clean_cache_control_with_image`.
-5. **Re-tag & Pipeline Re-trigger:**
+5. **Workflow Package Mirror Resilience & Guaranteed Asset Publishing:**
+   - Added `--fix-missing` with automatic mirror update retry to `Install dependencies (Linux)` in `release.yml` and `ci.yml` to prevent 404 security upgrade race conditions on Ubuntu arm64/x64 runners.
+   - Configured `publish-release` with `if: always() && !cancelled() && needs.build-tauri.result != 'cancelled'` so GitHub release assets and notes are guaranteed to publish from completed matrix platforms.
+6. **Re-tag & Pipeline Re-trigger:**
    - Tag `v4.16.0` moved to new commit and pushed to remote `origin`.
 
 ### 4. Prevention & Learnings
 - **Full Module Re-export Audit:** When synchronizing mapper modules or handlers across branches, verify that all symbols imported in `mod.rs` and `handlers/` are concretely declared in child modules.
-- **Strict Struct Contract Checking:** Ensure test mocks conform to struct definitions (`Option<T>` vs `T`).
+- **Variable Rename Completeness:** When renaming variables to resolve underscore/scope issues, ensure every downstream usage in the function is updated.
+- **Resilient CI/CD Ingestion:** Package repositories change versions during active runs; use `--fix-missing` and retry blocks to ensure robustness.
+
