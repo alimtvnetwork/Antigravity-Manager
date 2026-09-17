@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.17.0 (2026-09-17)**:
+        -   **[Cross-Platform Test Suite Resilience & Upstream Protocol Stability] SQLite Signature Caching, Canonical Gemini 3.7 Routing & Data Directory Isolation**:
+            -   **SQLite L2 Tool Signature Persistence**: Implemented `clear_tool_signatures` in `proxy_db` to coordinate dual-tier cache eviction between memory and SQLite persistence during testing and runtime recovery.
+            -   **Canonical Model Resolution**: Calibrated `resolve_real_model` to preserve canonical identifier `gemini-3.7-flash` across dynamic variant mappings while ensuring full compatibility with public OpenCode DTO registries.
+            -   **Nanosecond Test Directory Concurrency**: Enhanced `TestDataDir` with nanosecond precision timestamps, thread mutex guards, and poisoned mutex recovery across Linux, macOS, and Windows runners.
+            -   **Payload Audit & Retention Budget Balance**: Harmonized log payload audit thresholds with disk budget cleanup allocations to eliminate truncation and guarantee predictable disk space reclamation.
+            -   **Strict Code Formatting & Type Safety**: Realigned tuple return types and integration tests for 100% compliance with `rustfmt` and TypeScript compilers.
     *   **v4.16.0 (2026-09-17)**:
         -   **[Unified Pipeline & Upstream Sync] Upstream Engine Synchronization, Thinking Store, and SQLite Acceleration**:
             -   **Unified Multi-Protocol Pipeline**: Merged modular Inbound/Outbound pipeline architecture for OpenAI Chat, Claude Messages, Responses API, and Google Gemini Native protocols.

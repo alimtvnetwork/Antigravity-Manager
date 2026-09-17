@@ -286,15 +286,41 @@ def execute_version_bump(next_version, scope, dry_run=False):
         mv_content = re.sub(r"setAppVersion\('[0-9.]+'\)", f"setAppVersion('{next_version}')", mv_content)
         miniview_tsx.write_text(mv_content, encoding="utf-8")
 
-    # 8. Update README files badges and version titles
+    err_gen_ts = REPO_ROOT / "src" / "lib" / "error-report-generator.ts"
+    if err_gen_ts.is_file():
+        eg_content = err_gen_ts.read_text(encoding="utf-8")
+        eg_content = re.sub(r"version:\s*'v[0-9.]+'", f"version: 'v{next_version}'", eg_content)
+        err_gen_ts.write_text(eg_content, encoding="utf-8")
+
+    # 8. Update docker build helper
+    docker_build_ps1 = REPO_ROOT / "docker" / "build.ps1"
+    if docker_build_ps1.is_file():
+        db_content = docker_build_ps1.read_text(encoding="utf-8")
+        db_content = re.sub(r'antigravity-manager:[0-9.]+', f'antigravity-manager:{next_version}', db_content)
+        docker_build_ps1.write_text(db_content, encoding="utf-8")
+
+    # 9. Update README files badges and version titles
     for readme_path in [REPO_ROOT / "readme.md", REPO_ROOT / "README.md", REPO_ROOT / "README_EN.md"]:
         if readme_path.is_file():
             rm_content = readme_path.read_text(encoding="utf-8")
             rm_content = re.sub(r"\(v[0-9.]+\)", f"(v{next_version})", rm_content)
-            rm_content = re.sub(r"badge/Version-[0-9.]+-blue", f"badge/Version-{next_version}-blue", rm_content)
+            rm_content = re.sub(r"badge/Version-[0-9.]+-([A-Za-z0-9]+)", rf"badge/Version-{next_version}-\g<1>", rm_content)
+            rm_content = re.sub(r'alt="Version [0-9.]+"', f'alt="Version {next_version}"', rm_content)
+            rm_content = re.sub(r'--version [0-9.]+', f'--version {next_version}', rm_content)
+            if readme_path.name.lower() == "readme.md" and "## 🔄 What's New" in rm_content:
+                new_section_marker = "## 🔄 What's New\n\n"
+                new_entry = (
+                    f"- **v{next_version}** ({today_str}):\n"
+                    f"  - **Test Suite Resilience & SQLite Persistence**: Dual-tier tool signature persistence (`clear_tool_signatures`) and nanosecond-precision test isolation.\n"
+                    f"  - **Canonical Model Resolution**: Preserved canonical `gemini-3.7-flash` model identifier across dynamic variant mappings.\n"
+                    f"  - **Payload Audit Sizing**: Harmonized payload audit threshold with disk budget quotas to prevent unexpected truncation.\n"
+                    f"  - **Strict Lint & Rustfmt Compliance**: Multi-line tuple return formatting and universal response envelope standards.\n"
+                )
+                if f"- **v{next_version}**" not in rm_content:
+                    rm_content = rm_content.replace(new_section_marker, new_section_marker + new_entry, 1)
             readme_path.write_text(rm_content, encoding="utf-8")
 
-    # 9. Update fallback version in standalone install scripts
+    # 10. Update fallback version in standalone install scripts
     for installer_path in [REPO_ROOT / "install.ps1", REPO_ROOT / "install.sh"]:
         if installer_path.is_file():
             inst_content = installer_path.read_text(encoding="utf-8")
@@ -303,18 +329,21 @@ def execute_version_bump(next_version, scope, dry_run=False):
             inst_content = re.sub(r'falling back to v[0-9.]+', f'falling back to v{next_version}', inst_content)
             installer_path.write_text(inst_content, encoding="utf-8")
 
-    # 10. Update changelog files
+    # 11. Update changelog files
+    zh_entry = (
+        f"    *   **v{next_version} ({today_str})**:\n"
+        f"        -   **[Cross-Platform Test Suite Resilience & Upstream Protocol Stability] SQLite Signature Caching, Canonical Gemini 3.7 Routing & Data Directory Isolation**:\n"
+        f"            -   **SQLite L2 Tool Signature Persistence**: Implemented `clear_tool_signatures` in `proxy_db` to coordinate dual-tier cache eviction between memory and SQLite persistence during testing and runtime recovery.\n"
+        f"            -   **Canonical Model Resolution**: Calibrated `resolve_real_model` to preserve canonical identifier `gemini-3.7-flash` across dynamic variant mappings while ensuring full compatibility with public OpenCode DTO registries.\n"
+        f"            -   **Nanosecond Test Directory Concurrency**: Enhanced `TestDataDir` with nanosecond precision timestamps, thread mutex guards, and poisoned mutex recovery across Linux, macOS, and Windows runners.\n"
+        f"            -   **Payload Audit & Retention Budget Balance**: Harmonized log payload audit thresholds with disk budget cleanup allocations to eliminate truncation and guarantee predictable disk space reclamation.\n"
+        f"            -   **Strict Code Formatting & Type Safety**: Realigned tuple return types and integration tests for 100% compliance with `rustfmt` and TypeScript compilers.\n"
+    )
+    en_entry = zh_entry
+
     changelog_zh = REPO_ROOT / "CHANGELOG.md"
     if changelog_zh.is_file():
         cl_content = changelog_zh.read_text(encoding="utf-8")
-        zh_entry = (
-            f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:\n"
-            f"            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
-            f"            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
-            f"            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
-            f"            -   **Manifest & Attribution Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
-        )
         marker_zh = "[English Changelog](CHANGELOG_EN.md)。"
         if marker_zh in cl_content:
             idx = cl_content.find(marker_zh) + len(marker_zh)
@@ -328,21 +357,13 @@ def execute_version_bump(next_version, scope, dry_run=False):
     changelog_en = REPO_ROOT / "CHANGELOG_EN.md"
     if changelog_en.is_file():
         cl_en_content = changelog_en.read_text(encoding="utf-8")
-        en_entry = (
-            f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:\n"
-            f"            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
-            f"            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
-            f"            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
-            f"            -   **Manifest & Attribution Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
-        )
         if "*   **Version History**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{en_entry}", 1)
         elif "*   **Version Evolution**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)
         changelog_en.write_text(cl_en_content, encoding="utf-8")
 
-    # 11. Generate release notes file with Quick Install one-liners
+    # 12. Generate release notes file with Quick Install one-liners
     release_notes_dir = REPO_ROOT / ".lovable" / "release"
     release_notes_dir.mkdir(parents=True, exist_ok=True)
     notes_file = release_notes_dir / f"release-notes-v{next_version}.md"
@@ -362,10 +383,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
-        f"- **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
-        f"- **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
-        f"- **Attribution & Manifest Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
+        f"- **Test Suite Resilience & SQLite Persistence**: Added dedicated dual-tier cache clearing (`clear_tool_signatures`) in `proxy_db` and nanosecond precision in `TestDataDir`.\n"
+        f"- **Canonical Gemini 3.7 Flash Model Resolution**: Calibrated `resolve_real_model` to preserve canonical identifier `gemini-3.7-flash` across dynamic variant mappings.\n"
+        f"- **Payload Audit & Retention Threshold Harmonization**: Balanced payload audit threshold with retention disk budgets to eliminate truncation while retaining 100% test reliability.\n"
+        f"- **Code Formatting & Clean Builds**: Formatted multi-line tuple return types for complete `cargo fmt` compliance and zero warnings.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 
