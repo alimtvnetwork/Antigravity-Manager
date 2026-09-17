@@ -49,12 +49,27 @@ pub fn get_storage_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
     }
 
     let folder_names: &[&str] = if target_ide == Some("ide") {
-        &["Antigravity IDE"]
+        &[
+            "Antigravity IDE",
+            "antigravity-ide",
+            "Antigravity",
+            "antigravity",
+        ]
     } else if target_ide == Some("code") || target_ide == Some("cursor") {
-        &["Antigravity"]
+        &[
+            "Antigravity",
+            "antigravity",
+            "Antigravity IDE",
+            "antigravity-ide",
+        ]
     } else {
         // target_ide = None: try IDE folder first, fall back to classic name
-        &["Antigravity IDE", "Antigravity"]
+        &[
+            "Antigravity IDE",
+            "Antigravity",
+            "antigravity-ide",
+            "antigravity",
+        ]
     };
 
     // 3) Standard installation location
@@ -98,9 +113,104 @@ pub fn get_storage_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
                 return Ok(path);
             }
         }
+
+        let snap_paths = vec![
+            home.join("snap/antigravity/current/.config/Antigravity/User/globalStorage/storage.json"),
+            home.join("snap/antigravity/current/.config/antigravity/User/globalStorage/storage.json"),
+            home.join("snap/antigravity-ide/current/.config/Antigravity IDE/User/globalStorage/storage.json"),
+            home.join("snap/code/current/.config/Code/User/globalStorage/storage.json"),
+        ];
+        for path in snap_paths {
+            if path.exists() {
+                return Ok(path);
+            }
+        }
+
+        let flatpak_paths = vec![
+            home.join(".var/app/com.antigravity.ide/config/Antigravity IDE/User/globalStorage/storage.json"),
+            home.join(".var/app/com.antigravity.ide/config/antigravity/User/globalStorage/storage.json"),
+        ];
+        for path in flatpak_paths {
+            if path.exists() {
+                return Ok(path);
+            }
+        }
     }
 
-    Err("storage_json_not_found".to_string())
+    // 4) Auto-healing fallback if not found anywhere
+    auto_heal_storage_json(target_ide)
+}
+
+fn get_default_storage_candidate_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
+    let folder_name = if target_ide == Some("ide") {
+        "Antigravity IDE"
+    } else {
+        "Antigravity"
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir().ok_or("failed_to_get_home_dir")?;
+        return Ok(home.join(format!(
+            "Library/Application Support/{}/User/globalStorage/storage.json",
+            folder_name
+        )));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata =
+            std::env::var("APPDATA").map_err(|_| "failed_to_get_appdata_env".to_string())?;
+        return Ok(PathBuf::from(&appdata)
+            .join(folder_name)
+            .join("User\\globalStorage\\storage.json"));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = dirs::home_dir().ok_or("failed_to_get_home_dir")?;
+        return Ok(home.join(format!(
+            ".config/{}/User/globalStorage/storage.json",
+            folder_name
+        )));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        let home = dirs::home_dir().ok_or("failed_to_get_home_dir")?;
+        Ok(home.join(".config/Antigravity/User/globalStorage/storage.json"))
+    }
+}
+
+fn auto_heal_storage_json(target_ide: Option<&str>) -> Result<PathBuf, String> {
+    let fallback_path = get_default_storage_candidate_path(target_ide)?;
+    if let Some(parent) = fallback_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let default_profile = generate_profile();
+    let initial_content = serde_json::json!({
+        "telemetry": {
+            "machineId": default_profile.machine_id,
+            "macMachineId": default_profile.mac_machine_id,
+            "devDeviceId": default_profile.dev_device_id,
+            "sqmId": default_profile.sqm_id,
+        },
+        "telemetry.machineId": default_profile.machine_id,
+        "telemetry.macMachineId": default_profile.mac_machine_id,
+        "telemetry.devDeviceId": default_profile.dev_device_id,
+        "telemetry.sqmId": default_profile.sqm_id,
+        "storage.serviceMachineId": default_profile.dev_device_id,
+    });
+
+    if let Ok(serialized) = serde_json::to_string_pretty(&initial_content) {
+        if fs::write(&fallback_path, serialized).is_ok() {
+            logger::log_info(&format!("auto_healed_storage_json_at: {:?}", fallback_path));
+            return Ok(fallback_path);
+        }
+    }
+
+    Ok(fallback_path)
 }
 
 /// Get directory of storage.json

@@ -2,6 +2,18 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.13.0 (2026-09-17)**:
+        -   **[Ubuntu/Linux 自愈与深度 IDE 探测] 彻底解决 Ubuntu 下 IDE 丢失与 `storage_json_not_found` 异常**:
+            -   **Linux IDE 可执行文件全方位多源解析**: 引入基于系统动态 `PATH` (`which`)、标准目录 (`/usr/bin`, `/usr/local/bin`)、Snap (`/snap/bin`, `/var/lib/snapd/snap/bin`)、Flatpak (`~/.var/app/com.antigravity.ide/`) 以及系统 `.desktop` 文件解析的双重动态可执行文件发现机制，确保在任何 Linux 发行版均可精准定位 IDE。
+            -   **配置与数据库自动自愈 (`storage.json` & SQLite Auto-Healing)**: 全面扩充 Linux 配置候选路径（包括小写命名与 Snap/Flatpak 路径）；当配置文件缺失时，自动建立各级父级目录并合成初始 `storage.json`（自动注入合法 `machineId`、`macMachineId`、`devDeviceId` 及 `sqmId`），彻底杜绝 `storage_json_not_found` 崩溃并保障 SQLite `ItemTable` 开箱即用。
+        -   **[结构化错误管理与 AI 交互模态] 全端 Universal Response Envelope 与一键 AI 报告输出**:
+            -   **Rust 后端 Universal Envelope 统一化**: 在 `src-tauri/src/error.rs` 中实现标准 `AppError` 错误信封，涵盖 `Status`, `Errors`, `Attributes` 及 `E1001`–`E9001` 标准错误码体系。
+            -   **前端 ErrorStore 缓冲与交互追踪**: 在 React 19 前端实现全局未捕获异常捕获、最近 10 次点击行为追踪缓冲以及调用栈解析。
+            -   **一键 AI 友好 Compact Markdown 弹窗**: 打造现代化全屏/模态错误弹窗，支持“一键复制 AI 格式错误报告”，附带排查建议与修复路径。
+        -   **[根目录 README 规范化与开源致谢] 遵循规范全面重构英文 README**:
+            -   **全面英文规范重构**: 严格依照 `02-spec/01-spec-authoring-guide/13-root-readme-conventions.md` 完成 100% 英文重构，杜绝所有非英文字符。
+            -   **致敬原作 lbjlaq 与维护体系传承**: 深度致谢上游原作者 `lbjlaq/Antigravity-Manager` 及全体贡献者，明晰未来由 MD Animal Experiments (`Md. Alim Ul Karim`, Riseup Asia LLC) 治理与 Rivera 赞助的开源演进路线。
+
     *   **v4.12.0 (2026-09-16)**:
         -   **[架构解耦 & Gitmap 流水线隔离] 全面解耦上游仓库依赖与 Gitmap 流水线数据库中央存储隔离**:
             -   **全面迁移至 alimtvnetwork 仓库**: 彻底替换所有更新检测接口 (`updater.json`)、下载源、快速安装脚本 (`install.ps1`, `install.sh`)、Homebrew Cask 以及文档链接至 `alimtvnetwork/Antigravity-Manager`，彻底消除对上游仓库的依赖与回退。

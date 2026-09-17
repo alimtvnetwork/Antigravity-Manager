@@ -3,6 +3,17 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.13.0 (2026-09-17)**:
+        -   **[Ubuntu/Linux Auto-Healing & Deep IDE Discovery] Complete Resolution of IDE Detection and `storage_json_not_found` on Ubuntu**:
+            -   **Multi-Source Dynamic Linux IDE Discovery**: Implemented dynamic `PATH` scanning (`which`), standard filesystem lookups (`/usr/bin`, `/usr/local/bin`), Snap directories (`/snap/bin`, `/var/lib/snapd/snap/bin`), Flatpak application packages, and system `.desktop` file parsing to guarantee infallible IDE executable location on any Linux distribution.
+            -   **Storage & Database Auto-Healing (`storage.json` & SQLite Schema Initialization)**: Expanded configuration candidate directories to include lowercase and containerized paths. When storage configuration is missing on fresh environments, the system autonomously synthesizes directory hierarchies and a valid `storage.json` with valid `machineId`, `macMachineId`, `devDeviceId`, and `sqmId`, permanently eliminating `storage_json_not_found` crashes and ensuring SQLite `ItemTable` availability.
+        -   **[Structured Error Management & AI Modal] End-to-End Universal Response Envelope with One-Click AI Export**:
+            -   **Unified Rust Backend Error Envelope**: Standardized `AppError` response envelopes in `src-tauri/src/error.rs` adhering to `Status`, `Errors`, `Attributes`, and `E1001`–`E9001` taxonomy.
+            -   **Frontend ErrorStore with User Interaction Trails**: Implemented global error listeners, interaction trail recording (last 10 user clicks), and stack trace parsing in React 19.
+            -   **AI-Friendly Compact Markdown Modal**: Designed interactive full-featured error modal with "Copy Error for AI" action providing actionable triage reports.
+        -   **[Root README Overhaul & Open-Source Attribution] Complete English Refactor Following Family Standards**:
+            -   **100% English Specification Compliance**: Overhauled `readme.md` strictly in English adhering to `02-spec/01-spec-authoring-guide/13-root-readme-conventions.md`.
+            -   **Praise for Upstream Authors & Governance Evolution**: Honored original creator `lbjlaq/Antigravity-Manager` and all contributors, clarifying ongoing governance under the MD Animal Experiments series (`Md. Alim Ul Karim`, Riseup Asia LLC) sponsored by Rivera.
     *   **v4.12.0 (2026-09-16)**:
         -   **[Architecture Decoupling & Gitmap Pipeline Isolation] Complete Fork Independence and Centralized Gitmap Pipeline Database Storage**:
             -   **Complete Migration to alimtvnetwork Repository**: Retargeted all update check endpoints (`updater.json`), download sources, quick install one-liners (`install.ps1`, `install.sh`), Homebrew Cask formulas, and documentation to `alimtvnetwork/Antigravity-Manager`, fully eliminating upstream fallbacks and coupling.

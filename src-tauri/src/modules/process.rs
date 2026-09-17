@@ -1222,34 +1222,121 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
     #[cfg(target_os = "linux")]
     {
         for folder_name in folder_names {
-            let exe_name = if *folder_name == "Antigravity IDE" {
-                "antigravity-ide"
+            let exe_names: &[&str] = if *folder_name == "Antigravity IDE" {
+                &["antigravity-ide", "antigravity"]
+            } else if target_ide == Some("cursor") {
+                &["cursor", "antigravity"]
+            } else if target_ide == Some("code") {
+                &["code", "antigravity"]
             } else {
-                "antigravity"
+                &["antigravity", "antigravity-ide"]
             };
 
-            let possible_paths = vec![
-                std::path::PathBuf::from(format!("/usr/bin/{}", exe_name)),
-                std::path::PathBuf::from(format!("/opt/{}/{}", folder_name, exe_name)),
-                std::path::PathBuf::from(format!("/usr/share/{}/{}", folder_name, exe_name)),
-            ];
-
-            // User local installation
-            if let Some(home) = dirs::home_dir() {
-                let user_local = home.join(format!(".local/bin/{}", exe_name));
-                if user_local.exists() {
-                    return Some(user_local);
-                }
+            if let Some(path) = resolve_linux_path_env(exe_names) {
+                return Some(path);
             }
 
-            for path in possible_paths {
-                if path.exists() {
-                    return Some(path);
-                }
+            if let Some(path) = resolve_linux_standard_paths(folder_name, exe_names) {
+                return Some(path);
+            }
+
+            if let Some(path) = resolve_linux_desktop_entry(exe_names) {
+                return Some(path);
             }
         }
     }
 
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_linux_path_env(exe_names: &[&str]) -> Option<std::path::PathBuf> {
+    let path_var = std::env::var("PATH").ok()?;
+    for p in std::env::split_paths(&path_var) {
+        for exe in exe_names {
+            let candidate = p.join(exe);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_linux_desktop_entry(exe_names: &[&str]) -> Option<std::path::PathBuf> {
+    let mut dirs_to_check = vec![std::path::PathBuf::from("/usr/share/applications")];
+    if let Some(home) = dirs::home_dir() {
+        dirs_to_check.push(home.join(".local/share/applications"));
+    }
+
+    for dir in dirs_to_check {
+        if !dir.exists() {
+            continue;
+        }
+        let entries = std::fs::read_dir(dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_string_lossy().to_lowercase();
+            if !file_name.ends_with(".desktop") {
+                continue;
+            }
+
+            let matches_target = exe_names.iter().any(|name| file_name.contains(name));
+            if matches_target {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    for line in content.lines() {
+                        let trimmed = line.trim();
+                        if let Some(exec_cmd) = trimmed.strip_prefix("Exec=") {
+                            let exec_token = exec_cmd.split_whitespace().next().unwrap_or("");
+                            let binary_path = std::path::PathBuf::from(exec_token);
+                            if binary_path.is_file() {
+                                return Some(binary_path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_linux_standard_paths(
+    folder_name: &str,
+    exe_names: &[&str],
+) -> Option<std::path::PathBuf> {
+    let folder_lower = folder_name.to_lowercase().replace(' ', "-");
+    let folder_lower_simple = folder_name.to_lowercase().replace(' ', "");
+
+    for exe in exe_names {
+        let mut candidates = vec![
+            std::path::PathBuf::from(format!("/usr/bin/{}", exe)),
+            std::path::PathBuf::from(format!("/usr/local/bin/{}", exe)),
+            std::path::PathBuf::from(format!("/snap/bin/{}", exe)),
+            std::path::PathBuf::from(format!("/var/lib/snapd/snap/bin/{}", exe)),
+            std::path::PathBuf::from(format!("/opt/{}/{}", folder_name, exe)),
+            std::path::PathBuf::from(format!("/opt/{}/{}", folder_lower, exe)),
+            std::path::PathBuf::from(format!("/opt/{}/{}", folder_lower_simple, exe)),
+            std::path::PathBuf::from(format!("/usr/share/{}/{}", folder_name, exe)),
+            std::path::PathBuf::from(format!("/usr/share/{}/{}", folder_lower, exe)),
+        ];
+
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(format!(".local/bin/{}", exe)));
+            candidates.push(home.join(format!(".local/share/{}/{}", folder_name, exe)));
+            candidates.push(home.join(format!(".local/share/{}/{}", folder_lower, exe)));
+            candidates.push(home.join(format!("Applications/{}.AppImage", folder_name)));
+            candidates.push(home.join(format!("Applications/{}.AppImage", folder_lower)));
+        }
+
+        for path in candidates {
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
     None
 }
 

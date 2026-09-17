@@ -42,11 +42,26 @@ pub fn get_all_candidate_db_paths(target_ide: Option<&str>) -> Vec<PathBuf> {
     }
 
     let folder_names: &[&str] = if target_ide == Some("ide") {
-        &["Antigravity IDE", "Antigravity"]
+        &[
+            "Antigravity IDE",
+            "antigravity-ide",
+            "Antigravity",
+            "antigravity",
+        ]
     } else if target_ide == Some("code") || target_ide == Some("cursor") {
-        &["Antigravity", "Antigravity IDE"]
+        &[
+            "Antigravity",
+            "antigravity",
+            "Antigravity IDE",
+            "antigravity-ide",
+        ]
     } else {
-        &["Antigravity IDE", "Antigravity"]
+        &[
+            "Antigravity IDE",
+            "Antigravity",
+            "antigravity-ide",
+            "antigravity",
+        ]
     };
 
     #[cfg(target_os = "macos")]
@@ -78,6 +93,26 @@ pub fn get_all_candidate_db_paths(target_ide: Option<&str>) -> Vec<PathBuf> {
                 folder_name
             )));
         }
+        paths.push(
+            home.join(
+                "snap/antigravity/current/.config/Antigravity/User/globalStorage/state.vscdb",
+            ),
+        );
+        paths.push(
+            home.join(
+                "snap/antigravity/current/.config/antigravity/User/globalStorage/state.vscdb",
+            ),
+        );
+        paths.push(home.join(
+            "snap/antigravity-ide/current/.config/Antigravity IDE/User/globalStorage/state.vscdb",
+        ));
+        paths.push(home.join("snap/code/current/.config/Code/User/globalStorage/state.vscdb"));
+        paths.push(home.join(
+            ".var/app/com.antigravity.ide/config/Antigravity IDE/User/globalStorage/state.vscdb",
+        ));
+        paths.push(home.join(
+            ".var/app/com.antigravity.ide/config/antigravity/User/globalStorage/state.vscdb",
+        ));
     }
 
     paths
@@ -91,10 +126,15 @@ pub fn get_db_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
             return Ok(path.clone());
         }
     }
-    candidates
+    let chosen = candidates
         .into_iter()
         .next()
-        .ok_or_else(|| "Failed to locate database path".to_string())
+        .ok_or_else(|| "Failed to locate database path".to_string())?;
+
+    if let Some(parent) = chosen.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    Ok(chosen)
 }
 
 /// Inject Token and Email into database
@@ -152,7 +192,15 @@ fn inject_new_format(
     project_id: Option<&str>,
     id_token: Option<&str>,
 ) -> Result<String, String> {
+    if let Some(parent) = db_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
+        [],
+    )
+    .map_err(|e| format!("Failed to initialize ItemTable: {}", e))?;
 
     // Create OAuthTokenInfo (binary)
     let oauth_info = protobuf::create_oauth_info(
