@@ -7,4 +7,5 @@ pub mod common;
 pub mod gemini;
 pub mod mcp;
 pub mod openai;
+pub mod thinking; // Thinking block session completion and queries
 pub mod warmup; // 预热处理器

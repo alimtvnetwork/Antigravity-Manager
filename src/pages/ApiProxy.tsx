@@ -424,7 +424,7 @@ export default function ApiProxy() {
                 setCfUseHttp2(config.cloudflared.use_http2 !== false); // 默认 true
             }
         } catch (error) {
-            console.error('加载配置失败:', error);
+            console.error('Failed to load configuration:', error);
             setConfigError(String(error));
         } finally {
             setConfigLoading(false);
@@ -442,7 +442,7 @@ export default function ApiProxy() {
                 setStatus(s);
             }
         } catch (error) {
-            console.error('获取状态失败:', error);
+            console.error('Failed to fetch status:', error);
         }
     };
 
@@ -453,7 +453,18 @@ export default function ApiProxy() {
         try {
             await invoke('save_config', { config: newConfig });
         } catch (error) {
-            console.error('保存配置失败:', error);
+            console.error('Failed to save configuration:', error);
+            showToast(`${t('common.error')}: ${error}`, 'error');
+        }
+    };
+
+    const handleSaveProxySettings = async () => {
+        if (!appConfig) return;
+        try {
+            await invoke('save_config', { config: appConfig });
+            showToast(t('common.saved'), 'success');
+        } catch (error) {
+            console.error('Failed to save configuration:', error);
             showToast(`${t('common.error')}: ${error}`, 'error');
         }
     };
@@ -887,7 +898,7 @@ export default function ApiProxy() {
             updateProxyConfig({ api_key: newKey });
             showToast(t('common.success'), 'success');
         } catch (error: any) {
-            console.error('生成 API Key 失败:', error);
+            console.error('Failed to generate API Key:', error);
             showToast(t('proxy.dialog.operate_failed', { error: error.toString() }), 'error');
         }
     };
@@ -1124,6 +1135,14 @@ print(response.choices[0].message.content)`;
 
                             {/* 控制按钮 */}
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleSaveProxySettings}
+                                    disabled={!appConfig}
+                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 ${!appConfig ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Save size={14} />
+                                    {t('settings.save')}
+                                </button>
                                 <button
                                     onClick={handleToggle}
                                     disabled={loading || !appConfig}
@@ -2055,6 +2074,60 @@ print(response.choices[0].message.content)`;
                                             </div>
                                         </>
                                     )}
+
+                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                    {t('proxy.config.experimental.payload_storage_mode_label', { defaultValue: 'Payload Storage Mode' })}
+                                                </span>
+                                                <HelpTooltip text={t('proxy.config.experimental.payload_storage_mode_tooltip', { defaultValue: 'Concise mode writes only thinking blocks, usage, session IDs, and concise messages to SQLite; Full mode persists raw payloads. API keys are always masked.' })} />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 max-w-lg">
+                                                {t('proxy.config.experimental.payload_storage_mode_desc', { defaultValue: 'Default concise storage prevents database bloat from tool payloads and images. Switch to full mode when raw payload debugging is required.' })}
+                                            </p>
+                                        </div>
+                                        <select
+                                            className="select select-sm select-bordered w-48 text-xs font-normal focus:outline-none dark:bg-base-300 dark:text-base-content border-gray-200 dark:border-base-400"
+                                            value={appConfig.proxy.experimental?.payload_storage_mode || 'simple'}
+                                            onChange={(e) => updateExperimentalConfig({ payload_storage_mode: e.target.value as 'simple' | 'full' })}
+                                        >
+                                            <option value="simple" className="text-xs dark:bg-base-300">{t('proxy.config.experimental.payload_mode_simple', { defaultValue: 'Concise (Default)' })}</option>
+                                            <option value="full" className="text-xs dark:bg-base-300">{t('proxy.config.experimental.payload_mode_full', { defaultValue: 'Full Raw' })}</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1 p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                            <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                {t('proxy.config.experimental.log_retention_days_label', { defaultValue: 'Request Log Retention (Days)' })}
+                                            </span>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={3650}
+                                                className="input input-sm input-bordered w-full text-xs"
+                                                value={appConfig.proxy.experimental?.log_retention_days ?? 30}
+                                                onChange={(e) => updateExperimentalConfig({ log_retention_days: Math.max(1, parseInt(e.target.value) || 30) })}
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1 p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                            <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                {t('proxy.config.experimental.thinking_retention_days_label', { defaultValue: 'Thinking Block Retention (Sliding Window Days)' })}
+                                            </span>
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                                {t('proxy.config.experimental.thinking_retention_days_desc', { defaultValue: 'Default 15-day sliding window. As long as the client session ID is active, each request refreshes the expiration window.' })}
+                                            </p>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={3650}
+                                                className="input input-sm input-bordered w-full text-xs"
+                                                value={appConfig.proxy.experimental?.thinking_retention_days ?? 15}
+                                                onChange={(e) => updateExperimentalConfig({ thinking_retention_days: Math.max(1, parseInt(e.target.value) || 15) })}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </CollapsibleCard>
 

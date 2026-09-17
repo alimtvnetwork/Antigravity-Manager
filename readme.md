@@ -18,7 +18,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.15.0-3B82F6?style=flat-square" alt="Version 4.15.0">
+    <img src="https://img.shields.io/badge/Version-4.16.0-3B82F6?style=flat-square" alt="Version 4.16.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -112,7 +112,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.15.0`
+> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.16.0`
 > - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
 
 ---
@@ -358,6 +358,11 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.16.0** (2026-09-17):
+  - **Unified Pipeline Architecture**: Upstream synchronization introducing canonical Inbound/Outbound pipeline for OpenAI, Claude, Responses, and Gemini Native protocols.
+  - **Thinking Store & Cryptographic Signatures**: Integrated server-authoritative Thinking Store with Gzip compression and cryptographic signature healing.
+  - **SQLite Performance & Bounded Logs**: Read-only connection caching for sub-second tool queries and configurable disk quota bounds.
+  - **Ecosystem Risk Mitigation**: Filtered Claude desktop billing tracking metadata to prevent upstream 429 RESOURCE_EXHAUSTED errors.
 - **v4.15.0** (2026-09-17):
   - Unified branding overhaul: App and window title updated to "AGM by Alim", product name "Anti-Gravity Tools by Alim".
   - High-density Accounts quota UI overhaul: consolidated model quota displays into unified Gemini and Claude shared buckets.

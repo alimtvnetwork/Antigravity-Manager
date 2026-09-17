@@ -25,6 +25,17 @@ impl CloudflaredState {
         }
         Ok(())
     }
+
+    /// Stop tunnel if initialized
+    pub async fn stop(&self) -> Result<Option<CloudflaredStatus>, String> {
+        let lock = self.manager.read().await;
+        if let Some(manager) = lock.as_ref() {
+            let status = manager.stop().await?;
+            Ok(Some(status))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// 检查cloudflared是否已安装

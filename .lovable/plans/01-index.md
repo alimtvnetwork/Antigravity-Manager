@@ -33,3 +33,4 @@ Master directory of architectural and execution plans.
 - [20-ubuntu-ide-detection-and-readme-overhaul.md](completed/20-ubuntu-ide-detection-and-readme-overhaul.md): Ubuntu IDE auto-healing, storage JSON repair, and root README overhaul.
 - [21-ubuntu-ide-diagnostics-and-multi-instance-cloning.md](completed/21-ubuntu-ide-diagnostics-and-multi-instance-cloning.md): Ubuntu IDE discovery diagnostics, std::backtrace capture, multi-instance isolation, cross-platform executable cloning, and v4.14.0 release ceremony.
 - [22-agm-branding-ui-overhaul-and-v4-15-0-release.md](completed/22-agm-branding-ui-overhaul-and-v4-15-0-release.md): AGM branding, UI compactness, instances fix, and v4.15.0 release.
+- [23-upstream-pipeline-sync-and-v4-16-0-release.md](completed/23-upstream-pipeline-sync-and-v4-16-0-release.md): Upstream PR #2 logical sync, streaming pipeline engine, thinking store, and v4.16.0 release.

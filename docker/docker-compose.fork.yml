@@ -1,0 +1,25 @@
+# Custom / local build compose override
+# Usage (from project root):
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.fork.yml up -d --build
+#
+# Windows note: host network mode is unavailable, use bridge port mapping instead.
+
+services:
+  antigravity-manager:
+    image: antigravity-manager:local
+    # Override upstream compose host mode for Windows / Docker Desktop compatibility
+    network_mode: bridge
+    ports:
+      - "${PORT:-8045}:8045"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - API_KEY=${API_KEY:-changeme}
+      - WEB_PASSWORD=${WEB_PASSWORD:-}
+      - ABV_API_KEY=${API_KEY:-changeme}
+      - ABV_WEB_PASSWORD=${WEB_PASSWORD:-}
+      - ABV_BIND_LOCAL_ONLY=${ABV_BIND_LOCAL_ONLY:-false}
+      - ABV_DATA_DIR=${ABV_DATA_DIR:-/root/.antigravity_tools}
+      - ABV_MAX_BODY_SIZE=${ABV_MAX_BODY_SIZE:-104857600}
+      - PORT=8045
+    volumes:
+      - ${ABV_HOST_DATA_DIR:-~/.antigravity_tools}:/root/.antigravity_tools

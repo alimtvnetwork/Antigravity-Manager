@@ -89,24 +89,53 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                     }
                 }
                 "quit" => {
-                    // 先停止 Admin Server 和反代服务，避免进程残留和端口占用
-                    let state = app.state::<crate::commands::proxy::ProxyServiceState>();
-                    let admin_server = state.admin_server.clone();
-                    let instance = state.instance.clone();
+                    let app_handle = app.clone();
                     tauri::async_runtime::spawn(async move {
+                        tracing::info!("[Tray] Gateway exit triggered, cleaning up services and releasing ports...");
+
+                        let state = app_handle.state::<crate::commands::proxy::ProxyServiceState>();
+                        let cf_state =
+                            app_handle.state::<crate::commands::cloudflared::CloudflaredState>();
+
+                        // 1. Terminate cloudflared tunnel subprocess
+                        let _ = tokio::time::timeout(
+                            std::time::Duration::from_millis(500),
+                            cf_state.stop(),
+                        )
+                        .await;
+
+                        // 2. Stop Admin Server (close TCP listener and active connections)
+                        if let Ok(mut lock) = tokio::time::timeout(
+                            std::time::Duration::from_millis(1000),
+                            state.admin_server.write(),
+                        )
+                        .await
                         {
-                            let mut lock = admin_server.write().await;
                             if let Some(admin) = lock.take() {
-                                admin.axum_server.stop();
+                                admin.stop().await;
                             }
                         }
+
+                        // 3. Stop proxy instances and background tasks
+                        if let Ok(mut lock) = tokio::time::timeout(
+                            std::time::Duration::from_millis(1000),
+                            state.instance.write(),
+                        )
+                        .await
                         {
-                            let mut lock = instance.write().await;
                             if let Some(inst) = lock.take() {
-                                inst.token_manager.abort_background_tasks().await;
+                                let _ = tokio::time::timeout(
+                                    std::time::Duration::from_millis(500),
+                                    inst.token_manager
+                                        .graceful_shutdown(std::time::Duration::from_millis(400)),
+                                )
+                                .await;
                                 inst.axum_server.set_running(false).await;
+                                inst.axum_server.stop();
                             }
                         }
+
+                        // 4. Short grace period for socket unregistration before clean process exit
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                         std::process::exit(0);
                     });

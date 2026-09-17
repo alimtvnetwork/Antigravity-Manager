@@ -34,6 +34,31 @@ export default function AdvancedThinking({
                 </div>
 
                 <div className="space-y-4 divide-y divide-gray-100 dark:divide-gray-800">
+                    {/* 0. Server-side thinking backfill switch */}
+                    <div className="pt-0 flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                {t("settings.advanced_thinking.store_enabled", { defaultValue: "Server-Side Thinking Backfill" })}
+                            </h4>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-lg">
+                                {t("settings.advanced_thinking.store_enabled_desc", { defaultValue: "Enabled by default. Automatically captures and backfills reasoning blocks and signatures when agents omit prior thinking turns. Custom agents can purge sessions via DELETE /v1/thinking/sessions/:id." })}
+                            </p>
+                        </div>
+                        <input
+                            type="checkbox"
+                            className="toggle toggle-sm toggle-primary"
+                            checked={config.experimental?.thinking_store_enabled !== false}
+                            onChange={(e) => onChange({
+                                ...config,
+                                experimental: {
+                                    enable_usage_scaling: config.experimental?.enable_usage_scaling ?? false,
+                                    ...config.experimental,
+                                    thinking_store_enabled: e.target.checked,
+                                },
+                            })}
+                        />
+                    </div>
+
                     {/* 1. 思考预算 (Thinking Budget) */}
                     <div className="pt-0">
                         <ThinkingBudget

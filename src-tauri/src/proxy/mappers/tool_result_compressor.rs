@@ -383,11 +383,11 @@ Please read the file locally."#;
         let mut blocks = vec![
             serde_json::json!({
                 "type": "text",
-                "text": "a".repeat(10_000)
+                "text": "a".repeat(50_000)
             }),
             serde_json::json!({
                 "type": "text",
-                "text": "b".repeat(15_000)
+                "text": "b".repeat(50_000)
             }),
             serde_json::json!({
                 "type": "image",
@@ -402,7 +402,7 @@ Please read the file locally."#;
             }),
         ];
 
-        // 确认工具结果不再剔除图片，所有内容块保留
+        // Ensure tool results no longer strip images; all content blocks are retained
         sanitize_tool_result_blocks(&mut blocks);
         assert_eq!(blocks.len(), 4);
     }
@@ -427,7 +427,7 @@ Please read the file locally."#;
             }),
         ];
 
-        // 超过 MAX_TOOL_RESULT_CHARS (200,000) 时，在第二块截断并终止后续块
+        // When exceeding MAX_TOOL_RESULT_CHARS (200,000), truncate at the second block and terminate subsequent blocks
         sanitize_tool_result_blocks(&mut blocks);
         assert_eq!(blocks.len(), 2);
     }

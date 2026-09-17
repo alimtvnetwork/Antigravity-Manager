@@ -165,6 +165,10 @@ pub struct TokenManager {
 }
 
 impl TokenManager {
+    fn resolved_data_dir(&self) -> PathBuf {
+        crate::modules::account::get_data_dir().unwrap_or_else(|_| self.data_dir.clone())
+    }
+
     /// 创建新的 TokenManager
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
@@ -253,7 +257,7 @@ impl TokenManager {
 
     /// 从主应用账号目录加载所有账号
     pub async fn load_accounts(&self) -> Result<usize, String> {
-        let accounts_dir = self.data_dir.join("accounts");
+        let accounts_dir = self.resolved_data_dir().join("accounts");
 
         if !accounts_dir.exists() {
             return Err(format!("账号目录不存在: {:?}", accounts_dir));
@@ -2455,14 +2459,14 @@ impl TokenManager {
                                     {
                                         entry.project_id = Some(pid.clone());
                                     }
-                                    // [FIX] 写盘后台化：project_id 已写入内存，磁盘持久化不阻塞热路径
+                                    // [FIX] Background disk persistence: project_id is written to memory, disk persistence does not block the hot path
                                     {
                                         let write_path = self
                                             .tokens
                                             .get(&token.account_id)
                                             .map(|e| e.account_path.clone())
                                             .unwrap_or_else(|| {
-                                                self.data_dir
+                                                self.resolved_data_dir()
                                                     .join("accounts")
                                                     .join(format!("{}.json", token.account_id))
                                             });
@@ -2542,7 +2546,7 @@ impl TokenManager {
         let path = if let Some(entry) = self.tokens.get(account_id) {
             entry.account_path.clone()
         } else {
-            self.data_dir
+            self.resolved_data_dir()
                 .join("accounts")
                 .join(format!("{}.json", account_id))
         };
@@ -2793,7 +2797,7 @@ impl TokenManager {
     /// 清除所有限流记录
     pub fn clear_all_rate_limits(&self) {
         self.rate_limit_tracker.clear_all();
-        let accounts_dir = self.data_dir.join("accounts");
+        let accounts_dir = self.resolved_data_dir().join("accounts");
         if let Ok(entries) = std::fs::read_dir(accounts_dir) {
             for entry in entries.flatten() {
                 if entry.path().extension().and_then(|value| value.to_str()) == Some("json") {
@@ -3401,7 +3405,7 @@ impl TokenManager {
         let path = if let Some(entry) = self.tokens.get(account_id) {
             entry.account_path.clone()
         } else {
-            self.data_dir
+            self.resolved_data_dir()
                 .join("accounts")
                 .join(format!("{}.json", account_id))
         };
@@ -3452,7 +3456,7 @@ impl TokenManager {
         let path = if let Some(entry) = self.tokens.get(account_id) {
             entry.account_path.clone()
         } else {
-            self.data_dir
+            self.resolved_data_dir()
                 .join("accounts")
                 .join(format!("{}.json", account_id))
         };

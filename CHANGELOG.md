@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.16.0 (2026-09-17)**:
+        -   **[Unified Pipeline & Upstream Sync] Upstream Engine Synchronization, Thinking Store, and SQLite Acceleration**:
+            -   **Unified Multi-Protocol Pipeline**: Merged modular Inbound/Outbound pipeline architecture for OpenAI Chat, Claude Messages, Responses API, and Google Gemini Native protocols.
+            -   **Thinking Store & Signature Resilience**: Integrated multi-tier Thinking Store with Gzip AGZ1 compression and server-authoritative signature backfill, resolving 400 signature failures on Google upstream.
+            -   **SQLite Concurrency & Disk Bounds**: Implemented read-only connection pooling and disk quota pruning in proxy DB to prevent unconstrained disk growth under high volume.
+            -   **Ecosystem & Billing Safeguards**: Filtered Claude desktop billing tracking metadata for Gemini targets, eliminating false 429 RESOURCE_EXHAUSTED errors.
+
     *   **v4.15.0 (2026-09-17)**:
         -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:
             -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to "AGM by Alim", and executable output to "Anti-Gravity Tools by Alim".
@@ -53,6 +60,62 @@
         -   **[架构与代码规范] Go CLI AppError 规范与 DRY 帮助检查统一体系**:
             -   **全面取缔标准 Go error**: 所有 Go 命令处理函数与工具包严禁返回原生 error，统一采用 *appfault.AppError 结构化错误类型，确保错误码、严重级别、领域边界与跨语言信封序列化一致性。
             -   **中央 DRY 帮助与参数校验函数**: 引入 CheckHelpOrEmpty 统一拦截 --help / -h 并校验最小位置参数，彻底消除各命令中重复冗余的 if len(args) == 0 || hasHelpFlag(args) 模板代码。
+
+    *   **v4.7.4 (2026-09-17)**:
+        -   **[统一流水线架构与适配器重构] 引入统一 Pipeline 处理引擎，全面以适配器模式抹平四大 AI 协议差异 (PR #3459)**:
+            -   **四大协议适配与规范化规范**: 统一收敛 OpenAI Chat (`/v1/chat/completions`)、Anthropic Claude (`/v1/messages`)、OpenAI Responses (`/v1/responses`) 以及 Google Gemini Native 协议；引入模块化 `Inbound` 进站清洗、`Outbound` 出站萃取与规范化扩散，抹平多协议由于字段命名、结构嵌套与元数据表达引起的割裂。
+            -   **用量精确换算与增量审计**: 新增 `proxy::pipeline::usage` 权威计量模块，针对不同协议规范精确收拢 `prompt_tokens`、`completion_tokens` 与缓存命中增量（`prompt_tokens_details.cached_tokens`），杜绝跨协议转接时的用量漏算或异常放大。
+        -   **[思考链与加密签名归一化回填] 权威思考状态矩阵与双层自动回填 (PR #3459)**:
+            -   **归一化全场景处理矩阵**: 针对客户端回传请求中思考块（完整/占位符 `...`/丢失）与签名（真签/伪造签/缺失）的 6 种典型场景建立权威判定流；对携带残缺思考或占位符的请求，原地自动复活为本地数据库记录的完整未截断思考与真实有效签名，彻底攻克 Google 上游 400 签名校验失败。
+            -   **双向反向入库保护**: 客户端回传原生合法签名及有效思考时，自动双层备份落库（L1 内存热存 + L2 SQLite 离线恢复），防止后续会话中模型切换或多轮调用造成历史签名遗失。
+        -   **[SQLite 性能优化与长上下文飞跃] 复用只读连接查询工具签名并优化多线程测试隔离 (PR #3459, PR #3462, Fixes #3461)**:
+            -   **根治查询链路 fsync 写入瓶颈**: 彻底将 `PRAGMA auto_vacuum = INCREMENTAL` 移至 `init_db()` 初始化阶段，彻底消除大上下文工具查询过程中每次新建连接触发的不必要磁盘 fsync 与写入事务。
+            -   **只读连接懒加载与预编译复用**: 采用 `SQLITE_OPEN_READ_ONLY` 标志搭配 `OnceLock<Mutex<Connection>>` 实现只读连接懒加载与进程级单例复用，使用 `prepare_cached` 高效复用查询计划；查询完毕后即时释放 row、statement 和锁，保障数据更新立即可见。
+            -   **显著性能提升**: 在 38 万 ~ 42 万 tokens 级别的大上下文长会话测试中，本地填充转换耗时从 **14.7s 骤降至 0.22s（耗时缩减 98.5%）**。
+            -   **多线程测试隔离**: 引入 `TEST_MUTEX` 机制，保障并行自动化测试环境下的临时数据目录切换与 DB 状态相互隔离。
+        -   **[稳定性与生态缺陷修复] 彻底修复 Hermes 闪退、OpenAI 429/503 及中文指纹 Panic (PR #3459, Fixes #3455, Fixes #3457)**:
+            -   **彻底修复 Hermes / Python SDK 流式闪退 (Fixes #3455)**: 严格遵循 OpenAI 流式契约，未明确声明 `include_usage` 时严禁发射带有空 `choices: []` 的 Usage 块；用量信息安全搭载在最后一个含有 choices 的数据分块中，彻底解决下游客户端 `IndexError` 崩溃。
+            -   **彻底修复 OpenAI 协议调用 Gemini 3.8/3.7 异常 429 / 503 (Fixes #3457)**: 在进站流水线统一定点抹除客户端传入的低限额与 `reasoning_effort` 污染，自动对齐服务端真实支持的模型档位字典，杜绝死循环与配额误判。
+            -   **彻底修复中文系统提示词 UTF-8 截断 502 Panic**: 重构 `session_manager.rs` 中前 512 字节指纹生成逻辑，改用 `is_char_boundary` 安全向前探查字符边界，彻底根治多字节中文截断导致的运行时 Panic 与 502 Bad Gateway 异常。
+            -   **CI 门禁与离线编译保障**: 修复纯 Rust 离线环境下缺失前端产物导致 Tauri 宏编译崩溃的问题，全平台 7 项 CI 自动化构建与代码检查 100% 通过。
+    *   **v4.7.3 (2026-09-16)**:
+        -   **[服务端思考链持久化与智能调度] 从0到1自研 Thinking Store 思考链引擎，根治长对话模型失常与提前摆烂 (PR #3451, Issue #3382, Issue #3393)**:
+            -   **服务端主动接管思考链 (Thinking Store)**: 客户端零侵入，只需调用带思考后缀的模型（`-high`/`-medium`/`-low` 或包含 `flash`/`pro`/`claude`/`deepseek`），网关服务端全自动捕获、持久化与精准回填上下文思考链与加密签名（`thoughtSignature`），彻底解决第三方 CLI 与 Agent 无法处理 Google 复杂签名算法导致的思考链断裂降级或提前摆烂。
+            -   **L1内存 + L2 SQLite 双级缓存架构**: L1 内存采用 `DashMap` 热缓存，活跃会话亚毫秒级（0.3ms）直接回填；L2 本地独立存储于 `thinking_store.db`，消除主库锁争用，重启后支持秒级按 `tool_id` 自动恢复加密签名；提供 15 天滑动窗口淘汰机制与会话级主动清理接口。
+            -   **长上下文极致性能重构 (AGZ1)**: 严格阻断 `...` 等占位块入库；采用逐字节流式哈希（`hash_normalized_ws`）进行零内存分配比对；超过 384 字符思考块自动启用 `flate2` Gzip 快速压缩（`AGZ1` 标识），磁盘存储体积缩减 70% 以上，往返解压 100% 字节无损。
+        -   **[四大协议归一化与原生工具链调度] 统一 Claude / OpenAI / Gemini / Codex 流水线，消除提示词污染 (PR #3451)**:
+            -   **执行流水线归一化**: 规范化四大协议请求为「清洗 (Clean) -> 中转归一 (Norm) -> Thinking 回填 (Hydrate) -> 全协议计量统计 (Usage)」标准流水线，上游发往 Google 前全量对齐为标准 Gemini Contents，统一 `systemInstruction.role` 为 `user`。
+            -   **原生工具调用与防降级锁**: 彻底拔除历史遗留的硬编码 MCP XML 提示词注入，杜绝工具调用跑到正文的缺陷；动态锁死 Gemini 3+ 原生思维预算（Flash: 10000, Pro: 10001），防止客户端传低额 budget 导致模型思考被截断。
+            -   **计量与缓存统计修正 (Issue #3391)**: 纠正 Anthropic 协议下输入 Prompt Tokens 漏算问题，修复缓存命中率因分母未计入缓存导致的超过 100%（如 `583.1%`）溢出错误。
+        -   **[全链路微观诊断视窗] 响应报文秒级耗时面板与横向三栏对比审计 (PR #3451)**:
+            -   **全链路多阶段毫秒打点**: 网关内嵌微观阶段计时，精确监控初始清洗 (`Clean`)、中转归一 (`Norm`)、Thinking回填 (`Thinking`)、首包延迟 (`TTFT`)、传输流持续 (`Stream`) 与真实总耗时 (`Total`)。
+            -   **前端耗时分类面板**: 响应卡片顶部集成彩色多阶段耗时比例进度条，并支持一键复制耗时分类；监控弹窗支持横向三栏（原始请求 / 中转请求 / 响应报文）全景审计，支持简要（simple）与全量（full）脱敏存储模式自由切换。
+        -   **[代理监控与日志优化] 流量日志内存精简、并发持久化限流与 SQLite 磁盘配额管理 (PR #3445, Issue #3443)**:
+            -   **内存占用精简**: 内存环形队列（Ring Buffer）中仅保留轻量级 Summary 摘要，移除高体积的完整请求体（`request_body`）与响应体（`response_body`），并将错误信息（`error`）截断在 1024 字符内；前端查看特定日志时通过详情接口按需加载完整内容，彻底根治长时间运行高频请求下的内存泄露与 OOM 隐患。
+            -   **持久化并发控制与高负载丢弃**: 引入信号量限制（最多 4 个并发后台持久化写入任务），超出阈值时自动跳过落盘，防止短时突发流量打满后台阻塞线程池与积压内存。
+            -   **SQLite 磁盘配额管理与渐进式空间回收**: 新增 `proxy.log_retention.max_disk_mb` 配置项（默认 1024 MiB，支持动态热加载）。在写入前综合评估 DB 与 WAL 大小及事务预留空间，超配额时分批清理老旧日志全文并优先回收空闲页（Free Pages），从根源杜绝日志数据库无休止膨胀占满磁盘。
+        -   **[OpenAI / Codex 适配] 规范化清洗陈旧 Codex 模型身份声明以规避 Gemini 429 频控 (PR #3444, Issue #3442)**:
+            -   **过滤陈旧身份语句**: 在将 OpenAI/Responses 协议映射为 Gemini 请求并进行系统指令缓存查找前，自动将陈旧身份描述 `You are Codex, an agent based on GPT-5.` 规范化清洗为 `You are Codex, an agent.`。
+            -   **精准作用域保护**: 仅针对顶层 `instructions`、系统/开发者消息（`system`/`developer`）和历史模型切换指令进行规范化，用户消息（`user`）与工具执行结果（`tool`）内容严格保持原样不作修改，解决该特定模式触发 Gemini 服务端持续 429 报错的缺陷。
+        -   **[智能体生态与工具链适配] 适配 DeepSeek Harness (DSH) 与 WorkBuddy 等工具调用协议 (Issue #3440, Issue #3430)**:
+            -   **pwsh / bash 强约束双向补齐**: 针对 DSH 严格校验 `command` 与 `description` 为非空字符串的运行时断言，自动在缺失 `description` 时按命令语义提取生成简述（如 `Run: <cmd>`），防止前端卡片渲染因字段缺失抛出异常崩溃。
+            -   **真实执行命令精准提取还原**: 修复此前缺失命令时盲目回退为 `echo` 占位导致执行被吞的问题；当模型将真实执行命令输出在 `description` 时，优先识别提取为有效 `command`，保障真实命令准确下发。
+            -   **workflow 工具嵌套元数据适配**: 适配 DSH `tool-workflow` 的 `{ script, meta: { name, description } }` 嵌套规范；当模型将字段平铺返回时，自动归拢并组装合法 `meta` 对象，彻底解决 DSH workflow 解析异常。
+        -   **[Claude 客户端与多工具风控规避] 过滤 Claude Desktop 注入的私有计费元数据以解决 Gemini 429 报错 (Issue #3452)**:
+            -   **过滤客户端专属追踪元数据**: 当请求目标为 Gemini 模型且携带大量工具（如 99 个 MCP 工具）时，自动识别并过滤 Claude Desktop 在系统提示词中注入的单行计费与入口声明（`x-anthropic-billing-header:`）。
+            -   **精准隔离与多行保护**: 仅对单行且匹配指定前缀的独立元数据行进行过滤，严格保留多行指令、引用提及、工具声明、缓存标记及非 Gemini 目标的原始行为，消除触发 Google 服务端风控导致的虚假 `RESOURCE_EXHAUSTED` 429 报错。
+    *   **v4.7.2 (2026-09-15)**:
+        -   **[OpenAI / Codex 适配] 修复 Codex 客户端中 Gemini 模型思考过程未作为 reasoning summary 显示的问题 (PR #3439, Issue #3438)**:
+            -   **标准化 Reasoning Summary 事件**: 使用流式 `POST /v1/responses` 时，将 Gemini 的 `thought: true` 思考分片调整为标准 `rs_...` 项（`type: reasoning`），并通过 `response.reasoning_summary_part.*` 与 `response.reasoning_summary_text.*` 规范事件流输出，使 Codex 可以在合适位置正规渲染思考摘要。
+            -   **生命周期隔离与流结束闭合**: 在普通文本或工具调用开始前以及流结束时及时闭合 reasoning summary，确保与普通输出项的生命周期互不重叠，并保证会话持久化及 `response.completed` 输出一致性。
+        -   **[Prompt 格式规范与内存同步] 全局系统提示词换行隔离、Gemini 包装防重与配置即时生效 (PR #3433)**:
+            -   **Markdown 格式安全隔离**: 在 Antigravity 预置身份末尾及全局提示词后添加规范换行分隔符（`\n\n`），防止用户填写的 Markdown 标题紧贴前置粗体词造成渲染解析异常，并避免后续 HTTP 头部紧挨 Prompt 尾部。
+            -   **Gemini Wrapper 提示词去重**: 在 `wrap_request_v2` 中增加去重检测，防止请求在多次包装或重试时反复注入全局系统提示词。
+            -   **配置保存即时同步全局内存**: 在 `save_config` 中将全局内存配置（Thinking Budget、全局系统提示词、图片思考模式、上下文压缩参数等）更新提取至代理实例检查之外，确保反代服务未启动或处于停止状态时，保存的配置也能立即同步到内存中。
+        -   **[存储与数据管理] 支持自定义数据存储目录并一键平滑全量迁移 (Issue #3441)**:
+            -   **自定义数据目录与自举寻址机制**: 针对默认存储在 C 盘（`~/.antigravity_tools`）导致系统盘容易爆满的问题，新增持久化指针文件寻址。支持在高级设置中自由选择任意磁盘目录（如 `D:\AntigravityData`），应用启动时自动识别并重定向。
+            -   **全量平滑迁移与空间安全释放**: 在高级设置中提供「更改并迁移」功能，一键将现有账号、全局配置、请求日志及 SQLite 数据库无损复制到新目录，支持迁移成功后自动清理原目录以释放 C 盘空间，并自动重启应用无缝加载新目录。
+
     *   **v4.7.1 (2026-09-12)**:
         -   **[上游协议优化 & 原生对齐] 原生语言服务逆向对齐：按需切换 Agent 模式、细粒度 429 熔断分类与空响应异常自愈**:
             -   **动态按需切换 `requestType: "agent"`**: 逆向分析原生 Antigravity 语言服务客户端行为，消除以往所有请求盲目携带 `requestType: "agent"` 挤占 Google 专用 Agent 资源池导致的频繁 429 限流。仅在请求携带 `tools` 函数定义或包含历史工具交互轮次时才激活 Agent 通道；常规文本对话、代码补全均走标准 Chat 资源池，显著降低限流概率。

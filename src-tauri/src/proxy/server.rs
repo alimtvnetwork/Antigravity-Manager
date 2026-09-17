@@ -407,7 +407,7 @@ fn to_account_response(
 /// Axum 服务器实例
 #[derive(Clone)]
 pub struct AxumServer {
-    shutdown_tx: Arc<tokio::sync::Mutex<Option<oneshot::Sender<()>>>>,
+    cancel_token: tokio_util::sync::CancellationToken,
     custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
     proxy_state: Arc<tokio::sync::RwLock<crate::proxy::config::UpstreamProxyConfig>>,
     upstream: Arc<crate::proxy::upstream::client::UpstreamClient>,
@@ -675,6 +675,15 @@ impl AxumServer {
             .route("/internal/warmup", post(handlers::warmup::handle_warmup)) // 内部预热端点
             .route("/v1/api/event_logging/batch", post(silent_ok_handler))
             .route("/v1/api/event_logging", post(silent_ok_handler))
+            .route(
+                "/v1/thinking/end",
+                post(handlers::thinking::handle_end_session),
+            )
+            .route(
+                "/v1/thinking/sessions/:session_id",
+                axum::routing::get(handlers::thinking::handle_session_stats)
+                    .delete(handlers::thinking::handle_delete_session),
+            )
             // 应用 AI 服务特定的层
             // 注意：Axum layer 执行顺序是从下往上（洋葱模型）
             // 请求: ip_filter -> auth -> monitor -> handler
@@ -874,7 +883,10 @@ impl AxumServer {
             )
             .route("/accounts/warmup", post(admin_warm_up_all_accounts))
             .route("/accounts/:accountId/warmup", post(admin_warm_up_account))
-            .route("/system/data-dir", get(admin_get_data_dir_path))
+            .route(
+                "/system/data-dir",
+                get(admin_get_data_dir_path).post(admin_set_data_dir),
+            )
             .route("/system/updates/settings", get(admin_get_update_settings))
             .route(
                 "/system/updates/check-status",
@@ -983,19 +995,15 @@ impl AxumServer {
             app
         };
 
-        // 绑定地址
-        let addr = format!("{}:{}", host, port);
-        let listener = tokio::net::TcpListener::bind(&addr)
-            .await
-            .map_err(|e| format!("地址 {} 绑定失败: {}", addr, e))?;
+        // Bind address (uses socket2 with SO_REUSEADDR to prevent port collision and TIME_WAIT retention)
+        let listener = bind_tcp_listener(&host, port)?;
+        tracing::info!("API proxy server started on http://{}:{}", host, port);
 
-        tracing::info!("反代服务器启动在 http://{}", addr);
-
-        // 创建关闭通道
-        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        // Create unified cancellation token
+        let cancel_token = tokio_util::sync::CancellationToken::new();
 
         let server_instance = Self {
-            shutdown_tx: Arc::new(tokio::sync::Mutex::new(Some(shutdown_tx))),
+            cancel_token: cancel_token.clone(),
             custom_mapping: custom_mapping_state.clone(),
             proxy_state,
             upstream: state.upstream.clone(),
@@ -1011,6 +1019,7 @@ impl AxumServer {
             only_raw_quota_models: only_raw_quota_models_state,
         };
 
+        let server_cancel_token = cancel_token.clone();
         // 在新任务中启动服务器
         let handle = tokio::spawn(async move {
             use hyper::server::conn::http1;
@@ -1019,6 +1028,10 @@ impl AxumServer {
 
             loop {
                 tokio::select! {
+                    _ = server_cancel_token.cancelled() => {
+                        tracing::info!("Proxy server received termination signal, releasing port");
+                        break;
+                    }
                     res = listener.accept() => {
                         match res {
                             Ok((stream, remote_addr)) => {
@@ -1033,25 +1046,36 @@ impl AxumServer {
                                 });
 
                                 let service = TowerToHyperService::new(app_with_info);
+                                let conn_cancel_token = server_cancel_token.clone();
 
                                 tokio::task::spawn(async move {
-                                    if let Err(err) = http1::Builder::new()
+                                    let conn = http1::Builder::new()
                                         .serve_connection(io, service)
-                                        .with_upgrades() // 支持 WebSocket (如果以后需要)
-                                        .await
-                                    {
-                                        debug!("连接处理结束或出错: {:?}", err);
+                                        .with_upgrades();
+                                    tokio::pin!(conn);
+
+                                    tokio::select! {
+                                        res = conn.as_mut() => {
+                                            if let Err(err) = res {
+                                                debug!("Connection processing ended or encountered error: {:?}", err);
+                                            }
+                                        }
+                                        _ = conn_cancel_token.cancelled() => {
+                                            // Global shutdown signal: notify Hyper to gracefully terminate connections
+                                            conn.as_mut().graceful_shutdown();
+                                            // Allow up to 500ms grace period before closing socket
+                                            let _ = tokio::time::timeout(std::time::Duration::from_millis(500), conn).await;
+                                        }
                                     }
                                 });
                             }
                             Err(e) => {
+                                if server_cancel_token.is_cancelled() {
+                                    break;
+                                }
                                 error!("接收连接失败: {:?}", e);
                             }
                         }
-                    }
-                    _ = &mut shutdown_rx => {
-                        tracing::info!("反代服务器停止监听");
-                        break;
                     }
                 }
             }
@@ -1062,15 +1086,56 @@ impl AxumServer {
 
     /// 停止服务器
     pub fn stop(&self) {
-        let tx_mutex = self.shutdown_tx.clone();
-        tokio::spawn(async move {
-            let mut lock = tx_mutex.lock().await;
-            if let Some(tx) = lock.take() {
-                let _ = tx.send(());
-                tracing::info!("Axum server 停止信号已发送");
-            }
-        });
+        self.cancel_token.cancel();
+        tracing::info!("Axum server stop signal sent");
     }
+
+    /// Check if server has been stopped
+    pub fn is_stopped(&self) -> bool {
+        self.cancel_token.is_cancelled()
+    }
+}
+
+/// Bind TCP listener with SO_REUSEADDR to prevent TIME_WAIT socket errors on restart
+fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, String> {
+    use std::net::ToSocketAddrs;
+    let addr_str = format!("{}:{}", host, port);
+    let socket_addr = addr_str
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve address {}: {}", addr_str, e))?
+        .next()
+        .ok_or_else(|| format!("Failed to resolve address: {}", addr_str))?;
+
+    let domain = if socket_addr.is_ipv6() {
+        socket2::Domain::IPV6
+    } else {
+        socket2::Domain::IPV4
+    };
+
+    let socket = socket2::Socket::new(domain, socket2::Type::STREAM, Some(socket2::Protocol::TCP))
+        .map_err(|e| format!("Failed to create socket ({}): {}", addr_str, e))?;
+
+    // Enable SO_REUSEADDR on Windows/Unix to prevent WSAEADDRINUSE (10048) on restarts
+    let _ = socket.set_reuse_address(true);
+
+    #[cfg(unix)]
+    let _ = socket.set_reuse_port(true);
+
+    socket
+        .set_nonblocking(true)
+        .map_err(|e| format!("Failed to set non-blocking mode ({}): {}", addr_str, e))?;
+
+    socket
+        .bind(&socket_addr.into())
+        .map_err(|e| format!("Failed to bind address {}: {}", addr_str, e))?;
+
+    socket
+        .listen(1024)
+        .map_err(|e| format!("Failed to listen on address {}: {}", addr_str, e))?;
+
+    let std_listener: std::net::TcpListener = socket.into();
+    tokio::net::TcpListener::from_std(std_listener)
+        .map_err(|e| format!("Failed to convert to Tokio TcpListener ({}): {}", addr_str, e))
 }
 
 // ===== API 处理器 (旧代码已移除，由 src/proxy/handlers/* 接管) =====
@@ -1971,10 +2036,11 @@ async fn admin_set_proxy_monitor_enabled(
 async fn admin_get_proxy_logs_count_filtered(
     Query(params): Query<LogsRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    let res = tokio::task::spawn_blocking(move || {
-        proxy_db::get_logs_count_filtered(&params.filter, params.errors_only)
-    })
-    .await;
+    let res: Result<Result<u64, String>, tokio::task::JoinError> =
+        tokio::task::spawn_blocking(move || {
+            proxy_db::get_logs_count_filtered(&params.filter, params.errors_only)
+        })
+        .await;
 
     match res {
         Ok(Ok(count)) => Ok(Json(count)),
@@ -2005,9 +2071,11 @@ async fn admin_clear_proxy_logs() -> impl IntoResponse {
 async fn admin_get_proxy_log_detail(
     Path(log_id): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    let res =
-        tokio::task::spawn_blocking(move || crate::modules::proxy_db::get_log_detail(&log_id))
-            .await;
+    let res: Result<
+        Result<crate::proxy::monitor::ProxyRequestLog, String>,
+        tokio::task::JoinError,
+    > = tokio::task::spawn_blocking(move || crate::modules::proxy_db::get_log_detail(&log_id))
+        .await;
 
     match res {
         Ok(Ok(log)) => Ok(Json(log)),
@@ -2040,7 +2108,10 @@ struct LogsFilterQuery {
 async fn admin_get_proxy_logs_filtered(
     Query(params): Query<LogsFilterQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    let res = tokio::task::spawn_blocking(move || {
+    let res: Result<
+        Result<Vec<crate::proxy::monitor::ProxyRequestLog>, String>,
+        tokio::task::JoinError,
+    > = tokio::task::spawn_blocking(move || {
         crate::modules::proxy_db::get_logs_filtered(
             &params.filter,
             params.errors_only,
@@ -2074,9 +2145,41 @@ async fn admin_get_proxy_stats(
 
 async fn admin_get_data_dir_path() -> impl IntoResponse {
     match crate::modules::account::get_data_dir() {
-        Ok(p) => Json(p.to_string_lossy().to_string()),
+        Ok(p) => Json(crate::modules::account::format_data_dir_path(&p)),
         Err(e) => Json(format!("Error: {}", e)),
     }
+}
+
+#[derive(Deserialize)]
+struct SetDataDirRequest {
+    path: String,
+}
+
+async fn admin_set_data_dir(
+    Json(payload): Json<SetDataDirRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let path = payload.path;
+    let new_path = tokio::task::spawn_blocking(move || {
+        crate::modules::account::migrate_data_dir(std::path::PathBuf::from(path))
+    })
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })?;
+    Ok(Json(crate::modules::account::format_data_dir_path(
+        &new_path,
+    )))
 }
 
 // --- User Token Handlers ---
@@ -4207,5 +4310,16 @@ mod image_scheduler_tests {
         let without_ide: SwitchRequest = serde_json::from_str(r#"{"accountId": "acc_2"}"#).unwrap();
         assert_eq!(without_ide.account_id, "acc_2");
         assert_eq!(without_ide.target_ide, None);
+    }
+
+    #[tokio::test]
+    async fn test_bind_tcp_listener_and_reuse() {
+        let port = 18099;
+        let listener1 =
+            super::bind_tcp_listener("127.0.0.1", port).expect("first bind should succeed");
+        drop(listener1);
+        let listener2 = super::bind_tcp_listener("127.0.0.1", port)
+            .expect("immediate re-bind must succeed with SO_REUSEADDR");
+        drop(listener2);
     }
 }
