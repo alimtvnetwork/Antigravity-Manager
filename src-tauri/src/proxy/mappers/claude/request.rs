@@ -349,6 +349,26 @@ fn reorder_gemini_parts(parts: &mut Vec<Value>) {
     parts.extend(tool_parts);
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TransformTiming {
+    pub think_fill_micros: u64,
+}
+
+pub fn transform_claude_request_in_timed(
+    claude_req: &ClaudeRequest,
+    project_id: &str,
+    is_retry: bool,
+    account_id: Option<&str>,
+    session_id: &str,
+    token: Option<&crate::proxy::token_manager::ProxyToken>,
+) -> Result<(Value, TransformTiming), String> {
+    let timing = TransformTiming::default();
+    let body = transform_claude_request_in(
+        claude_req, project_id, is_retry, account_id, session_id, token,
+    )?;
+    Ok((body, timing))
+}
+
 pub fn transform_claude_request_in(
     claude_req: &ClaudeRequest,
     project_id: &str,
@@ -2528,8 +2548,8 @@ mod tests {
                     content: MessageContent::Array(vec![ContentBlock::Image {
                         source: ImageSource {
                             source_type: "base64".to_string(),
-                            media_type: "image/png".to_string(),
-                            data: "iVBORw0KGgo=".to_string(),
+                            media_type: Some("image/png".to_string()),
+                            data: Some("iVBORw0KGgo=".to_string()),
                         },
                         cache_control: Some(json!({"type": "ephemeral"})), // 这个也应该被清理
                     }]),

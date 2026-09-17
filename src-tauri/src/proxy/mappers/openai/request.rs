@@ -336,13 +336,14 @@ pub fn transform_openai_request_with_session(
         && !mapped_model_lower.contains("claude");
     // Client thinking flags/budgets are ignored for enablement and fill.
     // Server authority: model-id heuristics + ThinkingStore hydrate/finalize only.
-    let _user_enabled_thinking = request
+    let user_enabled_thinking = request
         .thinking
         .as_ref()
         .map(|t| t.thinking_type.as_deref() == Some("enabled"))
         .unwrap_or(false);
     let _user_thinking_budget = request.thinking.as_ref().and_then(|t| t.budget_tokens);
 
+    let is_claude_model = mapped_model_lower.contains("claude");
     let is_claude_thinking = mapped_model_lower.ends_with("-thinking")
         || (is_claude_model && (user_enabled_thinking || mapped_model_lower.contains("thinking")));
     let force_server_thinking = !is_under_v3

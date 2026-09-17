@@ -280,6 +280,29 @@ pub fn resolve(canonical: &str, budget_tokens: Option<u32>) -> Option<RealModelS
 }
 
 // ── verified real model specs (from upstream spec) ──
+// gemini-3.7-flash family (maxOutputTokens = 65536)
+const SPEC_37_FLASH_LOW: RealModelSpec = RealModelSpec {
+    id: "gemini-3.7-flash-low",
+    thinking_budget: 1000,
+    max_output_tokens: 65536,
+    include_thoughts: true,
+    preserve_client_budget: false,
+};
+const SPEC_37_FLASH_MEDIUM: RealModelSpec = RealModelSpec {
+    id: "gemini-3.7-flash-medium",
+    thinking_budget: 4000,
+    max_output_tokens: 65536,
+    include_thoughts: true,
+    preserve_client_budget: false,
+};
+const SPEC_37_FLASH_HIGH: RealModelSpec = RealModelSpec {
+    id: "gemini-3.7-flash-high",
+    thinking_budget: 10000,
+    max_output_tokens: 65536,
+    include_thoughts: true,
+    preserve_client_budget: false,
+};
+
 // gemini-3.5-flash family (maxOutputTokens = 65536)
 const SPEC_35_FLASH_EXTRA_LOW: RealModelSpec = RealModelSpec {
     id: "gemini-3.5-flash-extra-low",
