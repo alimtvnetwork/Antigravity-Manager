@@ -82,6 +82,7 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             id: "default".to_string(),
             name: "Default".to_string(),
             data_dir: default_dir.to_string_lossy().to_string(),
+            executable_path: None,
             extensions_dir: None,
             bound_account_id: None,
             bound_email: None,
@@ -221,6 +222,7 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
         id: instance_id,
         name: trimmed_name.to_string(),
         data_dir: instance_data_dir.to_string_lossy().to_string(),
+        executable_path: None,
         extensions_dir: None,
         bound_account_id: None,
         bound_email: None,
@@ -346,46 +348,208 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Launch a specific instance
-pub fn launch_instance(instance_id: &str) -> Result<(), String> {
-    let mut registry = load_registry()?;
+/// Launch a specific instance with multi-window isolation and custom/cloned executable support
+pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> {
+    let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
     let pos = registry
         .instances
         .iter()
         .position(|i| i.id == instance_id)
-        .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
 
     let config = &mut registry.instances[pos];
     config.last_used = chrono::Utc::now().timestamp();
     let data_dir = config.data_dir.clone();
     let is_default = config.is_default;
-    save_registry(&registry)?;
+    let custom_exe = config.executable_path.clone();
+    let extensions_dir = config.extensions_dir.clone();
+    save_registry(&registry).map_err(crate::error::AppError::Config)?;
 
-    let exe_path = crate::modules::process::get_antigravity_executable_path(None)
-        .ok_or_else(|| "Could not locate Antigravity executable on this system".to_string())?;
+    // Determine executable: custom/cloned executable path if present and exists, otherwise system detection
+    let exe_path = if let Some(ref p) = custom_exe {
+        let pb = PathBuf::from(p);
+        if pb.exists() {
+            pb
+        } else {
+            crate::modules::process::detect_antigravity_with_diagnostics(None)?
+        }
+    } else {
+        crate::modules::process::detect_antigravity_with_diagnostics(None)?
+    };
 
     let exe_str = exe_path.to_string_lossy().to_string();
-    let mut cmd = Command::new(&exe_str);
 
-    if !is_default {
-        cmd.arg(format!("--user-data-dir={}", data_dir));
+    #[cfg(target_os = "macos")]
+    {
+        let mut cmd = Command::new("open");
+        // -n flag guarantees a new separate instance is spawned even if another is already running
+        cmd.arg("-n");
+        cmd.arg("-a");
+        cmd.arg(&exe_str);
+        cmd.arg("--args");
+        if !is_default {
+            cmd.arg(format!("--user-data-dir={}", data_dir));
+        }
+        if let Some(ref ext_dir) = extensions_dir {
+            cmd.arg(format!("--extensions-dir={}", ext_dir));
+        }
+        cmd.arg("--new-window");
+
+        cmd.spawn().map_err(|e| {
+            crate::error::AppError::Process(format!("Failed to spawn macOS instance process: {}", e))
+        })?;
+
+        return Ok(());
     }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut cmd = Command::new(&exe_str);
+
+        if !is_default {
+            cmd.arg(format!("--user-data-dir={}", data_dir));
+        }
+        if let Some(ref ext_dir) = extensions_dir {
+            cmd.arg(format!("--extensions-dir={}", ext_dir));
+        }
+        cmd.arg("--new-window");
+
+        #[cfg(target_os = "linux")]
+        {
+            // Bypass GNOME Keyring by isolating tokens in local state.vscdb
+            cmd.arg("--password-store=basic");
+            crate::modules::process::clean_appimage_env(&mut cmd);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            cmd.creation_flags(0x08000000);
+        }
+
+        cmd.spawn().map_err(|e| {
+            crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
+        })?;
+
+        Ok(())
+    }
+}
+
+/// Clone or create an isolated executable for an instance regardless of OS
+pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::error::AppError> {
+    let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
+    let pos = registry
+        .instances
+        .iter()
+        .position(|i| i.id == instance_id)
+        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
+
+    // 1. Locate base executable
+    let base_exe = crate::modules::process::detect_antigravity_with_diagnostics(None)?;
+
+    // 2. Prepare instance bin directory
+    let instances_dir = get_instances_dir().map_err(crate::error::AppError::Config)?;
+    let instance_bin_dir = instances_dir.join(instance_id).join("bin");
+    if !instance_bin_dir.exists() {
+        fs::create_dir_all(&instance_bin_dir)
+            .map_err(|e| crate::error::AppError::Io(e))?;
+    }
+
+    // 3. Platform-specific cloning logic
+    #[cfg(target_os = "windows")]
+    let cloned_path = {
+        let parent_dir = base_exe.parent().unwrap_or(&instance_bin_dir);
+        let target_in_parent = parent_dir.join(format!("Antigravity-{}.exe", instance_id));
+        // Try hardlink in the application directory so all DLLs/assets are naturally resolved
+        let link_result = std::fs::hard_link(&base_exe, &target_in_parent);
+        if link_result.is_ok() {
+            target_in_parent
+        } else {
+            // If hardlink fails (e.g. read-only Program Files), create a launcher cmd script in instance bin
+            let launcher_cmd = instance_bin_dir.join(format!("launch-{}.cmd", instance_id));
+            let script_content = format!(
+                "@echo off\r\nstart \"\" \"{}\" %*\r\n",
+                base_exe.to_string_lossy()
+            );
+            fs::write(&launcher_cmd, script_content)
+                .map_err(|e| crate::error::AppError::Io(e))?;
+            launcher_cmd
+        }
+    };
 
     #[cfg(target_os = "linux")]
-    {
-        // Bypass GNOME Keyring by isolating tokens in local state.vscdb
-        cmd.arg("--password-store=basic");
-        crate::modules::process::clean_appimage_env(&mut cmd);
-    }
+    let cloned_path = {
+        let launcher_sh = instance_bin_dir.join(format!("antigravity-{}", instance_id));
+        let base_str = base_exe.to_string_lossy();
+        if base_str.ends_with(".AppImage") {
+            let appimage_target = instance_bin_dir.join(format!("antigravity-{}.AppImage", instance_id));
+            let _ = std::os::unix::fs::symlink(&base_exe, &appimage_target);
+            if appimage_target.exists() {
+                appimage_target
+            } else {
+                let script_content = format!(
+                    "#!/bin/sh\nexec \"{}\" \"$@\"\n",
+                    base_str
+                );
+                fs::write(&launcher_sh, script_content)
+                    .map_err(|e| crate::error::AppError::Io(e))?;
+                use std::os::unix::fs::PermissionsExt;
+                let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+                launcher_sh
+            }
+        } else {
+            let script_content = format!(
+                "#!/bin/sh\nexec \"{}\" \"$@\"\n",
+                base_str
+            );
+            fs::write(&launcher_sh, script_content)
+                .map_err(|e| crate::error::AppError::Io(e))?;
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+            launcher_sh
+        }
+    };
 
-    #[cfg(target_os = "windows")]
-    {
-        cmd.creation_flags(0x08000000);
-    }
+    #[cfg(target_os = "macos")]
+    let cloned_path = {
+        let launcher_sh = instance_bin_dir.join(format!("antigravity-{}", instance_id));
+        let base_str = base_exe.to_string_lossy();
+        let script_content = format!(
+            "#!/bin/sh\nopen -n -a \"{}\" --args \"$@\"\n",
+            base_str
+        );
+        fs::write(&launcher_sh, script_content)
+            .map_err(|e| crate::error::AppError::Io(e))?;
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+        launcher_sh
+    };
 
-    cmd.spawn()
-        .map_err(|e| format!("Failed to spawn instance process: {}", e))?;
+    let cloned_str = cloned_path.to_string_lossy().to_string();
+    registry.instances[pos].executable_path = Some(cloned_str.clone());
+    save_registry(&registry).map_err(crate::error::AppError::Config)?;
 
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Cloned executable for instance '{}': {}",
+        instance_id, cloned_str
+    ));
+
+    Ok(cloned_str)
+}
+
+/// Set or clear custom executable path for an instance
+pub fn set_instance_executable(
+    instance_id: &str,
+    executable_path: Option<String>,
+) -> Result<(), crate::error::AppError> {
+    let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
+    let pos = registry
+        .instances
+        .iter()
+        .position(|i| i.id == instance_id)
+        .ok_or_else(|| crate::error::AppError::Config(format!("Instance {} not found", instance_id)))?;
+
+    registry.instances[pos].executable_path = executable_path;
+    save_registry(&registry).map_err(crate::error::AppError::Config)?;
     Ok(())
 }
 

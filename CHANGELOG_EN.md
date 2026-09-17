@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.14.0 (2026-09-17)**:
+        -   **[Ubuntu IDE Discovery Diagnostics & Multi-Instance Executable Cloning] Enhanced IDE Detection, Multi-Process Isolation, and Structured Diagnostics**:
+            -   **Ubuntu/Linux Multi-Path Discovery Scanner**: Broadened search heuristics across standard PATH, Snap, Flatpak, ~/.local/bin, desktop entries, and AppImages, resolving .desktop Exec quoting and field-code issues.
+            -   **Structured Error Model & Stack Trace Capture**: Introduced E7002 (IdeNotFound) with standard std::backtrace and comprehensive audit trail details, decoded cleanly by frontend error dialog for 1-click copy.
+            -   **Cross-Platform Executable Cloning (clone_instance_executable)**: Added support for isolated executable cloning per instance across all operating systems (Windows hardlinks for distinct process images, Linux shell wrappers, macOS open -n -a isolation).
     *   **v4.13.0 (2026-09-17)**:
         -   **[Ubuntu/Linux Auto-Healing & Deep IDE Discovery] Complete Resolution of IDE Detection and `storage_json_not_found` on Ubuntu**:
             -   **Multi-Source Dynamic Linux IDE Discovery**: Implemented dynamic `PATH` scanning (`which`), standard filesystem lookups (`/usr/bin`, `/usr/local/bin`), Snap directories (`/snap/bin`, `/var/lib/snapd/snap/bin`), Flatpak application packages, and system `.desktop` file parsing to guarantee infallible IDE executable location on any Linux distribution.

@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
+import { useErrorStore } from '../stores/error-store';
 
 export interface InstanceConfig {
     id: string;
     name: string;
     data_dir: string;
+    executable_path?: string;
     extensions_dir?: string;
     bound_account_id?: string;
     bound_email?: string;
@@ -40,7 +42,42 @@ export async function wipeInstanceSession(instanceId: string): Promise<void> {
 }
 
 export async function launchInstance(instanceId: string): Promise<void> {
-    return await invoke('launch_instance', { instanceId });
+    try {
+        return await invoke('launch_instance', { instanceId });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.launchInstance',
+            endpoint: 'launch_instance',
+            triggerAction: 'launch_instance',
+        });
+        throw e;
+    }
+}
+
+export async function cloneInstanceExecutable(instanceId: string): Promise<string> {
+    try {
+        return await invoke('clone_instance_executable', { instanceId });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.cloneInstanceExecutable',
+            endpoint: 'clone_instance_executable',
+            triggerAction: 'clone_instance_executable',
+        });
+        throw e;
+    }
+}
+
+export async function setInstanceExecutable(instanceId: string, executablePath?: string): Promise<void> {
+    try {
+        return await invoke('set_instance_executable', { instanceId, executablePath });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.setInstanceExecutable',
+            endpoint: 'set_instance_executable',
+            triggerAction: 'set_instance_executable',
+        });
+        throw e;
+    }
 }
 
 export async function closeInstance(instanceId: string): Promise<void> {
@@ -56,7 +93,16 @@ export async function setActiveInstance(instanceId: string): Promise<void> {
 }
 
 export async function switchAccountToInstance(accountId: string, instanceId?: string): Promise<void> {
-    return await invoke('switch_account_to_instance', { accountId, instanceId });
+    try {
+        return await invoke('switch_account_to_instance', { accountId, instanceId });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.switchAccountToInstance',
+            endpoint: 'switch_account_to_instance',
+            triggerAction: 'switch_account_to_instance',
+        });
+        throw e;
+    }
 }
 
 export interface AutoProfileSwitcherConfig {

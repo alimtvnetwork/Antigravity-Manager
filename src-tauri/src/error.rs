@@ -25,6 +25,18 @@ pub enum AppError {
     #[error("Account error: {0}")]
     Account(String),
 
+    #[error("Process error: {0}")]
+    Process(String),
+
+    #[error("IDE detection failed: {message}")]
+    IdeNotFound {
+        message: String,
+        target_ide: Option<String>,
+        searched_locations: Vec<String>,
+        diagnostics: String,
+        stack_trace: String,
+    },
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
@@ -101,6 +113,8 @@ impl AppError {
             AppError::Io(_) => "E4001",
             AppError::Config(_) => "E5001",
             AppError::Account(_) => "E6001",
+            AppError::Process(_) => "E7001",
+            AppError::IdeNotFound { .. } => "E7002",
             AppError::Tauri(_) => "E8001",
             AppError::Unknown(_) => "E9001",
         }
@@ -113,9 +127,12 @@ impl AppError {
             AppError::Network(_, None) => 502,
             AppError::OAuth(_) => 401,
             AppError::Config(_) | AppError::Account(_) => 400,
-            AppError::Database(_) | AppError::Io(_) | AppError::Tauri(_) | AppError::Unknown(_) => {
-                500
-            }
+            AppError::IdeNotFound { .. } => 404,
+            AppError::Database(_)
+            | AppError::Io(_)
+            | AppError::Process(_)
+            | AppError::Tauri(_)
+            | AppError::Unknown(_) => 500,
         }
     }
 
@@ -131,6 +148,40 @@ impl AppError {
         let msg = self.to_string();
         let now_iso = chrono::Utc::now().to_rfc3339();
 
+        let (details, backend_stack, err_list) = match self {
+            AppError::IdeNotFound {
+                message,
+                searched_locations,
+                diagnostics,
+                stack_trace,
+                ..
+            } => {
+                let diag = format!(
+                    "Antigravity IDE was not detected on this system.\n\nSearched Locations ({} paths checked):\n{}\n\nDiagnostic Audit:\n{}\n\nRemediation:\n1. Specify the custom Antigravity executable path in Settings.\n2. Ensure Antigravity is installed in standard locations (/usr/bin, /opt/Antigravity, Snap, Flatpak, or Applications).\n3. If using an AppImage, ensure it has executable permissions (chmod +x).",
+                    searched_locations.len(),
+                    searched_locations
+                        .iter()
+                        .map(|p| format!("  - {}", p))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    diagnostics
+                );
+                (
+                    Some(diag),
+                    Some(stack_trace.clone()),
+                    vec![
+                        format!("{} [{}]", message, code_str),
+                        format!("Searched {} candidate paths", searched_locations.len()),
+                    ],
+                )
+            }
+            _ => (
+                None,
+                None,
+                vec![format!("{} [{}]", msg, code_str)],
+            ),
+        };
+
         AppErrorPayload {
             status: StatusBlock {
                 is_success: false,
@@ -140,7 +191,7 @@ impl AppError {
             },
             errors: ErrorsBlock {
                 backend_message: msg.clone(),
-                backend: vec![format!("{} [{}]", msg, code_str)],
+                backend: err_list,
             },
             attributes: AttributesBlock {
                 requested_at: None,
@@ -149,9 +200,9 @@ impl AppError {
             code: code_str,
             level: self.level(),
             message: msg,
-            details: None,
+            details,
             timestamp: now_iso,
-            backend_stack_trace: None,
+            backend_stack_trace: backend_stack,
         }
     }
 }

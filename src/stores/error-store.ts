@@ -178,8 +178,20 @@ function normalizeRawError(err: unknown): {
   envelopeErrors?: EnvelopeErrors;
   status?: number;
 } {
-  if (typeof err === 'object' && err !== null) {
-    const record = err as Record<string, any>;
+  let target = err;
+  if (typeof err === 'string') {
+    const trimmed = err.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        target = JSON.parse(trimmed);
+      } catch {
+        target = err;
+      }
+    }
+  }
+
+  if (typeof target === 'object' && target !== null) {
+    const record = target as Record<string, any>;
     const statusObj = record.Status;
     const msg = record.message || statusObj?.Message || record.error || String(err);
     const code = record.code || extractErrorCode(msg);

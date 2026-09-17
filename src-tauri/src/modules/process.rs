@@ -914,33 +914,40 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     {
         // Windows/Linux Auto-detection and Startup
-        if let Some(detected_path) = get_antigravity_executable_path(target_ide) {
-            let mut cmd = Command::new(&detected_path);
+        match detect_antigravity_with_diagnostics(target_ide) {
+            Ok(detected_path) => {
+                let mut cmd = Command::new(&detected_path);
 
-            // Add startup arguments
-            if let Some(ref args) = args {
-                for arg in args {
-                    cmd.arg(arg);
+                // Add startup arguments
+                if let Some(ref args) = args {
+                    for arg in args {
+                        cmd.arg(arg);
+                    }
                 }
+
+                #[cfg(target_os = "linux")]
+                clean_appimage_env(&mut cmd);
+
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+                cmd.spawn().map_err(|e| {
+                    format!("Startup failed (detected path {:?}): {}", detected_path, e)
+                })?;
+
+                crate::modules::logger::log_info(&format!(
+                    "Antigravity startup command sent (detected path: {:?})",
+                    detected_path
+                ));
+                Ok(())
             }
-
-            #[cfg(target_os = "linux")]
-            clean_appimage_env(&mut cmd);
-
-            #[cfg(target_os = "windows")]
-            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-
-            cmd.spawn().map_err(|e| {
-                format!("Startup failed (detected path {:?}): {}", detected_path, e)
-            })?;
-
-            crate::modules::logger::log_info(&format!(
-                "Antigravity startup command sent (detected path: {:?})",
-                detected_path
-            ));
-            Ok(())
-        } else {
-            Err("Unable to start Antigravity: executable not found".to_string())
+            Err(diag_err) => {
+                crate::modules::logger::log_error(&format!(
+                    "[IDE Discovery Failed] {}",
+                    diag_err
+                ));
+                Err(format!("{}", diag_err))
+            }
         }
     }
 }
@@ -1117,43 +1124,85 @@ pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::p
 ///
 /// Search strategy (highest to lowest priority):
 /// 1. Get path from running process (most reliable, supports any location)
-/// 2. Iterate standard installation locations
-/// 3. Return None
-pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::path::PathBuf> {
-    // Strategy 1: Get from running process (supports any location)
+/// Comprehensive detection engine that returns either the found PathBuf or a detailed AppError with audit trail and stack trace
+pub fn detect_antigravity_with_diagnostics(
+    target_ide: Option<&str>,
+) -> Result<std::path::PathBuf, crate::error::AppError> {
+    let mut audit_log = Vec::new();
+
+    // Strategy 1: Check running processes (supports any custom location)
     if let Some(path) = get_path_from_running_process(target_ide) {
-        return Some(path);
+        crate::modules::logger::log_info(&format!(
+            "[IDE Discovery] Located via running process: {:?}",
+            path
+        ));
+        return Ok(path);
     }
+    audit_log.push("No active Antigravity process found in process table".to_string());
 
     // Strategy 2: Check config paths (supports user-configured locations)
     if let Ok(config) = crate::modules::config::load_app_config() {
-        match target_ide {
-            Some("ide") => {
-                if let Some(ref p) = config.antigravity_ide_executable {
-                    let path = std::path::PathBuf::from(p);
-                    if path.exists() {
-                        return Some(path);
-                    }
-                }
+        let manual = if target_ide == Some("ide") {
+            config.antigravity_ide_executable.as_ref()
+        } else {
+            config.antigravity_executable.as_ref()
+        };
+
+        if let Some(p) = manual {
+            let path = std::path::PathBuf::from(p);
+            if path.exists() {
+                crate::modules::logger::log_info(&format!(
+                    "[IDE Discovery] Located via user configuration: {:?}",
+                    path
+                ));
+                return Ok(path);
             }
-            _ => {
-                // Try antigravity_executable first (closest match for target_ide=None)
-                if let Some(ref p) = config.antigravity_executable {
-                    let path = std::path::PathBuf::from(p);
-                    if path.exists() {
-                        return Some(path);
-                    }
-                }
-            }
+            audit_log.push(format!("Configured path '{:?}' does not exist on disk", path));
+        } else {
+            audit_log.push("No custom executable path configured in Settings".to_string());
         }
     }
 
-    // Strategy 3: Check standard installation locations
-    check_standard_locations(target_ide)
+    // Strategy 3: Standard installation locations, PATH, and Desktop entries
+    let (found, checked) = audit_standard_locations(target_ide);
+    if let Some(path) = found {
+        crate::modules::logger::log_info(&format!(
+            "[IDE Discovery] Located via filesystem search: {:?}",
+            path
+        ));
+        return Ok(path);
+    }
+
+    let stack = std::backtrace::Backtrace::capture().to_string();
+    let diag_summary = format!(
+        "Audit Log:\n{}\n\nTested {} candidate locations across PATH, standard directories, Snap, Flatpak, and .desktop entries.\nNone matched an existing executable binary.",
+        audit_log.join("\n"),
+        checked.len()
+    );
+
+    Err(crate::error::AppError::IdeNotFound {
+        message: format!(
+            "Could not locate Antigravity executable on this system (tested {} locations).",
+            checked.len()
+        ),
+        target_ide: target_ide.map(|s| s.to_string()),
+        searched_locations: checked,
+        diagnostics: diag_summary,
+        stack_trace: stack,
+    })
 }
 
-/// Check standard installation locations
-fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathBuf> {
+/// Fallback wrapper returning Option for backward compatibility
+pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::path::PathBuf> {
+    detect_antigravity_with_diagnostics(target_ide).ok()
+}
+
+/// Audit standard installation locations and collect diagnostics
+fn audit_standard_locations(
+    target_ide: Option<&str>,
+) -> (Option<std::path::PathBuf>, Vec<String>) {
+    let mut checked = Vec::new();
+
     let folder_names: &[&str] = if target_ide == Some("ide") {
         &["Antigravity IDE"]
     } else if target_ide == Some("code") || target_ide == Some("cursor") {
@@ -1165,9 +1214,25 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
     #[cfg(target_os = "macos")]
     {
         for folder_name in folder_names {
-            let path = std::path::PathBuf::from(format!("/Applications/{}.app", folder_name));
-            if path.exists() {
-                return Some(path);
+            let candidates = [
+                format!("/Applications/{}.app", folder_name),
+                format!("/Applications/{}.app/Contents/MacOS/Electron", folder_name),
+            ];
+            for c in candidates {
+                checked.push(c.clone());
+                let p = std::path::PathBuf::from(c);
+                if p.exists() {
+                    return (Some(p), checked);
+                }
+            }
+        }
+        if let Some(home) = dirs::home_dir() {
+            for folder_name in folder_names {
+                let p = home.join(format!("Applications/{}.app", folder_name));
+                checked.push(p.to_string_lossy().to_string());
+                if p.exists() {
+                    return (Some(p), checked);
+                }
             }
         }
     }
@@ -1176,7 +1241,6 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
     {
         use std::env;
 
-        // Get environment variables
         let local_appdata = env::var("LOCALAPPDATA").ok();
         let program_files =
             env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
@@ -1184,11 +1248,10 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
             env::var("ProgramFiles(x86)").unwrap_or_else(|_| "C:\\Program Files (x86)".to_string());
 
         for folder_name in folder_names {
-            let mut possible_paths = Vec::new();
+            let mut candidates = Vec::new();
 
-            // User installation location (preferred)
-            if let Some(local) = &local_appdata {
-                possible_paths.push(
+            if let Some(ref local) = local_appdata {
+                candidates.push(
                     std::path::PathBuf::from(local)
                         .join("Programs")
                         .join(folder_name)
@@ -1196,24 +1259,23 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
                 );
             }
 
-            // System installation location
-            possible_paths.push(
+            candidates.push(
                 std::path::PathBuf::from(&program_files)
                     .join(folder_name)
                     .join(format!("{}.exe", folder_name)),
             );
 
-            // 32-bit compatibility location
-            possible_paths.push(
+            candidates.push(
                 std::path::PathBuf::from(&program_files_x86)
                     .join(folder_name)
                     .join(format!("{}.exe", folder_name)),
             );
 
-            // Return the first existing path
-            for path in possible_paths {
+            for path in candidates {
+                let path_str = path.to_string_lossy().to_string();
+                checked.push(path_str);
                 if path.exists() {
-                    return Some(path);
+                    return (Some(path), checked);
                 }
             }
         }
@@ -1221,40 +1283,102 @@ fn check_standard_locations(target_ide: Option<&str>) -> Option<std::path::PathB
 
     #[cfg(target_os = "linux")]
     {
+        // 1. Direct APPIMAGE environment check
+        if let Ok(appimage) = std::env::var("APPIMAGE") {
+            let path = std::path::PathBuf::from(&appimage);
+            checked.push(format!("$APPIMAGE: {}", appimage));
+            if path.is_file() {
+                return (Some(path), checked);
+            }
+        }
+
+        let exe_names: &[&str] = if target_ide == Some("ide") {
+            &[
+                "antigravity-ide",
+                "Antigravity-IDE",
+                "antigravity",
+                "Antigravity",
+            ]
+        } else if target_ide == Some("cursor") {
+            &["cursor", "antigravity", "Antigravity"]
+        } else if target_ide == Some("code") {
+            &["code", "antigravity", "Antigravity"]
+        } else {
+            &[
+                "antigravity",
+                "Antigravity",
+                "antigravity-ide",
+                "Antigravity-IDE",
+                "google-antigravity",
+                "Google-Antigravity",
+                "agy",
+            ]
+        };
+
+        // 2. PATH resolution
+        if let Some(path) = resolve_linux_path_env(exe_names, &mut checked) {
+            return (Some(path), checked);
+        }
+
+        // 3. Standard filesystem locations & AppImages
         for folder_name in folder_names {
-            let exe_names: &[&str] = if *folder_name == "Antigravity IDE" {
-                &["antigravity-ide", "antigravity"]
-            } else if target_ide == Some("cursor") {
-                &["cursor", "antigravity"]
-            } else if target_ide == Some("code") {
-                &["code", "antigravity"]
-            } else {
-                &["antigravity", "antigravity-ide"]
-            };
-
-            if let Some(path) = resolve_linux_path_env(exe_names) {
-                return Some(path);
+            if let Some(path) = resolve_linux_standard_paths(folder_name, exe_names, &mut checked) {
+                return (Some(path), checked);
             }
+        }
 
-            if let Some(path) = resolve_linux_standard_paths(folder_name, exe_names) {
-                return Some(path);
-            }
-
-            if let Some(path) = resolve_linux_desktop_entry(exe_names) {
-                return Some(path);
-            }
+        // 4. Desktop entry parsing (.desktop)
+        if let Some(path) = resolve_linux_desktop_entry(exe_names, &mut checked) {
+            return (Some(path), checked);
         }
     }
 
-    None
+    (None, checked)
 }
 
 #[cfg(target_os = "linux")]
-fn resolve_linux_path_env(exe_names: &[&str]) -> Option<std::path::PathBuf> {
+fn clean_desktop_exec_command(exec_cmd: &str) -> Option<String> {
+    let trimmed = exec_cmd.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Handle quotes: e.g. "/opt/Antigravity/antigravity" %U or '...'
+    let unquoted = if (trimmed.starts_with('"') && trimmed.contains('"', 1))
+        || (trimmed.starts_with('\'') && trimmed.contains('\'', 1))
+    {
+        let quote_char = trimmed.chars().next().unwrap();
+        let end_idx = trimmed[1..].find(quote_char).map(|i| i + 1).unwrap_or(trimmed.len());
+        &trimmed[1..end_idx]
+    } else {
+        trimmed.split_whitespace().next().unwrap_or("")
+    };
+
+    // If starts with env or /usr/bin/env, skip to next token
+    let binary = if unquoted.ends_with("/env") || unquoted == "env" {
+        let after_env = trimmed.trim_start_matches(unquoted).trim();
+        after_env.split_whitespace().next().unwrap_or("")
+    } else {
+        unquoted
+    };
+
+    if binary.is_empty() {
+        None
+    } else {
+        Some(binary.to_string())
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_linux_path_env(
+    exe_names: &[&str],
+    checked: &mut Vec<String>,
+) -> Option<std::path::PathBuf> {
     let path_var = std::env::var("PATH").ok()?;
     for p in std::env::split_paths(&path_var) {
         for exe in exe_names {
             let candidate = p.join(exe);
+            checked.push(candidate.to_string_lossy().to_string());
             if candidate.is_file() {
                 return Some(candidate);
             }
@@ -1264,34 +1388,57 @@ fn resolve_linux_path_env(exe_names: &[&str]) -> Option<std::path::PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-fn resolve_linux_desktop_entry(exe_names: &[&str]) -> Option<std::path::PathBuf> {
-    let mut dirs_to_check = vec![std::path::PathBuf::from("/usr/share/applications")];
+fn resolve_linux_desktop_entry(
+    exe_names: &[&str],
+    checked: &mut Vec<String>,
+) -> Option<std::path::PathBuf> {
+    let mut dirs_to_check = vec![
+        std::path::PathBuf::from("/usr/share/applications"),
+        std::path::PathBuf::from("/usr/local/share/applications"),
+        std::path::PathBuf::from("/var/lib/snapd/desktop/applications"),
+        std::path::PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+    ];
     if let Some(home) = dirs::home_dir() {
         dirs_to_check.push(home.join(".local/share/applications"));
+        dirs_to_check.push(home.join(".local/share/flatpak/exports/share/applications"));
     }
 
     for dir in dirs_to_check {
         if !dir.exists() {
             continue;
         }
-        let entries = std::fs::read_dir(dir).ok()?;
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
         for entry in entries.flatten() {
             let path = entry.path();
-            let file_name = path.file_name()?.to_string_lossy().to_lowercase();
+            let file_name = match path.file_name() {
+                Some(f) => f.to_string_lossy().to_lowercase(),
+                None => continue,
+            };
             if !file_name.ends_with(".desktop") {
                 continue;
             }
 
-            let matches_target = exe_names.iter().any(|name| file_name.contains(name));
+            let matches_target = exe_names.iter().any(|name| file_name.contains(&name.to_lowercase()));
             if matches_target {
+                checked.push(format!(".desktop: {}", path.to_string_lossy()));
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     for line in content.lines() {
                         let trimmed = line.trim();
                         if let Some(exec_cmd) = trimmed.strip_prefix("Exec=") {
-                            let exec_token = exec_cmd.split_whitespace().next().unwrap_or("");
-                            let binary_path = std::path::PathBuf::from(exec_token);
-                            if binary_path.is_file() {
-                                return Some(binary_path);
+                            if let Some(clean_cmd) = clean_desktop_exec_command(exec_cmd) {
+                                let binary_path = std::path::PathBuf::from(&clean_cmd);
+                                checked.push(format!("  -> Exec: {}", clean_cmd));
+                                if binary_path.is_file() {
+                                    return Some(binary_path);
+                                }
+                                // If relative or bare command, check PATH
+                                if let Some(found) = resolve_linux_path_env(&[&clean_cmd], checked) {
+                                    return Some(found);
+                                }
                             }
                         }
                     }
@@ -1306,6 +1453,7 @@ fn resolve_linux_desktop_entry(exe_names: &[&str]) -> Option<std::path::PathBuf>
 fn resolve_linux_standard_paths(
     folder_name: &str,
     exe_names: &[&str],
+    checked: &mut Vec<String>,
 ) -> Option<std::path::PathBuf> {
     let folder_lower = folder_name.to_lowercase().replace(' ', "-");
     let folder_lower_simple = folder_name.to_lowercase().replace(' ', "");
@@ -1319,19 +1467,31 @@ fn resolve_linux_standard_paths(
             std::path::PathBuf::from(format!("/opt/{}/{}", folder_name, exe)),
             std::path::PathBuf::from(format!("/opt/{}/{}", folder_lower, exe)),
             std::path::PathBuf::from(format!("/opt/{}/{}", folder_lower_simple, exe)),
+            std::path::PathBuf::from(format!("/opt/Google/Antigravity/{}", exe)),
+            std::path::PathBuf::from(format!("/opt/google-antigravity/{}", exe)),
             std::path::PathBuf::from(format!("/usr/share/{}/{}", folder_name, exe)),
             std::path::PathBuf::from(format!("/usr/share/{}/{}", folder_lower, exe)),
+            std::path::PathBuf::from(format!("/usr/lib/{}/{}", folder_name, exe)),
+            std::path::PathBuf::from(format!("/usr/lib/{}/{}", folder_lower, exe)),
         ];
 
         if let Some(home) = dirs::home_dir() {
             candidates.push(home.join(format!(".local/bin/{}", exe)));
+            candidates.push(home.join(format!("bin/{}", exe)));
             candidates.push(home.join(format!(".local/share/{}/{}", folder_name, exe)));
             candidates.push(home.join(format!(".local/share/{}/{}", folder_lower, exe)));
             candidates.push(home.join(format!("Applications/{}.AppImage", folder_name)));
             candidates.push(home.join(format!("Applications/{}.AppImage", folder_lower)));
+            candidates.push(home.join("Applications/Antigravity.AppImage"));
+            candidates.push(home.join("Applications/antigravity.AppImage"));
+            candidates.push(home.join("Downloads/Antigravity.AppImage"));
+            candidates.push(home.join("Downloads/antigravity.AppImage"));
+            candidates.push(home.join("Desktop/Antigravity.AppImage"));
+            candidates.push(home.join("Desktop/antigravity.AppImage"));
         }
 
         for path in candidates {
+            checked.push(path.to_string_lossy().to_string());
             if path.exists() {
                 return Some(path);
             }

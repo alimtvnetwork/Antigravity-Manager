@@ -27,8 +27,21 @@ pub fn wipe_instance_session(instance_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_instance(instance_id: String) -> Result<(), String> {
+pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError> {
     instance::launch_instance(&instance_id)
+}
+
+#[tauri::command]
+pub fn clone_instance_executable(instance_id: String) -> Result<String, crate::error::AppError> {
+    instance::clone_instance_executable(&instance_id)
+}
+
+#[tauri::command]
+pub fn set_instance_executable(
+    instance_id: String,
+    executable_path: Option<String>,
+) -> Result<(), crate::error::AppError> {
+    instance::set_instance_executable(&instance_id, executable_path)
 }
 
 #[tauri::command]

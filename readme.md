@@ -18,7 +18,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.13.0-3B82F6?style=flat-square" alt="Version 4.13.0">
+    <img src="https://img.shields.io/badge/Version-4.14.0-3B82F6?style=flat-square" alt="Version 4.14.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -112,7 +112,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.13.0`
+> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.14.0`
 > - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
 
 ---
@@ -358,7 +358,7 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
-- **v4.13.0** (2026-09-17):
+- **v4.14.0** (2026-09-17):
   - Comprehensive Linux/Ubuntu IDE executable discovery (`which`, Snap `/snap/bin`, Flatpak, `/usr/local/bin`, and `.desktop` parsing).
   - Storage JSON auto-healing and initial telemetry synthesis on Linux/Ubuntu.
   - End-to-end Structured Universal Error Management in Rust and TypeScript with AI-sharable Compact Markdown error reports.

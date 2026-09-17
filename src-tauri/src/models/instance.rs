@@ -6,6 +6,8 @@ pub struct InstanceConfig {
     pub id: String,
     pub name: String,
     pub data_dir: String,
+    #[serde(default)]
+    pub executable_path: Option<String>,
     pub extensions_dir: Option<String>,
     pub bound_account_id: Option<String>,
     pub bound_email: Option<String>,

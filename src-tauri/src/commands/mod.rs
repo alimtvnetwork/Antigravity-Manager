@@ -888,7 +888,7 @@ pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<()
 
 /// 获取 Antigravity 可执行文件路径
 #[tauri::command]
-pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String, String> {
+pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String, crate::error::AppError> {
     // 1. 优先从配置查询 (除非明确要求绕过)
     if bypass_config != Some(true) {
         if let Ok(config) = crate::modules::config::load_app_config() {
@@ -900,11 +900,9 @@ pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String,
         }
     }
 
-    // 2. 执行实时探测
-    match crate::modules::process::get_antigravity_executable_path(None) {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
-        None => Err("未找到 Antigravity 安装路径".to_string()),
-    }
+    // 2. 执行实时探测 (附带完整诊断追踪与调用栈)
+    let path = crate::modules::process::detect_antigravity_with_diagnostics(None)?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 /// 获取 Antigravity CLI (agy) 可执行文件路径

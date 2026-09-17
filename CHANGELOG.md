@@ -2,6 +2,12 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.14.0 (2026-09-17)**:
+        -   **[Ubuntu IDE 路径智能探测与多实例可执行文件克隆] 全面增强跨平台 IDE 发现、隔离运行与结构化诊断**:
+            -   **Ubuntu/Linux 多路径诊断扫描**: 深度扩展 Linux IDE 候选路径（标准路径、PATH、Snap、Flatpak、~/.local/bin、桌面条目及 AppImage 等），修复 .desktop Exec 引号与字段代码解析缺陷，彻底杜绝 Ubuntu 找不到 Antigravity 路径问题。
+            -   **结构化错误模型与堆栈捕获**: 新增 E7002 (IdeNotFound) 结构化错误模型与后端 std::backtrace 捕获，前端一键复制完整搜索路径与诊断日志，便于快速排查与 AI 自愈。
+            -   **跨平台可执行文件克隆 (clone_instance_executable)**: 支持在各平台下为实例独立克隆可执行文件或包装器（Windows 硬链接独立进程名、Linux 隔离可执行脚本、macOS open -n -a 隔离会话），彻底解决多实例并发冲突。
+
     *   **v4.13.0 (2026-09-17)**:
         -   **[Ubuntu/Linux 自愈与深度 IDE 探测] 彻底解决 Ubuntu 下 IDE 丢失与 `storage_json_not_found` 异常**:
             -   **Linux IDE 可执行文件全方位多源解析**: 引入基于系统动态 `PATH` (`which`)、标准目录 (`/usr/bin`, `/usr/local/bin`)、Snap (`/snap/bin`, `/var/lib/snapd/snap/bin`)、Flatpak (`~/.var/app/com.antigravity.ide/`) 以及系统 `.desktop` 文件解析的双重动态可执行文件发现机制，确保在任何 Linux 发行版均可精准定位 IDE。

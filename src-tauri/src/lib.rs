@@ -755,6 +755,8 @@ pub fn run() {
             commands::delete_instance,
             commands::wipe_instance_session,
             commands::launch_instance,
+            commands::clone_instance_executable,
+            commands::set_instance_executable,
             commands::close_instance,
             commands::get_active_instance,
             commands::set_active_instance,

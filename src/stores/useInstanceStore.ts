@@ -23,6 +23,8 @@ interface InstanceState {
     deleteInstance: (instanceId: string) => Promise<void>;
     wipeSession: (instanceId: string) => Promise<void>;
     launchInstance: (instanceId: string) => Promise<void>;
+    cloneInstanceExecutable: (instanceId: string) => Promise<string>;
+    setInstanceExecutable: (instanceId: string, executablePath?: string) => Promise<void>;
     closeInstance: (instanceId: string) => Promise<void>;
     setActiveInstance: (instanceId: string) => Promise<void>;
     switchAccountToInstance: (accountId: string, instanceId?: string) => Promise<void>;
@@ -135,6 +137,31 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             await get().fetchInstances();
         } catch (err: any) {
             set({ error: err?.toString() || 'Failed to launch instance' });
+            throw err;
+        }
+    },
+
+    cloneInstanceExecutable: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const clonedPath = await instanceService.cloneInstanceExecutable(instanceId);
+            await get().fetchInstances();
+            set({ isLoading: false });
+            return clonedPath;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to clone executable' });
+            throw err;
+        }
+    },
+
+    setInstanceExecutable: async (instanceId: string, executablePath?: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            await instanceService.setInstanceExecutable(instanceId, executablePath);
+            await get().fetchInstances();
+            set({ isLoading: false });
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to set executable path' });
             throw err;
         }
     },

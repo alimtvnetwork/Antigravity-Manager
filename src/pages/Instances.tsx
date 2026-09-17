@@ -10,6 +10,7 @@ import {
     Folder,
     Search,
     AlertCircle,
+    Cpu,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
@@ -29,6 +30,7 @@ export default function Instances() {
         deleteInstance,
         wipeSession,
         launchInstance,
+        cloneInstanceExecutable,
         closeInstance,
         setActiveInstance,
     } = useInstanceStore();
@@ -107,6 +109,25 @@ export default function Instances() {
             } catch (e: any) {
                 setActionError(e?.toString() || 'Failed to wipe session');
             }
+        }
+    };
+
+    const handleLaunch = async (id: string) => {
+        setActionError(null);
+        try {
+            await launchInstance(id);
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to launch instance');
+        }
+    };
+
+    const handleCloneExecutable = async (id: string) => {
+        setActionError(null);
+        try {
+            const cloned = await cloneInstanceExecutable(id);
+            alert(`Executable cloned successfully:\n${cloned}`);
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to clone executable');
         }
     };
 
@@ -276,6 +297,12 @@ export default function Instances() {
                                         <Folder className="w-3.5 h-3.5 shrink-0" />
                                         <span className="truncate">{inst.config.data_dir}</span>
                                     </div>
+                                    {inst.config.executable_path && (
+                                        <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
+                                            <Cpu className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -293,7 +320,7 @@ export default function Instances() {
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={() => launchInstance(inst.config.id)}
+                                            onClick={() => handleLaunch(inst.config.id)}
                                             className="btn btn-xs btn-primary gap-1"
                                             title="Launch instance window"
                                         >
@@ -301,6 +328,13 @@ export default function Instances() {
                                             <span>Launch</span>
                                         </button>
                                     )}
+                                    <button
+                                        onClick={() => handleCloneExecutable(inst.config.id)}
+                                        className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400"
+                                        title="Clone executable binary for this profile"
+                                    >
+                                        <Cpu className="w-3.5 h-3.5" />
+                                    </button>
                                     <button
                                         onClick={() => {
                                             setCopyTargetId(inst.config.id);
