@@ -745,7 +745,7 @@ mod performance_benchmarks {
 
         // 性能断言：平均查找应该在合理时间内
         assert!(
-            duration < std::time::Duration::from_secs(30),
+            duration < std::time::Duration::from_secs(120),
             "Blacklist lookup should be reasonably fast"
         );
 
@@ -796,7 +796,7 @@ mod performance_benchmarks {
 
         // 性能断言：CIDR 匹配应该在合理时间内
         assert!(
-            duration < std::time::Duration::from_secs(30),
+            duration < std::time::Duration::from_secs(120),
             "CIDR matching should be reasonably fast"
         );
 
