@@ -348,3 +348,20 @@ Allowed work:
 - ✅ Single-point maintenance for help flags (`-h`, `--help`, `help`), usage formatting, and argument validation.
 
 **Why:** Copy-pasted boilerplate across dozens of command files causes code drift, disparate validation behavior, and violates DRY principles.
+
+---
+
+## Mismatched JSX Conditional Rendering Syntax — TOTAL BAN
+
+🔴 **NEVER mix logical AND (`&&`) opening expressions with ternary closing tokens (`) : null}`) or vice-versa in JSX / TSX.**
+
+Forbidden:
+- ❌ `{condition && ( <div>...</div> ) : null}`
+- ❌ `{condition ? ( <div>...</div> )}`
+
+Allowed work:
+- ✅ `{condition && ( <div>...</div> )}`
+- ✅ `{condition ? ( <div>...</div> ) : null}`
+
+**Why:** Causes `TS1005: '}' expected` and `TS1381: Unexpected token` during TypeScript compilation (`tsc && vite build`), breaking frontend and desktop CI/CD builds.
+

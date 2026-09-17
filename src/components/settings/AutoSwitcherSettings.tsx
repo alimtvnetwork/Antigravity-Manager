@@ -214,7 +214,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
                     ) : null}
                 </div>
-            ) : null}
+            )}
 
             {/* Prominent "How Auto Rotation Works" Guide */}
             <div className="mt-4 pt-4 border-t border-gray-100 dark:border-base-300">
