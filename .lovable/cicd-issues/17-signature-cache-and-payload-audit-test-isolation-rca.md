@@ -34,8 +34,8 @@ In GitHub Actions CI pipeline [#35260347408](https://github.com/alimtvnetwork/An
 ### 3. Resolution
 1. **Preserve Canonical ID for Gemini 3.7 Flash:**
    - Updated `resolve_real_model` in `src-tauri/src/proxy/common/variant_mapping.rs` so that if `is_canonical` and `family.canonical_id == "gemini-3.7-flash"`, `spec.id` is set to `family.canonical_id`.
-2. **Standardize Sample Log Response Body Length:**
-   - In `src-tauri/src/proxy/monitor.rs`, changed `"err".repeat(bytes)` to `"e".repeat(bytes)` so that a 4096-byte input produces a 4096-character response body, remaining comfortably within the 8,000-character payload audit simple-mode threshold.
+2. **Standardize Prompt Log Test Body Size:**
+   - In `src-tauri/src/proxy/monitor.rs`, updated `prompt_log_memory_summary_and_database_detail` to use `sample_log("detail", 2048)`, ensuring its response body (6,144 chars) is safely within the 8,000-char simple-mode payload audit limit without modifying `sample_log` itself (which other database retention tests depend on for exact byte allocations).
 3. **Implement `clear_tool_signatures` and Isolate Signature Tests:**
    - Added `clear_tool_signatures()` in `src-tauri/src/modules/proxy_db.rs` to delete all rows from `tool_signatures` and reset the cached read-only `TOOL_SIGNATURE_DB` connection.
    - Updated `SignatureCache::clear()` in `src-tauri/src/proxy/signature_cache.rs` to call `clear_tool_signatures()`.

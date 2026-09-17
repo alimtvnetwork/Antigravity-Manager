@@ -45,7 +45,7 @@ pub(crate) mod prompt_log_tests {
         serde_json::from_value(serde_json::json!({
             "id": id, "timestamp": chrono::Utc::now().timestamp_millis(),
             "method": "POST", "url": "/v1/chat/completions", "status": 500, "duration": 10,
-            "request_body": "q".repeat(bytes), "response_body": "e".repeat(bytes),
+            "request_body": "q".repeat(bytes), "response_body": "err".repeat(bytes),
             "error": "err".repeat(2048)
         }))
         .unwrap()
@@ -103,7 +103,7 @@ pub(crate) mod prompt_log_tests {
             enabled: Arc::new(AtomicBool::new(true)),
             app_handle: None,
         };
-        let log = sample_log("detail", 4096);
+        let log = sample_log("detail", 2048);
         let response = log.response_body.clone();
         monitor.log_request(log).await;
         let _finished = LOG_WRITERS.acquire_many(4).await.unwrap();
@@ -114,10 +114,10 @@ pub(crate) mod prompt_log_tests {
         assert_eq!(detail.response_body, response);
         assert_eq!(
             detail.request_body.as_deref(),
-            Some("q".repeat(4096).as_str())
+            Some("q".repeat(2048).as_str())
         );
         monitor.set_enabled(false);
-        monitor.log_request(sample_log("disabled", 4096)).await;
+        monitor.log_request(sample_log("disabled", 2048)).await;
         assert!(crate::modules::proxy_db::get_log_detail("disabled").is_err());
     }
 }
