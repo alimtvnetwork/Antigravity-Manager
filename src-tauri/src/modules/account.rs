@@ -119,7 +119,9 @@ mod tests {
 
     #[test]
     fn test_migrate_data_dir_rename_and_copy() {
-        let _data_dir_guard = TEST_DATA_DIR_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        let _data_dir_guard = TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let pointer_path = dirs::home_dir()
             .expect("home")
