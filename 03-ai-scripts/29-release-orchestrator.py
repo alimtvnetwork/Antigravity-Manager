@@ -365,7 +365,7 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"- **Multi-Instance Isolation & Concurrency**: Spawns isolated user data directories with separate window contexts and macOS `open -n -a` support.\n"
         f"- **Cross-Platform Executable Cloning**: `clone_instance_executable` enables instances to run custom binaries or hardlinks regardless of OS.\n"
     )
-    notes_file.write_text(notes_content, encoding="utf-8")
+    notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 
 
 def stage_and_commit_release(next_version, scope, dry_run=False):
