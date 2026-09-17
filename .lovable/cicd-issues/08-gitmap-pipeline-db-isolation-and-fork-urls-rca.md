@@ -12,7 +12,7 @@
 ## 1. Symptoms
 
 1. **Repo Workspace Pollution**:
-   When running `gitmap` commands (such as pipeline status checks or error reports), Gitmap CLI generated `.gitmap/data/pipeline.db`, `.gitmap/pipeline/`, and `.gitmap/last_error.log` directly inside the target repository working tree (`d:\work\Antigravity-Manager\.gitmap`).
+   When running `gitmap` commands (such as pipeline status checks or error reports), Gitmap CLI generated `.gitmap/data/pipeline.db`, `.gitmap/pipeline/`, and `.gitmap/last_error.log` directly inside the target repository working tree (`.gitmap`).
 2. **Persistent Phantom Failure Report (#35045785921)**:
    Even after release `#35067964730` (`v4.11.0`) succeeded 100% green, running `gitmap pipeline errorlogs` continued to report old failed run `#35045785921` from 5 hours prior, displaying `Saved Log: .gitmap/pipeline/35045785921.log`.
 3. **CI Formatting Failure**:
@@ -39,7 +39,7 @@
 ## 3. Resolution
 
 1. **Centralized Pipeline Database & Log Storage**:
-   In `d:\work\gitmap`:
+   In `gitmap`:
    - `cli/pipelinedb/pipeline_split_db.go`: `PipelineDbDir()` points strictly to `filepath.Join(store.BinaryDataDir(), "pipeline")` (`%LOCALAPPDATA%\gitmap-cli\data\pipeline\`), storing `pipeline_<slug>.db`.
    - `cli/cmdpipeline/pipeline_persist.go`: `resolvePipelineDir()` returns `pipelinedb.PipelineDbDir()`, eliminating `.gitmap/pipeline`. `writeLastErrorLog` writes to the CLI data folder.
    - `cli/cmdpipeline/pipeline_sync_cache.go`: `resolveDbStatTarget()` points to `pipelinedb.ResolvePipelineDbPath(...)`.
@@ -49,7 +49,7 @@
 3. **Rustfmt Multi-Line Split**:
    In `src-tauri/src/modules/update_checker.rs`, split `download_url` across two lines adhering to rustfmt column bounds.
 4. **Purged Rogue Workspace Directory**:
-   Deleted `d:\work\Antigravity-Manager\.gitmap`.
+   Deleted `.gitmap` directory.
 5. **Complete Decoupling of Fork URLs & Docker Gating**:
    Re-routed all update checkers, download links, installer scripts, and cask formulas to `alimtvnetwork/Antigravity-Manager`. Gated Docker Hub build steps behind `vars.ENABLE_DOCKER_PUSH == 'true'` so missing Docker Hub credentials in forks gracefully skip instead of failing.
 
@@ -58,9 +58,9 @@
 ## 4. Verification & Prevention
 
 1. **Verification**:
-   - Running `gitmap pipeline errorlogs` inside `d:\work\Antigravity-Manager` confirms:
+   - Running `gitmap pipeline errorlogs` inside repo root confirms:
      - Old failure `#35045785921` is recognized as superseded and no longer reported.
-     - All logs, error reports, and database files reside in `C:\Users\Administrator\AppData\Local\gitmap-cli\data\pipeline\`.
+     - All logs, error reports, and database files reside in `%LOCALAPPDATA%\gitmap-cli\data\pipeline\`.
      - `Test-Path .gitmap` returns `False` (zero repo pollution).
    - Local `cargo fmt -- --check` passed 100% clean with exit code 0.
    - Remote CI run `#35071131724` passed `Check Rust formatting`, `Run Clippy`, and `Check Rust compilation` steps.
