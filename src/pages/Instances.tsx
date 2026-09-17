@@ -6,6 +6,7 @@ import {
     Copy,
     Trash2,
     RotateCcw,
+    RotateCw,
     Plus,
     Folder,
     Search,
@@ -15,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { isTauri } from '../utils/env';
+import { cn } from '../utils/cn';
 
 export default function Instances() {
     const { t } = useTranslation();
@@ -22,6 +24,8 @@ export default function Instances() {
         instances,
         activeInstanceId,
         switcherStatus,
+        isLoading,
+        error,
         fetchInstances,
         fetchSwitcherStatus,
         triggerManualRotation,
@@ -47,7 +51,7 @@ export default function Instances() {
         fetchInstances();
         fetchSwitcherStatus();
         const timer = setInterval(() => {
-            fetchInstances();
+            fetchInstances(true);
             fetchSwitcherStatus();
         }, 3000);
         return () => clearInterval(timer);
@@ -160,6 +164,18 @@ export default function Instances() {
                     </div>
                     <button
                         onClick={() => {
+                            fetchInstances();
+                            fetchSwitcherStatus();
+                        }}
+                        disabled={isLoading}
+                        className="btn btn-ghost btn-sm gap-1.5 border border-gray-200 dark:border-base-100 text-xs"
+                        title={t('common.refresh', 'Refresh')}
+                    >
+                        <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
+                        <span className="hidden sm:inline">{t('common.refresh', 'Refresh')}</span>
+                    </button>
+                    <button
+                        onClick={() => {
                             setNewInstanceName('');
                             setIsCreateOpen(true);
                         }}
@@ -171,8 +187,25 @@ export default function Instances() {
                 </div>
             </div>
 
-            {/* Error Alert */}
-            {actionError && (
+            {/* Store Error Alert */}
+            {error ? (
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                    <button
+                        onClick={() => fetchInstances()}
+                        className="btn btn-xs btn-outline btn-error gap-1 shrink-0"
+                    >
+                        <RotateCw className="w-3 h-3" />
+                        <span>{t('common.retry', 'Retry')}</span>
+                    </button>
+                </div>
+            ) : null}
+
+            {/* Action Error Alert */}
+            {actionError ? (
                 <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
@@ -180,10 +213,10 @@ export default function Instances() {
                     </div>
                     <button onClick={() => setActionError(null)} className="text-xs font-semibold">✕</button>
                 </div>
-            )}
+            ) : null}
 
             {/* Auto-Switcher Status Banner */}
-            {switcherStatus && switcherStatus.is_running && (
+            {switcherStatus?.is_running ? (
                 <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2.5">
                         <span className="relative flex h-2.5 w-2.5">
@@ -198,7 +231,7 @@ export default function Instances() {
                                 {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
                                     ? `Current Active Quota: ${switcherStatus.current_quota_percent.toFixed(0)}%`
                                     : 'Monitoring active profile quota'}
-                                {switcherStatus.last_switch_reason && ` • Last switch: ${switcherStatus.last_switch_reason}`}
+                                {switcherStatus.last_switch_reason ? ` • Last switch: ${switcherStatus.last_switch_reason}` : ''}
                             </span>
                         </div>
                     </div>
@@ -217,7 +250,7 @@ export default function Instances() {
                         <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
                     </button>
                 </div>
-            )}
+            ) : null}
 
             {/* Search Filter */}
             <div className="flex items-center gap-2 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-xl px-3 py-2 shadow-xs">
@@ -231,145 +264,202 @@ export default function Instances() {
                 />
             </div>
 
-            {/* Instance Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredInstances.map((inst) => {
-                    const isActive = inst.config.id === activeInstanceId;
-                    return (
-                        <div
-                            key={inst.config.id}
-                            className={`rounded-2xl border p-5 transition-all flex flex-col justify-between bg-white dark:bg-base-200 ${isActive ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20 shadow-xs'}`}
+            {/* Instance Cards Grid or Empty / Loading States */}
+            {isLoading && instances.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-base-200 rounded-2xl border border-gray-200/80 dark:border-base-100">
+                    <RotateCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin mb-3" />
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {t('instances.loading', 'Loading instances and profiles...')}
+                    </p>
+                </div>
+            ) : instances.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-base-200 rounded-2xl border border-dashed border-gray-300 dark:border-base-100">
+                    <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-4">
+                        <Laptop className="w-10 h-10" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-base-content mb-1">
+                        {t('instances.empty_title', 'No Profiles Found')}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mb-6 leading-relaxed">
+                        {t('instances.empty_desc', 'Instances allow you to run isolated Antigravity windows with dedicated account tokens, extensions, and workspaces. Initialize your default profile or create a custom one to get started.')}
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={async () => {
+                                setActionError(null);
+                                try {
+                                    await createInstance('Default');
+                                } catch (e: any) {
+                                    setActionError(e?.toString() || 'Failed to initialize default profile');
+                                }
+                            }}
+                            className="btn btn-primary btn-sm gap-1.5 shadow-sm"
                         >
-                            {/* Card Top */}
-                            <div>
-                                <div className="flex items-start justify-between gap-2 mb-3">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span
-                                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                        />
-                                        <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
-                                            {inst.config.name}
-                                        </h3>
-                                        {inst.config.is_default && (
-                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-base-100 text-gray-600 dark:text-gray-400 shrink-0">
-                                                DEFAULT
+                            <Play className="w-3.5 h-3.5" />
+                            <span>{t('instances.init_default', 'Initialize Default Profile')}</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setNewInstanceName('');
+                                setIsCreateOpen(true);
+                            }}
+                            className="btn btn-outline btn-sm gap-1.5"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{t('instances.create_custom', 'Create Custom Profile')}</span>
+                        </button>
+                    </div>
+                </div>
+            ) : filteredInstances.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-2xl border border-gray-200/80 dark:border-base-100">
+                    <Search className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {t('instances.no_search_results', 'No profiles match your search')}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                        {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredInstances.map((inst) => {
+                        const isActive = inst.config.id === activeInstanceId;
+                        return (
+                            <div
+                                key={inst.config.id}
+                                className={`rounded-2xl border p-5 transition-all flex flex-col justify-between bg-white dark:bg-base-200 ${isActive ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20 shadow-xs'}`}
+                            >
+                                {/* Card Top */}
+                                <div>
+                                    <div className="flex items-start justify-between gap-2 mb-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span
+                                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                            />
+                                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
+                                                {inst.config.name}
+                                            </h3>
+                                            {inst.config.is_default && (
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-base-100 text-gray-600 dark:text-gray-400 shrink-0">
+                                                    DEFAULT
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="shrink-0">
+                                            {isActive ? (
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                                    Active Target
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setActiveInstance(inst.config.id)}
+                                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium"
+                                                    title="Set as active instance for account switches"
+                                                >
+                                                    Set Active
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Status details */}
+                                    <div className="space-y-2 text-xs py-2 border-y border-gray-100 dark:border-base-100 text-gray-600 dark:text-gray-400">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-400">Status:</span>
+                                            <span className={`font-medium ${inst.is_running ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>
+                                                {inst.is_running ? `Running (PID: ${inst.pid})` : 'Idle'}
                                             </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-400">Bound Account:</span>
+                                            <span className="font-medium text-gray-900 dark:text-gray-200 truncate max-w-[170px]" title={inst.config.bound_email || 'None'}>
+                                                {inst.config.bound_email || 'Unassigned'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-400">Profile ID:</span>
+                                            <span className="font-mono text-[11px] text-gray-500 truncate max-w-[170px]">
+                                                {inst.config.id}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate pt-1" title={inst.config.data_dir}>
+                                            <Folder className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="truncate">{inst.config.data_dir}</span>
+                                        </div>
+                                        {inst.config.executable_path && (
+                                            <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
+                                                <Cpu className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="shrink-0">
-                                        {isActive ? (
-                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                                                Active Target
-                                            </span>
+                                </div>
+
+                                {/* Card Actions */}
+                                <div className="pt-4 flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1">
+                                        {inst.is_running ? (
+                                            <button
+                                                onClick={() => closeInstance(inst.config.id)}
+                                                className="btn btn-xs btn-error btn-outline gap-1"
+                                                title="Gracefully close this instance window"
+                                            >
+                                                <Square className="w-3 h-3" />
+                                                <span>Close</span>
+                                            </button>
                                         ) : (
                                             <button
-                                                onClick={() => setActiveInstance(inst.config.id)}
-                                                className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium"
-                                                title="Set as active instance for account switches"
+                                                onClick={() => handleLaunch(inst.config.id)}
+                                                className="btn btn-xs btn-primary gap-1"
+                                                title="Launch instance window"
                                             >
-                                                Set Active
+                                                <Play className="w-3 h-3" />
+                                                <span>Launch</span>
                                             </button>
                                         )}
+                                        <button
+                                            onClick={() => handleCloneExecutable(inst.config.id)}
+                                            className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400"
+                                            title="Clone executable binary for this profile"
+                                        >
+                                            <Cpu className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setCopyTargetId(inst.config.id);
+                                                setCopyInstanceName(`${inst.config.name} Copy`);
+                                            }}
+                                            className="btn btn-xs btn-ghost text-gray-600 dark:text-gray-300"
+                                            title="Clone profile settings and extensions"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleWipeSession(inst.config.id)}
+                                            disabled={inst.is_running}
+                                            className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400"
+                                            title="Wipe auth credentials (keep settings)"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
-                                </div>
 
-                                {/* Status details */}
-                                <div className="space-y-2 text-xs py-2 border-y border-gray-100 dark:border-base-100 text-gray-600 dark:text-gray-400">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Status:</span>
-                                        <span className={`font-medium ${inst.is_running ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>
-                                            {inst.is_running ? `Running (PID: ${inst.pid})` : 'Idle'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Bound Account:</span>
-                                        <span className="font-medium text-gray-900 dark:text-gray-200 truncate max-w-[170px]" title={inst.config.bound_email || 'None'}>
-                                            {inst.config.bound_email || 'Unassigned'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Profile ID:</span>
-                                        <span className="font-mono text-[11px] text-gray-500 truncate max-w-[170px]">
-                                            {inst.config.id}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate pt-1" title={inst.config.data_dir}>
-                                        <Folder className="w-3.5 h-3.5 shrink-0" />
-                                        <span className="truncate">{inst.config.data_dir}</span>
-                                    </div>
-                                    {inst.config.executable_path && (
-                                        <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
-                                            <Cpu className="w-3.5 h-3.5 shrink-0" />
-                                            <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
-                                        </div>
+                                    {!inst.config.is_default && (
+                                        <button
+                                            onClick={() => handleDelete(inst.config.id)}
+                                            disabled={inst.is_running}
+                                            className="btn btn-xs btn-ghost text-rose-600 dark:text-rose-400"
+                                            title="Delete profile"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                     )}
                                 </div>
                             </div>
-
-                            {/* Card Actions */}
-                            <div className="pt-4 flex items-center justify-between gap-1.5">
-                                <div className="flex items-center gap-1">
-                                    {inst.is_running ? (
-                                        <button
-                                            onClick={() => closeInstance(inst.config.id)}
-                                            className="btn btn-xs btn-error btn-outline gap-1"
-                                            title="Gracefully close this instance window"
-                                        >
-                                            <Square className="w-3 h-3" />
-                                            <span>Close</span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleLaunch(inst.config.id)}
-                                            className="btn btn-xs btn-primary gap-1"
-                                            title="Launch instance window"
-                                        >
-                                            <Play className="w-3 h-3" />
-                                            <span>Launch</span>
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleCloneExecutable(inst.config.id)}
-                                        className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400"
-                                        title="Clone executable binary for this profile"
-                                    >
-                                        <Cpu className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setCopyTargetId(inst.config.id);
-                                            setCopyInstanceName(`${inst.config.name} Copy`);
-                                        }}
-                                        className="btn btn-xs btn-ghost text-gray-600 dark:text-gray-300"
-                                        title="Clone profile settings and extensions"
-                                    >
-                                        <Copy className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleWipeSession(inst.config.id)}
-                                        disabled={inst.is_running}
-                                        className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400"
-                                        title="Wipe auth credentials (keep settings)"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-
-                                {!inst.config.is_default && (
-                                    <button
-                                        onClick={() => handleDelete(inst.config.id)}
-                                        disabled={inst.is_running}
-                                        className="btn btn-xs btn-ghost text-rose-600 dark:text-rose-400"
-                                        title="Delete profile"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Create Instance Modal */}
             {isCreateOpen && (

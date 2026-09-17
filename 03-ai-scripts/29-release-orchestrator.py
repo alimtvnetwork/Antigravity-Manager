@@ -309,10 +309,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_content = changelog_zh.read_text(encoding="utf-8")
         zh_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Ubuntu IDE 路径智能探测与多实例可执行文件克隆] 全面增强跨平台 IDE 发现、隔离运行与结构化诊断**:\n"
-            f"            -   **Ubuntu/Linux 多路径诊断扫描**: 深度扩展 Linux IDE 候选路径（标准路径、PATH、Snap、Flatpak、~/.local/bin、桌面条目及 AppImage 等），修复 .desktop Exec 引号与字段代码解析缺陷，彻底杜绝 Ubuntu 找不到 Antigravity 路径问题。\n"
-            f"            -   **结构化错误模型与堆栈捕获**: 新增 E7002 (IdeNotFound) 结构化错误模型与后端 std::backtrace 捕获，前端一键复制完整搜索路径与诊断日志，便于快速排查与 AI 自愈。\n"
-            f"            -   **跨平台可执行文件克隆 (clone_instance_executable)**: 支持在各平台下为实例独立克隆可执行文件或包装器（Windows 硬链接独立进程名、Linux 隔离可执行脚本、macOS open -n -a 隔离会话），彻底解决多实例并发冲突。\n"
+            f"        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:\n"
+            f"            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
+            f"            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
+            f"            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
+            f"            -   **Manifest & Attribution Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
         )
         marker_zh = "[English Changelog](CHANGELOG_EN.md)。"
         if marker_zh in cl_content:
@@ -329,10 +330,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cl_en_content = changelog_en.read_text(encoding="utf-8")
         en_entry = (
             f"    *   **v{next_version} ({today_str})**:\n"
-            f"        -   **[Ubuntu IDE Discovery Diagnostics & Multi-Instance Executable Cloning] Enhanced IDE Detection, Multi-Process Isolation, and Structured Diagnostics**:\n"
-            f"            -   **Ubuntu/Linux Multi-Path Discovery Scanner**: Broadened search heuristics across standard PATH, Snap, Flatpak, ~/.local/bin, desktop entries, and AppImages, resolving .desktop Exec quoting and field-code issues.\n"
-            f"            -   **Structured Error Model & Stack Trace Capture**: Introduced E7002 (IdeNotFound) with standard std::backtrace and comprehensive audit trail details, decoded cleanly by frontend error dialog for 1-click copy.\n"
-            f"            -   **Cross-Platform Executable Cloning (clone_instance_executable)**: Added support for isolated executable cloning per instance across all operating systems (Windows hardlinks for distinct process images, Linux shell wrappers, macOS open -n -a isolation).\n"
+            f"        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:\n"
+            f"            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
+            f"            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
+            f"            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
+            f"            -   **Manifest & Attribution Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
         )
         if "*   **Version History**:\n" in cl_en_content:
             cl_en_content = cl_en_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{en_entry}", 1)
@@ -360,10 +362,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Ubuntu IDE Discovery Diagnostics**: Expanded multi-path scanner covering standard paths, Snap, Flatpak, ~/.local/bin, desktop entries, and AppImages; fixed .desktop quoting and field-code parsing.\n"
-        f"- **Structured Error Model & Stack Trace Capture**: Introduced `AppError::IdeNotFound` (E7002, 404) with std::backtrace and audit diagnostics for 1-click troubleshooting.\n"
-        f"- **Multi-Instance Isolation & Concurrency**: Spawns isolated user data directories with separate window contexts and macOS `open -n -a` support.\n"
-        f"- **Cross-Platform Executable Cloning**: `clone_instance_executable` enables instances to run custom binaries or hardlinks regardless of OS.\n"
+        f"- **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to 'AGM by Alim', and executable output to 'Anti-Gravity Tools by Alim'.\n"
+        f"- **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.\n"
+        f"- **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.\n"
+        f"- **Attribution & Manifest Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution to upstream lbjlaq/Antigravity-Manager.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 

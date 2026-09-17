@@ -18,7 +18,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.14.0-3B82F6?style=flat-square" alt="Version 4.14.0">
+    <img src="https://img.shields.io/badge/Version-4.15.0-3B82F6?style=flat-square" alt="Version 4.15.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -47,7 +47,7 @@
 </p>
 
 <p align="center">
-  <em>Part of the <strong>MD Animal Experiments</strong> research and tooling series · Proudly sponsored by <strong>Rivera</strong></em>
+  <em>Managed and enhanced by <strong>Md. Alim Ul Karim</strong> · Originally created by <strong>lbjlaq</strong> and upstream contributors</em>
 </p>
 
 ---
@@ -112,7 +112,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.14.0`
+> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.15.0`
 > - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
 
 ---
@@ -168,10 +168,10 @@ docker compose up -d
 ### Genesis & Upstream Attribution
 This project is an active, production-hardened fork originating from the groundbreaking work done by **[lbjlaq](https://github.com/lbjlaq)** and contributors on **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)**. 
 
-We extend our deepest gratitude, respect, and praise to **lbjlaq** and the upstream development community for creating the foundational architecture of Antigravity Manager. Their ingenuity demonstrated how local session tokens could be multiplexed into high-availability AI gateways.
+We extend our deepest gratitude, respect, and praise to **lbjlaq** and the upstream development community for creating the foundational architecture of Antigravity Manager. Their ingenuity demonstrated how local session tokens could be multiplexed into high-availability AI gateways. Full credit, respect, and sincere thanks are given to **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)** and all original upstream contributors.
 
-### The MD Animal Experiments Evolution
-Under this fork, **Md. Alim Ul Karim** and the **Riseup Asia LLC** engineering team maintain and evolve the codebase as part of the **MD Animal Experiments** series, proudly sponsored by **Rivera**. 
+### Maintenance & Continuous Enhancement
+This project is **managed and enhanced by Md. Alim Ul Karim** and the **Riseup Asia LLC** engineering team · **Originally created by lbjlaq and upstream contributors**. 
 
 This edition introduces critical enterprise hardening, automated self-healing, and developer tooling:
 1. **Ubuntu & Linux Auto-Healing**: Fully resolves missing `storage.json` issues on clean OS installations, containers, and portable setups by auto-generating complete telemetry profiles (`telemetry.machineId`, `macMachineId`, `devDeviceId`, `sqmId`) and ensuring SQLite schema initialization.
@@ -358,11 +358,16 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.15.0** (2026-09-17):
+  - Unified branding overhaul: App and window title updated to "AGM by Alim", product name "Anti-Gravity Tools by Alim".
+  - High-density Accounts quota UI overhaul: consolidated model quota displays into unified Gemini and Claude shared buckets.
+  - Multi-instance management and execution fixes; added comprehensive automatic rotation guidance in Settings.
+  - Complete removal of Chinese comments in backend Cargo manifests and release orchestration scripts; refreshed attribution giving full credit to upstream `lbjlaq/Antigravity-Manager`.
 - **v4.14.0** (2026-09-17):
   - Comprehensive Linux/Ubuntu IDE executable discovery (`which`, Snap `/snap/bin`, Flatpak, `/usr/local/bin`, and `.desktop` parsing).
   - Storage JSON auto-healing and initial telemetry synthesis on Linux/Ubuntu.
   - End-to-end Structured Universal Error Management in Rust and TypeScript with AI-sharable Compact Markdown error reports.
-  - Root README English-only overhaul under MD Animal Experiments governance, citing original creators and Rivera sponsorship.
+  - Root README English-only overhaul with comprehensive upstream attribution.
 - **v4.12.0** (2026-09-16):
   - Enhanced error handling, CI/CD pipeline bugfixes, and multi-instance profile launch arguments.
 - **v4.11.0** (2026-09-15):
@@ -412,7 +417,6 @@ We extend our sincere thanks to all creators, developers, and open-source contri
 
 We proudly acknowledge the organizations and projects supporting this research and development:
 
-- **Rivera**: Premier Sponsor of the MD Animal Experiments series.
 - **PackyCode**: Reliable API relay provider supporting Claude Code, Codex, and Gemini.
 - **APIKEY.FUN**: Enterprise-grade multi-model API access.
 - **Claude API**: High-stability Anthropic gateway provider.
@@ -446,5 +450,5 @@ We proudly acknowledge the organizations and projects supporting this research a
 - **Security Statement**: All tokens, credentials, and session state are securely encrypted and stored locally in SQLite database files on your machine. No telemetry or authentication credentials leave your device.
 
 <p align="center">
-  <em>Antigravity Tools · Maintained by Md. Alim Ul Karim &amp; Riseup Asia LLC · Upstream Genesis by lbjlaq</em>
+  <em>Antigravity Tools · Managed and enhanced by Md. Alim Ul Karim &amp; Riseup Asia LLC · Special thanks and full credit to the original upstream repository <a href="https://github.com/lbjlaq/Antigravity-Manager">lbjlaq/Antigravity-Manager</a> and all original contributors.</em>
 </p>

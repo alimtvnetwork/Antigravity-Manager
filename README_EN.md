@@ -1,15 +1,16 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.14.0)
+> Professional AI Account Management & Protocol Proxy System (v4.15.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
 
   <h3>Your Personal High-Performance AI Gateway</h3>
   <p>Not just account management, but the ultimate solution to break API barriers.</p>
+  <p><em>Managed and enhanced by <strong>Md. Alim Ul Karim</strong> · Originally created by <strong>lbjlaq</strong> and upstream contributors</em></p>
 
   <p>
-    <a href="https://github.com/lbjlaq/Antigravity-Manager">
-      <img src="https://img.shields.io/badge/Version-4.14.0-blue?style=flat-square" alt="Version">
+    <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
+      <img src="https://img.shields.io/badge/Version-4.15.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,5 +506,6 @@ This project has referenced or learned from the ideas or code of the following e
 
 <div align="center">
   <p>If you find this tool helpful, please give it a ⭐️ on GitHub!</p>
+  <p>Managed and enhanced by Md. Alim Ul Karim &amp; Riseup Asia LLC · Special thanks and full credit to the original upstream project <a href="https://github.com/lbjlaq/Antigravity-Manager">lbjlaq/Antigravity-Manager</a> and original contributors.</p>
   <p>Copyright © 2024-2026 Antigravity Team.</p>
 </div>

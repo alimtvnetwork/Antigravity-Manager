@@ -54,11 +54,12 @@ import {
 import type { Account, ModelQuota } from '../../types/account';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../utils/cn';
+import { Gemini, Claude } from '@lobehub/icons';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import { QuotaItem } from './QuotaItem';
 import { MODEL_CONFIG, sortModels, resolveQuotaModels, ensurePinnedImageSelector } from '../../config/modelConfig';
-import { categorizeModel, getModelProtectionKey } from '../../utils/modelCategory';
+import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
 
@@ -248,32 +249,32 @@ function SortableAccountRow({
             style={style as React.CSSProperties}
             className={cn(
                 "group transition-colors border-b border-gray-100 dark:border-base-200",
-                isCurrent && "bg-blue-50/50 dark:bg-blue-900/10",
-                isDragging && "bg-blue-100 dark:bg-blue-900/30 shadow-lg",
-                !isDragging && "hover:bg-gray-50 dark:hover:bg-base-200"
+                isCurrent ? "bg-blue-50/50 dark:bg-blue-900/10" : "",
+                isDragging ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg" : "",
+                !isDragging ? "hover:bg-gray-50 dark:hover:bg-base-200" : ""
             )}
         >
             {/* 拖拽手柄 */}
-            <td className="pl-2 py-1 w-8 align-middle">
+            <td className="pl-2 py-0.5 w-7 align-middle">
                 <div
                     {...(!isDragDisabled ? attributes : {})}
                     {...(!isDragDisabled ? listeners : {})}
                     className={cn(
-                        "flex items-center justify-center w-6 h-6 rounded transition-colors",
+                        "flex items-center justify-center w-5 h-5 rounded transition-colors",
                         isDragDisabled
                             ? "text-gray-200 dark:text-gray-700 cursor-not-allowed opacity-40"
                             : "cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     )}
                     title={isDragDisabled ? t('accounts.drag_disabled_during_sort', '已激活列排序，拖拽排序已暂停') : t('accounts.drag_to_reorder')}
                 >
-                    <GripVertical className="w-4 h-4" />
+                    <GripVertical className="w-3.5 h-3.5" />
                 </div>
             </td>
             {/* 复选框 */}
-            <td className="px-2 py-1 w-10 align-middle">
+            <td className="px-1.5 py-0.5 w-8 align-middle">
                 <input
                     type="checkbox"
-                    className="checkbox checkbox-sm rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
+                    className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
                     checked={selected}
                     onChange={onSelect}
                     disabled={isRefreshing}
@@ -386,156 +387,182 @@ function AccountRowContent({
         });
     }, [quotaWindow, account.quota?.quota_groups]);
 
-    // 获取要显示的模型列表
-    const pinnedModels = ensurePinnedImageSelector(
-        config?.pinned_quota_models?.models || Object.keys(MODEL_CONFIG),
-    );
+    // 决定要显示的模型列表
+    const displayModels = useMemo(() => {
+        if (showAllQuotas) {
+            const uniqueLabels = new Set<string>();
+            return sortModels(
+                (account.quota?.models || []).map(m => {
+                    const modelCfg = MODEL_CONFIG[m.name.toLowerCase()];
+                    const label = m.display_name || (modelCfg?.i18nKey ? t(modelCfg.i18nKey) : (modelCfg?.shortLabel || modelCfg?.label || m.name));
+                    const protectedKey = modelCfg?.protectedKey || m.name.toLowerCase();
+                    return {
+                        id: m.name.toLowerCase(),
+                        label,
+                        percentage: m.percentage || 0,
+                        resetTime: m.reset_time,
+                        isProtected: Boolean(config?.quota_protection?.enabled && isModelProtected(account.protected_models, protectedKey)),
+                        liveLimit: getLiveLimitForModel(account, m.name.toLowerCase(), protectedKey),
+                        Icon: modelCfg?.Icon || Bot,
+                    };
+                }).filter(m => {
+                    const isHiddenThinking = m.id.includes('thinking');
+                    if (isHiddenThinking) return false;
 
-    // 根据 show_all 状态决定显示哪些模型
-    const uniqueLabels = new Set<string>();
-    const displayModels = sortModels(
-        (showAllQuotas
-            ? (account.quota?.models || []).map(m => {
-                const config = MODEL_CONFIG[m.name.toLowerCase()];
-                const label = m.display_name || (config?.i18nKey ? t(config.i18nKey) : (config?.shortLabel || config?.label || m.name));
-                return {
-                    id: m.name.toLowerCase(),
-                    label: label,
-                    protectedKey: config?.protectedKey || m.name.toLowerCase(),
-                    data: m
-                };
+                    const labelKey = `${m.label}-${m.id}`;
+                    if (uniqueLabels.has(labelKey)) {
+                        return false;
+                    }
+                    uniqueLabels.add(labelKey);
+                    return true;
+                })
+            );
+        }
+
+        // Consolidated view (Default): exactly TWO unified items (Gemini and Claude)
+        // 1. Gemini (shared quota pool)
+        const geminiQuotaModel = findQuotaModel(account.quota?.models, 'gemini-pro')
+            || findQuotaModel(account.quota?.models, 'gemini-flash')
+            || account.quota?.models?.find(m => {
+                const cat = categorizeModel(m.name);
+                return cat === 'gemini-pro' || cat === 'gemini-flash' || cat === 'gemini-pro-image' || cat === 'gemini-flash-image';
             })
-            : resolveQuotaModels(account.quota?.models, pinnedModels).map(sel => {
-                const selectorConfig = MODEL_CONFIG[sel.selectorId.toLowerCase()];
-                const resolvedConfig = sel.model ? MODEL_CONFIG[sel.model.name.toLowerCase()] : undefined;
-                if (!selectorConfig && !sel.model) return null;
-                const label = sel.model?.display_name
-                    || (resolvedConfig?.shortLabel || resolvedConfig?.label)
-                    || (selectorConfig?.shortLabel || selectorConfig?.label)
-                    || (resolvedConfig?.i18nKey ? t(resolvedConfig.i18nKey) : undefined)
-                    || (selectorConfig?.i18nKey ? t(selectorConfig.i18nKey) : undefined)
-                    || sel.selectorId;
-                return {
-                    id: sel.model?.name.toLowerCase() ?? sel.selectorId.toLowerCase(),
-                    label,
-                    protectedKey: getModelProtectionKey(sel.model?.name ?? sel.selectorId) ?? resolvedConfig?.protectedKey ?? selectorConfig?.protectedKey ?? sel.selectorId,
-                    data: sel.model,
-                };
-            }).filter((item): item is { id: string; label: string; protectedKey: string; data: ModelQuota | undefined } => item !== null)
-    ).filter(m => {
-            // 过滤特定的 Claude/Gemini 思考变体 (在列表页隐藏)
-            const isHiddenThinking = m.id.includes('thinking');
+            || account.quota?.models?.find(m => m.name.toLowerCase().includes('gemini'));
 
-            if (isHiddenThinking) return false;
+        const isGeminiProtected = Boolean(
+            config?.quota_protection?.enabled && (
+                isModelProtected(account.protected_models, 'gemini-pro') ||
+                isModelProtected(account.protected_models, 'gemini-flash')
+            )
+        );
 
-            // 基于标签去重 (例如 G3.1 Pro 只显示一次)
-            // 优先显示有配额数据的 ID
-            const labelKey = `${m.label}-${m.protectedKey}`;
-            if (uniqueLabels.has(labelKey)) {
-                return false;
-            }
-            if (m.data) {
-                uniqueLabels.add(labelKey);
-                return true;
-            }
-            return true;
-        })
-    ).filter((m, index, self) => {
-        // 第二次过滤：确保即使没有数据的重复 Label 也只保留一个
-        const labelKey = `${m.label}-${m.protectedKey}`;
-        return self.findIndex(t => `${t.label}-${t.protectedKey}` === labelKey) === index;
-    });
+        const geminiLiveLimit = getLiveLimitForModel(account, 'gemini-3.1-pro-high', 'gemini-pro')
+            || getLiveLimitForModel(account, 'gemini-3-flash', 'gemini-flash');
+
+        // 2. Claude (Claude Sonnet pool)
+        const claudeQuotaModel = findQuotaModel(account.quota?.models, 'claude')
+            || account.quota?.models?.find(m => categorizeModel(m.name) === 'claude')
+            || account.quota?.models?.find(m => m.name.toLowerCase().includes('claude'));
+
+        const isClaudeProtected = Boolean(
+            config?.quota_protection?.enabled && isModelProtected(account.protected_models, 'claude')
+        );
+
+        const claudeLiveLimit = getLiveLimitForModel(account, 'claude-sonnet-4-6', 'claude');
+
+        return [
+            {
+                id: 'gemini',
+                label: 'Gemini',
+                percentage: geminiQuotaModel?.percentage ?? 0,
+                resetTime: geminiQuotaModel?.reset_time,
+                isProtected: isGeminiProtected,
+                liveLimit: geminiLiveLimit,
+                Icon: Gemini.Color,
+            },
+            {
+                id: 'claude',
+                label: 'Claude',
+                percentage: claudeQuotaModel?.percentage ?? 0,
+                resetTime: claudeQuotaModel?.reset_time,
+                isProtected: isClaudeProtected,
+                liveLimit: claudeLiveLimit,
+                Icon: Claude.Color,
+            },
+        ];
+    }, [showAllQuotas, account.quota?.models, account.protected_models, config?.quota_protection?.enabled, t]);
 
 
     return (
         <>
             {/* 邮箱列 */}
-            <td className="px-2 py-1 align-middle">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <td className="px-2 py-0.5 align-middle">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className={cn(
-                        "font-medium text-sm break-all transition-colors",
-                        isCurrent ? "text-blue-700 dark:text-blue-400" : "text-gray-900 dark:text-base-content"
+                        "font-medium text-xs break-all transition-colors",
+                        isCurrent ? "text-blue-700 dark:text-blue-400 font-semibold" : "text-gray-900 dark:text-base-content"
                     )} title={account.email}>
                         {account.email}
                     </span>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        {isCurrent && (
-                            <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-bold shadow-sm border border-blue-200/50 dark:border-blue-800/50">
+                    <div className="flex items-center gap-1 shrink-0">
+                        {isCurrent ? (
+                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold shadow-xs border border-blue-200/50 dark:border-blue-800/50">
                                 {t('accounts.current').toUpperCase()}
                             </span>
-                        )}
-                        {isDisabled && (
+                        ) : null}
+                        {isDisabled ? (
                             <span
-                                className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-rose-200/50"
+                                className="px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-rose-200/50"
                             >
                                 <Ban className="w-2.5 h-2.5" />
                                 <span>{t('accounts.disabled')}</span>
                             </span>
-                        )}
+                        ) : null}
 
-                        {account.proxy_disabled && (
+                        {account.proxy_disabled ? (
                             <span
-                                className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-orange-200/50"
+                                className="px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-orange-200/50"
                             >
                                 <Ban className="w-2.5 h-2.5" />
                                 <span>{t('accounts.proxy_disabled')}</span>
                             </span>
-                        )}
+                        ) : null}
 
-                        {account.quota?.is_forbidden && (
-                            <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-red-200/50">
+                        {account.quota?.is_forbidden ? (
+                            <span className="px-1.5 py-0.2 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-red-200/50">
                                 <Lock className="w-2.5 h-2.5" />
                                 <span>{t('accounts.forbidden')}</span>
                             </span>
-                        )}
-                        {account.validation_blocked && (
-                            <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-amber-200/50">
+                        ) : null}
+                        {account.validation_blocked ? (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-amber-200/50">
                                 <Clock className="w-2.5 h-2.5" />
                                 <span>{validationBlockedLabel}</span>
                             </span>
-                        )}
-
+                        ) : null}
 
                         {/* 订阅类型徽章 */}
                         {account.quota?.subscription_tier && (() => {
                             const tier = account.quota.subscription_tier.toLowerCase();
                             if (tier.includes('ultra')) {
                                 return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                    <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-bold shadow-xs cursor-default">
                                         <Gem className="w-2.5 h-2.5 fill-current" />
                                         {t('accounts.ultra')}
                                     </span>
                                 );
-                            } else if (tier.includes('pro')) {
+                            }
+                            if (tier.includes('pro')) {
                                 return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                    <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-bold shadow-xs cursor-default">
                                         <Diamond className="w-2.5 h-2.5 fill-current" />
                                         {t('accounts.pro')}
                                     </span>
                                 );
-                            } else {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[10px] font-bold shadow-sm border border-gray-200 dark:border-white/10 hover:bg-gray-200 transition-colors cursor-default">
-                                        <Circle className="w-2.5 h-2.5" />
-                                        {t('accounts.free')}
-                                    </span>
-                                );
                             }
+                            return (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-white/10 hover:bg-gray-200 transition-colors cursor-default">
+                                    <Circle className="w-2.5 h-2.5" />
+                                    {t('accounts.free')}
+                                </span>
+                            );
                         })()}
                         {/* 自定义标签 */}
-                        {account.custom_label && !isEditingLabel && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
-                                <Tag className="w-2.5 h-2.5" />
-                                {account.custom_label}
-                            </span>
-                        )}
+                        {account.custom_label ? (
+                            isEditingLabel ? null : (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold shadow-xs border border-orange-200/50 dark:border-orange-800/50">
+                                    <Tag className="w-2.5 h-2.5" />
+                                    {account.custom_label}
+                                </span>
+                            )
+                        ) : null}
                         {/* 标签编辑输入框 */}
                         {isEditingLabel && (
                             <div className="flex items-center gap-1">
                                 <input
                                     type="text"
-                                    className="px-1.5 py-0.5 text-[10px] w-20 border border-orange-300 dark:border-orange-700 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white dark:bg-base-200"
+                                    className="px-1.5 py-0.2 text-[10px] w-20 border border-orange-300 dark:border-orange-700 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white dark:bg-base-200"
                                     placeholder={t('accounts.custom_label_placeholder', 'Label')}
                                     value={labelInput}
                                     onChange={(e) => setLabelInput(e.target.value)}
@@ -564,19 +591,19 @@ function AccountRowContent({
             </td>
 
             {/* 模型配额列 */}
-            <td className="px-2 py-1 align-middle">
+            <td className="px-2 py-0.5 align-middle">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
-                        "flex items-center justify-center gap-3 py-1.5 px-4 rounded-xl border group/error",
+                        "flex items-center justify-center gap-2 py-1 px-3 rounded-lg border group/error",
                         account.validation_blocked ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20" : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20"
                     )}>
                         <div className={cn(
                             "flex items-center gap-1.5",
                             account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
                         )}>
-                            {account.validation_blocked ? <Clock className="w-3.5 h-3.5" /> : (account.quota?.is_forbidden ? <Lock className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />)}
+                            {account.validation_blocked ? <Clock className="w-3 h-3" /> : (account.quota?.is_forbidden ? <Lock className="w-3 h-3" /> : <Ban className="w-3 h-3" />)}
                             <span className={cn(
-                                "text-[11px] font-bold",
+                                "text-[10px] font-bold",
                                 account.validation_blocked ? "text-amber-700/80 dark:text-amber-400" : "text-red-700/80 dark:text-red-400"
                             )}>
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
@@ -595,7 +622,7 @@ function AccountRowContent({
                     </div>
                 ) : (
                     <div className={cn(
-                        "grid gap-x-2 gap-y-1 py-0",
+                        "grid gap-1.5 py-0",
                         (quotaWindow === 'weekly' && weeklyItems.length > 0)
                             ? (weeklyItems.length === 1 ? "grid-cols-1" : "grid-cols-2")
                             : (displayModels.length === 1 ? "grid-cols-1" : "grid-cols-2")
@@ -611,33 +638,29 @@ function AccountRowContent({
                                 />
                             ))
                         ) : (
-                            displayModels.map((model) => {
-                                const modelData = model.data;
-
-                                return (
-                                    <QuotaItem
-                                        key={model.id}
-                                        label={model.label}
-                                        percentage={modelData?.percentage || 0}
-                                        resetTime={modelData?.reset_time}
-                                        isProtected={Boolean(config?.quota_protection?.enabled && isModelProtected(account.protected_models, model.protectedKey))}
-                                        liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
-                                        Icon={MODEL_CONFIG[model.id]?.Icon || Bot}
-                                    />
-                                );
-                            })
+                            displayModels.map((model) => (
+                                <QuotaItem
+                                    key={model.id}
+                                    label={model.label}
+                                    percentage={model.percentage}
+                                    resetTime={model.resetTime}
+                                    isProtected={model.isProtected}
+                                    liveLimit={model.liveLimit}
+                                    Icon={model.Icon}
+                                />
+                            ))
                         )}
                     </div>
                 )}
             </td>
 
             {/* 最后使用时间列 */}
-            <td className="px-2 py-1 align-middle">
-                <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
+            <td className="px-2 py-0.5 align-middle">
+                <div className="flex flex-col leading-tight">
+                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
                         {new Date(account.last_used * 1000).toLocaleDateString()}
                     </span>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono whitespace-nowrap leading-tight">
+                    <span className="text-[9px] text-gray-400 dark:text-gray-500 font-mono whitespace-nowrap">
                         {new Date(account.last_used * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
@@ -645,23 +668,23 @@ function AccountRowContent({
 
             {/* 操作列 */}
             <td className={cn(
-                "px-1 py-1 sticky right-0 z-10 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
+                "px-1 py-0.5 sticky right-0 z-10 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
                 // 动态背景色处理
                 isCurrent
                     ? "bg-[#f1f6ff] dark:bg-[#1e2330]" // 接近 blue-50/50 的实色
                     : "bg-white dark:bg-base-100",
-                !isCurrent && "group-hover:bg-gray-50 dark:group-hover:bg-base-200"
+                !isCurrent ? "group-hover:bg-gray-50 dark:group-hover:bg-base-200" : ""
             )}>
-                <div className="flex flex-wrap items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity max-w-[220px] mx-auto">
+                <div className="flex items-center justify-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
                         title={t('common.details')}
                     >
                         <Info className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
                         title={t('accounts.device_fingerprint')}
                     >
@@ -671,7 +694,7 @@ function AccountRowContent({
                     {onUpdateLabel && (
                         <button
                             className={cn(
-                                "p-1.5 rounded-lg transition-all",
+                                "p-1 rounded transition-all",
                                 account.custom_label
                                     ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                                     : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
@@ -684,7 +707,7 @@ function AccountRowContent({
                     )}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
-                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onSwitch(); }}
                             onContextMenu={(e) => {
                                 e.preventDefault();
@@ -726,7 +749,7 @@ function AccountRowContent({
                     </div>
 
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', '切换到 Antigravity IDE'))}
                         disabled={isSwitching || isDisabled}
@@ -734,7 +757,7 @@ function AccountRowContent({
                         <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', '切换到 Antigravity CLI (agy)'))}
                         disabled={isSwitching || isDisabled}
@@ -743,7 +766,7 @@ function AccountRowContent({
                     </button>
                     {onWarmup && (
                         <button
-                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
+                            className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                             title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', '预热该账号'))}
                             disabled={isRefreshing || isDisabled}
@@ -752,7 +775,7 @@ function AccountRowContent({
                         </button>
                     )}
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
                         disabled={isRefreshing || isDisabled}
@@ -760,7 +783,7 @@ function AccountRowContent({
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
                         title={t('common.export')}
                     >
@@ -768,7 +791,7 @@ function AccountRowContent({
                     </button>
                     <button
                         className={cn(
-                            "p-1.5 rounded-lg transition-all",
+                            "p-1 rounded transition-all",
                             account.proxy_disabled
                                 ? "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
                                 : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
@@ -783,7 +806,7 @@ function AccountRowContent({
                         )}
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('common.delete')}
                     >
@@ -932,19 +955,19 @@ function AccountTable({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-gray-100 dark:border-base-200 bg-gray-50 dark:bg-base-200">
-                            <th className="pl-2 py-2 text-left w-8">
+                            <th className="pl-2 py-1 text-left w-7">
                                 <span className="sr-only">{t('accounts.drag_to_reorder')}</span>
                             </th>
-                            <th className="px-2 py-2 text-left w-10">
+                            <th className="px-1.5 py-1 text-left w-8">
                                 <input
                                     type="checkbox"
-                                    className="checkbox checkbox-sm rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
+                                    className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
                                     checked={accounts.length > 0 && selectedIds.size === accounts.length}
                                     onChange={onToggleAll}
                                 />
                             </th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[300px] whitespace-nowrap">{t('accounts.table.email')}</th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[340px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[320px] whitespace-nowrap">
                                 <button
                                     type="button"
                                     onClick={() => handleSortToggle('reset_time')}
@@ -962,7 +985,7 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[90px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[85px] whitespace-nowrap">
                                 <button
                                     type="button"
                                     onClick={() => handleSortToggle('last_used')}
@@ -980,9 +1003,9 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
-                        </tr >
-                    </thead >
+                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[260px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                        </tr>
+                    </thead>
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
                         <tbody className="divide-y divide-gray-100 dark:divide-base-200">
                             {sortedAccounts.map((account) => (
@@ -1021,12 +1044,12 @@ function AccountTable({
                         <table className="w-full bg-white dark:bg-base-100 shadow-2xl rounded-lg border border-blue-200 dark:border-blue-800">
                             <tbody>
                                 <tr className="bg-blue-50 dark:bg-blue-900/30">
-                                    <td className="pl-2 py-1 w-8">
-                                        <div className="flex items-center justify-center w-6 h-6 text-blue-500">
-                                            <GripVertical className="w-4 h-4" />
+                                    <td className="pl-2 py-0.5 w-7">
+                                        <div className="flex items-center justify-center w-5 h-5 text-blue-500">
+                                            <GripVertical className="w-3.5 h-3.5" />
                                         </div>
                                     </td>
-                                    <td className="px-2 py-1 w-10">
+                                    <td className="px-1.5 py-0.5 w-8">
                                         <input
                                             type="checkbox"
                                             className="checkbox checkbox-xs rounded border-2"

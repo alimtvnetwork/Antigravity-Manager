@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RotateCw, Play, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+    RotateCw,
+    Play,
+    CheckCircle2,
+    AlertCircle,
+    Sparkles,
+    Clock,
+    Gauge,
+    Award,
+    History,
+    ShieldCheck,
+} from 'lucide-react';
 import { AutoProfileSwitcherConfig } from '../../types/config';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 
@@ -192,7 +203,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </button>
                     </div>
 
-                    {rotationFeedback && (
+                    {rotationFeedback ? (
                         <div className="p-2.5 rounded-lg bg-gray-100 dark:bg-base-100 text-xs flex items-center gap-2 text-gray-800 dark:text-gray-200">
                             {rotationFeedback.startsWith('Error') ? (
                                 <AlertCircle size={14} className="text-rose-500 shrink-0" />
@@ -201,9 +212,108 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             )}
                             <span className="truncate">{rotationFeedback}</span>
                         </div>
-                    )}
+                    ) : null}
                 </div>
-            )}
+            ) : null}
+
+            {/* Prominent "How Auto Rotation Works" Guide */}
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-base-300">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-sky-50/60 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-sky-950/20 border border-blue-100 dark:border-blue-900/40 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
+                                <Sparkles className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                                    {t('settings.auto_switcher.guide_title', 'How Auto Rotation Works')}
+                                </h4>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    {t('settings.auto_switcher.guide_subtitle', 'Autonomous quota failover and zero-loss task protection mechanism')}
+                                </p>
+                            </div>
+                        </div>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                            AGM by Alim
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        {/* Step 1: Background Polling */}
+                        <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/80 dark:bg-base-200/80 border border-blue-100/60 dark:border-base-100">
+                            <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                                <Clock className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="text-xs">
+                                <div className="font-semibold text-gray-900 dark:text-gray-200">
+                                    1. {t('settings.auto_switcher.step1_title', 'Background Quota Polling')}
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
+                                    {t('settings.auto_switcher.step1_desc', 'Monitors the currently active Antigravity profile in the background at your configured polling interval (15s–600s), checking live token consumption.')}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 2: Threshold Trigger */}
+                        <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/80 dark:bg-base-200/80 border border-blue-100/60 dark:border-base-100">
+                            <div className="p-1.5 rounded-md bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
+                                <Gauge className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="text-xs">
+                                <div className="font-semibold text-gray-900 dark:text-gray-200">
+                                    2. {t('settings.auto_switcher.step2_title', 'Threshold Trigger (<10%)')}
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
+                                    {t('settings.auto_switcher.step2_desc', 'When the primary evaluated model falls below your threshold (default <10%), AGM automatically flags the account for seamless rotation.')}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 3: Best Profile Selection */}
+                        <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/80 dark:bg-base-200/80 border border-blue-100/60 dark:border-base-100">
+                            <div className="p-1.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                                <Award className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="text-xs">
+                                <div className="font-semibold text-gray-900 dark:text-gray-200">
+                                    3. {t('settings.auto_switcher.step3_title', 'Dynamic Best Profile Selection')}
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
+                                    {t('settings.auto_switcher.step3_desc', 'Ranks all available profiles by quota remaining, cooldown timer, and tier, picking the highest-capacity account automatically.')}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 4: Zero-Loss Task Resumption */}
+                        <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/80 dark:bg-base-200/80 border border-blue-100/60 dark:border-base-100">
+                            <div className="p-1.5 rounded-md bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5">
+                                <History className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="text-xs">
+                                <div className="font-semibold text-gray-900 dark:text-gray-200">
+                                    4. {t('settings.auto_switcher.step4_title', 'Zero-Loss Task Resumption')}
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
+                                    {t('settings.auto_switcher.step4_desc', 'Snapshots ongoing prompt states and workspace context before rotation, resuming tasks upon relaunch without losing your coding progress.')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Step 5: How to enable & leave in background */}
+                    <div className="p-2.5 rounded-lg bg-blue-500/10 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/40 flex items-start gap-2.5">
+                        <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                        <div className="text-xs leading-normal">
+                            <span className="font-semibold text-blue-950 dark:text-blue-200">
+                                {t('settings.auto_switcher.step5_title', 'How to use: ')}
+                            </span>
+                            <span className="text-blue-900/80 dark:text-blue-300">
+                                {t('settings.auto_switcher.step5_desc', 'Toggle on the Auto Profile Switcher switch above. Keep AGM by Alim running in the background or minimized to the system tray. Your editor will automatically cycle between fresh quota pools 24/7 without losing task context.')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.15.0 (2026-09-17)**:
+        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:
+            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to "AGM by Alim", and executable output to "Anti-Gravity Tools by Alim".
+            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.
+            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.
+            -   **Attribution & Manifest Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution and sincere thanks to upstream lbjlaq/Antigravity-Manager.
     *   **v4.14.0 (2026-09-17)**:
         -   **[Ubuntu IDE Discovery Diagnostics & Multi-Instance Executable Cloning] Enhanced IDE Detection, Multi-Process Isolation, and Structured Diagnostics**:
             -   **Ubuntu/Linux Multi-Path Discovery Scanner**: Broadened search heuristics across standard PATH, Snap, Flatpak, ~/.local/bin, desktop entries, and AppImages, resolving .desktop Exec quoting and field-code issues.

@@ -14,7 +14,7 @@ interface InstanceState {
     isLoading: boolean;
     error: string | null;
 
-    fetchInstances: () => Promise<void>;
+    fetchInstances: (silent?: boolean) => Promise<void>;
     fetchSwitcherStatus: () => Promise<void>;
     updateSwitcherConfig: (config: AutoProfileSwitcherConfig) => Promise<void>;
     triggerManualRotation: () => Promise<string>;
@@ -37,15 +37,18 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchInstances: async () => {
+    fetchInstances: async (silent: boolean = false) => {
+        if (!silent) {
+            set({ isLoading: true, error: null });
+        }
         try {
             const [instances, activeId] = await Promise.all([
                 instanceService.listInstances(),
                 instanceService.getActiveInstance(),
             ]);
-            set({ instances, activeInstanceId: activeId, error: null });
+            set({ instances, activeInstanceId: activeId, isLoading: false, error: null });
         } catch (err: any) {
-            set({ error: err?.toString() || 'Failed to fetch instances' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to fetch instances' });
         }
     },
 

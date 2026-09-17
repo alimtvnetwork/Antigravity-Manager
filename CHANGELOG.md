@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.15.0 (2026-09-17)**:
+        -   **[Branding, Quota UI & Instance Management] AGM by Alim Branding, UI Compactness, and Automatic Rotation Guidance**:
+            -   **AGM by Alim Branding**: Standardized window title, Navbar title, and page titles to "AGM by Alim", and executable output to "Anti-Gravity Tools by Alim".
+            -   **Accounts Quota UI Compactness**: Consolidated multi-badge model quotas into unified Gemini and Claude shared buckets, streamlining vertical and horizontal density.
+            -   **Instance Management & Auto-Rotation Guidance**: Fixed instance discovery and runtime interactions, and added clear automatic rotation documentation in Settings.
+            -   **Attribution & Manifest Cleanup**: Removed Chinese comments from backend manifests and release tools, giving full attribution and sincere thanks to upstream lbjlaq/Antigravity-Manager.
+
     *   **v4.14.0 (2026-09-17)**:
         -   **[Ubuntu IDE 路径智能探测与多实例可执行文件克隆] 全面增强跨平台 IDE 发现、隔离运行与结构化诊断**:
             -   **Ubuntu/Linux 多路径诊断扫描**: 深度扩展 Linux IDE 候选路径（标准路径、PATH、Snap、Flatpak、~/.local/bin、桌面条目及 AppImage 等），修复 .desktop Exec 引号与字段代码解析缺陷，彻底杜绝 Ubuntu 找不到 Antigravity 路径问题。
