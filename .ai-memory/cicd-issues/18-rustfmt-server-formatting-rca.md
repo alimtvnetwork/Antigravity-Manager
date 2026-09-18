@@ -59,7 +59,7 @@ Because local development occurred on Windows without a locally installed `cargo
    - In `detect_running_projects()`, `find_pids_for_data_dir()`, `serde_json::from_str()`, and `workspace_storage_path` assignments required multi-line line wrapping matching `rustfmt` indentation heuristics.
 3. **`src-tauri/src/proxy/server.rs`:**
    - In `admin_rotate_account()`, the 101-character line `error: "Another switch or rotation operation is already in progress".to_string()` exceeded the line boundary by 1 character.
-   - In `admin_list_repo_projects()` and `admin_list_repo_prompts()`, the return type signatures `Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>` brought the signature line length to 101 characters, requiring `rustfmt` to place the function body opening brace `{` on a newline.
+   - In `admin_list_repo_projects()`, the return type signature brought the line length to 101 characters with `{`, requiring `rustfmt` to place the opening brace on a newline. Conversely, `admin_list_repo_prompts()` has 7 characters in "prompts" (versus 8 in "projects"), totaling exactly 100 characters on a single line with ` {`, meaning `rustfmt` keeps the opening brace on the same line.
 
 ### 3. Code Fix & Resolution
 The formatting in all three affected Rust source files was updated to conform precisely to `rustfmt` standards:
@@ -73,7 +73,7 @@ The formatting in all three affected Rust source files was updated to conform pr
    - Wrapped `find_pids_for_data_dir`, `serde_json::from_str`, and `workspace_storage_path` assignments.
 3. **`src-tauri/src/proxy/server.rs`:**
    - Wrapped `error: "Another switch or rotation operation is already in progress"` and `.to_string(),`.
-   - Placed `{` on a newline for `admin_list_repo_projects` and `admin_list_repo_prompts`.
+   - Placed `{` on a newline for `admin_list_repo_projects()` (101 chars) and kept `{` on the same line for `admin_list_repo_prompts()` (100 chars).
 
 ### 4. Verification & Prevention
 1. **Verification:**

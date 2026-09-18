@@ -1525,8 +1525,7 @@ async fn admin_list_repo_projects() -> Result<impl IntoResponse, (StatusCode, Js
     }
 }
 
-async fn admin_list_repo_prompts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
-{
+async fn admin_list_repo_prompts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     match crate::modules::repo_db::list_backed_up_prompts() {
         Ok(prompts) => Ok(Json(prompts)),
         Err(e) => Err((
