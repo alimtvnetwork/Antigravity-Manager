@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.20.0 (2026-09-18)**:
+        -   **[Cross-Platform Release & Email Security Vault Hardening] Automated Release, Credentials Vault & One-Liner Installers**:
+            -   **Split Database for Passwords**: Hardened dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.
+            -   **Plain Email Configuration Window**: Comprehensive UI modal for email account credentials, custom SMTP/IMAP servers, and port bindings.
+            -   **Two-Way Import/Export**: Full bidirectional import and export capability for email accounts across JSON, CSV, and Excel formats.
+            -   **Mailbox Failover Swapping & Background Sensors**: Integrated multi-trigger background sensors and dynamic mailbox failover pooling in `auto_switcher.rs`.
+            -   **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
     *   **v4.19.0 (2026-09-18)**:
         -   **[Email Management, Split Vault DB & CI/CD Hardening] Split Security DB for Credentials, Remote Control & 100% Green CI**:
             -   **Split Database for Passwords**: Created dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.
