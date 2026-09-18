@@ -490,11 +490,17 @@ pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, St
 pub fn delete_email_account(account_id: &str) -> Result<(), String> {
     let vault_conn = connect_vault_db()?;
     vault_conn
-        .execute("DELETE FROM email_accounts WHERE id = ?", params![account_id])
+        .execute(
+            "DELETE FROM email_accounts WHERE id = ?",
+            params![account_id],
+        )
         .map_err(|e| format!("Failed to delete email account: {}", e))?;
 
     if let Ok(pass_conn) = connect_passwords_db() {
-        let _ = pass_conn.execute("DELETE FROM email_credentials WHERE account_id = ?", params![account_id]);
+        let _ = pass_conn.execute(
+            "DELETE FROM email_credentials WHERE account_id = ?",
+            params![account_id],
+        );
     }
     Ok(())
 }
@@ -530,7 +536,8 @@ pub fn get_account_secret(account_id: &str) -> Result<String, String> {
         .optional()
         .map_err(|e| format!("Failed to query credentials: {}", e))?;
 
-    let cred = row.ok_or_else(|| format!("No credential record found for account '{}'", account_id))?;
+    let cred =
+        row.ok_or_else(|| format!("No credential record found for account '{}'", account_id))?;
     decrypt_secret(&cred.0, &cred.1)
 }
 
@@ -654,11 +661,31 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
 
     let is_en = if settings.is_enabled { 1 } else { 0 };
     let n_quota = if settings.notify_on_quota_drop { 1 } else { 0 };
-    let n_ws = if settings.notify_on_workspace_switch { 1 } else { 0 };
-    let n_idle = if settings.notify_on_idle_workspace { 1 } else { 0 };
-    let a_prompt = if settings.allow_remote_prompt_execution { 1 } else { 0 };
-    let a_cli = if settings.allow_remote_cli_execution { 1 } else { 0 };
-    let a_inst = if settings.allow_remote_instance_rotation { 1 } else { 0 };
+    let n_ws = if settings.notify_on_workspace_switch {
+        1
+    } else {
+        0
+    };
+    let n_idle = if settings.notify_on_idle_workspace {
+        1
+    } else {
+        0
+    };
+    let a_prompt = if settings.allow_remote_prompt_execution {
+        1
+    } else {
+        0
+    };
+    let a_cli = if settings.allow_remote_cli_execution {
+        1
+    } else {
+        0
+    };
+    let a_inst = if settings.allow_remote_instance_rotation {
+        1
+    } else {
+        0
+    };
 
     conn.execute(
         "INSERT INTO email_notification_settings

@@ -108,9 +108,19 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 
     if lower_subj.starts_with("instance: new") || lower_subj.starts_with("instance: create") {
-        let profile = body.trim().lines().next().unwrap_or("email-spawned").trim().to_string();
+        let profile = body
+            .trim()
+            .lines()
+            .next()
+            .unwrap_or("email-spawned")
+            .trim()
+            .to_string();
         return InboundAction::InstanceCreate {
-            profile_name: if profile.is_empty() { "email-spawned".to_string() } else { profile },
+            profile_name: if profile.is_empty() {
+                "email-spawned".to_string()
+            } else {
+                profile
+            },
         };
     }
 
@@ -156,7 +166,13 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
             "project-prompt:".len()
         };
         let project_name = first_line[prefix_len..].trim().to_string();
-        let prompt_body = body.lines().skip(1).collect::<Vec<&str>>().join("\n").trim().to_string();
+        let prompt_body = body
+            .lines()
+            .skip(1)
+            .collect::<Vec<&str>>()
+            .join("\n")
+            .trim()
+            .to_string();
         return InboundAction::PromptInjection {
             project_name,
             prompt: prompt_body,
@@ -187,7 +203,13 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
             "command:".len()
         };
         let target_ip = first_line[prefix_len..].trim().to_string();
-        let cmd_body = body.lines().skip(1).collect::<Vec<&str>>().join("\n").trim().to_string();
+        let cmd_body = body
+            .lines()
+            .skip(1)
+            .collect::<Vec<&str>>()
+            .join("\n")
+            .trim()
+            .to_string();
         return InboundAction::CliExecution {
             target_ip,
             command: cmd_body,
@@ -195,7 +217,10 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 
     InboundAction::Ignored {
-        reason: format!("Subject '{}' does not match any recognized command pattern", subject),
+        reason: format!(
+            "Subject '{}' does not match any recognized command pattern",
+            subject
+        ),
     }
 }
 
@@ -212,7 +237,10 @@ pub fn execute_inbound_action(
     let mut result_summary;
 
     match action {
-        InboundAction::PromptInjection { project_name, prompt } => {
+        InboundAction::PromptInjection {
+            project_name,
+            prompt,
+        } => {
             action_str = "prompt_injection".to_string();
             // Match against running projects in repo_db
             let projects = crate::modules::repo_db::list_running_projects()?;
@@ -230,7 +258,10 @@ pub fn execute_inbound_action(
                         rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &prompt, now, now],
                     );
                 }
-                result_summary = format!("Prompt injected into project '{}' (id: {})", proj.repo_name, p_id);
+                result_summary = format!(
+                    "Prompt injected into project '{}' (id: {})",
+                    proj.repo_name, p_id
+                );
 
                 // Bidirectional confirmation email receipt
                 let escaped_prompt = html_escape(&prompt);
@@ -241,7 +272,12 @@ pub fn execute_inbound_action(
 <p>Antigravity is currently executing this instruction.</p>"#,
                     proj.repo_name, escaped_prompt
                 );
-                let html = wrap_card("Prompt Injection Receipt", &reply_content, local_machine_name, local_machine_ip);
+                let html = wrap_card(
+                    "Prompt Injection Receipt",
+                    &reply_content,
+                    local_machine_name,
+                    local_machine_ip,
+                );
                 let _ = email_sender::dispatch_email_with_failover(
                     &format!("[AGM Receipt] Prompt Injected: {}", proj.repo_name),
                     &html,
@@ -249,8 +285,12 @@ pub fn execute_inbound_action(
                 );
             } else {
                 status = "rejected".to_string();
-                let available_names: Vec<String> = projects.iter().map(|p| p.repo_name.clone()).collect();
-                result_summary = format!("Project '{}' not found among active running projects", project_name);
+                let available_names: Vec<String> =
+                    projects.iter().map(|p| p.repo_name.clone()).collect();
+                result_summary = format!(
+                    "Project '{}' not found among active running projects",
+                    project_name
+                );
 
                 let reply_content = format!(
                     r#"<p><span class="badge badge-warn">PROJECT NOT FOUND</span></p>
@@ -259,9 +299,18 @@ pub fn execute_inbound_action(
 <ul>{}</ul>
 <p>Please reply with <code>Project: &lt;exact-name&gt;</code> to try again.</p>"#,
                     project_name,
-                    available_names.iter().map(|n| format!("<li>{}</li>", n)).collect::<Vec<_>>().join("")
+                    available_names
+                        .iter()
+                        .map(|n| format!("<li>{}</li>", n))
+                        .collect::<Vec<_>>()
+                        .join("")
                 );
-                let html = wrap_card("Prompt Injection Failed", &reply_content, local_machine_name, local_machine_ip);
+                let html = wrap_card(
+                    "Prompt Injection Failed",
+                    &reply_content,
+                    local_machine_name,
+                    local_machine_ip,
+                );
                 let _ = email_sender::dispatch_email_with_failover(
                     &format!("[AGM Alert] Project Not Found: {}", project_name),
                     &html,
@@ -289,7 +338,12 @@ pub fn execute_inbound_action(
 <p>Command was skipped to prevent execution on wrong node.</p>"#,
                     target_ip, local_machine_ip
                 );
-                let html = wrap_card("Execution Skipped", &reply_content, local_machine_name, local_machine_ip);
+                let html = wrap_card(
+                    "Execution Skipped",
+                    &reply_content,
+                    local_machine_name,
+                    local_machine_ip,
+                );
                 let _ = email_sender::dispatch_email_with_failover(
                     "[AGM Alert] Command IP Mismatch",
                     &html,
@@ -321,7 +375,7 @@ pub fn execute_inbound_action(
         }
         InboundAction::InstanceCreate { profile_name } => {
             action_str = "instance_create".to_string();
-            let create_res = crate::modules::instance::create_instance(&profile_name);
+            let create_res = crate::modules::instance::create_instance(profile_name.clone());
             result_summary = match create_res {
                 Ok(_) => format!("Spawned instance profile '{}'", profile_name),
                 Err(e) => format!("Failed to spawn instance: {}", e),
@@ -333,7 +387,12 @@ pub fn execute_inbound_action(
 <p>You can launch it anytime via Antigravity Manager.</p>"#,
                 profile_name, local_machine_name
             );
-            let html = wrap_card("Instance Created", &reply_content, local_machine_name, local_machine_ip);
+            let html = wrap_card(
+                "Instance Created",
+                &reply_content,
+                local_machine_name,
+                local_machine_ip,
+            );
             let _ = email_sender::dispatch_email_with_failover(
                 &format!("[AGM Response] Instance Created: {}", profile_name),
                 &html,
@@ -344,9 +403,14 @@ pub fn execute_inbound_action(
             action_str = "rotate".to_string();
             let _rotate_res = crate::modules::auto_switcher::check_and_rotate_if_needed();
             let current_account = crate::modules::account::get_current_account().unwrap_or(None);
-            let current_email = current_account.map(|a| a.email).unwrap_or_else(|| "Unknown".to_string());
+            let current_email = current_account
+                .map(|a| a.email)
+                .unwrap_or_else(|| "Unknown".to_string());
 
-            result_summary = format!("Triggered account rotation. Current profile: {}", current_email);
+            result_summary = format!(
+                "Triggered account rotation. Current profile: {}",
+                current_email
+            );
             let reply_content = format!(
                 r#"<p><span class="badge badge-info">PROFILE ROTATED</span></p>
 <p>Account rotation was triggered remotely via mailbox command.</p>
@@ -354,7 +418,12 @@ pub fn execute_inbound_action(
 <p>Node: <strong>{}</strong> ({})</p>"#,
                 current_email, local_machine_name, local_machine_ip
             );
-            let html = wrap_card("Account Rotation Report", &reply_content, local_machine_name, local_machine_ip);
+            let html = wrap_card(
+                "Account Rotation Report",
+                &reply_content,
+                local_machine_name,
+                local_machine_ip,
+            );
             let _ = email_sender::dispatch_email_with_failover(
                 "[AGM Response] Account Rotation Completed",
                 &html,
@@ -399,9 +468,16 @@ pub fn execute_inbound_action(
 <p>Found saved prompt matching <strong>{}</strong> and injected into workspace <strong>{}</strong>.</p>
 <div class="cmd">{}</div>
 <p>Antigravity is currently executing this instruction.</p>"#,
-                        html_escape(&prompt_query), proj.repo_name, escaped_prompt
+                        html_escape(&prompt_query),
+                        proj.repo_name,
+                        escaped_prompt
                     );
-                    let html = wrap_card("Named Prompt Execution Receipt", &reply_content, local_machine_name, local_machine_ip);
+                    let html = wrap_card(
+                        "Named Prompt Execution Receipt",
+                        &reply_content,
+                        local_machine_name,
+                        local_machine_ip,
+                    );
                     let _ = email_sender::dispatch_email_with_failover(
                         &format!("[AGM Receipt] Named Prompt Executed: {}", prompt_query),
                         &html,
@@ -409,13 +485,19 @@ pub fn execute_inbound_action(
                     );
                 } else {
                     status = "rejected".to_string();
-                    result_summary = format!("Prompt found but no active running projects available");
+                    result_summary =
+                        format!("Prompt found but no active running projects available");
                     let reply_content = format!(
                         r#"<p><span class="badge badge-warn">NO RUNNING WORKSPACES</span></p>
 <p>Found saved prompt matching <strong>{}</strong>, but no active workspaces are currently running to execute it.</p>"#,
                         html_escape(&prompt_query)
                     );
-                    let html = wrap_card("Named Prompt Execution Failed", &reply_content, local_machine_name, local_machine_ip);
+                    let html = wrap_card(
+                        "Named Prompt Execution Failed",
+                        &reply_content,
+                        local_machine_name,
+                        local_machine_ip,
+                    );
                     let _ = email_sender::dispatch_email_with_failover(
                         "[AGM Alert] No Active Workspaces",
                         &html,
@@ -431,7 +513,11 @@ pub fn execute_inbound_action(
                     .map(|p| {
                         let short_id = &p.id[..8.min(p.id.len())];
                         let short_content: String = p.prompt_content.chars().take(40).collect();
-                        format!("<li><code>{}</code>: {}...</li>", short_id, html_escape(&short_content))
+                        format!(
+                            "<li><code>{}</code>: {}...</li>",
+                            short_id,
+                            html_escape(&short_content)
+                        )
                     })
                     .collect();
 
@@ -442,9 +528,18 @@ pub fn execute_inbound_action(
 <ul>{}</ul>
 <p>Reply with <code>prompt: &lt;keyword-or-id&gt;</code> or send a new prompt with <code>Project: &lt;name&gt;</code>.</p>"#,
                     html_escape(&prompt_query),
-                    if available_snippets.is_empty() { "<li>No saved prompts found</li>".to_string() } else { available_snippets.join("") }
+                    if available_snippets.is_empty() {
+                        "<li>No saved prompts found</li>".to_string()
+                    } else {
+                        available_snippets.join("")
+                    }
                 );
-                let html = wrap_card("Prompt Not Found", &reply_content, local_machine_name, local_machine_ip);
+                let html = wrap_card(
+                    "Prompt Not Found",
+                    &reply_content,
+                    local_machine_name,
+                    local_machine_ip,
+                );
                 let _ = email_sender::dispatch_email_with_failover(
                     &format!("[AGM Alert] Prompt Not Found: {}", prompt_query),
                     &html,
@@ -467,10 +562,19 @@ pub fn execute_inbound_action(
                 local_machine_name,
                 local_machine_ip,
                 proj_names.len(),
-                proj_names.iter().map(|n| format!("<li>{}</li>", n)).collect::<Vec<_>>().join(""),
+                proj_names
+                    .iter()
+                    .map(|n| format!("<li>{}</li>", n))
+                    .collect::<Vec<_>>()
+                    .join(""),
                 prompts.len()
             );
-            let html = wrap_card("Node Status Report", &reply_content, local_machine_name, local_machine_ip);
+            let html = wrap_card(
+                "Node Status Report",
+                &reply_content,
+                local_machine_name,
+                local_machine_ip,
+            );
             let _ = email_sender::dispatch_email_with_failover(
                 "[AGM Status Report] Running Projects & Queue",
                 &html,
@@ -480,7 +584,8 @@ pub fn execute_inbound_action(
         }
         InboundAction::HelpRequest => {
             action_str = "help".to_string();
-            let (subj, html) = email_sender::render_help_email(local_machine_name, local_machine_ip);
+            let (subj, html) =
+                email_sender::render_help_email(local_machine_name, local_machine_ip);
             let _ = email_sender::dispatch_email_with_failover(&subj, &html, &[msg.from.clone()]);
             result_summary = format!("Dispatched help cheat sheet to '{}'", msg.from);
         }
@@ -564,7 +669,12 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
     if output.status.success() {
         Ok(stdout)
     } else {
-        Err(format!("Error (exit code {:?}):\n{}\n{}", output.status.code(), stdout, stderr))
+        Err(format!(
+            "Error (exit code {:?}):\n{}\n{}",
+            output.status.code(),
+            stdout,
+            stderr
+        ))
     }
 }
 
@@ -592,7 +702,11 @@ pub fn poll_unread_messages(
     let _ = read_imap_response(&mut stream);
 
     // Login
-    send_imap_cmd(&mut stream, "A01", &format!("LOGIN \"{}\" \"{}\"", account.email, password))?;
+    send_imap_cmd(
+        &mut stream,
+        "A01",
+        &format!("LOGIN \"{}\" \"{}\"", account.email, password),
+    )?;
     let login_resp = read_imap_response(&mut stream)?;
     if !login_resp.contains("OK") {
         return Err(format!("IMAP login failed: {}", login_resp));
@@ -622,7 +736,14 @@ pub fn poll_unread_messages(
     let mut messages = Vec::new();
     for (idx, id) in ids.iter().enumerate() {
         let tag = format!("A{:02}", idx + 10);
-        send_imap_cmd(&mut stream, &tag, &format!("FETCH {} (BODY[HEADER.FIELDS (SUBJECT FROM MESSAGE-ID)] BODY[TEXT])", id))?;
+        send_imap_cmd(
+            &mut stream,
+            &tag,
+            &format!(
+                "FETCH {} (BODY[HEADER.FIELDS (SUBJECT FROM MESSAGE-ID)] BODY[TEXT])",
+                id
+            ),
+        )?;
         let fetch_resp = read_imap_response(&mut stream)?;
         if let Some(msg) = parse_raw_fetch_response(&fetch_resp) {
             messages.push(msg);
@@ -663,7 +784,12 @@ fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
         }
     }
 
-    let body = resp.split("\r\n\r\n").nth(1).unwrap_or("").trim().to_string();
+    let body = resp
+        .split("\r\n\r\n")
+        .nth(1)
+        .unwrap_or("")
+        .trim()
+        .to_string();
 
     Some(RawEmailMessage {
         message_id,
@@ -681,7 +807,10 @@ mod tests {
     fn test_parse_project_command_with_re_prefix() {
         let action = parse_email_command("Re: Project: my-awesome-app", "Please fix bug #12");
         match action {
-            InboundAction::PromptInjection { project_name, prompt } => {
+            InboundAction::PromptInjection {
+                project_name,
+                prompt,
+            } => {
                 assert_eq!(project_name, "my-awesome-app");
                 assert_eq!(prompt, "Please fix bug #12");
             }

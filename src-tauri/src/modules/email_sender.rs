@@ -206,7 +206,12 @@ fn build_mime_message(
 // HTML Email Templates
 // ---------------------------------------------------------------------------
 
-fn wrap_email_card(title: &str, content_html: &str, machine_name: &str, machine_ip: &str) -> String {
+fn wrap_email_card(
+    title: &str,
+    content_html: &str,
+    machine_name: &str,
+    machine_ip: &str,
+) -> String {
     format!(
         r#"<!DOCTYPE html>
 <html>
@@ -253,7 +258,10 @@ pub fn render_quota_drop_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
-    let subject = format!("[AGM Alert] Low Quota Warning ({:.1}%) - {}", current_quota, email);
+    let subject = format!(
+        "[AGM Alert] Low Quota Warning ({:.1}%) - {}",
+        current_quota, email
+    );
     let content = format!(
         r#"<p><span class="badge badge-warn">CREDIT THRESHOLD TRIGGER</span></p>
 <p>The active profile <strong>{}</strong> has dropped to <strong>{:.1}%</strong> remaining credit, falling below the configured safety threshold of <strong>{}%</strong>.</p>
@@ -280,7 +288,12 @@ pub fn render_workspace_switch_email(
 <p>Running prompts and repository states were safely snapshotted to <code>repo_prompts.db</code>.</p>"#,
         from_instance, to_instance, reason
     );
-    let html = wrap_email_card("Profile Migration Notice", &content, machine_name, machine_ip);
+    let html = wrap_email_card(
+        "Profile Migration Notice",
+        &content,
+        machine_name,
+        machine_ip,
+    );
     (subject, html)
 }
 
@@ -305,7 +318,12 @@ pub fn render_idle_projects_email(
 <p>Antigravity Manager will read your reply and inject the prompt automatically.</p>"#,
         proj_list
     );
-    let html = wrap_email_card("Idle Projects Notification", &content, machine_name, machine_ip);
+    let html = wrap_email_card(
+        "Idle Projects Notification",
+        &content,
+        machine_name,
+        machine_ip,
+    );
     (subject, html)
 }
 
@@ -330,7 +348,12 @@ pub fn render_exec_result_email(
 <pre style="background: #0f172a; color: #f8fafc; padding: 14px; border-radius: 8px; overflow-x: auto; font-size: 12px;">{}</pre>"#,
         status_badge, cmd, exit_code, output
     );
-    let html = wrap_email_card("Command Execution Report", &content, machine_name, machine_ip);
+    let html = wrap_email_card(
+        "Command Execution Report",
+        &content,
+        machine_name,
+        machine_ip,
+    );
     (subject, html)
 }
 
@@ -387,7 +410,12 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
 </table>"#,
         machine_ip
     );
-    let html = wrap_email_card("Remote Instructions Cheat Sheet", &content, machine_name, machine_ip);
+    let html = wrap_email_card(
+        "Remote Instructions Cheat Sheet",
+        &content,
+        machine_name,
+        machine_ip,
+    );
     (subject, html)
 }
 
@@ -397,7 +425,8 @@ mod tests {
 
     #[test]
     fn test_template_rendering() {
-        let (subj, html) = render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
+        let (subj, html) =
+            render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
         assert!(html.contains("192.168.1.50"));
     }

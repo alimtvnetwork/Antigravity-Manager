@@ -85,7 +85,9 @@ pub fn start_email_watcher() {
         return;
     }
 
-    crate::modules::logger::log_info("[EmailWatcher] Starting background telemetry & mailbox watcher");
+    crate::modules::logger::log_info(
+        "[EmailWatcher] Starting background telemetry & mailbox watcher",
+    );
 
     tokio::spawn(async move {
         let mut loop_tick: u32 = 0;
@@ -133,7 +135,8 @@ pub fn start_email_watcher() {
                 if settings.notify_on_quota_drop {
                     let is_quota_check_due = now - last_quota_alert > 600; // 10 min cooldown
                     if is_quota_check_due {
-                        check_quota_drop_sensor(&settings, &m_name, &m_ip, &mut last_quota_alert).await;
+                        check_quota_drop_sensor(&settings, &m_name, &m_ip, &mut last_quota_alert)
+                            .await;
                     }
                 }
 
@@ -172,11 +175,10 @@ async fn poll_inbox_cycle(m_name: &str, m_ip: &str) {
 
     // Spawn blocking for socket IMAP calls
     let acc_clone = account.clone();
-    let unread = tokio::task::spawn_blocking(move || {
-        email_inbound::poll_unread_messages(&acc_clone, 5)
-    })
-    .await
-    .unwrap_or_else(|_| Ok(Vec::new()));
+    let unread =
+        tokio::task::spawn_blocking(move || email_inbound::poll_unread_messages(&acc_clone, 5))
+            .await
+            .unwrap_or_else(|_| Ok(Vec::new()));
 
     if let Ok(messages) = unread {
         for msg in messages {
@@ -232,7 +234,11 @@ async fn check_quota_drop_sensor(
                         m_name,
                         m_ip,
                     );
-                    let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
+                    let _ = email_sender::dispatch_email_with_failover(
+                        &subj,
+                        &html,
+                        &active_recipients,
+                    );
                     *last_alert = Utc::now().timestamp();
                     return;
                 }
