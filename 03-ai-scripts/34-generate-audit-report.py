@@ -106,7 +106,7 @@ Empty files: 0.
 7. **Unit 7: React 19 Frontend SPA** (`src/App.tsx`, `pages/`, `stores/`, `components/`)
    - Single-page application with Zustand stores, TailwindCSS styling, and Recharts metrics.
 
-### 3.2 Diff Against Subtask Specifications (`.lovable/plans/subtasks/04-reverse-engineering/`)
+### 3.2 Diff Against Subtask Specifications (`.ai-memory/plans/subtasks/04-reverse-engineering/`)
 - **Subtask 01 (`01-proxy-core-and-handlers.md`):** Claimed 116 files in scope. The resulting spec (`03-proxy-engine-and-protocols.md`) documented high-level concepts but omitted streaming state machines, concrete buffer configurations, and exact FNV-1a hashing signatures.
 - **Subtask 02 (`02-modules-storage-and-security.md`):** Claimed 49 files in scope. The resulting spec (`04-modules-storage-and-persistence.md`) omitted the entire `ip_whitelist` table, inverted columns in `request_logs`, and misnamed the IP access log table.
 - **Subtask 03 (`03-frontend-ui-and-state.md`):** Claimed 174 files in scope. The resulting spec (`05-frontend-ui-and-state-management.md` and `06-api-contracts-and-ipc-registry.md`) invented a non-existent `useProxyStore.ts`, misstated the desktop navigation layout as a sidebar, and omitted over 50 registered IPC commands.
@@ -147,7 +147,7 @@ Per file, coder decisions were classified into four categories:
 | Frontend State Stores | `05-frontend-ui-and-state-management.md` | `src/stores/` | ❌ Hallucination (`ProxyStore` documented, does not exist in code) |
 
 ### 5.2 Mirror Drift Assessment
-- `.lovable/coding-guidelines.md` is the master 71KB guideline mirror. It mandates strict boolean prefixing (`is_`, `has_`), positive polarity, and early return guards. The app specs in `02-spec/21-app/` fail to cite or bind to this document.
+- `.ai-memory/coding-guidelines.md` is the master 71KB guideline mirror. It mandates strict boolean prefixing (`is_`, `has_`), positive polarity, and early return guards. The app specs in `02-spec/21-app/` fail to cite or bind to this document.
 - `02-spec/17-consolidated-guidelines/` mirrors error architectures and database conventions. The application specifications deviate from standard repo database rules (SQLite tables in `proxy_logs.db` use plural snake_case `request_logs`, `ip_access_logs`, `ip_blacklist`). While this reflects actual desktop proxy implementation, the deviation is not documented as an authorized exception under `02-spec/01-spec-authoring-guide/11-exceptions.md`.
 
 ---
@@ -186,7 +186,7 @@ Rebuilt directly from the repository filesystem (`02-spec/02-coding-guidelines/`
 | database conventions | `02-spec/04-database-conventions/` | No | none |
 | ci pipeline + guards | `02-spec/12-cicd-pipeline-workflows/02-ci-pipeline.md` | No | none |
 
-**Consolidated Coding Guidelines Audit:** `.lovable/coding-guidelines.md` was audited. It enforces zero explicit `true` evaluations and non-mixed boolean polarity. However, none of the 6 files in `02-spec/21-app/` reference or bind to this document.
+**Consolidated Coding Guidelines Audit:** `.ai-memory/coding-guidelines.md` was audited. It enforces zero explicit `true` evaluations and non-mixed boolean polarity. However, none of the 6 files in `02-spec/21-app/` reference or bind to this document.
 **Anti-Garbage Naming Audit:** PASSED. No generic identifiers (`temp`, `data`, `obj`, `comp_100`, `Input100`, `TestHandleComp100`) were introduced into the specification files.
 
 ---
@@ -349,7 +349,7 @@ To evaluate whether an autonomous, blind AI could implement Antigravity-Manager 
 - **Path:** `02-spec/21-app/01-index.md`
 - **Dimension:** Coding-guideline checklist (Dimension 3)
 - **Points:** -10
-- **Description:** Zero cross-references or bindings to repository coding guidelines in `02-spec/02-coding-guidelines/` or `.lovable/coding-guidelines.md`.
+- **Description:** Zero cross-references or bindings to repository coding guidelines in `02-spec/02-coding-guidelines/` or `.ai-memory/coding-guidelines.md`.
 - **Remedy:** Add normative binding table in `01-index.md` linking to Rust, TS, and boolean guidelines.
 
 ### Finding F-009 (Major — Empty App DB and UI Folders)
@@ -400,7 +400,7 @@ Initial baseline audit run (`v1`). No prior findings exist to disposition.
 - [x] All 10 phases of RULE 4 executed in strict sequential order.
 - [x] All 12 dimensions evaluated and scored with evidence and point deductions.
 - [x] Coding guideline checklist rebuilt from filesystem with 27 topics and duplicate checks.
-- [x] Master guideline mirror `.lovable/coding-guidelines.md` audited.
+- [x] Master guideline mirror `.ai-memory/coding-guidelines.md` audited.
 - [x] Anti-garbage naming verified across all spec documents.
 - [x] Reference integrity metrics table contains exact numeric counts.
 - [x] Blind-buildability trace maps concrete failure points.

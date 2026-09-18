@@ -6,7 +6,7 @@
 ## 🎯 Actionable CI/CD & Agent Checklist
 
 - [ ] `/goal` Read and understand all numbered specifications under `01-spec-authoring-guide/`.
-- [ ] `/learn` Adhere strictly to `.lovable/folder-structure.md` and `.lovable/strictly-avoid.md`.
+- [ ] `/learn` Adhere strictly to `.ai-memory/folder-structure.md` and `.ai-memory/strictly-avoid.md`.
 - [ ] `/goal` Verify zero explicit `true` boolean evaluations and no mixed-polarity conditionals.
 - [ ] `/learn` Run all local verification linters via `python 03-ai-scripts/06-cicd-local-runner.py`.
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-This is the **definitive guide** for any AI agent or human contributor to understand, navigate, create, and maintain specifications in this repository. It covers folder structure, naming conventions, required files, templates, cross-referencing, scoring metrics, reliability validation, and the `.lovable/` institutional memory system — everything needed to produce spec-compliant documentation from scratch.
+This is the **definitive guide** for any AI agent or human contributor to understand, navigate, create, and maintain specifications in this repository. It covers folder structure, naming conventions, required files, templates, cross-referencing, scoring metrics, reliability validation, and the `.ai-memory/` institutional memory system — everything needed to produce spec-compliant documentation from scratch.
 
 ### How to Write an Overview (`01-index.md`)
 
@@ -192,7 +192,7 @@ App and WordPress projects use `02-fundamentals.md` as the first content file, t
 | 04 | [06-cli-module-template.md](./06-cli-module-template.md) | Template | Step-by-step template for CLI tool spec modules (3-folder pattern) |
 | 05 | [07-app-project-template.md](./07-app-project-template.md) | Template | Template for app/WordPress projects (fundamentals + features + issues) |
 | 06 | [08-non-cli-module-template.md](./08-non-cli-module-template.md) | Template | Template for flat/non-CLI modules (research, utilities, standards) |
-| 07 | [09-memory-folder-guide.md](./09-memory-folder-guide.md) | Guide | Structure and conventions for the `.lovable/memories/` tree |
+| 07 | [09-memory-folder-guide.md](./09-memory-folder-guide.md) | Guide | Structure and conventions for the `.ai-memory/memories/` tree |
 | 08 | [10-cross-references.md](./10-cross-references.md) | Rules | How to write cross-references, relative paths, and link integrity rules |
 | 09 | [11-exceptions.md](./11-exceptions.md) | Rules | All known exception cases with folder structure examples |
 | 10 | [12-mandatory-linter-infra03-structure.md](./12-mandatory-linter-infrastructure.md) | Rules | Mandatory linter scripts — AI must verify presence before validation |
@@ -200,12 +200,12 @@ App and WordPress projects use `02-fundamentals.md` as the first content file, t
 
 ## File Naming Convention (Quick Reference)
 
-All files and folders in `spec/` and `.lovable/` MUST use **lowercase kebab-case**:
+All files and folders in `spec/` and `.ai-memory/` MUST use **lowercase kebab-case**:
 
 ```
 ✅ 01-backend/                   ✅ 01-index.md
 ✅ 09-gsearch-cli/               ✅ 03-api-design.md
-✅ .lovable/memories/workflow/   ✅ file-naming-conventions.md
+✅ .ai-memory/memories/workflow/   ✅ file-naming-conventions.md
 
 ❌ 01-Backend/                   ❌ ApiDesign.md
 ❌ 09_gsearch_cli/               ❌ file_naming.md
@@ -258,14 +258,14 @@ Every module MUST include a **reliability risk assessment** to evaluate implemen
 
 ---
 
-## The `.lovable/` Folder
+## The `.ai-memory/` Folder
 
-The `.lovable/` directory is the **institutional knowledge hub** for the project. It persists AI-learned patterns, decisions, and workflows across sessions.
+The `.ai-memory/` directory is the **institutional knowledge hub** for the project. It persists AI-learned patterns, decisions, and workflows across sessions.
 
 ### Canonical Structure
 
 ```
-.lovable/
+.ai-memory/
 ├── memories/                    # ← CANONICAL memory folder (single source of truth)
 │   ├── 00-memory-index.md       # Complete inventory of all memory files
 │   ├── readme.md                # Simplified high-level overview
@@ -309,7 +309,7 @@ The memory folder includes dedicated folders for tracking work items:
 
 ### Consolidation Rule
 
-> **There is only ONE memory folder: `.lovable/memories/`.** The legacy `.lovable/memory/` variant is prohibited. If found during audits, migrate all contents to `.lovable/memories/` and delete the legacy folder.
+> **There is only ONE memory folder: `.ai-memory/memories/`.** The legacy `.ai-memory/memory/` variant is prohibited. If found during audits, migrate all contents to `.ai-memory/memories/` and delete the legacy folder.
 
 ### Memory File Conventions
 
@@ -326,12 +326,12 @@ The memory folder includes dedicated folders for tracking work items:
 | Content | Location |
 |---------|----------|
 | Formal specifications, APIs, data models | `spec/` |
-| Architectural decisions, conventions, patterns | `.lovable/memories/` |
-| Execution plans and batch tracking | `.lovable/29-plan.md` |
-| Suggestion tracking | `.lovable/memories/suggestions/` |
-| Pending / planned / done tasks | `.lovable/memories/pending/`, `planned/`, `done/` |
-| Completed issues | `.lovable/memories/completed-issues/` |
-| Reliability assessments | `.lovable/memories/reports/` or `02-spec/validation-reports/` |
+| Architectural decisions, conventions, patterns | `.ai-memory/memories/` |
+| Execution plans and batch tracking | `.ai-memory/29-plan.md` |
+| Suggestion tracking | `.ai-memory/memories/suggestions/` |
+| Pending / planned / done tasks | `.ai-memory/memories/pending/`, `planned/`, `done/` |
+| Completed issues | `.ai-memory/memories/completed-issues/` |
+| Reliability assessments | `.ai-memory/memories/reports/` or `02-spec/validation-reports/` |
 
 ### Where AI Should Write Updates
 
@@ -339,13 +339,13 @@ When an AI agent learns something new or the user provides instructions:
 
 | User Says | AI Writes To |
 |-----------|-------------|
-| "Remember this pattern" | `.lovable/memories/patterns/` or relevant category |
-| "Add this to the plan" | `.lovable/29-plan.md` |
-| "Track this task" | `.lovable/memories/planned/` or `pending/` |
-| "This issue is resolved" | Move to `.lovable/memories/completed-issues/` |
-| "Update coding guidelines" | `.lovable/memories/constraints/` |
+| "Remember this pattern" | `.ai-memory/memories/patterns/` or relevant category |
+| "Add this to the plan" | `.ai-memory/29-plan.md` |
+| "Track this task" | `.ai-memory/memories/planned/` or `pending/` |
+| "This issue is resolved" | Move to `.ai-memory/memories/completed-issues/` |
+| "Update coding guidelines" | `.ai-memory/memories/constraints/` |
 | "Add WP plugin spec" | `02-spec/XX-wp-plugin-name/` (spec tree) |
-| "Remember WP plugin convention" | `.lovable/memories/wp-plugins/` |
+| "Remember WP plugin convention" | `.ai-memory/memories/wp-plugins/` |
 
 See [09-memory-folder-guide.md](./09-memory-folder-guide.md) for the complete memory folder guide.
 
@@ -375,7 +375,7 @@ See [09-memory-folder-guide.md](./09-memory-folder-guide.md) for the complete me
 8. **Verify linter infrastructure** — read [12-mandatory-linter-infra03-structure.md](./12-mandatory-linter-infrastructure.md) and confirm `linter-scripts/` exists
 9. **Score the module** — set AI Confidence and Ambiguity percentages in `01-index.md`
 10. **Validate cross-references** — run the link scanner and fix any broken links
-11. **Check `.lovable/memories/`** — read relevant memories before writing new specs
+11. **Check `.ai-memory/memories/`** — read relevant memories before writing new specs
 
 ---
 
@@ -446,11 +446,11 @@ All specifications in this repository are authored by **Md. Alim Ul Karim** — 
 | Folder Structure (canonical) | `./02-folder-structure.md` |
 | Master Index | `../01-index.md` |
 | Coding Guidelines | `../02-coding-guidelines/01-index.md` |
-| Memory Index | `../../.lovable/memories/00-memory-index.md` |
-| App Spec Remediation v1 | `../../.lovable/plans/completed/12-spec-remediation-completed.md` |
-| App Spec Remediation v2 | `../../.lovable/plans/completed/13-spec-remediation-completed.md` |
-| App Spec Audit v1 (Resolved) | `../../.lovable/plans/completed/01-audit-2026-09-10-v1.md-resolved` |
-| App Spec Audit v2 (Resolved) | `../../.lovable/plans/completed/02-audit-2026-09-10-v2.md-resolved` |
+| Memory Index | `../../.ai-memory/memories/00-memory-index.md` |
+| App Spec Remediation v1 | `../../.ai-memory/plans/completed/12-spec-remediation-completed.md` |
+| App Spec Remediation v2 | `../../.ai-memory/plans/completed/13-spec-remediation-completed.md` |
+| App Spec Audit v1 (Resolved) | `../../.ai-memory/plans/completed/01-audit-2026-09-10-v1.md-resolved` |
+| App Spec Audit v2 (Resolved) | `../../.ai-memory/plans/completed/02-audit-2026-09-10-v2.md-resolved` |
 | App Spec Audit (Active) | `../25-app-spec-audit/01-audit-2026-09-10-v1.md` |
 
 ---

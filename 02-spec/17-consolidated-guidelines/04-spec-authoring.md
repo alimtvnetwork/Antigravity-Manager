@@ -7,7 +7,7 @@
 
 ## Purpose
 
-This is the **standalone consolidated reference** for spec authoring conventions. An AI reading only this file must be able to create, organize, and validate specification files correctly — including folder structure, naming, required files, templates, cross-references, validation, exceptions, and the `.lovable/` context layer.
+This is the **standalone consolidated reference** for spec authoring conventions. An AI reading only this file must be able to create, organize, and validate specification files correctly — including folder structure, naming, required files, templates, cross-references, validation, exceptions, and the `.ai-memory/` context layer.
 
 ---
 
@@ -204,14 +204,14 @@ NN-module-name/
 
 ---
 
-## `.lovable/` Folder — AI Context Layer
+## `.ai-memory/` Folder — AI Context Layer
 
-The `.lovable/` directory holds all AI-readable project knowledge.
+The `.ai-memory/` directory holds all AI-readable project knowledge.
 
 ### Canonical Structure
 
 ```
-.lovable/
+.ai-memory/
 ├── overview.md                     # AI onboarding — read FIRST
 ├── user-preferences                # Communication preferences
 ├── 29-plan.md                         # Current roadmap
@@ -240,7 +240,7 @@ The `.lovable/` directory holds all AI-readable project knowledge.
 
 ### Critical Rules
 
-- **Memory folder is `.lovable/memory/`** — never `.lovable/memories/` (no trailing `s`)
+- **Memory folder is `.ai-memory/memory/`** — never `.ai-memory/memories/` (no trailing `s`)
 - Memory subfolders use **kebab-case WITHOUT numeric prefixes**
 - When adding a memory file, **always** update `memory/01-index.md`
 - AI reading order: `overview.md` → `strictly-avoid.md` → `user-preferences` → `memory/01-index.md` → `29-plan.md`
@@ -358,7 +358,7 @@ These exceptions are permanent and tracked in `02-spec/01-spec-authoring-guide/1
 | 3 | Non-markdown data files (`.json`) | `spec/` modules |
 | 4 | Legacy `C-XXX` suggestion file names | `suggestions/completed/` |
 | 5 | Dual-purpose prefix `02` | `spec/` root |
-| 6 | Memory folders without numeric prefixes | `.lovable/memory/` |
+| 6 | Memory folders without numeric prefixes | `.ai-memory/memory/` |
 | 7 | CLI module without `02-frontend/` folder | Headless CLIs |
 | 8 | Extra CLI subfolders beyond core 3 | Complex CLIs |
 | 9 | Legacy `suggestions.md` without prefix | Memory root |

@@ -31,14 +31,14 @@
 
 | Order | File | What You Learn |
 |-------|------|----------------|
-| 1 | `.lovable/01-index.md` | Project summary, tech stack, navigation map |
-| 2 | `.lovable/strictly-avoid.md` | **Hard prohibitions** — violating ANY of these is a critical failure |
-| 3 | `.lovable/user-preferences` | How the human expects you to communicate and behave |
-| 4 | `.lovable/memory/01-index.md` | Index of all institutional knowledge files |
-| 5 | `.lovable/29-plan.md` | Current active roadmap and priorities |
-| 6 | `.lovable/suggestions.md` | Pending improvement ideas (not yet approved) |
+| 1 | `.ai-memory/01-index.md` | Project summary, tech stack, navigation map |
+| 2 | `.ai-memory/strictly-avoid.md` | **Hard prohibitions** — violating ANY of these is a critical failure |
+| 3 | `.ai-memory/user-preferences` | How the human expects you to communicate and behave |
+| 4 | `.ai-memory/memory/01-index.md` | Index of all institutional knowledge files |
+| 5 | `.ai-memory/29-plan.md` | Current active roadmap and priorities |
+| 6 | `.ai-memory/suggestions.md` | Pending improvement ideas (not yet approved) |
 
-### Step 1.2 — Read EVERY file referenced in `.lovable/memory/01-index.md`
+### Step 1.2 — Read EVERY file referenced in `.ai-memory/memory/01-index.md`
 
 - If the index lists 12 files, you read 12 files. No exceptions.
 - If there are subfolders, traverse them recursively.
@@ -91,7 +91,7 @@
 |---------|-------------------|
 | File and folder naming conventions | Spec authoring guide |
 | Required files in every spec folder (`01-index.md`, `99-consistency-report.md`) | Spec authoring guide |
-| The `.lovable/` folder structure and its purpose | `09-memory-folder-guide.md` |
+| The `.ai-memory/` folder structure and its purpose | `09-memory-folder-guide.md` |
 | Linter infrastructure requirements | Spec authoring guide |
 
 > ⛔ **DO NOT begin any task until Phases 1–3 are complete.**
@@ -175,21 +175,21 @@ When you learn something new during a session, follow this decision tree:
 New information discovered
 │
 ├─ Is it institutional knowledge (pattern, convention, decision)?
-│  └─ YES → Write to `.lovable/memory/` and update `.lovable/memory/01-index.md`
+│  └─ YES → Write to `.ai-memory/memory/` and update `.ai-memory/memory/01-index.md`
 │
 ├─ Is it something that must NEVER be done?
-│  └─ YES → Add to `.lovable/strictly-avoid.md`
+│  └─ YES → Add to `.ai-memory/strictly-avoid.md`
 │
 ├─ Is it a suggestion or improvement idea (not yet approved)?
-│  └─ YES → Add to `.lovable/suggestions.md`
+│  └─ YES → Add to `.ai-memory/suggestions.md`
 │
 └─ None of the above → Do not persist it
 ```
 
 ### Critical Rules
 
-- The memory folder is `.lovable/memory/` — **never** `.lovable/memories/` (no trailing `s`).
-- When adding a new memory file, **always** update the index at `.lovable/memory/01-index.md`.
+- The memory folder is `.ai-memory/memory/` — **never** `.ai-memory/memories/` (no trailing `s`).
+- When adding a new memory file, **always** update the index at `.ai-memory/memory/01-index.md`.
 - When modifying an existing memory, preserve all other content — do not truncate or overwrite unrelated entries.
 
 ---
@@ -221,7 +221,7 @@ Then **stop and wait** for instructions. Do not suggest next steps. Do not ask e
 ## Usage Notes
 
 - **Full onboarding** — Give the entire prompt above for a fresh AI session
-- **Quick refresh** — For an AI that has already been onboarded, ask it to re-read only `.lovable/strictly-avoid.md` and `.lovable/memory/01-index.md`
+- **Quick refresh** — For an AI that has already been onboarded, ask it to re-read only `.ai-memory/strictly-avoid.md` and `.ai-memory/memory/01-index.md`
 - **Task-specific** — For a focused task, give Phase 1 + the relevant Phase 4 folder only
 - **"Read memory"** — Refers to executing this full onboarding protocol (see `01-prompts/01-read-prompt.md`)
 
@@ -241,8 +241,8 @@ Then **stop and wait** for instructions. Do not suggest next steps. Do not ask e
 ## Cross-References
 
 - `01-prompts/01-read-prompt.md` — Quick-access copy of this protocol
-- `.lovable/prompt.md` — Prompt index referencing all available prompts
-- `.lovable/01-index.md` — Shorter always-present onboarding doc
+- `.ai-memory/prompt.md` — Prompt index referencing all available prompts
+- `.ai-memory/01-index.md` — Shorter always-present onboarding doc
 
 ---
 

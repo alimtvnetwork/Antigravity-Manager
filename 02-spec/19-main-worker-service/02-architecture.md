@@ -132,7 +132,7 @@ Config keys consumed by this spec live under namespace `MainWorker.*`. Full key 
 
 ## 7. Compliance Hooks
 
-- All endpoint handlers obey `.lovable/coding-guidelines.md` (≤15 line functions, zero nested `if`, positive booleans, no `any`).
+- All endpoint handlers obey `.ai-memory/coding-guidelines.md` (≤15 line functions, zero nested `if`, positive booleans, no `any`).
 - All access checks use the `User has access to {EnumPage}` pattern (`08-role-based-dashboards.md`), never `if user.role == 'admin'`.
 - Every `catch` logs per `02-spec/03-error-manage/` and the inline contract in `09-error-contract.md`.
 

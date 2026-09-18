@@ -2,7 +2,7 @@
 
 ## Mandatory Citation & Relative Path Rule (CODE RED)
 
-Whenever an AI agent generates code, creates plans (`.lovable/plans/pending/`), breaks tasks into subtasks (`.lovable/plans/subtasks/`), writes memory logs (`.lovable/memory/issues/`), explains design decisions, or enforces standards, it **MUST** cite the specific `spec/` or `.lovable/` markdown file and line/section that justifies the action using **STRICTLY RELATIVE PATHS FROM THE GIT REPOSITORY ROOT**.
+Whenever an AI agent generates code, creates plans (`.ai-memory/plans/pending/`), breaks tasks into subtasks (`.ai-memory/plans/subtasks/`), writes memory logs (`.ai-memory/memory/issues/`), explains design decisions, or enforces standards, it **MUST** cite the specific `spec/` or `.ai-memory/` markdown file and line/section that justifies the action using **STRICTLY RELATIVE PATHS FROM THE GIT REPOSITORY ROOT**.
 
 ### 1. Total Ban on Absolute Paths & `file:///` URIs in Repository Files
 

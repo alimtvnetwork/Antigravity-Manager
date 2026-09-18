@@ -181,7 +181,7 @@
 
 ## v5.124.0 — 2026-07-19 (OQ-A1 → D15, OQ-A2 → D16; chapter 17 v1.1.0)
 
-**Scope:** Version bump (`5.123.0` → `5.124.0`). Chapter 17 (`18-cascading-roles-and-cache-bin.md`) promoted from v1.0.0 to v1.1.0. §7 rewritten from "Open Questions, Default Proposals Adopted" to "Resolved Decisions". OQ-A1 (cascading semantics) locked as **D15** (simple union final, no role hierarchy). OQ-A2 (cache-bin storage tier) locked as **D16** (per-process SQLite `:memory:` final; Redis and in-process map remain configurable alternatives against the four-function contract in §4 and the invalidation endpoint in §5). `.lovable/29-plan.md` Locked Decisions table updated with D15/D16; Open Questions section now shows both items resolved. Every downstream chapter (13, 14, 15, 07, 11) already conforms; no cross-chapter edits required.
+**Scope:** Version bump (`5.123.0` → `5.124.0`). Chapter 17 (`18-cascading-roles-and-cache-bin.md`) promoted from v1.0.0 to v1.1.0. §7 rewritten from "Open Questions, Default Proposals Adopted" to "Resolved Decisions". OQ-A1 (cascading semantics) locked as **D15** (simple union final, no role hierarchy). OQ-A2 (cache-bin storage tier) locked as **D16** (per-process SQLite `:memory:` final; Redis and in-process map remain configurable alternatives against the four-function contract in §4 and the invalidation endpoint in §5). `.ai-memory/29-plan.md` Locked Decisions table updated with D15/D16; Open Questions section now shows both items resolved. Every downstream chapter (13, 14, 15, 07, 11) already conforms; no cross-chapter edits required.
 
 ## v5.115.0 — 2026-07-19 (Slides build fix (slide 59 JSX escapes, structure section registry) + release preflight (SRA + guideline drift + slides typecheck) + pre-push parity)
 

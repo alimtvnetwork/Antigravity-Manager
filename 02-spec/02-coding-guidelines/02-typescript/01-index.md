@@ -65,4 +65,4 @@ TypeScript-specific coding standards, enum definitions, and type safety enforcem
 |-----------|----------|
 | Parent Overview | `../01-index.md` |
 | Cross-Language Rules | `../01-cross-language/01-index.md` |
-| Coding Guidelines Memory | `../../../.lovable/memories/constraints/coding-guidelines.md` |
+| Coding Guidelines Memory | `../../../.ai-memory/memories/constraints/coding-guidelines.md` |

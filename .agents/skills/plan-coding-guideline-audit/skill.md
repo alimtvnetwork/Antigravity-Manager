@@ -15,4 +15,4 @@ Autonomously plans a comprehensive audit of repository codebases against the mas
 5. **Code Metrics:** Functions <= 15 lines, files <= 100 lines coding, blank line padding.
 
 ## Output
-Generates structured audit logs and phased remediation plans in `.lovable/plans/pending/` with subtask micro-batches.
+Generates structured audit logs and phased remediation plans in `.ai-memory/plans/pending/` with subtask micro-batches.

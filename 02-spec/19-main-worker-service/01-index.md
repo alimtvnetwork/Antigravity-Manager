@@ -6,7 +6,7 @@
 ## 🎯 Actionable CI/CD & Agent Checklist
 
 - [ ] `/goal` Read and understand all numbered specifications under `19-main-worker-service/`.
-- [ ] `/learn` Adhere strictly to `.lovable/folder-structure.md` and `.lovable/strictly-avoid.md`.
+- [ ] `/learn` Adhere strictly to `.ai-memory/folder-structure.md` and `.ai-memory/strictly-avoid.md`.
 - [ ] `/goal` Verify zero explicit `true` boolean evaluations and no mixed-polarity conditionals.
 - [ ] `/learn` Run all local verification linters via `python 03-ai-scripts/06-cicd-local-runner.py`.
 
@@ -158,7 +158,7 @@ A literal AI MUST read every numbered file 00→24 before scoping work. The map 
 
 This spec inherits and does not redefine:
 
-- `.lovable/coding-guidelines.md` — function length, zero-nesting, positive booleans, PascalCase, enum-for-Type/Status/Category/Kind
+- `.ai-memory/coding-guidelines.md` — function length, zero-nesting, positive booleans, PascalCase, enum-for-Type/Status/Category/Kind
 - `02-spec/03-error-manage/` — generic error rules (catch → log → rethrow; `apperror` wrapping; explicit file/op context)
 - `02-spec/04-database-conventions/` — DB schema + REST header rules (PascalCase, `{TableName}Id`, no UUIDs as PKs, `X-Correlation-Id` / `X-Idempotency-Key` / `X-Auth-Action`)
 - `02-spec/05-split-db-architecture/` — 6-tier split-DB model (Worker uses 4, Main uses 3 per FU-1)

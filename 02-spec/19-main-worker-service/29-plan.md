@@ -66,7 +66,7 @@ Each phase is one user `next` cycle.
 - Bump `package.json` minor (per standing rule: any codebase change → minor bump)
 - `node scripts/sync-version.mjs`
 - `node scripts/sync-spec-tree.mjs`
-- Update `.lovable/29-plan.md` with v-bump entry
+- Update `.ai-memory/29-plan.md` with v-bump entry
 
 ---
 
@@ -85,7 +85,7 @@ Each phase is one user `next` cycle.
 - Seedable-Config mechanics → `02-spec/06-seedable-config-architecture/`
 - Error handling generics → `02-spec/03-error-manage/`
 - Self-update mechanism → `02-spec/14-update/` (this spec only points)
-- Coding rules → `.lovable/coding-guidelines.md`
+- Coding rules → `.ai-memory/coding-guidelines.md`
 
 ---
 

@@ -336,7 +336,7 @@ Main tier (snapshot integrity, slot `21192` — first free in Phase-11-reserved 
 
 ## 13. Cross-references
 
-- Decision register: `.lovable/29-plan.md` D14, OQ-A4.
+- Decision register: `.ai-memory/29-plan.md` D14, OQ-A4.
 - `19-backup-nodes.md` §6 `KnownBackupNode` — pairing assertion source for BE-6.
 - `20-incremental-backup-sync.md` — incremental path co-existing with snapshot path; restores reset the watermark per R7.
 - `21-backup-encryption-and-keys.md` §5 — HKDF salt convention reused with `"BackupSnapshot/v1"`.

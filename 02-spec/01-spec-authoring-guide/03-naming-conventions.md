@@ -7,7 +7,7 @@
 
 ## Overview
 
-All files and folders in the `spec/` and `.lovable/memories/` trees follow strict naming conventions. These rules are non-negotiable and enforced by the health dashboard scanner.
+All files and folders in the `spec/` and `.ai-memory/memories/` trees follow strict naming conventions. These rules are non-negotiable and enforced by the health dashboard scanner.
 
 ---
 

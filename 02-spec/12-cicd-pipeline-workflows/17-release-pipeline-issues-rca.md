@@ -384,7 +384,7 @@ A `git tag vX.Y.Z` was pushed out-of-band to trigger a release before `version.j
 | 4 | Version reads from `package.json` use `sed`, not `node` | Avoid Node toolchain dependency | Issue #3 |
 | 5 | All `actions/*` versions pinned to exact tag (no `@latest`/`@main`) | Reproducibility | Issue #8 |
 | 6 | Tool versions pinned exactly (e.g. `golangci-lint@vX.Y.Z`) | Reproducibility | Issue #8 |
-| 7 | Every code change bumps at least the minor version | Per `.lovable/user-preferences` | — |
+| 7 | Every code change bumps at least the minor version | Per `.ai-memory/user-preferences` | — |
 | 8 | Touching `release-artifacts/` outside of `release.sh` is forbidden | Generated content; do not hand-edit | — |
 | 9 | NEVER `cd` inside `run:` blocks — use `working-directory:` | Steps reset CWD to repo root | Issue #5 |
 | 10 | Every output directory used in CI must be guarded with `test -d` | Fail fast with actionable error | Issue #5 |

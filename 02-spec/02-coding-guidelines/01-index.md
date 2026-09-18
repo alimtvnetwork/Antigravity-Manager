@@ -6,7 +6,7 @@
 ## 🎯 Actionable CI/CD & Agent Checklist
 
 - [ ] `/goal` Read and understand all numbered specifications under `02-coding-guidelines/`.
-- [ ] `/learn` Adhere strictly to `.lovable/folder-structure.md` and `.lovable/strictly-avoid.md`.
+- [ ] `/learn` Adhere strictly to `.ai-memory/folder-structure.md` and `.ai-memory/strictly-avoid.md`.
 - [ ] `/goal` Verify zero explicit `true` boolean evaluations and no mixed-polarity conditionals.
 - [ ] `/learn` Run all local verification linters via `python 03-ai-scripts/06-cicd-local-runner.py`.
 

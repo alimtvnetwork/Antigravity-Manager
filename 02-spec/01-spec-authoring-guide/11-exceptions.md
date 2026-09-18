@@ -41,7 +41,7 @@ spec/
 
 **Where:**
 
-- `.lovable/memories/readme.md` — Project memory overview
+- `.ai-memory/memories/readme.md` — Project memory overview
 - Any project root `readme.md`
 
 **Reason:** `readme.md` is a universal convention recognized by Git hosting platforms (GitHub, GitLab) for auto-rendering.
@@ -71,12 +71,12 @@ spec/
 
 ## Exception 4: Legacy Suggestion File Naming
 
-**Rule:** Files in `.lovable/memories/` use kebab-case.
-**Exception:** Completed suggestion files in `.lovable/memories/suggestions/completed/` use legacy `C-XXX` prefixes.
+**Rule:** Files in `.ai-memory/memories/` use kebab-case.
+**Exception:** Completed suggestion files in `.ai-memory/memories/suggestions/completed/` use legacy `C-XXX` prefixes.
 
 **Example:**
 ```
-.lovable/memories/suggestions/completed/
+.ai-memory/memories/suggestions/completed/
 ├── C-001-suggestion-title.md
 ├── C-002-suggestion-title.md
 ├── ...
@@ -99,11 +99,11 @@ spec/
 ## Exception 6: Memory Folders Without Numeric Prefixes
 
 **Rule:** Spec folders require numeric prefixes (`{NN}-{name}/`).
-**Exception:** Memory folders (`/.lovable/memories/`) use plain kebab-case without numeric prefixes.
+**Exception:** Memory folders (`/.ai-memory/memories/`) use plain kebab-case without numeric prefixes.
 
 **Example:**
 ```
-.lovable/memories/
+.ai-memory/memories/
 ├── architecture/       # No numeric prefix
 ├── workflow/           # No numeric prefix
 ├── constraints/        # No numeric prefix
@@ -158,7 +158,7 @@ spec/
 
 ## Exception 9: The `suggestions.md` Legacy Tracker
 
-**Rule:** All files in `.lovable/memories/` use kebab-case with optional numeric prefix.
+**Rule:** All files in `.ai-memory/memories/` use kebab-case with optional numeric prefix.
 **Exception:** `suggestions.md` at the memory root is a legacy file without a numeric prefix.
 
 **Reason:** Created before the convention was established. Maintained for backward compatibility.
@@ -193,7 +193,7 @@ spec/
 | 3 | Non-markdown data files | spec/ modules | ✅ Yes |
 | 4 | Legacy C-XXX suggestion names | memories/suggestions/ | ✅ Yes (frozen) |
 | 5 | Dual-purpose prefix 02 | spec/ root | ✅ Yes |
-| 6 | Memory folders without prefixes | .lovable/memories/ | ✅ Yes |
+| 6 | Memory folders without prefixes | .ai-memory/memories/ | ✅ Yes |
 | 7 | CLI without frontend folder | CLI modules | ✅ Yes (case-by-case) |
 | 8 | Extra CLI subfolders | CLI modules | ✅ Yes (case-by-case) |
 | 9 | Legacy suggestions.md | memories/ root | ✅ Yes (frozen) |
@@ -213,8 +213,8 @@ spec/
 ## Strictly Prohibited
 
 > 🔴 Hard prohibitions for spec authoring. Numbered for stable reference —
-> never renumber, only append. Mirrors `.lovable/strictly-avoid.md` →
-> "Strictly Prohibited" and `.lovable/memory/avoid/`.
+> never renumber, only append. Mirrors `.ai-memory/strictly-avoid.md` →
+> "Strictly Prohibited" and `.ai-memory/memory/avoid/`.
 >
 > 🧠 **Memory directive:** Once an AI agent reads this section, it MUST
 > retain every numbered prohibition in its strictly-avoid working memory
@@ -234,5 +234,5 @@ spec/
 - **Only** modify `readme.txt` when the user explicitly asks in that
   exact turn, using the format the user dictates.
 - **No follow-up offers** about time after writing `readme.txt`.
-- Cross-reference: `.lovable/memory/avoid/02-no-time-suggestions-in-readme-txt.md`
-  and `.lovable/strictly-avoid.md` → "Strictly Prohibited" → Sequence 01.
+- Cross-reference: `.ai-memory/memory/avoid/02-no-time-suggestions-in-readme-txt.md`
+  and `.ai-memory/strictly-avoid.md` → "Strictly Prohibited" → Sequence 01.

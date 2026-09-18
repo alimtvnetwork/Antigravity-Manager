@@ -300,7 +300,7 @@ When an AI Agent or automated system handles a release, it MUST synchronously up
 ### 🎯 Actionable CI/CD & Agent Checklist
 
 1. [ ] `/goal` Verify version consistency between `version.json` and `package.json`.
-2. [ ] `/learn` Read `.lovable/folder-structure.md` and `02-spec/12-cicd-pipeline-workflows/03-shared-conventions.md` to follow version resolution rules.
+2. [ ] `/learn` Read `.ai-memory/folder-structure.md` and `02-spec/12-cicd-pipeline-workflows/03-shared-conventions.md` to follow version resolution rules.
 3. [ ] `/goal` Verify branch changes are committed and pushed to remote before pushing tags.
 4. [ ] `/learn` Read `02-spec/12-cicd-pipeline-workflows/17-release-pipeline-issues-rca.md` Issue #13 to prevent release skew.
 5. [ ] `/learn` Run verification via `python 03-ai-scripts/06-cicd-local-runner.py`.

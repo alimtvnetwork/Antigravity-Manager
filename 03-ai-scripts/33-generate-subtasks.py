@@ -8,7 +8,7 @@ import json
 import pathlib
 
 root = pathlib.Path(".")
-inv_file = root / ".lovable" / "temp" / "files-inventory.json"
+inv_file = root / ".ai-memory" / "temp" / "files-inventory.json"
 with open(inv_file, "r", encoding="utf-8") as f:
     inv = json.load(f)
 
@@ -56,7 +56,7 @@ assignments = {
     }
 }
 
-ledger_file = root / ".lovable" / "temp" / "file-assignments.json"
+ledger_file = root / ".ai-memory" / "temp" / "file-assignments.json"
 with open(ledger_file, "w", encoding="utf-8") as f:
     json.dump(assignments, f, indent=2)
 
@@ -65,7 +65,7 @@ print(f"  Agent 1 (Proxy Core): {len(backend_core)} files")
 print(f"  Agent 2 (Modules & DB): {len(backend_modules)} files")
 print(f"  Agent 3 (Frontend & Ops): {len(frontend_files) + len(other_files)} files")
 
-subtasks_dir = root / ".lovable" / "plans" / "subtasks" / "04-reverse-engineering"
+subtasks_dir = root / ".ai-memory" / "plans" / "subtasks" / "04-reverse-engineering"
 subtasks_dir.mkdir(parents=True, exist_ok=True)
 
 # Subtask 1
@@ -130,4 +130,4 @@ with open(subtasks_dir / "03-frontend-ui-and-state.md", "w", encoding="utf-8") a
 4. Synthesize findings into `02-spec/21-app/04-frontend-ui-and-state.md`.
 """)
 
-print("Subtasks authored under .lovable/plans/subtasks/04-reverse-engineering/")
+print("Subtasks authored under .ai-memory/plans/subtasks/04-reverse-engineering/")

@@ -141,7 +141,7 @@ This repository uses a **husky pre-commit hook**:
    - Re-stages `version.json` so the updated value ships in the commit.
 2. The hook is wired in `.husky/pre-commit`.
 3. The CI `version-drift` gate (see
-   `.lovable/cicd-issues/06-version-drift-after-package-bump.md`) blocks
+   `.ai-memory/cicd-issues/06-version-drift-after-package-bump.md`) blocks
    any push where `LastCommitSha` does not match the committed `HEAD~1`
    (the parent at the time the hook ran).
 
@@ -249,4 +249,4 @@ legacy keys entirely.
 - [Enum Standards](../17-consolidated-guidelines/07-enum-standards.md)
 - [Root README Conventions](./13-root-readme-conventions.md)
 - [Author Attribution](mem://project/author-attribution)
-- [CI/CD Issue 06 — Version Drift](../../.lovable/resolved-issues/07-version-drift-after-package-bump.md)
+- [CI/CD Issue 06 — Version Drift](../../.ai-memory/resolved-issues/07-version-drift-after-package-bump.md)

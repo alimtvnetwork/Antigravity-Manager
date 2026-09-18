@@ -293,7 +293,7 @@ Main tier (rotation orchestration, range `MAIN-820-*` / 21186-21188):
 
 ## 13. Cross-references
 
-- Decision register: `.lovable/29-plan.md` D13.
+- Decision register: `.ai-memory/29-plan.md` D13.
 - `19-backup-nodes.md` §3 — primary/backup pairing.
 - `20-incremental-backup-sync.md` §6 — envelope SQLite shape (input to step 1 of §4).
 - `06-auth-and-2fa.md` §S2S — transport mTLS context.

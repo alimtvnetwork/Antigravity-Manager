@@ -165,7 +165,7 @@ React components use a `<RequiresAccess page={AccessItem.PushUpdate}>` wrapper:
 
 The wrapper reads access flags from the worker JWT's `roles` claim resolved against the local `RoleAccessItem` cache (refreshed when token refreshes). NEVER hardcode role names in JSX.
 
-Per `.lovable/coding-guidelines.md`: React components < 100 lines, small and reusable.
+Per `.ai-memory/coding-guidelines.md`: React components < 100 lines, small and reusable.
 
 ---
 

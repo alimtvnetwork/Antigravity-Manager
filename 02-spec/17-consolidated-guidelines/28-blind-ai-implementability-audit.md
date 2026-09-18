@@ -157,7 +157,7 @@ The repo actually ships **16 linter assets**:
 
 ### 🟡 MEDIUM-3 — Memory File Conventions Are Not Surfaced
 
-The user's `mem://` files contain critical operational rules (axios pinning, gitmap-sync exclusions, code-red metrics, free-text linter rules). A blind AI receiving only the consolidated folder will violate at least three of these on its first PR. `24-lovable-folder-03-structure.md` mentions the `.lovable/` folder exists but does not enumerate the active core memory rules.
+The user's `mem://` files contain critical operational rules (axios pinning, gitmap-sync exclusions, code-red metrics, free-text linter rules). A blind AI receiving only the consolidated folder will violate at least three of these on its first PR. `24-lovable-folder-03-structure.md` mentions the `.ai-memory/` folder exists but does not enumerate the active core memory rules.
 
 **Fix:** Add a "Project Memory — Active Core Rules" appendix to `24-lovable-folder-03-structure.md` that mirrors `mem://index.md` Core section.
 

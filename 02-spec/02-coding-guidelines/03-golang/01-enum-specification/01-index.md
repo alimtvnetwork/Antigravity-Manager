@@ -107,15 +107,15 @@ internal/enums/
 
 | CLI / Project | Status | Score | Audit Report |
 |---------------|--------|-------|--------------|
-| GSearch CLI | ✅ Compliant | 50/50 | `.lovable/audits/gsearch-cli-enum-compliance-audit-2026-02-06.md` |
-| BRun CLI | ✅ Compliant | 50/50 | `.lovable/audits/brun-cli-enum-compliance-audit-2026-02-06.md` |
-| AI Bridge CLI | ✅ Compliant | 50/50 | `.lovable/audits/ai-bridge-cli-enum-compliance-audit-2026-02-06.md` |
-| Nexus Flow CLI | ✅ Compliant | 50/50 | `.lovable/audits/nexus-flow-cli-enum-compliance-audit-2026-02-06.md` |
-| Spec Reverse CLI | ✅ Compliant | 50/50 | `.lovable/audits/spec-reverse-cli-enum-compliance-audit-2026-02-06.md` |
-| WP SEO Publish CLI | ✅ Compliant | 50/50 | `.lovable/audits/wp-seo-publish-cli-enum-compliance-audit-2026-02-06.md` |
-| AI Transcribe CLI | ✅ Compliant | 50/50 | `.lovable/audits/ai-transcribe-cli-enum-compliance-audit-2026-02-06.md` |
-| WP Plugin Builder | ✅ Compliant | 50/50 | `.lovable/audits/wp-plugin-builder-cli-enum-compliance-audit-2026-02-06.md` |
-| Spec Management | ✅ Compliant | 50/50 | `.lovable/audits/spec-management-enum-compliance-audit-2026-02-06.md` |
+| GSearch CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/gsearch-cli-enum-compliance-audit-2026-02-06.md` |
+| BRun CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/brun-cli-enum-compliance-audit-2026-02-06.md` |
+| AI Bridge CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/ai-bridge-cli-enum-compliance-audit-2026-02-06.md` |
+| Nexus Flow CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/nexus-flow-cli-enum-compliance-audit-2026-02-06.md` |
+| Spec Reverse CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/spec-reverse-cli-enum-compliance-audit-2026-02-06.md` |
+| WP SEO Publish CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/wp-seo-publish-cli-enum-compliance-audit-2026-02-06.md` |
+| AI Transcribe CLI | ✅ Compliant | 50/50 | `.ai-memory/audits/ai-transcribe-cli-enum-compliance-audit-2026-02-06.md` |
+| WP Plugin Builder | ✅ Compliant | 50/50 | `.ai-memory/audits/wp-plugin-builder-cli-enum-compliance-audit-2026-02-06.md` |
+| Spec Management | ✅ Compliant | 50/50 | `.ai-memory/audits/spec-management-enum-compliance-audit-2026-02-06.md` |
 | **WP Plugin Publish** | 🔄 Migration In Progress | — | 11/12 migrated, 1 int-based exempt |
 
 > **Note:** All 9 CLIs have been migrated to `Invalid` as zero value per spec v2.0.0 (completed 2026-02-11).
@@ -152,7 +152,7 @@ internal/enums/
 
 - Error Code Registry <!-- external: 02-spec/03-error-manage/03-error-code-registry/01-registry.md -->
 - Split DB Architecture <!-- external: 02-spec/05-split-db-architecture/01-index.md -->
-- Coding Guidelines Memory <!-- external: .lovable/memories/constraints/coding-guidelines.md -->
+- Coding Guidelines Memory <!-- external: .ai-memory/memories/constraints/coding-guidelines.md -->
 
 ---
 

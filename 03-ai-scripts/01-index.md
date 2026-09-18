@@ -590,7 +590,7 @@ python 03-ai-scripts/19-artifact-remover.py --clean-all --force --permanent
 <summary><strong>20 — <code>20-plan-consolidator.py</code>: Lovable Plan Index Synchronizer and Archiver</strong></summary>
 
 #### Why It Exists
-Automates the lifecycle management of Lovable execution plans and subtasks (`.lovable/plans/pending/`, `completed/`, `subtasks/`), keeping planning directories lean, archived, and sequentially ordered.
+Automates the lifecycle management of Lovable execution plans and subtasks (`.ai-memory/plans/pending/`, `completed/`, `subtasks/`), keeping planning directories lean, archived, and sequentially ordered.
 
 #### What It Does
 - Automatically creates a timestamped safety backup git branch before any operations.
@@ -620,7 +620,7 @@ python 03-ai-scripts/20-plan-consolidator.py --clean-subtasks --force
 Enforces integrity across all sequential documentation, prompts, execution plans, and agent skills, ensuring that numeric references and internal relative markdown links resolve to real files on disk.
 
 #### What It Does
-- Audits documents in `.lovable/prompts`, `.lovable/plans`, `.agents/skills`, `.lovable/coding-guidelines`, etc.
+- Audits documents in `.ai-memory/prompts`, `.ai-memory/plans`, `.agents/skills`, `.ai-memory/coding-guidelines`, etc.
 - Parses markdown links `[text](target)` and inline backtick paths.
 - Resolves target paths against the repository root while ignoring template placeholders (`<slug>`, `vX.Y.Z`, `XX-`).
 - Returns exit code 0 when all links resolve cleanly, or exit code 1 with broken link details.
@@ -637,7 +637,7 @@ python 03-ai-scripts/21-sequence-integrity-linter.py
 <summary><strong>22 — <code>22-doc-path-linter.py</code>: Documentation Relative Path Reference Checker</strong></summary>
 
 #### Why It Exists
-Autonomously verifies all markdown links and path references across `01-prompts/`, `02-spec/`, `.lovable/`, and `.agents/`, eliminating dead references and preventing AI agent hallucinations.
+Autonomously verifies all markdown links and path references across `01-prompts/`, `02-spec/`, `.ai-memory/`, and `.agents/`, eliminating dead references and preventing AI agent hallucinations.
 
 #### What It Does
 - Executes comprehensive markdown path verification against all tracked documentation directories.
@@ -656,11 +656,11 @@ python 03-ai-scripts/22-doc-path-linter.py
 <summary><strong>23 — <code>23-coding-guideline-path-consolidator.py</code>: Coding Guideline Cross-Link Canonicalizer</strong></summary>
 
 #### Why It Exists
-Autonomously consolidates references from the legacy nested path (`.lovable/coding-guidelines/coding-guidelines.md`) to the canonical path (`.lovable/coding-guidelines.md`) across all documentation, code, specs, and linters.
+Autonomously consolidates references from the legacy nested path (`.ai-memory/coding-guidelines/coding-guidelines.md`) to the canonical path (`.ai-memory/coding-guidelines.md`) across all documentation, code, specs, and linters.
 
 #### What It Does
 - Recursively scans markdown, Python, JavaScript, TypeScript, Go, shell, and config files.
-- Replaces old paths with the canonical relative path `.lovable/coding-guidelines.md`.
+- Replaces old paths with the canonical relative path `.ai-memory/coding-guidelines.md`.
 - Preserves file formatting and skips ignored directories (`.git`, `node_modules`, `tmp`).
 
 #### CLI Usage & Examples
@@ -694,7 +694,7 @@ python 03-ai-scripts/24-spec-path-migrator.py
 <summary><strong>25 — <code>25-repo-migrator.py</code>: Transactional Repository Asset Migrator with Rollback</strong></summary>
 
 #### Why It Exists
-Provides a fully transactional, reversible engine to restructure repository layouts (such as migrating legacy `spec/` to `02-spec/`, `.lovable/prompts/` to `01-prompts/`, and `.lovable/ai-fix-scripts/` to `03-ai-scripts/`) with 100% undo/redo safety.
+Provides a fully transactional, reversible engine to restructure repository layouts (such as migrating legacy `spec/` to `02-spec/`, `.ai-memory/prompts/` to `01-prompts/`, and `.ai-memory/ai-fix-scripts/` to `03-ai-scripts/`) with 100% undo/redo safety.
 
 #### What It Does
 - Logs all structural modifications to an atomic SQLite transaction journal (`tmp/migrations.db`).

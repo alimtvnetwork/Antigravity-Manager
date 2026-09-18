@@ -1,0 +1,627 @@
+# Spec Migration Transaction Log
+
+This log records all atomic file moves, renames, merges, and index normalizations in spec/ for future reference and automated migration scripts.
+
+## Operations Log
+
+- MOVE: .ai-memory/02-spec/commands/01-slides-attached-to-release.md -> .ai-memory/memory/preferences/02-slides-attached-to-release.md (Eliminated .ai-memory/spec/)
+- MOVE: .ai-memory/02-spec/commands/02-improvement-audit-cadence.md -> .ai-memory/memory/preferences/03-improvement-audit-cadence.md (Eliminated .ai-memory/spec/)
+- DELETE: Removed directory .ai-memory/spec/ (Banned in strictly-avoid)
+- DELETE: Removed unnumbered duplicate 02-spec/authoring-guideline/
+- DELETE: Removed duplicate folder 02-spec/06-design-system/ in favor of 02-spec/07-design-system/
+- MOVE: 02-spec/09-pipeline-extend-v2/gitmap-pipeline/ -> 02-spec/12-cicd-pipeline-workflows/04-gitmap-pipeline/
+- MERGE: 02-spec/09-pipeline-extend-v2\01-ai-release-synchronization.md -> 02-spec/12-cicd-pipeline-workflows\24-ai-release-synchronization.md
+- MERGE: 02-spec/09-pipeline-extend-v2\02-changelog-awk-integration.md -> 02-spec/12-cicd-pipeline-workflows\25-changelog-awk-integration.md
+- MERGE: 02-spec/09-pipeline-extend-v2\03-query-wrapper-python-ts.md -> 02-spec/12-cicd-pipeline-workflows\26-query-wrapper-python-ts.md
+- MERGE: 02-spec/09-pipeline-extend-v2\04-strict-enum-enforcement.md -> 02-spec/12-cicd-pipeline-workflows\27-strict-enum-enforcement.md
+- MERGE: 02-spec/09-pipeline-extend-v2\05-rca-release-skew.md -> 02-spec/12-cicd-pipeline-workflows\28-rca-release-skew.md
+- DELETE: Removed directory 02-spec/09-pipeline-extend-v2/ after merging into 02-spec/12-cicd-pipeline-workflows/
+- MERGE: 02-spec/09-pipeline\10-known-issues-and-fixes.md -> 02-spec/12-cicd-pipeline-workflows\22-known-issues-and-fixes.md
+- MERGE: 02-spec/09-pipeline\11-lint-gating-rules.md -> 02-spec/12-cicd-pipeline-workflows\23-lint-gating-rules.md
+- DELETE: Removed directory 02-spec/09-pipeline/ after merging into 02-spec/12-cicd-pipeline-workflows/
+- DELETE: Removed 02-spec/12-cicd-pipeline-workflows/readme.md (Consolidated into 01-index.md)
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/02-folder-structure.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/03-naming-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/04-required-files.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/05-ai-onboarding-prompt.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/06-cli-module-template.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/07-app-project-template.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/08-non-cli-module-template.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/09-memory-folder-guide.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/10-cross-references.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/11-exceptions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/12-mandatory-linter-infra03-structure.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/13-root-readme-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/01-spec-authoring-guide/14-version-schema.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/02-coding-guidelines/02-canonical-size-tier.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/02-coding-guidelines/03-03-coding-style-checklist.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/02-coding-guidelines/01-cross-language/01-index.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/02-coding-guidelines/05-05-consolidated-review-guide.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/03-error-manage/02-improvements.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/03-error-manage/03-03-structure.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/03-naming-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/03-schema-design.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/04-orm-and-views.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/05-testing-strategy.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/06-relationship-diagrams.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/07-rest-api-format.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/04-database-conventions/08-split-db-pattern.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/05-split-db-architecture/02-fundamentals.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/06-seedable-config-architecture/02-fundamentals.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/02-design-principles.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/03-theme-variable-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/04-typography.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/05-spacing-layout.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/06-borders-shapes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/07-css-modularity.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/08-motion-transitions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/09-code-blocks.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/10-header-navigation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/11-button-system.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/12-sidebar-system.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/13-section-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/14-page-creation-rules.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/07-design-system/15-wordpress-migration.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/08-docs-viewer-ui/02-fundamentals.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/02-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/03-html-03-structure.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/04-syntax-highlighting.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/05-interactions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/06-styling.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/07-constants-and-maps.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/08-clipboard.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/09-checklist-blocks.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/10-tree-structure-rendering.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/09-code-block-system/11-selection-bar.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/02-configuration-schema.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/03-template-vs-project-differences.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/04-script-reference.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/05-integration-guide.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/06-error-codes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/07-firewall-rules.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/08-php-known-issues.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/09-multi-site-deployment.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/10-changelog.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/11-powershell-integration/11-11-parallel-work-sync-output.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/02-ci-pipeline.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/03-shared-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/04-github-release-standard.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/05-release-pipeline.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/06-vulnerability-scanning.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/07-install-script-generation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/08-installation-flow.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/09-changelog-integration.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/10-code-signing.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/11-self-update-mechanism.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/12-version-and-help.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/13-environment-variable-setup.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/14-release-body-and-changelog.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/15-terminal-output-standards.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/16-binary-icon-branding.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/17-release-pipeline-issues-rca.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/18-blue-green-deployment.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/19-flaky-test-quarantine.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/01-index.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/21-e2e-testing-pattern.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/22-known-issues-and-fixes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/23-lint-gating-rules.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/24-ai-release-synchronization.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/25-changelog-awk-integration.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/26-query-wrapper-python-ts.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/27-strict-enum-enforcement.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/12-cicd-pipeline-workflows/28-rca-release-skew.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/02-self-update-overview.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/03-deploy-path-resolution.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/04-rename-first-deploy.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/05-build-scripts.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/06-handoff-mechanism.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/07-cleanup.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/08-console-safe-handoff.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/09-repo-path-sync.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/10-version-verification.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/11-last-release-detection.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/12-windows-icon-embedding.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/13-code-signing.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/14-release-assets.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/15-checksums-verification.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/16-release-versioning.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/17-cross-compilation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/18-release-pipeline.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/19-install-scripts.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/20-updater-binary.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/21-network-requirements.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/22-config-file.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/23-update-command-workflow.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/14-update/24-install-script-version-probe.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/15-distribution-and-runner/02-install-contract.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/15-distribution-and-runner/03-runner-contract.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/15-distribution-and-runner/04-release-pipeline.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/15-distribution-and-runner/05-install-config.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/02-cross-compilation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/04-release-pipeline.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/04-install-scripts.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/05-checksums-verification.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/06-release-assets.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/07-release-metadata.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/08-known-issues-and-fixes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/16-generic-release/09-version-pinned-release-installers.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/02-ai-review-overview.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/03-strictly-avoid-quickref.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/04-spec-authoring.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/05-coding-guidelines.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/06-error-management.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/07-enum-standards.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/08-split-db-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/09-seedable-config.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/10-design-system.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/11-docs-viewer-ui.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/12-code-block-system.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/13-powershell-integration.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/14-research.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/15-root-research.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/16-app.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/17-app-issues.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/18-cicd-pipeline-workflows.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/19-app-design-system-and-ui.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/20-self-update-app-update.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/21-database-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/22-gap-analysis.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/23-wp-plugin-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/24-lovable-folder-03-structure.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/25-app-database.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/26-generic-cli.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/27-folder-mapping.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/28-blind-ai-implementability-audit.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/29-blind-ai-audit-v2.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/30-linter-authoring-guide.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/31-distribution-and-runner.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/32-blind-ai-audit-v3.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/33-readme-improvement-suggestions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/34-compiled-simple-coding-guidelines.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/17-consolidated-guidelines/35-ai-code-review-guide.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/02-quick-start.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/03-foundation-and-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/04-traits-and-composition.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/05-logging-and-error-handling.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/06-helpers-responses-and-integration.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/07-input-validation-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/08-reference-implementations.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/09-wordpress-integration-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/10-testing-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/11-deployment-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/12-frontend-and-template-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/13-design-system.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/14-admin-ui-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/15-rest-api-conventions.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/16-settings-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/17-error-handling-extraction.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/18-data-file-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/19-frontend-javascript-patterns.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/20-micro-orm-and-root-db.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/21-end-to-end-walkthrough.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/22-ping-endpoint.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/18-wp-plugin-how-to/23-changelog.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/02-architecture.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/03-glossary.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/04-main-db-schema.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/05-worker-routing.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/06-auth-and-2fa.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/07-core-api-endpoints.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/08-role-based-dashboards.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/09-error-contract.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/10-self-update-pointer.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/11-worker-bootstrap-protocol.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/12-split-db-tier-reconciliation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/13-jwt-delivery-contract.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/14-error-codes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/15-rbac-and-status-seed.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/16-tunable-constants.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/17-update-channels.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/18-cascading-roles-and-cache-bin.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/19-backup-nodes.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/20-incremental-backup-sync.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/21-backup-encryption-and-keys.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/22-backup-endpoints.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/23-backup-apply-logic.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/24-snapshot-storage-and-restore.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/25-threat-model.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/26-inherited-rules.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/27-trust-boundaries-and-isolation.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/28-git-backup-targets.md`
+- RENAME: `02-spec/19-main-worker-service/29-29-plan.md` -> `02-spec/19-main-worker-service/29-29-plan.md`
+- DELETE: Removed `02-spec/11-powershell-integration/readme.md` (Consolidated into 01-index.md)
+- DELETE: Removed `02-spec/14-update/readme.md` (Consolidated into 01-index.md)
+- DELETE: Removed `02-spec/18-wp-plugin-how-to/readme.md` (Consolidated into 01-index.md)
+- DELETE: Removed `02-spec/19-main-worker-service/diagrams/readme.md` (Consolidated into 01-index.md)
+- DELETE: Removed `02-spec/19-main-worker-service/fixtures/readme.md` (Consolidated into 01-index.md)
+- DELETE: Removed `02-spec/19-main-worker-service/images/readme.md` (Consolidated into 01-index.md)
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\01-spec-authoring-guide\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\02-coding-guidelines\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\03-error-manage\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\04-database-conventions\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\05-split-db-architecture\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\06-seedable-config-architecture\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\07-design-system\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\08-docs-viewer-ui\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\09-code-block-system\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\10-research\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\11-powershell-integration\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\12-cicd-pipeline-workflows\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\13-generic-cli\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\14-update\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\15-distribution-and-runner\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\16-generic-release\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\17-consolidated-guidelines\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\18-wp-plugin-how-to\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\19-main-worker-service\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\21-app\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\22-app-issues\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\23-app-db\01-index.md`
+- ENHANCE: Injected `/goal` and `/learn` actionable checklist in `spec\24-app-ui-design-system\01-index.md`
+- CREATE: `spec-coding-guideline/01-index.md` & `spec-coding-guideline/02-slides-app-spec.md` (Internal repo specs)
+- MOVE: spec-slides\01-architecture.md -> spec-coding-guideline\01-architecture.md
+- MOVE: spec-slides\02-slide-authoring.md -> spec-coding-guideline\02-slide-authoring.md
+- MOVE: spec-slides\03-design-tokens.md -> spec-coding-guideline\03-design-tokens.md
+- MOVE: spec-slides\04-animation-primitives.md -> spec-coding-guideline\04-animation-primitives.md
+- MOVE: spec-slides\05-curriculum.md -> spec-coding-guideline\05-curriculum.md
+- MOVE: spec-slides\06-build-and-zip-pipeline.md -> spec-coding-guideline\06-build-and-zip-pipeline.md
+- MOVE: spec-slides\07-gif-generation.md -> spec-coding-guideline\07-gif-generation.md
+- MOVE: spec-slides\08-quality-and-offline.md -> spec-coding-guideline\08-quality-and-offline.md
+- DELETE: Merged and removed spec-slides/ into spec-coding-guideline/
+- MERGE: Merged `22-known-issues-and-fixes.md` & `28-rca-release-skew.md` into `17-release-pipeline-issues-rca.md`
+- MERGE: Merged `24-ai-release-synchronization.md` into `05-release-pipeline.md`
+- MOVE: `02-spec/12-cicd-pipeline-workflows\25-changelog-awk-integration.md` -> `02-spec/12-cicd-pipeline-workflows\03-reusable-ci-guards\10-changelog-awk-integration.md`
+- MOVE: `02-spec/12-cicd-pipeline-workflows\27-strict-enum-enforcement.md` -> `02-spec/12-cicd-pipeline-workflows\03-reusable-ci-guards\11-strict-enum-enforcement.md`
+- MOVE: `02-spec/12-cicd-pipeline-workflows\26-query-wrapper-python-ts.md` -> `02-spec/12-cicd-pipeline-workflows\03-reusable-ci-guards\12-query-wrapper-python-ts.md`
+- DELETE: Removed merged `02-spec/12-cicd-pipeline-workflows\22-known-issues-and-fixes.md`
+- DELETE: Removed merged `02-spec/12-cicd-pipeline-workflows\24-ai-release-synchronization.md`
+- DELETE: Removed merged `02-spec/12-cicd-pipeline-workflows\28-rca-release-skew.md`
+- RENAME: `02-spec/12-cicd-pipeline-workflows/23-lint-gating-rules.md` -> `02-spec/12-cicd-pipeline-workflows/18-lint-gating-rules.md`
+- RENAME: `02-spec/12-cicd-pipeline-workflows/18-blue-green-deployment.md` -> `02-spec/12-cicd-pipeline-workflows/19-blue-green-deployment.md`
+- RENAME: `02-spec/12-cicd-pipeline-workflows/19-flaky-test-quarantine.md` -> `02-spec/12-cicd-pipeline-workflows/20-flaky-test-quarantine.md`
+- RENAME: `02-spec/12-cicd-pipeline-workflows/01-index.md` -> `02-spec/12-cicd-pipeline-workflows/21-contract-testing.md`
+- RENAME: `02-spec/12-cicd-pipeline-workflows/21-e2e-testing-pattern.md` -> `02-spec/12-cicd-pipeline-workflows/22-e2e-testing-pattern.md`
+- UPDATE: Updated `02-spec/12-cicd-pipeline-workflows/03-reusable-ci-guards/01-index.md`
+- UPDATE: Updated `02-spec/12-cicd-pipeline-workflows/01-index.md` with consolidated 22-item inventory
+- RESOLVE: Marked OQ-1 as resolved in `02-spec/19-main-worker-service/29-plan.md`
+- RENAME: `spec/_template.md` -> `02-02-spec/02-_template.md`
+- RENAME: `02-spec/folder-structure-root.md` -> `02-spec/03-folder-structure-root.md`
+- RENAME: `02-spec/health-dashboard.md` -> `02-spec/04-health-dashboard.md`
+- RENAME: `02-spec/spec-index.md` -> `02-spec/05-spec-index.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language/01-issues-and-fixes-log.md` -> `spec\02-coding-guidelines\01-cross-language/02-issues-and-fixes-log.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language/02-boolean-principles.md` -> `spec\02-coding-guidelines\01-cross-language/03-boolean-principles.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language/03-casting-elimination-patterns.md` -> `spec\02-coding-guidelines\01-cross-language/04-casting-elimination-patterns.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/01-naming-prefixes.md` -> `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/02-naming-prefixes.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/02-guards-and-extraction.md` -> `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/03-guards-and-extraction.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/03-parameters-and-conditions.md` -> `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/04-parameters-and-conditions.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/04-quick-reference.md` -> `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/05-quick-reference.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/05-exemptions-and-api.md` -> `spec\02-coding-guidelines\01-cross-language\02-boolean-principles/06-exemptions-and-api.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/01-braces-and-nesting.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/02-braces-and-nesting.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/02-conditions-and-extraction.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/03-conditions-and-extraction.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/03-blank-lines-and-spacing.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/04-blank-lines-and-spacing.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/04-function-and-type-size.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/05-function-and-type-size.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/05-multi-line-formatting.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/06-multi-line-formatting.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/06-comments-and-documentation.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/07-comments-and-documentation.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\04-code-style/07-checklist.md` -> `spec\02-coding-guidelines\01-cross-language\04-code-style/08-checklist.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/01-naming-and-database.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/02-naming-and-database.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/02-boolean-and-enum.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/03-boolean-and-enum.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/03-code-style-and-errors.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/04-code-style-and-errors.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/04-type-safety.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/05-type-safety.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/05-magic-strings-and-organization.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/06-magic-strings-and-organization.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/06-advanced-patterns.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/07-advanced-patterns.md`
+- RENAME: `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/07-checklist.md` -> `spec\02-coding-guidelines\01-cross-language\15-master-coding-guidelines/08-checklist.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/01-connection-status-enum.md` -> `spec\02-coding-guidelines\02-typescript/02-connection-status-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/02-entity-status-enum.md` -> `spec\02-coding-guidelines\02-typescript/03-entity-status-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/03-execution-status-enum.md` -> `spec\02-coding-guidelines\02-typescript/04-execution-status-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/04-export-status-enum.md` -> `spec\02-coding-guidelines\02-typescript/05-export-status-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/05-http-method-enum.md` -> `spec\02-coding-guidelines\02-typescript/06-http-method-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/06-message-status-enum.md` -> `spec\02-coding-guidelines\02-typescript/07-message-status-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/07-type-safety-remediation-plan.md` -> `spec\02-coding-guidelines\02-typescript/08-type-safety-remediation-plan.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/08-typescript-standards-reference.md` -> `spec\02-coding-guidelines\02-typescript/09-typescript-standards-reference.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/09-promise-await-patterns.md` -> `spec\02-coding-guidelines\02-typescript/10-promise-await-patterns.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/10-log-level-enum.md` -> `spec\02-coding-guidelines\02-typescript/11-log-level-enum.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/11-eslint-enforcement.md` -> `spec\02-coding-guidelines\02-typescript/12-eslint-enforcement.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/12-discriminated-union-patterns.md` -> `spec\02-coding-guidelines\02-typescript/13-discriminated-union-patterns.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/13-enum-checking-and-validation.md` -> `spec\02-coding-guidelines\02-typescript/14-enum-checking-and-validation.md`
+- RENAME: `spec\02-coding-guidelines\02-typescript/14-state-management.md` -> `spec\02-coding-guidelines\02-typescript/15-state-management.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\01-enum-specification/01-enum-pattern.md` -> `spec\02-coding-guidelines\03-golang\01-enum-specification/02-enum-pattern.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\01-enum-specification/02-required-methods.md` -> `spec\02-coding-guidelines\03-golang\01-enum-specification/03-required-methods.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\01-enum-specification/03-folder-structure.md` -> `spec\02-coding-guidelines\03-golang\01-enum-specification/04-folder-structure.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\01-enum-specification/04-validation-checklist.md` -> `spec\02-coding-guidelines\03-golang\01-enum-specification/05-validation-checklist.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\01-enum-specification/05-info-object-pattern.md` -> `spec\02-coding-guidelines\03-golang\01-enum-specification/06-info-object-pattern.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/01-file-and-function-rules.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/02-file-and-function-rules.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/02-type-safety-and-errors.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/03-type-safety-and-errors.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/03-database-and-structs.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/04-database-and-structs.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/04-naming-and-organization.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/05-naming-and-organization.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/05-enums-and-dry.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/06-enums-and-dry.md`
+- RENAME: `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/06-concurrency-and-patterns.md` -> `spec\02-coding-guidelines\03-golang\04-golang-standards-reference/07-concurrency-and-patterns.md`
+- RENAME: `spec\02-coding-guidelines\04-php/01-enums.md` -> `spec\02-coding-guidelines\04-php/02-enums.md`
+- RENAME: `spec\02-coding-guidelines\04-php/02-forbidden-patterns.md` -> `spec\02-coding-guidelines\04-php/03-forbidden-patterns.md`
+- RENAME: `spec\02-coding-guidelines\04-php/03-naming-conventions.md` -> `spec\02-coding-guidelines\04-php/04-naming-conventions.md`
+- RENAME: `spec\02-coding-guidelines\04-php/07-php-standards-reference.md` -> `spec\02-coding-guidelines\04-php/06-php-standards-reference.md`
+- RENAME: `spec\02-coding-guidelines\04-php/08-spacing-and-imports.md` -> `spec\02-coding-guidelines\04-php/07-spacing-and-imports.md`
+- RENAME: `spec\02-coding-guidelines\04-php/09-response-key-type-inventory.md` -> `spec\02-coding-guidelines\04-php/08-response-key-type-inventory.md`
+- RENAME: `spec\02-coding-guidelines\04-php/10-php-go-consistency-audit.md` -> `spec\02-coding-guidelines\04-php/09-php-go-consistency-audit.md`
+- RENAME: `spec\02-coding-guidelines\04-php\07-php-standards-reference/01-naming-and-errors.md` -> `spec\02-coding-guidelines\04-php\07-php-standards-reference/02-naming-and-errors.md`
+- RENAME: `spec\02-coding-guidelines\04-php\07-php-standards-reference/02-constants-and-deps.md` -> `spec\02-coding-guidelines\04-php\07-php-standards-reference/03-constants-and-deps.md`
+- RENAME: `spec\02-coding-guidelines\04-php\07-php-standards-reference/03-initialization-and-booleans.md` -> `spec\02-coding-guidelines\04-php\07-php-standards-reference/04-initialization-and-booleans.md`
+- RENAME: `spec\02-coding-guidelines\04-php\07-php-standards-reference/04-code-style.md` -> `spec\02-coding-guidelines\04-php\07-php-standards-reference/05-code-style.md`
+- RENAME: `spec\02-coding-guidelines\04-php\07-php-standards-reference/05-forbidden-and-database.md` -> `spec\02-coding-guidelines\04-php\07-php-standards-reference/06-forbidden-and-database.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/01-naming-conventions.md` -> `spec\02-coding-guidelines\05-rust/02-naming-conventions.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/02-error-handling.md` -> `spec\02-coding-guidelines\05-rust/03-error-handling.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/03-async-patterns.md` -> `spec\02-coding-guidelines\05-rust/04-async-patterns.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/04-memory-safety.md` -> `spec\02-coding-guidelines\05-rust/05-memory-safety.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/05-testing-standards.md` -> `spec\02-coding-guidelines\05-rust/06-testing-standards.md`
+- RENAME: `spec\02-coding-guidelines\05-rust/06-ffi-platform.md` -> `spec\02-coding-guidelines\05-rust/07-ffi-platform.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/01-anti-hallucination-rules.md` -> `spec\02-coding-guidelines\06-ai-optimization/02-anti-hallucination-rules.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/02-ai-quick-reference-checklist.md` -> `spec\02-coding-guidelines\06-ai-optimization/03-ai-quick-reference-checklist.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/03-common-ai-mistakes.md` -> `spec\02-coding-guidelines\06-ai-optimization/04-common-ai-mistakes.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/04-condensed-master-guidelines.md` -> `spec\02-coding-guidelines\06-ai-optimization/05-condensed-master-guidelines.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/05-citation-requirement.md` -> `spec\02-coding-guidelines\06-ai-optimization/06-citation-requirement.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/05-enum-naming-quick-reference.md` -> `spec\02-coding-guidelines\06-ai-optimization/07-enum-naming-quick-reference.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/06-hallucination-checks.md` -> `spec\02-coding-guidelines\06-ai-optimization/08-hallucination-checks.md`
+- RENAME: `spec\02-coding-guidelines\06-ai-optimization/07-agent-memory-lifecycle.md` -> `spec\02-coding-guidelines\06-ai-optimization/09-agent-memory-lifecycle.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/01-sarif-contract.md` -> `spec\02-coding-guidelines\06-cicd-integration/02-sarif-contract.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/02-plugin-model.md` -> `spec\02-coding-guidelines\06-cicd-integration/03-plugin-model.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/03-language-roadmap.md` -> `spec\02-coding-guidelines\06-cicd-integration/04-language-roadmap.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/04-ci-templates.md` -> `spec\02-coding-guidelines\06-cicd-integration/05-ci-templates.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/05-distribution.md` -> `spec\02-coding-guidelines\06-cicd-integration/06-distribution.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/06-rules-mapping.md` -> `spec\02-coding-guidelines\06-cicd-integration/07-rules-mapping.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration/07-performance.md` -> `spec\02-coding-guidelines\06-cicd-integration/08-performance.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/01-fix-repo-contract.md` -> `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/02-fix-repo-contract.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/02-installer-contract.md` -> `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/03-installer-contract.md`
+- RENAME: `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/03-visibility-change-contract.md` -> `spec\02-coding-guidelines\06-cicd-integration\08-fix-repo-and-installers/04-visibility-change-contract.md`
+- RENAME: `spec\02-coding-guidelines\07-csharp/01-naming-and-conventions.md` -> `spec\02-coding-guidelines\07-csharp/02-naming-and-conventions.md`
+- RENAME: `spec\02-coding-guidelines\07-csharp/02-method-design.md` -> `spec\02-coding-guidelines\07-csharp/03-method-design.md`
+- RENAME: `spec\02-coding-guidelines\07-csharp/03-error-handling.md` -> `spec\02-coding-guidelines\07-csharp/04-error-handling.md`
+- RENAME: `spec\02-coding-guidelines\07-csharp/04-type-safety.md` -> `spec\02-coding-guidelines\07-csharp/05-type-safety.md`
+- RENAME: `spec\02-coding-guidelines\08-file-folder-naming/01-cross-language.md` -> `spec\02-coding-guidelines\08-file-folder-naming/02-cross-language.md`
+- RENAME: `spec\02-coding-guidelines\08-file-folder-naming/02-php-wordpress.md` -> `spec\02-coding-guidelines\08-file-folder-naming/03-php-wordpress.md`
+- RENAME: `spec\02-coding-guidelines\08-file-folder-naming/03-golang.md` -> `spec\02-coding-guidelines\08-file-folder-naming/04-golang.md`
+- RENAME: `spec\02-coding-guidelines\08-file-folder-naming/04-typescript-javascript.md` -> `spec\02-coding-guidelines\08-file-folder-naming/05-typescript-javascript.md`
+- RENAME: `spec\02-coding-guidelines\08-file-folder-naming/05-rust-csharp.md` -> `spec\02-coding-guidelines\08-file-folder-naming/06-rust-csharp.md`
+- RENAME: `spec\02-coding-guidelines\11-security\01-axios-version-control/01-implementation-rules.md` -> `spec\02-coding-guidelines\11-security\01-axios-version-control/02-implementation-rules.md`
+- RENAME: `spec\02-coding-guidelines\11-security\01-axios-version-control/02-security-notes.md` -> `spec\02-coding-guidelines\11-security\01-axios-version-control/03-security-notes.md`
+- RENAME: `spec\02-coding-guidelines\12-python/01-standards.md` -> `spec\02-coding-guidelines\12-python/02-standards.md`
+- RENAME: `spec\02-coding-guidelines\13-cpp/01-standards.md` -> `spec\02-coding-guidelines\13-cpp/02-standards.md`
+- HEADER_SYNC: `spec\03-error-manage\03-structure.md`: changed #04 to #03
+- RENAME: `spec\03-error-manage\01-error-resolution/00-error-documentation-guideline.md` -> `spec\03-error-manage\01-error-resolution/02-error-documentation-guideline.md`
+- RENAME: `spec\03-error-manage\01-error-resolution/01-cross-reference-diagram.md` -> `spec\03-error-manage\01-error-resolution/03-cross-reference-diagram.md`
+- RENAME: `spec\03-error-manage\01-error-resolution/02-debugging-cheat-sheet.md` -> `spec\03-error-manage\01-error-resolution/04-debugging-cheat-sheet.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\03-retrospectives/01-health-endpoint-mismatch.md` -> `spec\03-error-manage\01-error-resolution\03-retrospectives/02-health-endpoint-mismatch.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\03-retrospectives/02-retry-debounce-dedup-fixes.md` -> `spec\03-error-manage\01-error-resolution\03-retrospectives/03-retry-debounce-dedup-fixes.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\03-retrospectives/03-zip-finalization-before-return.md` -> `spec\03-error-manage\01-error-resolution\03-retrospectives/04-zip-finalization-before-return.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\03-retrospectives/04-activation-endpoint-mismatch.md` -> `spec\03-error-manage\01-error-resolution\03-retrospectives/05-activation-endpoint-mismatch.md`
+- HEADER_SYNC: `spec\03-error-manage\01-error-resolution\03-retrospectives\02-health-endpoint-mismatch.md`: changed #01 to #02
+- RENAME: `spec\03-error-manage\01-error-resolution\04-verification-patterns/01-frontend-backend-sync.md` -> `spec\03-error-manage\01-error-resolution\04-verification-patterns/02-frontend-backend-sync.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\05-debugging-guides/01-debugging-php.md` -> `spec\03-error-manage\01-error-resolution\05-debugging-guides/02-debugging-php.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\05-debugging-guides/02-debugging-go.md` -> `spec\03-error-manage\01-error-resolution\05-debugging-guides/03-debugging-go.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\05-debugging-guides/03-debugging-typescript.md` -> `spec\03-error-manage\01-error-resolution\05-debugging-guides/04-debugging-typescript.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\app-issues/error-management-file-path-and-missing-file-code-red-rule.md` -> `spec\03-error-manage\01-error-resolution\app-issues/02-error-management-file-path-and-missing-file-code-red-rule.md`
+- RENAME: `spec\03-error-manage\01-error-resolution\app-issues/2026-04-02-url-error-casing-fix.md` -> `spec\03-error-manage\01-error-resolution\app-issues/03-04-02-url-error-casing-fix.md`
+- RENAME: `spec\03-error-manage\02-error-architecture/01-error-handling-reference.md` -> `spec\03-error-manage\02-error-architecture/02-error-handling-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture/02-go-delegation-fix.md` -> `spec\03-error-manage\02-error-architecture/03-go-delegation-fix.md`
+- RENAME: `spec\03-error-manage\02-error-architecture/03-notification-colors.md` -> `spec\03-error-manage\02-error-architecture/04-notification-colors.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/01-copy-formats.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/02-copy-formats.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/02-react-components.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/03-react-components.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/03-error-modal-reference.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/04-error-modal-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/04-color-themes.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/05-color-themes.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/05-error-history-persistence.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/06-error-history-persistence.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal/06-suppress-global-error.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal/07-suppress-global-error.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/01-compact-report.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/02-compact-report.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/02-full-report.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/03-full-report.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/03-full-report-with-backend-logs.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/04-full-report-with-backend-logs.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/04-error-log-txt.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/05-error-log-txt.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/05-full-log-txt.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/06-full-log-txt.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/06-error-log-with-delegated-info.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/07-error-log-with-delegated-info.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/07-envelope-error-response.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/08-envelope-error-response.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/08-session-diagnostics.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/09-session-diagnostics.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/09-generator-code-reference.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\01-copy-formats/10-generator-code-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/01-typescript-interfaces.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/02-typescript-interfaces.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/02-error-store.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/03-error-store.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/03-api-types.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/04-api-types.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/04-hooks.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/05-hooks.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/05-component-hierarchy.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/06-component-hierarchy.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/06-component-source.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/07-component-source.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/07-report-generator.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/08-report-generator.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/08-integration-guide.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\02-react-components/09-integration-guide.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/01-data-model.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/02-data-model.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/02-capture-pipeline.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/03-capture-pipeline.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/03-envelope-parsing.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/04-envelope-parsing.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/04-modal-structure.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/05-modal-structure.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/05-backend-tabs.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/06-backend-tabs.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/06-frontend-tabs.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/07-frontend-tabs.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/07-request-chain.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/08-request-chain.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/08-traversal-details.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/09-traversal-details.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/09-session-diagnostics.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/10-session-diagnostics.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/10-report-generation.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/11-report-generation.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/11-queue-navigation.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/12-queue-navigation.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/12-code-examples.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/13-code-examples.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/13-file-reference.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\03-error-modal-reference/14-file-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/01-design-tokens.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/02-design-tokens.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/02-backend-tab-colors.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/03-backend-tab-colors.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/03-frontend-and-ui-colors.md` -> `spec\03-error-manage\02-error-architecture\04-error-modal\04-color-themes/04-frontend-and-ui-colors.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\05-response-envelope/01-adr.md` -> `spec\03-error-manage\02-error-architecture\05-response-envelope/02-adr.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\05-response-envelope/02-changelog.md` -> `spec\03-error-manage\02-error-architecture\05-response-envelope/03-changelog.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\05-response-envelope/03-configurability.md` -> `spec\03-error-manage\02-error-architecture\05-response-envelope/04-configurability.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\05-response-envelope/04-response-envelope-reference.md` -> `spec\03-error-manage\02-error-architecture\05-response-envelope/05-response-envelope-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package/01-apperror-reference.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package/02-apperror-reference.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package/08-go-apperror-linter-spec.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package/03-go-apperror-linter-spec.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package/09-ai-action-plan-apperror-methods.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package/04-ai-action-plan-apperror-methods.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/01-overview-and-stack.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/02-overview-and-stack.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/02-apperror-struct.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/03-apperror-struct.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/03-result-types.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/04-result-types.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/04-codes-and-policy.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/05-codes-and-policy.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/05-apperrtype-enums.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/06-apperrtype-enums.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/05-usage-and-adapters.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/07-usage-and-adapters.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/06-serialization-and-guards.md` -> `spec\03-error-manage\02-error-architecture\06-apperror-package\01-apperror-reference/08-serialization-and-guards.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\07-logging-and-diagnostics/01-react-execution-logger.md` -> `spec\03-error-manage\02-error-architecture\07-logging-and-diagnostics/02-react-execution-logger.md`
+- RENAME: `spec\03-error-manage\02-error-architecture\07-logging-and-diagnostics/02-session-based-logging.md` -> `spec\03-error-manage\02-error-architecture\07-logging-and-diagnostics/03-session-based-logging.md`
+- RENAME: `spec\03-error-manage\03-error-code-registry/01-registry.md` -> `spec\03-error-manage\03-error-code-registry/02-registry.md`
+- RENAME: `spec\03-error-manage\03-error-code-registry/02-integration-guide.md` -> `spec\03-error-manage\03-error-code-registry/03-integration-guide.md`
+- RENAME: `spec\03-error-manage\03-error-code-registry/03-collision-resolution-summary.md` -> `spec\03-error-manage\03-error-code-registry/04-collision-resolution-summary.md`
+- RENAME: `spec\03-error-manage\03-error-code-registry/04-error-code-utilization-report.md` -> `spec\03-error-manage\03-error-code-registry/05-error-code-utilization-report.md`
+- RENAME: `spec\03-error-manage\03-error-code-registry/05-overlap-validator.md` -> `spec\03-error-manage\03-error-code-registry/06-overlap-validator.md`
+- HEADER_SYNC: `spec\03-error-manage\03-error-code-registry\06-overlap-validator.md`: changed #02 to #06
+- RENAME: `spec\03-error-manage\03-error-code-registry\09-templates/01-error-codes-template.md` -> `spec\03-error-manage\03-error-code-registry\09-templates/02-error-codes-template.md`
+- RENAME: `spec\05-split-db-architecture/97-changelog.md` -> `spec\05-split-db-architecture/98-changelog.md`
+- RENAME: `spec\05-split-db-architecture/98-acceptance-criteria.md` -> `spec\05-split-db-architecture/99-acceptance-criteria.md`
+- RENAME: `spec\05-split-db-architecture/99-consistency-report.md` -> `spec\05-split-db-architecture/100-consistency-report.md`
+- RENAME: `spec\05-split-db-architecture\02-features/01-cli-examples.md` -> `spec\05-split-db-architecture\02-features/02-cli-examples.md`
+- RENAME: `spec\05-split-db-architecture\02-features/02-reset-api-standard.md` -> `spec\05-split-db-architecture\02-features/03-reset-api-standard.md`
+- RENAME: `spec\05-split-db-architecture\02-features/03-database-flow-diagrams.md` -> `spec\05-split-db-architecture\02-features/04-database-flow-diagrams.md`
+- RENAME: `spec\05-split-db-architecture\02-features/04-rbac-casbin.md` -> `spec\05-split-db-architecture\02-features/05-rbac-casbin.md`
+- RENAME: `spec\05-split-db-architecture\02-features/05-user-scoped-isolation.md` -> `spec\05-split-db-architecture\02-features/06-user-scoped-isolation.md`
+- RENAME: `spec\06-seedable-config-architecture/97-changelog.md` -> `spec\06-seedable-config-architecture/98-changelog.md`
+- RENAME: `spec\06-seedable-config-architecture/98-acceptance-criteria.md` -> `spec\06-seedable-config-architecture/99-acceptance-criteria.md`
+- RENAME: `spec\06-seedable-config-architecture/99-consistency-report.md` -> `spec\06-seedable-config-architecture/100-consistency-report.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/01-rag-chunk-settings.md` -> `spec\06-seedable-config-architecture\02-features/02-rag-chunk-settings.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/02-rag-validation-helpers.md` -> `spec\06-seedable-config-architecture\02-features/03-rag-validation-helpers.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/03-rag-validation-tests.md` -> `spec\06-seedable-config-architecture\02-features/04-rag-validation-tests.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/04-rag-test-coverage-matrix.md` -> `spec\06-seedable-config-architecture\02-features/05-rag-test-coverage-matrix.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/05-validation-data-seeding.md` -> `spec\06-seedable-config-architecture\02-features/06-validation-data-seeding.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/06-update-check-keys.md` -> `spec\06-seedable-config-architecture\02-features/07-update-check-keys.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/07-reference-table-seeding.md` -> `spec\06-seedable-config-architecture\02-features/08-reference-table-seeding.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/08-config-schema-tables-block.md` -> `spec\06-seedable-config-architecture\02-features/09-config-schema-tables-block.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/09-config-seed-1.3.0-bump.md` -> `spec\06-seedable-config-architecture\02-features/10-config-seed-1.3.0-bump.md`
+- RENAME: `spec\06-seedable-config-architecture\02-features/10-at-ref-resolver.md` -> `spec\06-seedable-config-architecture\02-features/11-at-ref-resolver.md`
+- HEADER_SYNC: `spec\06-seedable-config-architecture\02-features\08-reference-table-seeding.md`: changed #07 to #08
+- HEADER_SYNC: `spec\06-seedable-config-architecture\02-features\09-config-schema-tables-block.md`: changed #08 to #09
+- HEADER_SYNC: `spec\06-seedable-config-architecture\02-features\10-config-seed-1.3.0-bump.md`: changed #09 to #10
+- HEADER_SYNC: `spec\06-seedable-config-architecture\02-features\11-at-ref-resolver.md`: changed #10 to #11
+- RENAME: `spec\08-docs-viewer-ui\02-features/01-typography.md` -> `spec\08-docs-viewer-ui\02-features/02-typography.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/02-syntax-highlighting.md` -> `spec\08-docs-viewer-ui\02-features/03-syntax-highlighting.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/03-fullscreen-mode.md` -> `spec\08-docs-viewer-ui\02-features/04-fullscreen-mode.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/04-keyboard-navigation.md` -> `spec\08-docs-viewer-ui\02-features/05-keyboard-navigation.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/05-copy-markdown.md` -> `spec\08-docs-viewer-ui\02-features/06-copy-markdown.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/06-shortcuts-overlay.md` -> `spec\08-docs-viewer-ui\02-features/07-shortcuts-overlay.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/06-ui-theme-animations.md` -> `spec\08-docs-viewer-ui\02-features/08-ui-theme-animations.md`
+- RENAME: `spec\08-docs-viewer-ui\02-features/07-visual-rendering-guide.md` -> `spec\08-docs-viewer-ui\02-features/09-visual-rendering-guide.md`
+- HEADER_SYNC: `spec\09-code-block-system\01-index.md`: changed #08 to #01
+- HEADER_SYNC: `spec\09-code-block-system\10-tree-structure-rendering.md`: changed #09 to #10
+- HEADER_SYNC: `spec\12-cicd-pipeline-workflows\17-release-pipeline-issues-rca.md`: changed #10 to #17
+- RENAME: `spec\12-cicd-pipeline-workflows\01-browser-extension-deploy/01-ci-pipeline.md` -> `spec\12-cicd-pipeline-workflows\01-browser-extension-deploy/02-ci-pipeline.md`
+- RENAME: `spec\12-cicd-pipeline-workflows\01-browser-extension-deploy/02-release-pipeline.md` -> `spec\12-cicd-pipeline-workflows\01-browser-extension-deploy/03-release-pipeline.md`
+- RENAME: `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/01-ci-pipeline.md` -> `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/02-ci-pipeline.md`
+- RENAME: `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/02-release-pipeline.md` -> `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/03-release-pipeline.md`
+- RENAME: `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/03-complete-workflow-reference.md` -> `spec\12-cicd-pipeline-workflows\02-go-binary-deploy/04-complete-workflow-reference.md`
+- HEADER_SYNC: `spec\14-update\02-self-update-overview.md`: changed #01 to #02
+- HEADER_SYNC: `spec\14-update\03-deploy-path-resolution.md`: changed #02 to #03
+- HEADER_SYNC: `spec\14-update\04-rename-first-deploy.md`: changed #03 to #04
+- HEADER_SYNC: `spec\14-update\05-build-scripts.md`: changed #04 to #05
+- HEADER_SYNC: `spec\14-update\06-handoff-mechanism.md`: changed #05 to #06
+- HEADER_SYNC: `spec\14-update\07-cleanup.md`: changed #06 to #07
+- HEADER_SYNC: `spec\14-update\08-console-safe-handoff.md`: changed #07 to #08
+- HEADER_SYNC: `spec\14-update\10-version-verification.md`: changed #09 to #10
+- HEADER_SYNC: `spec\14-update\11-last-release-detection.md`: changed #10 to #11
+- HEADER_SYNC: `spec\14-update\12-windows-icon-embedding.md`: changed #11 to #12
+- HEADER_SYNC: `spec\14-update\13-code-signing.md`: changed #12 to #13
+- HEADER_SYNC: `spec\14-update\24-install-script-version-probe.md`: changed #17 to #24
+- RENAME: `spec\14-update\24-update-check-mechanism/97-changelog.md` -> `spec\14-update\24-update-check-mechanism/98-changelog.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/01-fundamentals.md` -> `spec\14-update\24-update-check-mechanism/02-fundamentals.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/02-status-script-json.md` -> `spec\14-update\24-update-check-mechanism/03-status-script-json.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/03-combined-json.md` -> `spec\14-update\24-update-check-mechanism/04-combined-json.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/04-database-schema.md` -> `spec\14-update\24-update-check-mechanism/05-database-schema.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/05-update-checker-service.md` -> `spec\14-update\24-update-check-mechanism/06-update-checker-service.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/06-cli-commands.md` -> `spec\14-update\24-update-check-mechanism/07-cli-commands.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/07-pre-command-hook.md` -> `spec\14-update\24-update-check-mechanism/08-pre-command-hook.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/08-error-handling.md` -> `spec\14-update\24-update-check-mechanism/09-error-handling.md`
+- RENAME: `spec\14-update\24-update-check-mechanism/09-json-fallback-store.md` -> `spec\14-update\24-update-check-mechanism/10-json-fallback-store.md`
+- HEADER_SYNC: `spec\16-generic-release\02-cross-compilation.md`: changed #01 to #02
+- HEADER_SYNC: `spec\16-generic-release\03-release-pipeline.md`: changed #02 to #03
+- HEADER_SYNC: `spec\16-generic-release\04-install-scripts.md`: changed #03 to #04
+- HEADER_SYNC: `spec\16-generic-release\05-checksums-verification.md`: changed #04 to #05
+- HEADER_SYNC: `spec\16-generic-release\06-release-assets.md`: changed #05 to #06
+- HEADER_SYNC: `spec\16-generic-release\07-release-metadata.md`: changed #06 to #07
+- HEADER_SYNC: `spec\16-generic-release\08-known-issues-and-fixes.md`: changed #07 to #08
+- HEADER_SYNC: `spec\16-generic-release\09-version-pinned-release-installers.md`: changed #08 to #09
+- HEADER_SYNC: `spec\17-consolidated-guidelines\30-linter-authoring-guide.md`: changed #27 to #30
+- HEADER_SYNC: `spec\17-consolidated-guidelines\31-distribution-and-runner.md`: changed #28 to #31
+- HEADER_SYNC: `spec\17-consolidated-guidelines\32-blind-ai-audit-v3.md`: changed #29 to #32
+- RENAME: `spec\18-wp-plugin-how-to\02-enums-and-coding-style/01-enum-architecture.md` -> `spec\18-wp-plugin-how-to\02-enums-and-coding-style/02-enum-architecture.md`
+- RENAME: `spec\18-wp-plugin-how-to\02-enums-and-coding-style/02-enum-metadata-pattern.md` -> `spec\18-wp-plugin-how-to\02-enums-and-coding-style/03-enum-metadata-pattern.md`
+- RENAME: `spec\18-wp-plugin-how-to\02-enums-and-coding-style/03-self-update-status-enum.md` -> `spec\18-wp-plugin-how-to\02-enums-and-coding-style/04-self-update-status-enum.md`
+- RENAME: `spec\18-wp-plugin-how-to\02-enums-and-coding-style/04-action-type-enum.md` -> `spec\18-wp-plugin-how-to\02-enums-and-coding-style/05-action-type-enum.md`
+- HEADER_SYNC: `spec\19-main-worker-service\01-index.md`: changed #00 to #01
+- HEADER_SYNC: `spec\19-main-worker-service\02-architecture.md`: changed #01 to #02
+- HEADER_SYNC: `spec\19-main-worker-service\03-glossary.md`: changed #02 to #03
+- HEADER_SYNC: `spec\19-main-worker-service\04-main-db-schema.md`: changed #03 to #04
+- HEADER_SYNC: `spec\19-main-worker-service\05-worker-routing.md`: changed #04 to #05
+- HEADER_SYNC: `spec\19-main-worker-service\06-auth-and-2fa.md`: changed #05 to #06
+- HEADER_SYNC: `spec\19-main-worker-service\07-core-api-endpoints.md`: changed #06 to #07
+- HEADER_SYNC: `spec\19-main-worker-service\08-role-based-dashboards.md`: changed #07 to #08
+- HEADER_SYNC: `spec\19-main-worker-service\09-error-contract.md`: changed #08 to #09
+- HEADER_SYNC: `spec\19-main-worker-service\10-self-update-pointer.md`: changed #09 to #10
+- HEADER_SYNC: `spec\19-main-worker-service\11-worker-bootstrap-protocol.md`: changed #10 to #11
+- HEADER_SYNC: `spec\19-main-worker-service\12-split-db-tier-reconciliation.md`: changed #11 to #12
+- HEADER_SYNC: `spec\19-main-worker-service\13-jwt-delivery-contract.md`: changed #12 to #13
+- HEADER_SYNC: `spec\19-main-worker-service\14-error-codes.md`: changed #13 to #14
+- HEADER_SYNC: `spec\19-main-worker-service\15-rbac-and-status-seed.md`: changed #14 to #15
+- HEADER_SYNC: `spec\19-main-worker-service\16-tunable-constants.md`: changed #15 to #16
+- HEADER_SYNC: `spec\19-main-worker-service\17-update-channels.md`: changed #16 to #17
+- HEADER_SYNC: `spec\19-main-worker-service\18-cascading-roles-and-cache-bin.md`: changed #17 to #18
+- HEADER_SYNC: `spec\19-main-worker-service\19-backup-nodes.md`: changed #18 to #19
+- HEADER_SYNC: `spec\19-main-worker-service\20-incremental-backup-sync.md`: changed #19 to #20
+- HEADER_SYNC: `spec\19-main-worker-service\21-backup-encryption-and-keys.md`: changed #20 to #21
+- HEADER_SYNC: `spec\19-main-worker-service\22-backup-endpoints.md`: changed #21 to #22
+- HEADER_SYNC: `spec\19-main-worker-service\23-backup-apply-logic.md`: changed #22 to #23
+- HEADER_SYNC: `spec\19-main-worker-service\24-snapshot-storage-and-restore.md`: changed #23 to #24
+- HEADER_SYNC: `spec\19-main-worker-service\25-threat-model.md`: changed #24 to #25
+- HEADER_SYNC: `spec\19-main-worker-service\26-inherited-rules.md`: changed #25 to #26
+- HEADER_SYNC: `spec\19-main-worker-service\27-trust-boundaries-and-isolation.md`: changed #26 to #27
+- HEADER_SYNC: `spec\19-main-worker-service\28-git-backup-targets.md`: changed #27 to #28
+- RENAME: `.ai-memory\memory/release-architecture-map.md` -> `.ai-memory\memory/02-release-architecture-map.md`
+- RENAME: `.ai-memory\memory\preferences/02-slides-attached-to-release.md` -> `.ai-memory\memory\preferences/01-slides-attached-to-release.md`
+- RENAME: `.ai-memory\memory\preferences/03-improvement-audit-cadence.md` -> `.ai-memory\memory\preferences/02-improvement-audit-cadence.md`
+- RENAME: `.ai-memory\memory\preferences/release-ceremony.md` -> `.ai-memory\memory\preferences/03-release-ceremony.md`
+- RENAME: `.ai-memory\memory\project/03-readme-bundle-installers.md` -> `.ai-memory\memory\project/01-readme-bundle-installers.md`
+- RENAME: `.ai-memory\memory\project/naming-compliance-issues.md` -> `.ai-memory\memory\project/02-naming-compliance-issues.md`
+- RENAME: `.ai-memory\memory\project/phase2-content-overlap-audit.md` -> `.ai-memory\memory\project/03-phase2-content-overlap-audit.md`
+- RENAME: `.ai-memory\memory\project/phase3-consolidated-structure-design.md` -> `.ai-memory\memory\project/04-phase3-consolidated-structure-design.md`
+- RENAME: `.ai-memory\memory\project/v2.2-error-spec-changes.md` -> `.ai-memory\memory\project/05-v2.2-error-spec-changes.md`
+- RENAME: `.ai-memory\memory\sessions/08-2026-08-09-code-red-refactor.md` -> `.ai-memory\memory\sessions/01-2026-08-09-code-red-refactor.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-19-distribution-runner-slides.md` -> `.ai-memory\memory\sessions/02-04-19-distribution-runner-slides.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-19-perf-boolean-naming-schema.md` -> `.ai-memory\memory\sessions/03-04-19-perf-boolean-naming-schema.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-23-quickstart-and-zero-violations.md` -> `.ai-memory\memory\sessions/04-04-23-quickstart-and-zero-violations.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-23-readme-code-red-walkthrough.md` -> `.ai-memory\memory\sessions/05-04-23-readme-code-red-walkthrough.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-24-batch-cleanup-and-rebrand.md` -> `.ai-memory\memory\sessions/06-04-24-batch-cleanup-and-rebrand.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-27-docs-viewer-quick-jump-and-sync-banner.md` -> `.ai-memory\memory\sessions/07-04-27-docs-viewer-quick-jump-and-sync-banner.md`
+- RENAME: `.ai-memory\memory\sessions/2026-04-27-tree-diagnostics-logging.md` -> `.ai-memory\memory\sessions/08-04-27-tree-diagnostics-logging.md`
+- RENAME: `.ai-memory\memory\standards/04-prompt-synchronization-architecture.md` -> `.ai-memory\memory\standards/01-prompt-synchronization-architecture.md`
+- RENAME: `.ai-memory\memory\standards/05-fast-file-indexing-and-caching.md` -> `.ai-memory\memory\standards/02-fast-file-indexing-and-caching.md`
+- RENAME: `.ai-memory\memory\standards/installer-behavior.md` -> `.ai-memory\memory\standards/03-installer-behavior.md`
+- RENAME: `.ai-memory\memory\standards/version-source-of-truth.md` -> `.ai-memory\memory\standards/04-version-source-of-truth.md`
+- RENAME: `.ai-memory\memory\standards/wrapper-and-enum-rules.md` -> `.ai-memory\memory\standards/05-wrapper-and-enum-rules.md`
+- RENAME: `.ai-memory\memory\workflow/no-questions-mode.md` -> `.ai-memory\memory\workflow/02-no-questions-mode.md`
+- RENAME: `.ai-memory\plans\pending/01-slides-system-overhaul.md` -> `.ai-memory\plans\pending/02-slides-system-overhaul.md`
+- RENAME: `.ai-memory\plans\pending/02-apperror-human-logger-methods.md` -> `.ai-memory\plans\pending/03-apperror-human-logger-methods.md`
+- RENAME: `.ai-memory\plans\pending/03-guideline-prompt-and-installer-upgrade.md` -> `.ai-memory\plans\pending/04-guideline-prompt-and-installer-upgrade.md`
+- RENAME: `.ai-memory\plans\pending/04-rename-overviews-and-installer-json.md` -> `.ai-memory\plans\pending/05-rename-overviews-and-installer-json.md`
+- RENAME: `.ai-memory\plans\pending/05-fix-encoding.md` -> `.ai-memory\plans\pending/06-fix-encoding.md`
+- RENAME: `.ai-memory\plans\pending/06-trailing-newlines-and-ai-scripts.md` -> `.ai-memory\plans\pending/07-trailing-newlines-and-ai-scripts.md`
+- RENAME: `.ai-memory\plans\pending/07-lowercase-changelog.md` -> `.ai-memory\plans\pending/08-lowercase-changelog.md`
+- RENAME: `.ai-memory\plans\pending/08-update-prompts-and-release.md` -> `.ai-memory\plans\pending/09-update-prompts-and-release.md`
+- RENAME: `.ai-memory\plans\pending/09-rca-and-boolean-fix.md` -> `.ai-memory\plans\pending/10-rca-and-boolean-fix.md`
+- RENAME: `.ai-memory\plans\pending/14-code-red-refactor-remediation.md` -> `.ai-memory\plans\pending/11-code-red-refactor-remediation.md`
+- RENAME: `.ai-memory\plans\pending/15-prompt-architect-version-tracking.md` -> `.ai-memory\plans\pending/12-prompt-architect-version-tracking.md`
+- RENAME: `.ai-memory\plans\pending/16-cicd-pipeline-consolidation-and-owner-review.md` -> `.ai-memory\plans\pending/13-cicd-pipeline-consolidation-and-owner-review.md`
+- HEADER_SYNC: `.ai-memory\plans\pending\12-prompt-architect-version-tracking.md`: changed #15 to #12
+- RENAME: `01-prompts\\02-core-workflow/05-unified-ai-prompt-v4.md` -> `01-prompts\\02-core-workflow/03-unified-ai-prompt-v4.md`
+- RENAME: `01-prompts\\07-bug-fix/02-fix-with-rca.md` -> `01-prompts\\07-bug-fix/01-fix-with-rca.md`
+- RENAME: `01-prompts\\12-old-plan-prompts/03-plan-steps.md` -> `01-prompts\\12-old-plan-prompts/02-plan-steps.md`
+- RENAME: `01-prompts\\12-old-plan-prompts/04-plan-steps-by-groups.md` -> `01-prompts\\12-old-plan-prompts/03-plan-steps-by-groups.md`
+- RENAME: `01-prompts\\12-old-plan-prompts/05-plan-maximum-enforcement-v5.md` -> `01-prompts\\12-old-plan-prompts/04-plan-maximum-enforcement-v5.md`
+- RENAME: `01-prompts\\12-old-plan-prompts/06-plan-spec-steps.md` -> `01-prompts\\12-old-plan-prompts/05-plan-spec-steps.md`
+- RENAME: `01-prompts\\21-old-execute-prompts/02-execute-robust-loop.md` -> `01-prompts\\21-old-execute-prompts/01-execute-robust-loop.md`
+- RENAME: `01-prompts\\21-old-execute-prompts/04-fix-subtask-naming-convention.md` -> `01-prompts\\21-old-execute-prompts/02-fix-subtask-naming-convention.md`
+- RENAME: `.ai-memory\question-and-ambiguity/01-ignored-deleted-reason-scope.md` -> `.ai-memory\question-and-ambiguity/02-ignored-deleted-reason-scope.md`
+- RENAME: `.ai-memory\question-and-ambiguity/task-counter.md` -> `.ai-memory\question-and-ambiguity/03-task-counter.md`
+- HEADER_SYNC: `.ai-memory\question-and-ambiguity\02-ignored-deleted-reason-scope.md`: changed #01 to #02
+- RENAME: `.ai-memory\resolved-issues/01-readme-boolean-negatives-and-style.md` -> `.ai-memory\resolved-issues/02-readme-boolean-negatives-and-style.md`
+- RENAME: `.ai-memory\resolved-issues/02-installsection-component-split.md` -> `.ai-memory\resolved-issues/03-installsection-component-split.md`
+- RENAME: `.ai-memory\resolved-issues/03-fuzzymatch-function-length-negative-guards.md` -> `.ai-memory\resolved-issues/04-fuzzymatch-function-length-negative-guards.md`
+- RENAME: `.ai-memory\resolved-issues/04-usesearchkeyboard-raw-not-operator.md` -> `.ai-memory\resolved-issues/05-usesearchkeyboard-raw-not-operator.md`
+- RENAME: `.ai-memory\resolved-issues/05-markdown-highlighter-newline-violations.md` -> `.ai-memory\resolved-issues/06-markdown-highlighter-newline-violations.md`
+- RENAME: `.ai-memory\resolved-issues/06-version-drift-after-package-bump.md` -> `.ai-memory\resolved-issues/07-version-drift-after-package-bump.md`
+- RENAME: `.ai-memory\resolved-issues/07-cross-spec-missing-file-link-checker.md` -> `.ai-memory\resolved-issues/08-cross-spec-missing-file-link-checker.md`
+- RENAME: `.ai-memory\suggestions/01-fix-absolute-file-paths.md` -> `.ai-memory\suggestions/02-fix-absolute-file-paths.md`

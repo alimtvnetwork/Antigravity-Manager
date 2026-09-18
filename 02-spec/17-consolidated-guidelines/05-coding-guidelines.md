@@ -6,7 +6,7 @@
 This file previously duplicated the coding guidelines. To eliminate drift, the single source of truth is now:
 
 - `02-spec/17-consolidated-guidelines/34-compiled-simple-coding-guidelines.md` (source)
-- `.lovable/coding-guidelines.md` (mirror, auto-generated)
+- `.ai-memory/coding-guidelines.md` (mirror, auto-generated)
 - `.cursorrules` (mirror, auto-generated)
 
 Mirrors are produced by `scripts/sync-guidelines.mjs`. Do not hand-edit mirrors, and do not restore the old consolidated content here: any long-form coding rule additions must land in file 31 so the mirrors stay authoritative for agent search.

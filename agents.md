@@ -37,11 +37,11 @@ To survive massive checklists and complex codebases, you MUST operate using thes
 
 ## 5. Strict Relative Git Paths Mandate (TOTAL BAN on Absolute Paths / `file:///` URIs)
 
-- **Strict Relative Git Paths:** All file paths, markdown links, citations, subtask paths (`.lovable/plans/subtasks/`), and memory logs MUST be strictly relative paths starting from the git repository root (e.g., `02-spec/02-coding-guidelines/04-error-handling.md`, `.lovable/plans/subtasks/01-task.md`, `cmd/main.go`).
+- **Strict Relative Git Paths:** All file paths, markdown links, citations, subtask paths (`.ai-memory/plans/subtasks/`), and memory logs MUST be strictly relative paths starting from the git repository root (e.g., `02-spec/02-coding-guidelines/04-error-handling.md`, `.ai-memory/plans/subtasks/01-task.md`, `cmd/main.go`).
 - **TOTAL BAN:** NEVER write absolute filesystem paths (e.g., `/absolute/path/to/...`, `C:\Users\...`, `/home/...`) or absolute file URIs (`file:///absolute/path/to/...`, `file:///absolute/path/to/`) inside ANY repository files, plans, specs, comments, or documentation.
-  - ❌ **BAD:** `[SSH Commands](file:///absolute/path/to/.lovable/02-spec/commands/01-ssh-commands.md)`
+  - ❌ **BAD:** `[SSH Commands](file:///absolute/path/to/.ai-memory/02-spec/commands/01-ssh-commands.md)`
   - ❌ **BAD:** `Target File: /absolute/path/to/...\cmd\login.go`
-  - ✅ **GOOD:** `[SSH Commands](.lovable/02-spec/commands/01-ssh-commands.md)`
+  - ✅ **GOOD:** `[SSH Commands](.ai-memory/02-spec/commands/01-ssh-commands.md)`
   - ✅ **GOOD:** `Target File: cmd/login.go`
 
 ## 6. Go Error Return Type: `*appfault.AppError` (Standard)

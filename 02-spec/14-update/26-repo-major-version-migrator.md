@@ -81,7 +81,7 @@ The script scans these file globs and replaces exact matches of `--from` with `-
 
 Excluded:
 
-- `.lovable/`, `node_modules/`, `bun.lock*`, `package-lock.json`, `.release/`, `.git/`.
+- `.ai-memory/`, `node_modules/`, `bun.lock*`, `package-lock.json`, `.release/`, `.git/`.
 - Binary files (detected by null-byte scan of first 8KB).
 
 ### Pin Enforcement
@@ -125,7 +125,7 @@ Excluded:
 
 ## Forbidden Behaviors
 
-1. Editing `.lovable/`, `.release/`, `node_modules/`, lockfiles, or `.git/`.
+1. Editing `.ai-memory/`, `.release/`, `node_modules/`, lockfiles, or `.git/`.
 2. Rewriting bare `vNN` tokens outside a qualified slug.
 3. Touching the `name` field of `package.json` (Lovable scaffold; not the public repo name).
 4. Performing the migration without a clean working tree (must error with exit 7).

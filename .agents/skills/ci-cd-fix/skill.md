@@ -10,7 +10,7 @@ Trigger Keywords & Aliases: `fix with RCA`, `fix`, `fix, fix`, `CI/CD fix`, `cic
 
 /goal Autonomously diagnose, update or create the local Python CI/CD runner script (`03-ai-scripts/06-cicd-local-runner.py`) from repository workflows or screenshot pipeline names, and fix all failures by executing a singly-done self-looping sequence (zeroing in on one failure at a time) until the runner exits with code 0 without stopping.
 
-/learn Ingest recent RCAs from `.lovable/cicd-issues/`, `.lovable/issues/`, `02-spec/02-coding-guidelines/02-canonical-size-tier.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, and `02-spec/03-error-manage/` before touching any code so past mistakes are never repeated.
+/learn Ingest recent RCAs from `.ai-memory/cicd-issues/`, `.ai-memory/issues/`, `02-spec/02-coding-guidelines/02-canonical-size-tier.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, and `02-spec/03-error-manage/` before touching any code so past mistakes are never repeated.
 
 ---
 
@@ -27,18 +27,18 @@ Both N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after the user sets them.
 
 ---
 
-## Strict In-Repository Execution & `.lovable/` Bounding Mandate
+## Strict In-Repository Execution & `.ai-memory/` Bounding Mandate
 
 > [!IMPORTANT]
-> **STRICT IN-REPOSITORY EXECUTION & `.lovable/` STORAGE CONTRACT:**
+> **STRICT IN-REPOSITORY EXECUTION & `.ai-memory/` STORAGE CONTRACT:**
 >
 > 1. **In-Codebase Execution Only:** Whenever a Python script (runner, autofixer, linter, test aggregator) is executed or created, it MUST be executed **strictly within the repository root** (current working directory), NEVER outside the codebase or against external arbitrary directories.
-> 2. **Strict Folder Bounding (`.lovable/`):** All AI scripts, local runners, autofixers, helper utilities, memory issue logs, and planning files MUST be created inside the `.lovable/` folder:
+> 2. **Strict Folder Bounding (`.ai-memory/`):** All AI scripts, local runners, autofixers, helper utilities, memory issue logs, and planning files MUST be created inside the `.ai-memory/` folder:
 >    - Python AI Scripts: `03-ai-scripts/` (e.g. `01-file-manipulator.py`, `05-guideline-autofixer.py`, `06-cicd-local-runner.py`).
->    - RCA & Issue Logs: `.lovable/memory/issues/` and `.lovable/cicd-issues/`.
->    - Execution Plans & Subtasks: `.lovable/plans/pending/`, `.lovable/plans/subtasks/`.
->    - Coding Guidelines Mirror: `.lovable/coding-guidelines.md`.
-> 3. **Strict Relative Git Paths (TOTAL BAN on Absolute Paths / `file:///` URIs):** All file paths, markdown links, citations, and subtask paths inside plans, RCA logs (`.lovable/memory/issues/`), scripts, and code comments MUST be strictly relative paths from the git root (e.g., `02-spec/03-error-manage/01-index.md`, `.lovable/plans/01-index.md`, `cmd/main.go`). NEVER write absolute OS paths (`/absolute/path/to/...`, `/absolute/path/to/...`, `/home/...`) or absolute file URIs (`file:///...`).
+>    - RCA & Issue Logs: `.ai-memory/memory/issues/` and `.ai-memory/cicd-issues/`.
+>    - Execution Plans & Subtasks: `.ai-memory/plans/pending/`, `.ai-memory/plans/subtasks/`.
+>    - Coding Guidelines Mirror: `.ai-memory/coding-guidelines.md`.
+> 3. **Strict Relative Git Paths (TOTAL BAN on Absolute Paths / `file:///` URIs):** All file paths, markdown links, citations, and subtask paths inside plans, RCA logs (`.ai-memory/memory/issues/`), scripts, and code comments MUST be strictly relative paths from the git root (e.g., `02-spec/03-error-manage/01-index.md`, `.ai-memory/plans/01-index.md`, `cmd/main.go`). NEVER write absolute OS paths (`/absolute/path/to/...`, `/absolute/path/to/...`, `/home/...`) or absolute file URIs (`file:///...`).
 >    - ❌ **BAD:** `[SSH Commands](file:///absolute/path/to/...)`
 >    - ✅ **GOOD:** `[SSH Commands](02-spec/13-generic-cli/01-index.md)`
 > 4. **No External or Random File Creation:** NEVER write scripts, temporary test scripts, or scratch files to root, `/tmp`, global system paths, or outside the repository boundary.
@@ -72,8 +72,8 @@ Every step must be **singly done** using bounded self-looping turns:
   2. If exit code = 0, proceed to End of Tunnel. If exit code != 0, zero in on the first specific failure.
 
 - **Self-Loop Step 4 (RCA & Zero In on Error):**
-  1. Write 4-part RCA in `.lovable/memory/issues/XX-<slug>.md`.
-  2. Register in `.lovable/01-index.md` and `.lovable/strictly-avoid.md`.
+  1. Write 4-part RCA in `.ai-memory/memory/issues/XX-<slug>.md`.
+  2. Register in `.ai-memory/01-index.md` and `.ai-memory/strictly-avoid.md`.
 
 - **Self-Loop Step 5 (Surgical Code Fix):**
   1. Open the specific file and line, apply minimal surgical fix.
@@ -279,7 +279,7 @@ WHILE (STEP < PHASE_2_STEPS):
 
     ELSE:
         3. Parse failure: identify exact failing job, error message, file, and line.
-        4. Document 4-part RCA in .lovable/memory/issues/XX-<slug>.md
+        4. Document 4-part RCA in .ai-memory/memory/issues/XX-<slug>.md
         5. Apply the minimal surgical code fix.
         6. Run: python 03-ai-scripts/05-guideline-autofixer.py <modified-files>
         7. Loop immediately to step 1. DO NOT stop.
@@ -294,14 +294,14 @@ IF STEP >= PHASE_2_STEPS AND exit_code != 0:
 
 ## Phase 3: 4-Part RCA Requirement
 
-For each distinct failure write `.lovable/memory/issues/XX-<slug>.md` with:
+For each distinct failure write `.ai-memory/memory/issues/XX-<slug>.md` with:
 
 1. **Why it happened:** High-level architectural reason.
 2. **How it happened:** Exact execution flow that triggered the error.
 3. **Root Cause:** Exact file, line number, and dependency responsible.
 4. **Code Fix:** Before/after code snippet.
 
-Also append any new forbidden patterns to `.lovable/strictly-avoid.md`.
+Also append any new forbidden patterns to `.ai-memory/strictly-avoid.md`.
 
 ---
 
@@ -339,7 +339,7 @@ Also append any new forbidden patterns to `.lovable/strictly-avoid.md`.
 
 - [ ] **Zero Linting/CI/CD Bypass:** Confirmed that NO CLI linters, static analysis tools, or test scripts were disabled, commented out, skipped, or bypassed with `|| true`.
 - [ ] `python 03-ai-scripts/06-cicd-local-runner.py` exited with code 0.
-- [ ] All failures documented in `.lovable/memory/issues/XX-<slug>.md`.
+- [ ] All failures documented in `.ai-memory/memory/issues/XX-<slug>.md`.
 - [ ] Changes committed: `fix(ci): resolve <summary>`.
 - [ ] Pushed to the current branch.
 - [ ] File change summary posted in chat (file, what changed, why).

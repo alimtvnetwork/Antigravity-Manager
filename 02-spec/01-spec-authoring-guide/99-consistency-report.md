@@ -54,5 +54,5 @@ All internal links verified valid. ✅
 | 2026-04-09 | 5.0.0 | Added `12-mandatory-linter-infra03-structure.md`; noted 02-folder-structure.md as canonical source. Total: 12 → 13 |
 | 2026-03-30 | 4.0.0 | Added `98-changelog.md`. Total: 11 → 12 |
 | 2026-03-30 | 3.0.0 | Added `97-acceptance-criteria.md`. Total: 10 → 11 |
-| 2026-03-30 | 2.0.0 | Enhanced overview with scoring metrics, keywords, reliability reports, .lovable folder guidance |
+| 2026-03-30 | 2.0.0 | Enhanced overview with scoring metrics, keywords, reliability reports, .ai-memory folder guidance |
 | 2026-03-30 | 1.0.0 | Initial consistency report created |

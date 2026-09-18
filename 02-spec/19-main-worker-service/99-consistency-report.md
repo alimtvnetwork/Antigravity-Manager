@@ -86,7 +86,7 @@ All 6 diagrams carry the **NON-AUTHORITATIVE PROJECTION** banner (v1.0.0); spec 
 | `02-spec/05-split-db-architecture/` | ✅ exists |
 | `02-spec/06-seedable-config-architecture/` | ✅ exists |
 | `02-spec/14-update/` | ✅ exists |
-| `.lovable/coding-guidelines.md` | ✅ exists |
+| `.ai-memory/coding-guidelines.md` | ✅ exists |
 | `mem://architecture/error-handling` | ✅ in memory index |
 | `mem://architecture/caching-policy` | ✅ in memory index |
 | `mem://features/self-update-architecture` | ✅ in memory index |
@@ -176,7 +176,7 @@ Last verified: 2026-05-04 — 4.1: 0 matches in non-meta files (`02-architecture
 | Generic error rules | `02-spec/03-error-manage/` | NO ✅ — `08-` adds only Main↔Worker patterns |
 | Self-update mechanism | `02-spec/14-update/` | NO ✅ — `09-` is pointer-only |
 | DB schema conventions | `02-spec/04-database-conventions/` | NO ✅ — `03-` references and applies |
-| Coding metrics | `.lovable/coding-guidelines.md` | NO ✅ — applied via examples |
+| Coding metrics | `.ai-memory/coding-guidelines.md` | NO ✅ — applied via examples |
 
 ---
 
@@ -197,7 +197,7 @@ All 9 verbatim acceptance criteria mapped in `97-acceptance-criteria.md`. Covera
 
 ## 9. Outstanding (next phase)
 
-- **Phase 5** (separate task): bump `package.json` minor, run `node scripts/sync-version.mjs` and `node scripts/sync-spec-tree.mjs`, log entry in `.lovable/29-plan.md`.
+- **Phase 5** (separate task): bump `package.json` minor, run `node scripts/sync-version.mjs` and `node scripts/sync-spec-tree.mjs`, log entry in `.ai-memory/29-plan.md`.
 - Future: implement Phase 1 of the deliverables when user issues `next` after Phase 5 (or explicitly says "implement").
 
 ---

@@ -17,21 +17,21 @@ N = total self-loop steps budget that the agents will perform (default: 80 steps
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Step 0 (Dynamic Environment Bootstrap): Detect if `.lovable/` and `.lovable/temp/` exist; if missing, dynamically create `.lovable/temp/` to hold scratch files and inventories.
+1. [ ] /goal Step 0 (Dynamic Environment Bootstrap): Detect if `.ai-memory/` and `.ai-memory/temp/` exist; if missing, dynamically create `.ai-memory/temp/` to hold scratch files and inventories.
 2. [ ] /goal Step 0 (Spec Folder Initialization): Detect or create the target spec folder (defaulting to `02-spec/21-app/` or `<XX>-spec/21-app/`) adhering to two-digit monotonic numbering and strictly lowercase directory conventions.
 3. [ ] /goal Phase 0 (Antigravity Skill Bootstrap): Check if `.agents/skills/spec-reverse-engineering/skill.md` exists; if missing, auto-scaffold the skill with YAML frontmatter for progressive memory disclosure.
-4. [ ] /goal Step 1 (Tooling Script Creation): Create or verify the Python inventory tool (`03-ai-scripts/<NN>-codebase-file-lister.py` or `.lovable/<temp>/list_files.py`) to crawl all repository files while excluding `.git`, `node_modules`, `vendor`, and build artifacts.
-5. [ ] /goal Step 2 (Codebase Crawl & Language Topology): Execute the inventory script to generate `.lovable/<temp>/files-inventory.json` with relative paths, file sizes, and language breakdown percentages.
-6. [ ] /goal Phase 1 (Planning & File Management Ledger, Steps 1..N/2): Partition discovered files into balanced batches across 2–3 concurrent sub-agents, recording active locks in `.lovable/<temp>/file-assignments.json`.
-7. [ ] /goal Phase 1 (Micro-Tasking Subtasks): Decompose file analysis into granular subtask files under `.lovable/plans/subtasks/<reverse-engineering>/` tracking which sub-agent processes which file paths.
+4. [ ] /goal Step 1 (Tooling Script Creation): Create or verify the Python inventory tool (`03-ai-scripts/<NN>-codebase-file-lister.py` or `.ai-memory/<temp>/list_files.py`) to crawl all repository files while excluding `.git`, `node_modules`, `vendor`, and build artifacts.
+5. [ ] /goal Step 2 (Codebase Crawl & Language Topology): Execute the inventory script to generate `.ai-memory/<temp>/files-inventory.json` with relative paths, file sizes, and language breakdown percentages.
+6. [ ] /goal Phase 1 (Planning & File Management Ledger, Steps 1..N/2): Partition discovered files into balanced batches across 2–3 concurrent sub-agents, recording active locks in `.ai-memory/<temp>/file-assignments.json`.
+7. [ ] /goal Phase 1 (Micro-Tasking Subtasks): Decompose file analysis into granular subtask files under `.ai-memory/plans/subtasks/<reverse-engineering>/` tracking which sub-agent processes which file paths.
 8. [ ] /goal Phase 1 (Zero-Stop Transition): Immediately upon completing file inventory and assignment planning, self-loop and transition directly into Phase 2 execution mode without pausing or requesting user input.
 9. [ ] /goal Phase 2 (Parallel File Reverse Engineering, Steps N/2+1..N): Dispatch 2–3 execution sub-agents in parallel on disjoint file sets to analyze code semantics, exported types, data flow, functions, and external dependencies.
 10. [ ] /goal Phase 2 (Component Specification Generation): Write dedicated, modular specification files under `02-spec/21-app/` (e.g., `02-spec/21-app/XX-core-engine.md`, `02-spec/21-app/XX-data-models.md`, `02-spec/21-app/XX-api-contracts.md`) documenting all reverse-engineered logic.
 11. [ ] /goal Phase 3 (Master Index Synthesis): Author `02-spec/21-app/01-index.md` summarizing the overall application architecture, behavior, technology stack, architectural health score, and component topology.
 12. [ ] /goal Phase 3 (Security Audit & Risk Assessment): Identify hardcoded credentials, unauthenticated endpoints, input sanitization flaws, and dependency vulnerabilities, publishing an exhaustive risk evaluation in `02-spec/21-app/xx-security-and-risks.md`.
 13. [ ] /goal Phase 3 (Final Structure Communication): Output a clean, viewable markdown/ASCII folder tree in the final chat response illustrating the complete generated specification layout.
-14. [ ] /learn Ingest `.lovable/memory/01-index.md` for project memory index and past learnings.
-15. [ ] /learn Ingest `.lovable/strictly-avoid.md` for banned anti-patterns and strict constraints.
+14. [ ] /learn Ingest `.ai-memory/memory/01-index.md` for project memory index and past learnings.
+15. [ ] /learn Ingest `.ai-memory/strictly-avoid.md` for banned anti-patterns and strict constraints.
 16. [ ] /learn Ingest `02-spec/02-coding-guidelines/08-file-folder-naming/` for lowercase naming and continuous file sequencing.
 17. [ ] /learn Ingest `02-spec/02-coding-guidelines/01-cross-language/01-index.md` for strict relative path citation requirements.
 18. [ ] /learn Ingest `02-spec/21-app/01-index.md` for baseline application documentation standards.
@@ -52,9 +52,9 @@ N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after initialization. Never mo
 > **DYNAMIC ADAPTATION TO ANY CODEBASE:**
 > This workflow is designed to execute against any target codebase, including legacy projects or repositories lacking predefined directory structures. The AI must dynamically adapt:
 
-1. **`.lovable/` Directory Handling:**
-   - If the target workspace lacks a `.lovable/` folder, create `.lovable/` and `.lovable/temp/`.
-   - All ephemeral file inventories, crawler outputs, and subagent file locks MUST reside in `.lovable/temp/`.
+1. **`.ai-memory/` Directory Handling:**
+   - If the target workspace lacks a `.ai-memory/` folder, create `.ai-memory/` and `.ai-memory/temp/`.
+   - All ephemeral file inventories, crawler outputs, and subagent file locks MUST reside in `.ai-memory/temp/`.
 2. **Spec Directory Conventions:**
    - Locate the primary specification folder (e.g., `02-spec/`, `<spec>/`, or create `02-spec/` if none exists).
    - Create or populate the application-specific spec folder: `<spec-root>/21-app/` (e.g. `02-spec/21-app/`).
@@ -88,12 +88,12 @@ To prevent context-window exhaustion on large repositories, the AI must NOT atte
 
 1. **Tooling Script Location:**
    - In standard meta-repositories: `03-ai-scripts/<NN>-codebase-file-lister.py`.
-   - In bare workspaces: `.lovable/<temp>/list_files.py`.
+   - In bare workspaces: `.ai-memory/<temp>/list_files.py`.
 2. **Crawler Capabilities:**
    - Scans directory tree using non-blocking traversal.
    - Strictly ignores `.git/`, `node_modules/`, `vendor/`, `dist/`, `build/`, `bin/`, `.venv/`, and binary file extensions (`.png`, `.jpg`, `.exe`, `.tar`, `.zip`, `.dll`, `.so`).
    - Counts lines of code (LOC) and detects primary programming languages based on file extensions (`.go`, `.ts`, `.tsx`, `.py`, `.rs`, `.cs`, `.php`, `.java`, `.c`, `.cpp`, `.sql`, etc.).
-   - Outputs JSON payload to `.lovable/<temp>/files-inventory.json`:
+   - Outputs JSON payload to `.ai-memory/<temp>/files-inventory.json`:
      ```json
      {
        "total_files": 42,
@@ -114,7 +114,7 @@ To prevent context-window exhaustion on large repositories, the AI must NOT atte
 
 The AI orchestrator must establish a rigorous File Management System before assigning tasks to sub-agents:
 
-1. **Concurrency Ledger (`.lovable/<temp>/file-assignments.json`):**
+1. **Concurrency Ledger (`.ai-memory/<temp>/file-assignments.json`):**
    - Partition the discovered file list into 2 or 3 balanced disjoint batches.
    - Structure the assignment ledger:
      ```json
@@ -137,7 +137,7 @@ The AI orchestrator must establish a rigorous File Management System before assi
    - No file may ever be assigned to more than one sub-agent concurrently.
    - When a subagent completes analysis of a file, it marks the file as `"completed"` in the ledger.
 3. **Subtask Decomposition:**
-   - Write microscopic subtasks in `.lovable/plans/subtasks/<reverse-engineering>/` defining file boundaries and expected specification sections.
+   - Write microscopic subtasks in `.ai-memory/plans/subtasks/<reverse-engineering>/` defining file boundaries and expected specification sections.
 4. **Mandatory Auto-Loop:**
    - Transition immediately into Phase 2 execution mode without prompting the user.
 

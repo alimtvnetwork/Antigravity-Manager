@@ -69,7 +69,7 @@ All five critical handoff files now publish explicit Source-Folder Coverage Maps
 | 18 | `21-database-conventions.md` | `04-database-conventions/` | 945 | 2,321 | 41% | 95% | None | — |
 | 19 | `22-gap-analysis.md` | — (meta) | — | — | — | — | — | — |
 | 20 | `23-wp-plugin-conventions.md` | `18-wp-plugin-how-to/` | **570+** | 17,088 | 3% | **92%** | None | ⬆ +4 |
-| 21 | `24-lovable-folder-03-structure.md` | `.lovable/` | **220+** | — | — | **91%** | None | ⬆ +6 |
+| 21 | `24-lovable-folder-03-structure.md` | `.ai-memory/` | **220+** | — | — | **91%** | None | ⬆ +6 |
 | 22 | `25-app-database.md` | `23-app-db/` | **310+** | — | — | **90%** | None | 🆕 New |
 
 ---

@@ -6,9 +6,9 @@
 
 ## Single Source of Truth
 
-The complete folder structure specification — including repository organization, `.lovable/` AI metadata layers, numbering policy, required folders, rules, and validation checklists — is maintained in:
+The complete folder structure specification — including repository organization, `.ai-memory/` AI metadata layers, numbering policy, required folders, rules, and validation checklists — is maintained in:
 
-> **📄 [Canonical Folder Structure Specification](../.lovable/folder-structure.md)**
+> **📄 [Canonical Folder Structure Specification](../.ai-memory/folder-structure.md)**
 > **📄 [`02-spec/01-spec-authoring-guide/02-folder-structure.md`](./01-spec-authoring-guide/02-folder-structure.md)** (Spec Hierarchy Guide)
 
 This file previously contained a full copy of the folder structure rules. To eliminate duplication and maintain a single source of truth, all content has been consolidated into the spec authoring guide.
@@ -22,7 +22,7 @@ This file previously contained a full copy of the folder structure rules. To eli
 | `01-prompts/` | Prompt Architect prompt library (workflows, coding standards, instructions) |
 | `02-spec/` | Master engineering specifications (01–20 core standards, 21+ application specs) |
 | `03-ai-scripts/` | Reusable deterministic Python automation and quality gate scripts |
-| `.lovable/` | Agent memory, master plans, subtasks, and rule sets |
+| `.ai-memory/` | Agent memory, master plans, subtasks, and rule sets |
 
 ## Spec Numbering Quick Reference
 

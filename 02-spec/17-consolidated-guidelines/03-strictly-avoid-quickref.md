@@ -8,7 +8,7 @@
 
 > ⛔ **Every rule below is a hard prohibition.** Violating any of these is a **blocking** issue and will fail CI. Pre-flight your PR by scanning this list before you push.
 >
-> This page is the canonical home. `.lovable/strictly-avoid.md`, the `05-coding-guidelines.md` CODE-RED markers, and the gap-analysis report all defer to this file. If you spot drift, fix it here first.
+> This page is the canonical home. `.ai-memory/strictly-avoid.md`, the `05-coding-guidelines.md` CODE-RED markers, and the gap-analysis report all defer to this file. If you spot drift, fix it here first.
 >
 > 🧠 **Memory directive:** Once an AI agent reads this file, every numbered
 > "Strictly Prohibited" item below MUST be retained in its strictly-avoid
@@ -22,7 +22,7 @@
 
 | Seq | Prohibition | Source |
 |-----|-------------|--------|
-| 01 | **`readme.txt` time suggestions.** Never suggest/recommend/hint/auto-add timestamps, "git update time", last-modified metadata, scheduled regeneration, cron, or any time-flavoured workflow in or about `readme.txt`. Only modify `readme.txt` when the user explicitly asks in that exact turn, in the format they dictate. No follow-up time offers. | `.lovable/memory/avoid/02-no-time-suggestions-in-readme-txt.md`, `02-spec/01-spec-authoring-guide/11-exceptions.md` § Strictly Prohibited |
+| 01 | **`readme.txt` time suggestions.** Never suggest/recommend/hint/auto-add timestamps, "git update time", last-modified metadata, scheduled regeneration, cron, or any time-flavoured workflow in or about `readme.txt`. Only modify `readme.txt` when the user explicitly asks in that exact turn, in the format they dictate. No follow-up time offers. | `.ai-memory/memory/avoid/02-no-time-suggestions-in-readme-txt.md`, `02-spec/01-spec-authoring-guide/11-exceptions.md` § Strictly Prohibited |
 
 Sequence numbers are stable — never renumber, only append.
 
@@ -40,8 +40,8 @@ Sequence numbers are stable — never renumber, only append.
 
 | ⛔ Don't | ✅ Do | Source |
 |---------|------|--------|
-| Create `.lovable/memories/` | Use `.lovable/memory/` (no trailing `s`) | `04-spec-authoring.md` §`.lovable/` |
-| Create per-task folders under `.lovable/` (`completed-tasks/`, `pending-tasks/`, free-form `suggestions/`) | One file per kind: `29-plan.md`, `suggestions.md`, with `## Completed` / `## Implemented` sections | `.lovable/memory/avoid/01-avoid-per-task-folders.md` |
+| Create `.ai-memory/memories/` | Use `.ai-memory/memory/` (no trailing `s`) | `04-spec-authoring.md` §`.ai-memory/` |
+| Create per-task folders under `.ai-memory/` (`completed-tasks/`, `pending-tasks/`, free-form `suggestions/`) | One file per kind: `29-plan.md`, `suggestions.md`, with `## Completed` / `## Implemented` sections | `.ai-memory/memory/avoid/01-avoid-per-task-folders.md` |
 | Reference `coding-guidelines-v24` / any `v1` namespace | Use `alimtvnetwork/coding-guidelines-v24` | `mem://constraints/avoid-app-sync` |
 | Touch `.release/` | Externally managed | repo policy |
 | Sync `01-app`, `02-app-issues`, `03-general`, `03-tasks`, `12-consolidated-guidelines` from sibling repos | Maintain locally | `mem://constraints/avoid-app-sync` |
@@ -124,4 +124,4 @@ Sequence numbers are stable — never renumber, only append.
 
 ---
 
-*Created 2026-04-26 to deduplicate prohibitions previously scattered across `.lovable/strictly-avoid.md`, the consolidated docs, and the gap-analysis report.*
+*Created 2026-04-26 to deduplicate prohibitions previously scattered across `.ai-memory/strictly-avoid.md`, the consolidated docs, and the gap-analysis report.*

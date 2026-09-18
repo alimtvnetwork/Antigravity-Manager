@@ -202,7 +202,7 @@ cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/release/') }}
 
 - `.github/workflows/release.yml`
 - `.github/workflows/ci.yml`
-- `.lovable/memory/tech/ci-release-automation.md`
+- `.ai-memory/memory/tech/ci-release-automation.md`
 
 ---
 
@@ -242,7 +242,7 @@ If `VERSION` was unset (e.g., version-resolution step failed silently) or `sed` 
 ### Related Files
 
 - `.github/workflows/release.yml`
-- `.lovable/memory/tech/ci-release-automation.md`
+- `.ai-memory/memory/tech/ci-release-automation.md`
 
 ---
 

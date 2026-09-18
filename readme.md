@@ -192,7 +192,7 @@ AI coding agents and autonomous workflows operating within this repository can f
 | **Coding Standards** | `02-spec/02-coding-guidelines/` | Language-specific architectural specifications |
 | **Error Management Spec** | `02-spec/03-error-manage/` | Error codes, envelopes, and modal standards |
 | **README Conventions** | `02-spec/01-spec-authoring-guide/13-root-readme-conventions.md` | Non-negotiable README structure and styling |
-| **Active Plans** | `.lovable/plans/` | Plan index, active subtasks, and completion logs |
+| **Active Plans** | `.ai-memory/plans/` | Plan index, active subtasks, and completion logs |
 
 ---
 

@@ -49,7 +49,7 @@ func ProcessTransaction(
 
 ## 3. Temporary Scripts
 
-- Any temporary code, scratchpads, or debugging scripts you create must be written to the \.lovable/temp-scripts/\ directory.
+- Any temporary code, scratchpads, or debugging scripts you create must be written to the \.ai-memory/temp-scripts/\ directory.
 - **NEVER** commit temporary scripts to Git.
 
 ## 4. File Encoding & Line Endings

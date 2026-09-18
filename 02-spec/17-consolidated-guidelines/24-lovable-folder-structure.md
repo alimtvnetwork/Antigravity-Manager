@@ -1,4 +1,4 @@
-# Consolidated: `.lovable/` Folder Structure
+# Consolidated: `.ai-memory/` Folder Structure
 
 **Version:** 4.0.0
 **Updated:** 2026-08-31
@@ -8,14 +8,14 @@
 
 ## Purpose
 
-This is the **standalone consolidated reference** for the `.lovable/` folder structure — the AI context layer. An AI reading only this file must be able to create, maintain, and navigate the `.lovable/` directory correctly.
+This is the **standalone consolidated reference** for the `.ai-memory/` folder structure — the AI context layer. An AI reading only this file must be able to create, maintain, and navigate the `.ai-memory/` directory correctly.
 
 ---
 
 ## Canonical Structure
 
 ```
-.lovable/
+.ai-memory/
 ├── 01-overview.md                   # AI onboarding — read FIRST
 ├── 02-user-preferences              # User communication preferences
 ├── 03-strictly-avoid.md             # ⛔ Quick-read prohibition summary
@@ -68,7 +68,7 @@ This is the **standalone consolidated reference** for the `.lovable/` folder str
 
 ## Critical Rules
 
-> **There is exactly ONE memory folder: `.lovable/memory/` (singular).** The variant `.lovable/memories/` (plural) is **prohibited**. If found, migrate contents and delete it.
+> **There is exactly ONE memory folder: `.ai-memory/memory/` (singular).** The variant `.ai-memory/memories/` (plural) is **prohibited**. If found, migrate contents and delete it.
 
 > **`memory/01-index.md` is the single source of truth** for all memory files. Every memory file must be listed there. Orphaned files (in `memory/` but not in `index.md`) must be indexed or removed.
 
@@ -103,4 +103,4 @@ This is the **standalone consolidated reference** for the `.lovable/` folder str
 
 ---
 
-*Consolidated .lovable folder structure — v4.0.0 — 2026-08-31*
+*Consolidated .ai-memory folder structure — v4.0.0 — 2026-08-31*

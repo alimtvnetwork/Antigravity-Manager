@@ -6,7 +6,7 @@
 ## 🎯 Actionable CI/CD & Agent Checklist
 
 1. [ ] `/goal` Read and understand all numbered specifications under `12-cicd-pipeline-workflows/`.
-2. [ ] `/learn` Adhere strictly to `.lovable/folder-structure.md` and `.lovable/strictly-avoid.md`.
+2. [ ] `/learn` Adhere strictly to `.ai-memory/folder-structure.md` and `.ai-memory/strictly-avoid.md`.
 3. [ ] `/goal` Verify zero explicit `true` boolean evaluations and no mixed-polarity conditionals.
 4. [ ] `/learn` Run all local verification linters via `python 03-ai-scripts/06-cicd-local-runner.py`.
 

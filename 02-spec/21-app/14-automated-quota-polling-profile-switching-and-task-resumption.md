@@ -125,7 +125,7 @@ When the active profile drops below `low_quota_threshold_percent`:
    - Location: `<appDataDir>/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`
    - Contains completed steps, pending user prompts, and planner actions.
 2. **Antigravity Plan Subtasks**:
-   - Location: `.lovable/plans/subtasks/` or `.lovable/plans/pending/`
+   - Location: `.ai-memory/plans/subtasks/` or `.ai-memory/plans/pending/`
    - Lists numbered atomic tasks with checkboxes (`[ ]` uncompleted, `[x]` completed).
 3. **VS Code Workspace Memento**:
    - Location: `<user-data-dir>/User/workspaceStorage/<hash>/state.vscdb`
@@ -136,7 +136,7 @@ Before terminating an IDE instance during a quota failover:
 1. **Locate Active Workspace Storage**:
    Inspect `<user-data-dir>/User/workspaceStorage/` for the most recently modified database.
 2. **Extract Unfinished Goals**:
-   Read `.lovable/plans/01-index.md` and `.lovable/plans/pending/` to retrieve the current `/goal` text and uncompleted checklist numbers.
+   Read `.ai-memory/plans/01-index.md` and `.ai-memory/plans/pending/` to retrieve the current `/goal` text and uncompleted checklist numbers.
 3. **Write Snapshot Artifact**:
    Save a recovery snapshot to `<config_dir>/task_recovery/snapshot_<instance_id>.json`:
    ```json
@@ -146,7 +146,7 @@ Before terminating an IDE instance during a quota failover:
      "timestamp": 1773558000,
      "workspace_path": "/work/Antigravity-Manager",
      "pending_goal": "/goal Autonomously orchestrate parent task...",
-     "next_subtask_path": ".lovable/plans/subtasks/14-multi/02-dispatch.md",
+     "next_subtask_path": ".ai-memory/plans/subtasks/14-multi/02-dispatch.md",
      "is_recovered": false
    }
    ```

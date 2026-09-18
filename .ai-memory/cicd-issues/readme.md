@@ -1,0 +1,21 @@
+# CI/CD Issues
+
+This directory contains CI/CD issue tracking and pipeline RCAs.
+
+- [01-rust-test-failures-and-concurrency-rca.md](.ai-memory/cicd-issues/01-rust-test-failures-and-concurrency-rca.md)
+- [02-rust-formatting-and-github-pages-rca.md](.ai-memory/cicd-issues/02-rust-formatting-and-github-pages-rca.md)
+- [03-test-setup-scope-compilation-rca.md](.ai-memory/cicd-issues/03-test-setup-scope-compilation-rca.md)
+- [04-user-token-db-env-concurrency-rca.md](.ai-memory/cicd-issues/04-user-token-db-env-concurrency-rca.md)
+- [05-windows-stress-test-io-timeout-rca.md](.ai-memory/cicd-issues/05-windows-stress-test-io-timeout-rca.md)
+- [06-thinking-budget-concurrency-rca.md](.ai-memory/cicd-issues/06-thinking-budget-concurrency-rca.md)
+- [07-release-workflow-heredoc-syntax-rca.md](.ai-memory/cicd-issues/07-release-workflow-heredoc-syntax-rca.md)
+- [08-gitmap-pipeline-db-isolation-and-fork-urls-rca.md](.ai-memory/cicd-issues/08-gitmap-pipeline-db-isolation-and-fork-urls-rca.md)
+- [09-ts-jsx-namespace-and-unused-vars-rca.md](.ai-memory/cicd-issues/09-ts-jsx-namespace-and-unused-vars-rca.md)
+- [10-local-quality-gates-and-version-sync-rca.md](.ai-memory/cicd-issues/10-local-quality-gates-and-version-sync-rca.md)
+- [11-autoswitchersettings-jsx-syntax-error-rca.md](.ai-memory/cicd-issues/11-autoswitchersettings-jsx-syntax-error-rca.md)
+- [12-release-v4-16-0-ts-and-rustfmt-rca.md](.ai-memory/cicd-issues/12-release-v4-16-0-ts-and-rustfmt-rca.md)
+- [13-rust-compile-errors-release-v4-16-0-rca.md](.ai-memory/cicd-issues/13-rust-compile-errors-release-v4-16-0-rca.md)
+- [14-rust-tests-isolation-and-spec-alignment-rca.md](.ai-memory/cicd-issues/14-rust-tests-isolation-and-spec-alignment-rca.md)
+- [15-test-isolation-data-dir-env-concurrency-rca.md](.ai-memory/cicd-issues/15-test-isolation-data-dir-env-concurrency-rca.md)
+- [16-security-test-setup-rustfmt-rca.md](.ai-memory/cicd-issues/16-security-test-setup-rustfmt-rca.md)
+- [17-signature-cache-and-payload-audit-test-isolation-rca.md](.ai-memory/cicd-issues/17-signature-cache-and-payload-audit-test-isolation-rca.md)

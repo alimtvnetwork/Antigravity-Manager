@@ -16,8 +16,8 @@ N = total self-loop steps budget that the agents will perform.
 ### Master Task Checklist (Atomic Numbered Steps)
 
 1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using ripgrep to inventory all unexported domain structs declared inline in implementation files (`importer.go`, `store.go`, `service.go`), raw generic Result returns in non-types files (`result.ResultSlice[...]`, `appfault.ResultMap[...]`, `Wrap[...]`), and any generic type used 3 or more times without a centralized type alias.
-2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.lovable/plans/pending/XX-types-go-extraction-audit.md` with an exhaustive Types & Generics Violation Ledger table.
-3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.lovable/plans/subtasks/XX-types-go-extraction/`.
+2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/XX-types-go-extraction-audit.md` with an exhaustive Types & Generics Violation Ledger table.
+3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/XX-types-go-extraction/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
 5. [ ] /goal Phase 2 (Step A): Open each target package and create or inspect the dedicated `types.go` file (or leaf `types/` folder).
 6. [ ] /goal Phase 2 (Step B): Extract and export all domain payload structs (e.g. `ScheduleExportBundle`, `PluginSummary`, `UserProfile`) into `types.go`, eliminating local, unexported struct declarations from implementation files.
@@ -26,8 +26,8 @@ N = total self-loop steps budget that the agents will perform.
 9. [ ] /goal Phase 2 (Step E): Modernize all call sites, test assertions, and consumers to use the single reusable type and fluent pointer-safe predicates (`IsCountOtherThan`, `IsEmpty`, `HasRecord`, `IsDefined`).
 10. [ ] /goal Phase 2 (Step F): Enforce <= 8–15 line function decomposition, clean blank-line spacing, and affirmative boolean fields (`isDefined bool`).
 11. [ ] /goal Phase 2 (Step G): Execute targeted file-level linters (`python linter-scripts/check-function-lengths.py`, `check-mws-error-codes.py`, `check-newline-styling.py`, `check-enum-and-boolean.py`) to verify 0 remaining violations (`exit 0`). DO NOT run the full CI/CD pipeline runner (`06-cicd-local-runner.py`) during routine coding guideline execution turns.
-12. [ ] /learn Ingest `.lovable/memory/01-index.md` for project memory index and past learnings.
-13. [ ] /learn Ingest `.lovable/strictly-avoid.md` for banned anti-patterns and strict constraints.
+12. [ ] /learn Ingest `.ai-memory/memory/01-index.md` for project memory index and past learnings.
+13. [ ] /learn Ingest `.ai-memory/strictly-avoid.md` for banned anti-patterns and strict constraints.
 14. [ ] /learn Ingest `02-spec/02-coding-guidelines/02-canonical-size-tier.md` for canonical file and function size tiers.
 15. [ ] /learn Ingest `02-spec/02-coding-guidelines/01-cross-language/01-index.md` for single return type mandates and micro-tasking.
 16. [ ] /learn Ingest `02-spec/02-coding-guidelines/01-cross-language/27-types-folder-convention.md` for types folder convention and Rule 2 (Type Aliases for Repeated Generics).
@@ -37,11 +37,11 @@ N = total self-loop steps budget that the agents will perform.
 20. [ ] /learn Ingest `02-spec/03-error-manage/02-error-architecture/05-response-envelope/05-response-envelope-reference.md` for response envelope schemas.
 21. [ ] /learn Ingest `02-spec/03-error-manage/02-error-architecture/06-apperror-package/03-go-apperror-linter-spec.md` for Go AppError implementation specifications.
 22. [ ] /learn Ingest `02-spec/03-error-manage/02-error-architecture/06-apperror-package/01-apperror-reference/04-result-types.md` for Result[T], ResultSlice[T], and ResultMap[K, V] method specifications and Section 6.4 types.go mandate.
-23. [ ] /learn Ingest `.lovable/coding-guidelines.md` for master consolidated coding guidelines.
+23. [ ] /learn Ingest `.ai-memory/coding-guidelines.md` for master consolidated coding guidelines.
 24. [ ] /goal Create or update agent rules in the repository if missing from agent memory.
 
 ```text
-PHASE_1_STEPS = N / 2   (Steps 1 .. N/2: Scan Inline Structs & Raw Generics, Build Violation Ledger in .lovable/plans/pending/, Subtasks)
+PHASE_1_STEPS = N / 2   (Steps 1 .. N/2: Scan Inline Structs & Raw Generics, Build Violation Ledger in .ai-memory/plans/pending/, Subtasks)
 PHASE_2_STEPS = N / 2   (Steps N/2+1 .. N: Create types.go, Extract Structs & Aliases, Refactor Signatures, Verify Local Linters)
 ```
 
@@ -295,8 +295,8 @@ To survive large codebases without hitting step limits or context loss, execute 
 | | - Runs ripgrep queries to catalog all unexported inline structs     | |
 | | - Inventories scattered raw generic Result returns in non-types     | |
 | | - Identifies repeated generic patterns lacking type aliases         | |
-| | - Authors master audit plan in .lovable/plans/pending/             | |
-| | - Generates granular subtasks in .lovable/plans/subtasks/           | |
+| | - Authors master audit plan in .ai-memory/plans/pending/             | |
+| | - Generates granular subtasks in .ai-memory/plans/subtasks/           | |
 | +---------------------------------------------------------------------+ |
 |                                                                         |
 | Phase 2 (Steps 101..200): SURGICAL REFACTORING                          |

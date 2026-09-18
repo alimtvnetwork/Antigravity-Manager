@@ -12,8 +12,8 @@ description: Autonomously orchestrate and execute complex multi-step parent task
 
 ### Phase 1: Planning Mode & Subtask Generation FIRST (Steps 1 .. N/2)
 1. **Scan & Discover:** Spawn planning subagents to scan codebase for target changes.
-2. **Master Spec Generation:** Save master architectural plan into `.lovable/plans/pending/xx-<slug>.md` with 3-5 custom rules/constraints.
-3. **Lean Subtask Decomposition:** Break down master plan into granular subtasks in `.lovable/plans/subtasks/xx-<slug>/01-<subtask>.md`.
+2. **Master Spec Generation:** Save master architectural plan into `.ai-memory/plans/pending/xx-<slug>.md` with 3-5 custom rules/constraints.
+3. **Lean Subtask Decomposition:** Break down master plan into granular subtasks in `.ai-memory/plans/subtasks/xx-<slug>/01-<subtask>.md`.
 4. **Mandatory Auto-Loop:** Transition directly into execution mode without stopping.
 
 ### Phase 2: Execution Mode & Parallel Refactoring (Steps N/2+1 .. N)
@@ -23,7 +23,7 @@ description: Autonomously orchestrate and execute complex multi-step parent task
 4. **Targeted Quality Linting:** Run fast file-level linters on modified files only.
 
 ### Phase 3: Task Consolidation & File Reduction (End of Loop)
-1. Consolidate completed subtasks into `.lovable/plans/completed/xx-<slug>.md`.
+1. Consolidate completed subtasks into `.ai-memory/plans/completed/xx-<slug>.md`.
 2. Delete subtask folder and pending plan.
-3. Update `.lovable/plans/01-index.md`.
+3. Update `.ai-memory/plans/01-index.md`.
 4. Mandatory final commit and push to git in a single atomic commit.

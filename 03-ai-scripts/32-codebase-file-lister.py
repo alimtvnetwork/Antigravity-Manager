@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Codebase File Lister & Inventory Generator
-Crawls target repository files, classifies languages, counts lines of code, and outputs .lovable/temp/files-inventory.json.
+Crawls target repository files, classifies languages, counts lines of code, and outputs .ai-memory/temp/files-inventory.json.
 """
 
 import os
@@ -25,7 +25,7 @@ IGNORED_DIRS = {
     "venv",
     "__pycache__",
     "tmp",
-    ".lovable",
+    ".ai-memory",
     "02-spec",
     "03-ai-scripts",
     ".agents",
@@ -110,7 +110,7 @@ def scan_codebase(root_path="."):
         "files": files_list
     }
 
-    out_dir = root / ".lovable" / "temp"
+    out_dir = root / ".ai-memory" / "temp"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / "files-inventory.json"
 
@@ -118,7 +118,7 @@ def scan_codebase(root_path="."):
         json.dump(inventory, f, indent=2)
 
     print(f"Scanned {len(files_list)} files across {len(lang_counts)} languages.")
-    print(f"Saved inventory to: .lovable/temp/files-inventory.json")
+    print(f"Saved inventory to: .ai-memory/temp/files-inventory.json")
 
     for lang, count in sorted(lang_counts.items(), key=lambda x: -x[1]):
         print(f"  - {lang}: {count} files")

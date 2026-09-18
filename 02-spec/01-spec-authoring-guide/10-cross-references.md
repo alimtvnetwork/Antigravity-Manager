@@ -54,7 +54,7 @@ See: [GSearch Backend](../../09-gsearch-cli/01-backend/01-index.md)
 ### From spec to memories
 
 ```markdown
-See: [Database Standards](../../.lovable/memories/architecture/database-standards.md)
+See: [Database Standards](../../.ai-memory/memories/architecture/database-standards.md)
 ```
 
 ---
@@ -71,7 +71,7 @@ Every `01-index.md` file should end with a cross-reference table:
 |-----------|----------|
 | Module A | `../XX-module-a/01-index.md` |
 | Module B | `../YY-module-b/01-index.md` |
-| Memory X | `../../.lovable/memories/category/file.md` |
+| Memory X | `../../.ai-memory/memories/category/file.md` |
 ```
 
 ---
@@ -130,7 +130,7 @@ To write the correct relative path, count directory levels:
 
 The health dashboard scanner (`linter-scripts/generate-dashboard-data.cjs`) validates all markdown links:
 
-1. **Scans** every `.md` file in `spec/` and `.lovable/memories/`
+1. **Scans** every `.md` file in `spec/` and `.ai-memory/memories/`
 2. **Extracts** all markdown link patterns (`[text]\(path)` syntax)
 3. **Resolves** relative paths from the source file's location
 4. **Checks** that the target file exists on disk

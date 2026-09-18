@@ -42,7 +42,7 @@ CHANGELOG_MD = REPO_ROOT / "changelog.md"
 
 # Known bump scripts
 NODE_BUMP_SCRIPT = REPO_ROOT / "scripts" / "bump-version.mjs"
-PYTHON_BUMP_SCRIPT = REPO_ROOT / ".lovable" / "release" / "bump_versions.py"
+PYTHON_BUMP_SCRIPT = REPO_ROOT / ".ai-memory" / "release" / "bump_versions.py"
 
 
 def run_cmd(cmd, cwd=None, check=True, capture_output=True):
@@ -364,7 +364,7 @@ def execute_version_bump(next_version, scope, dry_run=False):
         changelog_en.write_text(cl_en_content, encoding="utf-8")
 
     # 12. Generate release notes file with Quick Install one-liners
-    release_notes_dir = REPO_ROOT / ".lovable" / "release"
+    release_notes_dir = REPO_ROOT / ".ai-memory" / "release"
     release_notes_dir.mkdir(parents=True, exist_ok=True)
     notes_file = release_notes_dir / f"release-notes-v{next_version}.md"
     notes_content = (

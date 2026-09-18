@@ -3,7 +3,7 @@
 **Spec:** `19-main-worker-service`
 **Version:** 1.1.0
 **Created:** 2026-05-06
-**Updated:** 2026-07-19 (v1.1.0: OQ-A1 promoted to D15, OQ-A2 promoted to D16; §7 rewritten as "Resolved decisions" and both items removed from `.lovable/29-plan.md` Open Questions.)
+**Updated:** 2026-07-19 (v1.1.0: OQ-A1 promoted to D15, OQ-A2 promoted to D16; §7 rewritten as "Resolved decisions" and both items removed from `.ai-memory/29-plan.md` Open Questions.)
 **Status:** Authoritative (Phase 5, all open questions in scope now closed)
 **Resolves:** locked decisions D11 (cascading = union), D12 (cache-bin in ER diagram), **D15** (simple union is final, no role hierarchy), **D16** (per-process SQLite `:memory:` is final for the cache bin storage tier; Redis and in-process map remain configurable alternatives per §4).
 
