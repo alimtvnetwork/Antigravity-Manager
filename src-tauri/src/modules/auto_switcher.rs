@@ -207,13 +207,13 @@ pub async fn execute_profile_rotation(
         target.instance_id, target.email, target.quota_percent, reason
     ));
 
+    // Step 2: Trigger email notification just before the workspace switch
+    crate::modules::email_watcher::notify_workspace_switched(&active_id, &target.instance_id, &reason);
+
     instance::switch_account_to_instance(&target.account_id, Some(&target.instance_id)).await?;
 
-    // Step 2: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
+    // Step 3: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
     let _ = crate::modules::repo_db::dispatch_running_prompts(&target.instance_id);
-
-    // Step 3: Trigger email notification if enabled
-    crate::modules::email_watcher::notify_workspace_switched(&active_id, &target.instance_id, &reason);
 
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();
