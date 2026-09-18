@@ -7,6 +7,11 @@ pub mod cloudflared;
 pub mod config;
 pub mod db;
 pub mod device;
+pub mod email_inbound;
+pub mod email_io;
+pub mod email_sender;
+pub mod email_vault_db;
+pub mod email_watcher;
 pub mod instance;
 
 #[allow(dead_code)]

@@ -18,6 +18,7 @@ import { relaunch } from '@tauri-apps/plugin-process';
 
 import DebugConsole from '../components/debug/DebugConsole';
 import ProxyPoolSettings from '../components/settings/ProxyPoolSettings';
+import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
 
 function normalizeDataDirDisplay(path: string): string {
     const trimmed = path.trim();
@@ -40,7 +41,7 @@ function Settings() {
     const { t, i18n } = useTranslation();
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
-    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'advanced' | 'debug' | 'about'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'advanced' | 'debug' | 'about'>('general');
     const [appVersion, setAppVersion] = useState<string>('4.18.0');
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
@@ -494,6 +495,15 @@ function Settings() {
                             onClick={() => setActiveTab('proxy')}
                         >
                             {t('settings.tabs.proxy')}
+                        </button>
+                        <button
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'email'
+                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                            onClick={() => setActiveTab('email')}
+                        >
+                            {t('settings.tabs.email', 'Email & Alerts')}
                         </button>
                         <button
                             className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'advanced'
@@ -1488,6 +1498,10 @@ function Settings() {
                                 )}
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'email' && (
+                        <EmailNotificationSettings />
                     )}
 
                     {activeTab === 'about' && (

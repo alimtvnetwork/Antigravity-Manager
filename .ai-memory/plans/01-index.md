@@ -35,3 +35,4 @@ Master directory of architectural and execution plans.
 - [22-agm-branding-ui-overhaul-and-v4-15-0-release.md](completed/22-agm-branding-ui-overhaul-and-v4-15-0-release.md): AGM branding, UI compactness, instances fix, and v4.15.0 release.
 - [23-upstream-pipeline-sync-and-v4-16-0-release.md](completed/23-upstream-pipeline-sync-and-v4-16-0-release.md): Upstream PR #2 logical sync, streaming pipeline engine, thinking store, and v4.16.0 release.
 - [24-auto-switch-quota-running-prompts-backup-and-ubuntu-fix.md](completed/24-auto-switch-quota-running-prompts-backup-and-ubuntu-fix.md): Auto-switch quota threshold update (15%), split repo DB running prompts backup & direct dispatch, Ubuntu switching fix, and root readme refactoring.
+- [25-email-management-split-security-db-and-remote-control.md](completed/25-email-management-split-security-db-and-remote-control.md): Email dispatch, mailbox remote management, split security vault DB, and bidirectional remote control.

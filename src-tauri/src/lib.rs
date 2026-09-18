@@ -767,6 +767,23 @@ pub fn run() {
             commands::trigger_manual_profile_rotation,
             commands::list_running_projects,
             commands::list_backed_up_prompts,
+            // Email and Mailbox Management commands
+            commands::get_email_settings,
+            commands::save_email_settings,
+            commands::list_email_accounts,
+            commands::add_email_account,
+            commands::update_email_account,
+            commands::delete_email_account,
+            commands::set_default_email_account,
+            commands::list_notify_recipients,
+            commands::add_notify_recipient,
+            commands::delete_notify_recipient,
+            commands::test_smtp_connection,
+            commands::test_imap_connection,
+            commands::export_email_data,
+            commands::import_email_data,
+            commands::get_email_watcher_status,
+            commands::trigger_manual_email_check,
         ])
 
 

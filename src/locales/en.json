@@ -371,6 +371,7 @@
       "general": "General",
       "account": "Account",
       "proxy": "Proxy Settings",
+      "email": "Email & Alerts",
       "advanced": "Advanced",
       "debug": "Debug",
       "about": "About"

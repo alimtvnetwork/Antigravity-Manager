@@ -22,6 +22,9 @@ pub use patch::*;
 // 导出 instance 命令
 pub mod instance;
 pub use instance::*;
+// 导出 email 命令
+pub mod email;
+pub use email::*;
 
 /// 列出所有账号
 #[tauri::command]

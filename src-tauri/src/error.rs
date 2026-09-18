@@ -37,6 +37,9 @@ pub enum AppError {
         stack_trace: String,
     },
 
+    #[error("Email error: {0}")]
+    Email(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
@@ -116,6 +119,7 @@ impl AppError {
             AppError::Process(_) => "E7001",
             AppError::IdeNotFound { .. } => "E7002",
             AppError::Tauri(_) => "E8001",
+            AppError::Email(_) => "E8002",
             AppError::Unknown(_) => "E9001",
         }
     }
@@ -126,7 +130,7 @@ impl AppError {
             AppError::Network(_, Some(status)) => *status,
             AppError::Network(_, None) => 502,
             AppError::OAuth(_) => 401,
-            AppError::Config(_) | AppError::Account(_) => 400,
+            AppError::Config(_) | AppError::Account(_) | AppError::Email(_) => 400,
             AppError::IdeNotFound { .. } => 404,
             AppError::Database(_)
             | AppError::Io(_)
