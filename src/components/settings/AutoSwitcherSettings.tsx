@@ -261,10 +261,10 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             </div>
                             <div className="text-xs">
                                 <div className="font-semibold text-gray-900 dark:text-gray-200">
-                                    2. {t('settings.auto_switcher.step2_title', 'Threshold Trigger (<10%)')}
+                                    2. {t('settings.auto_switcher.step2_title', 'Threshold Trigger (<15%)')}
                                 </div>
                                 <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
-                                    {t('settings.auto_switcher.step2_desc', 'When the primary evaluated model falls below your threshold (default <10%), AGM automatically flags the account for seamless rotation.')}
+                                    {t('settings.auto_switcher.step2_desc', 'When the primary evaluated model falls below your threshold (default <15%), AGM automatically flags the account for seamless rotation.')}
                                 </div>
                             </div>
                         </div>
@@ -284,17 +284,17 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             </div>
                         </div>
 
-                        {/* Step 4: Zero-Loss Task Resumption */}
+                        {/* Step 4: Split Repo DB Direct Dispatch */}
                         <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/80 dark:bg-base-200/80 border border-blue-100/60 dark:border-base-100">
                             <div className="p-1.5 rounded-md bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5">
                                 <History className="w-3.5 h-3.5" />
                             </div>
                             <div className="text-xs">
                                 <div className="font-semibold text-gray-900 dark:text-gray-200">
-                                    4. {t('settings.auto_switcher.step4_title', 'Zero-Loss Task Resumption')}
+                                    4. {t('settings.auto_switcher.step4_title', 'Split Repo DB Direct Dispatch')}
                                 </div>
                                 <div className="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-normal">
-                                    {t('settings.auto_switcher.step4_desc', 'Snapshots ongoing prompt states and workspace context before rotation, resuming tasks upon relaunch without losing your coding progress.')}
+                                    {t('settings.auto_switcher.step4_desc', 'Snapshots running prompts into dedicated repo_prompts.db before switching and dispatches them directly to active projects without queuing.')}
                                 </div>
                             </div>
                         </div>

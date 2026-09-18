@@ -135,3 +135,34 @@ export async function updateAutoSwitcherConfig(config: AutoProfileSwitcherConfig
 export async function triggerManualProfileRotation(): Promise<string> {
     return await invoke('trigger_manual_profile_rotation');
 }
+
+export interface RunningProject {
+    id: string;
+    instance_id: string;
+    repo_name: string;
+    repo_path: string;
+    workspace_storage_path?: string;
+    is_running: boolean;
+    last_detected_at: number;
+}
+
+export interface ActivePrompt {
+    id: string;
+    project_id: string;
+    instance_id: string;
+    repo_path: string;
+    prompt_content: string;
+    model?: string;
+    session_id?: string;
+    status: string;
+    created_at: number;
+    updated_at: number;
+}
+
+export async function listRunningProjects(): Promise<RunningProject[]> {
+    return await invoke('list_running_projects');
+}
+
+export async function listBackedUpPrompts(): Promise<ActivePrompt[]> {
+    return await invoke('list_backed_up_prompts');
+}

@@ -86,3 +86,13 @@ pub fn update_auto_switcher_config(
 pub async fn trigger_manual_profile_rotation() -> Result<String, String> {
     crate::modules::auto_switcher::trigger_manual_rotation().await
 }
+
+#[tauri::command]
+pub fn list_running_projects() -> Result<Vec<crate::modules::repo_db::RunningProject>, String> {
+    crate::modules::repo_db::list_running_projects()
+}
+
+#[tauri::command]
+pub fn list_backed_up_prompts() -> Result<Vec<crate::modules::repo_db::ActivePrompt>, String> {
+    crate::modules::repo_db::list_backed_up_prompts()
+}

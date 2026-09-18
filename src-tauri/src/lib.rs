@@ -765,6 +765,8 @@ pub fn run() {
             commands::get_auto_switcher_status,
             commands::update_auto_switcher_config,
             commands::trigger_manual_profile_rotation,
+            commands::list_running_projects,
+            commands::list_backed_up_prompts,
         ])
 
 

@@ -714,6 +714,8 @@ impl AxumServer {
             .route("/accounts/rotate", post(admin_rotate_account))
             .route("/auto-switcher/rotate", post(admin_rotate_account))
             .route("/auto-switcher/status", get(admin_get_auto_switcher_status))
+            .route("/repo-db/projects", get(admin_list_repo_projects))
+            .route("/repo-db/prompts", get(admin_list_repo_prompts))
             .route("/accounts/refresh", post(admin_refresh_all_quotas))
             .route("/accounts/:accountId", delete(admin_delete_account))
             .route("/accounts/:accountId/bind-device", post(admin_bind_device))
@@ -1509,6 +1511,26 @@ async fn admin_get_auto_switcher_status(
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let status = crate::modules::auto_switcher::get_status();
     Ok(Json(status))
+}
+
+async fn admin_list_repo_projects() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    match crate::modules::repo_db::list_running_projects() {
+        Ok(projects) => Ok(Json(projects)),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_list_repo_prompts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    match crate::modules::repo_db::list_backed_up_prompts() {
+        Ok(prompts) => Ok(Json(prompts)),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
 }
 
 async fn admin_refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>

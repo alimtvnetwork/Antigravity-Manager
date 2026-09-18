@@ -19,6 +19,8 @@ External automation scripts, CLI utilities, IDE extensions, or scheduled cron da
 | `POST` | `/api/accounts/rotate` | Triggers immediate rotation to the next best healthy account in the pool |
 | `POST` | `/api/auto-switcher/rotate` | Alias for account rotation via auto-switcher subsystem |
 | `GET` | `/api/auto-switcher/status` | Queries live status of auto-switcher daemon, active account, and quota |
+| `GET` | `/api/repo-db/projects` | Queries all detected running projects across instances |
+| `GET` | `/api/repo-db/prompts` | Queries all backed up prompts staged in repo_prompts.db |
 | `POST` | `/api/accounts/switch` | Explicitly switches to a specific `account_id` payload |
 
 ---
