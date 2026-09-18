@@ -333,7 +333,8 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Cross-Platform Release & Email Security Vault Hardening] Automated Release, Credentials Vault & One-Liner Installers**:\n"
+        f"        -   **[Automated Release Ceremony & Python Orchestration] Standalone Minor Bump, Security Vault Hardening & Synchronized Manifests**:\n"
+        f"            -   **Automated Release Lifecycle**: Executed complete Python-driven release orchestration (`29-release-orchestrator.py`) with automatic version propagation, branch preservation, and tag generation.\n"
         f"            -   **Split Database for Passwords**: Hardened dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.\n"
         f"            -   **Plain Email Configuration Window**: Comprehensive UI modal for email account credentials, custom SMTP/IMAP servers, and port bindings.\n"
         f"            -   **Two-Way Import/Export**: Full bidirectional import and export capability for email accounts across JSON, CSV, and Excel formats.\n"
@@ -384,6 +385,7 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
+        f"- **Automated Release Lifecycle**: Executed complete Python-driven release orchestration (`29-release-orchestrator.py`) with automatic version propagation, branch preservation, and tag generation.\n"
         f"- **Split Database for Passwords**: Hardened dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.\n"
         f"- **Plain Email Configuration Window**: Comprehensive UI modal for email account credentials, custom SMTP/IMAP servers, and port bindings.\n"
         f"- **Two-Way Import/Export**: Full bidirectional import and export capability for email accounts across JSON, CSV, and Excel formats.\n"
