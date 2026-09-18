@@ -51,7 +51,8 @@ pub fn connect_db() -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let conn = Connection::open(&path).map_err(|e| format!("Failed to open repo database: {}", e))?;
+    let conn =
+        Connection::open(&path).map_err(|e| format!("Failed to open repo database: {}", e))?;
     let _ = conn.pragma_update(None, "journal_mode", "WAL");
     let _ = conn.pragma_update(None, "busy_timeout", 5000);
     init_tables(&conn)?;
@@ -110,7 +111,10 @@ fn decode_uri_to_path(uri: &str) -> String {
         .or_else(|| uri.strip_prefix("file://"))
         .unwrap_or(uri);
 
-    let replaced = stripped.replace("%20", " ").replace("%3A", ":").replace("%3a", ":");
+    let replaced = stripped
+        .replace("%20", " ")
+        .replace("%3A", ":")
+        .replace("%3a", ":");
 
     #[cfg(target_os = "windows")]
     {
@@ -135,7 +139,8 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         .find(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance '{}' not found", instance_id))?;
 
-    let pids = crate::modules::instance::find_pids_for_data_dir(&instance.data_dir, instance.is_default);
+    let pids =
+        crate::modules::instance::find_pids_for_data_dir(&instance.data_dir, instance.is_default);
     let is_instance_active = !pids.is_empty();
 
     let storage_dir = PathBuf::from(&instance.data_dir)
@@ -153,11 +158,13 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     let ws_json_path = ws_folder.join("workspace.json");
                     if ws_json_path.exists() {
                         if let Ok(content) = fs::read_to_string(&ws_json_path) {
-                            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) {
-                                let folder_uri = json_val
-                                    .get("folder")
-                                    .and_then(|v| v.as_str())
-                                    .or_else(|| json_val.get("configuration").and_then(|v| v.as_str()));
+                            if let Ok(json_val) =
+                                serde_json::from_str::<serde_json::Value>(&content)
+                            {
+                                let folder_uri =
+                                    json_val.get("folder").and_then(|v| v.as_str()).or_else(|| {
+                                        json_val.get("configuration").and_then(|v| v.as_str())
+                                    });
 
                                 if let Some(uri) = folder_uri {
                                     let raw_path = decode_uri_to_path(uri);
@@ -178,7 +185,9 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                                         instance_id: instance_id.to_string(),
                                         repo_name,
                                         repo_path: raw_path,
-                                        workspace_storage_path: Some(ws_folder.to_string_lossy().to_string()),
+                                        workspace_storage_path: Some(
+                                            ws_folder.to_string_lossy().to_string(),
+                                        ),
                                         is_running: is_instance_active,
                                         last_detected_at: now,
                                     });

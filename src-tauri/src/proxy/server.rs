@@ -1461,7 +1461,8 @@ async fn admin_rotate_account(
             return Err((
                 StatusCode::CONFLICT,
                 Json(ErrorResponse {
-                    error: "Another switch or rotation operation is already in progress".to_string(),
+                    error: "Another switch or rotation operation is already in progress"
+                        .to_string(),
                 }),
             ));
         }
@@ -1513,7 +1514,8 @@ async fn admin_get_auto_switcher_status(
     Ok(Json(status))
 }
 
-async fn admin_list_repo_projects() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+async fn admin_list_repo_projects() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
+{
     match crate::modules::repo_db::list_running_projects() {
         Ok(projects) => Ok(Json(projects)),
         Err(e) => Err((
@@ -1523,7 +1525,8 @@ async fn admin_list_repo_projects() -> Result<impl IntoResponse, (StatusCode, Js
     }
 }
 
-async fn admin_list_repo_prompts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+async fn admin_list_repo_prompts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
+{
     match crate::modules::repo_db::list_backed_up_prompts() {
         Ok(prompts) => Ok(Json(prompts)),
         Err(e) => Err((

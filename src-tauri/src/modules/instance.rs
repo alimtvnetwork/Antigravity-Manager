@@ -623,9 +623,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 ));
                 for pid in &pids {
                     if system.process(sysinfo::Pid::from_u32(*pid)).is_some() {
-                        let _ = Command::new("kill")
-                            .args(["-9", &pid.to_string()])
-                            .output();
+                        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_millis(300));
@@ -787,24 +785,34 @@ mod tests {
         let json = serde_json::to_string(&instance).unwrap();
         let restored: InstanceConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "ubuntu-test");
-        assert_eq!(restored.executable_path, Some("/opt/antigravity/antigravity".to_string()));
+        assert_eq!(
+            restored.executable_path,
+            Some("/opt/antigravity/antigravity".to_string())
+        );
     }
 
     #[test]
     fn test_ubuntu_instance_switching_end_to_end_flow() {
-        let temp_dir = std::env::temp_dir().join(format!("agm_test_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "agm_test_{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
         let instance_data = temp_dir.join("ubuntu-inst").join("data");
         let user_storage = instance_data.join("User").join("globalStorage");
         assert!(std::fs::create_dir_all(&user_storage).is_ok());
 
         let db_path = user_storage.join("state.vscdb");
         let conn = rusqlite::Connection::open(&db_path).unwrap();
-        assert!(conn.execute(
-            "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB)",
-            [],
-        ).is_ok());
+        assert!(conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB)",
+                [],
+            )
+            .is_ok());
 
-        let rows_count: i64 = conn.query_row("SELECT count(*) FROM ItemTable", [], |r| r.get(0)).unwrap();
+        let rows_count: i64 = conn
+            .query_row("SELECT count(*) FROM ItemTable", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(rows_count, 0);
 
         let linux_data_str = instance_data.to_string_lossy().to_string();
