@@ -869,7 +869,7 @@ export default function EmailNotificationSettings() {
                             <Key className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-2.5" />
                         </div>
                         <p className="text-[11px] text-gray-400 mt-1">
-                            Stored in isolated <code>email_vault.db</code> with salted asymmetric key fingerprint encapsulation.
+                            Stored in isolated split database <code>email_passwords.db</code> with salted SSH RSA identity and machine-bound encryption.
                         </p>
                     </div>
 
