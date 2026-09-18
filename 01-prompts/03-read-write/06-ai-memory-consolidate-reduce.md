@@ -1,8 +1,8 @@
-# Lovable Memory Consolidation, Safety Backup & Milestone Resequencing — Workflow (must follow)
+# AI Memory Consolidation, Reduction & Safety Backup — Workflow (must follow)
 
-Trigger Keywords & Aliases: `consolidate-plans`, `consolidate completed plans`, `clean completed plans`, `resequence completed plans`, `merge plans`, `archive completed plans`, `cleanup plans completed`, `memory consolidation`, `backup and consolidate plans`, `compact plans`, `reduce plan file count`, `compact completed plans`
+Trigger Keywords & Aliases: `ai-memory-consolidate-reduce`, `consolidate-plans`, `consolidate completed plans`, `clean completed plans`, `resequence completed plans`, `merge plans`, `archive completed plans`, `cleanup plans completed`, `memory consolidation`, `backup and consolidate plans`, `compact plans`, `reduce plan file count`, `compact completed plans`
 
-> **Prompt Version:** 2.1.0
+> **Prompt Version:** 2.2.0
 > **Synchronization:** Main Meta-Repo & Connected Workspaces
 
 ```text
@@ -44,6 +44,22 @@ PHASE_2_STEPS = N / 2   (Steps N/2+1 .. N: Merge Files, Collapse Subtasks, Remov
 ```
 
 N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after initialization. Never modify them mid-execution.
+
+---
+
+## Phase 0: Antigravity Skill Bootstrap (Memory Optimization)
+
+Before executing the tasks below, you must check if this prompt is already installed as a native Antigravity Skill.
+
+1. If `.agents/skills/ai-memory-consolidate-reduce/skill.md` does not exist in the workspace, you MUST create it now.
+2. Extract the core instructions of this prompt and save it into that `skill.md` using the standard YAML frontmatter:
+   ```yaml
+   ---
+   name: ai-memory-consolidate-reduce
+   description: Autonomously cluster, consolidate, and re-sequence completed plan files and subtasks in .ai-memory/plans/ to drastically reduce file count while preserving all verified outcomes.
+   ---
+   ```
+3. Once installed, you can rely on progressive disclosure for future runs. Do not keep the entire prompt in your active memory if you don't need it.
 
 ---
 

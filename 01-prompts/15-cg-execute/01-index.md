@@ -13,7 +13,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase to inventory all architectural violations and anti-patterns.
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/` with an exhaustive Violation Ledger.
 3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
@@ -64,6 +64,11 @@ Prompts are sequenced according to priority. Error management, control-flow flat
 | **18** | [`18-function-argument-reduction-and-params.md`](./18-function-argument-reduction-and-params.md) | Argument Reduction, Parameter Structs & Return Architecture | `cg-argument-reduction`, `cg-params`, `cg-struct-params`, `cg-execute params` | Parameter structs (`*Params`) for >2–3 args, value-based passing, affirmative boolean fields (`is`/`has`), mandatory `*apperror.AppError` returns (zero void in Go), framework error conversion | `check-function-lengths.py`, `check-error-management.py` |
 | **19** | [`19-result-wrapper-and-apperror-returns.md`](./19-result-wrapper-and-apperror-returns.md) | Result Wrapper Types, Collections & AppError Returns | `cg-result-wrapper`, `cg-apperror-returns`, `cg-execute result-wrapper` | Eliminate multi-value `(T, error)` tuples and `(map[K]V, error)`, return single `Result[T]`/`ResultMap[K, V]`/`ResultSlice[T]`, outer inspection methods (`IsSuccess`, `IsFailure`, `HasError`, `Data`, `AppError`), zero dual handling | `check-error-management.py`, `check-function-lengths.py` |
 | **20** | [`20-extract-generic-types-to-types-go.md`](./20-extract-generic-types-to-types-go.md) | Extracting Generic Types, Envelopes & Models to `types.go` | `cg-types-go`, `cg-extract-types`, `cg-execute types-go`, `extract-generic-types` | Centralize domain structs, repeated generic Result wrappers (`ResultSlice[T]`, `ResultMap[K, V]`, `Result[T]`), and enums into package-level `types.go` as single reusable named types everywhere | `check-error-management.py`, `check-function-lengths.py` |
+| **21** | [`21-lazy-regex-and-pattern-matching.md`](./21-lazy-regex-and-pattern-matching.md) | Lazy Regex, Centralized Pattern Caching & Match Result Diagnostics | `cg-lazyregex`, `cg-regex`, `cg-execute regex` | Total ban on raw `regexp.MustCompile`, thread-safe `lazyregex.New(...)`, wrapped `MatchResult` (`ResultGroup`) with rich `AppError` test diagnostics showing pattern, comparing text, and character length | `golangci-lint`, `check-boolean-guidelines.py` |
+| **22** | [`22-file-size-and-function-reduction.md`](./22-file-size-and-function-reduction.md) | File Size & Function Size Reduction | `cg-size-reduction`, `cg-file-reduction`, `cg-function-reduction`, `cg-execute size` | Two-part reduction (functions <= 8-15 lines first, then files < 100 lines), zero line compression / whitespace removal, wrapper objects, boolean conventions, build verification at end only | `check-file-sizes.py`, `check-function-lengths.py` |
+| **23** | [`23-string-operations-and-efficiency.md`](./23-string-operations-and-efficiency.md) | String Operations & Memory Efficiency | `cg-string-efficiency`, `cg-strings`, `cg-string-comparison`, `cg-equalfold`, `cg-execute strings` | Zero-allocation case folding (`strings.EqualFold`, `StringComparison.OrdinalIgnoreCase`), short-circuiting lazy evaluation, loop hoisting, business logic safety first, functions <= 8–15 lines | `12-fast-cached-grep.py`, `check-function-lengths.py` |
+| **24** | [`24-isolate-destructive-os-and-heavy-unit-tests.md`](./24-isolate-destructive-os-and-heavy-unit-tests.md) | Unit Test Isolation & Destructive OS Prevention | `cg-isolate-os-tests`, `cg-mock-destructive`, `cg-execute os-tests` | Total ban on executing real OS shutdown, reboot, or heavy system altering commands in unit tests, injectable OSActionExecutor, mock delays (1s/2s), safe dry-run callbacks | `validate-guidelines.py` |
+| **25** | [`25-nuclear-package-modularization-and-unit-test-optimization.md`](./25-nuclear-package-modularization-and-unit-test-optimization.md) | Nuclear Package Modularization & Unit Test Optimization | `cg-nuclear-packages`, `cg-package-modularization`, `cg-test-optimization`, `cg-nuclear`, `nuclear-packages`, `isolate-heavy-tests`, `optimize-unit-tests`, `split-packages` | Decompose monolithic packages into acyclic DAG subpackages (< 0.05s test window), isolate heavy subprocess tests into `tests/heavy_test/`, enforce 5-day test inventory cache freshness (`.ai-memory/test-inventory.json`) | `33-test-inventory-generator.py`, `check-function-lengths.py` |
 
 ---
 
@@ -74,6 +79,8 @@ Prompts are sequenced according to priority. Error management, control-flow flat
 - **React Components:** Recommended <= 80 lines; standard max <= 100 lines.
 - **Nested `if` Statements:** Zero tolerance (must be flattened with guard clauses).
 - **NO Line-Compression Cheating:** Never collapse `if/else` onto a single line or delete blank lines to fit under line caps. Reduce size by decomposing into separate files.
+- **NO Inline Compound Condition Cramming:** Never cram variable assignments and compound boolean conditions into an `if` header (e.g. `if v, isString := ...; isString && len(v) > 0`). Put assignments on separate lines, evaluate booleans affirmatively before `if`, and ensure `if` statements check only one simple variable.
+- **Zero Magic Strings & Constant Returns:** Never hardcode raw string literals (like `"unknown"`, `"version"`, status words) into function bodies or return statements. Merge magic strings into typed constants or slices (e.g. `VersionUnknown = "unknown"`, `VersionKeys = []string{...}`), and always return defined constants instead of raw strings.
 
 ---
 
@@ -121,7 +128,7 @@ Every prompt in this suite operates using a strict two-phase loop budget:
 ### Phase 1: Scan, Spec & Subtasks (Steps 1 to N/2)
 
 1. **Memory Ingestion:** Ingest `.ai-memory/coding-guidelines.md`, `.ai-memory/strictly-avoid.md`, and recent issues in `.ai-memory/memory/issues/`.
-2. **High-Speed Violation Scan:** Run `python 03-ai-scripts/11-fast-file-scanner.py --check` and `python 03-ai-scripts/12-fast-cached-grep.py "<pattern>"` to detect AST violations across the codebase in milliseconds.
+2. **High-Speed Violation Scan:** Run `python 03-ai-scripts/11-fast-file-scanner.py --lang <lang> --limit 100 --stats`, `python 03-ai-scripts/12-fast-cached-grep.py --pattern "<pattern>" --limit 50`, `python 03-ai-scripts/17-fast-file-reader.py --list-folder <dir> --limit 50`, and `python 03-ai-scripts/18-codebase-topology-discoverer.py --summary` to detect AST violations and explore directory topologies in milliseconds without tool truncation.
 3. **Master Spec Creation:** Write `.ai-memory/plans/pending/xx-<slug>-audit.md` capturing the full violation ledger, affected files, line numbers, and acceptance criteria.
 4. **Subtask Decomposition:** Break down the master plan into granular subtasks in `.ai-memory/plans/subtasks/xx-<slug>/01-<subtask-title>.md`, `02-<subtask-title>.md`, etc.
 5. **Linter Hook Verification:** Check if the automated linter script exists in `linter-scripts/`. If missing, generate the linter script and connect it to `03-ai-scripts/06-cicd-local-runner.py` and CI/CD pipelines.

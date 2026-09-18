@@ -15,7 +15,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase to inventory all architectural violations and anti-patterns.
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/` with an exhaustive Violation Ledger.
 3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
@@ -171,6 +171,30 @@ To guarantee full execution without stopping after planning mode, the master orc
 - **Context Diet:** Provide subagents with minimal instructions (e.g. "Read subtask file `.ai-memory/plans/subtasks/xx-<parent-slug>/01-<subtask-title>.md` and execute it"). Do not paste huge files into agent prompts.
 
 ### 2. Phase 1: Planning Mode & Subtask Generation (Steps 1 .. N/2)
+
+### Fast File Discovery & Reading via Python Toolchain (Mandatory Acceleration)
+
+To avoid 50-result tool truncation limits and eliminate multi-turn exploratory roundtrips, the AI agent MUST use the repository's dedicated Python discovery scripts first:
+
+1. **Inventory Target Files (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts --limit 100 --stats
+   ```
+2. **Fast Cached Grep (<15ms, with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/12-fast-cached-grep.py --pattern "<search-pattern>" --lang go --limit 50
+   ```
+3. **Sub-Millisecond Folder & File Exploration (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/17-fast-file-reader.py --list-folder <folder-path> --ext .go --limit 50
+   python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000
+   python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --path <folder-path> --limit 50
+   ```
+4. **Subsystem & Topology Overview:**
+   ```bash
+   python 03-ai-scripts/18-codebase-topology-discoverer.py --summary
+   ```
+Do not rely on standard search tools with 50-item truncation when discovering repository-wide violations.
 
 - Spawn 2 planning subagents to scan the codebase for target guideline violations.
 - Write the master architectural specification in `.ai-memory/plans/pending/xx-audit.md` with an exhaustive Violation Ledger table.

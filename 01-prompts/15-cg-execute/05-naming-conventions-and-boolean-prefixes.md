@@ -15,7 +15,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase to inventory all architectural violations and anti-patterns: bare `ok`, inverted `!isEmpty`, negative names (`isNot*`), awkward `isExists`, and compound negative chains (`!a || !b || c`).
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/` with an exhaustive Violation Ledger.
 3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
@@ -82,6 +82,61 @@ You MUST replace bare `ok` with a domain-specific boolean starting with `is` or 
   - ❌ **FORBIDDEN:** `if !isEmpty { ... }`, `if !res.IsEmpty() { ... }`, `if !state.IsEmpty { ... }`
   - ✅ **REQUIRED:** `if isDefined { ... }`, `if res.IsDefined() { ... }`, `if state.IsDefined { ... }`
 - **When `isEmpty` is Allowed:** `isEmpty` is ONLY evaluated positively when explicitly handling the empty or missing path: `if isEmpty { return ErrEmpty }`. When handling the populated, valid data path, ALWAYS use affirmative `isDefined`.
+
+### 2.2 Multi-Line Statement Separation & Simple If Condition (No Inline Compound Cramming)
+
+- **Total Ban on Inline Compound Assignments (`if init; cond`):** While replacing bare `ok` with affirmative names (`isString`, `isFound`), NEVER cram the type assertion and compound conditions into a single `if` line (e.g. `if v, isString := rawMap[key].(string); isString && len(v) > 0 {`).
+- **Separation onto Distinct Lines:**
+  1. Execute the type assertion / map lookup on its own dedicated line.
+  2. Evaluate and name the boolean condition affirmatively (`hasContent`, `isFound`) on its own dedicated line *before* the `if` statement.
+  3. Keep a blank line before the `if` statement.
+  4. Keep the `if` condition dead simple, checking exactly ONE variable.
+  5. Define named constants for all lookup keys and fallback defaults (`versionKeyUpper`, `versionKeyLower`, `VersionUnknown`) and collect them into reusable slices (`versionKeys`), eliminating magic strings and raw string returns.
+
+```go
+// ❌ BANNED ANTI-PATTERN:
+// 1. Cramming type assertion assignment and compound condition into one line.
+// 2. Hardcoding magic strings ("Version", "version", "unknown") inline.
+// 3. Returning raw fallback literal instead of a defined constant.
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range []string{"Version", "version"} {
+        if v, isString := rawMap[key].(string); isString && len(v) > 0 {
+            return v
+        }
+    }
+
+    return "unknown"
+}
+
+// ✅ MANDATORY CLEAN PATTERN:
+// 1. Zero magic strings: extract lookup keys and defaults into constants.
+// 2. Merge repeated/related strings into reusable collections (versionKeys).
+// 3. Assignment on its own dedicated line.
+// 4. Affirmative boolean (hasContent) pre-evaluated BEFORE the if statement.
+// 5. Clean vertical breathing room (blank line before if).
+// 6. Dead-simple if statement evaluating exactly ONE variable.
+// 7. Return defined constant (VersionUnknown) instead of raw magic string literal.
+const (
+    VersionUnknown  = "unknown"
+    versionKeyUpper = "Version"
+    versionKeyLower = "version"
+)
+
+var versionKeys = []string{versionKeyUpper, versionKeyLower}
+
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range versionKeys {
+        v, isString := rawMap[key].(string)
+        hasContent := isString && len(v) > 0
+
+        if hasContent {
+            return v
+        }
+    }
+
+    return VersionUnknown
+}
+```
 
 ---
 
@@ -219,6 +274,30 @@ To guarantee full execution without stopping after planning mode, the master orc
 - **Context Diet:** Provide subagents with minimal instructions (e.g. "Read subtask file `.ai-memory/plans/subtasks/xx-<parent-slug>/01-<subtask-title>.md` and execute it"). Do not paste huge files into agent prompts.
 
 ### 2. Phase 1: Planning Mode & Subtask Generation (Steps 1 .. N/2)
+
+### Fast File Discovery & Reading via Python Toolchain (Mandatory Acceleration)
+
+To avoid 50-result tool truncation limits and eliminate multi-turn exploratory roundtrips, the AI agent MUST use the repository's dedicated Python discovery scripts first:
+
+1. **Inventory Target Files (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts --limit 100 --stats
+   ```
+2. **Fast Cached Grep (<15ms, with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/12-fast-cached-grep.py --pattern "<search-pattern>" --lang go --limit 50
+   ```
+3. **Sub-Millisecond Folder & File Exploration (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/17-fast-file-reader.py --list-folder <folder-path> --ext .go --limit 50
+   python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000
+   python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --path <folder-path> --limit 50
+   ```
+4. **Subsystem & Topology Overview:**
+   ```bash
+   python 03-ai-scripts/18-codebase-topology-discoverer.py --summary
+   ```
+Do not rely on standard search tools with 50-item truncation when discovering repository-wide violations.
 
 - Spawn 2 planning subagents to scan the codebase for target guideline violations.
 - Write the master architectural specification in `.ai-memory/plans/pending/xx-audit.md` with an exhaustive Violation Ledger table.

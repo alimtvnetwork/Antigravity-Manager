@@ -15,7 +15,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using AST and ripgrep to inventory all architectural violations: explicit `== true`/`== false`, negative names (`isNot*`), inverted success (`!isSuccess`), mixed polarity (`&& !`), single-letter boolean parameters (`v bool`, `b bool`), bare un-prefixed boolean identifiers (`stop`, `pause`, `force`, `dryRun`), awkward `isExists` identifiers, and compound negative chains (`!a || !b || c`).
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/` with an exhaustive Violation Ledger.
 3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
@@ -93,6 +93,12 @@ Boolean logic must be simple, readable, and unambiguous. Complex boolean chains 
    - NEVER chain multiple negated conditions in an `if` expression (e.g. `if !state.IsDefined || !state.IsEmpty || state.IsRepo`). Chained inverted conditions create high cognitive load and hide which specific invariant failed.
    - **In Test Assertions:** Break every condition into a discrete assertion (`if !state.IsDefined`, `if !state.IsEmpty`, `if state.IsRepo`) with its own distinct error message.
    - **In Application Logic:** Extract into an affirmative composite variable (`isCloneTargetFresh := !params.State.IsDefined || params.State.IsEmpty`) or use separate early return guard clauses.
+
+8. **Boolean Evaluation Must Occur BEFORE the `if` Statement (Simple One-Variable `if` Checking):**
+   - **Total Ban on Inline Compound Assignments (`if init; cond`):** NEVER cram variable declarations, type assertions, or multi-part boolean checks into the `if` header (e.g. `if v, isString := rawMap[key].(string); isString && len(v) > 0 {`).
+   - **Evaluation Precedes Branching:** Execute variable assignments on their own line, then evaluate and name the boolean condition on its own line *before* the `if` statement.
+   - **One Variable Checking:** The `if` statement itself must be dead simple, evaluating exactly ONE clean, named affirmative boolean variable (`if hasContent { ... }`, `if isMatch { ... }`).
+   - **Multi-Line Separation:** Keep statements separated across several lines so that business logic and type safety are immediately clear and easy to grasp. Never compress logic onto one line to fake file size reduction.
 
 ### Generic Code Patterns with Compliant Newline Gaps
 
@@ -401,9 +407,55 @@ if state.IsDefined {
     resumeTask()
 }
 
-// ✅ Also permitted: Affirmative isEmpty ONLY when handling the empty/missing case
 if res.IsEmpty() {
     return appfault.New(appfault.ErrNotFound).WithMessage("no records found")
+}
+```
+
+#### Pattern H: Boolean Evaluation BEFORE the `if` Statement (Simple One-Variable `if` Checking)
+
+```go
+// ❌ BANNED ANTI-PATTERN:
+// 1. Cramming type assertion assignment and compound condition into one line.
+// 2. Hardcoding magic strings ("Version", "version", "unknown") inline.
+// 3. Returning raw fallback literal instead of a defined constant.
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range []string{"Version", "version"} {
+        if v, isString := rawMap[key].(string); isString && len(v) > 0 {
+            return v
+        }
+    }
+
+    return "unknown"
+}
+
+// ✅ MANDATORY CLEAN PATTERN:
+// 1. Zero magic strings: extract lookup keys and defaults into constants.
+// 2. Merge repeated/related strings into reusable collections (versionKeys).
+// 3. Assignment on its own dedicated line.
+// 4. Affirmative boolean (hasContent) pre-evaluated BEFORE the if statement.
+// 5. Clean vertical breathing room (blank line before if).
+// 6. Dead-simple if statement evaluating exactly ONE variable.
+// 7. Return defined constant (VersionUnknown) instead of raw magic string literal.
+const (
+    VersionUnknown  = "unknown"
+    versionKeyUpper = "Version"
+    versionKeyLower = "version"
+)
+
+var versionKeys = []string{versionKeyUpper, versionKeyLower}
+
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range versionKeys {
+        v, isString := rawMap[key].(string)
+        hasContent := isString && len(v) > 0
+
+        if hasContent {
+            return v
+        }
+    }
+
+    return VersionUnknown
 }
 ```
 
@@ -422,6 +474,30 @@ if res.IsEmpty() {
 ## 2. Phase 1: Scan Codebase & Write Implementation Spec First (Steps 1 to PHASE_1_STEPS)
 
 Before modifying application code, you MUST thoroughly scan the repository and write an actionable execution spec.
+
+### Fast File Discovery & Reading via Python Toolchain (Mandatory Acceleration)
+
+To avoid 50-result tool truncation limits and eliminate multi-turn exploratory roundtrips, the AI agent MUST use the repository's dedicated Python discovery scripts first:
+
+1. **Inventory Target Files (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts --limit 100 --stats
+   ```
+2. **Fast Cached Grep (<15ms, with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/12-fast-cached-grep.py --pattern "<search-pattern>" --lang go --limit 50
+   ```
+3. **Sub-Millisecond Folder & File Exploration (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/17-fast-file-reader.py --list-folder <folder-path> --ext .go --limit 50
+   python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000
+   python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --path <folder-path> --limit 50
+   ```
+4. **Subsystem & Topology Overview:**
+   ```bash
+   python 03-ai-scripts/18-codebase-topology-discoverer.py --summary
+   ```
+Do not rely on standard search tools with 50-item truncation when discovering repository-wide violations.
 
 - **Actionable Scan:** Use search/grep and AST tools across all source files to identify:
   1. Explicit boolean comparisons (`== true`, `=== true`, `== false`, `=== false`).

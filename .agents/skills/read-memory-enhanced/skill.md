@@ -11,8 +11,8 @@ description: >-
 
 ## Ambiguity folder path (non-negotiable)
 
-- Open questions: `.ai-memory/ambiguous-questions/01-new-ambiguity/XX-<slug>.md`
-- Answered questions: `.ai-memory/ambiguous-questions/02-ambiguity-resolved/XX-<slug>.md`
+- Open questions: `.ai-memory/ambiguous-questions/01-new-ambiguity/xx-<slug>.md`
+- Answered questions: `.ai-memory/ambiguous-questions/02-ambiguity-resolved/xx-<slug>.md`
 Read both folders in full during Phase 1. Surface open-ambiguity counts and slugs in the Completion Confirmation block. Treat resolved-ambiguity files as binding project decisions, do not re-litigate them. If an open ambiguity is relevant to the incoming task, stop and surface it before doing work; never guess past it.
 
 ## Goal
@@ -37,7 +37,7 @@ The `.ai-memory/` folder, specs, and codebase can be massive. To process this in
 - **Specific Titling:** When spawning a sub-agent for reading, you must give it a highly specific title reflecting exactly what it is reading (e.g., `Reading Auth Specs` or `Scanning API Memory`). Do not use generic names. If an agent switches tasks, its title must change.
 - **Micro-Tasking:** Assign sub-agents small, granular folders/files to read rather than asking one agent to read the entire codebase.
 - You are allowed to write to the `.ai-memory/` directory to enhance project memory after reading. This includes:
-  - Writing summaries of what you learned and understood into `.ai-memory/memory/learned/XX-<slug>.md` (or `.ai-memory/01-index.md`), including the number of files read, to maintain context.
+  - Writing summaries of what you learned and understood into `.ai-memory/memory/learned/xx-<slug>.md` (or `.ai-memory/01-index.md`), including the number of files read, to maintain context.
   - Updating `.ai-memory/what-to-read.md` based on your progress to guide future reading workflows.
   - Documenting any problems or issues you discover in the codebase into `.ai-memory/issues/` or `.ai-memory/suggestions.md`.
   - Updating existing memory files, capturing open ambiguities, or updating plans.
@@ -47,9 +47,11 @@ The `.ai-memory/` folder, specs, and codebase can be massive. To process this in
 ## Phase 1 - Load the project & git history
 
 ### 1.0 Read the last 10 git commits & file changes (MANDATORY)
+
 Run `git log -n 10 --stat` to view the last 10 commits, their commit messages, and the exact files modified, added, or deleted. Analyze what was touched recently and the architectural intent behind recent changes so you do not revert recent progress or repeat past bugs.
 
 ### 1.1 Read what-to-read.md first (Authoritative Order)
+
 Read `.ai-memory/what-to-read.md` first. Follow every file and priority sequence it specifies before reading other files.
 
 ### 1.2 Read the whole `.ai-memory/` folder
@@ -64,11 +66,11 @@ Walk `.ai-memory/` recursively. Every file matters. Missing files are noted, not
 | 5 | `.ai-memory/prompt.md` + `01-prompts/` | Canonical prompts (Read, Plan, etc.). "Read memory" = run this prompt. |
 | 6 | `.ai-memory/memory/01-index.md` | Index of institutional knowledge. Then read every file it references, recursively. |
 | 7 | `.ai-memory/plans/01-index.md` | Roll-up of all plans (pending + completed + subtasks). Read this before touching individual plan files. |
-| 8 | `.ai-memory/plans/pending/` | Active plans, `XX-<slug>.md` |
+| 8 | `.ai-memory/plans/pending/` | Active plans, `xx-<slug>.md` |
 | 9 | `.ai-memory/plans/completed/` | Recent history, skim only |
-| 10 | `.ai-memory/plans/subtasks/XX-<slug>/` | Depth files linked from a parent plan |
+| 10 | `.ai-memory/plans/subtasks/xx-<slug>/` | Depth files linked from a parent plan |
 | 11 | `.ai-memory/suggestions.md` | Ideas not yet approved |
-| 12 | `.ai-memory/spec/commands/` | User commands and conventions, `XX-<slug>.md` |
+| 12 | `.ai-memory/spec/commands/` | User commands and conventions, `xx-<slug>.md` |
 | 13 | `.ai-memory/issues/` | General bugs and regressions |
 | 14 | `.ai-memory/cicd-issues/` | CI/CD-specific failures. Read ALL of these before any code change so you do not repeat the same mistakes. |
 | 15 | `.ai-memory/ambiguous-questions/01-new-ambiguity/` | Open questions currently blocking work. If any exist, surface them in the completion block, do NOT guess past them. |
@@ -151,15 +153,15 @@ New info discovered
 ├─ Idea, not yet approved?
 │ YES → .ai-memory/suggestions.md
 ├─ New user command / convention?
-│ YES → .ai-memory/02-spec/commands/XX-<slug>.md
+│ YES → .ai-memory/02-spec/commands/xx-<slug>.md
 ├─ Bug / regression?
-│ YES → .ai-memory/issues/XX-<slug>.md (or .ai-memory/cicd-issues/ if CI/CD)
+│ YES → .ai-memory/issues/xx-<slug>.md (or .ai-memory/cicd-issues/ if CI/CD)
 ├─ New or changed plan?
-│ YES → .ai-memory/plans/pending/XX-<slug>.md + update .ai-memory/plans/01-index.md
+│ YES → .ai-memory/plans/pending/xx-<slug>.md + update .ai-memory/plans/01-index.md
 ├─ Ambiguity / unclear requirement blocking progress?
-│ YES → .ai-memory/ambiguous-questions/01-new-ambiguity/XX-<slug>.md
+│ YES → .ai-memory/ambiguous-questions/01-new-ambiguity/xx-<slug>.md
 ├─ User just answered a previously-open ambiguity?
-│ YES → mv the file to .ai-memory/ambiguous-questions/02-ambiguity-resolved/XX-<slug>.md,
+│ YES → mv the file to .ai-memory/ambiguous-questions/02-ambiguity-resolved/xx-<slug>.md,
 │ append `## Resolution` (answer + applied solution), flip Status: resolved
 └─ None of the above → do not persist.
 ```

@@ -15,7 +15,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase to inventory ALL source code files (`*.go`, `*.ts`, `*.py`, `*.php`, `*.cs`) and discover all squeezed newline violations inside function bodies, loops, guard clauses, and struct instantiations.
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/XX-style-guidelines-audit.md` with an exhaustive File Inventory Manifest and Violation Ledger.
 3. [ ] /goal Phase 1 (Step C): Decompose ALL source files into granular, bounded subtask batches of **5–8 files each** in `.ai-memory/plans/subtasks/XX-style/batch-01.md`, `batch-02.md`, etc.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated style autofixer in `03-ai-scripts/05-guideline-autofixer.py` and register in `03-ai-scripts/01-index.md`.
@@ -495,9 +495,63 @@ Conditionals MUST NEVER exceed depth 1 (i.e., **no nested `if` statements inside
 
 ---
 
-### Rule 6: No Multi-Statement / Semicolon-Packed Lines
+### Rule 6: No Multi-Statement Lines & No Inline Compound Condition Cramming (Multi-Line Separation)
 
-Never compress multiple statements onto a single line using semicolons (`a = 1; b = 2; return a + b`). Each statement MUST occupy its own line.
+1. **No Semicolon Packing:** Never compress multiple statements onto a single line using semicolons (`a = 1; b = 2; return a + b`). Each statement MUST occupy its own line.
+2. **Total Ban on Inline Compound Assignments (`if init; cond`):** NEVER cram variable declarations, type assertions, or multi-part boolean checks into the `if` header (e.g. `if v, isString := rawMap[key].(string); isString && len(v) > 0 {`).
+3. **Multi-Line Statement Separation:**
+   - Execute variable assignments / lookups on their own dedicated line.
+   - Evaluate and assign the boolean condition to an affirmative variable (`is*` or `has*`) on its own dedicated line *before* the `if` statement.
+   - Maintain vertical breathing room (blank line before `if`).
+   - The `if` condition itself must be dead simple, checking **one single variable**.
+4. **Zero Magic Strings & Constant Returns:** Never use raw string literals (`"unknown"`, `"pending"`, `"failed"`) as return or fallback values. Define named constants (`VersionUnknown = "unknown"`) and return constants directly. Merge related lookup strings into constants and package-level slices (`versionKeys`), eliminating inline slice allocations.
+
+#### Canonical Example: What NOT to Do vs What to Do
+
+```go
+// ❌ BANNED ANTI-PATTERN:
+// 1. Cramming type assertion assignment and compound condition into one line.
+// 2. Hardcoding magic strings ("Version", "version", "unknown") inline.
+// 3. Returning raw fallback literal instead of a defined constant.
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range []string{"Version", "version"} {
+        if v, isString := rawMap[key].(string); isString && len(v) > 0 {
+            return v
+        }
+    }
+
+    return "unknown"
+}
+
+// ✅ MANDATORY CLEAN PATTERN:
+// 1. Zero magic strings: extract lookup keys and defaults into constants.
+// 2. Merge repeated/related strings into reusable collections (versionKeys).
+// 3. Assignment on its own dedicated line.
+// 4. Affirmative boolean (hasContent) pre-evaluated BEFORE the if statement.
+// 5. Clean vertical breathing room (blank line before if).
+// 6. Dead-simple if statement evaluating exactly ONE variable.
+// 7. Return defined constant (VersionUnknown) instead of raw magic string literal.
+const (
+    VersionUnknown  = "unknown"
+    versionKeyUpper = "Version"
+    versionKeyLower = "version"
+)
+
+var versionKeys = []string{versionKeyUpper, versionKeyLower}
+
+func extractVersionValue(rawMap map[string]interface{}) string {
+    for _, key := range versionKeys {
+        v, isString := rawMap[key].(string)
+        hasContent := isString && len(v) > 0
+
+        if hasContent {
+            return v
+        }
+    }
+
+    return VersionUnknown
+}
+```
 
 ---
 
@@ -520,6 +574,30 @@ To guarantee full execution without stopping after planning mode, the master orc
 - **Context Diet:** Provide subagents with minimal instructions (e.g. "Read subtask file `.ai-memory/plans/subtasks/xx-<parent-slug>/01-<subtask-title>.md` and execute it"). Do not paste huge files into agent prompts.
 
 ### 2. Phase 1: Planning Mode & Micro-Batch Subtask Partitioning (Steps 1 .. N/2)
+
+### Fast File Discovery & Reading via Python Toolchain (Mandatory Acceleration)
+
+To avoid 50-result tool truncation limits and eliminate multi-turn exploratory roundtrips, the AI agent MUST use the repository's dedicated Python discovery scripts first:
+
+1. **Inventory Target Files (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts --limit 100 --stats
+   ```
+2. **Fast Cached Grep (<15ms, with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/12-fast-cached-grep.py --pattern "<search-pattern>" --lang go --limit 50
+   ```
+3. **Sub-Millisecond Folder & File Exploration (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/17-fast-file-reader.py --list-folder <folder-path> --ext .go --limit 50
+   python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000
+   python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --path <folder-path> --limit 50
+   ```
+4. **Subsystem & Topology Overview:**
+   ```bash
+   python 03-ai-scripts/18-codebase-topology-discoverer.py --summary
+   ```
+Do not rely on standard search tools with 50-item truncation when discovering repository-wide violations.
 
 1. **Comprehensive File Inventory:** Scan and list EVERY single source code file in the repository (`*.go`, `*.ts`, `*.py`, `*.php`).
 2. **Partition into 5–8 File Batches:** Group the file list into numbered subtasks:

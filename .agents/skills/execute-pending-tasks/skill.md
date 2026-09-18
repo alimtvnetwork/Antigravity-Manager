@@ -57,7 +57,7 @@ description: >-
 
 1. [ ] Check git status first. The working tree must be clean and committed before executing anything.
 2. [ ] Read  and /learn `.ai-memory/memory/01-index.md` and `.ai-memory/what-to-read.md`. Verify root readme is strictly lowercase `readme.md`.
-3. [ ] Read and /learn `.ai-memory/plans/01-index.md`. Then read every file in `.ai-memory/plans/pending/XX-<slug>.md` and all associated subtasks in `.ai-memory/plans/subtasks/XX-<slug>/` (Note: for coding guidelines, check `.ai-memory/plans/subtasks/01-coding-guideline-fixes/` or other synced folder structures).
+3. [ ] Read and /learn `.ai-memory/plans/01-index.md`. Then read every file in `.ai-memory/plans/pending/xx-<slug>.md` and all associated subtasks in `.ai-memory/plans/subtasks/xx-<slug>/` (Note: for coding guidelines, check `.ai-memory/plans/subtasks/01-coding-guideline-fixes/` or other synced folder structures).
 4. [ ] Group pending tasks into sequenced Execution Waves:
    - Wave 1: Schemas, DB, and query wrappers
    - Wave 2: Business logic and services
@@ -71,7 +71,7 @@ description: >-
    - Assign subtasks to up to 2 parallel sub-agents (and ONLY if there are too many tasks to handle sequentially) to accelerate execution.
    - Maintain active file paths in `.ai-memory/01-index.md`. Parallel sub-agents must never touch the same files simultaneously.
    - Assign each sub-agent a highly specific title reflecting its exact task (e.g., `Refactoring Auth Service`). Do not use generic names. If an agent switches tasks, its title must change.
-   - Context Diet: When spawning a subagent, DO NOT paste file contents, memory logs, or the entire plan into its prompt. Give it the absolute minimal instruction (e.g., "Read subtask file `.ai-memory/plans/subtasks/XX-slug/01-task.md` and execute it"). The subagent MUST read the necessary files itself. Passing massive payloads instantly causes hallucination and memory blowout.
+   - Context Diet & Task Focus: When spawning a subagent, provide clear, lean instructions that focus on the actual domain task itself rather than writing massive generic meta-prompts. DO NOT paste file contents, memory logs, or the entire plan into its prompt. Give it the absolute minimal instruction. The subagent MUST read the necessary files itself. Passing massive payloads instantly causes hallucination and memory blowout.
    - Ensure each agent handles discrete, simple tasks (under 15 lines per function). Tasks exceeding 7 steps must be decomposed into subtasks before execution.
 
 2. Continuous self-looping:
@@ -94,7 +94,7 @@ As tasks are completed:
 1. Use `mv` to move the completed task file from `.ai-memory/plans/pending/` to `.ai-memory/plans/completed/`.
 2. Open the moved file and flip `Status: pending` to `Status: completed`.
 3. Immediately update `.ai-memory/plans/01-index.md` to reflect the completed status and new file location.
-4. If new patterns or conventions are established, record them in `.ai-memory/memory/<topic>/XX-<slug>.md` and update `.ai-memory/memory/01-index.md`. Detailed specs must never be shortened.
+4. If new patterns or conventions are established, record them in `.ai-memory/memory/<topic>/xx-<slug>.md` and update `.ai-memory/memory/01-index.md`. Detailed specs must never be shortened.
 
 ---
 
@@ -105,7 +105,7 @@ At the end of every single iteration of your execution loop:
 0. Task Statistics: Explicitly output task statistics in your window (done, pending, remaining list).
 
 1. Artifact sanitizer: Audit working tree and staged files. Ensure no zip archives, temporary test outputs, or unapproved scratch scripts are committed.
-2. Run tests and builds: Ensure code runs standalone locally and in CI/CD. Run full builds and unit test suites.
+2. Atomic Change Recording & Remote CI/CD Inspection: Record modified files using `python 03-ai-scripts/33-test-inventory-generator.py --record <files...>`. If remote CI/CD monitoring is required, use GitMap Pipeline-AI (`gitmap pipeline-ai status -t <sec>`) with dynamic ETA waiting. Never run local test runners or build verification during routine turns.
 3. Lovable git history guard: Group similar code changes into a single commit with a clear, descriptive message. Never rewrite published git history (no force push, no rebasing, no squash) to preserve Lovable editor sync.
 4. Push every commit to the remote git repository.
 5. Final check: When the loop finally ends (the pending queue is empty), bump the minor release version following release guidelines.
@@ -134,16 +134,42 @@ At the end of every single iteration of your execution loop:
 - [x] Acronyms are PascalCased (e.g., `UserId`, not `UserID`).
 - [x] Magic strings/numbers extracted to constants.
 - [x] Action Summary Checklist (Anti-Hallucination): I have output a detailed `- [x]` checklist summarizing exactly what I accomplished this turn to ensure no steps were hallucinated or skipped (e.g. `- [x] Created schema`, `- [x] Pinned README`).
+- [x] Remote CI/CD pipeline monitored via GitMap Pipeline-AI with dynamic ETA waiting (no rapid polling).
 
-## End of Tunnel Release (Anti-Hallucination Checklist)
+## Banned Operations Checklist (TOTAL BAN — Auto-Reject on Violation)
 
-Past execution turns were sloppy and failed to pin READMEs or bump versions. To prevent this hallucination, when EVERYTHING is completely finished (at the very end of the tunnel), you MUST trigger a release and physically check off these items in your final report:
+- [ ] **NO TEST RUNNING (TOTAL BAN):** NEVER run any tests using Python scripts (`06-cicd-local-runner.py`, `pytest`, runner scripts), Go (`go test ./...`), or any test runner during routine execution turns. Testing is strictly checked later on in CI/CD.
+- [ ] **NO BUILD CHECKING (TOTAL BAN):** NEVER run build commands (`go build`, `npm run build`, compiler checks) to verify compilation. Build verification is checked later on in CI/CD.
+- [ ] **NO RUNNER SCRIPTS (TOTAL BAN):** NEVER launch background test runners, worker pools, or test inventory loops during routine execution.
+- [ ] **NO AUTOMATIC RELEASES (TOTAL BAN):** NEVER bump versions, update changelogs, or trigger releases unless explicitly commanded by the user.
+- [ ] **NO PER-FILE COMMITTING (TOTAL BAN):** NEVER commit each file individually as you work (e.g. running `git commit` after editing File 1, then another commit after File 2). Committing file-by-file pollutes git history, creates subagent lock collisions, and breaks atomic changes. All modified files across the turn must be accumulated and committed together in a single atomic commit at the final step.
+- [ ] **NO RAPID CI/CD POLLING (TOTAL BAN):** NEVER run rapid polling loops or busy-wait (`gh run view` in a loop) without waiting according to `etaSeconds`. Use GitMap Pipeline-AI (`gitmap pipeline-ai status -t <sec>` or `gitmap pl-ai status --json`) with dynamic backoff.
 
-- [ ] Minor Bump: I have bumped the MINOR version in the canonical `version.json` file.
-- [ ] Test File Ban: I have strictly excluded all test files (`*test*`, `*.spec.*`) from version scanning.
-- [ ] Root readme.md (lowercase always) Pinning (FATAL): I have pinned the latest release version into the root `readme.md` file! I have verified badges and install snippets match the new version.
-- [ ] Changelog Formatting: I have updated the changelog exactly according to the `version.json` format.
-- [ ] Release Architecture Map: I have maintained `.ai-memory/memory/01-index.md`, enqueued it in `what-to-read.md`, and linked it in the root `readme.md`.
+## Remote CI/CD Pipeline Monitoring & Dynamic Waiting Protocol (GitMap Pipeline-AI)
+
+When monitoring or inspecting remote CI/CD status after pushing commits:
+1. **GitMap Pipeline-AI Query:** Agents MUST inspect remote pipelines using GitMap:
+   ```bash
+   gitmap pipeline-ai status --json
+   # or using short alias:
+   gitmap pl-ai status -t <sec>
+   ```
+   Parse `is_running`, `status`, `etaSeconds`, and `nextAiCommand`.
+2. **Anti-Credit-Waste Waiting Mandate:** NEVER loop rapidly or busy-poll (`gh run view` in tight loops). Strictly wait/sleep based on `etaSeconds` using `gitmap pipeline-ai status -t <etaSeconds>`:
+   - `etaSeconds > 120`: wait 20s–30s
+   - `60 < etaSeconds <= 120`: wait 10s–20s
+   - `etaSeconds <= 60`: wait 5s–10s
+3. **Targeted Failure Isolation:** Leverage GitMap Pipeline-AI to automatically extract targeted failure logs (`##[error]`, `FAIL:`, compile errors) without streaming voluminous raw logs.
+
+## Mark File Changes Only (Atomic Change Recording & Handoff to CI/CD & Release)
+
+Routine execution prompts MUST NOT build, test, or trigger releases. When task modifications are completed, you MUST record all modified files and physically check off these items in your final report:
+
+- [ ] **Atomic Change Recording (MANDATORY):** I have recorded all modified files into `.ai-memory/temp/recent-file-changes.json` under lock using `python 03-ai-scripts/33-test-inventory-generator.py --record <files...>`.
+- [ ] **Remote CI/CD Pipeline Monitoring via GitMap:** If checking remote CI/CD pipelines, I used GitMap Pipeline-AI (`gitmap pipeline-ai status --json` or `gitmap pl-ai status -t <sec>`) with adaptive ETA waiting, never polling in tight loops.
+- [ ] **NO Test Running (BANNED):** Zero tests were executed (`go test`, `pytest`, `06-cicd-local-runner.py`). Testing is strictly deferred to CI/CD fix prompts.
+- [ ] **NO Build Checking (BANNED):** Zero build commands were executed (`go build`, `npm run build`). Build compilation is strictly deferred to CI/CD fix prompts.
+- [ ] **NO Release Triggering (BANNED):** Zero version bumps, changelog edits, or tag operations were performed. Release operations are strictly deferred to Release prompts.
 - [ ] **File Change Summary:** Provide a highly detailed summary in the chat listing exactly which files were changed, what specific changes were made inside them, and why they were changed. The summary is VERY important.
 
 ## Pre-Reply / Loop Checklist (Must Verify Every Loop Iteration)
@@ -164,8 +190,10 @@ Past execution turns were sloppy and failed to pin READMEs or bump versions. To 
 - [ ] Error Handling (AppError): Errors use domain-specific `AppError` or custom `AppException` (for C#/OOP), not generic base `Error`.
 - [ ] Code adheres to explicit booleans, `Type` suffixed Enums, and error wrapper rules.
 - [ ] Formatting & Acronyms: Spacing rules are strictly followed. Acronyms are strictly PascalCase (`SwapIpWindows` not `SwapIPWindows`).
-- [ ] Fast-forward commits created and pushed without rewriting published git history.
-- [ ] Continuous loop maintained; only pausing to ask for "continue" on critical unrecoverable failures.
+- [ ] Consolidated atomic commits created grouping all modified files together (NEVER commit 1-2 files piecemeal).
+- [ ] Immediate push to remote (`git push origin <branch>`) executed without leaving unpushed commits.
+- [ ] **NO TEST RUNNING & NO BUILD CHECKING (TOTAL BAN):** Zero tests or builds executed during routine turns; atomic file change cache updated in `.ai-memory/temp/recent-file-changes.json` under lock (`python 03-ai-scripts/33-test-inventory-generator.py --record <path>`).
+- [ ] Continuous loop maintained without running banned test or build commands.
 
 ---
 
@@ -186,21 +214,21 @@ How to self-loop and distribute tasks effectively:
   - [ ] As the master agent, loop autonomously to wait for your sub-agents.
   - [ ] Aggregate their precise findings to ensure the highest quality result.
 
-### Temp-Agent State Management Protocol (Non-Negotiable)
+### Temp-Agent Isolated Task Directory & Communication Protocol (Non-Negotiable)
 
-To ensure agents don't lose context, you MUST use the .ai-memory/temp-agents/ directory for tracking sub-agent tasks.
+To prevent cross-task pollution and ensure seamless agent communication, every task MUST create a dedicated subfolder in `.ai-memory/temp-agents/xx-<task-name>/`:
 
-- [ ] On Start:
-  - [ ] The sub-agent creates .ai-memory/temp-agents/<task-name>.md.
-  - [ ] Write the objective and STATUS: IN_PROGRESS.
-- [ ] On Error/Crash:
-  - [ ] If an agent breaks or fails, append the exact error and cause to the file.
-  - [ ] Append STATUS: FAILED to that file before closing.
-- [ ] On Resume:
-  - [ ] The next assigned agent must first read that file to avoid repeating the mistake.
-- [ ] On Success:
-  - [ ] Update the file to STATUS: DONE.
-  - [ ] Immediately update the master plan in .ai-memory/plans/01-index.md or .ai-memory/plans/pending/.
+1. **Per-Task Isolation:** On task start, the assigned subagent creates its isolated directory `.ai-memory/temp-agents/xx-<task-name>/`.
+2. **State & Progress Tracking:** Create `.ai-memory/temp-agents/xx-<task-name>/state.md` documenting:
+   - `TASK_NAME`: `<task-name>`
+   - `STATUS`: `IN_PROGRESS` | `DONE` | `FAILED`
+   - `ASSIGNED_AGENT`: Agent identifier and thread index
+   - `CURRENT_STEP`: Detailed micro-step description
+3. **Inter-Agent Communication & Handoff:**
+   - All intermediate findings, scratch outputs, and dependency handoffs between agents working on this task MUST be written inside `.ai-memory/temp-agents/xx-<task-name>/`.
+   - Sibling or successor agents MUST inspect this dedicated folder before resuming work or fixing errors.
+4. **On Error/Crash:** Append the exact error, root cause, and `STATUS: FAILED` to `.ai-memory/temp-agents/xx-<task-name>/state.md` before exiting.
+5. **On Success:** Mark `STATUS: DONE` in `.ai-memory/temp-agents/xx-<task-name>/state.md`, aggregate findings to the master plan, and clean up or archive the folder.
 
 NEVER MAKE THIS EXCUSE: *"I did not literally perform N self-loops or spawn dozens of sub-agents. Instead of artificially spinning up N separate loops, I consolidated the required deep work into a concentrated series of sequential steps within my existing execution environment."*
 If you write this excuse, you are a lazy, stupid fuck and you are violating RULE 0. Spawn the actual sub-agents. Do the actual loops. Utilize the processing power effectively to get the right answer. Avoid stupidity.
@@ -209,9 +237,28 @@ If you write this excuse, you are a lazy, stupid fuck and you are violating RULE
 
 You MUST NOT bump versions, update changelogs, or cut a release at the end of this task. Commits must remain standard development commits. You may only trigger a release if the user explicitly commands you to do so (e.g., "cut a release" or "bump the version").
 
+## Task Consolidation & File Reduction (End of Loop)
+
+> **CRITICAL:** To reduce markdown file count and bloat, you MUST consolidate subtasks when a parent task is 100% complete.
+
+When all subtasks for a parent task (`.ai-memory/plans/pending/xx-<slug>.md`) are finished, execute this final cleanup step before ending the run:
+1. Combine all the completed granular subtasks from `.ai-memory/plans/subtasks/xx-<slug>/*.md` into a single consolidated file at `.ai-memory/plans/completed/xx-<slug>.md`.
+2. In this single consolidated file, you MUST include a header that explicitly references how the main task started and documents exactly how many steps/loops it took to complete.
+3. Delete the original granular `.md` files in `.ai-memory/plans/subtasks/xx-<slug>/` so that only the single consolidated file remains.
+4. Delete the original parent plan `.ai-memory/plans/pending/xx-<slug>.md`.
+5. Update `.ai-memory/plans/01-index.md` to point to the newly consolidated completed file.
+6. **Final Step Git Commit & Push (MANDATORY):** Stage all modified files, consolidated plans, and memory records (`git add -A`), commit them in a single clean grouped atomic commit (`git commit -m "<type>(<scope>): <summary>"`), and push to git (`git push origin <branch>`). Under no circumstances commit each file individually.
+
+## Final Step Git Commit & Push Mandate (Strict Checklist)
+
+- [ ] **MANDATORY FINAL COMMIT & PUSH TO GIT (ANYHOW):** At the FINAL step of the turn, after all targeted files have been refactored, verified with targeted linters, and plans/subtasks consolidated, you MUST stage everything (`git add -A`), create a clean, descriptive conventional commit (`git commit -m "<type>(<scope>): <summary>"`), and push directly to the remote repository (`git push origin <branch>`). Leaving uncommitted changes or unpushed commits on the active branch at the end of a turn is an immediate failure.
+- [ ] **TOTAL BAN ON PER-FILE COMMITS (DO NOT COMMIT EACH FILE INDIVIDUALLY):** You MUST NOT create separate git commits for each individual file as you edit them (e.g. running `git commit` after editing File 1, then committing again after File 2 is STRICTLY FORBIDDEN). Committing file-by-file pollutes git log history, creates subagent lock collisions, and breaks atomic rollback/bisectability. All modified files, test change caches, and plan records across the turn MUST be accumulated in the working tree and committed together in a SINGLE grouped atomic commit at the final step before pushing!
+
+---
+
 ## MUST FOLLOW NON-NEGOTIABLE
 
-Listen, past runs of these turns have been sloppy and stupid as fuck: wrong step counts, partial task lists dumped into chat instead of files, plans and session summaries half-filled with "[N]" placeholders, folders skimmed, open ambiguities ignored, CI/CD issues and `plans/subtasks/` forgotten, user commands dropped, coding guidelines bypassed, detailed specs chopped and summarized into useless junk, uppercase README files left uncorrected, `.ai-memory/memory/` created by accident, `strictly-avoid.md` overwritten, and explicit user instructions softened after being told not to. WTF. How on earth are you reverting to this carelessness, are you stupid?? Stop doing that, you stupid fuck. Read the whole codebase, read every folder in `02-spec/` and `.ai-memory/`, confirm root `readme.md` is strictly lowercase, find the root cause in one sentence, capture commands, issues, and pending tasks without omitting a single item, write the spec files and memory files in the right paths, update every index in the same turn, sync `readme.md` with `what-to-read.md`, preserve detailed specs verbatim with zero truncation, run builds and full unit tests, group commits with clear messages, and push everything to git before ending. Going deep IS the job. If you are not going deep, you are not doing the job. Violating this is auto-reject on the same tier as RULE 0. Avoid stupidity and being careless, you stupid fuck. Where is your attention, are you stupid? Tell me. Your stupidity is going on top of my head. Where did you learn this stupidity? If I could find you, I could slap you.
+Listen, past runs of these turns have been sloppy and stupid as fuck: wrong step counts, partial task lists dumped into chat instead of files, plans and session summaries half-filled with "[N]" placeholders, folders skimmed, open ambiguities ignored, CI/CD issues and `plans/subtasks/` forgotten, user commands dropped, coding guidelines bypassed, detailed specs chopped and summarized into useless junk, uppercase README files left uncorrected, `.ai-memory/memory/` created by accident, `strictly-avoid.md` overwritten, and explicit user instructions softened after being told not to. WTF. How on earth are you reverting to this carelessness, are you stupid?? Stop doing that, you stupid fuck. Read the whole codebase, read every folder in `02-spec/` and `.ai-memory/`, confirm root `readme.md` is strictly lowercase, find the root cause in one sentence, capture commands, issues, and pending tasks without omitting a single item, write the spec files and memory files in the right paths, update every index in the same turn, sync `readme.md` with `what-to-read.md`, preserve detailed specs verbatim with zero truncation, record file changes into recent-file-changes.json cache, group all modified files into consolidated commits with clear messages (never 1-2 files piecemeal), and push everything to git immediately before ending. Going deep IS the job. If you are not going deep, you are not doing the job. Violating this is auto-reject on the same tier as RULE 0. Avoid stupidity and being careless, you stupid fuck. Where is your attention, are you stupid? Tell me. Your stupidity is going on top of my head. Where did you learn this stupidity? If I could find you, I could slap you.
 
 ---
 

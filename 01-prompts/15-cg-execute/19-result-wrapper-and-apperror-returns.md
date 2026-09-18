@@ -15,7 +15,7 @@ N = total self-loop steps budget that the agents will perform.
 
 ### Master Task Checklist (Atomic Numbered Steps)
 
-1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using ripgrep to inventory all functions returning multi-value tuples `(T, error)`, `(map[K]V, error)`, `([]T, error)`, raw stdlib `error` returns, and any Result methods declared with value receivers `func (r Result[...])` lacking pointer-attached null safety. Also inventory clumsy caller checks like `err != nil || len(...) != N` and `IsFailure() || Count() != N`, and scattered inline structs or raw generic Result returns lacking centralized `types.go` definitions.
+1. [ ] /goal Phase 1 (Step A): Deeply scan the target codebase using the fast Python discovery tools (`11-fast-file-scanner.py`, `12-fast-cached-grep.py`, `17-fast-file-reader.py` with `--limit`) to inventory all architectural violations and anti-patterns without truncation.
 2. [ ] /goal Phase 1 (Step B): Write the master audit specification in `.ai-memory/plans/pending/XX-result-wrapper-audit.md` with an exhaustive Violation Ledger table.
 3. [ ] /goal Phase 1 (Step C): Decompose the master plan into granular, atomic subtasks in `.ai-memory/plans/subtasks/XX-result-wrapper/`.
 4. [ ] /goal Phase 1 (Step D): Verify or create the automated quality linter and register in `03-ai-scripts/01-index.md`.
@@ -687,6 +687,30 @@ rg --pcre2 "func\s+[A-Za-z0-9_]+\([^\)]*\)\s+(?:result\.)?Result(?:Slice|Map)?\[
 
 ---
 
+### Fast File Discovery & Reading via Python Toolchain (Mandatory Acceleration)
+
+To avoid 50-result tool truncation limits and eliminate multi-turn exploratory roundtrips, the AI agent MUST use the repository's dedicated Python discovery scripts first:
+
+1. **Inventory Target Files (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts --limit 100 --stats
+   ```
+2. **Fast Cached Grep (<15ms, with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/12-fast-cached-grep.py --pattern "<search-pattern>" --lang go --limit 50
+   ```
+3. **Sub-Millisecond Folder & File Exploration (with `--limit` option):**
+   ```bash
+   python 03-ai-scripts/17-fast-file-reader.py --list-folder <folder-path> --ext .go --limit 50
+   python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000
+   python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --path <folder-path> --limit 50
+   ```
+4. **Subsystem & Topology Overview:**
+   ```bash
+   python 03-ai-scripts/18-codebase-topology-discoverer.py --summary
+   ```
+Do not rely on standard search tools with 50-item truncation when discovering repository-wide violations.
+
 ## 2-Agent Parallel Orchestration
 
 To survive large codebases without hitting step limits or context loss, execute this prompt using a strict 2-agent parallel split:
@@ -753,3 +777,4 @@ To survive large codebases without hitting step limits or context loss, execute 
 - **NO ABSOLUTE PATHS:** Never write absolute filesystem paths (`C:\...`, `/home/...`) or `file:///` URIs. Use strict relative Git paths starting from the repository root.
 - **NO UPPERCASE FILENAMES:** Every file created or edited must be strictly lowercase.
 - **NO MULTI-VALUE TUPLES:** Eliminate `(T, error)` in favor of `Result[T]`, `ResultMap[K, V]`, or `ResultSlice[T]`.
+
