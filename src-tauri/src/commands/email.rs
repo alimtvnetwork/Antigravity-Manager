@@ -103,8 +103,7 @@ pub async fn test_imap_connection(account_id: String) -> AppResult<String> {
             .find(|a| a.id == account_id)
             .ok_or_else(|| AppError::Email("Account not found".to_string()))?;
 
-        let messages =
-            email_inbound::poll_unread_messages(&account, 1).map_err(AppError::Email)?;
+        let messages = email_inbound::poll_unread_messages(&account, 1).map_err(AppError::Email)?;
         Ok(format!(
             "IMAP connection successful! Found {} unread messages.",
             messages.len()
@@ -120,7 +119,9 @@ pub async fn export_email_data(format: String) -> AppResult<String> {
         "json" => email_io::export_to_json().map_err(AppError::Email),
         "csv" => email_io::export_to_csv().map_err(AppError::Email),
         "xlsx" | "excel" => email_io::export_to_excel().map_err(AppError::Email),
-        _ => Err(AppError::Email("Unsupported format. Use json, csv, or xlsx.".to_string())),
+        _ => Err(AppError::Email(
+            "Unsupported format. Use json, csv, or xlsx.".to_string(),
+        )),
     }
 }
 
@@ -130,7 +131,9 @@ pub async fn import_email_data(format: String, payload: String) -> AppResult<Imp
         "json" => email_io::import_from_json(&payload).map_err(AppError::Email),
         "csv" => email_io::import_from_csv(&payload).map_err(AppError::Email),
         "xlsx" | "excel" | "xml" => email_io::import_from_excel(&payload).map_err(AppError::Email),
-        _ => Err(AppError::Email("Unsupported format. Use json, csv, or excel/xml.".to_string())),
+        _ => Err(AppError::Email(
+            "Unsupported format. Use json, csv, or excel/xml.".to_string(),
+        )),
     }
 }
 
@@ -177,7 +180,9 @@ pub async fn trigger_manual_email_check() -> AppResult<String> {
         .collect();
 
     if active_emails.is_empty() {
-        return Err(AppError::Email("No active notification recipients configured".to_string()));
+        return Err(AppError::Email(
+            "No active notification recipients configured".to_string(),
+        ));
     }
 
     email_sender::dispatch_email_with_failover(&subj, &body, &active_emails)

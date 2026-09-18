@@ -61,6 +61,7 @@ pub fn import_from_json(payload: &str) -> Result<ImportSummary, String> {
     };
 
     for acc in bundle.accounts {
+        let acc_email = acc.email.clone();
         let input = EmailAccountInput {
             id: Some(acc.id),
             alias: acc.alias,
@@ -78,7 +79,9 @@ pub fn import_from_json(payload: &str) -> Result<ImportSummary, String> {
         if let Ok(_) = email_vault_db::upsert_email_account(input) {
             summary.accounts_imported += 1;
         } else {
-            summary.errors.push(format!("Failed to import account '{}'", acc.email));
+            summary
+                .errors
+                .push(format!("Failed to import account '{}'", acc_email));
         }
     }
 
@@ -194,7 +197,10 @@ pub fn import_from_csv(payload: &str) -> Result<ImportSummary, String> {
         } else if trimmed.starts_with("# SECTION: ACCOUNTS") {
             current_section = "accounts";
             continue;
-        } else if trimmed.starts_with('#') || trimmed.starts_with("alias,") || trimmed.starts_with("email,") {
+        } else if trimmed.starts_with('#')
+            || trimmed.starts_with("alias,")
+            || trimmed.starts_with("email,")
+        {
             continue;
         }
 
@@ -210,8 +216,14 @@ pub fn import_from_csv(payload: &str) -> Result<ImportSummary, String> {
                 imap_host: fields[4].clone(),
                 imap_port: fields[5].parse::<u16>().unwrap_or(993),
                 encryption_type: fields[6].clone(),
-                is_default: fields.get(7).map(|v| v == "true" || v == "1").unwrap_or(false),
-                is_active: fields.get(8).map(|v| v != "false" && v != "0").unwrap_or(true),
+                is_default: fields
+                    .get(7)
+                    .map(|v| v == "true" || v == "1")
+                    .unwrap_or(false),
+                is_active: fields
+                    .get(8)
+                    .map(|v| v != "false" && v != "0")
+                    .unwrap_or(true),
             };
 
             if let Ok(_) = email_vault_db::upsert_email_account(input) {
@@ -261,15 +273,42 @@ pub fn export_to_excel() -> Result<String, String> {
 
     for a in &accounts {
         xml.push_str("   <Row>\n");
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.alias));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.email));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.smtp_host));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\n", a.smtp_port));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.imap_host));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\n", a.imap_port));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.encryption_type));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.is_default));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", a.is_active));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.alias
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.email
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.smtp_host
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\n",
+            a.smtp_port
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.imap_host
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\n",
+            a.imap_port
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.encryption_type
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.is_default
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            a.is_active
+        ));
         xml.push_str("   </Row>\n");
     }
 
@@ -287,9 +326,18 @@ pub fn export_to_excel() -> Result<String, String> {
 
     for r in &recipients {
         xml.push_str("   <Row>\n");
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", r.email));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", r.group_name));
-        xml.push_str(&format!("    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n", r.is_active));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            r.email
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            r.group_name
+        ));
+        xml.push_str(&format!(
+            "    <Cell><Data ss:Type=\"String\">{}</Data></Cell>\n",
+            r.is_active
+        ));
         xml.push_str("   </Row>\n");
     }
 
