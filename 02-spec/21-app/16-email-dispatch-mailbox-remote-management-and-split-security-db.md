@@ -173,6 +173,7 @@ The inbound mail parser matches the last 5 unread emails using deterministic sub
 | Command Type | Subject Pattern | Body Format | Action Executed | Reply Sent |
 |---|---|---|---|---|
 | **Prompt Injection** | `Project: <project-name>` or `project-prompt: <name>` | Multi-line prompt text | Injects prompt into matching active running project via `repo_db` / IPC | HTML receipt with timestamp & machine IP |
+| **Named Prompt Exec** | `prompt: <name>` or `named-prompt: <name>` | Optional query or empty | Dispatches saved/backed-up prompt matching query to running workspace | HTML receipt with matched prompt & timestamp |
 | **CLI / GitMap Exec** | `exec: <ip>` or `command: <ip>` | Shell / GitMap command (e.g. `gitmap status`) | Sandboxed execution of approved commands on matching local machine IP | Full formatted HTML console log |
 | **Instance Launch** | `instance: new` or `instance: create` | Profile name or arguments | Calls `clone_instance_executable` or launches isolated profile | Confirmation with process PID & port |
 | **Account Rotation** | `rotate: accounts` or `account: rotate` | Optional target email/profile | Calls `/admin/accounts/rotate` or switches to next highest quota profile | New active profile status & quota table |

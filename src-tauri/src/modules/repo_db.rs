@@ -433,6 +433,38 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
     Ok(rows)
 }
 
+/// List recent prompts across statuses
+pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
+    let conn = connect_db()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at 
+             FROM active_prompts ORDER BY created_at DESC LIMIT 50",
+        )
+        .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query prompts: {}", e))?
+        .flatten()
+        .collect();
+
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -47,6 +47,7 @@ description: Autonomously manage email dispatch, split security vault databases,
 - **Reply Prefix Handling:** Automatically strips `Re: ` and `Fwd: ` prefixes from email client replies, falling back to body matching if needed.
 - **Supported Remote Commands:**
   - `Project: <project-name>`: Injects user reply prompt into the running project workspace in Antigravity.
+  - `prompt: <name>`: Finds saved or backed-up prompt matching `<name>` and executes it on active workspace.
   - `exec: <ip>`: Verifies that `<ip>` matches the machine's local IP address before executing approved shell/GitMap instructions, formatting stdout/stderr into an HTML log.
   - `instance: new`: Dynamically spawns an isolated IDE instance profile.
   - `rotate: accounts`: Triggers instant profile rotation to the next highest-quota account.

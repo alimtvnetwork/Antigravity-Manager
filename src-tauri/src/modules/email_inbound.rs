@@ -20,6 +20,9 @@ pub enum InboundAction {
         project_name: String,
         prompt: String,
     },
+    NamedPromptExecution {
+        prompt_query: String,
+    },
     CliExecution {
         target_ip: String,
         command: String,
@@ -119,6 +122,29 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         return InboundAction::StatusQuery;
     }
 
+    // Check Named Prompt Execution
+    let is_project_prompt = lower_subj.starts_with("project-prompt:");
+    if !is_project_prompt {
+        let is_named = lower_subj.starts_with("named-prompt:");
+        let is_run = lower_subj.starts_with("run-prompt:");
+        let is_prompt = lower_subj.starts_with("prompt:");
+        if is_named || is_run || is_prompt {
+            let prefix_len = if is_named {
+                "named-prompt:".len()
+            } else if is_run {
+                "run-prompt:".len()
+            } else {
+                "prompt:".len()
+            };
+            let query = clean_subj[prefix_len..].trim().to_string();
+            let body_first = body.trim().lines().next().unwrap_or("").trim().to_string();
+            let effective_query = if query.is_empty() { body_first } else { query };
+            return InboundAction::NamedPromptExecution {
+                prompt_query: effective_query,
+            };
+        }
+    }
+
     if lower_subj == "help" {
         return InboundAction::HelpRequest;
     }
@@ -138,6 +164,26 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
             project_name,
             prompt: prompt_body,
         };
+    }
+
+    let is_body_proj_prompt = lower_first_line.starts_with("project-prompt:");
+    if !is_body_proj_prompt {
+        let is_body_named = lower_first_line.starts_with("named-prompt:");
+        let is_body_run = lower_first_line.starts_with("run-prompt:");
+        let is_body_prompt = lower_first_line.starts_with("prompt:");
+        if is_body_named || is_body_run || is_body_prompt {
+            let prefix_len = if is_body_named {
+                "named-prompt:".len()
+            } else if is_body_run {
+                "run-prompt:".len()
+            } else {
+                "prompt:".len()
+            };
+            let query = first_line[prefix_len..].trim().to_string();
+            return InboundAction::NamedPromptExecution {
+                prompt_query: query,
+            };
+        }
     }
 
     if lower_first_line.starts_with("exec:") || lower_first_line.starts_with("command:") {
@@ -320,6 +366,96 @@ pub fn execute_inbound_action(
                 &html,
                 &[msg.from.clone()],
             );
+        InboundAction::NamedPromptExecution { prompt_query } => {
+            action_str = "named_prompt_exec".to_string();
+            let all_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
+            let lower_query = prompt_query.to_lowercase();
+
+            let matched_prompt = all_prompts.iter().find(|p| {
+                let id_match = p.id.to_lowercase().contains(&lower_query);
+                let content_match = p.prompt_content.to_lowercase().contains(&lower_query);
+                id_match || content_match
+            });
+
+            if let Some(found_prompt) = matched_prompt {
+                let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+                let target_proj = projects
+                    .iter()
+                    .find(|p| p.id == found_prompt.project_id)
+                    .or_else(|| projects.first());
+
+                if let Some(proj) = target_proj {
+                    let p_id = Uuid::new_v4().to_string();
+                    if let Ok(conn) = crate::modules::repo_db::connect_db() {
+                        let _ = conn.execute(
+                            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, status, created_at, updated_at)
+                             VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
+                            rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &found_prompt.prompt_content, now, now],
+                        );
+                    }
+                    result_summary = format!(
+                        "Named prompt '{}' found and dispatched into project '{}' (id: {})",
+                        prompt_query, proj.repo_name, p_id
+                    );
+
+                    let escaped_prompt = html_escape(&found_prompt.prompt_content);
+                    let reply_content = format!(
+                        r#"<p><span class="badge badge-success">NAMED PROMPT EXECUTED</span></p>
+<p>Found saved prompt matching <strong>{}</strong> and injected into workspace <strong>{}</strong>.</p>
+<div class="cmd">{}</div>
+<p>Antigravity is currently executing this instruction.</p>"#,
+                        html_escape(&prompt_query), proj.repo_name, escaped_prompt
+                    );
+                    let html = wrap_card("Named Prompt Execution Receipt", &reply_content, local_machine_name, local_machine_ip);
+                    let _ = email_sender::dispatch_email_with_failover(
+                        &format!("[AGM Receipt] Named Prompt Executed: {}", prompt_query),
+                        &html,
+                        &[msg.from.clone()],
+                    );
+                } else {
+                    status = "rejected".to_string();
+                    result_summary = format!("Prompt found but no active running projects available");
+                    let reply_content = format!(
+                        r#"<p><span class="badge badge-warn">NO RUNNING WORKSPACES</span></p>
+<p>Found saved prompt matching <strong>{}</strong>, but no active workspaces are currently running to execute it.</p>"#,
+                        html_escape(&prompt_query)
+                    );
+                    let html = wrap_card("Named Prompt Execution Failed", &reply_content, local_machine_name, local_machine_ip);
+                    let _ = email_sender::dispatch_email_with_failover(
+                        "[AGM Alert] No Active Workspaces",
+                        &html,
+                        &[msg.from.clone()],
+                    );
+                }
+            } else {
+                status = "rejected".to_string();
+                result_summary = format!("No saved prompt found matching '{}'", prompt_query);
+                let available_snippets: Vec<String> = all_prompts
+                    .iter()
+                    .take(5)
+                    .map(|p| {
+                        let short_id = &p.id[..8.min(p.id.len())];
+                        let short_content: String = p.prompt_content.chars().take(40).collect();
+                        format!("<li><code>{}</code>: {}...</li>", short_id, html_escape(&short_content))
+                    })
+                    .collect();
+
+                let reply_content = format!(
+                    r#"<p><span class="badge badge-warn">PROMPT NOT FOUND</span></p>
+<p>Could not find any saved prompt matching <strong>{}</strong>.</p>
+<p>Available saved prompts in queue:</p>
+<ul>{}</ul>
+<p>Reply with <code>prompt: &lt;keyword-or-id&gt;</code> or send a new prompt with <code>Project: &lt;name&gt;</code>.</p>"#,
+                    html_escape(&prompt_query),
+                    if available_snippets.is_empty() { "<li>No saved prompts found</li>".to_string() } else { available_snippets.join("") }
+                );
+                let html = wrap_card("Prompt Not Found", &reply_content, local_machine_name, local_machine_ip);
+                let _ = email_sender::dispatch_email_with_failover(
+                    &format!("[AGM Alert] Prompt Not Found: {}", prompt_query),
+                    &html,
+                    &[msg.from.clone()],
+                );
+            }
         }
         InboundAction::StatusQuery => {
             action_str = "status_query".to_string();
@@ -574,5 +710,16 @@ mod tests {
     fn test_parse_help_command() {
         let action = parse_email_command("help", "");
         assert_eq!(action, InboundAction::HelpRequest);
+    }
+
+    #[test]
+    fn test_parse_named_prompt_command() {
+        let action = parse_email_command("prompt: refactor auth", "");
+        match action {
+            InboundAction::NamedPromptExecution { prompt_query } => {
+                assert_eq!(prompt_query, "refactor auth");
+            }
+            _ => panic!("Expected NamedPromptExecution"),
+        }
     }
 }

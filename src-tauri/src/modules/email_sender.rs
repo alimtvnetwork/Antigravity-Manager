@@ -369,6 +369,16 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
       <td style="padding: 8px; border: 1px solid #cbd5e1;">Rotates to next highest quota account profile</td>
     </tr>
     <tr>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>prompt: &lt;name&gt;</code></td>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty or keyword)</td>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;">Finds saved prompt by name/keyword and executes it on active workspace</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>status</code></td>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty)</td>
+      <td style="padding: 8px; border: 1px solid #cbd5e1;">Reports running projects, active prompt queue, and node telemetry</td>
+    </tr>
+    <tr>
       <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>help</code></td>
       <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty)</td>
       <td style="padding: 8px; border: 1px solid #cbd5e1;">Returns this command cheat sheet</td>
