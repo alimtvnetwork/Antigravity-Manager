@@ -48,6 +48,7 @@
 
 ## Before writing code
 
+- `02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md`, why: authoritative specification for email dispatch, split security passwords vault, and remote execution bridge
 - `02-spec/21-app/`, why: complete reverse-engineered and remediated application architecture, proxy protocols, SQLite schemas, and frontend UI specs
 - `spec/`, why: understand feature specifications
 
@@ -81,3 +82,4 @@
 - .ai-memory/plans/completed/08-completed-plans-consolidation.md
 - .ai-memory/plans/completed/12-spec-remediation-completed.md
 - .ai-memory/plans/completed/16-repo-structure-installers-and-release.md
+- .ai-memory/plans/completed/25-email-management-split-security-db-and-remote-control.md
