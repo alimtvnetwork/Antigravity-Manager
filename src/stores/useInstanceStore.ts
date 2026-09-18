@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as instanceService from '../services/instanceService';
+import { useErrorStore } from './error-store';
 import type {
     InstanceConfig,
     InstanceStatus,
@@ -140,6 +141,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             await get().fetchInstances();
         } catch (err: any) {
             set({ error: err?.toString() || 'Failed to launch instance' });
+            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'launchInstance' });
             throw err;
         }
     },
@@ -153,6 +155,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             return clonedPath;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to clone executable' });
+            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'cloneInstanceExecutable' });
             throw err;
         }
     },
@@ -197,6 +200,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             set({ isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to switch account' });
+            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'switchAccountToInstance' });
             throw err;
         }
     },

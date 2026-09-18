@@ -711,6 +711,9 @@ impl AxumServer {
             )
             .route("/accounts/current", get(admin_get_current_account))
             .route("/accounts/switch", post(admin_switch_account))
+            .route("/accounts/rotate", post(admin_rotate_account))
+            .route("/auto-switcher/rotate", post(admin_rotate_account))
+            .route("/auto-switcher/status", get(admin_get_auto_switcher_status))
             .route("/accounts/refresh", post(admin_refresh_all_quotas))
             .route("/accounts/:accountId", delete(admin_delete_account))
             .route("/accounts/:accountId/bind-device", post(admin_bind_device))
@@ -1438,6 +1441,74 @@ async fn admin_switch_account(
             ))
         }
     }
+}
+
+#[derive(Serialize)]
+struct RotateAccountResponse {
+    is_success: bool,
+    message: String,
+    status: crate::modules::auto_switcher::AutoSwitcherStatus,
+}
+
+async fn admin_rotate_account(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    {
+        let switching = state.switching.read().await;
+        if *switching {
+            return Err((
+                StatusCode::CONFLICT,
+                Json(ErrorResponse {
+                    error: "Another switch or rotation operation is already in progress".to_string(),
+                }),
+            ));
+        }
+    }
+
+    {
+        let mut switching = state.switching.write().await;
+        *switching = true;
+    }
+
+    let result = crate::modules::auto_switcher::trigger_manual_rotation().await;
+
+    {
+        let mut switching = state.switching.write().await;
+        *switching = false;
+    }
+
+    match result {
+        Ok(msg) => {
+            logger::log_info(&format!("[API] Account rotation successful: {}", msg));
+            state.token_manager.clear_all_sessions();
+            if let Err(e) = state.token_manager.load_accounts().await {
+                logger::log_error(&format!(
+                    "[API] Failed to reload accounts after rotation: {}",
+                    e
+                ));
+            }
+
+            let switcher_status = crate::modules::auto_switcher::get_status();
+            Ok(Json(RotateAccountResponse {
+                is_success: true,
+                message: msg,
+                status: switcher_status,
+            }))
+        }
+        Err(e) => {
+            logger::log_error(&format!("[API] Account rotation failed: {}", e));
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            ))
+        }
+    }
+}
+
+async fn admin_get_auto_switcher_status(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let status = crate::modules::auto_switcher::get_status();
+    Ok(Json(status))
 }
 
 async fn admin_refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>

@@ -21,6 +21,7 @@ pub mod oauth_server;
 pub mod process;
 pub mod proxy_db;
 pub mod quota;
+pub mod repo_db;
 pub mod scheduler;
 pub mod security_db;
 pub mod token_stats;

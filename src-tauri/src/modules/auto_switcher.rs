@@ -193,6 +193,11 @@ pub async fn execute_profile_rotation(
     reason: String,
     has_auto_resume: bool,
 ) -> Result<(), String> {
+    let active_id = instance::get_active_instance_id().unwrap_or_default();
+
+    // Step 1: Split Repo DB - Snapshot running prompts for all active projects before switching
+    let _ = crate::modules::repo_db::backup_running_prompts(&active_id);
+
     if has_auto_resume {
         let _ = snapshot_task_state(&target.instance_id, &target.account_id, &reason);
     }
@@ -203,6 +208,9 @@ pub async fn execute_profile_rotation(
     ));
 
     instance::switch_account_to_instance(&target.account_id, Some(&target.instance_id)).await?;
+
+    // Step 2: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
+    let _ = crate::modules::repo_db::dispatch_running_prompts(&target.instance_id);
 
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();

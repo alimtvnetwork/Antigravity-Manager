@@ -23,7 +23,7 @@ interface AutoSwitcherSettingsProps {
 const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     is_enabled: false,
     check_interval_seconds: 60,
-    low_quota_threshold_percent: 10.0,
+    low_quota_threshold_percent: 15.0,
     target_model: 'gemini-pro',
     has_auto_resume: true,
     cooldown_seconds: 180,
@@ -139,7 +139,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <input
                                 type="range"
                                 min="1"
-                                max="30"
+                                max="50"
                                 step="1"
                                 value={currentConfig.low_quota_threshold_percent}
                                 onChange={(e) => handleThresholdChange(Number(e.target.value))}
@@ -147,9 +147,9 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             />
                             <div className="flex justify-between text-[10px] text-gray-400 font-mono">
                                 <span>1%</span>
-                                <span>10% (Default)</span>
-                                <span>20%</span>
+                                <span>15% (Default)</span>
                                 <span>30%</span>
+                                <span>50%</span>
                             </div>
                         </div>
                     </div>

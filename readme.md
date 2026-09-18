@@ -39,15 +39,17 @@
 </p>
 
 <p align="center">
-  <strong>By <a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> — Chief Software Engineer, <a href="https://riseup-asia.com/">Riseup Asia LLC</a><br/>
+  <strong>Lead Architect &amp; Maintainer: <a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
+  Chief Software Engineer, <a href="https://riseup-asia.com/"><strong>Riseup Asia LLC</strong></a> (Official Corporate Sponsor)<br/>
+  <a href="https://github.com/alim-ul-karim">GitHub Profile</a> ·
+  <a href="https://alimkarim.com/">Personal Website</a> ·
   <a href="https://www.linkedin.com/in/alimkarim">LinkedIn</a> ·
   <a href="https://stackoverflow.com/users/513511/md-alim-ul-karim">Stack Overflow</a> ·
-  <a href="https://github.com/alimtvnetwork">GitHub</a> ·
-  <a href="docs/author.md">Full bio</a>
+  <a href="docs/author.md">Full Biography</a>
 </p>
 
 <p align="center">
-  <em>Managed and enhanced by <strong>Md. Alim Ul Karim</strong> · Originally created by <strong>lbjlaq</strong> and upstream contributors</em>
+  <em>Maintained and enhanced by <strong><a href="https://github.com/alim-ul-karim">Md. Alim Ul Karim</a></strong> &amp; <strong><a href="https://riseup-asia.com/">Riseup Asia LLC</a></strong> · Originally created by <strong>lbjlaq</strong> and upstream contributors</em>
 </p>
 
 ---
@@ -166,19 +168,23 @@ docker compose up -d
 </p>
 
 ### Genesis & Upstream Attribution
-This project is an active, production-hardened fork originating from the groundbreaking work done by **[lbjlaq](https://github.com/lbjlaq)** and contributors on **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)**. 
+This project is an active, production-hardened fork originating from the groundbreaking work done by **[lbjlaq](https://github.com/lbjlaq)** and contributors on **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)**.
 
 We extend our deepest gratitude, respect, and praise to **lbjlaq** and the upstream development community for creating the foundational architecture of Antigravity Manager. Their ingenuity demonstrated how local session tokens could be multiplexed into high-availability AI gateways. Full credit, respect, and sincere thanks are given to **[lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)** and all original upstream contributors.
 
 ### Maintenance & Continuous Enhancement
-This project is **managed and enhanced by Md. Alim Ul Karim** and the **Riseup Asia LLC** engineering team · **Originally created by lbjlaq and upstream contributors**. 
+This project is **maintained and enhanced by [Md. Alim Ul Karim](https://github.com/alim-ul-karim)** and the **[Riseup Asia LLC](https://riseup-asia.com/)** engineering team · **Originally created by lbjlaq and upstream contributors**.
 
 This edition introduces critical enterprise hardening, automated self-healing, and developer tooling:
-1. **Ubuntu & Linux Auto-Healing**: Fully resolves missing `storage.json` issues on clean OS installations, containers, and portable setups by auto-generating complete telemetry profiles (`telemetry.machineId`, `macMachineId`, `devDeviceId`, `sqmId`) and ensuring SQLite schema initialization.
-2. **Deep Linux Executable Discovery**: Scans standard paths, dynamic `PATH` resolution via `which`, Snap paths (`/snap/bin`), Flatpak packages, and system `.desktop` files.
-3. **Multi-Instance Isolation Architecture**: Allows concurrent, conflict-free operations across multiple profiles and developer instances.
-4. **Structured Error Management Architecture**: End-to-end universal error models in Rust (`error.rs`) and TypeScript (`error-store.ts`, `error-modal.tsx`), complete with an interactive AI-sharable Compact Markdown error exporter.
-5. **Rigorous CI/CD Pipelines**: Zero-touch multi-platform automated builds, typecheck enforcement, and release orchestration.
+1. **Auto-Switch Quota Polling (< 15% Credit Threshold)**: Intelligent background supervisor actively monitoring residual model credits and auto-switching to the highest-quota profile when remaining quota drops below 15%.
+2. **Split Repo DB & Running Prompts Direct Dispatch**: Dedicated SQLite state database (`repo_prompts.db`) capturing running project prompts before profile rotation, and immediately dispatching them directly upon profile switch without queuing.
+3. **Ubuntu & Linux Deterministic Process Switching**: Synchronous process termination with graceful SIGTERM polling and automatic SIGKILL (`kill -9`) fallback, eliminating SQLite lock contention and state overwrite on Ubuntu/Debian.
+4. **Account Rotation HTTP API Endpoint**: Programmatic `/api/accounts/rotate` and `/api/auto-switcher/rotate` endpoints enabling external CLI tools, IDE extensions, or background scripts to trigger account rotation on demand.
+5. **Ubuntu & Linux Auto-Healing**: Fully resolves missing `storage.json` issues on clean OS installations, containers, and portable setups by auto-generating complete telemetry profiles (`telemetry.machineId`, `macMachineId`, `devDeviceId`, `sqmId`) and ensuring SQLite schema initialization.
+6. **Deep Linux Executable Discovery**: Scans standard paths, dynamic `PATH` resolution, Snap paths (`/snap/bin`), Flatpak packages, AppImages, and system `.desktop` files.
+7. **Multi-Instance Isolation Architecture**: Allows concurrent, conflict-free operations across multiple isolated profiles and developer instances.
+8. **Structured Error Management Architecture**: End-to-end universal error models in Rust (`error.rs`) and TypeScript (`error-store.ts`, `error-modal.tsx`), complete with an interactive AI-sharable Compact Markdown error exporter.
+9. **Rigorous CI/CD Pipelines**: Zero-touch multi-platform automated builds, typecheck enforcement, and release orchestration.
 
 ---
 
@@ -425,8 +431,19 @@ We extend our sincere thanks to all creators, developers, and open-source contri
 
 ## 💖 Sponsors & Special Thanks
 
-We proudly acknowledge the organizations and projects supporting this research and development:
+### Official Corporate Sponsor
 
+<p align="center">
+  <a href="https://riseup-asia.com/">
+    <img src="public/images/antigravity-manager-icon.png" width="90" alt="Riseup Asia LLC Sponsor Logo" />
+    <br/>
+    <strong>Riseup Asia LLC</strong>
+  </a>
+  <br/>
+  <em>Proudly sponsoring the research, multi-instance orchestration, and ongoing enterprise engineering of Antigravity Tools.</em>
+</p>
+
+### Relay & Infrastructure Partners
 - **PackyCode**: Reliable API relay provider supporting Claude Code, Codex, and Gemini.
 - **APIKEY.FUN**: Enterprise-grade multi-model API access.
 - **Claude API**: High-stability Anthropic gateway provider.
@@ -442,14 +459,16 @@ We proudly acknowledge the organizations and projects supporting this research a
 
 ---
 
-## 👤 Author & Company
+## 👤 Lead Architect & Company
 
 <p align="center">
-  <strong>By <a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> — Chief Software Engineer, <a href="https://riseup-asia.com/">Riseup Asia LLC</a><br/>
+  <strong><a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
+  Chief Software Engineer, <a href="https://riseup-asia.com/"><strong>Riseup Asia LLC</strong></a><br/>
+  <a href="https://github.com/alim-ul-karim">GitHub Profile</a> ·
+  <a href="https://alimkarim.com/">Personal Website</a> ·
   <a href="https://www.linkedin.com/in/alimkarim">LinkedIn</a> ·
   <a href="https://stackoverflow.com/users/513511/md-alim-ul-karim">Stack Overflow</a> ·
-  <a href="https://github.com/alimtvnetwork">GitHub</a> ·
-  <a href="docs/author.md">Full bio</a>
+  <a href="docs/author.md">Full Biography</a>
 </p>
 
 ---

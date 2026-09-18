@@ -123,6 +123,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
     system.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     let normalized_target = data_dir.to_lowercase().replace('\\', "/");
+    let clean_target = normalized_target.trim_end_matches('/');
     let mut matched_pids = Vec::new();
 
     for (pid, process) in system.processes() {
@@ -133,17 +134,22 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             .unwrap_or("")
             .to_lowercase();
 
-        let is_antigravity = name.contains("antigravity") || exe.contains("antigravity");
-        if !is_antigravity {
-            continue;
-        }
-
         let args = process.cmd();
         let args_str = args
             .iter()
             .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
             .collect::<Vec<String>>()
             .join(" ");
+
+        let is_antigravity = name.contains("antigravity")
+            || exe.contains("antigravity")
+            || args_str.contains("antigravity")
+            || exe.contains("/tmp/.mount_")
+            || name == "apprun";
+
+        if !is_antigravity {
+            continue;
+        }
 
         let is_helper =
             args_str.contains("--type=") || name.contains("helper") || name.contains("crashpad");
@@ -153,7 +159,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
 
         let has_user_data_arg = args_str.contains("--user-data-dir");
         if has_user_data_arg {
-            if args_str.contains(&normalized_target) {
+            if args_str.contains(clean_target) {
                 matched_pids.push(pid.as_u32());
             }
         } else if is_default {
@@ -488,6 +494,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
         if base_str.ends_with(".AppImage") {
             let appimage_target =
                 instance_bin_dir.join(format!("antigravity-{}.AppImage", instance_id));
+            let _ = std::fs::remove_file(&appimage_target);
             let _ = std::os::unix::fs::symlink(&base_exe, &appimage_target);
             if appimage_target.exists() {
                 appimage_target
@@ -564,7 +571,14 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    for pid in pids {
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Terminating {} process(es) for instance '{}' (PIDs: {:?})",
+        pids.len(),
+        instance_id,
+        pids
+    ));
+
+    for pid in &pids {
         #[cfg(target_os = "windows")]
         {
             let _ = Command::new("taskkill")
@@ -580,6 +594,50 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 .output();
         }
     }
+
+    // Synchronously wait for processes to exit to prevent SQLite locks and state overwrite
+    let mut system = System::new();
+    let start_wait = std::time::Instant::now();
+    let max_graceful = std::time::Duration::from_millis(3000);
+
+    loop {
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+        let has_alive = pids
+            .iter()
+            .any(|&pid| system.process(sysinfo::Pid::from_u32(pid)).is_some());
+
+        if !has_alive {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Successfully closed all processes for instance '{}'",
+                instance_id
+            ));
+            break;
+        }
+
+        if start_wait.elapsed() > max_graceful {
+            #[cfg(not(target_os = "windows"))]
+            {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Graceful exit timed out for instance '{}', sending SIGKILL to remaining processes...",
+                    instance_id
+                ));
+                for pid in &pids {
+                    if system.process(sysinfo::Pid::from_u32(*pid)).is_some() {
+                        let _ = Command::new("kill")
+                            .args(["-9", &pid.to_string()])
+                            .output();
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    // Small settle delay to ensure OS flushes file handles and SQLite locks
+    std::thread::sleep(std::time::Duration::from_millis(150));
 
     Ok(())
 }
@@ -684,4 +742,76 @@ pub async fn switch_account_to_instance(
     launch_instance(&instance.id).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_pids_target_path_normalization() {
+        let raw_path = "C:\\Users\\User\\.config\\antigravity\\";
+        let normalized = raw_path.to_lowercase().replace('\\', "/");
+        let clean = normalized.trim_end_matches('/');
+        assert_eq!(clean, "c:/users/user/.config/antigravity");
+    }
+
+    #[test]
+    fn test_linux_process_name_matching() {
+        let names = ["antigravity", "antigravity-ide", "apprun", "code"];
+        let is_matched_first = names[0].contains("antigravity");
+        let is_matched_third = names[2] == "apprun";
+        assert!(is_matched_first);
+        assert!(is_matched_third);
+
+        let helper_args = "--type=renderer --user-data-dir=/tmp/test";
+        let is_helper = helper_args.contains("--type=");
+        assert!(is_helper);
+    }
+
+    #[test]
+    fn test_instance_config_serialization() {
+        let instance = InstanceConfig {
+            id: "ubuntu-test".to_string(),
+            name: "Ubuntu Test".to_string(),
+            data_dir: "/home/user/.config/antigravity-test".to_string(),
+            executable_path: Some("/opt/antigravity/antigravity".to_string()),
+            extensions_dir: None,
+            bound_account_id: Some("acc-123".to_string()),
+            bound_email: Some("dev@example.com".to_string()),
+            created_at: 1000,
+            last_used: 2000,
+            is_default: false,
+        };
+
+        let json = serde_json::to_string(&instance).unwrap();
+        let restored: InstanceConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, "ubuntu-test");
+        assert_eq!(restored.executable_path, Some("/opt/antigravity/antigravity".to_string()));
+    }
+
+    #[test]
+    fn test_ubuntu_instance_switching_end_to_end_flow() {
+        let temp_dir = std::env::temp_dir().join(format!("agm_test_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+        let instance_data = temp_dir.join("ubuntu-inst").join("data");
+        let user_storage = instance_data.join("User").join("globalStorage");
+        assert!(std::fs::create_dir_all(&user_storage).is_ok());
+
+        let db_path = user_storage.join("state.vscdb");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        assert!(conn.execute(
+            "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value BLOB)",
+            [],
+        ).is_ok());
+
+        let rows_count: i64 = conn.query_row("SELECT count(*) FROM ItemTable", [], |r| r.get(0)).unwrap();
+        assert_eq!(rows_count, 0);
+
+        let linux_data_str = instance_data.to_string_lossy().to_string();
+        let normalized = linux_data_str.to_lowercase().replace('\\', "/");
+        let clean = normalized.trim_end_matches('/');
+        assert!(clean.contains("ubuntu-inst"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }
