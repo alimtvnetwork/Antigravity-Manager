@@ -311,10 +311,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
                 new_section_marker = "## 🔄 What's New\n\n"
                 new_entry = (
                     f"- **v{next_version}** ({today_str}):\n"
-                    f"  - **Test Suite Resilience & SQLite Persistence**: Dual-tier tool signature persistence (`clear_tool_signatures`) and nanosecond-precision test isolation.\n"
-                    f"  - **Canonical Model Resolution**: Preserved canonical `gemini-3.7-flash` model identifier across dynamic variant mappings.\n"
-                    f"  - **Payload Audit Sizing**: Harmonized payload audit threshold with disk budget quotas to prevent unexpected truncation.\n"
-                    f"  - **Strict Lint & Rustfmt Compliance**: Multi-line tuple return formatting and universal response envelope standards.\n"
+                    f"  - **Auto-Switch 15% Quota Threshold**: Auto-switching triggers when remaining credits drop below 15% to maximize quota utilization.\n"
+                    f"  - **Split Repo DB & Active Prompt Backup**: Backs up and restores active prompts across workspace switches via dedicated SQLite storage.\n"
+                    f"  - **Account Rotation API & IPC**: Added `/admin/rotate` endpoint and IPC commands for running projects and active prompts.\n"
+                    f"  - **Hardened Ubuntu Process Termination**: Guaranteed clean workspace directory release with SIGKILL process cleanup.\n"
+                    f"  - **Repository Architecture Migration**: Migrated workspace structure to `.ai-memory` and `02-spec` with 100% rustfmt compliance.\n"
                 )
                 if f"- **v{next_version}**" not in rm_content:
                     rm_content = rm_content.replace(new_section_marker, new_section_marker + new_entry, 1)
@@ -332,12 +333,12 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Cross-Platform Test Suite Resilience & Upstream Protocol Stability] SQLite Signature Caching, Canonical Gemini 3.7 Routing & Data Directory Isolation**:\n"
-        f"            -   **SQLite L2 Tool Signature Persistence**: Implemented `clear_tool_signatures` in `proxy_db` to coordinate dual-tier cache eviction between memory and SQLite persistence during testing and runtime recovery.\n"
-        f"            -   **Canonical Model Resolution**: Calibrated `resolve_real_model` to preserve canonical identifier `gemini-3.7-flash` across dynamic variant mappings while ensuring full compatibility with public OpenCode DTO registries.\n"
-        f"            -   **Nanosecond Test Directory Concurrency**: Enhanced `TestDataDir` with nanosecond precision timestamps, thread mutex guards, and poisoned mutex recovery across Linux, macOS, and Windows runners.\n"
-        f"            -   **Payload Audit & Retention Budget Balance**: Harmonized log payload audit thresholds with disk budget cleanup allocations to eliminate truncation and guarantee predictable disk space reclamation.\n"
-        f"            -   **Strict Code Formatting & Type Safety**: Realigned tuple return types and integration tests for 100% compliance with `rustfmt` and TypeScript compilers.\n"
+        f"        -   **[Auto-Switcher Quota Threshold & Split Repo DB Active Prompt Dispatch] 15% Remaining Threshold, Prompt Persistence, and Ubuntu Process Cleanup**:\n"
+        f"            -   **15% Quota Threshold Dynamic Switch**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%), maximizing token utilization across all accounts.\n"
+        f"            -   **Split Repo DB & Active Prompt Backup**: Introduced dedicated SQLite repo database (`repo_db.rs`) to detect running projects and serialize active user prompt instructions before workspace switching, restoring them immediately upon switch.\n"
+        f"            -   **Account Rotation API & IPC Endpoints**: Implemented `/admin/rotate` HTTP endpoint and IPC commands (`list_repo_projects`, `list_repo_prompts`) with interactive status in AutoSwitcherSettings.\n"
+        f"            -   **Hardened Ubuntu Process Termination**: Enhanced process cleanup using explicit SIGKILL on target child processes to guarantee clean workspace directory release.\n"
+        f"            -   **Repository-Wide Architecture Migration & Rustfmt**: Migrated legacy `.lovable` workspace to `.ai-memory` and `02-spec`, and resolved RCA 18 formatting alignment.\n"
     )
     en_entry = zh_entry
 
@@ -383,10 +384,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Test Suite Resilience & SQLite Persistence**: Added dedicated dual-tier cache clearing (`clear_tool_signatures`) in `proxy_db` and nanosecond precision in `TestDataDir`.\n"
-        f"- **Canonical Gemini 3.7 Flash Model Resolution**: Calibrated `resolve_real_model` to preserve canonical identifier `gemini-3.7-flash` across dynamic variant mappings.\n"
-        f"- **Payload Audit & Retention Threshold Harmonization**: Balanced payload audit threshold with retention disk budgets to eliminate truncation while retaining 100% test reliability.\n"
-        f"- **Code Formatting & Clean Builds**: Formatted multi-line tuple return types for complete `cargo fmt` compliance and zero warnings.\n"
+        f"- **Auto-Switch Quota Threshold (15%)**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%).\n"
+        f"- **Split Repo DB & Active Prompt Backup**: Dedicated SQLite storage (`repo_db.rs`) to back up and restore active prompts across workspace switches.\n"
+        f"- **Account Rotation API & IPC Endpoints**: Implemented `/admin/rotate` HTTP endpoint and IPC commands for running projects and active prompts.\n"
+        f"- **Hardened Ubuntu Process Termination**: Enhanced process cleanup using explicit SIGKILL on target child processes.\n"
+        f"- **Architecture Migration & Rustfmt**: Migrated repository structure to `.ai-memory` and `02-spec`, matching 100% CI compliance.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 

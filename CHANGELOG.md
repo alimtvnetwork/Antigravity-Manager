@@ -2,6 +2,14 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.18.0 (2026-09-18)**:
+        -   **[Auto-Switcher Quota Threshold & Split Repo DB Active Prompt Dispatch] 15% Remaining Threshold, Prompt Persistence, and Ubuntu Process Cleanup**:
+            -   **15% Quota Threshold Dynamic Switch**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%), maximizing token utilization across all accounts.
+            -   **Split Repo DB & Active Prompt Backup**: Introduced dedicated SQLite repo database (`repo_db.rs`) to detect running projects and serialize active user prompt instructions before workspace switching, restoring them immediately upon switch.
+            -   **Account Rotation API & IPC Endpoints**: Implemented `/admin/rotate` HTTP endpoint and IPC commands (`list_repo_projects`, `list_repo_prompts`) with interactive status in AutoSwitcherSettings.
+            -   **Hardened Ubuntu Process Termination**: Enhanced process cleanup using explicit SIGKILL on target child processes to guarantee clean workspace directory release.
+            -   **Repository-Wide Architecture Migration & Rustfmt**: Migrated legacy `.lovable` workspace to `.ai-memory` and `02-spec`, and resolved RCA 18 formatting alignment.
+
     *   **v4.17.0 (2026-09-17)**:
         -   **[Cross-Platform Test Suite Resilience & Upstream Protocol Stability] SQLite Signature Caching, Canonical Gemini 3.7 Routing & Data Directory Isolation**:
             -   **SQLite L2 Tool Signature Persistence**: Implemented `clear_tool_signatures` in `proxy_db` to coordinate dual-tier cache eviction between memory and SQLite persistence during testing and runtime recovery.
