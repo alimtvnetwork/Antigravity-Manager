@@ -2,21 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
     Mail,
     Send,
-    Inbox,
     Server,
     Key,
     RefreshCw,
     Plus,
     Trash2,
-    CheckCircle2,
-    AlertTriangle,
-    Download,
     Upload,
-    ShieldCheck,
     FileSpreadsheet,
     FileText,
     FileJson,
-    Check,
     Cpu,
     Radio,
     Sparkles,
@@ -70,7 +64,6 @@ export default function EmailNotificationSettings() {
         updated_at: 0,
     });
     const [watcherStatus, setWatcherStatus] = useState<WatcherStatus | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     // Account modal state
@@ -100,7 +93,6 @@ export default function EmailNotificationSettings() {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const loadAll = async () => {
-        setIsLoading(true);
         try {
             const [accs, recs, sets, st] = await Promise.all([
                 listEmailAccounts(),
@@ -115,8 +107,6 @@ export default function EmailNotificationSettings() {
         } catch (e: any) {
             console.error('Failed to load email settings:', e);
             showToast('Failed to load email configurations', 'error');
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -827,8 +817,12 @@ export default function EmailNotificationSettings() {
             {/* Account Add/Edit Modal */}
             <ModalDialog
                 isOpen={isAccountModalOpen}
-                onClose={() => setIsAccountModalOpen(false)}
                 title={editingAccount.id ? 'Edit Mailbox Configuration' : 'Add Mailbox to Secure Split Vault'}
+                type="confirm"
+                confirmText="Save Account"
+                cancelText="Cancel"
+                onConfirm={handleSaveAccount}
+                onCancel={() => setIsAccountModalOpen(false)}
             >
                 <div className="space-y-4 text-xs">
                     <div>
@@ -953,29 +947,18 @@ export default function EmailNotificationSettings() {
                             <span>Active</span>
                         </label>
                     </div>
-
-                    <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-base-200">
-                        <button
-                            onClick={() => setIsAccountModalOpen(false)}
-                            className="px-4 py-2 border border-gray-200 dark:border-base-300 rounded-lg hover:bg-gray-50 dark:hover:bg-base-200"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSaveAccount}
-                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm"
-                        >
-                            Save Account
-                        </button>
-                    </div>
                 </div>
             </ModalDialog>
 
             {/* Import Modal */}
             <ModalDialog
                 isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
                 title="Import Email Accounts & Settings"
+                type="confirm"
+                confirmText="Execute Import"
+                cancelText="Cancel"
+                onConfirm={handleImportSubmit}
+                onCancel={() => setIsImportModalOpen(false)}
             >
                 <div className="space-y-4 text-xs">
                     <div className="flex items-center justify-between">
@@ -1043,21 +1026,6 @@ export default function EmailNotificationSettings() {
                             placeholder={`Paste your ${importFormat.toUpperCase()} here or click Browse File...`}
                             className="w-full px-3 py-2 font-mono text-[11px] border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button
-                            onClick={() => setIsImportModalOpen(false)}
-                            className="px-4 py-2 border border-gray-200 dark:border-base-300 rounded-lg hover:bg-gray-50 dark:hover:bg-base-200"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleImportSubmit}
-                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm"
-                        >
-                            Execute Import
-                        </button>
                     </div>
                 </div>
             </ModalDialog>

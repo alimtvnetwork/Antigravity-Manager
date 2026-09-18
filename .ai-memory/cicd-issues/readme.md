@@ -20,3 +20,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [16-security-test-setup-rustfmt-rca.md](.ai-memory/cicd-issues/16-security-test-setup-rustfmt-rca.md)
 - [17-signature-cache-and-payload-audit-test-isolation-rca.md](.ai-memory/cicd-issues/17-signature-cache-and-payload-audit-test-isolation-rca.md)
 - [18-rustfmt-server-formatting-rca.md](.ai-memory/cicd-issues/18-rustfmt-server-formatting-rca.md)
+- [19-modal-props-and-rust-delimiter-syntax-error-rca.md](.ai-memory/cicd-issues/19-modal-props-and-rust-delimiter-syntax-error-rca.md)

@@ -342,7 +342,7 @@ pub fn execute_inbound_action(
         }
         InboundAction::AccountRotate => {
             action_str = "rotate".to_string();
-            let rotate_res = crate::modules::auto_switcher::check_and_rotate_if_needed();
+            let _rotate_res = crate::modules::auto_switcher::check_and_rotate_if_needed();
             let current_account = crate::modules::account::get_current_account().unwrap_or(None);
             let current_email = current_account.map(|a| a.email).unwrap_or_else(|| "Unknown".to_string());
 
@@ -360,6 +360,7 @@ pub fn execute_inbound_action(
                 &html,
                 &[msg.from.clone()],
             );
+        }
         InboundAction::NamedPromptExecution { prompt_query } => {
             action_str = "named_prompt_exec".to_string();
             let all_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
