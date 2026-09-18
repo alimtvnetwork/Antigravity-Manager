@@ -2,6 +2,14 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.19.0 (2026-09-18)**:
+        -   **[Email Management, Split Vault DB & CI/CD Hardening] Split Security DB for Credentials, Remote Control & 100% Green CI**:
+            -   **Split Database for Passwords**: Created dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.
+            -   **Plain Email Configuration Window**: Added UI modal to input email account credentials, SMTP/IMAP servers, and custom ports.
+            -   **Two-Way Email Import/Export**: Added bidirectional import and export functionality for email configurations across JSON, CSV, and Excel formats.
+            -   **Mailbox Failover Swapping & Background Sensors**: Implemented multi-trigger background sensors and dynamic mailbox failover pooling in `auto_switcher.rs`.
+            -   **CI/CD Pipeline Repair & Rustfmt Alignment**: Fixed modal prop mismatch in `EmailNotificationSettings.tsx`, Rust delimiter error in `email_inbound.rs`, borrower ownership in `email_io.rs`, and formatted all modules with rustfmt.
+
     *   **v4.18.0 (2026-09-18)**:
         -   **[Auto-Switcher Quota Threshold & Split Repo DB Active Prompt Dispatch] 15% Remaining Threshold, Prompt Persistence, and Ubuntu Process Cleanup**:
             -   **15% Quota Threshold Dynamic Switch**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%), maximizing token utilization across all accounts.

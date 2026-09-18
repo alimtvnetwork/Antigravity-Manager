@@ -333,12 +333,12 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Auto-Switcher Quota Threshold & Split Repo DB Active Prompt Dispatch] 15% Remaining Threshold, Prompt Persistence, and Ubuntu Process Cleanup**:\n"
-        f"            -   **15% Quota Threshold Dynamic Switch**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%), maximizing token utilization across all accounts.\n"
-        f"            -   **Split Repo DB & Active Prompt Backup**: Introduced dedicated SQLite repo database (`repo_db.rs`) to detect running projects and serialize active user prompt instructions before workspace switching, restoring them immediately upon switch.\n"
-        f"            -   **Account Rotation API & IPC Endpoints**: Implemented `/admin/rotate` HTTP endpoint and IPC commands (`list_repo_projects`, `list_repo_prompts`) with interactive status in AutoSwitcherSettings.\n"
-        f"            -   **Hardened Ubuntu Process Termination**: Enhanced process cleanup using explicit SIGKILL on target child processes to guarantee clean workspace directory release.\n"
-        f"            -   **Repository-Wide Architecture Migration & Rustfmt**: Migrated legacy `.lovable` workspace to `.ai-memory` and `02-spec`, and resolved RCA 18 formatting alignment.\n"
+        f"        -   **[Email Management, Split Vault DB & CI/CD Hardening] Split Security DB for Credentials, Remote Control & 100% Green CI**:\n"
+        f"            -   **Split Database for Passwords**: Created dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.\n"
+        f"            -   **Plain Email Configuration Window**: Added UI modal to input email account credentials, SMTP/IMAP servers, and custom ports.\n"
+        f"            -   **Two-Way Email Import/Export**: Added bidirectional import and export functionality for email configurations across JSON, CSV, and Excel formats.\n"
+        f"            -   **Mailbox Failover Swapping & Background Sensors**: Implemented multi-trigger background sensors and dynamic mailbox failover pooling in `auto_switcher.rs`.\n"
+        f"            -   **CI/CD Pipeline Repair & Rustfmt Alignment**: Fixed modal prop mismatch in `EmailNotificationSettings.tsx`, Rust delimiter error in `email_inbound.rs`, borrower ownership in `email_io.rs`, and formatted all modules with rustfmt.\n"
     )
     en_entry = zh_entry
 
@@ -384,11 +384,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Auto-Switch Quota Threshold (15%)**: Calibrated automatic account rotation threshold to trigger at 15% remaining credits (down from 50%).\n"
-        f"- **Split Repo DB & Active Prompt Backup**: Dedicated SQLite storage (`repo_db.rs`) to back up and restore active prompts across workspace switches.\n"
-        f"- **Account Rotation API & IPC Endpoints**: Implemented `/admin/rotate` HTTP endpoint and IPC commands for running projects and active prompts.\n"
-        f"- **Hardened Ubuntu Process Termination**: Enhanced process cleanup using explicit SIGKILL on target child processes.\n"
-        f"- **Architecture Migration & Rustfmt**: Migrated repository structure to `.ai-memory` and `02-spec`, matching 100% CI compliance.\n"
+        f"- **Split Database for Passwords**: Created dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to protect email passwords.\n"
+        f"- **Plain Email Configuration Window**: Added UI controls for email passwords, ports, and SMTP/IMAP settings to connect and read mailboxes.\n"
+        f"- **Two-Way Email Import/Export**: Implemented JSON, CSV, and Excel two-way import/export for email configurations.\n"
+        f"- **Mailbox Failover & Sensor Swapping**: Built background sensor pooling with bidirectional remote mailbox control and auto-swapper integration.\n"
+        f"- **CI/CD Quality Gates & Rustfmt**: Resolved all TypeScript prop mismatches, Rust delimiter and borrow checker issues, and achieved 100% green CI passing.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 
@@ -448,6 +448,17 @@ def push_release(branch_name, tag_name, original_branch="main", dry_run=False):
     if original_branch:
         print(f"[*] Pushing original branch '{original_branch}' to origin...")
         run_cmd(["git", "push", "origin", original_branch])
+
+    # Create GitHub release via gh CLI if available
+    release_ver = tag_name.lstrip("v")
+    notes_file = REPO_ROOT / ".ai-memory" / "release" / f"release-notes-v{release_ver}.md"
+    if notes_file.is_file():
+        print(f"[*] Creating GitHub release for {tag_name}...")
+        try:
+            run_cmd(["gh", "release", "create", tag_name, "--title", tag_name, "--notes-file", str(notes_file), "--generate-notes"])
+            print(f"[OK] GitHub release created successfully: {tag_name}")
+        except Exception as e:
+            print(f"[!] Warning: gh release create encountered: {e}")
 
 
 def revert_to_original_branch(original_branch, dry_run=False):
