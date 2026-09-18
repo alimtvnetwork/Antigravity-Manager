@@ -3,9 +3,11 @@
 > **Plan Path:** `.ai-memory/plans/completed/25-email-management-split-security-db-and-remote-control.md`
 > **Specification Reference:** `02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md`
 > **Status:** Completed
+> **Task Inception & Start:** Initiated from verbatim user prompt in Step 0; decomposed into 8 isolated subtasks across 2 execution phases.
 > **Total Budget:** N = 150 Steps
-> **Phase 1 Budget:** Steps 1 .. 75
-> **Phase 2 Budget:** Steps 76 .. 150
+> **Execution Loops:** Completed in Loop 1 (Steps 1 .. 150)
+> **Phase 1 Budget:** Steps 1 .. 75 (Spec Generation, Database & Schema Design, Task Decomposition)
+> **Phase 2 Budget:** Steps 76 .. 150 (Parallel Implementation, Frontend Settings UI, Bidirectional Commands, Two-Way IO, Subtask Consolidation)
 
 ---
 

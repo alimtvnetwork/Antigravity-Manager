@@ -1,0 +1,15 @@
+{
+  "timestamp": 1789669500,
+  "modified_files": [
+    "02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md",
+    "src-tauri/src/commands/email.rs",
+    "src-tauri/src/lib.rs",
+    "src-tauri/src/modules/email_inbound.rs",
+    "src-tauri/src/modules/email_io.rs",
+    "src-tauri/src/modules/email_sender.rs",
+    "src-tauri/src/modules/email_vault_db.rs",
+    "src-tauri/src/modules/email_watcher.rs",
+    "src/components/settings/EmailNotificationSettings.tsx",
+    "src/services/emailService.ts"
+  ]
+}
