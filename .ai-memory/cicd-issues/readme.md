@@ -23,4 +23,3 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [19-modal-props-and-rust-delimiter-syntax-error-rca.md](.ai-memory/cicd-issues/19-modal-props-and-rust-delimiter-syntax-error-rca.md)
 - [20-rustfmt-and-email-compile-errors-rca.md](.ai-memory/cicd-issues/20-rustfmt-and-email-compile-errors-rca.md)
 - [21-relative-path-and-newline-styling-rca.md](.ai-memory/cicd-issues/21-relative-path-and-newline-styling-rca.md)
-
