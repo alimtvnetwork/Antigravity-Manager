@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-19T02:00:00Z, Memory write: v4.18.0 email management, split security vault DB, bidirectional remote control, 20 CI/CD RCAs, and quality resilience recorded in learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md.
 - 2026-09-18T09:00:00Z, Memory write: v4.17.0 architecture, SQLite L2 tool signatures, test suite resilience, 17 CI/CD RCAs, and .ai-memory migration recorded in learned/15-v4-17-0-architecture-sqlite-tool-signatures-and-test-resilience.md.
 - 2026-09-17T14:00:00Z, Memory write: comprehensive project context, v4.14.0 release state, 10 recent git commits, and CODE RED rules recorded in learned/14-comprehensive-project-context-and-v4-14-0-state.md.
 - 2026-09-15T15:30:00Z, Architecture Realignment & Release: consolidated canonical prompts to 01-prompts/, migrated technical specs to 02-spec/21-app/ (08 through 14), implemented standalone portable installers (install.ps1, install.sh), and released v4.9.0.
@@ -37,6 +38,7 @@
 - .ai-memory/memory/learned/13-refresh-token-capture-multi-instance-and-window-specs.md, why: authoritative token capture pathways, multi-instance profile isolation, and window customization specs
 - .ai-memory/memory/learned/14-comprehensive-project-context-and-v4-14-0-state.md, why: comprehensive project context, v4.14.0 release state, 10 recent git commits, and CODE RED rules
 - .ai-memory/memory/learned/15-v4-17-0-architecture-sqlite-tool-signatures-and-test-resilience.md, why: v4.17.0 architecture, SQLite L2 tool signatures, test suite resilience, 17 CI/CD RCAs, and .ai-memory migration
+- .ai-memory/memory/learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md, why: v4.18.0 email management, split security passwords DB, 20 CI/CD RCAs, and quality resilience
 - `02-spec/21-app/01-index.md`, why: master index of application specifications, architecture guides, token capture sequences, and multi-instance blueprints
 - `.ai-memory/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.ai-memory/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony
