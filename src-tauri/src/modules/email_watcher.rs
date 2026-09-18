@@ -131,16 +131,16 @@ pub fn start_email_watcher() {
             if loop_tick % poll_interval == 0 {
                 // Sensor A: Quota Drop Check
                 if settings.notify_on_quota_drop {
-                    let should_check_quota = now - last_quota_alert > 600; // 10 min cooldown
-                    if should_check_quota {
+                    let is_quota_check_due = now - last_quota_alert > 600; // 10 min cooldown
+                    if is_quota_check_due {
                         check_quota_drop_sensor(&settings, &m_name, &m_ip, &mut last_quota_alert).await;
                     }
                 }
 
                 // Sensor B: Idle Running Projects Check
                 if settings.notify_on_idle_workspace {
-                    let should_check_idle = now - last_idle_alert > 600; // 10 min cooldown
-                    if should_check_idle {
+                    let is_idle_check_due = now - last_idle_alert > 600; // 10 min cooldown
+                    if is_idle_check_due {
                         check_idle_projects_sensor(&m_name, &m_ip, &mut last_idle_alert).await;
                     }
                 }
@@ -289,8 +289,12 @@ pub fn notify_workspace_switched(from_instance: &str, to_instance: &str, reason:
     };
 
     let is_enabled = settings.is_enabled;
-    let should_notify = settings.notify_on_workspace_switch;
-    if !is_enabled || !should_notify {
+    if !is_enabled {
+        return;
+    }
+
+    let is_switch_notify_enabled = settings.notify_on_workspace_switch;
+    if !is_switch_notify_enabled {
         return;
     }
 

@@ -123,26 +123,23 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 
     // Check Named Prompt Execution
-    let is_project_prompt = lower_subj.starts_with("project-prompt:");
-    if !is_project_prompt {
-        let is_named = lower_subj.starts_with("named-prompt:");
-        let is_run = lower_subj.starts_with("run-prompt:");
-        let is_prompt = lower_subj.starts_with("prompt:");
-        if is_named || is_run || is_prompt {
-            let prefix_len = if is_named {
-                "named-prompt:".len()
-            } else if is_run {
-                "run-prompt:".len()
-            } else {
-                "prompt:".len()
-            };
-            let query = clean_subj[prefix_len..].trim().to_string();
-            let body_first = body.trim().lines().next().unwrap_or("").trim().to_string();
-            let effective_query = if query.is_empty() { body_first } else { query };
-            return InboundAction::NamedPromptExecution {
-                prompt_query: effective_query,
-            };
-        }
+    let is_named = lower_subj.starts_with("named-prompt:");
+    let is_run = lower_subj.starts_with("run-prompt:");
+    let is_prompt = lower_subj.starts_with("prompt:");
+    if is_named || is_run || is_prompt {
+        let prefix_len = if is_named {
+            "named-prompt:".len()
+        } else if is_run {
+            "run-prompt:".len()
+        } else {
+            "prompt:".len()
+        };
+        let query = clean_subj[prefix_len..].trim().to_string();
+        let body_first = body.trim().lines().next().unwrap_or("").trim().to_string();
+        let effective_query = if query.is_empty() { body_first } else { query };
+        return InboundAction::NamedPromptExecution {
+            prompt_query: effective_query,
+        };
     }
 
     if lower_subj == "help" {
@@ -166,24 +163,21 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         };
     }
 
-    let is_body_proj_prompt = lower_first_line.starts_with("project-prompt:");
-    if !is_body_proj_prompt {
-        let is_body_named = lower_first_line.starts_with("named-prompt:");
-        let is_body_run = lower_first_line.starts_with("run-prompt:");
-        let is_body_prompt = lower_first_line.starts_with("prompt:");
-        if is_body_named || is_body_run || is_body_prompt {
-            let prefix_len = if is_body_named {
-                "named-prompt:".len()
-            } else if is_body_run {
-                "run-prompt:".len()
-            } else {
-                "prompt:".len()
-            };
-            let query = first_line[prefix_len..].trim().to_string();
-            return InboundAction::NamedPromptExecution {
-                prompt_query: query,
-            };
-        }
+    let is_body_named = lower_first_line.starts_with("named-prompt:");
+    let is_body_run = lower_first_line.starts_with("run-prompt:");
+    let is_body_prompt = lower_first_line.starts_with("prompt:");
+    if is_body_named || is_body_run || is_body_prompt {
+        let prefix_len = if is_body_named {
+            "named-prompt:".len()
+        } else if is_body_run {
+            "run-prompt:".len()
+        } else {
+            "prompt:".len()
+        };
+        let query = first_line[prefix_len..].trim().to_string();
+        return InboundAction::NamedPromptExecution {
+            prompt_query: query,
+        };
     }
 
     if lower_first_line.starts_with("exec:") || lower_first_line.starts_with("command:") {

@@ -372,11 +372,10 @@ pub fn import_from_excel(payload: &str) -> Result<ImportSummary, String> {
                         .get(7)
                         .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
                         .unwrap_or(false);
-                    let is_false_flag = cells
-                        .get(8)
-                        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
-                        .unwrap_or(false);
-                    let is_act = !is_false_flag;
+                    let is_act = match cells.get(8) {
+                        Some(v) if v.eq_ignore_ascii_case("false") || v == "0" => false,
+                        _ => true,
+                    };
 
                     let input = EmailAccountInput {
                         id: None,
@@ -424,11 +423,10 @@ pub fn import_from_excel(payload: &str) -> Result<ImportSummary, String> {
                         continue;
                     }
 
-                    let is_false_flag = cells
-                        .get(2)
-                        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
-                        .unwrap_or(false);
-                    let is_act = !is_false_flag;
+                    let is_act = match cells.get(2) {
+                        Some(v) if v.eq_ignore_ascii_case("false") || v == "0" => false,
+                        _ => true,
+                    };
 
                     let input = NotifyRecipientInput {
                         email: cells[0].clone(),
