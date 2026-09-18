@@ -1,6 +1,6 @@
 //! Inbound Email Poller and Remote Execution Bridge
-//! Reads last 5 unread messages via IMAP, parses instruction subjects,
-//! and dispatches prompts, CLI execution, or instance management.
+//! Reads last 5 unread messages via IMAP, parses instruction subjects/bodies,
+//! and dispatches prompts, CLI execution, or instance management with full HTML reply receipts.
 
 #![allow(dead_code)]
 
@@ -44,11 +44,40 @@ pub struct RawEmailMessage {
     pub body: String,
 }
 
+/// Clean subject by removing reply/forward prefixes
+fn strip_email_prefixes(subject: &str) -> String {
+    let mut clean = subject.trim();
+    loop {
+        let lower = clean.to_lowercase();
+        if lower.starts_with("re:") {
+            clean = clean[3..].trim();
+        } else if lower.starts_with("fwd:") {
+            clean = clean[4..].trim();
+        } else if lower.starts_with("fw:") {
+            clean = clean[3..].trim();
+        } else {
+            break;
+        }
+    }
+    clean.to_string()
+}
+
+/// Escape raw console output for clean HTML embedding without spam scoring
+fn html_escape(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 /// Parse subject and body into strongly typed InboundAction
 pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
-    let clean_subj = subject.trim();
+    let clean_subj = strip_email_prefixes(subject);
     let lower_subj = clean_subj.to_lowercase();
 
+    // Check Subject First
     if lower_subj.starts_with("project:") || lower_subj.starts_with("project-prompt:") {
         let prefix_len = if lower_subj.starts_with("project:") {
             "project:".len()
@@ -94,12 +123,43 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         return InboundAction::HelpRequest;
     }
 
+    // Fallback: Check first line of body if user replied to an idle notification
+    let first_line = body.lines().next().unwrap_or("").trim();
+    let lower_first_line = first_line.to_lowercase();
+    if lower_first_line.starts_with("project:") || lower_first_line.starts_with("project-prompt:") {
+        let prefix_len = if lower_first_line.starts_with("project:") {
+            "project:".len()
+        } else {
+            "project-prompt:".len()
+        };
+        let project_name = first_line[prefix_len..].trim().to_string();
+        let prompt_body = body.lines().skip(1).collect::<Vec<&str>>().join("\n").trim().to_string();
+        return InboundAction::PromptInjection {
+            project_name,
+            prompt: prompt_body,
+        };
+    }
+
+    if lower_first_line.starts_with("exec:") || lower_first_line.starts_with("command:") {
+        let prefix_len = if lower_first_line.starts_with("exec:") {
+            "exec:".len()
+        } else {
+            "command:".len()
+        };
+        let target_ip = first_line[prefix_len..].trim().to_string();
+        let cmd_body = body.lines().skip(1).collect::<Vec<&str>>().join("\n").trim().to_string();
+        return InboundAction::CliExecution {
+            target_ip,
+            command: cmd_body,
+        };
+    }
+
     InboundAction::Ignored {
         reason: format!("Subject '{}' does not match any recognized command pattern", subject),
     }
 }
 
-/// Process a parsed inbound email action
+/// Process a parsed inbound email action and dispatch bidirectional HTML reply
 pub fn execute_inbound_action(
     msg: &RawEmailMessage,
     action: InboundAction,
@@ -131,9 +191,42 @@ pub fn execute_inbound_action(
                     );
                 }
                 result_summary = format!("Prompt injected into project '{}' (id: {})", proj.repo_name, p_id);
+
+                // Bidirectional confirmation email receipt
+                let escaped_prompt = html_escape(&prompt);
+                let reply_content = format!(
+                    r#"<p><span class="badge badge-success">PROMPT INJECTED</span></p>
+<p>Your prompt was successfully injected into workspace <strong>{}</strong>.</p>
+<div class="cmd">{}</div>
+<p>Antigravity is currently executing this instruction.</p>"#,
+                    proj.repo_name, escaped_prompt
+                );
+                let html = wrap_card("Prompt Injection Receipt", &reply_content, local_machine_name, local_machine_ip);
+                let _ = email_sender::dispatch_email_with_failover(
+                    &format!("[AGM Receipt] Prompt Injected: {}", proj.repo_name),
+                    &html,
+                    &[msg.from.clone()],
+                );
             } else {
                 status = "rejected".to_string();
+                let available_names: Vec<String> = projects.iter().map(|p| p.repo_name.clone()).collect();
                 result_summary = format!("Project '{}' not found among active running projects", project_name);
+
+                let reply_content = format!(
+                    r#"<p><span class="badge badge-warn">PROJECT NOT FOUND</span></p>
+<p>Could not find active project matching <strong>{}</strong>.</p>
+<p>Available running projects on this machine:</p>
+<ul>{}</ul>
+<p>Please reply with <code>Project: &lt;exact-name&gt;</code> to try again.</p>"#,
+                    project_name,
+                    available_names.iter().map(|n| format!("<li>{}</li>", n)).collect::<Vec<_>>().join("")
+                );
+                let html = wrap_card("Prompt Injection Failed", &reply_content, local_machine_name, local_machine_ip);
+                let _ = email_sender::dispatch_email_with_failover(
+                    &format!("[AGM Alert] Project Not Found: {}", project_name),
+                    &html,
+                    &[msg.from.clone()],
+                );
             }
         }
         InboundAction::CliExecution { target_ip, command } => {
@@ -150,6 +243,18 @@ pub fn execute_inbound_action(
                     "Command IP mismatch: target '{}' != local '{}'",
                     target_ip, local_machine_ip
                 );
+                let reply_content = format!(
+                    r#"<p><span class="badge badge-warn">IP MISMATCH</span></p>
+<p>Instruction targeted IP <code>{}</code>, but this machine's local IP is <code>{}</code>.</p>
+<p>Command was skipped to prevent execution on wrong node.</p>"#,
+                    target_ip, local_machine_ip
+                );
+                let html = wrap_card("Execution Skipped", &reply_content, local_machine_name, local_machine_ip);
+                let _ = email_sender::dispatch_email_with_failover(
+                    "[AGM Alert] Command IP Mismatch",
+                    &html,
+                    &[msg.from.clone()],
+                );
             } else {
                 let trimmed_cmd = command.trim();
                 let output = execute_safe_cli_command(trimmed_cmd);
@@ -159,10 +264,11 @@ pub fn execute_inbound_action(
                 };
 
                 result_summary = format!("Executed '{}' (exit: {})", trimmed_cmd, code);
+                let escaped_output = html_escape(&text);
                 let (_, html) = email_sender::render_exec_result_email(
                     trimmed_cmd,
                     code,
-                    &text,
+                    &escaped_output,
                     local_machine_name,
                     local_machine_ip,
                 );
@@ -175,24 +281,67 @@ pub fn execute_inbound_action(
         }
         InboundAction::InstanceCreate { profile_name } => {
             action_str = "instance_create".to_string();
-            let _ = crate::modules::instance::create_instance(&profile_name);
-            result_summary = format!("Spawned instance profile '{}'", profile_name);
+            let create_res = crate::modules::instance::create_instance(&profile_name);
+            result_summary = match create_res {
+                Ok(_) => format!("Spawned instance profile '{}'", profile_name),
+                Err(e) => format!("Failed to spawn instance: {}", e),
+            };
+
+            let reply_content = format!(
+                r#"<p><span class="badge badge-success">INSTANCE CREATED</span></p>
+<p>Successfully provisioned isolated IDE instance profile <strong>{}</strong> on Node <strong>{}</strong>.</p>
+<p>You can launch it anytime via Antigravity Manager.</p>"#,
+                profile_name, local_machine_name
+            );
+            let html = wrap_card("Instance Created", &reply_content, local_machine_name, local_machine_ip);
+            let _ = email_sender::dispatch_email_with_failover(
+                &format!("[AGM Response] Instance Created: {}", profile_name),
+                &html,
+                &[msg.from.clone()],
+            );
         }
         InboundAction::AccountRotate => {
             action_str = "rotate".to_string();
-            result_summary = "Triggered account rotation".to_string();
+            let rotate_res = crate::modules::auto_switcher::check_and_rotate_if_needed();
+            let current_account = crate::modules::account::get_current_account().unwrap_or(None);
+            let current_email = current_account.map(|a| a.email).unwrap_or_else(|| "Unknown".to_string());
+
+            result_summary = format!("Triggered account rotation. Current profile: {}", current_email);
+            let reply_content = format!(
+                r#"<p><span class="badge badge-info">PROFILE ROTATED</span></p>
+<p>Account rotation was triggered remotely via mailbox command.</p>
+<p>Active Profile: <strong>{}</strong></p>
+<p>Node: <strong>{}</strong> ({})</p>"#,
+                current_email, local_machine_name, local_machine_ip
+            );
+            let html = wrap_card("Account Rotation Report", &reply_content, local_machine_name, local_machine_ip);
+            let _ = email_sender::dispatch_email_with_failover(
+                "[AGM Response] Account Rotation Completed",
+                &html,
+                &[msg.from.clone()],
+            );
         }
         InboundAction::StatusQuery => {
             action_str = "status_query".to_string();
             let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+            let prompts = crate::modules::repo_db::list_backed_up_prompts().unwrap_or_default();
             let proj_names: Vec<String> = projects.into_iter().map(|p| p.repo_name).collect();
-            let (_, html) = email_sender::render_idle_projects_email(
-                &proj_names,
+
+            let reply_content = format!(
+                r#"<p><span class="badge badge-info">NODE STATUS</span></p>
+<p>Node: <strong>{}</strong> &nbsp;|&nbsp; Local IP: <strong>{}</strong></p>
+<p><strong>Running Projects ({}):</strong></p>
+<ul>{}</ul>
+<p><strong>Active Prompts in Queue:</strong> {}</p>"#,
                 local_machine_name,
                 local_machine_ip,
+                proj_names.len(),
+                proj_names.iter().map(|n| format!("<li>{}</li>", n)).collect::<Vec<_>>().join(""),
+                prompts.len()
             );
+            let html = wrap_card("Node Status Report", &reply_content, local_machine_name, local_machine_ip);
             let _ = email_sender::dispatch_email_with_failover(
-                "[AGM Status Report] Active Projects & Instances",
+                "[AGM Status Report] Running Projects & Queue",
                 &html,
                 &[msg.from.clone()],
             );
@@ -225,6 +374,39 @@ pub fn execute_inbound_action(
     let _ = email_vault_db::record_inbound_audit_log(audit);
 
     Ok(result_summary)
+}
+
+/// Helper to wrap simple response cards
+fn wrap_card(title: &str, content_html: &str, machine_name: &str, machine_ip: &str) -> String {
+    format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }}
+    .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }}
+    .header {{ background: #0f172a; color: #ffffff; padding: 20px; }}
+    .header h1 {{ margin: 0; font-size: 17px; }}
+    .body {{ padding: 20px; color: #334155; line-height: 1.6; font-size: 14px; }}
+    .badge {{ display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }}
+    .badge-warn {{ background: #fef3c7; color: #92400e; }}
+    .badge-info {{ background: #e0f2fe; color: #075985; }}
+    .badge-success {{ background: #dcfce7; color: #166534; }}
+    .footer {{ padding: 14px 20px; background: #f1f5f9; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+    .cmd {{ background: #0f172a; color: #38bdf8; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 12px 0; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header"><h1>Antigravity Manager · {}</h1></div>
+    <div class="body">{}</div>
+    <div class="footer">Node: <strong>{}</strong> | Local IP: <strong>{}</strong><br>Automated Mailbox Control</div>
+  </div>
+</body>
+</html>"#,
+        title, content_html, machine_name, machine_ip
+    )
 }
 
 /// Execute approved CLI / GitMap command safely
@@ -365,8 +547,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_project_command() {
-        let action = parse_email_command("Project: my-awesome-app", "Please fix bug #12");
+    fn test_parse_project_command_with_re_prefix() {
+        let action = parse_email_command("Re: Project: my-awesome-app", "Please fix bug #12");
         match action {
             InboundAction::PromptInjection { project_name, prompt } => {
                 assert_eq!(project_name, "my-awesome-app");

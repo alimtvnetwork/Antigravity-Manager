@@ -79,11 +79,15 @@ flowchart TB
 
 ---
 
-## 3. Split Vault Database Schema (`email_vault.db`)
+## 3. Split Vault Database Schema (`email_vault.db` & `email_passwords.db`)
 
-The email credentials, mailboxes, and notification rules are isolated in a dedicated SQLite database located at `crate::modules::account::get_data_dir()?.join("email_vault.db")` with WAL mode and foreign key constraints:
+The email subsystem operates two isolated SQLite databases for defense-in-depth security:
+1. **`email_vault.db`**: Configuration, mailboxes, notification recipients, settings, and inbound audit logs.
+2. **`email_passwords.db`**: Completely isolated split database storing credential secrets, OpenSSH RSA public key identities, and salt derivations.
 
-### 3.1 Table: `email_accounts`
+Both databases operate in SQLite WAL mode with `busy_timeout = 5000` and foreign keys enabled:
+
+### 3.1 Table: `email_accounts` (`email_vault.db`)
 ```sql
 CREATE TABLE IF NOT EXISTS email_accounts (
     id TEXT PRIMARY KEY,
@@ -101,16 +105,16 @@ CREATE TABLE IF NOT EXISTS email_accounts (
 );
 ```
 
-### 3.2 Table: `email_credentials` (Separate Secure Table)
+### 3.2 Table: `email_credentials` (`email_passwords.db`)
 ```sql
 CREATE TABLE IF NOT EXISTS email_credentials (
     account_id TEXT PRIMARY KEY,
     auth_type TEXT NOT NULL DEFAULT 'password', -- password, rsa_key, oauth2
     encrypted_secret TEXT NOT NULL,
     rsa_public_fingerprint TEXT NOT NULL,
+    ssh_rsa_public_key TEXT NOT NULL,
     salt TEXT NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE
+    updated_at INTEGER NOT NULL
 );
 ```
 

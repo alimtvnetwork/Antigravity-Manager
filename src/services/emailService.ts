@@ -78,7 +78,15 @@ export interface WatcherStatus {
 }
 
 export async function getEmailSettings(): Promise<EmailNotificationSettings> {
-    return await invoke('get_email_settings');
+    try {
+        return await invoke('get_email_settings');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.getEmailSettings',
+            endpoint: 'get_email_settings',
+        });
+        throw e;
+    }
 }
 
 export async function saveEmailSettings(settings: EmailNotificationSettings): Promise<void> {
@@ -94,7 +102,15 @@ export async function saveEmailSettings(settings: EmailNotificationSettings): Pr
 }
 
 export async function listEmailAccounts(): Promise<EmailAccount[]> {
-    return await invoke('list_email_accounts');
+    try {
+        return await invoke('list_email_accounts');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.listEmailAccounts',
+            endpoint: 'list_email_accounts',
+        });
+        throw e;
+    }
 }
 
 export async function addEmailAccount(account: EmailAccountInput): Promise<EmailAccount> {
@@ -146,7 +162,15 @@ export async function setDefaultEmailAccount(id: string): Promise<void> {
 }
 
 export async function listNotifyRecipients(): Promise<NotifyRecipient[]> {
-    return await invoke('list_notify_recipients');
+    try {
+        return await invoke('list_notify_recipients');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.listNotifyRecipients',
+            endpoint: 'list_notify_recipients',
+        });
+        throw e;
+    }
 }
 
 export async function addNotifyRecipient(recipient: NotifyRecipientInput): Promise<NotifyRecipient> {
@@ -198,7 +222,15 @@ export async function testImapConnection(accountId: string): Promise<string> {
 }
 
 export async function exportEmailData(format: string): Promise<string> {
-    return await invoke('export_email_data', { format });
+    try {
+        return await invoke('export_email_data', { format });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.exportEmailData',
+            endpoint: 'export_email_data',
+        });
+        throw e;
+    }
 }
 
 export async function importEmailData(format: string, payload: string): Promise<ImportSummary> {
@@ -213,8 +245,40 @@ export async function importEmailData(format: string, payload: string): Promise<
     }
 }
 
+export async function backupEmailDb(targetPath: string): Promise<string> {
+    try {
+        return await invoke('backup_email_db', { targetPath });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.backupEmailDb',
+            endpoint: 'backup_email_db',
+        });
+        throw e;
+    }
+}
+
+export async function restoreEmailDb(sourcePath: string): Promise<string> {
+    try {
+        return await invoke('restore_email_db', { sourcePath });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.restoreEmailDb',
+            endpoint: 'restore_email_db',
+        });
+        throw e;
+    }
+}
+
 export async function getEmailWatcherStatus(): Promise<WatcherStatus> {
-    return await invoke('get_email_watcher_status');
+    try {
+        return await invoke('get_email_watcher_status');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.getEmailWatcherStatus',
+            endpoint: 'get_email_watcher_status',
+        });
+        throw e;
+    }
 }
 
 export async function triggerManualEmailCheck(): Promise<string> {

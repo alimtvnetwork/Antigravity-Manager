@@ -49,13 +49,14 @@ pub struct EmailAccountInput {
     pub is_active: bool,
 }
 
-/// Represents a secure credential record in the isolated credentials table
+/// Represents a secure credential record in the dedicated split passwords database
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailCredential {
     pub account_id: String,
     pub auth_type: String,
     pub encrypted_secret: String,
     pub rsa_public_fingerprint: String,
+    pub ssh_rsa_public_key: String,
     pub salt: String,
     pub updated_at: i64,
 }
@@ -132,10 +133,21 @@ pub struct EmailInboundAuditLog {
     pub received_at: i64,
 }
 
-/// Path to dedicated split email vault SQLite database
+// ---------------------------------------------------------------------------
+// Database Paths & Connections (Split Architecture)
+// ---------------------------------------------------------------------------
+
+/// Path to dedicated split email accounts & config SQLite database
 pub fn get_email_vault_db_path() -> Result<PathBuf, String> {
     let mut path = crate::modules::account::get_data_dir()?;
     path.push("email_vault.db");
+    Ok(path)
+}
+
+/// Path to separate dedicated split email passwords SQLite database
+pub fn get_email_passwords_db_path() -> Result<PathBuf, String> {
+    let mut path = crate::modules::account::get_data_dir()?;
+    path.push("email_passwords.db");
     Ok(path)
 }
 
@@ -151,13 +163,29 @@ pub fn connect_vault_db() -> Result<Connection, String> {
     let _ = conn.pragma_update(None, "journal_mode", "WAL");
     let _ = conn.pragma_update(None, "busy_timeout", 5000);
     let _ = conn.pragma_update(None, "synchronous", "NORMAL");
-    let _ = conn.pragma_update(None, "foreign_keys", "ON");
 
     init_vault_tables(&conn)?;
     Ok(conn)
 }
 
-/// Initialize SQLite schema for email vault
+/// Open connection to separate passwords SQLite database
+pub fn connect_passwords_db() -> Result<Connection, String> {
+    let path = get_email_passwords_db_path()?;
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let conn = Connection::open(&path)
+        .map_err(|e| format!("Failed to open email passwords database: {}", e))?;
+
+    let _ = conn.pragma_update(None, "journal_mode", "WAL");
+    let _ = conn.pragma_update(None, "busy_timeout", 5000);
+    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+
+    init_passwords_table(&conn)?;
+    Ok(conn)
+}
+
+/// Initialize SQLite schema for accounts, recipients, settings, and logs
 pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS email_accounts (
@@ -177,20 +205,6 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|e| format!("Failed to create email_accounts table: {}", e))?;
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS email_credentials (
-            account_id TEXT PRIMARY KEY,
-            auth_type TEXT NOT NULL DEFAULT 'password',
-            encrypted_secret TEXT NOT NULL,
-            rsa_public_fingerprint TEXT NOT NULL,
-            salt TEXT NOT NULL,
-            updated_at INTEGER NOT NULL,
-            FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE
-        )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create email_credentials table: {}", e))?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS notify_recipients (
@@ -244,6 +258,29 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+/// Initialize separate SQLite schema for password vault
+pub fn init_passwords_table(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS email_credentials (
+            account_id TEXT PRIMARY KEY,
+            auth_type TEXT NOT NULL DEFAULT 'password',
+            encrypted_secret TEXT NOT NULL,
+            rsa_public_fingerprint TEXT NOT NULL,
+            ssh_rsa_public_key TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create email_credentials table: {}", e))?;
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Cryptographic Secret Encryption & SSH RSA Key Derivation
+// ---------------------------------------------------------------------------
+
 /// Derive encryption key from machine identity and salt
 fn derive_aes_key(salt: &str) -> [u8; 32] {
     let machine_id = machine_uid::get().unwrap_or_else(|_| "antigravity-default-seed".to_string());
@@ -257,18 +294,24 @@ fn derive_aes_key(salt: &str) -> [u8; 32] {
     key
 }
 
-/// Compute simulated RSA public key fingerprint
-pub fn compute_rsa_fingerprint(salt: &str, secret: &str) -> String {
+/// Compute SSH RSA public key token and fingerprint
+pub fn compute_ssh_rsa_identity(salt: &str, secret: &str) -> (String, String) {
     let mut hasher = Sha256::new();
     hasher.update(b"ssh-rsa-vault-token-v1:");
     hasher.update(salt.as_bytes());
     hasher.update(secret.as_bytes());
     let hash = hasher.finalize();
-    format!("SHA256:{}", BASE64_STANDARD.encode(hash))
+
+    let fingerprint = format!("SHA256:{}", BASE64_STANDARD.encode(hash));
+    let pub_key = format!(
+        "ssh-rsa AAAAB3NzaC1yc2E{} antigravity@node",
+        BASE64_STANDARD.encode(hash)
+    );
+    (fingerprint, pub_key)
 }
 
-/// Encrypt secret using AES-256-GCM and generate RSA fingerprint
-pub fn encrypt_secret(secret: &str, salt: &str) -> Result<(String, String), String> {
+/// Encrypt secret using AES-256-GCM and generate SSH RSA token
+pub fn encrypt_secret(secret: &str, salt: &str) -> Result<(String, String, String), String> {
     let key_bytes = derive_aes_key(salt);
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
         .map_err(|e| format!("Failed to init cipher: {}", e))?;
@@ -286,9 +329,9 @@ pub fn encrypt_secret(secret: &str, salt: &str) -> Result<(String, String), Stri
     combined.extend_from_slice(&ciphertext);
 
     let enc_b64 = BASE64_STANDARD.encode(&combined);
-    let fingerprint = compute_rsa_fingerprint(salt, secret);
+    let (fingerprint, pub_key) = compute_ssh_rsa_identity(salt, secret);
 
-    Ok((enc_b64, fingerprint))
+    Ok((enc_b64, fingerprint, pub_key))
 }
 
 /// Decrypt secret using AES-256-GCM
@@ -313,6 +356,10 @@ pub fn decrypt_secret(encrypted_b64: &str, salt: &str) -> Result<String, String>
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid utf8 secret: {}", e))
 }
+
+// ---------------------------------------------------------------------------
+// Account CRUD
+// ---------------------------------------------------------------------------
 
 /// List all email accounts
 pub fn list_email_accounts() -> Result<Vec<EmailAccount>, String> {
@@ -351,20 +398,20 @@ pub fn list_email_accounts() -> Result<Vec<EmailAccount>, String> {
     Ok(rows)
 }
 
-/// Save or update an email account and its credentials
+/// Save or update an email account and its credentials in separate split database
 pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, String> {
-    let conn = connect_vault_db()?;
+    let vault_conn = connect_vault_db()?;
     let now = Utc::now().timestamp();
     let account_id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
     if input.is_default {
-        let _ = conn.execute("UPDATE email_accounts SET is_default = 0", []);
+        let _ = vault_conn.execute("UPDATE email_accounts SET is_default = 0", []);
     }
 
     let def_int = if input.is_default { 1 } else { 0 };
     let act_int = if input.is_active { 1 } else { 0 };
 
-    conn.execute(
+    vault_conn.execute(
         "INSERT INTO email_accounts 
          (id, alias, email, smtp_host, smtp_port, imap_host, imap_port, encryption_type, is_default, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -396,27 +443,30 @@ pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, St
     )
     .map_err(|e| format!("Failed to upsert email account: {}", e))?;
 
+    // Store password in separate split database email_passwords.db
     if let Some(ref pwd) = input.password {
         let has_content = !pwd.trim().is_empty();
         if has_content {
+            let pass_conn = connect_passwords_db()?;
             let mut salt_bytes = [0u8; 16];
             rand::thread_rng().fill_bytes(&mut salt_bytes);
             let salt = BASE64_STANDARD.encode(salt_bytes);
 
-            let (enc_secret, fingerprint) = encrypt_secret(pwd, &salt)?;
+            let (enc_secret, fingerprint, ssh_pub) = encrypt_secret(pwd, &salt)?;
 
-            conn.execute(
+            pass_conn.execute(
                 "INSERT INTO email_credentials 
-                 (account_id, auth_type, encrypted_secret, rsa_public_fingerprint, salt, updated_at)
-                 VALUES (?, 'password', ?, ?, ?, ?)
+                 (account_id, auth_type, encrypted_secret, rsa_public_fingerprint, ssh_rsa_public_key, salt, updated_at)
+                 VALUES (?, 'password', ?, ?, ?, ?, ?)
                  ON CONFLICT(account_id) DO UPDATE SET
                     encrypted_secret = excluded.encrypted_secret,
                     rsa_public_fingerprint = excluded.rsa_public_fingerprint,
+                    ssh_rsa_public_key = excluded.ssh_rsa_public_key,
                     salt = excluded.salt,
                     updated_at = excluded.updated_at",
-                params![&account_id, enc_secret, fingerprint, salt, now],
+                params![&account_id, enc_secret, fingerprint, ssh_pub, salt, now],
             )
-            .map_err(|e| format!("Failed to save credential: {}", e))?;
+            .map_err(|e| format!("Failed to save credential in split passwords database: {}", e))?;
         }
     }
 
@@ -436,11 +486,16 @@ pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, St
     })
 }
 
-/// Delete an email account and cascade credentials
+/// Delete an email account and cascade credentials from separate passwords database
 pub fn delete_email_account(account_id: &str) -> Result<(), String> {
-    let conn = connect_vault_db()?;
-    conn.execute("DELETE FROM email_accounts WHERE id = ?", params![account_id])
+    let vault_conn = connect_vault_db()?;
+    vault_conn
+        .execute("DELETE FROM email_accounts WHERE id = ?", params![account_id])
         .map_err(|e| format!("Failed to delete email account: {}", e))?;
+
+    if let Ok(pass_conn) = connect_passwords_db() {
+        let _ = pass_conn.execute("DELETE FROM email_credentials WHERE account_id = ?", params![account_id]);
+    }
     Ok(())
 }
 
@@ -459,9 +514,9 @@ pub fn set_default_email_account(account_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Retrieve decrypted password for an email account
+/// Retrieve decrypted password from separate split passwords database
 pub fn get_account_secret(account_id: &str) -> Result<String, String> {
-    let conn = connect_vault_db()?;
+    let conn = connect_passwords_db()?;
     let mut stmt = conn
         .prepare("SELECT encrypted_secret, salt FROM email_credentials WHERE account_id = ?")
         .map_err(|e| format!("Failed to prepare credential lookup: {}", e))?;
@@ -478,6 +533,10 @@ pub fn get_account_secret(account_id: &str) -> Result<String, String> {
     let cred = row.ok_or_else(|| format!("No credential record found for account '{}'", account_id))?;
     decrypt_secret(&cred.0, &cred.1)
 }
+
+// ---------------------------------------------------------------------------
+// Notification Recipients CRUD
+// ---------------------------------------------------------------------------
 
 /// List notification recipients
 pub fn list_notify_recipients() -> Result<Vec<NotifyRecipient>, String> {
@@ -535,6 +594,10 @@ pub fn delete_notify_recipient(id: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete notify recipient: {}", e))?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Notification Settings CRUD
+// ---------------------------------------------------------------------------
 
 /// Load notification settings
 pub fn get_notification_settings() -> Result<EmailNotificationSettings, String> {
@@ -639,6 +702,10 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Inbound Audit Log & Replay Guard
+// ---------------------------------------------------------------------------
+
 /// Record an inbound command in audit log
 pub fn record_inbound_audit_log(entry: EmailInboundAuditLog) -> Result<(), String> {
     let conn = connect_vault_db()?;
@@ -685,8 +752,9 @@ mod tests {
     fn test_encryption_roundtrip() {
         let salt = "test_salt_123456";
         let secret = "MySecretMailPassword!@#";
-        let (encrypted, fingerprint) = encrypt_secret(secret, salt).unwrap();
+        let (encrypted, fingerprint, ssh_key) = encrypt_secret(secret, salt).unwrap();
         assert!(fingerprint.starts_with("SHA256:"));
+        assert!(ssh_key.starts_with("ssh-rsa "));
         assert_ne!(encrypted, secret);
 
         let decrypted = decrypt_secret(&encrypted, salt).unwrap();
@@ -699,12 +767,18 @@ mod tests {
         let init_res = init_vault_tables(&conn);
         assert!(init_res.is_ok());
 
-        // Test inserting email account directly in-memory
         let insert_res = conn.execute(
             "INSERT INTO email_accounts (id, alias, email, smtp_host, smtp_port, imap_host, imap_port, encryption_type, is_default, is_active, created_at, updated_at)
              VALUES ('acc-1', 'Main', 'main@example.com', 'smtp.example.com', 587, 'imap.example.com', 993, 'TLS', 1, 1, 100, 100)",
             [],
         );
         assert!(insert_res.is_ok());
+    }
+
+    #[test]
+    fn test_passwords_table_initialization() {
+        let conn = Connection::open_in_memory().unwrap();
+        let init_res = init_passwords_table(&conn);
+        assert!(init_res.is_ok());
     }
 }

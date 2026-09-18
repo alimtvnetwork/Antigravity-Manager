@@ -782,6 +782,8 @@ pub fn run() {
             commands::test_imap_connection,
             commands::export_email_data,
             commands::import_email_data,
+            commands::backup_email_db,
+            commands::restore_email_db,
             commands::get_email_watcher_status,
             commands::trigger_manual_email_check,
         ])

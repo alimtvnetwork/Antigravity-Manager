@@ -156,9 +156,13 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     for c in line.chars() {
         if c == '"' {
             in_quotes = !in_quotes;
-        } else if c == ',' && !in_quotes {
-            fields.push(current.trim().to_string());
-            current.clear();
+        } else if c == ',' {
+            if !in_quotes {
+                fields.push(current.trim().to_string());
+                current.clear();
+            } else {
+                current.push(c);
+            }
         } else {
             current.push(c);
         }
@@ -296,6 +300,155 @@ pub fn export_to_excel() -> Result<String, String> {
     Ok(xml)
 }
 
+/// Helper to unescape basic XML entities
+fn unescape_xml(val: &str) -> String {
+    val.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+}
+
+/// Helper to parse XML cells inside a <Row> block
+fn parse_xml_row(row_str: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut rest = row_str;
+
+    while let Some(start_data) = rest.find("<Data") {
+        let after_data_tag = &rest[start_data..];
+        if let Some(tag_close) = after_data_tag.find('>') {
+            let content_start = tag_close + 1;
+            let data_body = &after_data_tag[content_start..];
+            if let Some(end_data) = data_body.find("</Data>") {
+                let cell_val = &data_body[..end_data];
+                cells.push(unescape_xml(cell_val.trim()));
+                rest = &data_body[end_data + 7..];
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    cells
+}
+
+/// Helper to extract worksheet slice by name
+fn extract_worksheet<'a>(xml: &'a str, sheet_name: &str) -> Option<&'a str> {
+    let target = format!("Name=\"{}\"", sheet_name);
+    let pos = xml.find(&target)?;
+    let after_ws = &xml[pos..];
+    let end_pos = after_ws.find("</Worksheet>")?;
+    Some(&after_ws[..end_pos])
+}
+
+/// Import accounts and recipients from Excel XML Spreadsheet (.xlsx / .xml)
+pub fn import_from_excel(payload: &str) -> Result<ImportSummary, String> {
+    let mut summary = ImportSummary {
+        accounts_imported: 0,
+        recipients_imported: 0,
+        settings_updated: false,
+        errors: Vec::new(),
+    };
+
+    // 1. Process Mailboxes Worksheet
+    if let Some(mailboxes_ws) = extract_worksheet(payload, "Mailboxes") {
+        let mut rest = mailboxes_ws;
+        while let Some(row_start) = rest.find("<Row>") {
+            let after_row = &rest[row_start..];
+            if let Some(row_end) = after_row.find("</Row>") {
+                let row_xml = &after_row[..row_end];
+                let cells = parse_xml_row(row_xml);
+                rest = &after_row[row_end + 6..];
+
+                if cells.len() >= 7 {
+                    let is_header = cells[0].eq_ignore_ascii_case("alias")
+                        || cells[1].eq_ignore_ascii_case("email");
+                    if is_header {
+                        continue;
+                    }
+
+                    let is_def = cells
+                        .get(7)
+                        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+                        .unwrap_or(false);
+                    let is_false_flag = cells
+                        .get(8)
+                        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
+                        .unwrap_or(false);
+                    let is_act = !is_false_flag;
+
+                    let input = EmailAccountInput {
+                        id: None,
+                        alias: cells[0].clone(),
+                        email: cells[1].clone(),
+                        password: None,
+                        smtp_host: cells[2].clone(),
+                        smtp_port: cells[3].parse::<u16>().unwrap_or(587),
+                        imap_host: cells[4].clone(),
+                        imap_port: cells[5].parse::<u16>().unwrap_or(993),
+                        encryption_type: cells[6].clone(),
+                        is_default: is_def,
+                        is_active: is_act,
+                    };
+
+                    let email_name = cells[1].clone();
+                    if let Ok(_) = email_vault_db::upsert_email_account(input) {
+                        summary.accounts_imported += 1;
+                    } else {
+                        summary
+                            .errors
+                            .push(format!("Failed to import account '{}'", email_name));
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    // 2. Process Recipients Worksheet
+    if let Some(recipients_ws) = extract_worksheet(payload, "Recipients") {
+        let mut rest = recipients_ws;
+        while let Some(row_start) = rest.find("<Row>") {
+            let after_row = &rest[row_start..];
+            if let Some(row_end) = after_row.find("</Row>") {
+                let row_xml = &after_row[..row_end];
+                let cells = parse_xml_row(row_xml);
+                rest = &after_row[row_end + 6..];
+
+                if cells.len() >= 2 {
+                    let is_header = cells[0].eq_ignore_ascii_case("email")
+                        || cells[1].eq_ignore_ascii_case("group");
+                    if is_header {
+                        continue;
+                    }
+
+                    let is_false_flag = cells
+                        .get(2)
+                        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
+                        .unwrap_or(false);
+                    let is_act = !is_false_flag;
+
+                    let input = NotifyRecipientInput {
+                        email: cells[0].clone(),
+                        group_name: Some(cells[1].clone()),
+                        is_active: Some(is_act),
+                    };
+
+                    if let Ok(_) = email_vault_db::add_notify_recipient(input) {
+                        summary.recipients_imported += 1;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    Ok(summary)
+}
+
 /// Backup email_vault.db to target path
 pub fn backup_vault_db(target_path: &Path) -> Result<(), String> {
     let source_path = email_vault_db::get_email_vault_db_path()?;
@@ -340,5 +493,24 @@ mod tests {
     fn test_escape_csv_field() {
         assert_eq!(escape_csv_field("simple"), "simple");
         assert_eq!(escape_csv_field("has,comma"), "\"has,comma\"");
+    }
+
+    #[test]
+    fn test_unescape_xml() {
+        assert_eq!(unescape_xml("a &amp; b &lt; c &gt; d"), "a & b < c > d");
+    }
+
+    #[test]
+    fn test_parse_xml_row() {
+        let row = r#"   <Row>
+    <Cell><Data ss:Type="String">Alias &amp; Name</Data></Cell>
+    <Cell><Data ss:Type="String">test@example.com</Data></Cell>
+    <Cell><Data ss:Type="Number">587</Data></Cell>
+   </Row>"#;
+        let cells = parse_xml_row(row);
+        assert_eq!(cells.len(), 3);
+        assert_eq!(cells[0], "Alias & Name");
+        assert_eq!(cells[1], "test@example.com");
+        assert_eq!(cells[2], "587");
     }
 }
