@@ -1,9 +1,9 @@
 # Root Cause Analysis (RCA): Rust Test Isolation & Spec Alignment (#14)
 
-**File Path:** `.ai-memory/cicd-issues/14-rust-tests-isolation-and-spec-alignment-rca.md`  
-**Run ID:** [35250711335](https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/35250711335)  
-**Branch:** `main` / `release/v4.16.0`  
-**Date:** 2026-09-18  
+**File Path:** `.ai-memory/cicd-issues/14-rust-tests-isolation-and-spec-alignment-rca.md`
+**Run ID:** [35250711335](https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/35250711335)
+**Branch:** `main` / `release/v4.16.0`
+**Date:** 2026-09-18
 
 ---
 

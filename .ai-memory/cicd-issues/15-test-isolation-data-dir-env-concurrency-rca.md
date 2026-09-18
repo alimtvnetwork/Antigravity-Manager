@@ -1,9 +1,9 @@
 # Root Cause Analysis (RCA): Test Isolation, Data Dir Concurrency & Canonical DTO Alignment (#15)
 
-**File Path:** `.ai-memory/cicd-issues/15-test-isolation-data-dir-env-concurrency-rca.md`  
-**Run ID:** [35252566143](https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/35252566143)  
-**Branch:** `main` / `release/v4.16.0`  
-**Date:** 2026-09-18  
+**File Path:** `.ai-memory/cicd-issues/15-test-isolation-data-dir-env-concurrency-rca.md`
+**Run ID:** [35252566143](https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/35252566143)
+**Branch:** `main` / `release/v4.16.0`
+**Date:** 2026-09-18
 
 ---
 

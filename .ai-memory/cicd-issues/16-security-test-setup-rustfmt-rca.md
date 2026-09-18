@@ -15,7 +15,7 @@ In GitHub Actions CI pipeline [#35259953276](https://github.com/alimtvnetwork/An
 ```text
 Diff in src-tauri/src/proxy/tests/security_integration_tests.rs:12:
      use std::time::Duration;
- 
+
      /// 辅助函数：初始化测试并加锁隔离
 -    fn setup_test() -> (std::sync::MutexGuard<'static, ()>, std::sync::MutexGuard<'static, ()>) {
 +    fn setup_test() -> (
@@ -25,7 +25,7 @@ Diff in src-tauri/src/proxy/tests/security_integration_tests.rs:12:
 
 Diff in src-tauri/src/proxy/tests/security_integration_tests.rs:363:
      use std::time::{Duration, Instant};
- 
+
      /// 辅助函数：初始化测试并加锁隔离
 -    fn setup_test() -> (std::sync::MutexGuard<'static, ()>, std::sync::MutexGuard<'static, ()>) {
 +    fn setup_test() -> (
@@ -35,7 +35,7 @@ Diff in src-tauri/src/proxy/tests/security_integration_tests.rs:363:
 
 Diff in src-tauri/src/proxy/tests/security_ip_tests.rs:27:
      }
- 
+
      /// 辅助函数：初始化测试并加锁隔离
 -    fn setup_test() -> (std::sync::MutexGuard<'static, ()>, std::sync::MutexGuard<'static, ()>) {
 +    fn setup_test() -> (

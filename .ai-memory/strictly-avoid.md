@@ -364,4 +364,3 @@ Allowed work:
 - ✅ `{condition ? ( <div>...</div> ) : null}`
 
 **Why:** Causes `TS1005: '}' expected` and `TS1381: Unexpected token` during TypeScript compilation (`tsc && vite build`), breaking frontend and desktop CI/CD builds.
-
