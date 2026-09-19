@@ -14,12 +14,73 @@ import {
     Cpu,
     Pencil,
     FastForward,
+    Mail,
+    Clock,
+    Gem,
+    Diamond,
+    Circle,
 } from 'lucide-react';
+import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
+import { useAccountStore } from '../stores/useAccountStore';
 import { findBestRotationProfile, formatTimeAgo } from '../services/instanceService';
+import { findQuotaModel } from '../config/modelConfig';
+import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
+
+const INSTANCE_THEMES = [
+    {
+        name: 'Indigo',
+        accentBar: 'from-indigo-500 via-blue-500 to-indigo-600',
+        badge: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-400/30',
+        emailPill: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60',
+        dot: 'bg-indigo-500',
+    },
+    {
+        name: 'Emerald',
+        accentBar: 'from-emerald-500 via-teal-500 to-emerald-600',
+        badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-400/30',
+        emailPill: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+        dot: 'bg-emerald-500',
+    },
+    {
+        name: 'Purple',
+        accentBar: 'from-purple-500 via-fuchsia-500 to-purple-600',
+        badge: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-400/30',
+        emailPill: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60',
+        dot: 'bg-purple-500',
+    },
+    {
+        name: 'Amber',
+        accentBar: 'from-amber-500 via-yellow-500 to-orange-500',
+        badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-400/30',
+        emailPill: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+        dot: 'bg-amber-500',
+    },
+    {
+        name: 'Cyan',
+        accentBar: 'from-cyan-500 via-sky-500 to-blue-500',
+        badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-400/30',
+        emailPill: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/60',
+        dot: 'bg-cyan-500',
+    },
+    {
+        name: 'Rose',
+        accentBar: 'from-rose-500 via-pink-500 to-red-500',
+        badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-400/30',
+        emailPill: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+        dot: 'bg-rose-500',
+    },
+    {
+        name: 'Violet',
+        accentBar: 'from-violet-500 via-purple-500 to-indigo-500',
+        badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-400/30',
+        emailPill: 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60',
+        dot: 'bg-violet-500',
+    },
+];
 
 export default function Instances() {
     const { t } = useTranslation();
@@ -44,6 +105,13 @@ export default function Instances() {
         rotateToNextBestProfile,
     } = useInstanceStore();
 
+    const {
+        accounts,
+        currentAccount,
+        fetchAccounts,
+        refreshQuota,
+    } = useAccountStore();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState('');
@@ -57,12 +125,13 @@ export default function Instances() {
         if (!isTauri()) return;
         fetchInstances();
         fetchSwitcherStatus();
+        fetchAccounts();
         const timer = setInterval(() => {
             fetchInstances(true);
             fetchSwitcherStatus();
         }, 3000);
         return () => clearInterval(timer);
-    }, [fetchInstances, fetchSwitcherStatus]);
+    }, [fetchInstances, fetchSwitcherStatus, fetchAccounts]);
 
     const filteredInstances = instances.filter((inst) => {
         const query = searchQuery.toLowerCase();
@@ -342,63 +411,318 @@ export default function Instances() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {filteredInstances.map((inst) => {
+                    {filteredInstances.map((inst, index) => {
                         const isActive = inst.config.id === activeInstanceId;
+                        const theme = INSTANCE_THEMES[index % INSTANCE_THEMES.length];
+
+                        // Resolve bound account
+                        const boundAccount = accounts.find((a) => {
+                            if (inst.config.bound_account_id) {
+                                return a.id === inst.config.bound_account_id;
+                            }
+                            if (inst.config.bound_email) {
+                                return a.email.toLowerCase() === inst.config.bound_email.toLowerCase();
+                            }
+                            if (isActive) {
+                                if (currentAccount) {
+                                    return a.email.toLowerCase() === currentAccount.email.toLowerCase();
+                                }
+                            }
+                            return false;
+                        });
+
+                        const displayEmail = inst.config.bound_email || boundAccount?.email || (isActive && currentAccount ? currentAccount.email : null);
+
+                        const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+                        const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
+                        const geminiModel = geminiPro || geminiFlash;
+
                         return (
                             <div
                                 key={inst.config.id}
-                                className={`rounded-2xl border p-5 transition-all flex flex-col justify-between bg-white dark:bg-base-200 ${isActive ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20 shadow-xs'}`}
+                                className={cn(
+                                    "rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-base-200 overflow-hidden shadow-xs",
+                                    isActive
+                                        ? "border-blue-500 shadow-md ring-2 ring-blue-500/20"
+                                        : "border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20"
+                                )}
                             >
-                                {/* Card Top */}
-                                <div>
-                                    <div className="flex items-start justify-between gap-2 mb-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span
-                                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                            />
-                                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
-                                                {inst.config.name}
-                                            </h3>
-                                            {inst.config.is_default && (
-                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-base-100 text-gray-600 dark:text-gray-400 shrink-0">
-                                                    DEFAULT
+                                {/* Top Accent Bar identifying profile color */}
+                                <div className={cn("h-1.5 w-full bg-gradient-to-r", theme.accentBar)} />
+
+                                <div className="p-5 flex flex-col flex-1 justify-between">
+                                    {/* Card Top */}
+                                    <div>
+                                        <div className="flex items-start justify-between gap-2 mb-3">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span
+                                                    className={cn(
+                                                        "w-2.5 h-2.5 rounded-full shrink-0",
+                                                        inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
+                                                    )}
+                                                />
+                                                <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
+                                                    {inst.config.name}
+                                                </h3>
+                                                {inst.config.is_default ? (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-base-100 text-gray-600 dark:text-gray-400 shrink-0">
+                                                        DEFAULT
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <div className="shrink-0 flex items-center gap-1">
+                                                {isActive ? (
+                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                                        Active Target
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setActiveInstance(inst.config.id)}
+                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-1 cursor-pointer"
+                                                        title="Set as active instance for account switches"
+                                                    >
+                                                        Set Active
+                                                    </button>
+                                                )}
+                                                {/* Top Quick Actions: Edit, Duplicate, Delete */}
+                                                <button
+                                                    onClick={() => {
+                                                        setEditTargetId(inst.config.id);
+                                                        setEditInstanceName(inst.config.name);
+                                                    }}
+                                                    className="btn btn-ghost btn-xs p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                                                    title={t('instances.edit_title', 'Rename profile')}
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setCopyTargetId(inst.config.id);
+                                                        setCopyInstanceName(`${inst.config.name} Copy`);
+                                                    }}
+                                                    className="btn btn-ghost btn-xs p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-100 cursor-pointer"
+                                                    title="Clone profile settings and extensions"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                </button>
+                                                {inst.config.is_default ? null : (
+                                                    <button
+                                                        onClick={() => handleDelete(inst.config.id)}
+                                                        disabled={inst.is_running}
+                                                        className="btn btn-ghost btn-xs p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
+                                                        title="Delete profile"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Bound Account / Email Section with distinct color pill */}
+                                        <div className="py-2 px-3 rounded-xl bg-gray-50/80 dark:bg-base-100/60 border border-gray-100 dark:border-base-100/80 mb-3 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                                <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                                <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
+                                                    Account:
                                                 </span>
+                                                {displayEmail ? (
+                                                    <span
+                                                        className={cn(
+                                                            "px-2 py-0.5 rounded-md text-xs font-semibold font-mono border flex items-center gap-1.5 truncate max-w-[210px] shadow-2xs",
+                                                            theme.emailPill
+                                                        )}
+                                                        title={displayEmail}
+                                                    >
+                                                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dot)} />
+                                                        <span className="truncate">{displayEmail}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 italic">
+                                                        Unassigned
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {boundAccount?.quota?.subscription_tier ? (() => {
+                                                const tier = boundAccount.quota.subscription_tier.toLowerCase();
+                                                if (tier.includes('ultra')) {
+                                                    return (
+                                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-bold shadow-xs shrink-0">
+                                                            <Gem className="w-2.5 h-2.5 fill-current" />
+                                                            ULTRA
+                                                        </span>
+                                                    );
+                                                }
+                                                if (tier.includes('pro')) {
+                                                    return (
+                                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-bold shadow-xs shrink-0">
+                                                            <Diamond className="w-2.5 h-2.5 fill-current" />
+                                                            PRO
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-white/10 shrink-0">
+                                                        <Circle className="w-2.5 h-2.5" />
+                                                        FREE
+                                                    </span>
+                                                );
+                                            })() : null}
+                                        </div>
+
+                                        {/* Colorful Gemini Quota Progress Bar Section */}
+                                        <div className="mb-3">
+                                            {geminiModel ? (() => {
+                                                const pct = Math.min(100, Math.max(0, geminiModel.percentage));
+                                                const getGradient = (percentage: number) => {
+                                                    if (percentage >= 50) return 'from-emerald-500 via-teal-400 to-emerald-400 shadow-emerald-500/20';
+                                                    if (percentage >= 20) return 'from-amber-500 via-yellow-400 to-orange-400 shadow-amber-500/20';
+                                                    return 'from-rose-500 via-red-500 to-pink-500 shadow-rose-500/20';
+                                                };
+                                                const getTextClass = (percentage: number) => {
+                                                    if (percentage >= 50) return 'text-emerald-600 dark:text-emerald-400';
+                                                    if (percentage >= 20) return 'text-amber-600 dark:text-amber-400';
+                                                    return 'text-rose-600 dark:text-rose-400';
+                                                };
+
+                                                return (
+                                                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50/90 to-blue-50/20 dark:from-base-100/60 dark:to-blue-950/10 border border-gray-200/70 dark:border-base-100 space-y-2">
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Gemini.Color className="w-4 h-4 shrink-0" />
+                                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs">
+                                                                    {geminiModel.display_name || 'Gemini 3.1 Pro'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {geminiModel.reset_time ? (
+                                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1 font-mono" title={`Resets in ${formatTimeRemaining(geminiModel.reset_time)}`}>
+                                                                        <Clock className="w-3 h-3 text-gray-400" />
+                                                                        {formatTimeRemaining(geminiModel.reset_time)}
+                                                                    </span>
+                                                                ) : null}
+                                                                <span className={cn("font-mono font-bold text-xs px-1.5 py-0.5 rounded-md bg-white dark:bg-base-200 shadow-2xs border border-gray-100 dark:border-base-100", getTextClass(pct))}>
+                                                                    {pct}%
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Progress bar with glowing animated gradient */}
+                                                        <div className="h-2.5 w-full bg-gray-200/90 dark:bg-base-200 rounded-full overflow-hidden p-0.5 relative shadow-inner">
+                                                            <div
+                                                                className={cn(
+                                                                    "h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out shadow-xs",
+                                                                    getGradient(pct)
+                                                                )}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })() : boundAccount ? (
+                                                <div className="p-2.5 rounded-xl bg-gray-50/60 dark:bg-base-100/40 border border-gray-100 dark:border-base-100 flex items-center justify-between text-xs text-gray-500">
+                                                    <div className="flex items-center gap-2">
+                                                        <Gemini.Color className="w-4 h-4 shrink-0 opacity-70" />
+                                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Gemini quota not synced</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => refreshQuota(boundAccount.id)}
+                                                        className="btn btn-ghost btn-xs text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer"
+                                                    >
+                                                        <RotateCw className="w-3 h-3" />
+                                                        <span>Sync</span>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="p-2.5 rounded-xl bg-gray-50/40 dark:bg-base-100/20 border border-dashed border-gray-200 dark:border-base-100 flex items-center justify-between text-xs text-gray-400">
+                                                    <div className="flex items-center gap-2">
+                                                        <Gemini.Color className="w-4 h-4 shrink-0 opacity-40 grayscale" />
+                                                        <span className="text-[11px] italic">Gemini Quota (No profile bound)</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400/80">Launch to assign</span>
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="shrink-0 flex items-center gap-1">
-                                            {isActive ? (
-                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                                                    Active Target
+
+                                        {/* Status and Profile details */}
+                                        <div className="space-y-1.5 text-xs py-2 border-t border-gray-100 dark:border-base-100 text-gray-600 dark:text-gray-400">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-400">Status:</span>
+                                                <span className={cn("font-medium", inst.is_running ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-gray-500")}>
+                                                    {inst.is_running ? `Running (PID: ${inst.pid})` : 'Idle'}
                                                 </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-400">Profile ID:</span>
+                                                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[170px]">
+                                                    {inst.config.id}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate pt-0.5" title={inst.config.data_dir}>
+                                                <Folder className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">{inst.config.data_dir}</span>
+                                            </div>
+                                            {inst.config.executable_path ? (
+                                                <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
+                                                    <Cpu className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    {/* Card Actions */}
+                                    <div className="pt-3 border-t border-gray-100 dark:border-base-100 flex items-center justify-between gap-1.5 mt-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            {inst.is_running ? (
+                                                <button
+                                                    onClick={() => closeInstance(inst.config.id)}
+                                                    className="btn btn-xs btn-error btn-outline gap-1 cursor-pointer"
+                                                    title="Gracefully close this instance window"
+                                                >
+                                                    <Square className="w-3 h-3" />
+                                                    <span>Close</span>
+                                                </button>
                                             ) : (
                                                 <button
-                                                    onClick={() => setActiveInstance(inst.config.id)}
-                                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-1 cursor-pointer"
-                                                    title="Set as active instance for account switches"
+                                                    onClick={() => handleLaunch(inst.config.id)}
+                                                    className="btn btn-xs btn-primary gap-1 shadow-xs cursor-pointer"
+                                                    title="Launch instance window"
                                                 >
-                                                    Set Active
+                                                    <Play className="w-3 h-3" />
+                                                    <span>Launch</span>
                                                 </button>
                                             )}
-                                            {/* Top Quick Actions: Edit, Duplicate, Delete */}
+                                            {/* Double Play Button with Candidate Tooltip */}
+                                            {(() => {
+                                                const candidate = findBestRotationProfile(instances, inst.config.id);
+                                                const tooltip = candidate
+                                                    ? `Double Play: Switch & launch ${candidate.config.name} (Last used: ${formatTimeAgo(candidate.config.last_used)})`
+                                                    : 'Double Play: No idle profile available';
+                                                return (
+                                                    <button
+                                                        disabled={!candidate}
+                                                        onClick={async () => {
+                                                            try {
+                                                                const rotated = await rotateToNextBestProfile(inst.config.id);
+                                                                alert(`Rotated to profile: ${rotated.config.name}`);
+                                                            } catch (e: any) {
+                                                                setActionError(e?.toString() || 'Rotation failed');
+                                                            }
+                                                        }}
+                                                        className="btn btn-xs btn-primary btn-outline gap-1 disabled:opacity-40 cursor-pointer"
+                                                        title={tooltip}
+                                                    >
+                                                        <FastForward className="w-3 h-3" />
+                                                        <span>Double Play</span>
+                                                    </button>
+                                                );
+                                            })()}
                                             <button
-                                                onClick={() => {
-                                                    setEditTargetId(inst.config.id);
-                                                    setEditInstanceName(inst.config.name);
-                                                }}
-                                                className="btn btn-ghost btn-xs p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
-                                                title={t('instances.edit_title', 'Rename profile')}
+                                                onClick={() => handleCloneExecutable(inst.config.id)}
+                                                className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400 cursor-pointer"
+                                                title="Clone executable binary for this profile"
                                             >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setCopyTargetId(inst.config.id);
-                                                    setCopyInstanceName(`${inst.config.name} Copy`);
-                                                }}
-                                                className="btn btn-ghost btn-xs p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-100 cursor-pointer"
-                                                title="Clone profile settings and extensions"
-                                            >
-                                                <Copy className="w-3.5 h-3.5" />
+                                                <Cpu className="w-3.5 h-3.5" />
                                             </button>
                                             {inst.config.is_default ? null : (
                                                 <button
@@ -410,104 +734,15 @@ export default function Instances() {
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
-                                        </div>
-                                    </div>
-
-                                    {/* Status details */}
-                                    <div className="space-y-2 text-xs py-2 border-y border-gray-100 dark:border-base-100 text-gray-600 dark:text-gray-400">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-400">Status:</span>
-                                            <span className={`font-medium ${inst.is_running ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>
-                                                {inst.is_running ? `Running (PID: ${inst.pid})` : 'Idle'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-400">Bound Account:</span>
-                                            <span className="font-medium text-gray-900 dark:text-gray-200 truncate max-w-[170px]" title={inst.config.bound_email || 'None'}>
-                                                {inst.config.bound_email || 'Unassigned'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-400">Profile ID:</span>
-                                            <span className="font-mono text-[11px] text-gray-500 truncate max-w-[170px]">
-                                                {inst.config.id}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate pt-1" title={inst.config.data_dir}>
-                                            <Folder className="w-3.5 h-3.5 shrink-0" />
-                                            <span className="truncate">{inst.config.data_dir}</span>
-                                        </div>
-                                        {inst.config.executable_path ? (
-                                            <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
-                                                <Cpu className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </div>
-
-                                {/* Card Actions */}
-                                <div className="pt-4 flex items-center justify-between gap-1.5">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        {inst.is_running ? (
                                             <button
-                                                onClick={() => closeInstance(inst.config.id)}
-                                                className="btn btn-xs btn-error btn-outline gap-1 cursor-pointer"
-                                                title="Gracefully close this instance window"
+                                                onClick={() => handleWipeSession(inst.config.id)}
+                                                disabled={inst.is_running}
+                                                className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-30"
+                                                title="Wipe auth credentials (keep settings)"
                                             >
-                                                <Square className="w-3 h-3" />
-                                                <span>Close</span>
+                                                <RotateCcw className="w-3.5 h-3.5" />
                                             </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleLaunch(inst.config.id)}
-                                                className="btn btn-xs btn-primary gap-1 shadow-xs cursor-pointer"
-                                                title="Launch instance window"
-                                            >
-                                                <Play className="w-3 h-3" />
-                                                <span>Launch</span>
-                                            </button>
-                                        )}
-                                        {/* Double Play Button with Candidate Tooltip */}
-                                        {(() => {
-                                            const candidate = findBestRotationProfile(instances, inst.config.id);
-                                            const tooltip = candidate
-                                                ? `Double Play: Switch & launch ${candidate.config.name} (Last used: ${formatTimeAgo(candidate.config.last_used)})`
-                                                : 'Double Play: No idle profile available';
-                                            return (
-                                                <button
-                                                    disabled={!candidate}
-                                                    onClick={async () => {
-                                                        try {
-                                                            const rotated = await rotateToNextBestProfile(inst.config.id);
-                                                            alert(`Rotated to profile: ${rotated.config.name}`);
-                                                        } catch (e: any) {
-                                                            setActionError(e?.toString() || 'Rotation failed');
-                                                        }
-                                                    }}
-                                                    className="btn btn-xs btn-primary btn-outline gap-1 disabled:opacity-40 cursor-pointer"
-                                                    title={tooltip}
-                                                >
-                                                    <FastForward className="w-3 h-3" />
-                                                    <span>Double Play</span>
-                                                </button>
-                                            );
-                                        })()}
-                                        <button
-                                            onClick={() => handleCloneExecutable(inst.config.id)}
-                                            className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400 cursor-pointer"
-                                            title="Clone executable binary for this profile"
-                                        >
-                                            <Cpu className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleWipeSession(inst.config.id)}
-                                            disabled={inst.is_running}
-                                            className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-30"
-                                            title="Wipe auth credentials (keep settings)"
-                                        >
-                                            <RotateCcw className="w-3.5 h-3.5" />
-                                        </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

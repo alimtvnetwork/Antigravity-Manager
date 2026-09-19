@@ -8,6 +8,7 @@ import { QuotaItem } from './QuotaItem';
 import { MODEL_CONFIG, sortModels, getModelProtectionKey, resolveQuotaModels, ensurePinnedImageSelector } from '../../config/modelConfig';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
+import { useInstanceStore } from '../../stores/useInstanceStore';
 
 interface AccountCardProps {
     account: Account;
@@ -40,8 +41,14 @@ const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
 function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountCardProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
+    const { instances } = useInstanceStore();
     const isDisabled = Boolean(account.disabled);
     const validationBlockedLabel = getValidationBlockedStatusLabel(account.validation_blocked_reason, t);
+
+    const boundInstance = instances.find(
+        (i) => i.config.bound_account_id === account.id ||
+            (i.config.bound_email && i.config.bound_email.toLowerCase() === account.email.toLowerCase())
+    );
 
     // 自定义标签编辑状态
     const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -249,6 +256,19 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
                                     <Tag className="w-2.5 h-2.5" />
                                     {account.custom_label}
+                                </span>
+                            )}
+                            {/* 绑定实例徽章 */}
+                            {boundInstance && (
+                                <span
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-800/50 cursor-default"
+                                    title={`Bound to profile: ${boundInstance.config.name}`}
+                                >
+                                    <span className={cn(
+                                        "w-1.5 h-1.5 rounded-full shrink-0",
+                                        boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
+                                    )} />
+                                    <span>{boundInstance.config.name}</span>
                                 </span>
                             )}
                         </div>
