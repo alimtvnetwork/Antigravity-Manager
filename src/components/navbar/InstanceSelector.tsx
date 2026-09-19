@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Copy, Plus, Check, Laptop, Pencil } from 'lucide-react';
+import { ChevronDown, Copy, Plus, Check, Laptop, Pencil, Play, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { isTauri } from '../../utils/env';
+import { showToast } from '../common/ToastContainer';
 
 export function InstanceSelector() {
     const { t } = useTranslation();
@@ -14,6 +15,8 @@ export function InstanceSelector() {
         createInstance,
         copyInstance,
         renameInstance,
+        launchInstance,
+        closeInstance,
     } = useInstanceStore();
 
     const [isOpen, setIsOpen] = useState(false);
@@ -24,6 +27,7 @@ export function InstanceSelector() {
     const [copyInstanceName, setCopyInstanceName] = useState('');
     const [editInstanceName, setEditInstanceName] = useState('');
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
+    const [launchingId, setLaunchingId] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -81,6 +85,24 @@ export function InstanceSelector() {
         }
     };
 
+    const handleToggleLaunch = async (instanceId: string, isRunning: boolean) => {
+        setLaunchingId(instanceId);
+        try {
+            if (isRunning) {
+                await closeInstance(instanceId);
+                showToast(t('instances.closed_toast', 'Instance window closed'), 'info');
+            } else {
+                await launchInstance(instanceId);
+                showToast(t('instances.launched_toast', 'Instance launched successfully'), 'success');
+            }
+        } catch (e: any) {
+            console.error('Failed to toggle instance:', e);
+            showToast(t('instances.launch_error', 'Failed to launch instance: ') + (e?.message || e), 'error');
+        } finally {
+            setLaunchingId(null);
+        }
+    };
+
     if (!isTauri()) return null;
 
     return (
@@ -88,7 +110,7 @@ export function InstanceSelector() {
             {/* Instance Dropdown Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors border border-gray-200/60 dark:border-base-100 shrink-0"
+                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors border border-gray-200/60 dark:border-base-100 shrink-0 cursor-pointer"
                 title={t('instances.selector_tooltip', 'Select active Antigravity instance')}
             >
                 <span
@@ -98,6 +120,33 @@ export function InstanceSelector() {
                     {activeInstance?.config.name || 'Default'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+            </button>
+
+            {/* Quick Run / Stop Button */}
+            <button
+                type="button"
+                disabled={launchingId === activeInstance?.config.id}
+                onClick={() => {
+                    if (activeInstance) {
+                        handleToggleLaunch(activeInstance.config.id, Boolean(activeInstance.is_running));
+                    }
+                }}
+                className={`p-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                    activeInstance?.is_running
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 border border-emerald-200 dark:border-emerald-800'
+                        : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs hover:scale-105 active:scale-95'
+                }`}
+                title={
+                    activeInstance?.is_running
+                        ? t('instances.running_tooltip', 'Instance is running. Click to close window.')
+                        : t('instances.run_tooltip', 'Run this instance profile in Antigravity IDE')
+                }
+            >
+                {activeInstance?.is_running ? (
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                ) : (
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                )}
             </button>
 
             {/* Quick Edit Button */}
@@ -176,13 +225,37 @@ export function InstanceSelector() {
                                     <div className="flex items-center gap-1 shrink-0 ml-1.5">
                                         <button
                                             type="button"
+                                            disabled={launchingId === inst.config.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleToggleLaunch(inst.config.id, Boolean(inst.is_running));
+                                            }}
+                                            className={`p-1 rounded transition-colors cursor-pointer ${
+                                                inst.is_running
+                                                    ? 'text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40'
+                                                    : 'text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                                            }`}
+                                            title={
+                                                inst.is_running
+                                                    ? t('instances.close_title', 'Close instance window')
+                                                    : t('instances.launch_title', 'Run instance window')
+                                            }
+                                        >
+                                            {inst.is_running ? (
+                                                <Square className="w-3 h-3 fill-current" />
+                                            ) : (
+                                                <Play className="w-3 h-3 fill-current" />
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setEditTargetId(inst.config.id);
                                                 setEditInstanceName(inst.config.name);
                                                 setIsEditOpen(true);
                                             }}
-                                            className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100"
+                                            className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer"
                                             title={t('instances.edit_title', 'Rename profile')}
                                         >
                                             <Pencil className="w-3 h-3" />
@@ -192,6 +265,36 @@ export function InstanceSelector() {
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* Launch Active Instance Footer Bar */}
+                    <div className="p-2 border-t border-gray-100 dark:border-base-100">
+                        <button
+                            type="button"
+                            disabled={launchingId === activeInstance?.config.id}
+                            onClick={() => {
+                                if (activeInstance) {
+                                    handleToggleLaunch(activeInstance.config.id, Boolean(activeInstance.is_running));
+                                }
+                            }}
+                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                activeInstance?.is_running
+                                    ? 'bg-red-50 dark:bg-red-950/30 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/40'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs hover:scale-[1.01]'
+                            }`}
+                        >
+                            {activeInstance?.is_running ? (
+                                <>
+                                    <Square className="w-3.5 h-3.5 fill-current" />
+                                    <span>{t('instances.close_active', 'Close Active Instance')}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Play className="w-3.5 h-3.5 fill-current" />
+                                    <span>{t('instances.run_active', 'Run Selected Profile')}</span>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             )}
