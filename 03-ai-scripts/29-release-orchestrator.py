@@ -455,7 +455,7 @@ def push_release(branch_name, tag_name, original_branch="main", dry_run=False):
     if notes_file.is_file():
         print(f"[*] Creating GitHub release for {tag_name}...")
         try:
-            run_cmd(["gh", "release", "create", tag_name, "--title", tag_name, "--notes-file", str(notes_file), "--generate-notes"])
+            run_cmd(["gh", "release", "create", tag_name, "--repo", "alimtvnetwork/Antigravity-Manager", "--title", tag_name, "--notes-file", str(notes_file)])
             print(f"[OK] GitHub release created successfully: {tag_name}")
         except Exception as e:
             print(f"[!] Warning: gh release create encountered: {e}")
