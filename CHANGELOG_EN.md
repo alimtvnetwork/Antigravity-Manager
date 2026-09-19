@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.24.0 (2026-09-19)**:
+        -   **[Email & UI Boundary Overhaul] Dedicated Email Setup Page, Navbar Dropdown Boundaries, and Dynamic Release Asset Discovery**:
+            -   **Dedicated Email Setup Page**: Added `/email` route, top-level `Email.tsx` view with active status badge, and surfaced `Email & Alerts` with `Mail` icon in main navigation.
+            -   **Navbar Dropdown Boundary Protection**: Added viewport boundary locks `max-w-[calc(100vw-32px)]` to both navigation and instance selector popovers, eliminating window overflow.
+            -   **Dynamic Release Asset Discovery**: Hardened `install.ps1` to query `/releases` array and dynamically pick the newest release with published binary assets.
+            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
     *   **v4.23.0 (2026-09-19)**:
         -   **[Installer & UI Overhaul] Direct EXE Setup Installation, Compact Top-Level Navbar Menu, and Instance Selector Boundary Protection**:
             -   **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.

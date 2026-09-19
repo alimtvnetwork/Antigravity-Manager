@@ -10,6 +10,7 @@ import ApiProxy from './pages/ApiProxy';
 import Monitor from './pages/Monitor';
 import TokenStats from './pages/TokenStats';
 import Security from './pages/Security';
+import Email from './pages/Email';
 import ThemeManager from './components/common/ThemeManager';
 import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
@@ -67,6 +68,10 @@ const router = createBrowserRouter([
       {
         path: 'security',
         element: <Security />,
+      },
+      {
+        path: 'email',
+        element: <Email />,
       },
       {
         path: 'settings',

@@ -52,6 +52,7 @@
     "call_records": "流量日誌",
     "security": "IP 管理",
     "security_logs": "IP 日志",
+    "email": "郵件與告警",
     "settings": "設定",
     "theme_to_dark": "切換到深色模式",
     "theme_to_light": "切換到淺色模式",

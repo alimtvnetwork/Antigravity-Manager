@@ -333,11 +333,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Installer & UI Overhaul] Direct EXE Setup Installation, Compact Top-Level Navbar Menu, and Instance Selector Boundary Protection**:\n"
-        f"            -   **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.\n"
-        f"            -   **Compact Top-Level Navbar & Middle Menu Button**: Replaced sprawling 10-tab navbar with core quick-jump pills (`Dashboard`, `Accounts`, `Instances`) and a dedicated 'Menu' button with popover dropdown for secondary pages.\n"
-        f"            -   **Instance Selector Boundary Protection**: Guaranteed `<InstanceSelector />` and settings controls remain 100% visible within window boundaries across all screen sizes with `shrink-0` constraints and optimized spacing.\n"
-        f"            -   **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
+        f"        -   **[Email & UI Boundary Overhaul] Dedicated Email Setup Page, Navbar Dropdown Boundaries, and Dynamic Release Asset Discovery**:\n"
+        f"            -   **Dedicated Email Setup Page**: Added `/email` route, top-level `Email.tsx` view with active status badge, and surfaced `Email & Alerts` with `Mail` icon in main navigation.\n"
+        f"            -   **Navbar Dropdown Boundary Protection**: Added viewport boundary locks `max-w-[calc(100vw-32px)]` to both navigation and instance selector popovers, eliminating window overflow.\n"
+        f"            -   **Dynamic Release Asset Discovery**: Hardened `install.ps1` to query `/releases` array and dynamically pick the newest release with published binary assets.\n"
+        f"            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     en_entry = zh_entry
 
@@ -383,10 +383,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.\n"
-        f"- **Compact Top-Level Navbar & Middle Menu Button**: Replaced sprawling 10-tab navbar with core quick-jump pills (`Dashboard`, `Accounts`, `Instances`) and a dedicated 'Menu' button with popover dropdown for secondary pages.\n"
-        f"- **Instance Selector Boundary Protection**: Guaranteed `<InstanceSelector />` and settings controls remain 100% visible within window boundaries across all screen sizes with `shrink-0` constraints and optimized spacing.\n"
-        f"- **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
+        f"- **Dedicated Email Setup Page**: Added `/email` route and standalone `Email.tsx` view, directly surfaced in top-level navigation as `Email & Alerts`.\n"
+        f"- **Navbar Dropdown Boundary Protection**: Constrained all navigation and instance selector popovers with `max-w-[calc(100vw-32px)]` to prevent clipping beyond screen boundaries.\n"
+        f"- **Dynamic Release Asset Discovery**: Hardened `install.ps1` to query `/releases` and dynamically select releases with verified uploaded assets, avoiding stale release downloads.\n"
+        f"- **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 

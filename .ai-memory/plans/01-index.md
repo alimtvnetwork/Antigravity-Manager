@@ -38,3 +38,4 @@ Master directory of architectural and execution plans.
 - [25-email-management-split-security-db-and-remote-control.md](completed/25-email-management-split-security-db-and-remote-control.md): Email dispatch, mailbox remote management, split security vault DB, and bidirectional remote control.
 - [26-installer-exe-and-compact-navbar-menu-ui.md](completed/26-installer-exe-and-compact-navbar-menu-ui.md): Direct EXE installation, compact navbar menu button, and instance selector boundary protection.
 - [27-single-menu-button-navbar-and-pure-exe-installer.md](completed/27-single-menu-button-navbar-and-pure-exe-installer.md): Single menu button navbar, space utilization, and pure EXE installer.
+- [28-email-setup-page-and-installer-hardening.md](completed/28-email-setup-page-and-installer-hardening.md): Dedicated Email setup page, navbar dropdown boundary locks, and installer asset resolution.

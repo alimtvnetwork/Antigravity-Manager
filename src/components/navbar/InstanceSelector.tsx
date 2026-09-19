@@ -110,7 +110,7 @@ export function InstanceSelector() {
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-64 rounded-xl shadow-xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-2 z-50 animate-in fade-in zoom-in-95">
+                <div className="absolute top-full right-0 mt-1.5 w-64 max-w-[calc(100vw-32px)] rounded-xl shadow-xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-2 z-50 animate-in fade-in zoom-in-95">
                     <div className="px-3 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                         {t('instances.title', 'Instances / Profiles')}
                     </div>

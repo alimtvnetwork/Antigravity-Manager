@@ -51,7 +51,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
             {/* 导航下拉菜单 */}
             {isMenuOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-white dark:bg-base-200 rounded-xl shadow-xl border border-gray-200 dark:border-base-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-base-200 rounded-xl shadow-xl border border-gray-200 dark:border-base-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
                     <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                         {t('common.navigation', 'Navigation')}
                     </div>

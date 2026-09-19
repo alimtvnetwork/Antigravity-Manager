@@ -55,6 +55,7 @@
     "token_stats": "Token 统计",
     "security": "IP 管理",
     "security_logs": "IP 日志",
+    "email": "邮件与告警",
     "settings": "设置",
     "theme_to_dark": "切换到深色模式",
     "theme_to_light": "切换到浅色模式",

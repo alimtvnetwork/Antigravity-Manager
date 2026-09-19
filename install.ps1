@@ -160,14 +160,26 @@ if ($TargetVersion) {
 } else {
     Write-Step "Discovering latest release version from GitHub..."
     $apiEndpoints = @(
+        "https://api.github.com/repos/$Repo/releases",
         "https://api.github.com/repos/$Repo/releases/latest",
+        "https://api.github.com/repos/$UpstreamRepo/releases",
         "https://api.github.com/repos/$UpstreamRepo/releases/latest"
     )
 
     foreach ($endpoint in $apiEndpoints) {
         try {
-            $releaseData = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 8
-            if ($releaseData -and $releaseData.tag_name) {
+            $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 8
+            if ($resp -is [System.Array] -and $resp.Count -gt 0) {
+                # Pick newest release that already has uploaded assets
+                $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
+                if (-not $candidate) { $candidate = $resp[0] }
+                if ($candidate -and $candidate.tag_name) {
+                    $releaseData = $candidate
+                    $TargetVersion = $releaseData.tag_name -replace "^v", ""
+                    break
+                }
+            } elseif ($resp -and $resp.tag_name) {
+                $releaseData = $resp
                 $TargetVersion = $releaseData.tag_name -replace "^v", ""
                 break
             }
@@ -187,7 +199,7 @@ if ($TargetVersion) {
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.23.0"
+        $TargetVersion = "4.24.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }
