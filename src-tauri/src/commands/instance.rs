@@ -17,6 +17,11 @@ pub fn copy_instance(source_id: String, target_name: String) -> Result<InstanceC
 }
 
 #[tauri::command]
+pub fn rename_instance(instance_id: String, new_name: String) -> Result<InstanceConfig, String> {
+    instance::rename_instance(&instance_id, new_name)
+}
+
+#[tauri::command]
 pub fn delete_instance(instance_id: String) -> Result<(), String> {
     instance::delete_instance(&instance_id)
 }

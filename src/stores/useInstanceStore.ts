@@ -21,6 +21,7 @@ interface InstanceState {
     triggerManualRotation: () => Promise<string>;
     createInstance: (name: string) => Promise<InstanceConfig>;
     copyInstance: (sourceId: string, targetName: string) => Promise<InstanceConfig>;
+    renameInstance: (instanceId: string, newName: string) => Promise<InstanceConfig>;
     deleteInstance: (instanceId: string) => Promise<void>;
     wipeSession: (instanceId: string) => Promise<void>;
     launchInstance: (instanceId: string) => Promise<void>;
@@ -109,6 +110,19 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             return config;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to copy instance' });
+            throw err;
+        }
+    },
+
+    renameInstance: async (instanceId: string, newName: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const config = await instanceService.renameInstance(instanceId, newName);
+            await get().fetchInstances();
+            set({ isLoading: false });
+            return config;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to rename instance' });
             throw err;
         }
     },

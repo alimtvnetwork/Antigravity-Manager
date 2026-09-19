@@ -33,6 +33,10 @@ export async function copyInstance(sourceId: string, targetName: string): Promis
     return await invoke('copy_instance', { sourceId, targetName });
 }
 
+export async function renameInstance(instanceId: string, newName: string): Promise<InstanceConfig> {
+    return await invoke('rename_instance', { instanceId, newName });
+}
+
 export async function deleteInstance(instanceId: string): Promise<void> {
     return await invoke('delete_instance', { instanceId });
 }

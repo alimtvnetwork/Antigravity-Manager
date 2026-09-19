@@ -47,6 +47,7 @@
   "nav": {
     "dashboard": "儀表板",
     "accounts": "帳號管理",
+    "instances": "多實例",
     "proxy": "API 反向代理",
     "token_stats": "統計",
     "call_records": "流量日誌",
@@ -79,6 +80,28 @@
     "switch_to_malay": "切換到馬來語",
     "switch_to_malay_short": "MY",
     "user_token": "用戶 Token"
+  },
+  "instances": {
+    "title": "多實例配置",
+    "page_title": "多實例管理",
+    "page_desc": "在同一系統中並行運行多個 Antigravity 視窗，憑據與外掛完全隔離",
+    "running_summary": "運行中: {{running}} / {{total}}",
+    "create_btn": "新建實例",
+    "create_modal_title": "建立新實例配置",
+    "name_placeholder": "配置名稱（如：個人工作、客戶專案）",
+    "copy_modal_title": "複製實例配置",
+    "copy_placeholder": "新配置名稱",
+    "duplicate": "複製",
+    "edit_modal_title": "重命名實例配置",
+    "edit_modal_desc": "更新此隔離實例配置的顯示名稱。",
+    "edit_current": "重命名當前實例配置",
+    "edit_title": "重命名配置",
+    "edit_placeholder": "新配置名稱",
+    "search_placeholder": "搜尋配置名稱、ID 或綁定帳號...",
+    "auto_switcher_active": "自動配額輪換運行中",
+    "rotate_next_best": "立即輪換至最佳實例",
+    "confirm_delete": "確定要刪除此實例配置嗎？",
+    "confirm_wipe": "確定清除此實例的登入憑據嗎？偏好設定與擴充功能將被保留。"
   },
   "dashboard": {
     "hello": "你好, 使用者 👋",

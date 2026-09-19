@@ -12,6 +12,7 @@ import {
     Search,
     AlertCircle,
     Cpu,
+    Pencil,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
@@ -31,6 +32,7 @@ export default function Instances() {
         triggerManualRotation,
         createInstance,
         copyInstance,
+        renameInstance,
         deleteInstance,
         wipeSession,
         launchInstance,
@@ -44,6 +46,8 @@ export default function Instances() {
     const [newInstanceName, setNewInstanceName] = useState('');
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [copyInstanceName, setCopyInstanceName] = useState('');
+    const [editTargetId, setEditTargetId] = useState<string | null>(null);
+    const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -91,6 +95,18 @@ export default function Instances() {
             setCopyTargetId(null);
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to copy instance');
+        }
+    };
+
+    const handleEdit = async () => {
+        if (!editTargetId || !editInstanceName.trim()) return;
+        setActionError(null);
+        try {
+            await renameInstance(editTargetId, editInstanceName.trim());
+            setEditInstanceName('');
+            setEditTargetId(null);
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to rename instance');
         }
     };
 
@@ -426,6 +442,16 @@ export default function Instances() {
                                         </button>
                                         <button
                                             onClick={() => {
+                                                setEditTargetId(inst.config.id);
+                                                setEditInstanceName(inst.config.name);
+                                            }}
+                                            className="btn btn-xs btn-ghost text-blue-600 dark:text-blue-400"
+                                            title={t('instances.edit_title', 'Rename profile')}
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => {
                                                 setCopyTargetId(inst.config.id);
                                                 setCopyInstanceName(`${inst.config.name} Copy`);
                                             }}
@@ -537,6 +563,47 @@ export default function Instances() {
                                 className="btn btn-primary btn-sm"
                             >
                                 {t('instances.duplicate', 'Duplicate')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Modal */}
+            {editTargetId && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
+                        <div className="flex items-center gap-2.5 mb-4">
+                            <Pencil className="w-5 h-5 text-blue-600" />
+                            <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                {t('instances.edit_modal_title', 'Rename Profile')}
+                            </h3>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                            {t('instances.edit_modal_desc', 'Update display name for this isolated instance profile.')}
+                        </p>
+                        <input
+                            type="text"
+                            placeholder={t('instances.edit_placeholder', 'New profile name')}
+                            value={editInstanceName}
+                            onChange={(e) => setEditInstanceName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-5 text-sm"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2.5">
+                            <button
+                                onClick={() => setEditTargetId(null)}
+                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
+                            >
+                                {t('common.cancel', 'Cancel')}
+                            </button>
+                            <button
+                                onClick={handleEdit}
+                                disabled={!editInstanceName.trim()}
+                                className="btn btn-primary btn-sm"
+                            >
+                                {t('common.save', 'Save')}
                             </button>
                         </div>
                     </div>

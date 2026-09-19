@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.26.0 (2026-09-19)**:
+        -   **[Instance Profile Management] In-Place Profile Rename & Navbar Quick Actions**:
+            -   **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.
+            -   **Navbar Quick Rename**: Added quick edit button and dropdown inline rename controls in `InstanceSelector.tsx` for seamless profile management.
+            -   **Instances Management Page**: Added profile rename modal and card action button in `Instances.tsx`.
+            -   **Full Trilingual Localization**: Added complete translations across English (`en`), Simplified Chinese (`zh`), and Traditional Chinese (`zh-TW`).
+            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
     *   **v4.25.0 (2026-09-19)**:
         -   **[UI & Z-Index Layering Overhaul] Eliminate Toolbar Hover Collision and Elevate Navbar Stacking Context**:
             -   **Eliminate Rogue Z-Index on Add Account**: Removed `relative z-[100]` on Add Account button in `AddAccountDialog.tsx` that previously bled through and blocked hover on the Instance dropdown menu.

@@ -13,7 +13,6 @@
 ```text
 is it done properly?
 
-
 Couple of problems. Uh, first of all, the zip file that you, uh, add to the installation, that really does not work. Um, so that needs to fix actually. So probably you need to look into the installer script. Installer works. Now, the installer script, uh, should actually install the, the EXE rather than the zip. I think we should execute the zip. But we, we have to discuss about the zip later. So let's fix the installation part, part first. And you didn't fix the UI issue for the, for the instance. I actually asked you several times. The instance I cannot see that it's outside of the window. I can look into that. You didn't fix the UI issues. The UI looks much compact now, but I, I do think that you should utilize the space in between a little bit more and make the top level UI more compact. Uh, middle, too many options. Uh, let's, let's make it a menu button. Okay, make these fixes please, and make a release
 ```
 

@@ -311,11 +311,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
                 new_section_marker = "## 🔄 What's New\n\n"
                 new_entry = (
                     f"- **v{next_version}** ({today_str}):\n"
-                    f"  - **Auto-Switch 15% Quota Threshold**: Auto-switching triggers when remaining credits drop below 15% to maximize quota utilization.\n"
-                    f"  - **Split Repo DB & Active Prompt Backup**: Backs up and restores active prompts across workspace switches via dedicated SQLite storage.\n"
-                    f"  - **Account Rotation API & IPC**: Added `/admin/rotate` endpoint and IPC commands for running projects and active prompts.\n"
-                    f"  - **Hardened Ubuntu Process Termination**: Guaranteed clean workspace directory release with SIGKILL process cleanup.\n"
-                    f"  - **Repository Architecture Migration**: Migrated workspace structure to `.ai-memory` and `02-spec` with 100% rustfmt compliance.\n"
+                    f"  - **Instance Profile Edit & Rename**: Added in-place rename capability for isolated instance profiles directly from the top navigation dropdown and Instances page.\n"
+                    f"  - **Top Bar Quick Rename Action**: Direct edit pencil button on top navbar instance selector to instantly rename the currently active profile.\n"
+                    f"  - **Dropdown Inline Action Bar**: Enhanced instance profile items in the selector dropdown with dedicated rename action buttons.\n"
+                    f"  - **Multi-Language Support**: Full localization for instance renaming across English, Simplified Chinese, and Traditional Chinese.\n"
+                    f"  - **Verified Quality Gates**: Validated all repository quality gates and cross-platform CI compliance with zero bypasses.\n"
                 )
                 if f"- **v{next_version}**" not in rm_content:
                     rm_content = rm_content.replace(new_section_marker, new_section_marker + new_entry, 1)
@@ -333,9 +333,11 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[UI & Z-Index Layering Overhaul] Eliminate Toolbar Hover Collision and Elevate Navbar Stacking Context**:\n"
-        f"            -   **Eliminate Rogue Z-Index on Add Account**: Removed `relative z-[100]` on Add Account button in `AddAccountDialog.tsx` that previously bled through and blocked hover on the Instance dropdown menu.\n"
-        f"            -   **Navbar Stacking Layer Elevation**: Elevated sticky navbar to `zIndex: 60` and ensured all dropdown menus (`LanguageDropdown`, `MoreDropdown`, `InstanceSelector`, `NavMenu`) are permanently above page body content.\n"
+        f"        -   **[Instance Profile Management] In-Place Profile Rename & Navbar Quick Actions**:\n"
+        f"            -   **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.\n"
+        f"            -   **Navbar Quick Rename**: Added quick edit button and dropdown inline rename controls in `InstanceSelector.tsx` for seamless profile management.\n"
+        f"            -   **Instances Management Page**: Added profile rename modal and card action button in `Instances.tsx`.\n"
+        f"            -   **Full Trilingual Localization**: Added complete translations across English (`en`), Simplified Chinese (`zh`), and Traditional Chinese (`zh-TW`).\n"
         f"            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     en_entry = zh_entry
@@ -382,9 +384,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Eliminate Toolbar Rogue Z-Index**: Removed `relative z-[100]` on the Add Account trigger button in `AddAccountDialog.tsx`, fixing the UI issue where the button poked through and intercepted hover over the active instance profile menu.\n"
-        f"- **Navbar Stacking Context Elevation**: Raised navbar sticky container to `zIndex: 60`, ensuring all top-bar menus layer cleanly over page body elements.\n"
-        f"- **Navbar Dropdown Hardening**: Applied `z-50` and viewport width constraints across all navbar popover menus (`LanguageDropdown`, `MoreDropdown`, `InstanceSelector`, `NavMenu`).\n"
+        f"- **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.\n"
+        f"- **Navbar Quick Rename**: Added quick edit button and dropdown inline rename controls in `InstanceSelector.tsx` for seamless profile management.\n"
+        f"- **Instances Management Page**: Added profile rename modal and card action button in `Instances.tsx`.\n"
+        f"- **Full Trilingual Localization**: Added complete translations across English (`en`), Simplified Chinese (`zh`), and Traditional Chinese (`zh-TW`).\n"
         f"- **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")

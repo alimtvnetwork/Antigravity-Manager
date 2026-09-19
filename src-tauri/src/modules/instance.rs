@@ -270,6 +270,27 @@ pub fn copy_instance(source_id: &str, target_name: String) -> Result<InstanceCon
     Ok(new_instance)
 }
 
+/// Rename an existing instance profile
+pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceConfig, String> {
+    let mut registry = load_registry()?;
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("Profile name cannot be empty".to_string());
+    }
+
+    let pos = registry
+        .instances
+        .iter()
+        .position(|i| i.id == instance_id)
+        .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+
+    registry.instances[pos].name = trimmed.to_string();
+    let updated = registry.instances[pos].clone();
+    save_registry(&registry)?;
+
+    Ok(updated)
+}
+
 /// Helper function to copy directories recursively
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {

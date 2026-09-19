@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Copy, Plus, Check, Laptop } from 'lucide-react';
+import { ChevronDown, Copy, Plus, Check, Laptop, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { isTauri } from '../../utils/env';
@@ -13,13 +13,17 @@ export function InstanceSelector() {
         setActiveInstance,
         createInstance,
         copyInstance,
+        renameInstance,
     } = useInstanceStore();
 
     const [isOpen, setIsOpen] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isCopyOpen, setIsCopyOpen] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState('');
     const [copyInstanceName, setCopyInstanceName] = useState('');
+    const [editInstanceName, setEditInstanceName] = useState('');
+    const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -65,6 +69,18 @@ export function InstanceSelector() {
         }
     };
 
+    const handleEdit = async () => {
+        if (!editTargetId || !editInstanceName.trim()) return;
+        try {
+            await renameInstance(editTargetId, editInstanceName.trim());
+            setEditInstanceName('');
+            setEditTargetId(null);
+            setIsEditOpen(false);
+        } catch (e) {
+            console.error('Failed to rename instance:', e);
+        }
+    };
+
     if (!isTauri()) return null;
 
     return (
@@ -82,6 +98,21 @@ export function InstanceSelector() {
                     {activeInstance?.config.name || 'Default'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+            </button>
+
+            {/* Quick Edit Button */}
+            <button
+                onClick={() => {
+                    if (activeInstance) {
+                        setEditTargetId(activeInstance.config.id);
+                        setEditInstanceName(activeInstance.config.name);
+                        setIsEditOpen(true);
+                    }
+                }}
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0"
+                title={t('instances.edit_current', 'Rename current instance profile')}
+            >
+                <Pencil className="w-3.5 h-3.5" />
             </button>
 
             {/* Quick Copy Button */}
@@ -118,15 +149,18 @@ export function InstanceSelector() {
                         {instances.map((inst) => {
                             const isSelected = inst.config.id === activeInstanceId;
                             return (
-                                <button
+                                <div
                                     key={inst.config.id}
-                                    onClick={() => {
-                                        setActiveInstance(inst.config.id);
-                                        setIsOpen(false);
-                                    }}
-                                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-base-100 ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}
+                                    className={`w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-base-100 ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}
                                 >
-                                    <div className="flex items-center gap-2 truncate">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveInstance(inst.config.id);
+                                            setIsOpen(false);
+                                        }}
+                                        className="flex items-center gap-2 truncate flex-1 text-left"
+                                    >
                                         <span
                                             className={`w-2 h-2 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`}
                                         />
@@ -138,9 +172,24 @@ export function InstanceSelector() {
                                                 </span>
                                             )}
                                         </div>
+                                    </button>
+                                    <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditTargetId(inst.config.id);
+                                                setEditInstanceName(inst.config.name);
+                                                setIsEditOpen(true);
+                                            }}
+                                            className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100"
+                                            title={t('instances.edit_title', 'Rename profile')}
+                                        >
+                                            <Pencil className="w-3 h-3" />
+                                        </button>
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                                     </div>
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -217,6 +266,44 @@ export function InstanceSelector() {
                                 className="btn btn-primary btn-xs"
                             >
                                 {t('instances.duplicate', 'Duplicate')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Instance Modal */}
+            {isEditOpen && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-base-200 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-base-100">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Pencil className="w-5 h-5 text-blue-600" />
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                                {t('instances.edit_modal_title', 'Rename Profile')}
+                            </h3>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder={t('instances.edit_placeholder', 'Profile name')}
+                            value={editInstanceName}
+                            onChange={(e) => setEditInstanceName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+                            className="input input-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg mb-4 text-xs"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setIsEditOpen(false)}
+                                className="btn btn-ghost btn-xs text-gray-600 dark:text-gray-400"
+                            >
+                                {t('common.cancel', 'Cancel')}
+                            </button>
+                            <button
+                                onClick={handleEdit}
+                                disabled={!editInstanceName.trim()}
+                                className="btn btn-primary btn-xs"
+                            >
+                                {t('common.save', 'Save')}
                             </button>
                         </div>
                     </div>
