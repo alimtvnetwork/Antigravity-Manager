@@ -16,8 +16,7 @@ export function NavLogo() {
                 />
             </div>
 
-            {/* Hide when parent width < 200px */}
-            <span className="hidden @[200px]/logo:inline text-nowrap">{t('common.app_name', 'AGM by Alim')}</span>
+            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-base-content whitespace-nowrap">{t('common.app_name', 'AGM by Alim')}</span>
         </Link>
     );
 }

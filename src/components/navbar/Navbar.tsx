@@ -104,27 +104,27 @@ function Navbar() {
             {/* 窗口拖拽区域 - Tauri 专用 */}
             {isTauri() && (
                 <div
-                    className="absolute top-9 left-0 right-0 h-16"
+                    className="absolute top-9 left-0 right-0 h-14"
                     style={{ zIndex: 5, backgroundColor: 'rgba(0,0,0,0.001)' }}
                     data-tauri-drag-region
                 />
             )}
 
-            <div className="max-w-7xl mx-auto px-8 relative" style={{ zIndex: 10 }}>
-                {/* Flexbox 布局 - 子组件自己处理响应式 */}
-                <div className="flex items-center h-16 gap-4">
-                    {/* Logo - 使用父容器宽度做响应式 */}
-                    <div className="@container/logo basis-[200px] shrink min-w-0">
+            <div className="max-w-7xl mx-auto px-3 md:px-5 relative" style={{ zIndex: 10 }}>
+                {/* Flexbox 布局 */}
+                <div className="flex items-center justify-between h-14 gap-2 md:gap-3">
+                    {/* Logo */}
+                    <div className="shrink-0 flex items-center min-w-0">
                         <NavLogo />
                     </div>
 
-                    {/* 导航菜单 - 自己处理响应式 */}
-                    <div className="flex-1 flex justify-center">
+                    {/* 紧凑导航菜单 */}
+                    <div className="flex-1 flex justify-center min-w-0 px-1">
                         <NavMenu navItems={navItems} />
                     </div>
 
-                    {/* 实例选择器与设置按钮 */}
-                    <div className="flex items-center gap-2">
+                    {/* 实例选择器与设置按钮 (永久锁定在窗口内，不被挤压) */}
+                    <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
                         <InstanceSelector />
                         <NavSettings
                             theme={(config?.theme as 'light' | 'dark') || 'light'}

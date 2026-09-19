@@ -48,8 +48,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
-$AppName = "Antigravity Tools"
-$BinaryName = "Antigravity Tools.exe"
+$UpstreamRepo = "lbjlaq/Antigravity-Manager"
+$AppName = "Anti-Gravity Tools by Alim"
+$BinaryName = "Anti-Gravity Tools by Alim.exe"
 
 function Write-Step {
     param([string]$Message)
@@ -186,7 +187,7 @@ if ($TargetVersion) {
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.21.0"
+        $TargetVersion = "4.22.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }
@@ -195,23 +196,31 @@ Write-Success "Target release version: v$TargetVersion (Architecture: $Arch)"
 
 # Step 2: Determine Asset URL
 $matchedAsset = $null
+$NsisPattern = "*setup.exe"
+$ExePattern = "*.exe"
 $ZipPattern = "*windows_${Arch}.zip"
-$NsisPattern = "*_${Arch}-setup.exe"
 
 if ($releaseData -and $releaseData.assets) {
-    $matchedAsset = $releaseData.assets | Where-Object { $_.name -like $ZipPattern -or $_.name -like "*.zip" } | Select-Object -First 1
+    # 1. Prioritize architecture-specific setup EXE
+    $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
+    # 2. Standalone or other Windows executable
     if (-not $matchedAsset) {
-        $matchedAsset = $releaseData.assets | Where-Object { $_.name -like $NsisPattern -or $_.name -like "*-setup.exe" } | Select-Object -First 1
+        $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
+    }
+    # 3. Fallback to zip package only if no EXE is found
+    if (-not $matchedAsset) {
+        $matchedAsset = $releaseData.assets | Where-Object { $_.name -like $ZipPattern -or $_.name -like "*.zip" } | Select-Object -First 1
     }
 }
 
 if ($matchedAsset) {
     $DownloadUrl = $matchedAsset.browser_download_url
-    $IsZipPackage = $matchedAsset.name -like "*.zip"
+    $IsExePackage = $matchedAsset.name -like "*.exe"
 } else {
-    $ZipAsset = "Antigravity.Tools_${TargetVersion}_windows_${Arch}.zip"
-    $DownloadUrl = "https://github.com/$Repo/releases/download/v${TargetVersion}/$ZipAsset"
-    $IsZipPackage = $true
+    # Default direct EXE setup asset URL
+    $ExeAsset = "Anti-Gravity.Tools.by.Alim_${TargetVersion}_${Arch}-setup.exe"
+    $DownloadUrl = "https://github.com/$Repo/releases/download/v${TargetVersion}/$ExeAsset"
+    $IsExePackage = $true
 }
 
 Write-Step "Download source: $DownloadUrl"
@@ -219,7 +228,7 @@ Write-Step "Download source: $DownloadUrl"
 # Step 3: Execute Installation
 if ($DryRun) {
     Write-Warn "[DRY RUN] Would download $DownloadUrl"
-    Write-Warn "[DRY RUN] Would extract/install into $InstallDir"
+    Write-Warn "[DRY RUN] Would execute/install into $InstallDir"
     if (-not $NoPath) { Write-Warn "[DRY RUN] Would append $InstallDir to User PATH" }
     if (-not $NoShortcut) { Write-Warn "[DRY RUN] Would create Desktop & Start Menu shortcuts" }
     Write-Success "[DRY RUN] Dry run completed successfully."
@@ -255,23 +264,58 @@ if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-if ($IsZipPackage) {
-    Write-Step "Extracting portable package to $InstallDir..."
-    Expand-Archive -Path $DownloadedFile -DestinationPath $InstallDir -Force
+if ($IsExePackage) {
+    Write-Step "Running installer ($DownloadedFile)..."
+    $installProc = Start-Process -FilePath $DownloadedFile -ArgumentList "/S", "/D=$InstallDir" -Wait -PassThru
+    Write-Success "Installer finished with exit code $($installProc.ExitCode)"
     Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 } else {
-    Write-Step "Running standalone installer..."
-    Start-Process -FilePath $DownloadedFile -ArgumentList "/S" -Wait
+    Write-Step "Extracting portable package to $InstallDir..."
+    Expand-Archive -Path $DownloadedFile -DestinationPath $InstallDir -Force
     Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 }
 
 # Locate Main Executable
 $ExePath = Join-Path $InstallDir $BinaryName
 if (-not (Test-Path $ExePath)) {
-    # Check for child executables
-    $found = Get-ChildItem -Path $InstallDir -Filter "*.exe" -Recurse | Select-Object -First 1
+    $altNames = @(
+        "Anti-Gravity Tools by Alim.exe",
+        "Anti-Gravity Tools.exe",
+        "antigravity-tools.exe",
+        "Antigravity Tools.exe"
+    )
+    foreach ($name in $altNames) {
+        $candidate = Join-Path $InstallDir $name
+        if (Test-Path $candidate) {
+            $ExePath = $candidate
+            $BinaryName = $name
+            break
+        }
+    }
+}
+if (-not (Test-Path $ExePath)) {
+    $found = Get-ChildItem -Path $InstallDir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
     if ($found) {
         $ExePath = $found.FullName
+        $BinaryName = $found.Name
+    }
+}
+if (-not (Test-Path $ExePath)) {
+    $commonDirs = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
+        (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
+        (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim")
+    )
+    foreach ($dir in $commonDirs) {
+        if (Test-Path $dir) {
+            $found = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" } | Select-Object -First 1
+            if ($found) {
+                $InstallDir = $dir
+                $ExePath = $found.FullName
+                $BinaryName = $found.Name
+                break
+            }
+        }
     }
 }
 

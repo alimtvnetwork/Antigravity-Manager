@@ -333,12 +333,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Automated Release Ceremony & Python Orchestration] Standalone Minor Bump, Security Vault Hardening & Synchronized Manifests**:\n"
-        f"            -   **Automated Release Lifecycle**: Executed complete Python-driven release orchestration (`29-release-orchestrator.py`) with automatic version propagation, branch preservation, and tag generation.\n"
-        f"            -   **Split Database for Passwords**: Hardened dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.\n"
-        f"            -   **Plain Email Configuration Window**: Comprehensive UI modal for email account credentials, custom SMTP/IMAP servers, and port bindings.\n"
-        f"            -   **Two-Way Import/Export**: Full bidirectional import and export capability for email accounts across JSON, CSV, and Excel formats.\n"
-        f"            -   **Mailbox Failover Swapping & Background Sensors**: Integrated multi-trigger background sensors and dynamic mailbox failover pooling in `auto_switcher.rs`.\n"
+        f"        -   **[Installer & UI Overhaul] Direct EXE Setup Installation, Compact Top-Level Navbar Menu, and Instance Selector Boundary Protection**:\n"
+        f"            -   **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.\n"
+        f"            -   **Compact Top-Level Navbar & Middle Menu Button**: Replaced sprawling 10-tab navbar with core quick-jump pills (`Dashboard`, `Accounts`, `Instances`) and a dedicated 'Menu' button with popover dropdown for secondary pages.\n"
+        f"            -   **Instance Selector Boundary Protection**: Guaranteed `<InstanceSelector />` and settings controls remain 100% visible within window boundaries across all screen sizes with `shrink-0` constraints and optimized spacing.\n"
         f"            -   **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     en_entry = zh_entry
@@ -385,11 +383,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Automated Release Lifecycle**: Executed complete Python-driven release orchestration (`29-release-orchestrator.py`) with automatic version propagation, branch preservation, and tag generation.\n"
-        f"- **Split Database for Passwords**: Hardened dedicated split SQLite vault database (`email_vault_db.rs`, `security_vault.db`) with SSH RSA key derivation to prevent plaintext credential retrieval.\n"
-        f"- **Plain Email Configuration Window**: Comprehensive UI modal for email account credentials, custom SMTP/IMAP servers, and port bindings.\n"
-        f"- **Two-Way Import/Export**: Full bidirectional import and export capability for email accounts across JSON, CSV, and Excel formats.\n"
-        f"- **Mailbox Failover Swapping & Background Sensors**: Integrated multi-trigger background sensors and dynamic mailbox failover pooling in `auto_switcher.rs`.\n"
+        f"- **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.\n"
+        f"- **Compact Top-Level Navbar & Middle Menu Button**: Replaced sprawling 10-tab navbar with core quick-jump pills (`Dashboard`, `Accounts`, `Instances`) and a dedicated 'Menu' button with popover dropdown for secondary pages.\n"
+        f"- **Instance Selector Boundary Protection**: Guaranteed `<InstanceSelector />` and settings controls remain 100% visible within window boundaries across all screen sizes with `shrink-0` constraints and optimized spacing.\n"
         f"- **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")

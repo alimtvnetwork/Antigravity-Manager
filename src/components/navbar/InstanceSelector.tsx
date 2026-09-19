@@ -68,17 +68,17 @@ export function InstanceSelector() {
     if (!isTauri()) return null;
 
     return (
-        <div className="relative flex items-center gap-1" ref={dropdownRef}>
+        <div className="relative flex items-center gap-1 shrink-0" ref={dropdownRef}>
             {/* Instance Dropdown Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors border border-gray-200/60 dark:border-base-100"
+                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors border border-gray-200/60 dark:border-base-100 shrink-0"
                 title={t('instances.selector_tooltip', 'Select active Antigravity instance')}
             >
                 <span
                     className={`w-2 h-2 rounded-full shrink-0 ${activeInstance?.is_running ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}
                 />
-                <span className="truncate max-w-[110px] text-gray-800 dark:text-gray-200">
+                <span className="truncate max-w-[90px] md:max-w-[120px] text-gray-800 dark:text-gray-200">
                     {activeInstance?.config.name || 'Default'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
@@ -90,7 +90,7 @@ export function InstanceSelector() {
                     setCopyInstanceName(`${activeInstance?.config.name || 'Instance'} Copy`);
                     setIsCopyOpen(true);
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors"
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0"
                 title={t('instances.copy_current', 'Clone current instance profile')}
             >
                 <Copy className="w-3.5 h-3.5" />
@@ -102,7 +102,7 @@ export function InstanceSelector() {
                     setNewInstanceName('');
                     setIsCreateOpen(true);
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors"
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0"
                 title={t('instances.create_new', 'Create new isolated instance')}
             >
                 <Plus className="w-3.5 h-3.5" />
