@@ -7,7 +7,6 @@ Master directory of architectural and execution plans.
 - [04-guideline-prompt-and-installer-upgrade.md](pending/04-guideline-prompt-and-installer-upgrade.md): Guideline prompt and installer enhancements.
 - [09-update-prompts-and-release.md](pending/09-update-prompts-and-release.md): Update prompts and release lifecycle (deferred under WOR policy).
 - [11-code-red-refactor-remediation.md](pending/11-code-red-refactor-remediation.md): Remediate Code Red enum, boolean, and query wrapper violations across the codebase.
-- [27-single-menu-button-navbar-and-pure-exe-installer.md](pending/27-single-menu-button-navbar-and-pure-exe-installer.md): Single menu button navbar, space utilization, and pure EXE installer.
 
 ## Archived Plans
 
@@ -38,3 +37,4 @@ Master directory of architectural and execution plans.
 - [24-auto-switch-quota-running-prompts-backup-and-ubuntu-fix.md](completed/24-auto-switch-quota-running-prompts-backup-and-ubuntu-fix.md): Auto-switch quota threshold update (15%), split repo DB running prompts backup & direct dispatch, Ubuntu switching fix, and root readme refactoring.
 - [25-email-management-split-security-db-and-remote-control.md](completed/25-email-management-split-security-db-and-remote-control.md): Email dispatch, mailbox remote management, split security vault DB, and bidirectional remote control.
 - [26-installer-exe-and-compact-navbar-menu-ui.md](completed/26-installer-exe-and-compact-navbar-menu-ui.md): Direct EXE installation, compact navbar menu button, and instance selector boundary protection.
+- [27-single-menu-button-navbar-and-pure-exe-installer.md](completed/27-single-menu-button-navbar-and-pure-exe-installer.md): Single menu button navbar, space utilization, and pure EXE installer.
