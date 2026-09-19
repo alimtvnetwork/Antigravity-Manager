@@ -153,8 +153,8 @@ get_version() {
     fi
 
     if ! _is_valid_version "${RELEASE_VERSION:-}"; then
-        warn "Could not resolve latest release, falling back to v4.27.0"
-        RELEASE_VERSION="4.27.0"
+        warn "Could not resolve latest release, falling back to v4.27.1"
+        RELEASE_VERSION="4.27.1"
     fi
 
     info "Latest version: v$RELEASE_VERSION"
