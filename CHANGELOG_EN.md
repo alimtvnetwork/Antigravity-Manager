@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.29.0 (2026-09-19)**:
+        -   **[UI Architecture & Window Management] Top Padding, Win32 Unminimize, Error Stack Traces, & Taskbar Branding**:
+            -   **Compact Layout & Top Spacing**: Reduced top padding across all major pages (Accounts, Instances, Settings, Email & Alerts) from 24-32px to 14-16px for vertical screen efficiency.
+            -   **Window Unminimize & Restore Fix**: Ensured Win32 window unminimizes (`unminimize()` followed by `show()` and `set_focus()`) on tray click, single-instance double launch, and IPC events.
+            -   **Error Management Drawer & Stack Trace Modal**: Real-time error queue badge in header, slide-over drawer, and comprehensive error detail dialog displaying full stack traces with one-click copy.
+            -   **Taskbar Branding & Icon Polish**: Embedded application icon in Windows PE resources (`comctl6.rc`) and assigned runtime window icon (`set_icon`) for taskbar and Alt-Tab display.
+            -   **Instance Double Play & Account Actions**: Double-click profile rotation prioritizing longest idle instances, reordered account action buttons, and defaulted landing tab to Accounts.
     *   **v4.28.0 (2026-09-19)**:
         -   **[Instance Architecture & Smart Play] Full Directory Cloning, Smart Rotation, & UI Action Bar**:
             -   **Full Instance Directory Cloning**: Enhanced `copy_instance` with default full directory copying for Chromium/Electron local state, session databases, and isolated user data with an on/off toggle in settings.

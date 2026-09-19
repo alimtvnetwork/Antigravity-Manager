@@ -8,7 +8,7 @@ import { isTauri } from '../../utils/env';
 export function NavLogo() {
     const { t } = useTranslation();
     const [appVersion, setAppVersion] = useState<string>(
-        versionData.version || versionData.Version || '4.28.0'
+        versionData.version || versionData.Version || '4.29.0'
     );
 
     useEffect(() => {

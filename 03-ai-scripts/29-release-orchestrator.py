@@ -317,10 +317,12 @@ def execute_version_bump(next_version, scope, dry_run=False):
                 new_section_marker = "## 🔄 What's New\n\n"
                 new_entry = (
                     f"- **v{next_version}** ({today_str}):\n"
-                    f"  - **Compact Top Spacing & UI Clean-up**: Reduced top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, tightened banners, and eliminated redundant nested card containers.\n"
-                    f"  - **Dedicated Scroll Containers**: Added `h-full w-full overflow-y-auto` to Email and Instances pages with layout `min-h-0` hardening, enabling smooth natural scrolling.\n"
-                    f"  - **Refined Telemetry & Card Hierarchy**: Compacted machine telemetry banners and settings cards for a polished, responsive viewport presentation.\n"
-                    f"  - **Verified Quality Gates**: Validated all repository quality gates and cross-platform CI compliance with zero bypasses.\n"
+                    f"  - **Compact Top Spacing & Window Controls**: Standardized compact top padding (14-16px) across all dashboard pages, reduced window drag handle to 16px, and eliminated vertical whitespace clutter.\n"
+                    f"  - **Win32 Window Unminimize Fix**: Ensured window unminimizes cleanly before show on tray click, single-instance activation, and IPC calls, preventing frozen or hidden UI states.\n"
+                    f"  - **Error Management Drawer & Stack Trace Viewer**: Debounced error queue badge in header, left-side slide-over drawer, and full stack trace inspection modal with one-click copy.\n"
+                    f"  - **Taskbar Branding & Accounts Polish**: Integrated official application icon in Windows taskbar/PE headers, reordered account action buttons, and defaulted landing tab to Accounts.\n"
+                    f"  - **Instance Smart Double Play**: Double-click profile rotation algorithm prioritizing longest idle profiles with SQLite profiling and candidate preview.\n"
+                    f"  - **Verified Quality Gates**: Validated across all 28 automated quality gates and cross-platform CI checks with zero bypasses.\n"
                 )
                 if f"- **v{next_version}**" not in rm_content:
                     rm_content = rm_content.replace(new_section_marker, new_section_marker + new_entry, 1)
@@ -337,11 +339,12 @@ def execute_version_bump(next_version, scope, dry_run=False):
 
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Instance Architecture & Smart Play] Full Directory Cloning, Smart Rotation, & UI Action Bar**:\n"
-        f"            -   **Full Instance Directory Cloning**: Enhanced `copy_instance` with default full directory copying for Chromium/Electron local state, session databases, and isolated user data with an on/off toggle in settings.\n"
-        f"            -   **Smart Play Profile Rotation**: Implemented intelligent multi-factor auto-rotation algorithm evaluating least recently used, lowest 4H quota, and lowest weekly quota to auto-bind and launch target instances.\n"
-        f"            -   **Top Action Bar & Profile Search**: Prominently placed Play (Smart Play), Duplicate, Edit (Rename), and Remove (Delete) icons adjacent to the dropdown selector, with real-time profile search and JSON Import/Export.\n"
-        f"            -   **Launch & Stacking Context Hardening**: Purged stale lock files, resolved process race conditions with 500ms unmap delays, and eliminated UI overlap bugs with isolated stacking contexts.\n"
+        f"        -   **[UI Architecture & Window Management] Top Padding, Win32 Unminimize, Error Stack Traces, & Taskbar Branding**:\n"
+        f"            -   **Compact Layout & Top Spacing**: Reduced top padding across all major pages (Accounts, Instances, Settings, Email & Alerts) from 24-32px to 14-16px for vertical screen efficiency.\n"
+        f"            -   **Window Unminimize & Restore Fix**: Ensured Win32 window unminimizes (`unminimize()` followed by `show()` and `set_focus()`) on tray click, single-instance double launch, and IPC events.\n"
+        f"            -   **Error Management Drawer & Stack Trace Modal**: Real-time error queue badge in header, slide-over drawer, and comprehensive error detail dialog displaying full stack traces with one-click copy.\n"
+        f"            -   **Taskbar Branding & Icon Polish**: Embedded application icon in Windows PE resources (`comctl6.rc`) and assigned runtime window icon (`set_icon`) for taskbar and Alt-Tab display.\n"
+        f"            -   **Instance Double Play & Account Actions**: Double-click profile rotation prioritizing longest idle instances, reordered account action buttons, and defaulted landing tab to Accounts.\n"
     )
     en_entry = zh_entry
 
@@ -387,11 +390,12 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Full Directory Cloning by Default**: `copy_instance` now duplicates the entire isolated environment (Chromium state, session databases, configurations) instead of just the User folder, preventing profile corruption.\n"
-        f"- **Smart Play Auto-Rotation**: Clicking Play automatically evaluates and binds the healthiest account (least recently used, lowest 4H and weekly quota used) and launches Antigravity IDE seamlessly.\n"
-        f"- **Top Action Bar & Profile Search**: Action icons (Play, Duplicate, Rename, Delete, Plus) placed prominently on top close to the instance selector, with real-time search and JSON Import/Export in the dropdown.\n"
-        f"- **RCA & Launch Hardening**: Grounded 4-part RCA resolved Electron mutex collisions, stale lock files, and Windows Credential Manager slot overlap.\n"
-        f"- **100% Green CI/CD Quality Gates**: Validated across all 27 automated quality gates.\n"
+        f"- **Compact Top Spacing & Layout**: Standardized compact top padding (14-16px) across all dashboard pages, reduced window drag handle to 16px, and eliminated vertical whitespace clutter.\n"
+        f"- **Win32 Window Unminimize Fix**: Ensured window unminimizes cleanly before show on tray click, single-instance activation, and IPC calls, preventing frozen or hidden UI states.\n"
+        f"- **Universal Error Management Drawer & Stack Trace Viewer**: Debounced error queue badge in header, left-side slide-over drawer, and full stack trace inspection modal with one-click copy.\n"
+        f"- **Taskbar Branding & Accounts Polish**: Integrated official application icon in Windows taskbar/PE headers, reordered account action buttons (Refresh #1, Switch #2), and defaulted landing tab to Accounts.\n"
+        f"- **Instance Smart Double Play**: Double-click profile rotation algorithm prioritizing longest idle profiles with SQLite profiling and candidate preview.\n"
+        f"- **100% Green CI/CD Quality Gates**: Validated across all 28 automated quality gates.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
 

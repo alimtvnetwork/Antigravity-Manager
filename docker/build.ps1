@@ -1,7 +1,7 @@
 # Build custom Antigravity Manager Docker image
 # Usage:
 #   .\docker\build.ps1
-#   .\docker\build.ps1 -Tag "antigravity-manager:4.28.0"
+#   .\docker\build.ps1 -Tag "antigravity-manager:4.29.0"
 #   .\docker\build.ps1 -UseMirror   # Regional mirror acceleration
 #   .\docker\build.ps1 -Push -Registry "yourname/antigravity-manager"
 
