@@ -1,9 +1,32 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LogoIcon from '../../../src-tauri/icons/icon.png';
+import versionData from '../../../version.json';
+import { isTauri } from '../../utils/env';
 
 export function NavLogo() {
     const { t } = useTranslation();
+    const [appVersion, setAppVersion] = useState<string>(
+        versionData.version || versionData.Version || '4.26.1'
+    );
+
+    useEffect(() => {
+        const isDesktop = isTauri();
+        if (isDesktop) {
+            import('@tauri-apps/api/app').then(({ getVersion }) => {
+                getVersion().then((v) => {
+                    const hasVersion = Boolean(v);
+                    if (hasVersion) {
+                        setAppVersion(v);
+                    }
+                }).catch(() => {});
+            });
+        }
+    }, []);
+
+    const hasVPrefix = appVersion.startsWith('v');
+    const displayVersion = hasVPrefix ? appVersion : `v${appVersion}`;
 
     return (
         <Link to="/" draggable="false" className="flex w-full min-w-0 items-center gap-2 text-xl font-semibold text-gray-900 dark:text-base-content">
@@ -17,6 +40,11 @@ export function NavLogo() {
             </div>
 
             <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-base-content whitespace-nowrap">{t('common.app_name', 'AGM by Alim')}</span>
+
+            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 shrink-0 leading-none">
+                {displayVersion}
+            </span>
         </Link>
     );
 }
+

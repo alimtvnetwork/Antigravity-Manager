@@ -14,6 +14,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { listen } from '@tauri-apps/api/event';
 
 import { useConfigStore } from '../../stores/useConfigStore';
+import versionData from '../../../version.json';
 
 interface ProxyRequestLog {
     id: string;
@@ -33,7 +34,9 @@ export default function MiniView() {
     const { t } = useTranslation();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [appVersion, setAppVersion] = useState('0.0.0');
+    const [appVersion, setAppVersion] = useState<string>(
+        versionData.version || versionData.Version || '4.26.1'
+    );
     const [latestLog, setLatestLog] = useState<ProxyRequestLog | null>(null);
 
     // Subscribe to proxy logs
@@ -62,16 +65,19 @@ export default function MiniView() {
     // Get app version
     useEffect(() => {
         const fetchVersion = async () => {
-            if (isTauri()) {
+            const isDesktop = isTauri();
+            if (isDesktop) {
                 try {
                     const version = await getVersion();
-                    setAppVersion(version);
+                    const hasVer = Boolean(version);
+                    if (hasVer) {
+                        setAppVersion(version);
+                    }
                 } catch (error) {
                     console.error('Failed to get app version:', error);
                 }
             } else {
-                // Fallback for web mode if needed, or import from package.json
-                setAppVersion('4.26.1');
+                setAppVersion(versionData.version || versionData.Version || '4.26.1');
             }
         };
         fetchVersion();

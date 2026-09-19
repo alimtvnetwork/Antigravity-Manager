@@ -274,22 +274,28 @@ def execute_version_bump(next_version, scope, dry_run=False):
         cask_file.write_text(cask_content, encoding="utf-8")
 
     # 7. Update UI fallback version strings in React
+    navlogo_tsx = REPO_ROOT / "src" / "components" / "navbar" / "NavLogo.tsx"
+    if navlogo_tsx.is_file():
+        nl_content = navlogo_tsx.read_text(encoding="utf-8")
+        nl_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", nl_content)
+        navlogo_tsx.write_text(nl_content, encoding="utf-8")
+
     settings_tsx = REPO_ROOT / "src" / "pages" / "Settings.tsx"
     if settings_tsx.is_file():
         st_content = settings_tsx.read_text(encoding="utf-8")
-        st_content = re.sub(r"useState<string>\('[0-9.]+'\)", f"useState<string>('{next_version}')", st_content)
+        st_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", st_content)
         settings_tsx.write_text(st_content, encoding="utf-8")
 
     miniview_tsx = REPO_ROOT / "src" / "components" / "layout" / "MiniView.tsx"
     if miniview_tsx.is_file():
         mv_content = miniview_tsx.read_text(encoding="utf-8")
-        mv_content = re.sub(r"setAppVersion\('[0-9.]+'\)", f"setAppVersion('{next_version}')", mv_content)
+        mv_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", mv_content)
         miniview_tsx.write_text(mv_content, encoding="utf-8")
 
     err_gen_ts = REPO_ROOT / "src" / "lib" / "error-report-generator.ts"
     if err_gen_ts.is_file():
         eg_content = err_gen_ts.read_text(encoding="utf-8")
-        eg_content = re.sub(r"version:\s*'v[0-9.]+'", f"version: 'v{next_version}'", eg_content)
+        eg_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", eg_content)
         err_gen_ts.write_text(eg_content, encoding="utf-8")
 
     # 8. Update docker build helper
