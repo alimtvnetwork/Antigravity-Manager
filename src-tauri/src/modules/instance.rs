@@ -262,7 +262,9 @@ pub fn copy_instance(
     let src_path = PathBuf::from(&source.data_dir);
     let dst_path = PathBuf::from(&new_instance.data_dir);
 
-    let is_profile_only = clone_mode.map(|m| m.eq_ignore_ascii_case("profile")).unwrap_or(false);
+    let is_profile_only = clone_mode
+        .map(|m| m.eq_ignore_ascii_case("profile"))
+        .unwrap_or(false);
 
     let has_src = src_path.exists();
     if has_src {

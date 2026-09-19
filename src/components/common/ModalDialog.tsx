@@ -10,8 +10,9 @@ interface ModalDialogProps {
     message?: string;
     children?: React.ReactNode;
     type?: ModalType;
-    onConfirm: () => void;
+    onConfirm?: () => void;
     onCancel?: () => void;
+    onClose?: () => void;
     confirmText?: string;
     cancelText?: string;
     isDestructive?: boolean;
@@ -26,6 +27,7 @@ export default function ModalDialog({
     type = 'confirm',
     onConfirm,
     onCancel,
+    onClose,
     confirmText,
     cancelText,
     isDestructive = false,
@@ -34,6 +36,8 @@ export default function ModalDialog({
     const { t } = useTranslation();
     const finalConfirmText = confirmText || t('common.confirm');
     const finalCancelText = cancelText || t('common.cancel');
+    const handleConfirm = onConfirm || onClose || (() => {});
+    const handleCancel = onCancel || onClose;
 
     if (!isOpen) return null;
 
@@ -60,7 +64,9 @@ export default function ModalDialog({
         }
     };
 
-    const showCancel = type === 'confirm' && onCancel;
+    const hasCancelHandler = Boolean(handleCancel);
+    const isConfirmType = type === 'confirm';
+    const showCancel = isConfirmType && hasCancelHandler;
 
     return createPortal(
         <div className="modal modal-open z-[100]">
@@ -88,7 +94,7 @@ export default function ModalDialog({
                             <button
                                 disabled={isLoading}
                                 className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-base-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={onCancel}
+                                onClick={handleCancel}
                             >
                                 {finalCancelText}
                             </button>
@@ -99,7 +105,7 @@ export default function ModalDialog({
                                 ? 'bg-red-500 hover:bg-red-600 focus:ring-red-500 shadow-red-100'
                                 : 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 shadow-blue-100'
                                 }`}
-                            onClick={onConfirm}
+                            onClick={handleConfirm}
                         >
                             {isLoading && <span className="loading loading-spinner loading-xs"></span>}
                             {finalConfirmText}
@@ -107,7 +113,7 @@ export default function ModalDialog({
                     </div>
                 </div>
             </div>
-            <div className="modal-backdrop bg-black/40 backdrop-blur-sm fixed inset-0 z-[-1]" onClick={showCancel ? onCancel : undefined}></div>
+            <div className="modal-backdrop bg-black/40 backdrop-blur-sm fixed inset-0 z-[-1]" onClick={showCancel ? handleCancel : undefined}></div>
         </div>,
         document.body
     );

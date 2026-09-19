@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Sparkles,
     Copy,
@@ -94,6 +94,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
             title="AI Ingestion Templates & Schemas"
             type="info"
             onClose={onClose}
+            onConfirm={onClose}
         >
             <div className="space-y-4 text-xs">
                 <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 text-blue-800 dark:text-blue-300 flex items-start gap-2.5">

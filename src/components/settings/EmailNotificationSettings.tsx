@@ -11,8 +11,6 @@ import {
     FileSpreadsheet,
     FileText,
     FileJson,
-    Cpu,
-    Radio,
     Sparkles,
     Database,
     ChevronDown,
@@ -24,7 +22,6 @@ import {
     EmailAccountInput,
     NotifyRecipient,
     EmailNotificationSettings as ISettings,
-    WatcherStatus,
     listEmailAccounts,
     addEmailAccount,
     updateEmailAccount,
@@ -41,7 +38,6 @@ import {
     importEmailData,
     backupEmailDb,
     restoreEmailDb,
-    getEmailWatcherStatus,
     triggerManualEmailCheck,
 } from '../../services/emailService';
 import ModalDialog from '../common/ModalDialog';
@@ -66,7 +62,6 @@ export default function EmailNotificationSettings() {
         local_machine_ip: '',
         updated_at: 0,
     });
-    const [watcherStatus, setWatcherStatus] = useState<WatcherStatus | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     // Account modal state
@@ -110,16 +105,14 @@ export default function EmailNotificationSettings() {
 
     const loadAll = async () => {
         try {
-            const [accs, recs, sets, st] = await Promise.all([
+            const [accs, recs, sets] = await Promise.all([
                 listEmailAccounts(),
                 listNotifyRecipients(),
                 getEmailSettings(),
-                getEmailWatcherStatus(),
             ]);
             setAccounts(accs);
             setRecipients(recs);
             setSettings(sets);
-            setWatcherStatus(st);
         } catch (e: any) {
             console.error('Failed to load email settings:', e);
             showToast('Failed to load email configurations', 'error');
@@ -135,8 +128,6 @@ export default function EmailNotificationSettings() {
         try {
             await saveEmailSettings(settings);
             showToast('Notification settings saved successfully', 'success');
-            const st = await getEmailWatcherStatus();
-            setWatcherStatus(st);
         } catch (e: any) {
             showToast('Failed to save settings: ' + (e?.message || e), 'error');
         } finally {

@@ -267,6 +267,7 @@ CI_JOBS_MATRIX: dict[str, list[str]] = {
     "Markdown Gap Check (.agents)": [sys.executable, "03-ai-scripts/31-md-gap-fixer.py", ".agents"],
     "Markdown Gap Check (03-ai-scripts)": [sys.executable, "03-ai-scripts/31-md-gap-fixer.py", "03-ai-scripts"],
     "Misspell Auditor": [sys.executable, "03-ai-scripts/27-misspell-auditor.py", "--staged"],
+    "TypeScript Typecheck": [sys.executable, "03-ai-scripts/34-typescript-checker.py"],
 }
 
 # --- Module-Level Directory & File Constants ---
