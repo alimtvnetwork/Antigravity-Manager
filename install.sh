@@ -224,6 +224,94 @@ download_installer() {
     success "Downloaded to $DOWNLOAD_PATH"
 }
 
+# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy packages
+remove_legacy_upstream_installation() {
+    if [[ "$PLATFORM" != "linux" ]]; then
+        return
+    fi
+
+    info "Checking for legacy or upstream (lbjlaq/Antigravity-Manager) installations..."
+
+    case "$PKG_MANAGER" in
+        apt)
+            if dpkg -s com.lbjlaq.antigravity-tools &>/dev/null; then
+                info "Removing legacy com.lbjlaq.antigravity-tools package..."
+                run sudo apt-get remove -y com.lbjlaq.antigravity-tools 2>/dev/null || run sudo dpkg -r com.lbjlaq.antigravity-tools 2>/dev/null || true
+            fi
+            if dpkg -s antigravity-tools &>/dev/null; then
+                info "Checking existing antigravity-tools package..."
+                run sudo apt-get remove -y antigravity-tools 2>/dev/null || true
+            fi
+            ;;
+        dnf|yum)
+            if rpm -q antigravity-tools &>/dev/null; then
+                info "Removing legacy antigravity-tools rpm..."
+                run sudo "${PKG_MANAGER}" remove -y antigravity-tools 2>/dev/null || true
+            fi
+            if rpm -q com.lbjlaq.antigravity-tools &>/dev/null; then
+                info "Removing legacy com.lbjlaq.antigravity-tools rpm..."
+                run sudo "${PKG_MANAGER}" remove -y com.lbjlaq.antigravity-tools 2>/dev/null || true
+            fi
+            ;;
+    esac
+
+    # Remove legacy standalone binaries and desktop shortcuts
+    local legacy_bins=(
+        "/usr/local/bin/antigravity-tools"
+        "${HOME}/.local/bin/antigravity-tools"
+        "/usr/share/applications/com.lbjlaq.antigravity-tools.desktop"
+        "${HOME}/.local/share/applications/com.lbjlaq.antigravity-tools.desktop"
+    )
+    for lb in "${legacy_bins[@]}"; do
+        if [[ -f "$lb" ]]; then
+            info "Removing legacy file: $lb"
+            run rm -f "$lb" 2>/dev/null || run sudo rm -f "$lb" 2>/dev/null || true
+        fi
+    done
+}
+
+# Pin application to Ubuntu GNOME dock / taskbar
+pin_ubuntu_dock() {
+    if [[ "$PLATFORM" != "linux" ]]; then
+        return
+    fi
+
+    local desktop_id=""
+    local candidates=(
+        "anti-gravity-tools-by-alim.desktop"
+        "anti-gravity-tools.desktop"
+        "antigravity-tools.desktop"
+        "com.lbjlaq.antigravity-tools.desktop"
+    )
+
+    for c in "${candidates[@]}"; do
+        if [[ -f "/usr/share/applications/$c" || -f "${HOME}/.local/share/applications/$c" ]]; then
+            desktop_id="$c"
+            break
+        fi
+    done
+
+    if [[ -z "$desktop_id" ]]; then
+        desktop_id="anti-gravity-tools-by-alim.desktop"
+    fi
+
+    if command -v gsettings &>/dev/null; then
+        local current_favs
+        current_favs=$(gsettings get org.gnome.shell favorite-apps 2>/dev/null || echo "")
+        if [[ -n "$current_favs" && "$current_favs" != *"$desktop_id"* ]]; then
+            info "Pinning ${APP_NAME} to Ubuntu taskbar / dock..."
+            local new_favs
+            if [[ "$current_favs" == "[]" || "$current_favs" == "@as []" ]]; then
+                new_favs="['${desktop_id}']"
+            else
+                new_favs=$(echo "$current_favs" | sed "s/]/, '${desktop_id}']/")
+            fi
+            run gsettings set org.gnome.shell favorite-apps "$new_favs" 2>/dev/null || true
+            success "Pinned ${APP_NAME} to Ubuntu dock."
+        fi
+    fi
+}
+
 # Install on Linux
 install_linux() {
     info "Installing ${APP_NAME}..."
@@ -269,6 +357,8 @@ install_linux() {
             fi
             ;;
     esac
+
+    pin_ubuntu_dock
 
     success "${APP_NAME} installed successfully!"
 }
@@ -337,6 +427,7 @@ main() {
 
     detect_platform
     detect_linux_distro
+    remove_legacy_upstream_installation
     get_version
     build_download_url
     download_installer

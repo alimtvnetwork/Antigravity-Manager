@@ -91,6 +91,165 @@ $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $StartMenuShortcut = Join-Path $StartMenuDir "$AppName.lnk"
 $DesktopDir = [Environment]::GetFolderPath("Desktop")
 $DesktopShortcut = Join-Path $DesktopDir "$AppName.lnk"
+$TaskbarDir = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+
+function Remove-LegacyUpstreamInstallation {
+    Write-Step "Checking for legacy or upstream (lbjlaq/Antigravity-Manager) installations..."
+
+    # 1. Stop any running Antigravity Tools processes
+    $legacyProcesses = Get-Process | Where-Object {
+        $_.ProcessName -eq "antigravity-tools" -or
+        $_.ProcessName -eq "Anti-Gravity Tools" -or
+        $_.ProcessName -eq "Anti-Gravity Tools by Alim"
+    }
+    if ($legacyProcesses) {
+        Write-Step "Stopping running Antigravity Tools processes..."
+        foreach ($proc in $legacyProcesses) {
+            try {
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            } catch {}
+        }
+        Start-Sleep -Milliseconds 800
+    }
+
+    # 2. Check Windows Registry Uninstall entries
+    $regPaths = @(
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+
+    foreach ($regPath in $regPaths) {
+        $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
+            ($_.Publisher -match "lbjlaq") -or
+            ($_.DisplayName -eq "Antigravity Tools") -or
+            ($_.InstallLocation -match "Antigravity Tools")
+        }
+
+        if ($entries) {
+            foreach ($entry in $entries) {
+                # Skip if already our brand in the exact target install dir
+                if ($entry.DisplayName -eq $AppName) {
+                    continue
+                }
+
+                Write-Step "Found legacy installation: $($entry.DisplayName) by $($entry.Publisher)"
+                if ($entry.UninstallString) {
+                    Write-Step "Executing legacy uninstaller: $($entry.UninstallString)"
+                    try {
+                        $uninstClean = $entry.UninstallString.Trim('"')
+                        if (Test-Path $uninstClean) {
+                            $p = Start-Process -FilePath $uninstClean -ArgumentList "/S", "/currentuser" -Wait -PassThru
+                            Write-Success "Legacy uninstaller completed (exit code: $($p.ExitCode))"
+                        }
+                    } catch {
+                        Write-Warn "Could not execute uninstaller: $_"
+                    }
+                }
+            }
+        }
+    }
+
+    # 3. Clean legacy directory paths if still existing
+    $legacyDirs = @(
+        (Join-Path $env:LOCALAPPDATA "Antigravity Tools"),
+        (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
+        (Join-Path $env:ProgramFiles "Antigravity Tools"),
+        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools")
+    )
+
+    foreach ($ldir in $legacyDirs) {
+        if (Test-Path $ldir) {
+            if ($ldir -ne $InstallDir) {
+                $uninstExe = Join-Path $ldir "uninstall.exe"
+                if (Test-Path $uninstExe) {
+                    Write-Step "Running uninstaller in $ldir..."
+                    try {
+                        Start-Process -FilePath $uninstExe -ArgumentList "/S" -Wait -ErrorAction SilentlyContinue
+                    } catch {}
+                }
+                Write-Step "Purging legacy directory: $ldir"
+                Remove-Item -Path $ldir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    # 4. Clean legacy shortcuts from Start Menu, Desktop, and Taskbar
+    $legacyShortcuts = @(
+        (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
+        (Join-Path $StartMenuDir "antigravity-tools.lnk"),
+        (Join-Path $DesktopDir "Antigravity Tools.lnk"),
+        (Join-Path $DesktopDir "antigravity-tools.lnk"),
+        (Join-Path $TaskbarDir "Antigravity Tools.lnk"),
+        (Join-Path $TaskbarDir "antigravity-tools.lnk")
+    )
+    foreach ($sc in $legacyShortcuts) {
+        if (Test-Path $sc) {
+            Remove-Item -Path $sc -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Success "Legacy cleanup complete."
+}
+
+function Pin-TaskbarShortcut {
+    param(
+        [string]$TargetExe,
+        [string]$TargetWorkDir,
+        [string]$ShortcutSource
+    )
+
+    Write-Step "Configuring Taskbar pinning for Windows 10, 11, and Windows Server..."
+
+    if (-not (Test-Path $TaskbarDir)) {
+        try {
+            New-Item -ItemType Directory -Path $TaskbarDir -Force | Out-Null
+        } catch {}
+    }
+
+    # Method 1: Create or update shortcut directly in User Pinned Taskbar directory
+    if (Test-Path $TaskbarDir) {
+        $pinnedShortcut = Join-Path $TaskbarDir "$AppName.lnk"
+        try {
+            $WshShell = New-Object -ComObject WScript.Shell
+            $sc = $WshShell.CreateShortcut($pinnedShortcut)
+            $sc.TargetPath = $TargetExe
+            $sc.WorkingDirectory = $TargetWorkDir
+            $sc.Description = $AppName
+            $sc.Save()
+            Write-Success "Pinned shortcut created in Taskbar directory: $pinnedShortcut"
+        } catch {
+            Write-Warn "Direct Taskbar shortcut creation note: $_"
+        }
+    }
+
+    # Method 2: Shell.Application InvokeVerb (Native Pin to taskbar verb for Windows 10, 11, and Windows Server)
+    if ($ShortcutSource) {
+        if (Test-Path $ShortcutSource) {
+            try {
+                $shell = New-Object -ComObject Shell.Application
+                $folderPath = Split-Path $ShortcutSource
+                $fileName = Split-Path $ShortcutSource -Leaf
+                $folder = $shell.Namespace($folderPath)
+                if ($folder) {
+                    $item = $folder.ParseName($fileName)
+                    if ($item) {
+                        $verbs = $item.Verbs()
+                        $pinVerb = $verbs | Where-Object {
+                            $_.Name.Replace('&', '') -match '^(Pin to taskbar|TaskbarPin|固定到任务栏|An Taskleiste anheften|Épingler à la barre des tâches)'
+                        }
+                        if ($pinVerb) {
+                            $pinVerb.DoIt()
+                            Write-Success "Invoked shell verb: $($pinVerb.Name)"
+                        }
+                    }
+                }
+            } catch {
+                Write-Warn "Shell verb taskbar pinning note: $_"
+            }
+        }
+    }
+}
 
 # --- UNINSTALL FLOW ---
 if ($Uninstall) {
@@ -142,6 +301,9 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "    $AppName Portable Installer" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
+
+# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy installations first
+Remove-LegacyUpstreamInstallation
 
 # Step 1: Resolve Release Version
 $TargetVersion = $Version
@@ -359,6 +521,9 @@ if (-not $NoShortcut -and (Test-Path $ExePath)) {
     } catch {
         Write-Warn "Could not create shortcuts: $_"
     }
+
+    # Step 6: Taskbar Pinning (Windows 10, Windows 11, Windows Server)
+    Pin-TaskbarShortcut -TargetExe $ExePath -TargetWorkDir $InstallDir -ShortcutSource $StartMenuShortcut
 }
 
 Write-Host ""

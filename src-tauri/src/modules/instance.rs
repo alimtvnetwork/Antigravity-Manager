@@ -392,7 +392,20 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     let is_default = config.is_default;
     let custom_exe = config.executable_path.clone();
     let extensions_dir = config.extensions_dir.clone();
+    let bound_acc = config.bound_account_id.clone();
     save_registry(&registry).map_err(crate::error::AppError::Config)?;
+
+    // If an account is bound to this instance profile, sync its token to the system keyring
+    if let Some(ref account_id) = bound_acc {
+        if let Ok(account) = crate::modules::account::load_account(account_id) {
+            let _ = crate::modules::integration::write_to_system_keyring(&account);
+        }
+    }
+
+    // Gracefully terminate conflicting Antigravity processes so Electron's single-instance mutex does not abort the new launch
+    if crate::modules::process::is_antigravity_running(None) {
+        let _ = crate::modules::process::close_antigravity(20, None);
+    }
 
     // Determine executable: custom/cloned executable path if present and exists, otherwise system detection
     let exe_path = if let Some(ref p) = custom_exe {
@@ -451,11 +464,6 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             // Bypass GNOME Keyring by isolating tokens in local state.vscdb
             cmd.arg("--password-store=basic");
             crate::modules::process::clean_appimage_env(&mut cmd);
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            cmd.creation_flags(0x08000000);
         }
 
         cmd.spawn().map_err(|e| {
@@ -731,6 +739,9 @@ pub async fn switch_account_to_instance(
 
     // Close only this specific instance window before database injection
     let _ = close_instance(&instance.id);
+    if crate::modules::process::is_antigravity_running(None) {
+        let _ = crate::modules::process::close_antigravity(20, None);
+    }
 
     // Inject token directly into instance's isolated state.vscdb
     crate::modules::db::inject_token(
@@ -749,6 +760,9 @@ pub async fn switch_account_to_instance(
     if let Some(ref profile) = account.device_profile {
         let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
     }
+
+    // For modern Antigravity (>= 2.0.0), write token directly to system keyring so the app receives credentials
+    let _ = crate::modules::integration::write_to_system_keyring(&account);
 
     // Bind account in registry and set as active
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
