@@ -35,7 +35,7 @@ export default function MiniView() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [appVersion, setAppVersion] = useState<string>(
-        versionData.version || versionData.Version || '4.27.2'
+        versionData.version || versionData.Version || '4.28.0'
     );
     const [latestLog, setLatestLog] = useState<ProxyRequestLog | null>(null);
 
@@ -77,7 +77,7 @@ export default function MiniView() {
                     console.error('Failed to get app version:', error);
                 }
             } else {
-                setAppVersion(versionData.version || versionData.Version || '4.27.2');
+                setAppVersion(versionData.version || versionData.Version || '4.28.0');
             }
         };
         fetchVersion();
