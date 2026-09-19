@@ -482,11 +482,17 @@ def record_recent_changes(changed_files: list[str]) -> dict[str, Any]:
             except Exception:
                 pass
 
+        tests_iter = []
+        if isinstance(inventory_tests, list):
+            tests_iter = [(t.get("name", str(i)), t) for i, t in enumerate(inventory_tests) if isinstance(t, dict)]
+        elif isinstance(inventory_tests, dict):
+            tests_iter = list(inventory_tests.items())
+
         associated_tests: set[str] = set()
         for fpath in file_set:
             stem = Path(fpath).stem
             fdir = str(Path(fpath).parent).replace("\\", "/")
-            for tid, tmeta in inventory_tests.items():
+            for tid, tmeta in tests_iter:
                 target = tmeta.get("target_file", "")
                 test_file = tmeta.get("test_file", "")
                 pkg = tmeta.get("package", "")

@@ -1,15 +1,9 @@
 {
-  "timestamp": 1789670400,
-  "modified_files": [
-    "02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md",
-    "src-tauri/src/commands/email.rs",
-    "src-tauri/src/lib.rs",
-    "src-tauri/src/modules/email_inbound.rs",
-    "src-tauri/src/modules/email_io.rs",
-    "src-tauri/src/modules/email_sender.rs",
-    "src-tauri/src/modules/email_vault_db.rs",
-    "src-tauri/src/modules/email_watcher.rs",
-    "src/components/settings/EmailNotificationSettings.tsx",
-    "src/services/emailService.ts"
-  ]
+  "version": 1,
+  "updated_at": "2026-09-19T16:44:02Z",
+  "files": [
+    ".github/workflows/ci.yml",
+    "install.sh"
+  ],
+  "associated_tests": []
 }

@@ -51,3 +51,4 @@ Master directory of architectural and execution plans.
 - [38-ui-branding-instances-and-email-polish.md](completed/38-ui-branding-instances-and-email-polish.md): UI branding, Instances selector, accounts actions, warm gold assets, and email polish.
 - [39-ui-audit-instances-quota-and-visual-polish.md](completed/39-ui-audit-instances-quota-and-visual-polish.md): UI audit, colorful Gemini quota progress, instance name reveal in quota slot, visible color-coded emails, and multi-instance themes.
 - [40-email-auto-config-test-connection-and-modal-actions.md](completed/40-email-auto-config-test-connection-and-modal-actions.md): Email auto-config heuristics, DNS socket fix, self-test mail, and modal action visibility.
+- [41-ubuntu-installer-hardening-and-aria2c.md](completed/41-ubuntu-installer-hardening-and-aria2c.md): Ubuntu installer hardening, aria2c parallel split acceleration, safe lifecycle, and migration UI.
