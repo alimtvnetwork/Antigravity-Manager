@@ -347,6 +347,45 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     </div>
                 )}
                 <div className="flex flex-wrap items-center justify-center gap-1 w-full">
+                    {/* 1. 刷新按钮 (优先排在首位) */}
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${isRefreshing
+                            ? 'text-green-600 bg-green-50'
+                            : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+                        disabled={isRefreshing || isDisabled}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    {/* 2. 切换操作组 (排在第二位) */}
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch(); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', '切换到 Antigravity (经典版)'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', '切换到 Antigravity IDE'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', '切换到 Antigravity CLI (agy)'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    {/* 3. 详情与辅助操作 */}
                     <button
                         className="p-1.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
@@ -376,30 +415,6 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                             <Tag className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', '切换到 Antigravity (经典版)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', '切换到 Antigravity IDE'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', '切换到 Antigravity CLI (agy)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
                     {onWarmup && (
                         <button
                             className={`p-1.5 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
@@ -410,16 +425,6 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                             <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
                         </button>
                     )}
-                    <button
-                        className={`p-1.5 rounded-lg transition-all ${isRefreshing
-                            ? 'text-green-600 bg-green-50'
-                            : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
-                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
-                        disabled={isRefreshing || isDisabled}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
                     <button
                         className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}

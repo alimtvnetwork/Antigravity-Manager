@@ -46,3 +46,4 @@ Master directory of architectural and execution plans.
 - [33-email-ui-verification-and-hardening.md](completed/33-email-ui-verification-and-hardening.md): Email UI verification, telemetry hardening, and complete polish.
 - [34-instance-full-copy-smart-play-and-rca.md](completed/34-instance-full-copy-smart-play-and-rca.md): Instance full directory copy, smart play profile rotation, UI action bar, and root cause analysis.
 - [35-instance-rotation-rca-and-release.md](completed/35-instance-rotation-rca-and-release.md): Instance launch RCA, full copy isolation, smart play rotation, and release.
+- [36-ui-error-manage-and-instance-play.md](completed/36-ui-error-manage-and-instance-play.md): UI Error Manage, Top Padding, Accounts Actions Reorder, and Instance Smart Double-Play.

@@ -6,6 +6,7 @@ import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
 import { InstanceSelector } from './InstanceSelector';
+import { ErrorQueueBadge } from '../errors/error-queue-badge';
 import type { NavItem } from './constants';
 
 /**
@@ -20,8 +21,8 @@ function Navbar() {
 
     // 创建导航项(包含翻译后的标签)
     const navItems: NavItem[] = [
-        { path: '/', label: t('nav.dashboard'), icon: LayoutDashboard, priority: 'high' },
         { path: '/accounts', label: t('nav.accounts'), icon: Users, priority: 'high' },
+        { path: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, priority: 'high' },
         { path: '/instances', label: t('nav.instances', '多实例'), icon: Laptop, priority: 'high' },
         { path: '/api-proxy', label: t('nav.proxy'), icon: Network, priority: 'high' },
         { path: '/apikey-fun', label: t('nav.apikey_fun', '中转站'), icon: KeyRound, priority: 'high' },
@@ -100,12 +101,12 @@ function Navbar() {
     return (
         <nav
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="pt-9 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
+            className="pt-6 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
         >
             {/* 窗口拖拽区域 - Tauri 专用 */}
             {isTauri() && (
                 <div
-                    className="absolute top-9 left-0 right-0 h-14"
+                    className="absolute top-6 left-0 right-0 h-14"
                     style={{ zIndex: 5, backgroundColor: 'rgba(0,0,0,0.001)' }}
                     data-tauri-drag-region
                 />
@@ -114,9 +115,10 @@ function Navbar() {
             <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
                 {/* Flexbox 布局 */}
                 <div className="flex items-center justify-between h-14 gap-2 md:gap-3">
-                    {/* Logo */}
-                    <div className="shrink-0 flex items-center min-w-0">
+                    {/* Logo & Error Manager Badge */}
+                    <div className="shrink-0 flex items-center gap-1.5 min-w-0">
                         <NavLogo />
+                        <ErrorQueueBadge />
                     </div>
 
                     {/* 紧凑导航菜单 */}

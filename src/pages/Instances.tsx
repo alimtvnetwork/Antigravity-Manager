@@ -13,9 +13,11 @@ import {
     AlertCircle,
     Cpu,
     Pencil,
+    FastForward,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
+import { findBestRotationProfile, formatTimeAgo } from '../services/instanceService';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 
@@ -39,6 +41,7 @@ export default function Instances() {
         cloneInstanceExecutable,
         closeInstance,
         setActiveInstance,
+        rotateToNextBestProfile,
     } = useInstanceStore();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -153,7 +156,7 @@ export default function Instances() {
 
     return (
         <div className="h-full w-full overflow-y-auto">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-4 space-y-3">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
@@ -362,7 +365,7 @@ export default function Instances() {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="shrink-0">
+                                        <div className="shrink-0 flex items-center gap-1">
                                             {isActive ? (
                                                 <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
                                                     Active Target
@@ -370,10 +373,41 @@ export default function Instances() {
                                             ) : (
                                                 <button
                                                     onClick={() => setActiveInstance(inst.config.id)}
-                                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium"
+                                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-1 cursor-pointer"
                                                     title="Set as active instance for account switches"
                                                 >
                                                     Set Active
+                                                </button>
+                                            )}
+                                            {/* Top Quick Actions: Edit, Duplicate, Delete */}
+                                            <button
+                                                onClick={() => {
+                                                    setEditTargetId(inst.config.id);
+                                                    setEditInstanceName(inst.config.name);
+                                                }}
+                                                className="btn btn-ghost btn-xs p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                                                title={t('instances.edit_title', 'Rename profile')}
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setCopyTargetId(inst.config.id);
+                                                    setCopyInstanceName(`${inst.config.name} Copy`);
+                                                }}
+                                                className="btn btn-ghost btn-xs p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-100 cursor-pointer"
+                                                title="Clone profile settings and extensions"
+                                            >
+                                                <Copy className="w-3.5 h-3.5" />
+                                            </button>
+                                            {inst.config.is_default ? null : (
+                                                <button
+                                                    onClick={() => handleDelete(inst.config.id)}
+                                                    disabled={inst.is_running}
+                                                    className="btn btn-ghost btn-xs p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
+                                                    title="Delete profile"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                         </div>
@@ -403,22 +437,22 @@ export default function Instances() {
                                             <Folder className="w-3.5 h-3.5 shrink-0" />
                                             <span className="truncate">{inst.config.data_dir}</span>
                                         </div>
-                                        {inst.config.executable_path && (
+                                        {inst.config.executable_path ? (
                                             <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
                                                 <Cpu className="w-3.5 h-3.5 shrink-0" />
                                                 <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
 
                                 {/* Card Actions */}
                                 <div className="pt-4 flex items-center justify-between gap-1.5">
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                         {inst.is_running ? (
                                             <button
                                                 onClick={() => closeInstance(inst.config.id)}
-                                                className="btn btn-xs btn-error btn-outline gap-1"
+                                                className="btn btn-xs btn-error btn-outline gap-1 cursor-pointer"
                                                 title="Gracefully close this instance window"
                                             >
                                                 <Square className="w-3 h-3" />
@@ -427,60 +461,54 @@ export default function Instances() {
                                         ) : (
                                             <button
                                                 onClick={() => handleLaunch(inst.config.id)}
-                                                className="btn btn-xs btn-primary gap-1"
+                                                className="btn btn-xs btn-primary gap-1 shadow-xs cursor-pointer"
                                                 title="Launch instance window"
                                             >
                                                 <Play className="w-3 h-3" />
                                                 <span>Launch</span>
                                             </button>
                                         )}
+                                        {/* Double Play Button with Candidate Tooltip */}
+                                        {(() => {
+                                            const candidate = findBestRotationProfile(instances, inst.config.id);
+                                            const tooltip = candidate
+                                                ? `Double Play: Switch & launch ${candidate.config.name} (Last used: ${formatTimeAgo(candidate.config.last_used)})`
+                                                : 'Double Play: No idle profile available';
+                                            return (
+                                                <button
+                                                    disabled={!candidate}
+                                                    onClick={async () => {
+                                                        try {
+                                                            const rotated = await rotateToNextBestProfile(inst.config.id);
+                                                            alert(`Rotated to profile: ${rotated.config.name}`);
+                                                        } catch (e: any) {
+                                                            setActionError(e?.toString() || 'Rotation failed');
+                                                        }
+                                                    }}
+                                                    className="btn btn-xs btn-primary btn-outline gap-1 disabled:opacity-40 cursor-pointer"
+                                                    title={tooltip}
+                                                >
+                                                    <FastForward className="w-3 h-3" />
+                                                    <span>Double Play</span>
+                                                </button>
+                                            );
+                                        })()}
                                         <button
                                             onClick={() => handleCloneExecutable(inst.config.id)}
-                                            className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400"
+                                            className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400 cursor-pointer"
                                             title="Clone executable binary for this profile"
                                         >
                                             <Cpu className="w-3.5 h-3.5" />
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                setEditTargetId(inst.config.id);
-                                                setEditInstanceName(inst.config.name);
-                                            }}
-                                            className="btn btn-xs btn-ghost text-blue-600 dark:text-blue-400"
-                                            title={t('instances.edit_title', 'Rename profile')}
-                                        >
-                                            <Pencil className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setCopyTargetId(inst.config.id);
-                                                setCopyInstanceName(`${inst.config.name} Copy`);
-                                            }}
-                                            className="btn btn-xs btn-ghost text-gray-600 dark:text-gray-300"
-                                            title="Clone profile settings and extensions"
-                                        >
-                                            <Copy className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
                                             onClick={() => handleWipeSession(inst.config.id)}
                                             disabled={inst.is_running}
-                                            className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400"
+                                            className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-30"
                                             title="Wipe auth credentials (keep settings)"
                                         >
                                             <RotateCcw className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
-
-                                    {!inst.config.is_default && (
-                                        <button
-                                            onClick={() => handleDelete(inst.config.id)}
-                                            disabled={inst.is_running}
-                                            className="btn btn-xs btn-ghost text-rose-600 dark:text-rose-400"
-                                            title="Delete profile"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    )}
                                 </div>
                             </div>
                         );

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="logo-white-title logo-white-desc">
+  <title id="logo-white-title">AG Manager white logo</title>
+  <desc id="logo-white-desc">A white upward AG monogram suspended inside a broken anti-gravity orbit.</desc>
+  <path d="M398 337c-29 58-88 98-157 98-97 0-176-79-176-176S144 83 241 83c57 0 108 27 140 70" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>
+  <path d="M398 153c26 33 41 74 41 118h-98" stroke="#ffffff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M168 333l88-181 88 181h-46l-42-91-42 91h-46Z" fill="#ffffff"/>
+  <path d="M219 306h103c0 34-28 62-62 62-19 0-36-8-48-21" stroke="#ffffff" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="91" r="24" fill="#ffffff"/>
+</svg>

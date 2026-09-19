@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="logo-dark-title logo-dark-desc">
+  <title id="logo-dark-title">AG Manager logo for dark surfaces</title>
+  <desc id="logo-dark-desc">A bright upward AG monogram suspended inside a blue and green anti-gravity orbit.</desc>
+  <defs>
+    <linearGradient id="dark-orbit" x1="76" y1="418" x2="430" y2="86" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#43d6a2"/>
+      <stop offset="0.52" stop-color="#3ed5e3"/>
+      <stop offset="1" stop-color="#61a5ff"/>
+    </linearGradient>
+    <linearGradient id="dark-core" x1="166" y1="338" x2="354" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#43d6a2"/>
+      <stop offset="1" stop-color="#61a5ff"/>
+    </linearGradient>
+  </defs>
+  <path d="M398 337c-29 58-88 98-157 98-97 0-176-79-176-176S144 83 241 83c57 0 108 27 140 70" stroke="url(#dark-orbit)" stroke-width="30" stroke-linecap="round"/>
+  <path d="M398 153c26 33 41 74 41 118h-98" stroke="#61a5ff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M168 333l88-181 88 181h-46l-42-91-42 91h-46Z" fill="url(#dark-core)"/>
+  <path d="M219 306h103c0 34-28 62-62 62-19 0-36-8-48-21" stroke="#3ed5e3" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="91" r="24" fill="#43d6a2"/>
+  <circle cx="256" cy="91" r="10" fill="#effff9"/>
+</svg>

@@ -249,8 +249,15 @@ function OverviewTab({ error }: { error: CapturedError }): React.ReactNode {
 }
 
 function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
-  const backendMsg = error.envelopeErrors?.BackendMessage || error.backendStackTrace;
-  const backendStack = error.envelopeErrors?.Backend || [];
+  const backendMsg = error.envelopeErrors?.BackendMessage || error.backendStackTrace || error.details || error.message;
+  let backendStack: string[] = [];
+  if (error.envelopeErrors?.Backend && error.envelopeErrors.Backend.length > 0) {
+    backendStack = error.envelopeErrors.Backend;
+  } else if (error.backendStackTrace) {
+    backendStack = error.backendStackTrace.split('\n').filter(Boolean);
+  } else if (error.stackTrace) {
+    backendStack = error.stackTrace.split('\n').filter(Boolean);
+  }
 
   return (
     <div className="space-y-4">
@@ -272,7 +279,7 @@ function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
         <div className="text-gray-400 mb-2 font-bold uppercase text-[10px] tracking-wider">
           Rust Backend Diagnostics
         </div>
-        {backendMsg && <div className="text-red-400 mb-2">{backendMsg}</div>}
+        {backendMsg && <div className="text-red-400 mb-2 whitespace-pre-wrap">{backendMsg}</div>}
         {backendStack.length > 0 ? (
           <div className="space-y-1">
             {backendStack.map((line, idx) => (
@@ -290,26 +297,47 @@ function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
 }
 
 function StackTab({ error }: { error: CapturedError }): React.ReactNode {
-  const [showRaw, setShowRaw] = useState(false);
   const frames = error.parsedFrames || [];
+  const hasFrames = frames.length > 0;
+  const [showRaw, setShowRaw] = useState(!hasFrames);
+  const rawStack = error.stackTrace || error.backendStackTrace || error.details || error.message;
+
+  const handleCopyStack = () => {
+    if (rawStack) {
+      navigator.clipboard.writeText(rawStack);
+      showToast('Stack trace copied to clipboard', 'success');
+    }
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500">
-          {frames.length} Frame(s) Captured
+          {hasFrames ? `${frames.length} Frame(s) Captured` : 'Raw Stack Trace'}
         </span>
-        <button
-          onClick={() => setShowRaw(!showRaw)}
-          className="text-xs text-blue-500 hover:underline font-medium"
-        >
-          {showRaw ? 'Show Formatted Table' : 'Show Raw Stack'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCopyStack}
+            className="text-xs text-blue-500 hover:underline font-medium"
+          >
+            Copy Stack
+          </button>
+          {hasFrames && (
+            <button
+              type="button"
+              onClick={() => setShowRaw(!showRaw)}
+              className="text-xs text-blue-500 hover:underline font-medium"
+            >
+              {showRaw ? 'Show Formatted Table' : 'Show Raw Stack'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {showRaw ? (
-        <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-72">
-          {error.stackTrace || error.message}
+      {showRaw || !hasFrames ? (
+        <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-80 whitespace-pre-wrap leading-relaxed">
+          {rawStack}
         </pre>
       ) : (
         <div className="border border-gray-200 dark:border-base-300 rounded-xl overflow-hidden">

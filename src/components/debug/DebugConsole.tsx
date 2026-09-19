@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, X, Trash2, Search, ArrowDownToLine, Pause, Play, Bug, Info, AlertTriangle, AlertOctagon } from 'lucide-react';
 import { useDebugConsole, LogEntry, LogLevel } from '../../stores/useDebugConsole';
+import { useErrorStore } from '../../stores/error-store';
 import { cn } from '../../utils/cn';
 
 const LEVEL_CONFIG: Record<LogLevel, { color: string, icon: React.ReactNode, label: string }> = {
@@ -20,11 +21,30 @@ const LogRow = React.memo(({ log }: { log: LogEntry }) => {
 
     const hasFields = Object.keys(log.fields).length > 0;
 
+    const handleDoubleClick = () => {
+        useErrorStore.getState().captureError(
+            {
+                message: log.message,
+                code: log.level === 'ERROR' ? 'E9001' : 'E1000',
+                level: log.level === 'ERROR' ? 'error' : log.level === 'WARN' ? 'warn' : 'info',
+                details: Object.keys(log.fields).length > 0 ? JSON.stringify(log.fields, null, 2) : undefined,
+                backend_stack_trace: (log.fields as any)?.stack_trace || (log.fields as any)?.backtrace || (log.fields as any)?.error,
+            },
+            {
+                source: log.target,
+                endpoint: log.target,
+                triggerAction: 'console_row_double_click',
+            }
+        );
+    };
+
     return (
         <div className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
             <div
                 className={cn("flex gap-2 px-2 py-1 items-start cursor-default text-[11px]", hasFields && "cursor-pointer")}
                 onClick={() => hasFields && setExpanded(!expanded)}
+                onDoubleClick={handleDoubleClick}
+                title="Click to expand fields, double-click to open Error Manager"
             >
                 <span className="text-zinc-400 dark:text-zinc-500 shrink-0 select-none min-w-[85px]">{timeStr}</span>
                 <span className={cn("shrink-0 min-w-[50px] font-bold uppercase flex items-center gap-1", LEVEL_CONFIG[log.level as LogLevel].color)}>

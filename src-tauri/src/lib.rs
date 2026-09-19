@@ -10,7 +10,7 @@ mod utils;
 
 use modules::logger;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tracing::{error, info, warn};
 
 #[derive(Clone, Copy)]
@@ -490,6 +490,17 @@ pub fn run() {
                 info!("Tray disabled for this session");
             }
 
+            // Explicitly set window icon for main window on Windows/Linux
+            if let Some(window) = app.get_webview_window("main") {
+                let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
+                if let Ok(img) = image::load_from_memory(icon_bytes) {
+                    let rgba = img.to_rgba8();
+                    let (width, height) = rgba.dimensions();
+                    let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
+                    let _ = window.set_icon(icon);
+                }
+            }
+
             // 立即启动管理服务器 (8045)，以便 Web 端能访问
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -556,25 +567,33 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let tray_enabled = window
-                    .app_handle()
-                    .try_state::<AppRuntimeFlags>()
-                    .map(|flags| flags.tray_enabled)
-                    .unwrap_or(true);
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    let tray_enabled = window
+                        .app_handle()
+                        .try_state::<AppRuntimeFlags>()
+                        .map(|flags| flags.tray_enabled)
+                        .unwrap_or(true);
 
-                if tray_enabled {
-                    let _ = window.hide();
-                    #[cfg(target_os = "macos")]
-                    {
-                        use tauri::Manager;
-                        window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory)
-                            .unwrap_or(());
+                    if tray_enabled {
+                        let _ = window.hide();
+                        #[cfg(target_os = "macos")]
+                        {
+                            use tauri::Manager;
+                            window
+                                .app_handle()
+                                .set_activation_policy(tauri::ActivationPolicy::Accessory)
+                                .unwrap_or(());
+                        }
+                        api.prevent_close();
                     }
-                    api.prevent_close();
                 }
+                tauri::WindowEvent::Focused(focused) => {
+                    if *focused {
+                        let _ = window.emit("window-restored", ());
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![

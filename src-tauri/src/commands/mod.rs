@@ -1021,6 +1021,13 @@ pub async fn migrate_data_dir(new_path: String, clean_source: bool) -> Result<()
 /// 显示主窗口
 #[tauri::command]
 pub async fn show_main_window(window: tauri::Window) -> Result<(), String> {
+    let icon_bytes: &[u8] = include_bytes!("../../icons/icon.png");
+    if let Ok(img) = image::load_from_memory(icon_bytes) {
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
+        let _ = window.set_icon(icon);
+    }
     window.show().map_err(|e| e.to_string())
 }
 

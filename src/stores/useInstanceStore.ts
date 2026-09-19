@@ -33,6 +33,7 @@ interface InstanceState {
     exportInstancesJson: () => Promise<string>;
     importInstancesJson: (jsonContent: string) => Promise<InstanceConfig[]>;
     smartPlayInstance: (instanceId?: string) => Promise<{ accountEmail: string; instanceName: string }>;
+    rotateToNextBestProfile: (sourceInstanceId?: string) => Promise<InstanceStatus>;
 }
 
 export const useInstanceStore = create<InstanceState>((set, get) => ({
@@ -278,6 +279,30 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             };
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to smart play instance' });
+            throw err;
+        }
+    },
+
+    rotateToNextBestProfile: async (sourceInstanceId?: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            await get().fetchInstances(true);
+            const list = get().instances;
+            const currentId = sourceInstanceId || get().activeInstanceId;
+            const best = instanceService.findBestRotationProfile(list, currentId);
+            if (!best) {
+                throw new Error('No candidate profile available for rotation');
+            }
+
+            // Set active and launch candidate profile
+            await instanceService.setActiveInstance(best.config.id);
+            await instanceService.launchInstance(best.config.id);
+            await get().fetchInstances(true);
+            set({ activeInstanceId: best.config.id, isLoading: false });
+            return best;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to rotate profile' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.rotateToNextBestProfile' });
             throw err;
         }
     },

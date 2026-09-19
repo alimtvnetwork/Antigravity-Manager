@@ -16,10 +16,39 @@ function Layout() {
     // This handles the case where the app was closed in Mini View (small size, no decorations)
     // and restarted (defaults to Full View state but keeps last window properties)
     useEffect(() => {
-        if (!isMiniView && isTauri()) {
+        if (isMiniView) return;
+        if (isTauri()) {
             ensureFullViewState();
         }
     }, [isMiniView]);
+
+    // Ensure WebView2 invalidates backbuffer and repaints after minimize/restore
+    useEffect(() => {
+        const handleRestore = () => {
+            if (document.hidden) return;
+            window.dispatchEvent(new Event('resize'));
+        };
+
+        window.addEventListener('focus', handleRestore);
+        document.addEventListener('visibilitychange', handleRestore);
+
+        let unlisten: (() => void) | undefined;
+        if (isTauri()) {
+            import('@tauri-apps/api/event').then(({ listen }) => {
+                listen('window-restored', () => {
+                    handleRestore();
+                }).then(fn => {
+                    unlisten = fn;
+                });
+            });
+        }
+
+        return () => {
+            window.removeEventListener('focus', handleRestore);
+            document.removeEventListener('visibilitychange', handleRestore);
+            if (unlisten) unlisten();
+        };
+    }, []);
 
     if (isMiniView) {
         return (
@@ -35,7 +64,7 @@ function Layout() {
         <div className="h-screen flex flex-col bg-[#FAFBFC] dark:bg-base-300">
             {/* 全局窗口拖拽区域 - 使用 JS 手动触发拖拽，解决 HTML 属性失效问题 */}
             <div
-                className="fixed top-0 left-0 right-0 h-9"
+                className="fixed top-0 left-0 right-0 h-6"
                 style={{
                     zIndex: 9999,
                     backgroundColor: 'rgba(0,0,0,0.001)',

@@ -7,6 +7,7 @@ import {
     Laptop,
     Pencil,
     Play,
+    FastForward,
     Square,
     Trash2,
     Search,
@@ -20,7 +21,7 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { isTauri } from '../../utils/env';
 import { request as invoke } from '../../utils/request';
 import { showToast } from '../common/ToastContainer';
-import type { InstanceStatus } from '../../services/instanceService';
+import { findBestRotationProfile, formatTimeAgo, type InstanceStatus } from '../../services/instanceService';
 
 export function InstanceSelector() {
     const { t } = useTranslation();
@@ -38,6 +39,7 @@ export function InstanceSelector() {
         exportInstancesJson,
         importInstancesJson,
         smartPlayInstance,
+        rotateToNextBestProfile,
     } = useInstanceStore();
 
     const config = useConfigStore(state => state.config);
@@ -262,6 +264,17 @@ export function InstanceSelector() {
         }
     };
 
+    const handleDoublePlay = async (sourceId?: string) => {
+        try {
+            const rotated = await rotateToNextBestProfile(sourceId);
+            showToast(t('instances.rotated_toast', `Rotated & launched profile: ${rotated.config.name}`), 'success');
+            setIsOpen(false);
+        } catch (e: any) {
+            console.error('Failed to rotate profile:', e);
+            showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
+        }
+    };
+
     const queryTrimmed = searchQuery.trim().toLowerCase();
     const hasQuery = queryTrimmed.length > 0;
     const filteredInstances = instances.filter(inst => {
@@ -332,6 +345,25 @@ export function InstanceSelector() {
                     <Play className="w-3.5 h-3.5 fill-current" />
                 )}
             </button>
+
+            {/* 2b. Top Action Bar: Double Play (Smart Profile Rotation) */}
+            {(() => {
+                const topCandidate = findBestRotationProfile(instances, activeInstance?.config.id);
+                const tooltipText = topCandidate
+                    ? `Double Play: Switch & launch ${topCandidate.config.name} (Used: ${formatTimeAgo(topCandidate.config.last_used)})`
+                    : 'Double Play: No idle profile available';
+                return (
+                    <button
+                        type="button"
+                        disabled={!topCandidate}
+                        onClick={() => handleDoublePlay(activeInstance?.config.id)}
+                        className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs hover:scale-105 active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={tooltipText}
+                    >
+                        <FastForward className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                );
+            })()}
 
             {/* 3. Top Action Bar: Edit / Rename */}
             <button
@@ -515,6 +547,28 @@ export function InstanceSelector() {
                                                     <Play className="w-3 h-3 fill-current" />
                                                 )}
                                             </button>
+
+                                            {/* Item Double Play (Smart Profile Rotation) */}
+                                            {(() => {
+                                                const rowCandidate = findBestRotationProfile(instances, inst.config.id);
+                                                const rowTooltip = rowCandidate
+                                                    ? `Double Play: Switch & launch ${rowCandidate.config.name} (Used: ${formatTimeAgo(rowCandidate.config.last_used)})`
+                                                    : 'Double Play: No idle profile available';
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        disabled={!rowCandidate}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDoublePlay(inst.config.id);
+                                                        }}
+                                                        className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title={rowTooltip}
+                                                    >
+                                                        <FastForward className="w-3 h-3 fill-current" />
+                                                    </button>
+                                                );
+                                            })()}
 
                                             {/* Item Rename */}
                                             <button

@@ -250,3 +250,57 @@ export function findBestSmartPlayAccount(
     return scored[0]?.account || null;
 }
 
+/**
+ * Smart Profile Rotation Algorithm
+ * Prioritizes profiles used longer ago (e.g. 15 hours ago > 30 minutes ago).
+ * Evaluates candidate profiles in batches of 3, picking the best idle profile.
+ */
+export function findBestRotationProfile(
+    instances: InstanceStatus[],
+    currentInstanceId?: string
+): InstanceStatus | null {
+    if (instances.length === 0) return null;
+
+    // Filter candidates: prefer those not currently running
+    const nonRunning = instances.filter(i => {
+        if (i.is_running) return false;
+        if (instances.length > 1 && i.config.id === currentInstanceId) return false;
+        return true;
+    });
+
+    const pool = nonRunning.length > 0 ? nonRunning : instances.filter(i => i.config.id !== currentInstanceId);
+    if (pool.length === 0) return instances[0] || null;
+
+    // Sort by longest delay since last used (ascending timestamp, where 0 or lowest = oldest / longest ago)
+    const sorted = [...pool].sort((a, b) => {
+        const lastA = a.config.last_used || 0;
+        const lastB = b.config.last_used || 0;
+        return lastA - lastB;
+    });
+
+    // Batched evaluation: step through chunks of 3 and pick the first available
+    for (let i = 0; i < sorted.length; i += 3) {
+        const batch = sorted.slice(i, i + 3);
+        const match = batch.find(item => !item.is_running);
+        if (match) {
+            return match;
+        }
+    }
+
+    return sorted[0] || null;
+}
+
+export function formatTimeAgo(timestampSec?: number): string {
+    if (!timestampSec || timestampSec <= 0) return 'Never used';
+    const nowSec = Math.floor(Date.now() / 1000);
+    const diffSec = Math.max(0, nowSec - timestampSec);
+    if (diffSec < 60) return 'Just now';
+    const mins = Math.floor(diffSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+
