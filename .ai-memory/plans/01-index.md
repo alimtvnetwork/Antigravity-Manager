@@ -42,3 +42,4 @@ Master directory of architectural and execution plans.
 - [29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md](completed/29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md): Eliminate toolbar hover collision and elevate navbar stacking context.
 - [30-instance-edit-rename-feature.md](completed/30-instance-edit-rename-feature.md): In-place instance profile edit and rename feature across navbar dropdown and Instances page.
 - [31-compact-top-padding-and-scrollable-views.md](completed/31-compact-top-padding-and-scrollable-views.md): Compact top padding and scrollable view containers for Email and Instances pages.
+- [32-email-management-ui-streamlining-and-templates.md](completed/32-email-management-ui-streamlining-and-templates.md): Email management UI streamlining, telemetry integration, compact actions dropdown, and AI sample templates.
