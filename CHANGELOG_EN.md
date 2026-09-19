@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.27.2 (2026-09-19)**:
+        -   **[Instance Architecture & Smart Play] Full Directory Cloning, Smart Rotation, & UI Action Bar**:
+            -   **Full Instance Directory Cloning**: Enhanced `copy_instance` with default full directory copying for Chromium/Electron local state, session databases, and isolated user data with an on/off toggle in settings.
+            -   **Smart Play Profile Rotation**: Implemented intelligent multi-factor auto-rotation algorithm evaluating least recently used, lowest 4H quota, and lowest weekly quota to auto-bind and launch target instances.
+            -   **Top Action Bar & Profile Search**: Prominently placed Play (Smart Play), Duplicate, Edit (Rename), and Remove (Delete) icons adjacent to the dropdown selector, with real-time profile search and JSON Import/Export.
+            -   **Launch & Stacking Context Hardening**: Purged stale lock files, resolved process race conditions with 500ms unmap delays, and eliminated UI overlap bugs with isolated stacking contexts.
     *   **v4.27.1 (2026-09-19)**:
         -   **[Instance Architecture & Smart Play] Full Directory Cloning, Smart Rotation, & UI Action Bar**:
             -   **Full Instance Directory Cloning**: Enhanced `copy_instance` with default full directory copying for Chromium/Electron local state, session databases, and isolated user data with an on/off toggle in settings.
