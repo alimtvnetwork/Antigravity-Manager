@@ -6,7 +6,7 @@ interface SuggestedFixMap {
 
 const APP_INFO = {
   name: 'AGM by Alim',
-  version: 'v4.22.0',
+  version: 'v4.23.0',
 };
 
 const SUGGESTED_FIXES: SuggestedFixMap = {

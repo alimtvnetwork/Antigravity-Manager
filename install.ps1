@@ -187,7 +187,7 @@ if ($TargetVersion) {
     }
 
     if (-not $TargetVersion) {
-        $TargetVersion = "4.22.0"
+        $TargetVersion = "4.23.0"
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }
@@ -196,31 +196,22 @@ Write-Success "Target release version: v$TargetVersion (Architecture: $Arch)"
 
 # Step 2: Determine Asset URL
 $matchedAsset = $null
-$NsisPattern = "*setup.exe"
-$ExePattern = "*.exe"
-$ZipPattern = "*windows_${Arch}.zip"
 
 if ($releaseData -and $releaseData.assets) {
-    # 1. Prioritize architecture-specific setup EXE
+    # 1. Prioritize architecture-specific NSIS setup EXE
     $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
-    # 2. Standalone or other Windows executable
+    # 2. Other Windows executables
     if (-not $matchedAsset) {
         $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
-    }
-    # 3. Fallback to zip package only if no EXE is found
-    if (-not $matchedAsset) {
-        $matchedAsset = $releaseData.assets | Where-Object { $_.name -like $ZipPattern -or $_.name -like "*.zip" } | Select-Object -First 1
     }
 }
 
 if ($matchedAsset) {
     $DownloadUrl = $matchedAsset.browser_download_url
-    $IsExePackage = $matchedAsset.name -like "*.exe"
 } else {
-    # Default direct EXE setup asset URL
+    # Direct NSIS setup asset URL fallback
     $ExeAsset = "Anti-Gravity.Tools.by.Alim_${TargetVersion}_${Arch}-setup.exe"
     $DownloadUrl = "https://github.com/$Repo/releases/download/v${TargetVersion}/$ExeAsset"
-    $IsExePackage = $true
 }
 
 Write-Step "Download source: $DownloadUrl"
@@ -264,16 +255,10 @@ if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-if ($IsExePackage) {
-    Write-Step "Running installer ($DownloadedFile)..."
-    $installProc = Start-Process -FilePath $DownloadedFile -ArgumentList "/S", "/D=$InstallDir" -Wait -PassThru
-    Write-Success "Installer finished with exit code $($installProc.ExitCode)"
-    Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Step "Extracting portable package to $InstallDir..."
-    Expand-Archive -Path $DownloadedFile -DestinationPath $InstallDir -Force
-    Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
-}
+Write-Step "Running installer ($DownloadedFile)..."
+$installProc = Start-Process -FilePath $DownloadedFile -ArgumentList "/S", "/D=$InstallDir" -Wait -PassThru
+Write-Success "Installer finished with exit code $($installProc.ExitCode)"
+Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 
 # Locate Main Executable
 $ExePath = Join-Path $InstallDir $BinaryName

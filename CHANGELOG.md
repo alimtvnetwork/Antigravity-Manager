@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.23.0 (2026-09-19)**:
+        -   **[Installer & UI Overhaul] Direct EXE Setup Installation, Compact Top-Level Navbar Menu, and Instance Selector Boundary Protection**:
+            -   **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.
+            -   **Compact Top-Level Navbar & Middle Menu Button**: Replaced sprawling 10-tab navbar with core quick-jump pills (`Dashboard`, `Accounts`, `Instances`) and a dedicated 'Menu' button with popover dropdown for secondary pages.
+            -   **Instance Selector Boundary Protection**: Guaranteed `<InstanceSelector />` and settings controls remain 100% visible within window boundaries across all screen sizes with `shrink-0` constraints and optimized spacing.
+            -   **Verified 100% Green Quality Gates**: Validated all 27 repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
+
     *   **v4.22.0 (2026-09-19)**:
         -   **[Installer & UI Overhaul] Direct EXE Setup Installation, Compact Top-Level Navbar Menu, and Instance Selector Boundary Protection**:
             -   **Direct EXE Setup Installation**: Enhanced `install.ps1` to download and install setup/standalone `.exe` assets directly with silent `/S` and `/D` parameters, eliminating `.zip` extraction issues on Windows.

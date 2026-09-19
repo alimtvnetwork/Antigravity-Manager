@@ -7,6 +7,7 @@ Master directory of architectural and execution plans.
 - [04-guideline-prompt-and-installer-upgrade.md](pending/04-guideline-prompt-and-installer-upgrade.md): Guideline prompt and installer enhancements.
 - [09-update-prompts-and-release.md](pending/09-update-prompts-and-release.md): Update prompts and release lifecycle (deferred under WOR policy).
 - [11-code-red-refactor-remediation.md](pending/11-code-red-refactor-remediation.md): Remediate Code Red enum, boolean, and query wrapper violations across the codebase.
+- [27-single-menu-button-navbar-and-pure-exe-installer.md](pending/27-single-menu-button-navbar-and-pure-exe-installer.md): Single menu button navbar, space utilization, and pure EXE installer.
 
 ## Archived Plans
 
