@@ -37,26 +37,26 @@ export function NavSettings({
     return (
         <>
             {/* 独立按钮 (≥ 480px) */}
-            <div className="hidden min-[480px]:flex items-center gap-2">
+            <div className="hidden min-[480px]:flex items-center gap-1.5 md:gap-2">
                 {/* 迷你视图切换按钮 */}
                 <button
                     onClick={() => setMiniView(true)}
-                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-colors"
+                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
                     title={t('nav.mini_view', 'Mini View')}
                 >
-                    <Minimize2 className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                    <Minimize2 className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
                 </button>
 
                 {/* 主题切换按钮 */}
                 <button
                     onClick={onThemeToggle}
-                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-colors"
+                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
                     title={theme === 'light' ? t('nav.theme_to_dark') : t('nav.theme_to_light')}
                 >
                     {theme === 'light' ? (
-                        <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
                     ) : (
-                        <Sun className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        <Sun className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
                     )}
                 </button>
 
@@ -71,10 +71,10 @@ export function NavSettings({
                 {!isTauri() && (
                     <button
                         onClick={handleLogout}
-                        className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-colors"
+                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
                         title={t('nav.logout', '登出')}
                     >
-                        <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        <LogOut className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400" />
                     </button>
                 )}
             </div>

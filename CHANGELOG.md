@@ -2,6 +2,14 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.30.0 (2026-09-19)**:
+        -   **[Custom Titlebar & Fluid Responsive UI] Custom Titlebar Caption Controls, Frameless Architecture, & Fluid Responsiveness**:
+            -   **Custom Window Controls**: Replaced native Windows OS titlebar frame with custom, fluid titlebar controls (Minimize `-`, Maximize/Restore `🗖`, and Close `✕`) directly integrated at the top of the application window.
+            -   **Window Dragging & Native Actions**: Implemented seamless `data-tauri-drag-region` across titlebar with double-click maximize/restore toggle and Fitts's-law-compliant caption button hit testing.
+            -   **Platform-Aware Titlebar Design**: Windows and Linux render sleek right-aligned caption buttons with soft crimson hover for close, while macOS renders authentic left-aligned traffic light dots (close, minimize, maximize).
+            -   **Fluid Responsive UI**: Enhanced header and navbar responsiveness across window widths, streamlined button dimensions with micro-interaction scaling (`active:scale-95`), and eliminated top overlay click interference.
+            -   **Linux Installer Hardening & Aria2c Acceleration**: Accelerated multi-connection split downloads via `aria2c`, inverted uninstallation sequence to protect existing installations, and improved migration path reporting.
+
     *   **v4.29.0 (2026-09-19)**:
         -   **[UI Architecture & Window Management] Top Padding, Win32 Unminimize, Error Stack Traces, & Taskbar Branding**:
             -   **Compact Layout & Top Spacing**: Reduced top padding across all major pages (Accounts, Instances, Settings, Email & Alerts) from 24-32px to 14-16px for vertical screen efficiency.

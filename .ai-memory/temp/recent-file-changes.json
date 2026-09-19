@@ -1,9 +1,19 @@
 {
   "version": 1,
-  "updated_at": "2026-09-19T16:44:02Z",
+  "updated_at": "2026-09-19T16:52:10Z",
   "files": [
     ".github/workflows/ci.yml",
-    "install.sh"
+    "install.sh",
+    "package.json",
+    "src-tauri/Cargo.toml",
+    "src-tauri/tauri.conf.json",
+    "src/components/layout/Layout.tsx",
+    "src/components/layout/TitleBar.tsx",
+    "src/components/navbar/NavSettings.tsx",
+    "src/components/navbar/Navbar.tsx",
+    "src/utils/env.ts",
+    "src/utils/windowManager.ts",
+    "version.json"
   ],
   "associated_tests": []
 }

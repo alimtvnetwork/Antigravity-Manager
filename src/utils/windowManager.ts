@@ -43,8 +43,8 @@ export const exitMiniMode = async () => {
         await win.setSize(new LogicalSize(1200, 800));
         await win.setAlwaysOnTop(false);
         await win.center();
-        // Restore window decorations (title bar)
-        await win.setDecorations(true);
+        // Keep custom title bar decorations disabled
+        await win.setDecorations(false);
         // Re-enable resizing
         await win.setResizable(true);
     } catch (error) {
@@ -66,8 +66,8 @@ export const ensureFullViewState = async () => {
             await win.setSize(new LogicalSize(1200, 800));
             await win.center();
         }
-        // Always enforce standard window properties for Full View
-        await win.setDecorations(true);
+        // Enforce custom title bar (frameless) for Full View
+        await win.setDecorations(false);
         await win.setResizable(true);
         await win.setAlwaysOnTop(false);
     } catch (error) {

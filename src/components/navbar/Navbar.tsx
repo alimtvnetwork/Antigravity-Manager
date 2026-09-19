@@ -1,7 +1,7 @@
 import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { isTauri, isLinux } from '../../utils/env';
+import { isLinux } from '../../utils/env';
 import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
@@ -101,16 +101,8 @@ function Navbar() {
     return (
         <nav
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="pt-3 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
+            className="py-1.5 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
         >
-            {/* 窗口拖拽区域 - Tauri 专用 */}
-            {isTauri() && (
-                <div
-                    className="absolute top-3 left-0 right-0 h-14"
-                    style={{ zIndex: 5, backgroundColor: 'rgba(0,0,0,0.001)' }}
-                    data-tauri-drag-region
-                />
-            )}
 
             <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
                 {/* Flexbox 布局 */}
