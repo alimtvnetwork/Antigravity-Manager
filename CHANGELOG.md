@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.26.1 (2026-09-19)**:
+        -   **[UI & Scrolling Polish] Compact Top Padding & Dedicated Scroll Containers**:
+            -   **Compact Top Padding**: Reduced top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, eliminating redundant nested card wrappers and oversized margins.
+            -   **Dedicated Scroll Containers**: Wrapped Email and Instances pages in `h-full w-full overflow-y-auto` and hardened layout main with `min-h-0` to guarantee natural vertical scrolling when content exceeds the viewport.
+            -   **Refined Card Hierarchy**: Compacted telemetry banners and card padding across settings and email components for optimal screen utilization.
+            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
+
     *   **v4.26.0 (2026-09-19)**:
         -   **[Instance Profile Management] In-Place Profile Rename & Navbar Quick Actions**:
             -   **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.

@@ -41,3 +41,4 @@ Master directory of architectural and execution plans.
 - [28-email-setup-page-and-installer-hardening.md](completed/28-email-setup-page-and-installer-hardening.md): Dedicated Email setup page, navbar dropdown boundary locks, and installer asset resolution.
 - [29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md](completed/29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md): Eliminate toolbar hover collision and elevate navbar stacking context.
 - [30-instance-edit-rename-feature.md](completed/30-instance-edit-rename-feature.md): In-place instance profile edit and rename feature across navbar dropdown and Instances page.
+- [31-compact-top-padding-and-scrollable-views.md](completed/31-compact-top-padding-and-scrollable-views.md): Compact top padding and scrollable view containers for Email and Instances pages.

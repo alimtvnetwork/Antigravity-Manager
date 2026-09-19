@@ -152,24 +152,25 @@ export default function Instances() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                            <Laptop className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-base-content">
-                                {t('instances.page_title', 'Instances & Profiles')}
-                            </h1>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {t('instances.page_desc', 'Run multiple Antigravity windows in parallel with isolated credentials and extensions')}
-                            </p>
+        <div className="h-full w-full overflow-y-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                <Laptop className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-base-content">
+                                    {t('instances.page_title', 'Instances & Profiles')}
+                                </h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {t('instances.page_desc', 'Run multiple Antigravity windows in parallel with isolated credentials and extensions')}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-base-200 text-xs text-gray-600 dark:text-gray-300 font-medium">
@@ -609,6 +610,7 @@ export default function Instances() {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }

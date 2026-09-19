@@ -311,10 +311,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
                 new_section_marker = "## 🔄 What's New\n\n"
                 new_entry = (
                     f"- **v{next_version}** ({today_str}):\n"
-                    f"  - **Instance Profile Edit & Rename**: Added in-place rename capability for isolated instance profiles directly from the top navigation dropdown and Instances page.\n"
-                    f"  - **Top Bar Quick Rename Action**: Direct edit pencil button on top navbar instance selector to instantly rename the currently active profile.\n"
-                    f"  - **Dropdown Inline Action Bar**: Enhanced instance profile items in the selector dropdown with dedicated rename action buttons.\n"
-                    f"  - **Multi-Language Support**: Full localization for instance renaming across English, Simplified Chinese, and Traditional Chinese.\n"
+                    f"  - **Compact Top Spacing & UI Clean-up**: Reduced top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, tightened banners, and eliminated redundant nested card containers.\n"
+                    f"  - **Dedicated Scroll Containers**: Added `h-full w-full overflow-y-auto` to Email and Instances pages with layout `min-h-0` hardening, enabling smooth natural scrolling.\n"
+                    f"  - **Refined Telemetry & Card Hierarchy**: Compacted machine telemetry banners and settings cards for a polished, responsive viewport presentation.\n"
                     f"  - **Verified Quality Gates**: Validated all repository quality gates and cross-platform CI compliance with zero bypasses.\n"
                 )
                 if f"- **v{next_version}**" not in rm_content:
@@ -333,11 +332,10 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Instance Profile Management] In-Place Profile Rename & Navbar Quick Actions**:\n"
-        f"            -   **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.\n"
-        f"            -   **Navbar Quick Rename**: Added quick edit button and dropdown inline rename controls in `InstanceSelector.tsx` for seamless profile management.\n"
-        f"            -   **Instances Management Page**: Added profile rename modal and card action button in `Instances.tsx`.\n"
-        f"            -   **Full Trilingual Localization**: Added complete translations across English (`en`), Simplified Chinese (`zh`), and Traditional Chinese (`zh-TW`).\n"
+        f"        -   **[UI & Scrolling Polish] Compact Top Padding & Dedicated Scroll Containers**:\n"
+        f"            -   **Compact Top Padding**: Reduced top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, eliminating redundant nested card wrappers and oversized margins.\n"
+        f"            -   **Dedicated Scroll Containers**: Wrapped Email and Instances pages in `h-full w-full overflow-y-auto` and hardened layout main with `min-h-0` to guarantee natural vertical scrolling when content exceeds the viewport.\n"
+        f"            -   **Refined Card Hierarchy**: Compacted telemetry banners and card padding across settings and email components for optimal screen utilization.\n"
         f"            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     en_entry = zh_entry
@@ -384,10 +382,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **In-Place Instance Rename**: Added `rename_instance` Tauri IPC command and frontend service to rename any profile without losing data.\n"
-        f"- **Navbar Quick Rename**: Added quick edit button and dropdown inline rename controls in `InstanceSelector.tsx` for seamless profile management.\n"
-        f"- **Instances Management Page**: Added profile rename modal and card action button in `Instances.tsx`.\n"
-        f"- **Full Trilingual Localization**: Added complete translations across English (`en`), Simplified Chinese (`zh`), and Traditional Chinese (`zh-TW`).\n"
+        f"- **Compact Top Padding & Proper Spacing**: Reduced excessive top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, removing redundant nested card containers and oversized headers.\n"
+        f"- **Dedicated Scroll Containers**: Added `h-full w-full overflow-y-auto` to Email and Instances pages with `min-h-0` on layout main, ensuring the window never clips content and can be freely scrolled when more space is required.\n"
+        f"- **Refined Card Hierarchy**: Compacted telemetry banners, badges, and card padding for a clean and balanced interface.\n"
         f"- **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")

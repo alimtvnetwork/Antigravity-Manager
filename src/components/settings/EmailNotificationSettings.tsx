@@ -360,30 +360,30 @@ export default function EmailNotificationSettings() {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Header & Machine Telemetry Banner */}
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl p-6 shadow-md border border-slate-800">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-slate-800">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                            <Mail className="w-6 h-6 text-sky-400" />
-                            <h2 className="text-xl font-bold tracking-tight">Mailbox Remote Automation & Security Vault</h2>
+                            <Mail className="w-5 h-5 text-sky-400" />
+                            <h2 className="text-base font-bold tracking-tight">Mailbox Remote Automation & Security Vault</h2>
                         </div>
-                        <p className="text-sm text-slate-300">
+                        <p className="text-xs text-slate-300">
                             Split database encryption, mailbox pool failover swapping, quota sensors, and remote prompt injection.
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="bg-slate-800/80 px-3.5 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center gap-2">
-                            <Cpu className="w-4 h-4 text-emerald-400" />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs flex items-center gap-1.5">
+                            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Node: <strong className="text-slate-100">{watcherStatus?.machine_name || 'Detecting...'}</strong></span>
                         </div>
-                        <div className="bg-slate-800/80 px-3.5 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center gap-2">
-                            <Radio className="w-4 h-4 text-sky-400" />
+                        <div className="bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs flex items-center gap-1.5">
+                            <Radio className="w-3.5 h-3.5 text-sky-400" />
                             <span>Local IP: <strong className="text-slate-100">{watcherStatus?.machine_ip || '127.0.0.1'}</strong></span>
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${watcherStatus?.is_running ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                        <div className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${watcherStatus?.is_running ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
                             <span className={`w-2 h-2 rounded-full ${watcherStatus?.is_running ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
                             {watcherStatus?.is_running ? 'Watcher Active' : 'Watcher Idle'}
                         </div>
@@ -392,7 +392,7 @@ export default function EmailNotificationSettings() {
             </div>
 
             {/* Mailboxes Card */}
-            <div className="bg-white dark:bg-base-100 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-base-200">
+            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200">
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h3 className="text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2">
@@ -552,7 +552,7 @@ export default function EmailNotificationSettings() {
             </div>
 
             {/* Notification Recipients Card */}
-            <div className="bg-white dark:bg-base-100 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-base-200">
+            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2 mb-1">
                     <Send className="w-4 h-4 text-emerald-500" />
                     Notification Recipients
@@ -609,7 +609,7 @@ export default function EmailNotificationSettings() {
             </div>
 
             {/* Watcher Daemon & Sensors Card */}
-            <div className="bg-white dark:bg-base-100 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-base-200 space-y-5">
+            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2">

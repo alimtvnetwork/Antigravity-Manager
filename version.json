@@ -7,13 +7,13 @@
     "inheritanceRule": "When a section is set to 'inherit', all tooling and codebases resolving that sub-package must inherit the root global Version.",
     "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
   },
-  "Version": "4.26.0",
+  "Version": "4.26.1",
   "Title": "AGM by Alim",
   "RepoSlug": "alimtvnetwork/Antigravity-Manager",
   "RepoUrl": "https://github.com/alimtvnetwork/Antigravity-Manager",
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",
   "backend": "inherit",
   "frontend": "inherit",
-  "version": "4.26.0",
+  "version": "4.26.1",
   "releaseDate": "2026-09-19"
 }
