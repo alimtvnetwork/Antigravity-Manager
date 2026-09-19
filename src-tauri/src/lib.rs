@@ -763,6 +763,8 @@ pub fn run() {
             commands::get_active_instance,
             commands::set_active_instance,
             commands::switch_account_to_instance,
+            commands::export_instances_json,
+            commands::import_instances_json,
             commands::get_auto_switcher_status,
             commands::update_auto_switcher_config,
             commands::trigger_manual_profile_rotation,

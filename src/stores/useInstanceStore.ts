@@ -20,7 +20,7 @@ interface InstanceState {
     updateSwitcherConfig: (config: AutoProfileSwitcherConfig) => Promise<void>;
     triggerManualRotation: () => Promise<string>;
     createInstance: (name: string) => Promise<InstanceConfig>;
-    copyInstance: (sourceId: string, targetName: string) => Promise<InstanceConfig>;
+    copyInstance: (sourceId: string, targetName: string, cloneMode?: string) => Promise<InstanceConfig>;
     renameInstance: (instanceId: string, newName: string) => Promise<InstanceConfig>;
     deleteInstance: (instanceId: string) => Promise<void>;
     wipeSession: (instanceId: string) => Promise<void>;
@@ -30,6 +30,9 @@ interface InstanceState {
     closeInstance: (instanceId: string) => Promise<void>;
     setActiveInstance: (instanceId: string) => Promise<void>;
     switchAccountToInstance: (accountId: string, instanceId?: string) => Promise<void>;
+    exportInstancesJson: () => Promise<string>;
+    importInstancesJson: (jsonContent: string) => Promise<InstanceConfig[]>;
+    smartPlayInstance: (instanceId?: string) => Promise<{ accountEmail: string; instanceName: string }>;
 }
 
 export const useInstanceStore = create<InstanceState>((set, get) => ({
@@ -101,10 +104,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         }
     },
 
-    copyInstance: async (sourceId: string, targetName: string) => {
+    copyInstance: async (sourceId: string, targetName: string, cloneMode?: string) => {
         set({ isLoading: true, error: null });
         try {
-            const config = await instanceService.copyInstance(sourceId, targetName);
+            const config = await instanceService.copyInstance(sourceId, targetName, cloneMode);
             await get().fetchInstances();
             set({ isLoading: false });
             return config;
@@ -215,6 +218,66 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to switch account' });
             useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'switchAccountToInstance' });
+            throw err;
+        }
+    },
+
+    exportInstancesJson: async () => {
+        return await instanceService.exportInstancesJson();
+    },
+
+    importInstancesJson: async (jsonContent: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const configs = await instanceService.importInstancesJson(jsonContent);
+            await get().fetchInstances();
+            set({ isLoading: false });
+            return configs;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to import instances JSON' });
+            throw err;
+        }
+    },
+
+    smartPlayInstance: async (targetInstanceId?: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const instId = targetInstanceId || get().activeInstanceId || 'default';
+            const { useAccountStore } = await import('./useAccountStore');
+            let accounts = useAccountStore.getState().accounts;
+            const hasAccounts = accounts.length > 0;
+            if (!hasAccounts) {
+                await useAccountStore.getState().fetchAccounts();
+                accounts = useAccountStore.getState().accounts;
+            }
+            const bestAccount = instanceService.findBestSmartPlayAccount(accounts);
+
+            const hasBest = Boolean(bestAccount);
+            if (!hasBest) {
+                await instanceService.launchInstance(instId);
+                await get().fetchInstances(true);
+                set({ isLoading: false });
+                const cur = get().instances.find(i => i.config.id === instId);
+                return {
+                    accountEmail: 'None',
+                    instanceName: cur?.config.name || 'Instance',
+                };
+            }
+
+            await instanceService.switchAccountToInstance(bestAccount!.id, instId);
+            await Promise.all([
+                get().fetchInstances(true),
+                useAccountStore.getState().fetchCurrentAccount(),
+            ]);
+
+            set({ isLoading: false });
+            const cur = get().instances.find(i => i.config.id === instId);
+            return {
+                accountEmail: bestAccount!.email,
+                instanceName: cur?.config.name || 'Instance',
+            };
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to smart play instance' });
             throw err;
         }
     },

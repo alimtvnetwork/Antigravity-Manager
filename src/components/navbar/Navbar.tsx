@@ -99,7 +99,7 @@ function Navbar() {
 
     return (
         <nav
-            style={{ position: 'sticky', top: 0, zIndex: 60 }}
+            style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
             className="pt-9 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
         >
             {/* 窗口拖拽区域 - Tauri 专用 */}

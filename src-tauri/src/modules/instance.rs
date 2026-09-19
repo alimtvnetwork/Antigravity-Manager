@@ -243,8 +243,12 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
     Ok(config)
 }
 
-/// Copy/clone an existing profile
-pub fn copy_instance(source_id: &str, target_name: String) -> Result<InstanceConfig, String> {
+/// Copy/clone an existing profile (full directory copy by default, or profile only)
+pub fn copy_instance(
+    source_id: &str,
+    target_name: String,
+    clone_mode: Option<&str>,
+) -> Result<InstanceConfig, String> {
     let registry = load_registry()?;
     let source = registry
         .instances
@@ -258,12 +262,20 @@ pub fn copy_instance(source_id: &str, target_name: String) -> Result<InstanceCon
     let src_path = PathBuf::from(&source.data_dir);
     let dst_path = PathBuf::from(&new_instance.data_dir);
 
-    // Recursively copy configuration if source exists
-    if src_path.exists() {
-        let user_settings_src = src_path.join("User");
-        if user_settings_src.exists() {
-            let user_settings_dst = dst_path.join("User");
-            let _ = copy_dir_recursive(&user_settings_src, &user_settings_dst);
+    let is_profile_only = clone_mode.map(|m| m.eq_ignore_ascii_case("profile")).unwrap_or(false);
+
+    let has_src = src_path.exists();
+    if has_src {
+        if is_profile_only {
+            let user_settings_src = src_path.join("User");
+            let has_user_dir = user_settings_src.exists();
+            if has_user_dir {
+                let user_settings_dst = dst_path.join("User");
+                let _ = copy_dir_recursive(&user_settings_src, &user_settings_dst);
+            }
+        } else {
+            // Full directory copy (default): copies entire instance data tree while skipping volatile locks/caches
+            let _ = copy_dir_recursive(&src_path, &dst_path);
         }
     }
 
@@ -274,7 +286,8 @@ pub fn copy_instance(source_id: &str, target_name: String) -> Result<InstanceCon
 pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceConfig, String> {
     let mut registry = load_registry()?;
     let trimmed = new_name.trim();
-    if trimmed.is_empty() {
+    let is_empty = trimmed.is_empty();
+    if is_empty {
         return Err("Profile name cannot be empty".to_string());
     }
 
@@ -291,21 +304,30 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
     Ok(updated)
 }
 
-/// Helper function to copy directories recursively
+/// Helper function to copy directories recursively while sanitizing lock files and volatile caches
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if !dst.exists() {
+    let has_dst = dst.exists();
+    if !has_dst {
         fs::create_dir_all(dst)?;
     }
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
-        let dest_child = dst.join(entry.file_name());
-        if file_type.is_dir() {
-            // Skip large cache directories
-            let dir_name = entry.file_name().to_string_lossy().to_lowercase();
-            if dir_name.contains("cache") || dir_name == "crashpad" {
-                continue;
-            }
+        let file_name = entry.file_name();
+        let name_str = file_name.to_string_lossy().to_lowercase();
+
+        // Skip volatile lock files, active socket handles, crashpad, and heavy caches
+        let is_lock = name_str.ends_with(".lock") || name_str.starts_with("singleton");
+        let is_cache = name_str.contains("cache")
+            || name_str == "crashpad"
+            || name_str.starts_with(".org.chromium");
+        if is_lock || is_cache {
+            continue;
+        }
+
+        let dest_child = dst.join(&file_name);
+        let is_directory = file_type.is_dir();
+        if is_directory {
             copy_dir_recursive(&entry.path(), &dest_child)?;
         } else {
             let _ = fs::copy(entry.path(), dest_child);
@@ -402,15 +424,38 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         }
     }
 
-    // Gracefully terminate conflicting Antigravity processes so Electron's single-instance mutex does not abort the new launch
-    if crate::modules::process::is_antigravity_running(None) {
+    // Clean any orphaned lock files in the target instance data directory
+    let target_data_path = PathBuf::from(&data_dir);
+    let has_target_dir = target_data_path.exists();
+    if has_target_dir {
+        let code_lock = target_data_path.join("code.lock");
+        let has_code_lock = code_lock.exists();
+        if has_code_lock {
+            let _ = fs::remove_file(&code_lock);
+        }
+        if let Ok(entries) = fs::read_dir(&target_data_path) {
+            for entry in entries.flatten() {
+                let fname = entry.file_name().to_string_lossy().to_lowercase();
+                let is_stale_lock = fname.starts_with("singleton") || fname.ends_with(".lock");
+                if is_stale_lock {
+                    let _ = fs::remove_file(entry.path());
+                }
+            }
+        }
+    }
+
+    // Gracefully terminate conflicting Antigravity processes and allow OS to unmap memory
+    let is_antigravity_active = crate::modules::process::is_antigravity_running(None);
+    if is_antigravity_active {
         let _ = crate::modules::process::close_antigravity(20, None);
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     // Determine executable: custom/cloned executable path if present and exists, otherwise system detection
     let exe_path = if let Some(ref p) = custom_exe {
         let pb = PathBuf::from(p);
-        if pb.exists() {
+        let has_pb = pb.exists();
+        if has_pb {
             pb
         } else {
             crate::modules::process::detect_antigravity_with_diagnostics(None)?
@@ -429,8 +474,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         cmd.arg("-a");
         cmd.arg(&exe_str);
         cmd.arg("--args");
-        if !is_default {
+        let has_custom_data = !is_default;
+        if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
+            cmd.arg("--password-store=basic");
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -451,8 +498,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     {
         let mut cmd = Command::new(&exe_str);
 
-        if !is_default {
+        let has_custom_data = !is_default;
+        if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
+            cmd.arg("--password-store=basic");
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -461,8 +510,6 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
         #[cfg(target_os = "linux")]
         {
-            // Bypass GNOME Keyring by isolating tokens in local state.vscdb
-            cmd.arg("--password-store=basic");
             crate::modules::process::clean_appimage_env(&mut cmd);
         }
 
@@ -472,6 +519,46 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
         Ok(())
     }
+}
+
+/// Export all instance configurations to a JSON string
+pub fn export_instances_json() -> Result<String, String> {
+    let registry = load_registry()?;
+    serde_json::to_string_pretty(&registry)
+        .map_err(|e| format!("Failed to export instances JSON: {}", e))
+}
+
+/// Import instance configurations from a JSON string, merging with existing
+pub fn import_instances_json(json_str: &str) -> Result<Vec<InstanceConfig>, String> {
+    let imported: InstanceRegistry = serde_json::from_str(json_str)
+        .map_err(|e| format!("Invalid instances JSON payload: {}", e))?;
+
+    let mut registry = load_registry()?;
+    let instances_root = get_instances_dir()?;
+
+    for mut inst in imported.instances {
+        let is_default_inst = inst.id == "default";
+        if is_default_inst {
+            continue;
+        }
+
+        let inst_dir = instances_root.join(&inst.id).join("data");
+        let has_dir = inst_dir.exists();
+        if !has_dir {
+            let _ = fs::create_dir_all(&inst_dir);
+        }
+        inst.data_dir = inst_dir.to_string_lossy().to_string();
+
+        let existing_pos = registry.instances.iter().position(|i| i.id == inst.id);
+        if let Some(pos) = existing_pos {
+            registry.instances[pos] = inst;
+        } else {
+            registry.instances.push(inst);
+        }
+    }
+
+    save_registry(&registry)?;
+    Ok(registry.instances)
 }
 
 /// Clone or create an isolated executable for an instance regardless of OS

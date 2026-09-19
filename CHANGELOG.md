@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.27.0 (2026-09-19)**:
+        -   **[Instance Architecture & Smart Play] Full Directory Cloning, Smart Rotation, & UI Action Bar**:
+            -   **Full Instance Directory Cloning**: Enhanced `copy_instance` with default full directory copying for Chromium/Electron local state, session databases, and isolated user data with an on/off toggle in settings.
+            -   **Smart Play Profile Rotation**: Implemented intelligent multi-factor auto-rotation algorithm evaluating least recently used, lowest 4H quota, and lowest weekly quota to auto-bind and launch target instances.
+            -   **Top Action Bar & Profile Search**: Prominently placed Play (Smart Play), Duplicate, Edit (Rename), and Remove (Delete) icons adjacent to the dropdown selector, with real-time profile search and JSON Import/Export.
+            -   **Launch & Stacking Context Hardening**: Purged stale lock files, resolved process race conditions with 500ms unmap delays, and eliminated UI overlap bugs with isolated stacking contexts.
+
     *   **v4.26.1 (2026-09-19)**:
         -   **[UI & Scrolling Polish] Compact Top Padding & Dedicated Scroll Containers**:
             -   **Compact Top Padding**: Reduced top padding across Email & Alerts and Instances pages from 24-32px to 14-16px, eliminating redundant nested card wrappers and oversized margins.

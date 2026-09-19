@@ -167,6 +167,7 @@ export interface AppConfig {
     proxy: ProxyConfig;
     cloudflared: CloudflaredConfig; // [NEW] Cloudflared 配置
     auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] 自动配额轮换与任务恢复配置
+    instance_clone_mode?: 'full' | 'profile'; // [NEW] 实例克隆模式：全量目录复制或仅配置
 }
 
 export interface AutoProfileSwitcherConfig {

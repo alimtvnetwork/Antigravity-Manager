@@ -34,6 +34,12 @@ pub struct AppConfig {
     pub cloudflared: CloudflaredConfig, // [NEW] Cloudflared configuration
     #[serde(default)]
     pub auto_profile_switcher: AutoProfileSwitcherConfig, // [NEW] Auto profile switcher configuration
+    #[serde(default = "default_instance_clone_mode")]
+    pub instance_clone_mode: String,
+}
+
+fn default_instance_clone_mode() -> String {
+    "full".to_string()
 }
 
 /// Scheduled warmup configuration
@@ -204,6 +210,7 @@ impl AppConfig {
             hidden_menu_items: Vec::new(),
             cloudflared: CloudflaredConfig::default(),
             auto_profile_switcher: AutoProfileSwitcherConfig::default(),
+            instance_clone_mode: default_instance_clone_mode(),
         }
     }
 }

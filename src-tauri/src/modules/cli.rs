@@ -89,7 +89,7 @@ pub fn handle_cli_arguments() -> bool {
             let source_id = &args[2];
             let target_name = args[3..].join(" ");
 
-            match instance::copy_instance(source_id, target_name) {
+            match instance::copy_instance(source_id, target_name, None) {
                 Ok(new_config) => {
                     println!("[CLI] Successfully cloned profile:");
                     println!("  ID:       {}", new_config.id);

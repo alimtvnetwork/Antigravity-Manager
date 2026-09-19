@@ -12,8 +12,22 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 }
 
 #[tauri::command]
-pub fn copy_instance(source_id: String, target_name: String) -> Result<InstanceConfig, String> {
-    instance::copy_instance(&source_id, target_name)
+pub fn copy_instance(
+    source_id: String,
+    target_name: String,
+    clone_mode: Option<String>,
+) -> Result<InstanceConfig, String> {
+    instance::copy_instance(&source_id, target_name, clone_mode.as_deref())
+}
+
+#[tauri::command]
+pub fn export_instances_json() -> Result<String, String> {
+    instance::export_instances_json()
+}
+
+#[tauri::command]
+pub fn import_instances_json(json_content: String) -> Result<Vec<InstanceConfig>, String> {
+    instance::import_instances_json(&json_content)
 }
 
 #[tauri::command]

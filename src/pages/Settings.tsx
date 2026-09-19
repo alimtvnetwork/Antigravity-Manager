@@ -43,7 +43,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.26.1');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.27.0');
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
         theme: 'system',
@@ -98,6 +98,7 @@ function Settings() {
             backoff_steps: [30, 60, 120, 300, 600]
         },
         hidden_menu_items: [],  // 菜单显示设置：默认不隐藏任何菜单项
+        instance_clone_mode: 'full',
         auto_profile_switcher: {
             is_enabled: false,
             check_interval_seconds: 60,
@@ -782,6 +783,31 @@ function Settings() {
                                         <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
                                         {t('settings.menu.selected_items_note')}
                                     </p>
+                                </div>
+
+                                {/* 实例克隆模式设置 */}
+                                <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
+                                    <h3 className="font-medium text-gray-900 dark:text-base-content mb-1">
+                                        {t('settings.instance.clone_mode_title', 'Instance Duplication Mode')}
+                                    </h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                        {t('settings.instance.clone_mode_desc', 'Choose whether cloning an instance copies the full directory or only profile configuration.')}
+                                    </p>
+                                    <select
+                                        className="w-full px-4 py-3 border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-base-content bg-gray-50 dark:bg-base-200 text-sm"
+                                        value={formData.instance_clone_mode || 'full'}
+                                        onChange={(e) => {
+                                            const mode = e.target.value as 'full' | 'profile';
+                                            setFormData({ ...formData, instance_clone_mode: mode });
+                                        }}
+                                    >
+                                        <option value="full">
+                                            {t('settings.instance.mode_full', 'Full Directory Copy (Default - complete settings, sessions, and extensions)')}
+                                        </option>
+                                        <option value="profile">
+                                            {t('settings.instance.mode_profile', 'Profile Only (Only User configuration and keybindings)')}
+                                        </option>
+                                    </select>
                                 </div>
                             </>
                         </div>

@@ -5,7 +5,7 @@ interface SuggestedFixMap {
   [errorCode: string]: string[];
 }
 
-const rawVersion = versionData.version || versionData.Version || '4.26.1';
+const rawVersion = versionData.version || versionData.Version || '4.27.0';
 const formattedVersion = rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
 
 const APP_INFO = {
