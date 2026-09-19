@@ -52,6 +52,12 @@ When an instance process crashes or is forcefully terminated, Electron frequentl
 - `singleton*`
 When `launch_instance` attempts to start the instance against that data directory, Electron treats the directory as already locked and aborts startup.
 
+### Root Cause E: Global Process Termination Destroying Detection and Parallelism
+In `launch_instance`, calling `close_antigravity(20, None)` globally before detecting the executable created two critical failure modes:
+1. `detect_antigravity_with_diagnostics` Strategy 1 relies on `get_path_from_running_process`. Killing all running instances before running detection caused Strategy 1 to return `None`, causing custom-installed or portable versions to fail detection.
+2. Terminating all running Antigravity processes globally killed other parallel instances, defeating multi-instance isolation and preventing multiple profiles from running simultaneously.
+Fixed by detecting the executable first while processes are still alive, and targeting process termination strictly to the target instance's PIDs via `find_pids_for_data_dir`.
+
 ---
 
 ## 3. Architecture & Engineering Fix
