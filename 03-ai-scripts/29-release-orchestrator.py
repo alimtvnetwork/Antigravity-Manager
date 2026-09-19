@@ -280,24 +280,8 @@ def stage_and_commit_release(next_version, scope, dry_run=False):
         print(f"[DRY RUN] Would stage changes and commit on release branch: '{commit_msg}'")
         return "dryrun_commit_sha"
 
-    # Stage release-specific and sync-regenerated files
-    release_candidates = [
-        VERSION_JSON,
-        PACKAGE_JSON,
-        CHANGELOG_MD,
-        README_MD,
-        NODE_BUMP_SCRIPT,
-        PYTHON_BUMP_SCRIPT,
-        AI_BUMP_SCRIPT,
-        REPO_ROOT / ".gitmap" / "release",
-        REPO_ROOT / "public" / "health-score.json",
-        REPO_ROOT / "src" / "data" / "specTree.json",
-        REPO_ROOT / "02-spec" / "19-main-worker-service" / "98-changelog.md",
-        REPO_ROOT / "reports" / "spec-verification" / "coverage.md",
-    ]
-    for vf in release_candidates:
-        if vf.exists():
-            run_cmd(["git", "add", str(vf)])
+    # Stage all release-specific and modified files
+    run_cmd(["git", "add", "-A"])
 
     # Commit
     run_cmd(["git", "commit", "-m", commit_msg])

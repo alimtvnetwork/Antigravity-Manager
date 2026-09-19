@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.31.0 (2026-09-20)**:
+        -   **[Update System & Installer Integration] Startup Auto-Update Checker, Shell Script Update Flags, & In-App Installer Execution**:
+            -   **Startup Auto-Update Checker**: Implemented automatic background update verification on application launch with toast notification and one-click update actions.
+            -   **Shell Script Update Integration**: Added `--check-update` and `--update` flags to `install.sh` and `-CheckUpdate` and `-Update` to `install.ps1` for autonomous headless checking and upgrading.
+            -   **One-Click In-App Installer Execution**: Added Tauri IPC command `run_installer_update` to invoke native installer scripts directly from the update notification and settings panels.
+            -   **Dynamic Titlebar & Version Synchronization**: Dynamic version badge binding in `TitleBar.tsx` and unified SemVer propagation across manifests and documentation.
     *   **v4.30.0 (2026-09-19)**:
         -   **[Custom Titlebar & Fluid Responsive UI] Custom Titlebar Caption Controls, Frameless Architecture, & Fluid Responsiveness**:
             -   **Custom Window Controls**: Replaced native Windows OS titlebar frame with custom, fluid titlebar controls (Minimize `-`, Maximize/Restore `🗖`, and Close `✕`) directly integrated at the top of the application window.

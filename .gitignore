@@ -74,4 +74,5 @@ tmp/
 *.tmp
 *.cache
 .gitmap/
+.ai-memory/cicd/
 

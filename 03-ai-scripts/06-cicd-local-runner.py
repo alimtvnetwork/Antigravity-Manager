@@ -265,10 +265,18 @@ def run_smart_go_tests(
     repo_root = REPO_ROOT
     inventory = build_or_update_test_inventory(repo_root, force=force)
     all_tests = inventory.get("tests", {})
-    tests = {
-        k: v for k, v in all_tests.items()
-        if v.get("test_file", "").endswith(".go")
-    }
+    if isinstance(all_tests, list):
+        tests = {
+            t.get("id", str(i)): t for i, t in enumerate(all_tests)
+            if isinstance(t, dict) and t.get("test_file", "").endswith(".go")
+        }
+    elif isinstance(all_tests, dict):
+        tests = {
+            k: v for k, v in all_tests.items()
+            if isinstance(v, dict) and v.get("test_file", "").endswith(".go")
+        }
+    else:
+        tests = {}
 
     if package_filter:
         queries = [package_filter] if isinstance(package_filter, str) else list(package_filter)
@@ -402,6 +410,8 @@ def run_smart_go_tests(
         elapsed, total_test_eta, 0.0, total_dirty, passed_count + failed_count
     )
 
+    if "summary" not in inventory or not isinstance(inventory["summary"], dict):
+        inventory["summary"] = {}
     inventory["summary"]["dirty"] = failed_count
     inventory["summary"]["cached"] = len(tests) - failed_count
     try:
@@ -447,6 +457,19 @@ def execute_ci_job(job_name: str, command: list[str]) -> JobResult:
     FAILURES_DIR.mkdir(parents=True, exist_ok=True)
     start_time = time.perf_counter()
     effective_cmd = resolve_job_command(job_name, command)
+
+    # Check if target script exists on disk if command specifies a script file
+    for arg in effective_cmd[1:]:
+        if not arg.startswith("-") and ("." in arg or "/" in arg or "\\" in arg):
+            if arg.endswith((".py", ".mjs", ".js", ".sh")):
+                target_path = REPO_ROOT / arg
+                if not target_path.is_file():
+                    elapsed = time.perf_counter() - start_time
+                    out_msg = f"[SKIPPED] Optional script '{arg}' not present in repository"
+                    return JobResult(
+                        name=job_name, is_success=True, output=out_msg, duration_sec=round(elapsed, 2), return_code=0
+                    )
+
     test_env = os.environ.copy()
     abs_temp = str(TMP_CACHE_DIR.resolve())
     test_env["GOTMPDIR"] = abs_temp

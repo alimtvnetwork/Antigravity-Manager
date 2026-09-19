@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.31.0 (2026-09-20)**:
+        -   **[更新系统与安装器集成] 启动自动更新检查、Shell 脚本更新参数与应用内一键升级**:
+            -   **启动自动更新检查**: 实现应用启动时在后台自动检测最新发布版本，并显示更新提示弹窗及一键升级操作。
+            -   **Shell 脚本更新参数**: 为 `install.sh` 添加 `--check-update` 与 `--update` 参数，为 `install.ps1` 添加 `-CheckUpdate` 与 `-Update` 参数，支持终端自动化检测与一键更新。
+            -   **应用内一键安装更新**: 新增 Tauri IPC 命令 `run_installer_update`，支持直接从更新通知和设置页面拉起原生安装脚本进行无感升级。
+            -   **标题栏版本动态绑定**: 修复并动态绑定 `TitleBar.tsx` 版本标签，实现版本号跨配置清单与文档的统一自动化同步。
+
     *   **v4.30.0 (2026-09-19)**:
         -   **[Custom Titlebar & Fluid Responsive UI] Custom Titlebar Caption Controls, Frameless Architecture, & Fluid Responsiveness**:
             -   **Custom Window Controls**: Replaced native Windows OS titlebar frame with custom, fluid titlebar controls (Minimize `-`, Maximize/Restore `🗖`, and Close `✕`) directly integrated at the top of the application window.

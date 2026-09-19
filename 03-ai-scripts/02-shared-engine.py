@@ -297,7 +297,7 @@ MAX_READ_SIZE_BYTES = 20 * 1024 * 1024  # 20MB memory safety cap
 
 EXCLUDE_DIRS = {
     ".git", ".gitmap", "gitmap", ".git-map",
-    "node_modules", "dist", "build", ".venv", "venv",
+    "node_modules", "dist", "build", ".venv", "venv", "target",
     ".gemini", "tmp", ".system_generated", "vendor", ".cache",
     ".next", "bin", "obj", "coverage", "__pycache__",
     ".vs", ".idea", ".agent", "release-artifacts", "release-assets",

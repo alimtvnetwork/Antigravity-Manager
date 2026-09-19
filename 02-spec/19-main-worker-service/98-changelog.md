@@ -1,3 +1,9 @@
+## v4.31.0 — 2026-09-19 (Startup auto-update checker, shell script flags, and in-app installer execution)
+
+**Scope:** Version bump. Startup auto-update checker, shell script flags, and in-app installer execution.
+
+---
+
 # 98 — Changelog
 
 **Spec:** `19-main-worker-service`
