@@ -31,7 +31,9 @@ fn embed_windows_manifest() {
     if std::fs::write(&manifest_path, manifest).is_ok() {
         let manifest_str = manifest_path.display().to_string().replace('\\', "/");
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-        let icon_path = std::path::Path::new(&manifest_dir).join("icons").join("icon.ico");
+        let icon_path = std::path::Path::new(&manifest_dir)
+            .join("icons")
+            .join("icon.ico");
         let icon_str = icon_path.display().to_string().replace('\\', "/");
         let rc_content = if icon_path.exists() {
             format!(

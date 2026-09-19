@@ -13,7 +13,7 @@ import {
   Wrench,
   Bot,
 } from 'lucide-react';
-import { useErrorStore, type CapturedError } from '../../stores/error-store';
+import { useErrorStore, type CapturedError, type ErrorModalTab } from '../../stores/error-store';
 import {
   generateCompactReport,
   generateJsonReport,
@@ -21,8 +21,6 @@ import {
 } from '../../lib/error-report-generator';
 import { showToast } from '../common/ToastContainer';
 import { cn } from '../../utils/cn';
-
-type ActiveTab = 'overview' | 'backend' | 'stack' | 'context';
 
 export function ErrorModal(): React.ReactNode {
   const {
@@ -32,9 +30,10 @@ export function ErrorModal(): React.ReactNode {
     errorQueue,
     currentQueueIndex,
     navigateQueue,
+    activeTab,
+    setActiveTab,
   } = useErrorStore();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [copiedAi, setCopiedAi] = useState(false);
 
   if (!isModalOpen) {
@@ -72,7 +71,9 @@ export function ErrorModal(): React.ReactNode {
         <TabNav activeTab={activeTab} onSelect={setActiveTab} />
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {activeTab === 'overview' && <OverviewTab error={selectedError} />}
+          {activeTab === 'overview' && (
+            <OverviewTab error={selectedError} onSelectTab={setActiveTab} />
+          )}
           {activeTab === 'backend' && <BackendTab error={selectedError} />}
           {activeTab === 'stack' && <StackTab error={selectedError} />}
           {activeTab === 'context' && <ContextTab error={selectedError} />}
@@ -163,16 +164,16 @@ function ModalHeader({
 }
 
 interface TabNavProps {
-  activeTab: ActiveTab;
-  onSelect: (tab: ActiveTab) => void;
+  activeTab: ErrorModalTab;
+  onSelect: (tab: ErrorModalTab) => void;
 }
 
 function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
-  const tabs: Array<{ id: ActiveTab; label: string; icon: React.ReactNode }> = [
-    { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
-    { id: 'backend', label: 'Backend Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
+  const tabs: Array<{ id: ErrorModalTab; label: string; icon: React.ReactNode }> = [
     { id: 'stack', label: 'Stack Trace', icon: <Layers className="w-3.5 h-3.5" /> },
-    { id: 'context', label: 'Context', icon: <Info className="w-3.5 h-3.5" /> },
+    { id: 'overview', label: 'Overview', icon: <Info className="w-3.5 h-3.5" /> },
+    { id: 'backend', label: 'Backend Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
+    { id: 'context', label: 'Context', icon: <Bot className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -184,9 +185,9 @@ function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
             key={tab.id}
             onClick={() => onSelect(tab.id)}
             className={cn(
-              'flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors',
+              'flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors cursor-pointer',
               selected
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-bold'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             )}
           >
@@ -199,15 +200,30 @@ function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
   );
 }
 
-function OverviewTab({ error }: { error: CapturedError }): React.ReactNode {
+function OverviewTab({
+  error,
+  onSelectTab,
+}: {
+  error: CapturedError;
+  onSelectTab: (tab: ErrorModalTab) => void;
+}): React.ReactNode {
   const fixes = getSuggestedFixes(error.code);
 
   return (
     <div className="space-y-4">
       <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-400 mb-1">
-          Error Message
-        </h4>
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
+            Error Message
+          </h4>
+          <button
+            type="button"
+            onClick={() => onSelectTab('stack')}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
+          >
+            Inspect Stack Trace →
+          </button>
+        </div>
         <p className="text-sm font-mono text-red-900 dark:text-red-200 break-words">
           {error.message}
         </p>

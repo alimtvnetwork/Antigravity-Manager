@@ -101,12 +101,12 @@ function Navbar() {
     return (
         <nav
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="pt-6 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
+            className="pt-3 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
         >
             {/* 窗口拖拽区域 - Tauri 专用 */}
             {isTauri() && (
                 <div
-                    className="absolute top-6 left-0 right-0 h-14"
+                    className="absolute top-3 left-0 right-0 h-14"
                     style={{ zIndex: 5, backgroundColor: 'rgba(0,0,0,0.001)' }}
                     data-tauri-drag-region
                 />

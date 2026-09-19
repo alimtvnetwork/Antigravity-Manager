@@ -1028,6 +1028,7 @@ pub async fn show_main_window(window: tauri::Window) -> Result<(), String> {
         let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
         let _ = window.set_icon(icon);
     }
+    let _ = window.unminimize();
     window.show().map_err(|e| e.to_string())
 }
 

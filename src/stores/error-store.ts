@@ -262,16 +262,20 @@ export function buildCapturedError(
   };
 }
 
+export type ErrorModalTab = 'overview' | 'backend' | 'stack' | 'context';
+
 interface ErrorStoreState {
   selectedError: CapturedError | null;
   isModalOpen: boolean;
+  activeTab: ErrorModalTab;
   recentErrors: CapturedError[];
   errorQueue: CapturedError[];
   currentQueueIndex: number;
 
   captureError: (error: unknown, meta?: CaptureErrorMeta) => CapturedError;
   captureException: (error: Error | string, context?: ErrorContext) => CapturedError;
-  openErrorModal: (error: CapturedError) => void;
+  openErrorModal: (error: CapturedError, initialTab?: ErrorModalTab) => void;
+  setActiveTab: (tab: ErrorModalTab) => void;
   openErrorQueue: (errors: CapturedError[], startIndex?: number) => void;
   navigateQueue: (direction: 'prev' | 'next') => void;
   closeErrorModal: () => void;
@@ -281,6 +285,7 @@ interface ErrorStoreState {
 export const useErrorStore = create<ErrorStoreState>((set, get) => ({
   selectedError: null,
   isModalOpen: false,
+  activeTab: 'stack',
   recentErrors: [],
   errorQueue: [],
   currentQueueIndex: 0,
@@ -290,6 +295,7 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
     set((state) => ({
       selectedError: captured,
       isModalOpen: true,
+      activeTab: 'stack',
       recentErrors: [captured, ...state.recentErrors].slice(0, 50),
       errorQueue: [captured, ...state.errorQueue],
       currentQueueIndex: 0,
@@ -302,6 +308,7 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
     set((state) => ({
       selectedError: captured,
       isModalOpen: true,
+      activeTab: 'stack',
       recentErrors: [captured, ...state.recentErrors].slice(0, 50),
       errorQueue: [captured, ...state.errorQueue],
       currentQueueIndex: 0,
@@ -309,11 +316,16 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
     return captured;
   },
 
-  openErrorModal: (error: CapturedError): void => {
+  openErrorModal: (error: CapturedError, initialTab: ErrorModalTab = 'stack'): void => {
     set({
       selectedError: error,
       isModalOpen: true,
+      activeTab: initialTab,
     });
+  },
+
+  setActiveTab: (tab: ErrorModalTab): void => {
+    set({ activeTab: tab });
   },
 
   openErrorQueue: (errors: CapturedError[], startIndex = 0): void => {

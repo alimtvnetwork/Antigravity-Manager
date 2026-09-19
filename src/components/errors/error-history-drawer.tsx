@@ -33,7 +33,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   });
 
   const handleSelectError = (error: CapturedError) => {
-    openErrorModal(error);
+    openErrorModal(error, 'stack');
   };
 
   return (
@@ -118,7 +118,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
                     },
                     { triggerAction: 'drawer_diagnostics_inspect', source: 'error_history_drawer' }
                   );
-                  openErrorModal(diag);
+                  openErrorModal(diag, 'stack');
                 }}
                 className="px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
               >

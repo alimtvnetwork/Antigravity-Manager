@@ -22,7 +22,7 @@ const LogRow = React.memo(({ log }: { log: LogEntry }) => {
     const hasFields = Object.keys(log.fields).length > 0;
 
     const handleDoubleClick = () => {
-        useErrorStore.getState().captureError(
+        const captured = useErrorStore.getState().captureError(
             {
                 message: log.message,
                 code: log.level === 'ERROR' ? 'E9001' : 'E1000',
@@ -36,6 +36,7 @@ const LogRow = React.memo(({ log }: { log: LogEntry }) => {
                 triggerAction: 'console_row_double_click',
             }
         );
+        useErrorStore.getState().openErrorModal(captured, 'stack');
     };
 
     return (

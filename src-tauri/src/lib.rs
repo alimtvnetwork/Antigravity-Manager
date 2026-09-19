@@ -442,6 +442,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = app.get_webview_window("main").map(|window| {
+                let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
                 #[cfg(target_os = "macos")]
@@ -853,8 +854,8 @@ pub fn run() {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
                         let _ = window.unminimize();
+                        let _ = window.show();
                         let _ = window.set_focus();
                         app_handle
                             .set_activation_policy(tauri::ActivationPolicy::Regular)

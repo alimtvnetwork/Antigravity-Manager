@@ -302,5 +302,3 @@ export function formatTimeAgo(timestampSec?: number): string {
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
 }
-
-

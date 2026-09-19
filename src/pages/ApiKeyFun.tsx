@@ -386,7 +386,7 @@ export const ApiKeyFun: React.FC = () => {
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="h-full flex flex-col p-6 md:p-8 gap-6 overflow-y-auto max-w-[90rem] mx-auto w-full"
+            className="h-full flex flex-col px-4 sm:px-6 pt-2 pb-4 gap-4 overflow-y-auto max-w-[90rem] mx-auto w-full"
         >
             {/* Header Card */}
             <div

@@ -175,7 +175,7 @@ function Dashboard() {
     return (
         <div className="h-full w-full overflow-y-auto">
             <div
-                className="p-5 space-y-4 max-w-7xl mx-auto"
+                className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-7xl mx-auto"
                 onMouseMove={() => console.log('Mouse moving over Dashboard')}
                 style={{ position: 'relative', zIndex: 1 }}
             >

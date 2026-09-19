@@ -64,7 +64,7 @@ function Layout() {
         <div className="h-screen flex flex-col bg-[#FAFBFC] dark:bg-base-300">
             {/* 全局窗口拖拽区域 - 使用 JS 手动触发拖拽，解决 HTML 属性失效问题 */}
             <div
-                className="fixed top-0 left-0 right-0 h-6"
+                className="fixed top-0 left-0 right-0 h-4"
                 style={{
                     zIndex: 9999,
                     backgroundColor: 'rgba(0,0,0,0.001)',
