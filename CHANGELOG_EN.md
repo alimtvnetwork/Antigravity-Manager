@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.25.0 (2026-09-19)**:
+        -   **[UI & Z-Index Layering Overhaul] Eliminate Toolbar Hover Collision and Elevate Navbar Stacking Context**:
+            -   **Eliminate Rogue Z-Index on Add Account**: Removed `relative z-[100]` on Add Account button in `AddAccountDialog.tsx` that previously bled through and blocked hover on the Instance dropdown menu.
+            -   **Navbar Stacking Layer Elevation**: Elevated sticky navbar to `zIndex: 60` and ensured all dropdown menus (`LanguageDropdown`, `MoreDropdown`, `InstanceSelector`, `NavMenu`) are permanently above page body content.
+            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.
     *   **v4.24.0 (2026-09-19)**:
         -   **[Email & UI Boundary Overhaul] Dedicated Email Setup Page, Navbar Dropdown Boundaries, and Dynamic Release Asset Discovery**:
             -   **Dedicated Email Setup Page**: Added `/email` route, top-level `Email.tsx` view with active status badge, and surfaced `Email & Alerts` with `Mail` icon in main navigation.

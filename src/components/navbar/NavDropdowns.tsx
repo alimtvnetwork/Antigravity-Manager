@@ -63,7 +63,7 @@ export function LanguageDropdown({
 
             {/* 下拉菜单 */}
             {isOpen && (
-                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-32 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-32 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
                     {languages.map((lang) => (
                         <button
                             key={lang.code}
@@ -211,7 +211,7 @@ export function MoreDropdown({
 
             {/* 下拉菜单 */}
             {isOpen && (
-                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-40 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-40 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
                     {/* 迷你视图 */}
                     <button
                         onClick={() => {

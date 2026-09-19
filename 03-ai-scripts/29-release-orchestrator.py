@@ -333,10 +333,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
     # 11. Update changelog files
     zh_entry = (
         f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[Email & UI Boundary Overhaul] Dedicated Email Setup Page, Navbar Dropdown Boundaries, and Dynamic Release Asset Discovery**:\n"
-        f"            -   **Dedicated Email Setup Page**: Added `/email` route, top-level `Email.tsx` view with active status badge, and surfaced `Email & Alerts` with `Mail` icon in main navigation.\n"
-        f"            -   **Navbar Dropdown Boundary Protection**: Added viewport boundary locks `max-w-[calc(100vw-32px)]` to both navigation and instance selector popovers, eliminating window overflow.\n"
-        f"            -   **Dynamic Release Asset Discovery**: Hardened `install.ps1` to query `/releases` array and dynamically pick the newest release with published binary assets.\n"
+        f"        -   **[UI & Z-Index Layering Overhaul] Eliminate Toolbar Hover Collision and Elevate Navbar Stacking Context**:\n"
+        f"            -   **Eliminate Rogue Z-Index on Add Account**: Removed `relative z-[100]` on Add Account button in `AddAccountDialog.tsx` that previously bled through and blocked hover on the Instance dropdown menu.\n"
+        f"            -   **Navbar Stacking Layer Elevation**: Elevated sticky navbar to `zIndex: 60` and ensured all dropdown menus (`LanguageDropdown`, `MoreDropdown`, `InstanceSelector`, `NavMenu`) are permanently above page body content.\n"
         f"            -   **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     en_entry = zh_entry
@@ -383,9 +382,9 @@ def execute_version_bump(next_version, scope, dry_run=False):
         f"```\n\n"
         f"---\n\n"
         f"## What's Changed in v{next_version}\n\n"
-        f"- **Dedicated Email Setup Page**: Added `/email` route and standalone `Email.tsx` view, directly surfaced in top-level navigation as `Email & Alerts`.\n"
-        f"- **Navbar Dropdown Boundary Protection**: Constrained all navigation and instance selector popovers with `max-w-[calc(100vw-32px)]` to prevent clipping beyond screen boundaries.\n"
-        f"- **Dynamic Release Asset Discovery**: Hardened `install.ps1` to query `/releases` and dynamically select releases with verified uploaded assets, avoiding stale release downloads.\n"
+        f"- **Eliminate Toolbar Rogue Z-Index**: Removed `relative z-[100]` on the Add Account trigger button in `AddAccountDialog.tsx`, fixing the UI issue where the button poked through and intercepted hover over the active instance profile menu.\n"
+        f"- **Navbar Stacking Context Elevation**: Raised navbar sticky container to `zIndex: 60`, ensuring all top-bar menus layer cleanly over page body elements.\n"
+        f"- **Navbar Dropdown Hardening**: Applied `z-50` and viewport width constraints across all navbar popover menus (`LanguageDropdown`, `MoreDropdown`, `InstanceSelector`, `NavMenu`).\n"
         f"- **Verified 100% Green Quality Gates**: Validated all repository quality gates, strict relative path guards, and multi-platform CI compliance with zero bypasses.\n"
     )
     notes_file.write_text(notes_content, encoding="utf-8", newline="\n")

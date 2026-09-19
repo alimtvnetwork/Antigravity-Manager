@@ -39,3 +39,4 @@ Master directory of architectural and execution plans.
 - [26-installer-exe-and-compact-navbar-menu-ui.md](completed/26-installer-exe-and-compact-navbar-menu-ui.md): Direct EXE installation, compact navbar menu button, and instance selector boundary protection.
 - [27-single-menu-button-navbar-and-pure-exe-installer.md](completed/27-single-menu-button-navbar-and-pure-exe-installer.md): Single menu button navbar, space utilization, and pure EXE installer.
 - [28-email-setup-page-and-installer-hardening.md](completed/28-email-setup-page-and-installer-hardening.md): Dedicated Email setup page, navbar dropdown boundary locks, and installer asset resolution.
+- [29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md](completed/29-eliminate-toolbar-hover-collision-and-z-index-hierarchy.md): Eliminate toolbar hover collision and elevate navbar stacking context.
