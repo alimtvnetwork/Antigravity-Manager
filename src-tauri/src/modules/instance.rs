@@ -444,14 +444,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         }
     }
 
-    // Gracefully terminate conflicting Antigravity processes and allow OS to unmap memory
-    let is_antigravity_active = crate::modules::process::is_antigravity_running(None);
-    if is_antigravity_active {
-        let _ = crate::modules::process::close_antigravity(20, None);
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-
-    // Determine executable: custom/cloned executable path if present and exists, otherwise system detection
+    // Determine executable FIRST while running processes are alive for discovery
     let exe_path = if let Some(ref p) = custom_exe {
         let pb = PathBuf::from(p);
         let has_pb = pb.exists();
@@ -463,6 +456,14 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     } else {
         crate::modules::process::detect_antigravity_with_diagnostics(None)?
     };
+
+    // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
+    let existing_pids = find_pids_for_data_dir(&data_dir, is_default);
+    let has_existing = !existing_pids.is_empty();
+    if has_existing {
+        let _ = close_instance(instance_id);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
 
     let exe_str = exe_path.to_string_lossy().to_string();
 
@@ -826,9 +827,7 @@ pub async fn switch_account_to_instance(
 
     // Close only this specific instance window before database injection
     let _ = close_instance(&instance.id);
-    if crate::modules::process::is_antigravity_running(None) {
-        let _ = crate::modules::process::close_antigravity(20, None);
-    }
+    std::thread::sleep(std::time::Duration::from_millis(300));
 
     // Inject token directly into instance's isolated state.vscdb
     crate::modules::db::inject_token(
