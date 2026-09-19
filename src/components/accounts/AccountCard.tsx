@@ -160,10 +160,10 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
 
     return (
         <div className={cn(
-            "flex flex-col p-3 rounded-xl border transition-all hover:shadow-md",
+            "flex flex-col p-3 rounded-xl border transition-all duration-150 hover:shadow-md",
             isCurrent
-                ? "bg-blue-50/30 border-blue-200 dark:bg-blue-900/10 dark:border-blue-900/30"
-                : "bg-white dark:bg-base-100 border-gray-200 dark:border-base-300",
+                ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-4 border-l-amber-400 border-amber-300/80 dark:border-blue-900/60 font-medium shadow-sm"
+                : "bg-white dark:bg-base-100 border-gray-200 dark:border-base-300 hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-4 hover:border-l-amber-400/80",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 

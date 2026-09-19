@@ -90,8 +90,8 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
     return (
         <tr className={cn(
-            "group hover:bg-gray-50 dark:hover:bg-base-200 transition-colors border-b border-gray-100 dark:border-base-200",
-            isCurrent && "bg-blue-50/50 dark:bg-blue-900/10",
+            "group transition-all duration-150 border-b border-gray-100 dark:border-base-200",
+            isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-4 border-l-amber-400 dark:border-l-amber-400 font-medium" : "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-2 hover:border-l-amber-400/80",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}

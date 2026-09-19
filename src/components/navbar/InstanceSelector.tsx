@@ -3,7 +3,6 @@ import {
     ChevronDown,
     Copy,
     Plus,
-    Check,
     Laptop,
     Pencil,
     Play,
@@ -18,6 +17,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { useAccountStore } from '../../stores/useAccountStore';
+import { cn } from '../../utils/cn';
 import { isTauri } from '../../utils/env';
 import { request as invoke } from '../../utils/request';
 import { showToast } from '../common/ToastContainer';
@@ -43,6 +44,8 @@ export function InstanceSelector() {
     } = useInstanceStore();
 
     const config = useConfigStore(state => state.config);
+    const currentAccount = useAccountStore(state => state.currentAccount);
+    const accounts = useAccountStore(state => state.accounts);
 
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -435,7 +438,7 @@ export function InstanceSelector() {
             {/* Dropdown Menu Popup (Strictly Above Page Content) */}
             {isOpen && (
                 <div
-                    className="absolute top-full right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-xl shadow-2xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-2 z-[9999] animate-in fade-in zoom-in-95"
+                    className="absolute top-full right-0 mt-1.5 w-80 max-w-[calc(100vw-32px)] rounded-xl shadow-2xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-2 z-[9999] animate-in fade-in zoom-in-95"
                     style={{ isolation: 'isolate' }}
                 >
                     {/* Dropdown Header Bar with Import / Export Actions */}
@@ -488,15 +491,18 @@ export function InstanceSelector() {
                                 const isSelected = inst.config.id === activeInstanceId;
                                 const isDefault = inst.config.id === 'default';
                                 const isRunning = Boolean(inst.is_running);
+                                const linkedAccount = accounts.find(a => a.id === inst.config.bound_account_id || (inst.config.bound_email && a.email === inst.config.bound_email));
+                                const displayEmail = inst.config.bound_email || linkedAccount?.email || (isSelected ? currentAccount?.email : undefined);
 
                                 return (
                                     <div
                                         key={inst.config.id}
-                                        className={`w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-base-100 ${
+                                        className={cn(
+                                            "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? 'bg-blue-50/60 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-                                                : 'text-gray-700 dark:text-gray-300'
-                                        }`}
+                                                ? "bg-amber-500/15 dark:bg-blue-950/80 border-l-amber-400 dark:border-l-amber-400 text-amber-950 dark:text-blue-200 font-medium shadow-xs"
+                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-amber-500/10 dark:hover:bg-blue-900/40 hover:border-l-amber-400/80"
+                                        )}
                                     >
                                         <button
                                             type="button"
@@ -504,104 +510,125 @@ export function InstanceSelector() {
                                                 setActiveInstance(inst.config.id);
                                                 setIsOpen(false);
                                             }}
-                                            className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer"
+                                            className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer min-w-0 pr-2"
                                         >
                                             <span
                                                 className={`w-2 h-2 rounded-full shrink-0 ${
                                                     isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
                                                 }`}
                                             />
-                                            <div className="flex flex-col truncate">
-                                                <span className="truncate">{inst.config.name}</span>
-                                                {inst.config.bound_email && (
-                                                    <span className="text-[10px] text-gray-400 truncate">
-                                                        {inst.config.bound_email}
+                                            <div className="flex flex-col truncate min-w-0">
+                                                <div className="flex items-center gap-1.5 truncate">
+                                                    <span className="truncate font-medium">{inst.config.name}</span>
+                                                    {isSelected && (
+                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 dark:bg-amber-400/10 border border-amber-400/30 shrink-0">
+                                                            ACTIVE
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {displayEmail ? (
+                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate font-mono">
+                                                        {displayEmail}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-gray-400/60 dark:text-gray-500/60 italic truncate">
+                                                        {t('instances.unlinked', 'No account linked')}
                                                     </span>
                                                 )}
                                             </div>
                                         </button>
 
-                                        <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                                            {/* Item Launch / Stop */}
-                                            <button
-                                                type="button"
-                                                disabled={launchingId === inst.config.id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleToggleLaunch(inst.config.id, isRunning);
-                                                }}
-                                                className={`p-1 rounded transition-colors cursor-pointer ${
-                                                    isRunning
-                                                        ? 'text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40'
-                                                        : 'text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                                                }`}
-                                                title={
-                                                    isRunning
-                                                        ? t('instances.close_title', 'Close window')
-                                                        : t('instances.launch_title', 'Run profile')
-                                                }
-                                            >
-                                                {isRunning ? (
-                                                    <Square className="w-3 h-3 fill-current" />
-                                                ) : (
-                                                    <Play className="w-3 h-3 fill-current" />
-                                                )}
-                                            </button>
+                                        {/* Fixed 4-slot Action Columns for Perfect Alignment */}
+                                        <div className="grid grid-cols-4 gap-1 shrink-0 ml-auto items-center">
+                                            {/* Slot 1: Item Launch / Stop */}
+                                            <div className="w-6 h-6 flex items-center justify-center">
+                                                <button
+                                                    type="button"
+                                                    disabled={launchingId === inst.config.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleLaunch(inst.config.id, isRunning);
+                                                    }}
+                                                    className={cn(
+                                                        "p-1 rounded transition-colors cursor-pointer flex items-center justify-center",
+                                                        isRunning
+                                                            ? "text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                                            : "text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                                                    )}
+                                                    title={
+                                                        isRunning
+                                                            ? t('instances.close_title', 'Close window')
+                                                            : t('instances.launch_title', 'Run profile')
+                                                    }
+                                                >
+                                                    {isRunning ? (
+                                                        <Square className="w-3 h-3 fill-current" />
+                                                    ) : (
+                                                        <Play className="w-3 h-3 fill-current" />
+                                                    )}
+                                                </button>
+                                            </div>
 
-                                            {/* Item Double Play (Smart Profile Rotation) */}
-                                            {(() => {
-                                                const rowCandidate = findBestRotationProfile(instances, inst.config.id);
-                                                const rowTooltip = rowCandidate
-                                                    ? `Double Play: Switch & launch ${rowCandidate.config.name} (Used: ${formatTimeAgo(rowCandidate.config.last_used)})`
-                                                    : 'Double Play: No idle profile available';
-                                                return (
-                                                    <button
-                                                        type="button"
-                                                        disabled={!rowCandidate}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDoublePlay(inst.config.id);
-                                                        }}
-                                                        className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        title={rowTooltip}
-                                                    >
-                                                        <FastForward className="w-3 h-3 fill-current" />
-                                                    </button>
-                                                );
-                                            })()}
+                                            {/* Slot 2: Item Double Play */}
+                                            <div className="w-6 h-6 flex items-center justify-center">
+                                                {(() => {
+                                                    const rowCandidate = findBestRotationProfile(instances, inst.config.id);
+                                                    const rowTooltip = rowCandidate
+                                                        ? `Double Play: Switch & launch ${rowCandidate.config.name} (Used: ${formatTimeAgo(rowCandidate.config.last_used)})`
+                                                        : 'Double Play: No idle profile available';
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            disabled={!rowCandidate}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDoublePlay(inst.config.id);
+                                                            }}
+                                                            className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                                                            title={rowTooltip}
+                                                        >
+                                                            <FastForward className="w-3 h-3 fill-current" />
+                                                        </button>
+                                                    );
+                                                })()}
+                                            </div>
 
-                                            {/* Item Rename */}
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setEditTargetId(inst.config.id);
-                                                    setEditInstanceName(inst.config.name);
-                                                    setIsEditOpen(true);
-                                                }}
-                                                className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer"
-                                                title={t('instances.edit_title', 'Rename profile')}
-                                            >
-                                                <Pencil className="w-3 h-3" />
-                                            </button>
-
-                                            {/* Item Delete (Non-default only) */}
-                                            {!isDefault && (
+                                            {/* Slot 3: Item Rename */}
+                                            <div className="w-6 h-6 flex items-center justify-center">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setDeleteTarget(inst);
-                                                        setIsDeleteOpen(true);
+                                                        setEditTargetId(inst.config.id);
+                                                        setEditInstanceName(inst.config.name);
+                                                        setIsEditOpen(true);
                                                     }}
-                                                    className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer"
-                                                    title={t('instances.delete_title', 'Delete profile')}
+                                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                    title={t('instances.edit_title', 'Rename profile')}
                                                 >
-                                                    <Trash2 className="w-3 h-3" />
+                                                    <Pencil className="w-3 h-3" />
                                                 </button>
-                                            )}
+                                            </div>
 
-                                            {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                                            {/* Slot 4: Item Delete (Empty spacer slot for Default) */}
+                                            <div className="w-6 h-6 flex items-center justify-center">
+                                                {isDefault ? (
+                                                    <span className="w-3 h-3" aria-hidden="true" />
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDeleteTarget(inst);
+                                                            setIsDeleteOpen(true);
+                                                        }}
+                                                        className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                        title={t('instances.delete_title', 'Delete profile')}
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );

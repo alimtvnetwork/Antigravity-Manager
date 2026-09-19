@@ -110,6 +110,7 @@ interface SortableRowProps {
     onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
     isDragDisabled?: boolean;
+    modelFilter?: 'both' | 'gemini' | 'claude';
 }
 
 interface AccountRowContentProps {
@@ -129,6 +130,7 @@ interface AccountRowContentProps {
     onUpdateLabel?: (label: string) => void;
     onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
+    modelFilter?: 'both' | 'gemini' | 'claude';
 }
 
 // ============================================================================
@@ -225,6 +227,7 @@ function SortableAccountRow({
     onViewError,
     quotaWindow,
     isDragDisabled = false,
+    modelFilter = 'both',
 }: SortableRowProps) {
     const { t } = useTranslation();
     const {
@@ -248,10 +251,10 @@ function SortableAccountRow({
             ref={setNodeRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group transition-colors border-b border-gray-100 dark:border-base-200",
-                isCurrent ? "bg-blue-50/50 dark:bg-blue-900/10" : "",
+                "group transition-all duration-150 border-b border-gray-100 dark:border-base-200",
+                isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-4 border-l-amber-400 dark:border-l-amber-400 font-medium" : "",
                 isDragging ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg" : "",
-                !isDragging ? "hover:bg-gray-50 dark:hover:bg-base-200" : ""
+                !isDragging ? "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-2 hover:border-l-amber-400/80" : ""
             )}
         >
             {/* 拖拽手柄 */}
@@ -297,6 +300,7 @@ function SortableAccountRow({
                 onUpdateLabel={onUpdateLabel}
                 onViewError={onViewError}
                 quotaWindow={quotaWindow}
+                modelFilter={modelFilter}
             />
         </tr>
     );
@@ -323,6 +327,7 @@ function AccountRowContent({
     onUpdateLabel,
     onViewError,
     quotaWindow,
+    modelFilter = 'both',
 }: AccountRowContentProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
@@ -334,6 +339,10 @@ function AccountRowContent({
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
     const { instances, activeInstanceId } = useInstanceStore();
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const boundInstance = useMemo(() => {
+        return instances.find((inst) => inst.config.bound_email === account.email || inst.config.bound_account_id === account.id);
+    }, [instances, account.email, account.id]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -450,7 +459,7 @@ function AccountRowContent({
 
         const claudeLiveLimit = getLiveLimitForModel(account, 'claude-sonnet-4-6', 'claude');
 
-        return [
+        const baseModels = [
             {
                 id: 'gemini',
                 label: 'Gemini',
@@ -470,7 +479,15 @@ function AccountRowContent({
                 Icon: Claude.Color,
             },
         ];
-    }, [showAllQuotas, account.quota?.models, account.protected_models, config?.quota_protection?.enabled, t]);
+
+        if (modelFilter === 'gemini') {
+            return baseModels.filter((m) => m.id === 'gemini');
+        }
+        if (modelFilter === 'claude') {
+            return baseModels.filter((m) => m.id === 'claude');
+        }
+        return baseModels;
+    }, [showAllQuotas, account.quota?.models, account.protected_models, config?.quota_protection?.enabled, t, modelFilter]);
 
 
     return (
@@ -548,6 +565,19 @@ function AccountRowContent({
                                 </span>
                             );
                         })()}
+                        {/* 绑定实例徽章 */}
+                        {boundInstance && (
+                            <span
+                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-800/50 cursor-default"
+                                title={`Bound to profile: ${boundInstance.config.name}`}
+                            >
+                                <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full shrink-0",
+                                    boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
+                                )} />
+                                <span>{boundInstance.config.name}</span>
+                            </span>
+                        )}
                         {/* 自定义标签 */}
                         {account.custom_label ? (
                             isEditingLabel ? null : (
@@ -669,42 +699,24 @@ function AccountRowContent({
             {/* 操作列 */}
             <td className={cn(
                 "px-1 py-0.5 sticky right-0 z-10 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
-                // 动态背景色处理
+                // 动态高对比高亮处理
                 isCurrent
-                    ? "bg-[#f1f6ff] dark:bg-[#1e2330]" // 接近 blue-50/50 的实色
+                    ? "bg-[#fffbeb] dark:bg-[#131b2e]"
                     : "bg-white dark:bg-base-100",
-                !isCurrent ? "group-hover:bg-gray-50 dark:group-hover:bg-base-200" : ""
+                !isCurrent ? "group-hover:bg-amber-500/10 dark:group-hover:bg-[#162238]" : ""
             )}>
                 <div className="flex items-center justify-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                    {/* 1. 刷新按钮 (首选首位) */}
                     <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-                        title={t('common.details')}
+                        className={`p-1 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
+                        disabled={isRefreshing || isDisabled}
                     >
-                        <Info className="w-3.5 h-3.5" />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
-                    <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                        title={t('accounts.device_fingerprint')}
-                    >
-                        <Fingerprint className="w-3.5 h-3.5" />
-                    </button>
-                    {/* 自定义标签按钮 */}
-                    {onUpdateLabel && (
-                        <button
-                            className={cn(
-                                "p-1 rounded transition-all",
-                                account.custom_label
-                                    ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                            )}
-                            onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
-                            title={t('accounts.edit_label', 'Edit Label')}
-                        >
-                            <Tag className="w-3.5 h-3.5" />
-                        </button>
-                    )}
+
+                    {/* 2. 切换/实例选择操作组 (排在第二位) */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
                             className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
@@ -764,6 +776,37 @@ function AccountRowContent({
                     >
                         <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
+
+                    {/* 3. 详情与其它操作 */}
+                    <button
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition-all"
+                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+                        title={t('common.details')}
+                    >
+                        <Info className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
+                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
+                        title={t('accounts.device_fingerprint')}
+                    >
+                        <Fingerprint className="w-3.5 h-3.5" />
+                    </button>
+                    {/* 自定义标签按钮 */}
+                    {onUpdateLabel && (
+                        <button
+                            className={cn(
+                                "p-1 rounded transition-all",
+                                account.custom_label
+                                    ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                                    : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                            )}
+                            onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
+                            title={t('accounts.edit_label', 'Edit Label')}
+                        >
+                            <Tag className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     {onWarmup && (
                         <button
                             className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
@@ -774,14 +817,6 @@ function AccountRowContent({
                             <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
                         </button>
                     )}
-                    <button
-                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
-                        disabled={isRefreshing || isDisabled}
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
                     <button
                         className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
@@ -849,6 +884,7 @@ function AccountTable({
 }: AccountTableProps) {
     const { t } = useTranslation();
 
+    const [modelFilter, setModelFilter] = useState<'both' | 'gemini' | 'claude'>('both');
     const [activeId, setActiveId] = useState<string | null>(null);
     // 排序状态配置: 支持按配额重置时间 (reset_time) 或最后使用时间 (last_used) 排序
     const [sortConfig, setSortConfig] = useState<{
@@ -968,22 +1004,61 @@ function AccountTable({
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[320px] whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    onClick={() => handleSortToggle('reset_time')}
-                                    className={cn(
-                                        "inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase font-medium",
-                                        sortConfig.key === 'reset_time' && "text-blue-600 dark:text-blue-400 font-semibold"
-                                    )}
-                                    title={t('accounts.table.sort_by_reset_time', '点击按配额重置时间排序')}
-                                >
-                                    <span>{quotaWindow === 'weekly' ? t('accounts.table.weekly_quota', '周配额') : t('accounts.table.quota')}</span>
-                                    {sortConfig.key === 'reset_time' ? (
-                                        sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                    ) : (
-                                        <ArrowUpDown className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-60 hover:opacity-100" />
-                                    )}
-                                </button>
+                                <div className="flex items-center justify-between gap-1 w-full">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSortToggle('reset_time')}
+                                        className={cn(
+                                            "inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase font-medium",
+                                            sortConfig.key === 'reset_time' && "text-blue-600 dark:text-blue-400 font-semibold"
+                                        )}
+                                        title={t('accounts.table.sort_by_reset_time', '点击按配额重置时间排序')}
+                                    >
+                                        <span>{quotaWindow === 'weekly' ? t('accounts.table.weekly_quota', '周配额') : t('accounts.table.quota')}</span>
+                                        {sortConfig.key === 'reset_time' ? (
+                                            sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                        ) : (
+                                            <ArrowUpDown className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-60 hover:opacity-100" />
+                                        )}
+                                    </button>
+
+                                    {/* Gemini / Claude 视图切换药丸按钮 */}
+                                    <div className="inline-flex items-center p-0.5 rounded-md bg-gray-200/70 dark:bg-base-300/80 text-[9px] font-semibold text-gray-500 dark:text-gray-400">
+                                        <button
+                                            type="button"
+                                            onClick={() => setModelFilter('both')}
+                                            className={cn(
+                                                "px-1.5 py-0.5 rounded transition-all",
+                                                modelFilter === 'both' ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                            )}
+                                            title="Show both Gemini and Claude"
+                                        >
+                                            All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setModelFilter('gemini')}
+                                            className={cn(
+                                                "px-1.5 py-0.5 rounded transition-all",
+                                                modelFilter === 'gemini' ? "bg-white dark:bg-base-100 text-emerald-600 dark:text-emerald-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                            )}
+                                            title="Only show Gemini"
+                                        >
+                                            Gemini
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setModelFilter('claude')}
+                                            className={cn(
+                                                "px-1.5 py-0.5 rounded transition-all",
+                                                modelFilter === 'claude' ? "bg-white dark:bg-base-100 text-purple-600 dark:text-purple-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                            )}
+                                            title="Only show Claude"
+                                        >
+                                            Claude
+                                        </button>
+                                    </div>
+                                </div>
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[85px] whitespace-nowrap">
                                 <button
@@ -1030,6 +1105,7 @@ function AccountTable({
                                     onViewError={() => onViewError(account.id)}
                                     quotaWindow={quotaWindow}
                                     isDragDisabled={isSortingActive}
+                                    modelFilter={modelFilter}
                                 />
                             ))}
                         </tbody>

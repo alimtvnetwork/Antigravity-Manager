@@ -15,6 +15,7 @@ import {
     Database,
     ChevronDown,
     SlidersHorizontal,
+    Copy,
 } from 'lucide-react';
 import AiSampleTemplatesModal from './ai-sample-templates-modal';
 import {
@@ -396,12 +397,12 @@ export default function EmailNotificationSettings() {
                             <button
                                 type="button"
                                 onClick={() => setIsActionsOpen(!isActionsOpen)}
-                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-base-300 bg-white dark:bg-base-200/60 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 hover:border-gray-300 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 hover:border-gray-400 dark:hover:border-slate-600 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                                 title="Mailbox & Vault Actions"
                             >
-                                <SlidersHorizontal className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                                <SlidersHorizontal className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
                                 <span>Actions</span>
-                                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isActionsOpen ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-150 ${isActionsOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isActionsOpen && (
@@ -487,16 +488,24 @@ export default function EmailNotificationSettings() {
                             title="Add New Mailbox Account"
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>+ Add</span>
+                            <span>Add Mailbox</span>
                         </button>
                     </div>
                 </div>
 
                 {accounts.length === 0 ? (
-                    <div className="py-6 px-4 text-center border border-dashed border-gray-200 dark:border-base-300 rounded-xl">
+                    <div className="py-6 px-4 text-center border border-dashed border-gray-200 dark:border-base-300 rounded-xl flex flex-col items-center justify-center">
                         <Mail className="w-6 h-6 text-gray-300 dark:text-gray-600 mx-auto mb-1.5" />
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-300">No mailboxes configured in vault</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Add an SMTP/IMAP account to enable dispatch and remote command execution</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 mb-3">Add an SMTP/IMAP account to enable dispatch and remote command execution</p>
+                        <button
+                            type="button"
+                            onClick={handleOpenAddAccount}
+                            className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all flex items-center gap-1.5 shadow-sm hover:scale-[1.02] cursor-pointer"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Mailbox</span>
+                        </button>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -855,6 +864,32 @@ export default function EmailNotificationSettings() {
                 onCancel={() => setIsAccountModalOpen(false)}
             >
                 <div className="space-y-4 text-xs">
+                    {/* One-Click AI Instructions Copy */}
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
+                        <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+                            <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                            <span className="font-medium text-[11px]">AI Automated Mailbox Configuration</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const instructions = `Configure Mailbox in Antigravity Manager:
+- Alias: Primary Mailbox
+- Email: your-email@gmail.com
+- App Password: <generated-app-password>
+- SMTP: smtp.gmail.com (Port: 587, TLS)
+- IMAP: imap.gmail.com (Port: 993, TLS)`;
+                                navigator.clipboard.writeText(instructions);
+                                showToast('AI instructions copied to clipboard', 'success');
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-base-100 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer hover:scale-105"
+                            title="Copy AI Instructions to Clipboard"
+                        >
+                            <Copy className="w-3 h-3" />
+                            <span>Copy AI Instructions</span>
+                        </button>
+                    </div>
+
                     <div>
                         <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Account Alias</label>
                         <input

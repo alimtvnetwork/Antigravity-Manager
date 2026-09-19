@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Anti-Gravity Tools by Alim",
+  "productName": "AGM by Alim",
   "version": "4.29.0",
   "identifier": "com.lbjlaq.antigravity-tools",
   "build": {
