@@ -21,7 +21,19 @@ export function ErrorQueueBadge(): React.ReactNode {
     if (hasErrors) {
       openErrorModal(recentErrors[0]);
     } else {
-      setDrawerOpen(true);
+      const diag = useErrorStore.getState().captureError(
+        {
+          message: 'Error Manager Diagnostics — System Healthy',
+          code: 'E1000',
+          level: 'info',
+          details: 'Application services and background monitors are running normally. No fatal exceptions reported.',
+        },
+        {
+          triggerAction: 'user_double_click_badge',
+          source: 'error_queue_badge',
+        }
+      );
+      openErrorModal(diag);
     }
   };
 

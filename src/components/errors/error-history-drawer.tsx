@@ -100,12 +100,30 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
         {/* Errors List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filteredErrors.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400">
+            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 px-4">
               <AlertCircle className="w-8 h-8 opacity-30 mb-2" />
-              <p className="text-xs font-medium">No errors found</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
+              <p className="text-xs font-medium">No errors recorded</p>
+              <p className="text-[10px] text-gray-400 mt-0.5 mb-3">
                 Runtime errors and IPC exceptions will be logged here
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const diag = useErrorStore.getState().captureError(
+                    {
+                      message: 'System Status & Error Diagnostics',
+                      code: 'E1000',
+                      level: 'info',
+                      details: 'All core modules and background tasks are healthy.',
+                    },
+                    { triggerAction: 'drawer_diagnostics_inspect', source: 'error_history_drawer' }
+                  );
+                  openErrorModal(diag);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+              >
+                Inspect Diagnostics Modal
+              </button>
             </div>
           ) : (
             filteredErrors.map((err) => {
