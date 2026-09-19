@@ -52,14 +52,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: E2E Test Ubuntu Installer (Temporary Test)
-        if: startsWith(matrix.platform, 'ubuntu')
-        run: |
-          bash -n install.sh
-          DRY_RUN=1 bash install.sh --version
-          DRY_RUN=1 bash install.sh --help
-          DRY_RUN=1 bash install.sh
-
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |

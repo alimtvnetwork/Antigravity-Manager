@@ -53,3 +53,4 @@ Master directory of architectural and execution plans.
 - [40-email-auto-config-test-connection-and-modal-actions.md](completed/40-email-auto-config-test-connection-and-modal-actions.md): Email auto-config heuristics, DNS socket fix, self-test mail, and modal action visibility.
 - [41-ubuntu-installer-hardening-and-aria2c.md](completed/41-ubuntu-installer-hardening-and-aria2c.md): Ubuntu installer hardening, aria2c parallel split acceleration, safe lifecycle, and migration UI.
 - [42-custom-titlebar-controls-fluid-ui-and-v4-30-0-release.md](completed/42-custom-titlebar-controls-fluid-ui-and-v4-30-0-release.md): Custom titlebar window controls, fluid responsive UI polish, and v4.30.0 release.
+- [43-ubuntu-installer-e2e-cleanup-and-rust-ci-fix.md](completed/43-ubuntu-installer-e2e-cleanup-and-rust-ci-fix.md): Ubuntu installer hardening, temporary CI E2E cleanup, and Rust formatting fix.

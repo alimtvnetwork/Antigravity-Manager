@@ -1,11 +1,15 @@
 {
   "version": 1,
-  "updated_at": "2026-09-19T16:52:10Z",
+  "updated_at": "2026-09-19T16:57:12Z",
   "files": [
+    ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".github/workflows/ci.yml",
     "install.sh",
     "package.json",
     "src-tauri/Cargo.toml",
+    "src-tauri/src/commands/email.rs",
+    "src-tauri/src/modules/email_inbound.rs",
+    "src-tauri/src/modules/email_sender.rs",
     "src-tauri/tauri.conf.json",
     "src/components/layout/Layout.tsx",
     "src/components/layout/TitleBar.tsx",

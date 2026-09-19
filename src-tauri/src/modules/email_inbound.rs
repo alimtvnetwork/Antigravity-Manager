@@ -688,12 +688,27 @@ pub fn poll_unread_messages(
 
     let socket_addr = addr
         .to_socket_addrs()
-        .map_err(|e| format!("Failed to resolve IMAP server '{}:{}': {}", account.imap_host, account.imap_port, e))?
+        .map_err(|e| {
+            format!(
+                "Failed to resolve IMAP server '{}:{}': {}",
+                account.imap_host, account.imap_port, e
+            )
+        })?
         .next()
-        .ok_or_else(|| format!("No socket address resolved for '{}:{}'", account.imap_host, account.imap_port))?;
+        .ok_or_else(|| {
+            format!(
+                "No socket address resolved for '{}:{}'",
+                account.imap_host, account.imap_port
+            )
+        })?;
 
-    let mut stream = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10))
-        .map_err(|e| format!("IMAP connection to '{}:{}' failed: {}", account.imap_host, account.imap_port, e))?;
+    let mut stream =
+        TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10)).map_err(|e| {
+            format!(
+                "IMAP connection to '{}:{}' failed: {}",
+                account.imap_host, account.imap_port, e
+            )
+        })?;
 
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))

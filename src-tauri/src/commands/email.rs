@@ -173,7 +173,6 @@ pub async fn test_direct_email_connection(account: EmailAccountInput) -> AppResu
     .unwrap_or_else(|_| Err(AppError::Email("Test task panicked".to_string())))
 }
 
-
 #[tauri::command]
 pub async fn export_email_data(format: String) -> AppResult<String> {
     match format.to_lowercase().as_str() {

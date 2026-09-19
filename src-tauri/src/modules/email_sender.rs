@@ -102,13 +102,28 @@ pub fn send_via_account_credentials(
     // Resolve hostname or IP
     let socket_addr = addr
         .to_socket_addrs()
-        .map_err(|e| format!("Failed to resolve SMTP server '{}:{}': {}", account.smtp_host, account.smtp_port, e))?
+        .map_err(|e| {
+            format!(
+                "Failed to resolve SMTP server '{}:{}': {}",
+                account.smtp_host, account.smtp_port, e
+            )
+        })?
         .next()
-        .ok_or_else(|| format!("No socket address resolved for '{}:{}'", account.smtp_host, account.smtp_port))?;
+        .ok_or_else(|| {
+            format!(
+                "No socket address resolved for '{}:{}'",
+                account.smtp_host, account.smtp_port
+            )
+        })?;
 
     // Establish TCP connection with timeout
-    let mut stream = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10))
-        .map_err(|e| format!("TCP connection to SMTP server '{}:{}' failed: {}", account.smtp_host, account.smtp_port, e))?;
+    let mut stream =
+        TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10)).map_err(|e| {
+            format!(
+                "TCP connection to SMTP server '{}:{}' failed: {}",
+                account.smtp_host, account.smtp_port, e
+            )
+        })?;
 
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))
@@ -446,7 +461,12 @@ pub fn render_self_test_email(
 <p>Remote commands, quota notifications, and failover routing are active for this account.</p>"#,
         email
     );
-    let html = wrap_email_card("Mailbox Self-Test Verification", &content, machine_name, machine_ip);
+    let html = wrap_email_card(
+        "Mailbox Self-Test Verification",
+        &content,
+        machine_name,
+        machine_ip,
+    );
     (subject, html)
 }
 
