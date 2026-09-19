@@ -25,6 +25,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   const [isClosing, setIsClosing] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>('checking');
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isInstalling, setIsInstalling] = useState(false);
   const downloadStarted = useRef(false);
 
   useEffect(() => {
@@ -33,23 +34,33 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
   const checkAndDownload = async () => {
     try {
-      // 1. Check for updates via backend
-      const info = await invoke<UpdateInfo>('check_for_updates');
+      // 1. Check for updates via backend script or API
+      const info = await invoke<UpdateInfo>('check_update_via_script').catch(() => invoke<UpdateInfo>('check_for_updates'));
       if (!info.has_update) {
         onClose();
         return;
       }
 
       setUpdateInfo(info);
-
-      // 2. Custom build protection:
-      // Prevent automatic silent downloading and installation that overwrites custom build features
       setUpdateState('manual');
       setTimeout(() => setIsVisible(true), 100);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('Update check failed:', errorMsg);
       onClose();
+    }
+  };
+
+  const handleRunInstaller = async () => {
+    setIsInstalling(true);
+    try {
+      await invoke('run_installer_update');
+      setUpdateState('ready');
+    } catch (error) {
+      console.error('Installer update failed:', error);
+      setUpdateState('error');
+    } finally {
+      setIsInstalling(false);
     }
   };
 
@@ -139,7 +150,9 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
               {updateState === 'ready' && t('update_notification.restart_prompt')}
               {updateState === 'error' && `${t('update_notification.toast.failed')}`}
               {updateState === 'manual' && (
-                t('update_notification.custom_build_warning', 'A new official version is available. Since you are running a custom enhanced build, automatic silent updates are disabled to prevent overwriting your customizations. You can view the release on GitHub or download manually.')
+                isInstalling
+                  ? t('update_notification.installing_desc', 'Running official installer in background with accelerated multi-connection downloading...')
+                  : t('update_notification.installer_available', 'A newer installer is available. Click Install Now to automatically download and upgrade to the latest version.')
               )}
             </p>
           </div>
@@ -174,7 +187,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   shadow-lg shadow-green-500/25
                   transition-all duration-300
                   flex items-center justify-center gap-2
-                  active:scale-[0.98]
+                  active:scale-[0.98] cursor-pointer
                 "
               >
                 <RotateCcw className="w-4 h-4" />
@@ -188,7 +201,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                   hover:bg-black/5 dark:hover:bg-white/10
                   transition-all duration-200
-                  text-sm font-medium
+                  text-sm font-medium cursor-pointer
                 "
               >
                 {t('update_notification.btn_later')}
@@ -196,45 +209,68 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
             </div>
           )}
 
-          {/* Manual download button */}
+          {/* Installer / Manual download button */}
           {updateState === 'manual' && (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRunInstaller}
+                  disabled={isInstalling}
+                  className="
+                    flex-1 group/btn
+                    relative overflow-hidden
+                    bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
+                    disabled:from-blue-400 disabled:to-purple-400 disabled:cursor-not-allowed
+                    text-white font-medium
+                    py-2.5 px-3 rounded-xl
+                    shadow-lg shadow-blue-500/25
+                    transition-all duration-300
+                    flex items-center justify-center gap-2
+                    active:scale-[0.98] cursor-pointer text-sm
+                  "
+                >
+                  {isInstalling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{t('update_notification.installing', 'Installing...')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>{t('update_notification.btn_install_now', 'Install Now')}</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleClose}
+                  disabled={isInstalling}
+                  className="
+                    px-3 py-2.5 rounded-xl
+                    text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
+                    hover:bg-black/5 dark:hover:bg-white/10
+                    transition-all duration-200
+                    text-sm font-medium cursor-pointer
+                  "
+                >
+                  {t('update_notification.btn_later')}
+                </button>
+              </div>
               <button
+                type="button"
                 onClick={async () => {
                   if (updateInfo) {
                     try {
                       const { openUrl } = await import('@tauri-apps/plugin-opener');
                       await openUrl(updateInfo.download_url);
-                    } catch (e) {
+                    } catch {
                       window.open(updateInfo.download_url, '_blank');
                     }
                   }
                 }}
-                className="
-                  flex-1 group/btn
-                  relative overflow-hidden
-                  bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
-                  text-white font-medium
-                  py-2.5 px-4 rounded-xl
-                  shadow-lg shadow-blue-500/25
-                  transition-all duration-300
-                  flex items-center justify-center gap-2
-                  active:scale-[0.98]
-                "
+                disabled={isInstalling}
+                className="text-[11px] text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
               >
-                <span>{t('update_notification.btn_view_github', 'View on GitHub')}</span>
-              </button>
-              <button
-                onClick={handleClose}
-                className="
-                  px-3 py-2.5 rounded-xl
-                  text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
-                  hover:bg-black/5 dark:hover:bg-white/10
-                  transition-all duration-200
-                  text-sm font-medium
-                "
-              >
-                {t('update_notification.btn_later')}
+                {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>
             </div>
           )}

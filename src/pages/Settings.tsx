@@ -132,6 +132,7 @@ function Settings() {
         downloadUrl: string;
         source?: string;
     } | null>(null);
+    const [isInstallerUpdating, setIsInstallerUpdating] = useState(false);
 
     // Homebrew Cask state
     const [isBrewInstalled, setIsBrewInstalled] = useState(false);
@@ -385,7 +386,13 @@ function Settings() {
                 current_version: string;
                 download_url: string;
                 source?: string;
-            }>('check_for_updates');
+            }>('check_update_via_script').catch(() => invoke<{
+                has_update: boolean;
+                latest_version: string;
+                current_version: string;
+                download_url: string;
+                source?: string;
+            }>('check_for_updates'));
 
             setUpdateInfo({
                 hasUpdate: result.has_update,
@@ -405,6 +412,25 @@ function Settings() {
             showToast(`${t('settings.about.update_check_failed')}: ${error}`, 'error');
         } finally {
             setIsCheckingUpdate(false);
+        }
+    };
+
+    const handleRunInstallerUpdate = async () => {
+        setIsInstallerUpdating(true);
+        try {
+            await invoke<string>('run_installer_update');
+            showToast(t('settings.about.installer_success', 'Official installer executed successfully! Restarting application...'), 'success');
+            setTimeout(async () => {
+                try {
+                    await relaunch();
+                } catch {
+                    // ignore
+                }
+            }, 1500);
+        } catch (error) {
+            showToast(`${t('settings.about.installer_failed', 'Installer update failed')}: ${error}`, 'error');
+        } finally {
+            setIsInstallerUpdating(false);
         }
     };
 
@@ -1680,6 +1706,23 @@ function Settings() {
                                                                 )}
                                                             </button>
                                                         )}
+                                                        <button
+                                                            onClick={handleRunInstallerUpdate}
+                                                            disabled={isInstallerUpdating}
+                                                            className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                                                        >
+                                                            {isInstallerUpdating ? (
+                                                                <>
+                                                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                                    <span>{t('settings.about.installer_running', 'Running Installer...')}</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Sparkles className="w-3.5 h-3.5" />
+                                                                    <span>{t('settings.about.run_installer', 'Install Update Now')}</span>
+                                                                </>
+                                                            )}
+                                                        </button>
                                                         <a
                                                             href={updateInfo.downloadUrl}
                                                             target="_blank"

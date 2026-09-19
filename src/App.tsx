@@ -154,16 +154,14 @@ function App() {
   useEffect(() => {
     const checkUpdates = async () => {
       try {
-        console.log('[App] Checking if we should check for updates...');
-        const shouldCheck = await invoke<boolean>('should_check_updates');
-        console.log('[App] Should check updates:', shouldCheck);
+        console.log('[App] Checking if we should check for updates on startup...');
+        const shouldCheck = await invoke<boolean>('should_check_updates_on_startup');
+        console.log('[App] Should check updates on startup:', shouldCheck);
 
         if (shouldCheck) {
           setShowUpdateNotification(true);
-          // 我们这里只负责显示通知组件，通知组件内部会去调用 check_for_updates
-          // 我们在显示组件后，标记已经检查过了（即便失败或无更新，组件内部也会处理）
           await invoke('update_last_check_time');
-          console.log('[App] Update check cycle initiated and last check time updated.');
+          console.log('[App] Startup update check initiated and last check time updated.');
         }
       } catch (error) {
         console.error('Failed to check update settings:', error);

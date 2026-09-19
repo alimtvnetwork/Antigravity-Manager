@@ -111,7 +111,10 @@ const COMMAND_MAPPING: Record<string, { url: string; method: 'GET' | 'POST' | 'D
 
   // Updates
   'should_check_updates': { url: '/api/system/updates/check-status', method: 'GET' },
+  'should_check_updates_on_startup': { url: '/api/system/updates/check-startup', method: 'GET' },
   'check_for_updates': { url: '/api/system/updates/check', method: 'POST' },
+  'check_update_via_script': { url: '/api/system/updates/check-script', method: 'POST' },
+  'run_installer_update': { url: '/api/system/updates/run-installer', method: 'POST' },
   'update_last_check_time': { url: '/api/system/updates/touch', method: 'POST' },
 
   // OAuth

@@ -42,7 +42,9 @@ param(
     [switch]$NoPath,
     [switch]$NoShortcut,
     [switch]$DryRun,
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [switch]$CheckUpdate,
+    [switch]$Update
 )
 
 $ErrorActionPreference = "Stop"
@@ -295,15 +297,85 @@ if ($Uninstall) {
     return
 }
 
+function Get-InstalledVersion {
+    $targetExe = Join-Path $InstallDir $BinaryName
+    if (Test-Path $targetExe) {
+        try {
+            $ver = (Get-Item $targetExe).VersionInfo.ProductVersion
+            if ($ver) { return ($ver -replace '^v', '').Trim() }
+        } catch {}
+    }
+    return ""
+}
+
+# --- CHECK-UPDATE FLOW ---
+if ($CheckUpdate) {
+    # Step 1: Resolve Release Version quietly
+    $TargetVersion = $Version
+    if ($TargetVersion) {
+        $TargetVersion = $TargetVersion -replace "^v", ""
+    } else {
+        $apiEndpoints = @(
+            "https://api.github.com/repos/$Repo/releases",
+            "https://api.github.com/repos/$Repo/releases/latest",
+            "https://api.github.com/repos/$UpstreamRepo/releases",
+            "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+        )
+        foreach ($endpoint in $apiEndpoints) {
+            try {
+                $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                if ($resp -is [System.Array] -and $resp.Count -gt 0) {
+                    $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
+                    if (-not $candidate) { $candidate = $resp[0] }
+                    if ($candidate -and $candidate.tag_name) {
+                        $TargetVersion = $candidate.tag_name -replace "^v", ""
+                        break
+                    }
+                } elseif ($resp -and $resp.tag_name) {
+                    $TargetVersion = $resp.tag_name -replace "^v", ""
+                    break
+                }
+            } catch {}
+        }
+        if (-not $TargetVersion) {
+            try {
+                $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
+                if ($updater -and $updater.version) {
+                    $TargetVersion = $updater.version -replace "^v", ""
+                }
+            } catch {}
+        }
+        if (-not $TargetVersion) {
+            $TargetVersion = "4.30.0"
+        }
+    }
+
+    $curr = Get-InstalledVersion
+    $hasUpdate = $false
+    if (-not $curr) {
+        if ($TargetVersion) { $hasUpdate = $true }
+    } elseif ($TargetVersion) {
+        if ($curr -ne $TargetVersion) {
+            $hasUpdate = $true
+        }
+    }
+
+    $jsonObj = [PSCustomObject]@{
+        has_update = $hasUpdate
+        current_version = if ($curr) { $curr } else { "unknown" }
+        latest_version = if ($TargetVersion) { $TargetVersion } else { "unknown" }
+        download_url = "https://github.com/$Repo/releases/tag/v$TargetVersion"
+    }
+    $jsonObj | ConvertTo-Json -Compress
+    return
+}
+
 # --- INSTALL FLOW ---
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "    $AppName Portable Installer" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-
-# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy installations first
-Remove-LegacyUpstreamInstallation
 
 # Step 1: Resolve Release Version
 $TargetVersion = $Version
@@ -365,6 +437,17 @@ if ($TargetVersion) {
         Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
     }
 }
+
+if ($Update) {
+    $curr = Get-InstalledVersion
+    if ($curr -and $TargetVersion -and $curr -eq $TargetVersion) {
+        Write-Success "Already on the latest version ($curr)."
+        return
+    }
+}
+
+# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy installations
+Remove-LegacyUpstreamInstallation
 
 Write-Success "Target release version: v$TargetVersion (Architecture: $Arch)"
 

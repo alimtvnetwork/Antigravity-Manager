@@ -53,8 +53,10 @@ show_help() {
     echo -e "${INDENT}    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | VERSION=4.7.6 bash"
     echo ""
     echo -e "${INDENT}Options:"
-    echo -e "${INDENT}    --help      Show this help message"
-    echo -e "${INDENT}    --version   Show script version"
+    echo -e "${INDENT}    --help          Show this help message"
+    echo -e "${INDENT}    --version       Show script version"
+    echo -e "${INDENT}    --check-update  Check if a newer release is available and print JSON"
+    echo -e "${INDENT}    --update        Check and update to latest version if available"
     echo ""
     echo -e "${INDENT}Environment Variables:"
     echo -e "${INDENT}    VERSION     Install specific version (default: latest)"
@@ -671,12 +673,58 @@ cleanup() {
     fi
 }
 
+# Check if a new release is available and print JSON
+check_for_updates_cli() {
+    detect_platform >&2 2>/dev/null || true
+    detect_linux_distro >&2 2>/dev/null || true
+    detect_current_version >&2 2>/dev/null || true
+    get_version >&2 2>/dev/null || true
+
+    local curr="${CURRENT_VERSION:-}"
+    local rel="${RELEASE_VERSION:-}"
+    local has_update_num=0
+
+    if [[ -z "$curr" ]]; then
+        if [[ -n "$rel" ]]; then
+            has_update_num=1
+        fi
+    elif [[ -n "$rel" ]]; then
+        local c_clean="${curr#v}"
+        local r_clean="${rel#v}"
+        if [[ "$c_clean" != "$r_clean" ]]; then
+            local lowest
+            lowest=$(printf "%s\n%s\n" "$c_clean" "$r_clean" | sort -V | head -n1)
+            if [[ "$lowest" != "$r_clean" ]]; then
+                has_update_num=1
+            fi
+        fi
+    fi
+
+    local has_update_str="false"
+    if [[ $has_update_num -eq 1 ]]; then
+        has_update_str="true"
+    fi
+
+    cat <<EOF
+{
+  "has_update": $has_update_str,
+  "current_version": "${curr:-unknown}",
+  "latest_version": "${rel:-unknown}",
+  "download_url": "https://github.com/${REPO}/releases/tag/v${rel:-latest}"
+}
+EOF
+    exit 0
+}
+
 # Main entry point
 main() {
+    local is_update_only=0
     for arg in "$@"; do
         case "$arg" in
-            --help|-h)    show_help ;;
-            --version|-v) echo "install.sh v2.0.0"; exit 0 ;;
+            --help|-h)              show_help ;;
+            --version|-v)           echo "install.sh v2.0.0"; exit 0 ;;
+            --check-update|--check) check_for_updates_cli ;;
+            --update)               is_update_only=1 ;;
         esac
     done
 
@@ -694,6 +742,20 @@ main() {
     detect_linux_distro
     detect_current_version
     get_version
+
+    if [[ $is_update_only -eq 1 ]]; then
+        local curr="${CURRENT_VERSION:-}"
+        local rel="${RELEASE_VERSION:-}"
+        if [[ -n "$curr" ]]; then
+            local c_clean="${curr#v}"
+            local r_clean="${rel#v}"
+            if [[ "$c_clean" == "$r_clean" ]]; then
+                success "Already up to date ($curr)."
+                exit 0
+            fi
+        fi
+    fi
+
     display_migration
     build_download_url
     download_installer

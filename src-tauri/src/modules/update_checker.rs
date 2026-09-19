@@ -18,7 +18,9 @@ pub struct UpdateInfo {
     pub latest_version: String,
     pub has_update: bool,
     pub download_url: String, // previously release_url
+    #[serde(default)]
     pub release_notes: String,
+    #[serde(default)]
     pub published_at: String,
     #[serde(default)]
     pub source: Option<String>,
@@ -506,6 +508,155 @@ pub async fn brew_upgrade_cask() -> Result<String, String> {
             Err("brew_already_latest".to_string())
         } else {
             Err("brew_upgrade_failed".to_string())
+        }
+    }
+}
+
+/// Check for updates by executing our official installer shell script
+pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
+    logger::log_info("Executing installer shell script to check for updates...");
+
+    #[cfg(target_os = "windows")]
+    {
+        let script_cmd = if std::path::Path::new("install.ps1").exists() {
+            "powershell -ExecutionPolicy Bypass -File .\\install.ps1 -CheckUpdate".to_string()
+        } else {
+            "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& { $script = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($script)) -CheckUpdate }\"".to_string()
+        };
+
+        let output = tokio::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script_cmd,
+            ])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to run powershell update check: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if output.status.success() && !stdout.is_empty() {
+            if let Some(start_idx) = stdout.find('{') {
+                if let Some(end_idx) = stdout.rfind('}') {
+                    let json_str = &stdout[start_idx..=end_idx];
+                    if let Ok(info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                        return Ok(info);
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let script_cmd = if std::path::Path::new("install.sh").exists() {
+            "./install.sh --check-update 2>/dev/null".to_string()
+        } else {
+            "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --check-update 2>/dev/null".to_string()
+        };
+
+        let output = tokio::process::Command::new("bash")
+            .args(["-c", &script_cmd])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to run bash update check: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if output.status.success() && !stdout.is_empty() {
+            if let Some(start_idx) = stdout.find('{') {
+                if let Some(end_idx) = stdout.rfind('}') {
+                    let json_str = &stdout[start_idx..=end_idx];
+                    if let Ok(info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                        return Ok(info);
+                    }
+                }
+            }
+        }
+    }
+
+    logger::log_warn(
+        "Script update check did not yield parseable result, falling back to check_for_updates",
+    );
+    check_for_updates().await
+}
+
+/// Run official installer to update the tool to the latest version
+pub async fn run_installer_update() -> Result<String, String> {
+    logger::log_info("Starting official installer to update application...");
+
+    #[cfg(target_os = "windows")]
+    {
+        let cmd = if std::path::Path::new("install.ps1").exists() {
+            "powershell -ExecutionPolicy Bypass -File .\\install.ps1 -Update".to_string()
+        } else {
+            "powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex\"".to_string()
+        };
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(300),
+            tokio::process::Command::new("powershell")
+                .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &cmd])
+                .output(),
+        )
+        .await;
+
+        let output = match result {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => return Err(format!("Failed to execute installer: {}", e)),
+            Err(_) => return Err("Installer timed out after 5 minutes".to_string()),
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        if output.status.success() {
+            logger::log_info(&format!("Installer update succeeded: {}", stdout));
+            Ok(stdout)
+        } else {
+            logger::log_error(&format!(
+                "Installer update failed - stdout: {} stderr: {}",
+                stdout, stderr
+            ));
+            Err(format!("Installer update failed: {}", stderr))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let cmd = if std::path::Path::new("install.sh").exists() {
+            "bash ./install.sh --update".to_string()
+        } else {
+            "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash".to_string()
+        };
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(300),
+            tokio::process::Command::new("bash")
+                .args(["-c", &cmd])
+                .output(),
+        )
+        .await;
+
+        let output = match result {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => return Err(format!("Failed to execute installer: {}", e)),
+            Err(_) => return Err("Installer timed out after 5 minutes".to_string()),
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        if output.status.success() {
+            logger::log_info(&format!("Installer update succeeded: {}", stdout));
+            Ok(stdout)
+        } else {
+            logger::log_error(&format!(
+                "Installer update failed - stdout: {} stderr: {}",
+                stdout, stderr
+            ));
+            Err(format!("Installer update failed: {}", stderr))
         }
     }
 }

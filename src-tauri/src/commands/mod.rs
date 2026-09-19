@@ -1116,6 +1116,22 @@ pub async fn should_check_updates() -> Result<bool, String> {
 }
 
 #[tauri::command]
+pub async fn should_check_updates_on_startup() -> Result<bool, String> {
+    let settings = crate::modules::update_checker::load_update_settings()?;
+    Ok(settings.auto_check)
+}
+
+#[tauri::command]
+pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
+    crate::modules::update_checker::check_update_via_script().await
+}
+
+#[tauri::command]
+pub async fn run_installer_update() -> Result<String, String> {
+    crate::modules::update_checker::run_installer_update().await
+}
+
+#[tauri::command]
 pub async fn update_last_check_time() -> Result<(), String> {
     crate::modules::update_checker::update_last_check_time()
 }

@@ -54,3 +54,4 @@ Master directory of architectural and execution plans.
 - [41-ubuntu-installer-hardening-and-aria2c.md](completed/41-ubuntu-installer-hardening-and-aria2c.md): Ubuntu installer hardening, aria2c parallel split acceleration, safe lifecycle, and migration UI.
 - [42-custom-titlebar-controls-fluid-ui-and-v4-30-0-release.md](completed/42-custom-titlebar-controls-fluid-ui-and-v4-30-0-release.md): Custom titlebar window controls, fluid responsive UI polish, and v4.30.0 release.
 - [43-ubuntu-installer-e2e-cleanup-and-rust-ci-fix.md](completed/43-ubuntu-installer-e2e-cleanup-and-rust-ci-fix.md): Ubuntu installer hardening, temporary CI E2E cleanup, and Rust formatting fix.
+- [44-auto-update-checker-and-installer-execution.md](completed/44-auto-update-checker-and-installer-execution.md): Auto update checker on startup, shell script update flags, and one-click installer execution.
