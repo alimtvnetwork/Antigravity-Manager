@@ -17,6 +17,7 @@ interface ModalDialogProps {
     cancelText?: string;
     isDestructive?: boolean;
     isLoading?: boolean;
+    maxWidth?: string;
 }
 
 export default function ModalDialog({
@@ -31,7 +32,8 @@ export default function ModalDialog({
     confirmText,
     cancelText,
     isDestructive = false,
-    isLoading = false
+    isLoading = false,
+    maxWidth = 'max-w-sm',
 }: ModalDialogProps) {
     const { t } = useTranslation();
     const finalConfirmText = confirmText || t('common.confirm');
@@ -69,31 +71,31 @@ export default function ModalDialog({
     const showCancel = isConfirmType && hasCancelHandler;
 
     return createPortal(
-        <div className="modal modal-open z-[100]">
+        <div className="modal modal-open z-[100] items-center justify-center p-4">
             {/* Draggable Top Region */}
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[110]" />
 
-            <div className="modal-box relative max-w-sm bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex flex-col items-center text-center p-6 pt-8">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 shadow-sm ${getIconBg()}`}>
+            <div className={`modal-box relative ${maxWidth} w-full max-h-[90vh] flex flex-col bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200`}>
+                <div className="flex flex-col items-center text-center p-5 pt-6 sm:p-6 sm:pt-7 flex-1 min-h-0 overflow-hidden">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm shrink-0 ${getIconBg()}`}>
                         {getIcon()}
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-base-content mb-2">{title}</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-base-content mb-2 shrink-0">{title}</h3>
 
                     {children ? (
-                        <div className="w-full text-left mb-8 px-1">
+                        <div className="w-full text-left flex-1 min-h-0 overflow-y-auto px-1 py-1 mb-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-base-300">
                             {children}
                         </div>
                     ) : (
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 leading-relaxed px-4">{message}</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 leading-relaxed px-4">{message}</p>
                     )}
 
-                    <div className="flex gap-3 w-full">
+                    <div className="flex gap-3 w-full pt-3 mt-auto border-t border-gray-100 dark:border-base-200 shrink-0">
                         {showCancel && (
                             <button
                                 disabled={isLoading}
-                                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-base-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-base-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 onClick={handleCancel}
                             >
                                 {finalCancelText}
@@ -101,7 +103,7 @@ export default function ModalDialog({
                         )}
                         <button
                             disabled={isLoading}
-                            className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${isDestructive && type === 'confirm'
+                            className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDestructive && type === 'confirm'
                                 ? 'bg-red-500 hover:bg-red-600 focus:ring-red-500 shadow-red-100'
                                 : 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 shadow-blue-100'
                                 }`}

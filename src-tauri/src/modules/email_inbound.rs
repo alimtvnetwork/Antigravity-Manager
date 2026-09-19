@@ -8,7 +8,7 @@ use crate::modules::email_sender;
 use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
 use chrono::Utc;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::process::Command;
 use std::time::Duration;
 use uuid::Uuid;
@@ -686,13 +686,14 @@ pub fn poll_unread_messages(
     let password = email_vault_db::get_account_secret(&account.id).unwrap_or_default();
     let addr = format!("{}:{}", account.imap_host, account.imap_port);
 
-    let mut stream = TcpStream::connect_timeout(
-        &addr
-            .parse()
-            .map_err(|e| format!("Invalid IMAP host/port '{}': {}", addr, e))?,
-        Duration::from_secs(10),
-    )
-    .map_err(|e| format!("IMAP connection to '{}' failed: {}", addr, e))?;
+    let socket_addr = addr
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve IMAP server '{}:{}': {}", account.imap_host, account.imap_port, e))?
+        .next()
+        .ok_or_else(|| format!("No socket address resolved for '{}:{}'", account.imap_host, account.imap_port))?;
+
+    let mut stream = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10))
+        .map_err(|e| format!("IMAP connection to '{}:{}' failed: {}", account.imap_host, account.imap_port, e))?;
 
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))

@@ -221,6 +221,19 @@ export async function testImapConnection(accountId: string): Promise<string> {
     }
 }
 
+export async function testDirectEmailConnection(account: EmailAccountInput): Promise<string> {
+    try {
+        return await invoke('test_direct_email_connection', { account });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.testDirectEmailConnection',
+            endpoint: 'test_direct_email_connection',
+        });
+        throw e;
+    }
+}
+
+
 export async function exportEmailData(format: string): Promise<string> {
     try {
         return await invoke('export_email_data', { format });

@@ -803,6 +803,7 @@ pub fn run() {
             commands::delete_notify_recipient,
             commands::test_smtp_connection,
             commands::test_imap_connection,
+            commands::test_direct_email_connection,
             commands::export_email_data,
             commands::import_email_data,
             commands::backup_email_db,

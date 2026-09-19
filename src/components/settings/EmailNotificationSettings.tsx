@@ -16,6 +16,9 @@ import {
     ChevronDown,
     SlidersHorizontal,
     Copy,
+    CheckCircle2,
+    AlertCircle,
+    Loader2,
 } from 'lucide-react';
 import AiSampleTemplatesModal from './ai-sample-templates-modal';
 import {
@@ -35,6 +38,7 @@ import {
     saveEmailSettings,
     testSmtpConnection,
     testImapConnection,
+    testDirectEmailConnection,
     exportEmailData,
     importEmailData,
     backupEmailDb,
@@ -136,6 +140,9 @@ export default function EmailNotificationSettings() {
         }
     };
 
+    const [isTestingDirect, setIsTestingDirect] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
     const handleOpenAddAccount = () => {
         setEditingAccount({
             alias: '',
@@ -149,6 +156,8 @@ export default function EmailNotificationSettings() {
             is_default: accounts.length === 0,
             is_active: true,
         });
+        setTestResult(null);
+        setIsTestingDirect(false);
         setIsAccountModalOpen(true);
     };
 
@@ -166,7 +175,93 @@ export default function EmailNotificationSettings() {
             is_default: acc.is_default,
             is_active: acc.is_active,
         });
+        setTestResult(null);
+        setIsTestingDirect(false);
         setIsAccountModalOpen(true);
+    };
+
+    const handleEmailChange = (newEmail: string) => {
+        const trimmed = newEmail.trim();
+        let updated = { ...editingAccount, email: newEmail };
+
+        if (trimmed.includes('@')) {
+            const parts = trimmed.split('@');
+            const userPart = parts[0];
+            const domain = parts[1]?.toLowerCase();
+
+            if (domain === 'gmail.com' || domain === 'googlemail.com') {
+                updated.smtp_host = 'smtp.gmail.com';
+                updated.smtp_port = 587;
+                updated.imap_host = 'imap.gmail.com';
+                updated.imap_port = 993;
+                updated.encryption_type = 'TLS';
+            } else if (domain && domain.includes('.')) {
+                if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com' || domain === 'office365.com') {
+                    updated.smtp_host = 'smtp.office365.com';
+                    updated.smtp_port = 587;
+                    updated.imap_host = 'outlook.office365.com';
+                    updated.imap_port = 993;
+                    updated.encryption_type = 'TLS';
+                } else if (domain === 'yahoo.com') {
+                    updated.smtp_host = 'smtp.mail.yahoo.com';
+                    updated.smtp_port = 465;
+                    updated.imap_host = 'imap.mail.yahoo.com';
+                    updated.imap_port = 993;
+                    updated.encryption_type = 'SSL';
+                } else {
+                    // Custom Domain auto-discovery heuristics per user requirements:
+                    // Outgoing Server: mail.<domain>, Port 465 (SSL)
+                    // Incoming Server: mail.<domain>, Port 993 (SSL)
+                    updated.smtp_host = `mail.${domain}`;
+                    updated.smtp_port = 465;
+                    updated.imap_host = `mail.${domain}`;
+                    updated.imap_port = 993;
+                    updated.encryption_type = 'SSL';
+                }
+
+                if (!editingAccount.alias || editingAccount.alias === 'Primary Mailbox') {
+                    updated.alias = `${userPart} (${domain})`;
+                }
+            }
+        }
+
+        setEditingAccount(updated);
+        if (testResult) {
+            setTestResult(null);
+        }
+    };
+
+    const handleTestDirectConnection = async () => {
+        if (!editingAccount.email.trim()) {
+            showToast('Email address is required to run connection test', 'error');
+            return;
+        }
+        const isEmailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editingAccount.email.trim());
+        if (!isEmailFormatValid) {
+            showToast('Please enter a valid email format before testing', 'error');
+            return;
+        }
+        const hasMissingPassword = !editingAccount.password || !editingAccount.password.trim();
+        if (!editingAccount.id) {
+            if (hasMissingPassword) {
+                showToast('Password is required to test mailbox authentication', 'error');
+                return;
+            }
+        }
+
+        setIsTestingDirect(true);
+        setTestResult(null);
+        try {
+            const res = await testDirectEmailConnection(editingAccount);
+            setTestResult({ success: true, message: res });
+            showToast('Connection verified! Self-test email delivered.', 'success');
+        } catch (e: any) {
+            const err = e?.message || String(e);
+            setTestResult({ success: false, message: err });
+            showToast(`Connection Test Failed: ${err}`, 'error');
+        } finally {
+            setIsTestingDirect(false);
+        }
     };
 
     const handleSaveAccount = async () => {
@@ -366,6 +461,20 @@ export default function EmailNotificationSettings() {
             showToast('Manual check failed: ' + (e?.message || e), 'error');
         }
     };
+
+    const trimmedEmail = editingAccount.email.trim();
+    let emailFormatStatus: 'empty' | 'invalid' | 'valid' = 'empty';
+    if (trimmedEmail.length > 0) {
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            emailFormatStatus = 'valid';
+        } else {
+            emailFormatStatus = 'invalid';
+        }
+    }
+
+    const testResultStatus: 'none' | 'success' | 'failed' = testResult
+        ? (testResult.success ? 'success' : 'failed')
+        : 'none';
 
     return (
         <div className="space-y-4">
@@ -858,12 +967,13 @@ export default function EmailNotificationSettings() {
                 isOpen={isAccountModalOpen}
                 title={editingAccount.id ? 'Edit Mailbox Configuration' : 'Add Mailbox to Secure Split Vault'}
                 type="confirm"
-                confirmText="Save Account"
+                maxWidth="max-w-lg"
+                confirmText={editingAccount.id ? 'Save Mailbox' : 'Add Mailbox to Vault'}
                 cancelText="Cancel"
                 onConfirm={handleSaveAccount}
                 onCancel={() => setIsAccountModalOpen(false)}
             >
-                <div className="space-y-4 text-xs">
+                <div className="space-y-3.5 text-xs">
                     {/* One-Click AI Instructions Copy */}
                     <div className="flex items-center justify-between p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
                         <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
@@ -891,23 +1001,35 @@ export default function EmailNotificationSettings() {
                     </div>
 
                     <div>
+                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+                        <input
+                            type="email"
+                            placeholder="e.g. ai-agm-tool-v2@hire-seoexperts.com"
+                            value={editingAccount.email}
+                            onChange={(e) => handleEmailChange(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {emailFormatStatus === 'valid' && (
+                            <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Valid email detected. Host and port settings auto-configured.</span>
+                            </div>
+                        )}
+                        {emailFormatStatus === 'invalid' && (
+                            <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>Please enter a complete email address (e.g. user@domain.com)</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
                         <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Account Alias</label>
                         <input
                             type="text"
                             placeholder="e.g. Primary Gmail, Alerts Mailer"
                             value={editingAccount.alias}
                             onChange={(e) => setEditingAccount({ ...editingAccount, alias: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
-                        <input
-                            type="email"
-                            placeholder="user@example.com"
-                            value={editingAccount.email}
-                            onChange={(e) => setEditingAccount({ ...editingAccount, email: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
@@ -934,7 +1056,7 @@ export default function EmailNotificationSettings() {
 
                     <div className="grid grid-cols-3 gap-3">
                         <div className="col-span-2">
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Host</label>
+                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Outgoing Server (SMTP Host)</label>
                             <input
                                 type="text"
                                 value={editingAccount.smtp_host}
@@ -948,16 +1070,41 @@ export default function EmailNotificationSettings() {
                                 type="number"
                                 value={editingAccount.smtp_port}
                                 onChange={(e) =>
-                                    setEditingAccount({ ...editingAccount, smtp_port: parseInt(e.target.value) || 587 })
+                                    setEditingAccount({ ...editingAccount, smtp_port: parseInt(e.target.value) || 465 })
                                 }
                                 className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
                             />
                         </div>
                     </div>
+                    {/* SMTP Port Preset Pills */}
+                    <div className="flex items-center gap-1.5 -mt-1.5">
+                        <span className="text-[10px] text-gray-400">Presets:</span>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 465, encryption_type: 'SSL' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 465 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            465 (SSL)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 587, encryption_type: 'TLS' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 587 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            587 (TLS)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 25, encryption_type: 'NONE' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 25 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            25 (Plain)
+                        </button>
+                    </div>
 
                     <div className="grid grid-cols-3 gap-3">
                         <div className="col-span-2">
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">IMAP Host</label>
+                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Incoming Server (IMAP Host)</label>
                             <input
                                 type="text"
                                 value={editingAccount.imap_host}
@@ -977,6 +1124,31 @@ export default function EmailNotificationSettings() {
                             />
                         </div>
                     </div>
+                    {/* IMAP Port Preset Pills */}
+                    <div className="flex items-center gap-1.5 -mt-1.5">
+                        <span className="text-[10px] text-gray-400">Presets:</span>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, imap_port: 993, encryption_type: 'SSL' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 993 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            993 (IMAP SSL)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, imap_port: 143, encryption_type: 'TLS' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 143 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            143 (IMAP)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEditingAccount({ ...editingAccount, imap_port: 995, encryption_type: 'SSL' })}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 995 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                        >
+                            995 (POP3)
+                        </button>
+                    </div>
 
                     <div>
                         <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Encryption Type</label>
@@ -985,14 +1157,14 @@ export default function EmailNotificationSettings() {
                             onChange={(e) => setEditingAccount({ ...editingAccount, encryption_type: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
                         >
-                            <option value="TLS">TLS (Recommended)</option>
+                            <option value="SSL">SSL / TLS (Recommended for Custom Domain)</option>
+                            <option value="TLS">TLS (Recommended for Gmail / Outlook)</option>
                             <option value="STARTTLS">STARTTLS</option>
-                            <option value="SSL">SSL</option>
                             <option value="NONE">None / Plain</option>
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-4 pt-2">
+                    <div className="flex items-center gap-4 pt-1">
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
@@ -1011,6 +1183,69 @@ export default function EmailNotificationSettings() {
                             />
                             <span>Active</span>
                         </label>
+                    </div>
+
+                    {/* Dedicated Test Section */}
+                    <div className="p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-2 mt-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <div className="font-semibold text-xs text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                                    <Send className="w-3.5 h-3.5 text-blue-500" />
+                                    <span>Test Connection & Self-Test Email</span>
+                                </div>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Sends a self-test email to verify outgoing SMTP & auth before saving.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleTestDirectConnection}
+                                disabled={isTestingDirect}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                            >
+                                {isTestingDirect ? (
+                                    <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Testing...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        <span>Send Test Email</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {testResultStatus === 'success' && (
+                            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2 text-emerald-800 dark:text-emerald-200 animate-in fade-in">
+                                <span className="relative flex h-3 w-3 mt-0.5 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                </span>
+                                <div className="flex-1 text-[11px]">
+                                    <div className="font-bold flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        <span>Connection & Delivery Successful (Green Signal)</span>
+                                    </div>
+                                    <div className="text-emerald-700 dark:text-emerald-300 mt-0.5">
+                                        {testResult?.message}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {testResultStatus === 'failed' && (
+                            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2 text-rose-800 dark:text-rose-200 animate-in fade-in">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 mt-0.5 shrink-0" />
+                                <div className="flex-1 text-[11px]">
+                                    <div className="font-bold">Connection Verification Failed</div>
+                                    <div className="text-rose-700 dark:text-rose-300 mt-0.5 break-all">
+                                        {testResult?.message}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </ModalDialog>

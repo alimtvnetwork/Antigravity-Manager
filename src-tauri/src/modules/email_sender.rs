@@ -8,7 +8,7 @@ use crate::modules::email_vault_db::{self, EmailAccount};
 use base64::prelude::*;
 use chrono::Utc;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -86,16 +86,29 @@ pub fn send_via_account(
     recipients: &[String],
 ) -> Result<(), String> {
     let password = email_vault_db::get_account_secret(&account.id).unwrap_or_default();
+    send_via_account_credentials(account, &password, subject, html_body, recipients)
+}
+
+/// Send email through an account with explicitly passed credentials
+pub fn send_via_account_credentials(
+    account: &EmailAccount,
+    password: &str,
+    subject: &str,
+    html_body: &str,
+    recipients: &[String],
+) -> Result<(), String> {
     let addr = format!("{}:{}", account.smtp_host, account.smtp_port);
 
+    // Resolve hostname or IP
+    let socket_addr = addr
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve SMTP server '{}:{}': {}", account.smtp_host, account.smtp_port, e))?
+        .next()
+        .ok_or_else(|| format!("No socket address resolved for '{}:{}'", account.smtp_host, account.smtp_port))?;
+
     // Establish TCP connection with timeout
-    let mut stream = TcpStream::connect_timeout(
-        &addr
-            .parse()
-            .map_err(|e| format!("Invalid host/port '{}': {}", addr, e))?,
-        Duration::from_secs(10),
-    )
-    .map_err(|e| format!("TCP connection to '{}' failed: {}", addr, e))?;
+    let mut stream = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10))
+        .map_err(|e| format!("TCP connection to SMTP server '{}:{}' failed: {}", account.smtp_host, account.smtp_port, e))?;
 
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))
@@ -416,6 +429,24 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
         machine_name,
         machine_ip,
     );
+    (subject, html)
+}
+
+/// Render HTML email for self-test mailbox verification
+pub fn render_self_test_email(
+    email: &str,
+    machine_name: &str,
+    machine_ip: &str,
+) -> (String, String) {
+    let subject = format!("[AGM Test] Mailbox Connection Verified - {}", email);
+    let content = format!(
+        r#"<p><span class="badge badge-success">CONNECTION VERIFIED ✓</span></p>
+<p>This is an automated self-test verification email from <strong>Antigravity Manager</strong>.</p>
+<p>Your mailbox account <code>{}</code> successfully authenticated via SMTP, passed credentials check, and delivered this verification message to itself.</p>
+<p>Remote commands, quota notifications, and failover routing are active for this account.</p>"#,
+        email
+    );
+    let html = wrap_email_card("Mailbox Self-Test Verification", &content, machine_name, machine_ip);
     (subject, html)
 }
 
