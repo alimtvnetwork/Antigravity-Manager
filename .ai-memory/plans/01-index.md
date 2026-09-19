@@ -47,3 +47,4 @@ Master directory of architectural and execution plans.
 - [34-instance-full-copy-smart-play-and-rca.md](completed/34-instance-full-copy-smart-play-and-rca.md): Instance full directory copy, smart play profile rotation, UI action bar, and root cause analysis.
 - [35-instance-rotation-rca-and-release.md](completed/35-instance-rotation-rca-and-release.md): Instance launch RCA, full copy isolation, smart play rotation, and release.
 - [36-ui-error-manage-and-instance-play.md](completed/36-ui-error-manage-and-instance-play.md): UI Error Manage, Top Padding, Accounts Actions Reorder, and Instance Smart Double-Play.
+- [37-audit-and-verify-ui-error-manage.md](completed/37-audit-and-verify-ui-error-manage.md): Audit and verification of UI, error management, minimize fix, and instance features.
