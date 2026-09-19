@@ -39,19 +39,15 @@ export default function Email() {
                             </h1>
 
                             {/* Telemetry badges placed inline beside Active tag */}
-                            <div className="flex items-center gap-1.5 text-xs">
-                                {watcherStatus?.machine_name && (
-                                    <div className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-medium text-[11px] flex items-center gap-1">
-                                        <Cpu className="w-3 h-3 text-emerald-500" />
-                                        <span>Node: <strong>{watcherStatus.machine_name}</strong></span>
-                                    </div>
-                                )}
-                                {watcherStatus?.machine_ip && (
-                                    <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-md font-mono text-[11px] flex items-center gap-1">
-                                        <Radio className="w-3 h-3 text-sky-500" />
-                                        <span>IP: <strong>{watcherStatus.machine_ip}</strong></span>
-                                    </div>
-                                )}
+                            <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                <div className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-medium text-[11px] flex items-center gap-1">
+                                    <Cpu className="w-3 h-3 text-emerald-500" />
+                                    <span>Node: <strong>{watcherStatus?.machine_name || 'Detecting...'}</strong></span>
+                                </div>
+                                <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-md font-mono text-[11px] flex items-center gap-1">
+                                    <Radio className="w-3 h-3 text-sky-500" />
+                                    <span>IP: <strong>{watcherStatus?.machine_ip || '127.0.0.1'}</strong></span>
+                                </div>
                                 <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 border ${
                                     watcherStatus?.is_running
                                         ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
