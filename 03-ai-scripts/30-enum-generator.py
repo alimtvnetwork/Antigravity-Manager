@@ -127,10 +127,7 @@ def normalize_config(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_variant_header(ctx: dict[str, Any]) -> list[str]:
-    imports = ['\t"encoding/json"']
-    if not ctx["is_string"]:
-        imports.append('\t"fmt"')
-    imports.extend(['', '\t"coding-guidelines/common/pkg/baseenumer"'])
+    imports = ['\t"coding-guidelines/common/pkg/baseenumer"']
     return [f"package {ctx['package']}", "", "import ("] + imports + [")", ""]
 
 
@@ -160,10 +157,7 @@ def build_variant_assertions(ctx: dict[str, Any]) -> list[str]:
     m_zero = 'Variant("")' if ctx["is_string"] else "Variant(0)"
     lines = ["var ("] + resolve_assertion_types(ctx)
     lines.extend([
-        f"\t_ baseenumer.MinMaxer[Variant] = {m_zero}",
         f"\t_ baseenumer.BoundedEnumer[Variant] = {m_zero}",
-        f"\t_ json.Marshaler = {m_zero}",
-        "\t_ json.Unmarshaler = (*Variant)(nil)",
         ")",
         "",
     ])
@@ -185,11 +179,14 @@ def build_variant_byte_methods(ctx: dict[str, Any]) -> list[str]:
 def build_variant_int_methods(ctx: dict[str, Any]) -> list[str]:
     if ctx["is_string"]:
         return ["func (v Variant) Value() string {\n\treturn string(v)\n}\n"]
-    return [
-        f"func (v Variant) Value() {ctx['underlying']} {{\n\treturn {ctx['underlying']}(v)\n}}\n",
+    res = []
+    if not ctx["is_byte"]:
+        res.append(f"func (v Variant) Value() {ctx['underlying']} {{\n\treturn {ctx['underlying']}(v)\n}}\n")
+    res.extend([
         "func (v Variant) Int() int {\n\treturn int(v)\n}\n",
         "func (v Variant) Code() uint16 {\n\treturn uint16(v)\n}\n",
-    ]
+    ])
+    return res
 
 
 def build_variant_collection_methods() -> list[str]:
@@ -258,7 +255,7 @@ def build_string_formatting() -> list[str]:
 def build_numeric_formatting(ctx: dict[str, Any]) -> list[str]:
     u, name = ctx["underlying"], ctx["name"]
     return [
-        f"func (v Variant) Name() string {{\n\tif int(v) < len(variantLabels) {{\n\t\treturn variantLabels[v]\n\t}}\n\treturn fmt.Sprintf(\"{name}(%d)\", {u}(v))\n}}\n",
+        f"func (v Variant) Name() string {{\n\tif int(v) < len(variantLabels) {{\n\t\treturn variantLabels[v]\n\t}}\n\n\treturn baseenumer.FormatNameValue(\"{name}\", {u}(v))\n}}\n",
         "func (v Variant) Label() string {\n\treturn v.Name()\n}\n",
         "func (v Variant) String() string {\n\treturn v.Name()\n}\n",
         f"func (v Variant) ValueString() string {{\n\treturn baseenumer.FormatNameValue(v.Name(), {u}(v))\n}}\n",
@@ -313,10 +310,8 @@ def generate_variant_go(ctx: dict[str, Any]) -> str:
 def build_vars_header(ctx: dict[str, Any]) -> list[str]:
     imports = [
         '\t"coding-guidelines/common/pkg/baseenumer"',
-        '\t"coding-guidelines/common/pkg/errtype"',
-        '\t"coding-guidelines/common/pkg/result"',
     ]
-    return [f"package {ctx['package']}", "", "import ("] + imports + [")", "", "type Result = result.Wrap[Variant]", ""]
+    return [f"package {ctx['package']}", "", "import ("] + imports + [")", ""]
 
 
 def build_string_registry(items: list[str]) -> list[str]:
@@ -332,7 +327,6 @@ def build_string_vars_data(ctx: dict[str, Any]) -> list[str]:
     lines.extend(["\t}", ""] + build_string_registry(ctx["items"]))
     lines.extend([
         f"\tbasicEnum = baseenumer.NewBasicString(allVariants, {ctx['zero_value']})",
-        "\tvariantMap = basicEnum.Map()",
         ")",
         "",
     ])
@@ -346,7 +340,6 @@ def build_numeric_vars_data(ctx: dict[str, Any]) -> list[str]:
         "\t}",
         "",
         f"\tbasicEnum = baseenumer.NewBasicInteger(variantLabels[:], {ctx['zero_value']})",
-        "\tvariantMap = basicEnum.Map()",
         ")",
         "",
     ])
@@ -387,17 +380,15 @@ build_vars_body = build_vars_helpers
 
 
 def build_vars_parser(ctx: dict[str, Any]) -> list[str]:
-    p = ctx["package"]
-    err_val = f'return result.WrapFailureWithId[Variant](errtype.Validation, baseenumer.FormatEmptyParseError("{p}"))'
-    err_nf = f'return result.WrapFailureWithId[Variant](errtype.NotFound, baseenumer.FormatParseError("{p}", s, Values()))'
-    body = (
-        f"func Parse(s string) Result {{\n"
-        f"\tv, trimmed, isOk := baseenumer.ParseLookup(s, variantMap)\n"
-        f"\tif len(trimmed) == 0 {{\n\t\t{err_val}\n\t}}\n\n"
-        f"\tif isOk {{\n\t\treturn result.WrapSuccess(v)\n\t}}\n\n"
-        f"\t{err_nf}\n}}"
-    )
-    return [body, ""]
+    zero = ctx["zero_value"]
+    lines = [
+        "func Parse(s string) (Variant, bool) {\n\treturn basicEnum.Parse(s)\n}\n",
+        "func ParseOrZero(s string) Variant {\n\treturn basicEnum.ParseOrZero(s)\n}\n",
+        "func ParseOrInvalid(s string) Variant {\n\treturn basicEnum.ParseOrZero(s)\n}\n",
+    ]
+    if zero != "Invalid":
+        lines.append(f"func ParseOr{zero}(s string) Variant {{\n\treturn basicEnum.ParseOrZero(s)\n}}\n")
+    return lines
 
 
 def generate_vars_go(ctx: dict[str, Any]) -> str:
@@ -489,14 +480,16 @@ def build_test_predicates(ctx: dict[str, Any]) -> list[str]:
 
 
 def build_test_names_and_vars(ctx: dict[str, Any]) -> list[str]:
-    pkg, first, n = ctx["package"], ctx["items"][0], len(ctx["items"])
+    pkg, first, zero, n = ctx["package"], ctx["items"][0], ctx["zero_value"], len(ctx["items"])
     return [
         f"func Test{ctx['name']}Type_VarsAndParse(t *testing.T) {{",
         f'\tall := {pkg}.All()\n\tif len(all) != {n} || len({pkg}.{first}.All()) != {n} {{\n\t\tt.Fatalf("expected {n} variants, got %d", len(all))\n\t}}',
         f'\tvals := {pkg}.Values()\n\tif len(vals) != {n} || len({pkg}.{first}.Values()) != {n} {{\n\t\tt.Fatalf("expected {n} values, got %d", len(vals))\n\t}}',
-        f'\tres := {pkg}.Parse("{first}")\n\tif !res.IsSuccess() || res.Data() != {pkg}.{first} {{\n\t\tt.Fatalf("expected successful Parse for {first}")\n\t}}',
-        f'\tif {pkg}.Parse("").IsSuccess() {{\n\t\tt.Fatalf("expected failure for empty string")\n\t}}',
-        f'\tif {pkg}.Parse("invalid_variant_value").IsSuccess() {{\n\t\tt.Fatalf("expected failure for bad variant")\n\t}}',
+        f'\tv, isOk := {pkg}.Parse("{first}")\n\tif !isOk || v != {pkg}.{first} {{\n\t\tt.Fatalf("expected successful Parse for {first}")\n\t}}',
+        f'\tif _, isOk := {pkg}.Parse(""); isOk {{\n\t\tt.Fatalf("expected failure for empty string")\n\t}}',
+        f'\tif _, isOk := {pkg}.Parse("invalid_variant_value"); isOk {{\n\t\tt.Fatalf("expected failure for bad variant")\n\t}}',
+        f'\tif {pkg}.ParseOrZero("{first}") != {pkg}.{first} {{\n\t\tt.Fatalf("ParseOrZero failed")\n\t}}',
+        f'\tif {pkg}.ParseOrInvalid("invalid_variant_value") != {pkg}.{zero} {{\n\t\tt.Fatalf("ParseOrInvalid fallback failed")\n\t}}',
         "}",
         "",
     ]
@@ -532,10 +525,10 @@ def generate_readme_md(ctx: dict[str, Any]) -> str:
         f"# `{p}` Package\n\n"
         f"`{p}` provides a type-safe {u}-backed enumeration for {n} variants ({members}).\n\n"
         "## Key Features\n\n"
-        "- **Zero Circular Dependencies:** Directly imports only `baseenumer`, `result`, `errtype`, and standard libraries.\n"
-        "- **Direct Result Return:** `Parse(s string) Result` returns canonical `type Result = result.Wrap[Variant]`.\n"
-        "- **High-Speed Lookups:** Precompiled lookup table via `baseenumer.CompileMap`.\n"
-        "- **DRY JSON Marshaling:** Uses `baseenumer.MarshalJSON` and `baseenumer.UnmarshalIntegerJSON` / `UnmarshalStringJSON`.\n"
+        "- **Zero Circular Dependencies:** Foundational leaf enum importing only `baseenumer` and standard libraries.\n"
+        "- **Zero-Allocation Parsing:** `Parse(s string) (Variant, bool)` directly delegates to `baseenumer.BasicInteger`.\n"
+        "- **Safe Fallback Parsers:** `ParseOrZero(s)`, `ParseOrInvalid(s)`, and `ParseOrUnknown(s)` helpers.\n"
+        "- **DRY JSON Marshaling:** Implements `json.Marshaler` and `json.Unmarshaler`.\n"
         "- **Boundary Operations:** First-class `Min()`, `Max()`, `IsMin()`, `IsMax()`, and `IsInRange(min, max Variant) bool` conforming to `baseenumer.BoundedEnumer[Variant]`.\n"
     )
 

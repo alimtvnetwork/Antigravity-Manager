@@ -30,3 +30,4 @@ To avoid 50-result tool truncation limits and eliminate multi-turn exploratory r
 - **Read Target File:** `python 03-ai-scripts/17-fast-file-reader.py --read-file <file-path> --max-bytes 100000`
 - **Fast Pattern Search:** `python 03-ai-scripts/17-fast-file-reader.py --search-pattern "<pattern>" --limit 50`
 - **Codebase Topology:** `python 03-ai-scripts/18-codebase-topology-discoverer.py --summary`
+

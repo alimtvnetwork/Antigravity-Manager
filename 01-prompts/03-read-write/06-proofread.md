@@ -366,7 +366,7 @@ If any box is unchecked, do not reply. Fix it first.
 
 ## Conversation archive (per-feature index)
 
-When the user's input clearly belongs to a feature, mirror the cleaned conversation to `/conversation/xx-feature/xx-title-of-conv.md` and update `01-prompts/03-read-write/04-conversation-log.md`. `xx` is a two-digit sequence. This is the ONLY archive location for user conversation content. Never scatter copies elsewhere.
+When the user's input clearly belongs to a feature, mirror the cleaned conversation to `/conversation/xx-feature/xx-title-of-conv.md` and update `01-prompts/03-read-write/05-conversation-log.md`. `xx` is a two-digit sequence. This is the ONLY archive location for user conversation content. Never scatter copies elsewhere.
 
 ## Issue placement
 

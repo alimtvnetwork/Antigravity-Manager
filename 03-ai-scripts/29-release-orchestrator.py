@@ -5,19 +5,20 @@
 Automates the complete release heavy-lifting lifecycle:
   1. Detects and preserves the original starting branch.
   2. Resolves current version and calculates next SemVer (minor default per Rule 0).
-  3. Checks for and runs bump-version script (bootstrapping it if missing).
-  4. Commits version bump changes to the repository.
-  5. Creates/updates the release branch: release/vX.Y.Z pointing to that commit.
-  6. Creates the annotated git tag: vX.Y.Z on that commit.
-  7. Optionally pushes the release branch and tag to the remote repository.
-  8. Reverts working tree back to the original starting branch.
+  3. Pre-release quality gates verification (06-cicd-local-runner.py --run-tests).
+  4. STEP 1: Creates and checks out dedicated release branch: release/vX.Y.Z.
+  5. STEP 2: Executes version bump using the repository bump script (37-bump-version.py / bump_versions.py).
+  6. STEP 3: Commits version bump changes in the release branch.
+  7. STEP 4: Creates the annotated git tag: vX.Y.Z on that release commit.
+  8. STEP 5: Merges release branch commit back to main branch, pushes main, release branch, and tag to origin.
+  9. Reverts working tree back to the original starting branch.
 
 Usage:
   python 03-ai-scripts/29-release-orchestrator.py
   python 03-ai-scripts/29-release-orchestrator.py --tier patch
   python 03-ai-scripts/29-release-orchestrator.py --tier minor --scope "Feature release"
   python 03-ai-scripts/29-release-orchestrator.py --tier major --scope "Breaking change"
-  python 03-ai-scripts/29-release-orchestrator.py --version 5.30.0
+  python 03-ai-scripts/29-release-orchestrator.py --version 6.42.0
   python 03-ai-scripts/29-release-orchestrator.py --dry-run
   python 03-ai-scripts/29-release-orchestrator.py --no-push
 """
@@ -43,6 +44,7 @@ CHANGELOG_MD = REPO_ROOT / "changelog.md"
 # Known bump scripts
 NODE_BUMP_SCRIPT = REPO_ROOT / "scripts" / "bump-version.mjs"
 PYTHON_BUMP_SCRIPT = REPO_ROOT / ".ai-memory" / "release" / "bump_versions.py"
+AI_BUMP_SCRIPT = REPO_ROOT / "03-ai-scripts" / "37-bump-version.py"
 
 
 def run_cmd(cmd, cwd=None, check=True, capture_output=True):
@@ -76,6 +78,20 @@ def get_current_branch():
     return branch
 
 
+def get_main_branch():
+    """Detects whether repository uses 'main' or 'master'."""
+    try:
+        branches = get_git_output("branch", "--list", "main", "master")
+        if "main" in branches:
+            return "main"
+        if "master" in branches:
+            return "master"
+    except Exception:
+        pass
+
+    return "main"
+
+
 def read_canonical_version():
     """Reads current SemVer from version.json or package.json."""
     if VERSION_JSON.is_file():
@@ -83,7 +99,7 @@ def read_canonical_version():
             with open(VERSION_JSON, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            raw_ver = data.get("version") or data.get("Version")
+            raw_ver = data.get("Version") or data.get("version")
             if raw_ver:
                 return str(raw_ver).strip()
         except Exception:
@@ -134,89 +150,104 @@ def calculate_next_version(current_ver, tier):
 
 def bootstrap_bump_script_if_needed():
     """Creates a basic bump script if none exists in the repository."""
-    if NODE_BUMP_SCRIPT.is_file() or PYTHON_BUMP_SCRIPT.is_file():
+    if AI_BUMP_SCRIPT.is_file() or PYTHON_BUMP_SCRIPT.is_file() or NODE_BUMP_SCRIPT.is_file():
         return
 
-    scripts_dir = REPO_ROOT / "scripts"
+    scripts_dir = REPO_ROOT / "03-ai-scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
 
-    bootstrap_content = '''#!/usr/bin/env node
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+    bootstrap_content = '''#!/usr/bin/env python3
+import argparse
+import datetime
+import json
+from pathlib import Path
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "..");
+ROOT = Path(__file__).resolve().parent.parent
 
-const args = process.argv.slice(2);
-let version = null;
-let scope = "Routine release ceremony";
+parser = argparse.ArgumentParser()
+parser.add_argument("--version", "-v", required=True)
+parser.add_argument("--scope", "-s", default="Routine release")
+args = parser.parse_args()
 
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--version" || args[i] === "-v") version = args[++i];
-  if (args[i] === "--scope" || args[i] === "-s") scope = args[++i];
-}
+v_json = ROOT / "version.json"
+if v_json.is_file():
+    data = json.loads(v_json.read_text(encoding="utf-8"))
+    data["version"] = args.version
+    data["releaseDate"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    v_json.write_text(json.dumps(data, indent=2) + "\\n", encoding="utf-8")
 
-if (!version) {
-  console.error("Missing required --version argument");
-  process.exit(1);
-}
+p_json = ROOT / "package.json"
+if p_json.is_file():
+    data = json.loads(p_json.read_text(encoding="utf-8"))
+    data["version"] = args.version
+    p_json.write_text(json.dumps(data, indent=2) + "\\n", encoding="utf-8")
 
-// 1. Update version.json
-const verJsonPath = resolve(ROOT, "version.json");
-if (existsSync(verJsonPath)) {
-  const data = JSON.parse(readFileSync(verJsonPath, "utf8"));
-  data.version = version;
-  data.releaseDate = new Date().toISOString().split("T")[0];
-  writeFileSync(verJsonPath, JSON.stringify(data, null, 2) + "\\n", "utf8");
-}
-
-// 2. Update package.json
-const pkgPath = resolve(ROOT, "package.json");
-if (existsSync(pkgPath)) {
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-  pkg.version = version;
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\\n", "utf8");
-}
-
-console.log(`Successfully bumped to ${version}`);
+print(f"Successfully bumped to {args.version}")
 '''
-    with open(NODE_BUMP_SCRIPT, "w", encoding="utf-8") as f:
+    with open(AI_BUMP_SCRIPT, "w", encoding="utf-8") as f:
         f.write(bootstrap_content)
 
-    print(f"[*] Bootstrapped missing bump script: {NODE_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
+    print(f"[*] Bootstrapped missing bump script: {AI_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
+
+
+def create_and_checkout_release_branch(next_version, dry_run=False):
+    """Step 1: Creates and switches to a dedicated release branch."""
+    branch_name = f"release/v{next_version}"
+    if dry_run:
+        print(f"[DRY RUN] Would create and checkout release branch: '{branch_name}'")
+        return branch_name
+
+    print(f"[*] Step 1: Creating and switching to release branch: '{branch_name}'...")
+    run_cmd(["git", "checkout", "-b", branch_name])
+    current = get_current_branch()
+    print(f"[*] Active branch is now: '{current}'")
+
+    return branch_name
 
 
 def execute_version_bump(next_version, scope, dry_run=False):
-    """Executes the version bump via existing scripts or standalone fallback."""
+    """Step 2: Executes the version bump on the release branch via scripts or standalone fallback."""
     if dry_run:
         print(f"[DRY RUN] Would bump version to {next_version} (scope: {scope})")
         return
 
-    # Optional helper bump script invocation
+    print(f"[*] Step 2: Executing version bump to v{next_version}...")
+
+    # Check 1: AI Scripts bump script (pure Python)
+    if AI_BUMP_SCRIPT.is_file():
+        print(f"[*] Invoking AI Python bump script: {AI_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
+        res = run_cmd([sys.executable, str(AI_BUMP_SCRIPT), "--version", next_version, "--scope", scope], check=False)
+        if res.returncode == 0:
+            return
+
+    # Check 2: .ai-memory Python bump script
     if PYTHON_BUMP_SCRIPT.is_file():
         print(f"[*] Invoking Python bump script: {PYTHON_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
-        try:
-            run_cmd([sys.executable, str(PYTHON_BUMP_SCRIPT), "--set", next_version])
-        except Exception as e:
-            print(f"[!] Sub-bump script notice: {e}")
+        res = run_cmd([sys.executable, str(PYTHON_BUMP_SCRIPT), "--version", next_version, "--scope", scope], check=False)
+        if res.returncode == 0:
+            return
 
-    # Check 3: Standalone autonomous version bump across all manifests and docs
-    print("[!] Executing standalone autonomous version bump across repository...")
+    # Check 3: Node bump script
+    if NODE_BUMP_SCRIPT.is_file():
+        print(f"[*] Invoking Node bump script: {NODE_BUMP_SCRIPT.relative_to(REPO_ROOT)}")
+        res = run_cmd(["node", str(NODE_BUMP_SCRIPT), "--version", next_version, "--scope", scope], check=False)
+        if res.returncode != 0:
+            run_cmd(["node", str(NODE_BUMP_SCRIPT), next_version, scope], check=False)
+        return
+
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
-    # 1. Update version.json
+    # Fallback in-place updates: version.json
     if VERSION_JSON.is_file():
         with open(VERSION_JSON, "r", encoding="utf-8") as f:
             v_data = json.load(f)
-        v_data["Version"] = next_version
         v_data["version"] = next_version
         v_data["releaseDate"] = today_str
         with open(VERSION_JSON, "w", encoding="utf-8") as f:
             json.dump(v_data, f, indent=2)
             f.write("\n")
 
-    # 2. Update package.json
+    # Fallback: package.json
     if PACKAGE_JSON.is_file():
         with open(PACKAGE_JSON, "r", encoding="utf-8") as f:
             p_data = json.load(f)
@@ -225,247 +256,98 @@ def execute_version_bump(next_version, scope, dry_run=False):
             json.dump(p_data, f, indent=2)
             f.write("\n")
 
-    # 3. Update package-lock.json
-    pkg_lock_file = REPO_ROOT / "package-lock.json"
-    if pkg_lock_file.is_file():
-        with open(pkg_lock_file, "r", encoding="utf-8") as f:
-            pl_data = json.load(f)
-        pl_data["version"] = next_version
-        if "packages" in pl_data:
-            if "" in pl_data["packages"]:
-                pl_data["packages"][""]["version"] = next_version
-        with open(pkg_lock_file, "w", encoding="utf-8") as f:
-            json.dump(pl_data, f, indent=2)
-            f.write("\n")
+    # Fallback: changelog.md
+    if CHANGELOG_MD.is_file():
+        with open(CHANGELOG_MD, "r", encoding="utf-8") as f:
+            cl_content = f.read()
 
-    # 4. Update src-tauri/Cargo.toml & Cargo.lock
-    cargo_file = REPO_ROOT / "src-tauri" / "Cargo.toml"
-    if cargo_file.is_file():
-        cargo_content = cargo_file.read_text(encoding="utf-8")
-        cargo_content = re.sub(r'(?m)^version\s*=\s*"[^"]+"', f'version = "{next_version}"', cargo_content, count=1)
-        cargo_file.write_text(cargo_content, encoding="utf-8")
+        entry_header = f"## [v{next_version}] - {today_str}\n\n### Added\n- {scope}\n\n"
+        if f"[v{next_version}]" not in cl_content:
+            if "# Changelog\n" in cl_content:
+                cl_content = cl_content.replace("# Changelog\n", f"# Changelog\n\n{entry_header}", 1)
+            else:
+                cl_content = f"# Changelog\n\n{entry_header}{cl_content}"
 
-    cargo_lock = REPO_ROOT / "src-tauri" / "Cargo.lock"
-    if cargo_lock.is_file():
-        lock_content = cargo_lock.read_text(encoding="utf-8")
-        lock_content = re.sub(
-            r'(\[\[package\]\]\r?\nname\s*=\s*"antigravity-tools"\r?\nversion\s*=\s*)"[^"]+"',
-            f'\\g<1>"{next_version}"',
-            lock_content,
-            count=1,
-        )
-        cargo_lock.write_text(lock_content, encoding="utf-8")
-
-    # 5. Update src-tauri/tauri.conf.json
-    tauri_conf = REPO_ROOT / "src-tauri" / "tauri.conf.json"
-    if tauri_conf.is_file():
-        with open(tauri_conf, "r", encoding="utf-8") as f:
-            tc_data = json.load(f)
-        tc_data["version"] = next_version
-        with open(tauri_conf, "w", encoding="utf-8") as f:
-            json.dump(tc_data, f, indent=2)
-            f.write("\n")
-
-    # 6. Update Casks/antigravity-tools.rb
-    cask_file = REPO_ROOT / "Casks" / "antigravity-tools.rb"
-    if cask_file.is_file():
-        cask_content = cask_file.read_text(encoding="utf-8")
-        cask_content = re.sub(r'version\s+"[^"]+"', f'version "{next_version}"', cask_content, count=1)
-        cask_file.write_text(cask_content, encoding="utf-8")
-
-    # 7. Update UI fallback version strings in React
-    navlogo_tsx = REPO_ROOT / "src" / "components" / "navbar" / "NavLogo.tsx"
-    if navlogo_tsx.is_file():
-        nl_content = navlogo_tsx.read_text(encoding="utf-8")
-        nl_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", nl_content)
-        navlogo_tsx.write_text(nl_content, encoding="utf-8")
-
-    settings_tsx = REPO_ROOT / "src" / "pages" / "Settings.tsx"
-    if settings_tsx.is_file():
-        st_content = settings_tsx.read_text(encoding="utf-8")
-        st_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", st_content)
-        settings_tsx.write_text(st_content, encoding="utf-8")
-
-    miniview_tsx = REPO_ROOT / "src" / "components" / "layout" / "MiniView.tsx"
-    if miniview_tsx.is_file():
-        mv_content = miniview_tsx.read_text(encoding="utf-8")
-        mv_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", mv_content)
-        miniview_tsx.write_text(mv_content, encoding="utf-8")
-
-    err_gen_ts = REPO_ROOT / "src" / "lib" / "error-report-generator.ts"
-    if err_gen_ts.is_file():
-        eg_content = err_gen_ts.read_text(encoding="utf-8")
-        eg_content = re.sub(r"\|\|\s*'[0-9.]+'", f"|| '{next_version}'", eg_content)
-        err_gen_ts.write_text(eg_content, encoding="utf-8")
-
-    # 8. Update docker build helper
-    docker_build_ps1 = REPO_ROOT / "docker" / "build.ps1"
-    if docker_build_ps1.is_file():
-        db_content = docker_build_ps1.read_text(encoding="utf-8")
-        db_content = re.sub(r'antigravity-manager:[0-9.]+', f'antigravity-manager:{next_version}', db_content)
-        docker_build_ps1.write_text(db_content, encoding="utf-8")
-
-    # 9. Update README files badges and version titles
-    for readme_path in [REPO_ROOT / "readme.md", REPO_ROOT / "README.md", REPO_ROOT / "README_EN.md"]:
-        if readme_path.is_file():
-            rm_content = readme_path.read_text(encoding="utf-8")
-            rm_content = re.sub(r"\(v[0-9.]+\)", f"(v{next_version})", rm_content)
-            rm_content = re.sub(r"badge/Version-[0-9.]+-([A-Za-z0-9]+)", rf"badge/Version-{next_version}-\g<1>", rm_content)
-            rm_content = re.sub(r'alt="Version [0-9.]+"', f'alt="Version {next_version}"', rm_content)
-            rm_content = re.sub(r'--version [0-9.]+', f'--version {next_version}', rm_content)
-            if readme_path.name.lower() == "readme.md" and "## 🔄 What's New" in rm_content:
-                new_section_marker = "## 🔄 What's New\n\n"
-                new_entry = (
-                    f"- **v{next_version}** ({today_str}):\n"
-                    f"  - **Compact Top Spacing & Window Controls**: Standardized compact top padding (14-16px) across all dashboard pages, reduced window drag handle to 16px, and eliminated vertical whitespace clutter.\n"
-                    f"  - **Win32 Window Unminimize Fix**: Ensured window unminimizes cleanly before show on tray click, single-instance activation, and IPC calls, preventing frozen or hidden UI states.\n"
-                    f"  - **Error Management Drawer & Stack Trace Viewer**: Debounced error queue badge in header, left-side slide-over drawer, and full stack trace inspection modal with one-click copy.\n"
-                    f"  - **Taskbar Branding & Accounts Polish**: Integrated official application icon in Windows taskbar/PE headers, reordered account action buttons, and defaulted landing tab to Accounts.\n"
-                    f"  - **Instance Smart Double Play**: Double-click profile rotation algorithm prioritizing longest idle profiles with SQLite profiling and candidate preview.\n"
-                    f"  - **Verified Quality Gates**: Validated across all 28 automated quality gates and cross-platform CI checks with zero bypasses.\n"
-                )
-                if f"- **v{next_version}**" not in rm_content:
-                    rm_content = rm_content.replace(new_section_marker, new_section_marker + new_entry, 1)
-            readme_path.write_text(rm_content, encoding="utf-8")
-
-    # 10. Update fallback version in standalone install scripts
-    for installer_path in [REPO_ROOT / "install.ps1", REPO_ROOT / "install.sh"]:
-        if installer_path.is_file():
-            inst_content = installer_path.read_text(encoding="utf-8")
-            inst_content = re.sub(r'(\$TargetVersion\s*=\s*)"[0-9.]+"', f'\\g<1>"{next_version}"', inst_content)
-            inst_content = re.sub(r'(RELEASE_VERSION\s*=\s*)"[0-9.]+"', f'\\g<1>"{next_version}"', inst_content)
-            inst_content = re.sub(r'falling back to v[0-9.]+', f'falling back to v{next_version}', inst_content)
-            installer_path.write_text(inst_content, encoding="utf-8")
-
-    zh_entry = (
-        f"    *   **v{next_version} ({today_str})**:\n"
-        f"        -   **[UI Architecture & Window Management] Top Padding, Win32 Unminimize, Error Stack Traces, & Taskbar Branding**:\n"
-        f"            -   **Compact Layout & Top Spacing**: Reduced top padding across all major pages (Accounts, Instances, Settings, Email & Alerts) from 24-32px to 14-16px for vertical screen efficiency.\n"
-        f"            -   **Window Unminimize & Restore Fix**: Ensured Win32 window unminimizes (`unminimize()` followed by `show()` and `set_focus()`) on tray click, single-instance double launch, and IPC events.\n"
-        f"            -   **Error Management Drawer & Stack Trace Modal**: Real-time error queue badge in header, slide-over drawer, and comprehensive error detail dialog displaying full stack traces with one-click copy.\n"
-        f"            -   **Taskbar Branding & Icon Polish**: Embedded application icon in Windows PE resources (`comctl6.rc`) and assigned runtime window icon (`set_icon`) for taskbar and Alt-Tab display.\n"
-        f"            -   **Instance Double Play & Account Actions**: Double-click profile rotation prioritizing longest idle instances, reordered account action buttons, and defaulted landing tab to Accounts.\n"
-    )
-    en_entry = zh_entry
-
-    changelog_zh = REPO_ROOT / "CHANGELOG.md"
-    if changelog_zh.is_file():
-        cl_content = changelog_zh.read_text(encoding="utf-8")
-        marker_zh = "[English Changelog](CHANGELOG_EN.md)。"
-        if marker_zh in cl_content:
-            idx = cl_content.find(marker_zh) + len(marker_zh)
-            nl_idx = cl_content.find("\n", idx)
-            if nl_idx != -1:
-                cl_content = cl_content[:nl_idx] + "\n\n" + zh_entry + cl_content[nl_idx+1:]
-        elif "*   **Version History**:\n" in cl_content:
-            cl_content = cl_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{zh_entry}", 1)
-        changelog_zh.write_text(cl_content, encoding="utf-8")
-
-    changelog_en = REPO_ROOT / "CHANGELOG_EN.md"
-    if changelog_en.is_file():
-        cl_en_content = changelog_en.read_text(encoding="utf-8")
-        if "*   **Version History**:\n" in cl_en_content:
-            cl_en_content = cl_en_content.replace("*   **Version History**:\n", f"*   **Version History**:\n{en_entry}", 1)
-        elif "*   **Version Evolution**:\n" in cl_en_content:
-            cl_en_content = cl_en_content.replace("*   **Version Evolution**:\n", f"*   **Version Evolution**:\n{en_entry}", 1)
-        changelog_en.write_text(cl_en_content, encoding="utf-8")
-
-    # 12. Generate release notes file with Quick Install one-liners
-    release_notes_dir = REPO_ROOT / ".ai-memory" / "release"
-    release_notes_dir.mkdir(parents=True, exist_ok=True)
-    notes_file = release_notes_dir / f"release-notes-v{next_version}.md"
-    notes_content = (
-        f"## Quick Install v{next_version}\n\n"
-        f"### Windows (PowerShell 5.1+)\n"
-        f"```powershell\n"
-        f"irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex\n"
-        f"# Or pinned version:\n"
-        f"irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.ps1 | iex\n"
-        f"```\n\n"
-        f"### Linux / macOS (Bash)\n"
-        f"```bash\n"
-        f"curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash\n"
-        f"# Or pinned version:\n"
-        f"curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.sh | bash\n"
-        f"```\n\n"
-        f"---\n\n"
-        f"## What's Changed in v{next_version}\n\n"
-        f"- **Compact Top Spacing & Layout**: Standardized compact top padding (14-16px) across all dashboard pages, reduced window drag handle to 16px, and eliminated vertical whitespace clutter.\n"
-        f"- **Win32 Window Unminimize Fix**: Ensured window unminimizes cleanly before show on tray click, single-instance activation, and IPC calls, preventing frozen or hidden UI states.\n"
-        f"- **Universal Error Management Drawer & Stack Trace Viewer**: Debounced error queue badge in header, left-side slide-over drawer, and full stack trace inspection modal with one-click copy.\n"
-        f"- **Taskbar Branding & Accounts Polish**: Integrated official application icon in Windows taskbar/PE headers, reordered account action buttons (Refresh #1, Switch #2), and defaulted landing tab to Accounts.\n"
-        f"- **Instance Smart Double Play**: Double-click profile rotation algorithm prioritizing longest idle profiles with SQLite profiling and candidate preview.\n"
-        f"- **100% Green CI/CD Quality Gates**: Validated across all 28 automated quality gates.\n"
-    )
-    notes_file.write_text(notes_content, encoding="utf-8", newline="\n")
+            with open(CHANGELOG_MD, "w", encoding="utf-8") as f:
+                f.write(cl_content)
 
 
 def stage_and_commit_release(next_version, scope, dry_run=False):
-    """Stages release files and commits on the current branch."""
+    """Step 3: Stages release files and commits on the release branch."""
     commit_msg = f"release: v{next_version} {scope}"
 
     if dry_run:
-        print(f"[DRY RUN] Would stage changes and commit: '{commit_msg}'")
+        print(f"[DRY RUN] Would stage changes and commit on release branch: '{commit_msg}'")
         return "dryrun_commit_sha"
 
-    # Stage all repository changes including specs and memory
-    run_cmd(["git", "add", "-A"])
+    # Stage release-specific and sync-regenerated files
+    release_candidates = [
+        VERSION_JSON,
+        PACKAGE_JSON,
+        CHANGELOG_MD,
+        README_MD,
+        NODE_BUMP_SCRIPT,
+        PYTHON_BUMP_SCRIPT,
+        AI_BUMP_SCRIPT,
+        REPO_ROOT / ".gitmap" / "release",
+        REPO_ROOT / "public" / "health-score.json",
+        REPO_ROOT / "src" / "data" / "specTree.json",
+        REPO_ROOT / "02-spec" / "19-main-worker-service" / "98-changelog.md",
+        REPO_ROOT / "reports" / "spec-verification" / "coverage.md",
+    ]
+    for vf in release_candidates:
+        if vf.exists():
+            run_cmd(["git", "add", str(vf)])
 
     # Commit
     run_cmd(["git", "commit", "-m", commit_msg])
     commit_sha = get_git_output("rev-parse", "HEAD")
-    print(f"[*] Committed release changes: {commit_sha[:8]} ('{commit_msg}')")
+    print(f"[*] Step 3: Committed release changes on release branch: {commit_sha[:8]} ('{commit_msg}')")
 
     return commit_sha
 
 
-def create_release_branch_and_tag(next_version, commit_sha, dry_run=False):
-    """Creates release branch and tag pointing to commit_sha."""
-    branch_name = f"release/v{next_version}"
+def create_release_tag(next_version, commit_sha, dry_run=False):
+    """Step 4: Creates annotated git tag on the release commit."""
     tag_name = f"v{next_version}"
 
     if dry_run:
-        print(f"[DRY RUN] Would create branch '{branch_name}' and tag '{tag_name}' at {commit_sha}")
-        return branch_name, tag_name
-
-    # Switch to the new release branch pointing to the release commit
-    run_cmd(["git", "branch", "-f", branch_name, commit_sha])
-    run_cmd(["git", "checkout", branch_name])
-    print(f"[*] Checked out release branch: {branch_name} -> {commit_sha[:8]}")
+        print(f"[DRY RUN] Would create annotated tag '{tag_name}' at {commit_sha}")
+        return tag_name
 
     # Create annotated tag
     run_cmd(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}", commit_sha])
-    print(f"[*] Created tag: {tag_name} -> {commit_sha[:8]}")
+    print(f"[*] Step 4: Created annotated tag: {tag_name} -> {commit_sha[:8]}")
 
-    return branch_name, tag_name
+    return tag_name
 
 
-def push_release(branch_name, tag_name, original_branch="main", dry_run=False):
-    """Pushes release branch, tag, and original branch to remote repository."""
+def merge_release_to_main(release_branch, main_branch="main", dry_run=False):
+    """Step 5a: Puts release commit back to the main branch via merge."""
     if dry_run:
-        print(f"[DRY RUN] Would push branch '{branch_name}', tag '{tag_name}', and '{original_branch}' to origin")
+        print(f"[DRY RUN] Would checkout '{main_branch}' and merge '{release_branch}'")
         return
 
-    print(f"[*] Pushing branch '{branch_name}' to origin...")
-    run_cmd(["git", "push", "origin", branch_name])
+    print(f"[*] Step 5a: Checking out '{main_branch}' and merging '{release_branch}'...")
+    run_cmd(["git", "checkout", main_branch])
+    run_cmd(["git", "merge", release_branch])
+    print(f"[OK] Merged release branch '{release_branch}' into '{main_branch}'.")
+
+
+def push_release(release_branch, tag_name, main_branch="main", dry_run=False):
+    """Step 5b: Pushes main branch, release branch, and tag to remote repository."""
+    if dry_run:
+        print(f"[DRY RUN] Would push main '{main_branch}', release branch '{release_branch}', and tag '{tag_name}' to origin")
+        return
+
+    print(f"[*] Step 5b: Pushing '{main_branch}' to origin...")
+    run_cmd(["git", "push", "origin", main_branch])
+
+    print(f"[*] Pushing release branch '{release_branch}' to origin...")
+    run_cmd(["git", "push", "origin", release_branch])
 
     print(f"[*] Pushing tag '{tag_name}' to origin...")
     run_cmd(["git", "push", "origin", tag_name])
-
-    if original_branch:
-        print(f"[*] Pushing original branch '{original_branch}' to origin...")
-        run_cmd(["git", "push", "origin", original_branch])
-
-    # Create GitHub release via gh CLI if available
-    release_ver = tag_name.lstrip("v")
-    notes_file = REPO_ROOT / ".ai-memory" / "release" / f"release-notes-v{release_ver}.md"
-    if notes_file.is_file():
-        print(f"[*] Creating GitHub release for {tag_name}...")
-        try:
-            run_cmd(["gh", "release", "create", tag_name, "--repo", "alimtvnetwork/Antigravity-Manager", "--title", tag_name, "--notes-file", str(notes_file)])
-            print(f"[OK] GitHub release created successfully: {tag_name}")
-        except Exception as e:
-            print(f"[!] Warning: gh release create encountered: {e}")
 
 
 def revert_to_original_branch(original_branch, dry_run=False):
@@ -488,11 +370,29 @@ def revert_to_original_branch(original_branch, dry_run=False):
     print(f"[OK] Working tree successfully restored to original branch: '{restored}'")
 
 
-def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run=False, push=True):
-    """Executes the complete release orchestration flow."""
+def verify_pre_release_quality_gates(dry_run=False, skip_tests=False):
+    """Executes full unit test suites and CI quality gates prior to release."""
+    if skip_tests:
+        print("[!] Warning: Pre-release test execution skipped via --skip-tests flag.")
+        return
+
+    if dry_run:
+        print("[DRY RUN] Would execute full unit test suites and CI quality gates: python 03-ai-scripts/06-cicd-local-runner.py --run-tests")
+        return
+
+    print("[*] Running full pre-release unit test suites and CI quality gates (python 03-ai-scripts/06-cicd-local-runner.py --run-tests)...")
+    runner_script = REPO_ROOT / "03-ai-scripts" / "06-cicd-local-runner.py"
+    res = run_cmd([sys.executable, str(runner_script), "--run-tests"], capture_output=False)
+    if res.returncode != 0:
+        raise RuntimeError("Pre-release quality gates / unit tests failed! Releases are forbidden on failing tests.")
+
+
+def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run=False, push=True, skip_tests=False):
+    """Executes the complete 5-step release orchestration flow."""
     # 1. Capture starting branch
     original_branch = get_current_branch()
-    print(f"[*] Starting release orchestration on branch: '{original_branch}'")
+    main_branch = get_main_branch()
+    print(f"[*] Starting release orchestration on branch: '{original_branch}' (main branch: '{main_branch}')")
 
     # 2. Resolve versions
     current_ver = read_canonical_version()
@@ -504,23 +404,34 @@ def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run
     default_scope = scope or f"Release v{next_ver}"
     print(f"[*] Version Plan: {current_ver} -> {next_ver} (Tier: {tier})")
 
+    # Pre-release quality gates and full unit test execution
+    verify_pre_release_quality_gates(dry_run=dry_run, skip_tests=skip_tests)
+
+    release_branch = f"release/v{next_ver}"
+    tag_name = f"v{next_ver}"
+
     try:
-        # 3. Bump version across manifests and docs
+        # STEP 1: Create and checkout release branch FIRST
+        create_and_checkout_release_branch(next_ver, dry_run=dry_run)
+
+        # STEP 2: Bump version on the release branch using script
         execute_version_bump(next_ver, default_scope, dry_run=dry_run)
 
-        # 4. Commit bump changes
+        # STEP 3: Commit bump changes in the release branch
         commit_sha = stage_and_commit_release(next_ver, default_scope, dry_run=dry_run)
 
-        # 5 & 6. Create release branch and tag pointing to the commit
-        branch_name, tag_name = create_release_branch_and_tag(next_ver, commit_sha, dry_run=dry_run)
+        # STEP 4: Create annotated tag on that release commit
+        create_release_tag(next_ver, commit_sha, dry_run=dry_run)
 
-        # 7. Push branch and tag if enabled
-        if not dry_run:
-            if push:
-                push_release(branch_name, tag_name, original_branch=original_branch, dry_run=dry_run)
+        # STEP 5: Put that commit back to the main branch (and push)
+        merge_release_to_main(release_branch, main_branch=main_branch, dry_run=dry_run)
+
+        is_push_enabled = push and not dry_run
+        if is_push_enabled:
+            push_release(release_branch, tag_name, main_branch=main_branch, dry_run=dry_run)
 
     finally:
-        # 8. Always revert back to the exact starting branch
+        # Restore original starting branch if different from current
         revert_to_original_branch(original_branch, dry_run=dry_run)
 
     print("\n" + "=" * 60)
@@ -528,8 +439,9 @@ def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run
     print(f"  - Starting Branch:  {original_branch}")
     print(f"  - Previous Version: {current_ver}")
     print(f"  - Released Version: {next_ver}")
-    print(f"  - Release Branch:   release/v{next_ver}")
-    print(f"  - Release Tag:      v{next_ver}")
+    print(f"  - Release Branch:   {release_branch}")
+    print(f"  - Release Tag:      {tag_name}")
+    print(f"  - Merged To Main:   {main_branch}")
     print(f"  - Active Branch:    {get_current_branch()} [Preserved]")
     print("=" * 60 + "\n")
 
@@ -537,7 +449,7 @@ def orchestrate_release(tier="minor", explicit_version=None, scope=None, dry_run
 def parse_arguments():
     """Configures CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="29-release-orchestrator: Autonomous release lifecycle with branch preservation."
+        description="29-release-orchestrator: Autonomous release lifecycle with 5-step release branching."
     )
     parser.add_argument(
         "-t",
@@ -569,6 +481,11 @@ def parse_arguments():
         action="store_true",
         help="Do not push release branch and tag to remote repository",
     )
+    parser.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="Skip pre-release unit test and quality gate verification (emergency use only)",
+    )
 
     return parser.parse_args()
 
@@ -589,6 +506,7 @@ def main():
         scope=args.scope,
         dry_run=args.dry_run,
         push=should_push,
+        skip_tests=args.skip_tests,
     )
 
 

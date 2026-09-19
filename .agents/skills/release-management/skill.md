@@ -5,18 +5,20 @@ description: Execute full release ceremony, SemVer version bumps, package synchr
 
 # Release Management
 
-Conducts the standardized release ceremony for coding-guidelines-v24.
+Conducts the standardized release ceremony with the mandatory 5-step release branching lifecycle.
 
-## Steps
+## Steps & 5-Step Release Branching Mandate
 
-1. Determine bump tier (MINOR default, reset PATCH to 0).
+1. Determine bump tier (MINOR default per Rule 0, reset PATCH to 0).
 2. **Mandatory Pre-Release Unit Tests & CI/CD Verification:** Execute `python 03-ai-scripts/06-cicd-local-runner.py --run-tests` and verify all unit test suites, AST checks, and quality gates pass 100% green (`exit 0`).
 3. **Test Inventory Validation:** Cross-reference `.ai-memory/temp/recent-file-changes.json` with `.ai-memory/test-inventory.json` to verify that all test suites covering recently modified files pass completely.
-4. Update version in `package.json` and run `npm run sync`.
-5. Prepend entry to `changelog.md` with verified, concrete changes.
-6. Commit: `chore(release): bump version to X.Y.0`.
-7. DO NOT create manual git tag if managed externally.
-8. Push to remote.
+4. **Mandatory 5-Step Release Branching Lifecycle:**
+   - **Step 1:** Create and switch to a dedicated release branch: `git checkout -b release/vX.Y.Z`.
+   - **Step 2:** Bump the version using the dedicated Python bump script (`03-ai-scripts/37-bump-version.py` or `.ai-memory/release/bump_versions.py`) on the release branch, updating `package.json`, `version.json`, `readme.md`, `changelog.md`, and running sync scripts.
+   - **Step 3:** Commit version bump changes in the release branch: `release: vX.Y.Z <scope>` (or `chore(release): bump version to X.Y.Z`).
+   - **Step 4:** Create the annotated git tag on the release commit: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`.
+   - **Step 5:** Put the release commit back to the `main` branch (`git checkout main && git merge release/vX.Y.Z`), push `main`, `release/vX.Y.Z`, and tag `vX.Y.Z` to `origin`, then restore the starting branch.
+5. Use `03-ai-scripts/29-release-orchestrator.py` to automate this complete 5-step lifecycle.
 
 ---
 

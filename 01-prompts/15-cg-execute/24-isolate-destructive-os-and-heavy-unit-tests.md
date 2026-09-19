@@ -144,7 +144,7 @@ func purgeCategoryFiles(paths []string) (int, int64) {
 ### Pattern 3: Temporary Directory Sweep Isolation (Go)
 
 ```go
-// ❌ ANTI-PATTERN: Sweeps host system /tmp or OS user AppData Temp directly
+// ❌ ANTI-PATTERN: Sweeps host system /tmp or C:\Users\...\AppData\Local\Temp directly
 func CleanTempDirectories(opts CleanOptions) CleanResult {
     dirs := resolveTempDirectories() // Returns real OS temp dirs
     for _, dir := range dirs {

@@ -322,6 +322,11 @@ def execute_migration(repo_root: Path, is_plan_only: bool = False, is_force: boo
             # 2. Execute File Modifications
             for p, old_txt, new_txt in planner.modifications:
                 seq += 1
+                # Adjust path if it was moved
+                for src, dst, kind in planner.moves:
+                    if str(p).startswith(str(src)):
+                        p = Path(str(p).replace(str(src), str(dst), 1))
+                        break
                 p.write_text(new_txt, encoding="utf-8")
                 conn.execute("""
                     INSERT INTO operations (transaction_id, seq_num, op_type, source_path, target_path, original_content, new_content, status)
