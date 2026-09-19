@@ -655,7 +655,7 @@ function AccountRowContent({
                         "grid gap-1.5 py-0",
                         (quotaWindow === 'weekly' && weeklyItems.length > 0)
                             ? (weeklyItems.length === 1 ? "grid-cols-1" : "grid-cols-2")
-                            : (displayModels.length === 1 ? "grid-cols-1" : "grid-cols-2")
+                            : "grid-cols-2"
                     )}>
                         {quotaWindow === 'weekly' && weeklyItems.length > 0 ? (
                             weeklyItems.map((item) => (
@@ -668,17 +668,46 @@ function AccountRowContent({
                                 />
                             ))
                         ) : (
-                            displayModels.map((model) => (
-                                <QuotaItem
-                                    key={model.id}
-                                    label={model.label}
-                                    percentage={model.percentage}
-                                    resetTime={model.resetTime}
-                                    isProtected={model.isProtected}
-                                    liveLimit={model.liveLimit}
-                                    Icon={model.Icon}
-                                />
-                            ))
+                            <>
+                                {displayModels.map((model) => (
+                                    <QuotaItem
+                                        key={model.id}
+                                        label={model.label}
+                                        percentage={model.percentage}
+                                        resetTime={model.resetTime}
+                                        isProtected={model.isProtected}
+                                        liveLimit={model.liveLimit}
+                                        Icon={model.Icon}
+                                    />
+                                ))}
+                                {modelFilter !== 'both' && (
+                                    boundInstance ? (
+                                        <div
+                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-indigo-200/60 dark:border-indigo-800/50 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 group/instance text-[10px] font-mono leading-none gap-1.5"
+                                            title={`Bound profile: ${boundInstance.config.name} (${boundInstance.is_running ? 'Running' : 'Idle'})`}
+                                        >
+                                            <span className={cn(
+                                                "w-2 h-2 rounded-full shrink-0",
+                                                boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
+                                            )} />
+                                            <span className="font-bold truncate flex-1">
+                                                {boundInstance.config.name}
+                                            </span>
+                                            <span className="text-[8px] opacity-70 shrink-0 font-sans uppercase">
+                                                {boundInstance.is_running ? "RUN" : "IDLE"}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-gray-200/40 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 text-gray-400 text-[10px] font-mono leading-none gap-1.5"
+                                            title="No profile bound"
+                                        >
+                                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                                            <span className="italic truncate flex-1 text-[9px]">Unbound</span>
+                                        </div>
+                                    )
+                                )}
+                            </>
                         )}
                     </div>
                 )}
@@ -1014,7 +1043,15 @@ function AccountTable({
                                         )}
                                         title={t('accounts.table.sort_by_reset_time', '点击按配额重置时间排序')}
                                     >
-                                        <span>{quotaWindow === 'weekly' ? t('accounts.table.weekly_quota', '周配额') : t('accounts.table.quota')}</span>
+                                        <span>
+                                            {quotaWindow === 'weekly'
+                                                ? t('accounts.table.weekly_quota', '周配额')
+                                                : modelFilter === 'gemini'
+                                                    ? 'Gemini + Instance'
+                                                    : modelFilter === 'claude'
+                                                        ? 'Claude + Instance'
+                                                        : t('accounts.table.quota')}
+                                        </span>
                                         {sortConfig.key === 'reset_time' ? (
                                             sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                                         ) : (

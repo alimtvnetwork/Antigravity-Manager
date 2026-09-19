@@ -48,3 +48,5 @@ Master directory of architectural and execution plans.
 - [35-instance-rotation-rca-and-release.md](completed/35-instance-rotation-rca-and-release.md): Instance launch RCA, full copy isolation, smart play rotation, and release.
 - [36-ui-error-manage-and-instance-play.md](completed/36-ui-error-manage-and-instance-play.md): UI Error Manage, Top Padding, Accounts Actions Reorder, and Instance Smart Double-Play.
 - [37-audit-and-verify-ui-error-manage.md](completed/37-audit-and-verify-ui-error-manage.md): Audit and verification of UI, error management, minimize fix, and instance features.
+- [38-ui-branding-instances-and-email-polish.md](completed/38-ui-branding-instances-and-email-polish.md): UI branding, Instances selector, accounts actions, warm gold assets, and email polish.
+- [39-ui-audit-instances-quota-and-visual-polish.md](completed/39-ui-audit-instances-quota-and-visual-polish.md): UI audit, colorful Gemini quota progress, instance name reveal in quota slot, visible color-coded emails, and multi-instance themes.
