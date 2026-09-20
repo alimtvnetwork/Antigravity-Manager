@@ -1,8 +1,9 @@
 {
-  "status": "idle",
-  "total_eta_sec": 0,
+  "status": "completed",
+  "updated_at": "2026-09-20T02:23:42Z",
+  "elapsed_sec": 8.7,
+  "total_estimated_sec": 28.8,
   "remaining_eta_sec": 0,
-  "passed": 0,
-  "failed": 0,
-  "completed": true
+  "total_jobs": 36,
+  "completed_jobs": 36
 }

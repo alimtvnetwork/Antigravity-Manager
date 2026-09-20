@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.32.0 (2026-09-20)**:
+        -   **[Release v4.32.0] Tool branding standardization, installer padding, migration display, and aria2c acceleration**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Tool branding standardization, installer padding, migration display, and aria2c acceleration.
     *   **v4.6.1 (2026-08-25)**:
         -   **[Core Fix] Fix 1M Token Context Overflow Caused by Historical Thinking Accumulation & Add Fallback Input Token Estimation on Errors (Token 1M Overflow & Monitor Token Estimation Fallback)**:
             -   **Automatic Reasoning Pruning**: Prunes old thought texts in historical turns while preserving `thoughtSignature` on tool invocations, preventing continuous multi-turn reasoning snowballing from exceeding Google's 1M context limit.

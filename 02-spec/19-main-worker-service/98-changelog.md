@@ -1,3 +1,9 @@
+## v4.32.0 — 2026-09-20 (Tool branding standardization, installer padding, migration display, and aria2c acceleration)
+
+**Scope:** Version bump. Tool branding standardization, installer padding, migration display, and aria2c acceleration.
+
+---
+
 ## v4.31.0 — 2026-09-19 (Startup auto-update checker, shell script flags, and in-app installer execution)
 
 **Scope:** Version bump. Startup auto-update checker, shell script flags, and in-app installer execution.

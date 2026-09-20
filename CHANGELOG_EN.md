@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.32.0 (2026-09-20)**:
+        -   **[Release v4.32.0] Tool branding standardization, installer padding, migration display, and aria2c acceleration**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Tool branding standardization, installer padding, migration display, and aria2c acceleration.
     *   **v4.31.0 (2026-09-20)**:
         -   **[Update System & Installer Integration] Startup Auto-Update Checker, Shell Script Update Flags, & In-App Installer Execution**:
             -   **Startup Auto-Update Checker**: Implemented automatic background update verification on application launch with toast notification and one-click update actions.
