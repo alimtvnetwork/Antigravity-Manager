@@ -39,7 +39,7 @@ if [ -n "$RELEASES_JSON" ]; then
     done <<< "$TAGS"
 fi
 
-FALLBACKS=("4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.7.6")
+FALLBACKS=("4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.7.6")
 for fb in "${FALLBACKS[@]}"; do
     if [ ${#CANDIDATES[@]} -ge 4 ]; then break; fi
     ALREADY=0
@@ -66,15 +66,28 @@ download_asset() {
     local url="$1"
     local output="$2"
     if command -v aria2c &>/dev/null; then
+        local aria_exit=0
         run_indented aria2c --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
             --allow-overwrite=true \
             --auto-file-renaming=false \
             --summary-interval=1 \
             --console-log-level=warn \
-            -o "$output" "$url"
-    else
-        run_indented curl -fSL --progress-bar --connect-timeout 10 --retry 3 -o "$output" "$url"
+            -o "$output" "$url" || aria_exit=$?
+        if [ "$aria_exit" -eq 28 ]; then
+            echo -e "\tAdapting aria2c segment size to 1MB minimum threshold (80 splits)..."
+            aria_exit=0
+            run_indented aria2c --disable-ipv6=true -x 16 -s 80 -j 16 -k 1M \
+                --allow-overwrite=true \
+                --auto-file-renaming=false \
+                --summary-interval=1 \
+                --console-log-level=warn \
+                -o "$output" "$url" || aria_exit=$?
+        fi
+        if [ "$aria_exit" -eq 0 ] && [ -s "$output" ]; then
+            return 0
+        fi
     fi
+    run_indented curl -fSL --progress-bar --connect-timeout 10 --retry 3 -o "$output" "$url"
 }
 
 MAX_ATTEMPTS=4

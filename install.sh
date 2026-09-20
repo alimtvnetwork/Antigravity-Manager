@@ -426,17 +426,31 @@ download_file() {
     # Try aria2c with 80 parallel split connections and 500KB chunks
     if [[ -n "${ARIA2C_BIN:-}" && -x "$ARIA2C_BIN" ]]; then
         info "Downloading with aria2c (80 parallel split connections, 500KB chunks)..."
-        if run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
+        local aria_exit=0
+        run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
             --allow-overwrite=true \
             --auto-file-renaming=false \
             --summary-interval=1 \
             --console-log-level=warn \
             --dir="$dest_dir" \
             -o "$dest_file" \
-            "$url"; then
-            if [[ -f "$full_path" && -s "$full_path" ]]; then
-                return 0
-            fi
+            "$url" || aria_exit=$?
+
+        if [[ "$aria_exit" -eq 28 ]]; then
+            info "Adapting aria2c segment size to 1MB minimum threshold (80 splits)..."
+            aria_exit=0
+            run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 1M \
+                --allow-overwrite=true \
+                --auto-file-renaming=false \
+                --summary-interval=1 \
+                --console-log-level=warn \
+                --dir="$dest_dir" \
+                -o "$dest_file" \
+                "$url" || aria_exit=$?
+        fi
+
+        if [[ "$aria_exit" -eq 0 && -f "$full_path" && -s "$full_path" ]]; then
+            return 0
         fi
         warn "aria2c download failed or interrupted, falling back to curl..."
     fi

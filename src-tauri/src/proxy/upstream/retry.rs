@@ -104,6 +104,11 @@ pub fn parse_retry_delay(error_text: &str, retry_after: Option<&str>) -> Option<
     parse_retry_delay_with_source(error_text, retry_after).map(|delay| delay.raw_ms)
 }
 
+/// Legacy compatibility wrapper for extracting retry delay from error text alone
+pub fn parse_legacy_retry_delay(error_text: &str) -> Option<u64> {
+    parse_retry_delay(error_text, None)
+}
+
 pub fn parse_retry_delay_with_source(
     error_text: &str,
     retry_after: Option<&str>,

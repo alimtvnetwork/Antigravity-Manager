@@ -1,3 +1,9 @@
+## v4.41.0 — 2026-09-20 (installer tab indentation, 80 aria2c splits & rust compile fixes)
+
+**Scope:** Version bump. installer tab indentation, 80 aria2c splits & rust compile fixes.
+
+---
+
 ## v4.40.0 — 2026-09-20 (support pinned installer version detection and multi-version fallback ladder)
 
 **Scope:** Version bump. support pinned installer version detection and multi-version fallback ladder.

@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.41.0 (2026-09-20)**:
+        -   **[Release v4.41.0] installer tab indentation, 80 aria2c splits & rust compile fixes**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: installer tab indentation, 80 aria2c splits & rust compile fixes.
     *   **v4.40.0 (2026-09-20)**:
         -   **[Pinned Version Respect & Intelligent Installer Fallback] Automatic URL Detection, Tag Prioritization & Descending Release Ladder**:
             -   **Automatic Pinned Release Detection**: Both `install.ps1` and `install.sh` now automatically detect when executed from a release asset URL (e.g. `irm https://.../releases/download/v4.34.0/install.ps1 | iex`), prioritizing the specified pinned release tag before discovering broader release lists.

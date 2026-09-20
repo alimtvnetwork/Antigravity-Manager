@@ -119,11 +119,11 @@ fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f
     let mut score = 0.0;
 
     // 1. Idle time factor (Longest time not used, or never used)
-    let has_never_used = acc.last_used.map_or(true, |v| v == 0);
+    let has_never_used = acc.last_used == 0;
     if has_never_used {
         score += 100000.0;
-    } else if let Some(last_used) = acc.last_used {
-        let idle_hours = ((now_sec - last_used) as f64 / 3600.0).max(0.0);
+    } else {
+        let idle_hours = ((now_sec - acc.last_used) as f64 / 3600.0).max(0.0);
         score += (idle_hours * 1000.0).min(50000.0);
     }
 

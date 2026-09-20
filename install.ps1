@@ -577,6 +577,25 @@ function Invoke-FastDownload {
                 "$Url"
             )
             $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs
+            if ($ariaExit -eq 28) {
+                Write-Step "Adapting aria2c segment size to 1MB minimum threshold (80 splits)..."
+                $ariaArgs1M = @(
+                    "--disable-ipv6=true",
+                    "-x", "16",
+                    "-s", "80",
+                    "-j", "16",
+                    "-k", "1M",
+                    "--file-allocation=none",
+                    "--allow-overwrite=true",
+                    "--auto-file-renaming=false",
+                    "--summary-interval=1",
+                    "--console-log-level=warn",
+                    "--dir=$destDir",
+                    "-o", "$destFile",
+                    "$Url"
+                )
+                $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs1M
+            }
             if ($ariaExit -eq 0) {
                 if (Test-Path $DestinationPath) {
                     if ((Get-Item $DestinationPath).Length -gt 0) {
@@ -747,7 +766,7 @@ foreach ($endpoint in $apiEndpoints) {
 }
 
 # Fallback known historical releases
-$knownFallbacks = @("4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
+$knownFallbacks = @("4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
 foreach ($kb in $knownFallbacks) {
     if ($candidateVersions.Count -ge 4) { break }
     if (-not $isPinned) {
