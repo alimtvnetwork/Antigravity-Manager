@@ -217,21 +217,28 @@ get_version() {
         fi
     fi
 
+    local is_pinned=0
     CANDIDATE_VERSIONS=()
 
     if [[ -n "${VERSION:-}" ]]; then
         local user_ver="${VERSION#v}"
         if _is_valid_version "$user_ver"; then
             CANDIDATE_VERSIONS+=("$user_ver")
-            info "Target version: v$user_ver"
+            is_pinned=1
+            info "Target pinned release version: v$user_ver"
         fi
     fi
 
     info "Discovering available release versions from GitHub..."
 
-    local api_urls=(
-        "${GITHUB_API}?per_page=10"
-        "${UPSTREAM_API}?per_page=10"
+    local api_urls=()
+    if [[ $is_pinned -eq 1 ]]; then
+        api_urls+=("${GITHUB_API}/tags/v${CANDIDATE_VERSIONS[0]}")
+        api_urls+=("${UPSTREAM_API}/tags/v${CANDIDATE_VERSIONS[0]}")
+    fi
+    api_urls+=(
+        "${GITHUB_API}?per_page=30"
+        "${UPSTREAM_API}?per_page=30"
     )
 
     for api_url in "${api_urls[@]}"; do
@@ -260,7 +267,7 @@ get_version() {
     done
 
     # Fallback ladder
-    local fallbacks=("4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.7.6")
+    local fallbacks=("4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
             break

@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.40.0 (2026-09-20)**:
+        -   **[Pinned Version Respect & Intelligent Installer Fallback] Automatic URL Detection, Tag Prioritization & Descending Release Ladder**:
+            -   **Automatic Pinned Release Detection**: Both `install.ps1` and `install.sh` now automatically detect when executed from a release asset URL (e.g. `irm https://.../releases/download/v4.34.0/install.ps1 | iex`), prioritizing the specified pinned release tag before discovering broader release lists.
+            -   **Dedicated Pinned Version README Section**: Added explicit `### Pinned Version Installation` section in root `readme.md` under Install Scripts with copy-paste PowerShell and Bash commands.
+            -   **Intelligent Descending Fallback Ladder**: When a pinned version is selected, the installer orders fallback candidates to strictly step down through prior releases (`< target_version`), preventing accidental leaps to newer releases if the pinned version asset is unavailable.
+            -   **Standardized 4-Attempt Exhaustion Notice**: Guaranteed that any failed installer execution cycle terminates cleanly with `"All 4 attempts failed. I fail, so I cannot do anything."` after stepping through 4 historical versions.
     *   **v4.39.0 (2026-09-20)**:
         -   **[Hidden Terminal, Multi-Version Fallback, Auto-Switch & Branding] Zero Window Flashes, 4-Attempt Fallback, Prompt Preservation & Vector Logos**:
             -   **Hidden Background Terminal Execution**: Enforced `CREATE_NO_WINDOW` (0x08000000) flags and `-WindowStyle Hidden` on all Windows PowerShell invocations, completely eliminating terminal popups and flashes during startup update checks and CLI execution.

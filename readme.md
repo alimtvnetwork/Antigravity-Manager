@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.39.0-3B82F6?style=flat-square" alt="Version 4.39.0">
+    <img src="https://img.shields.io/badge/Version-4.40.0-3B82F6?style=flat-square" alt="Version 4.40.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -119,8 +119,29 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.29.0`
+> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.34.0`
 > - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
+
+---
+
+### Pinned Version Installation (Historical Releases)
+
+To install an exact, pinned historical release directly from GitHub Releases:
+
+#### Windows (PowerShell 5.1+)
+```powershell
+# Install pinned release (e.g. v4.34.0)
+irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.34.0/install.ps1 | iex
+```
+
+#### Linux & macOS (Bash)
+```bash
+# Install pinned release (e.g. v4.34.0)
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.34.0/install.sh | bash
+```
+
+> [!NOTE]
+> The installer automatically detects pinned release URLs and honors the requested release version, falling back through up to 4 historical candidate releases if target assets cannot be retrieved.
 
 ---
 

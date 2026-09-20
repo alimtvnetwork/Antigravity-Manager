@@ -499,6 +499,16 @@ if ($CheckUpdate) {
     return
 }
 
+function Convert-ToSemVer {
+    param([string]$v)
+    $clean = $v -replace "^v", ""
+    $parts = $clean.Split("-")[0].Split(".")
+    $major = if ($parts.Length -ge 1) { [int]$parts[0] } else { 0 }
+    $minor = if ($parts.Length -ge 2) { [int]$parts[1] } else { 0 }
+    $patch = if ($parts.Length -ge 3) { [int]$parts[2] } else { 0 }
+    return [version]::new($major, $minor, $patch)
+}
+
 function Get-Aria2cPath {
     $cmd = Get-Command aria2c.exe -ErrorAction SilentlyContinue
     if (-not $cmd) {
@@ -635,16 +645,60 @@ Write-Host ""
 $candidateVersions = [System.Collections.Generic.List[string]]::new()
 $releaseMetadataMap = @{}
 
+# Check pinned version: 1) explicit -Version, 2) release-stamped $PinnedVersion, 3) URL invocation detection
+if (-not $Version) {
+    if ($PinnedVersion) {
+        if ($PinnedVersion -ne "__PINNED_VERSION__") {
+            $Version = $PinnedVersion
+        }
+    }
+}
+
+if (-not $Version) {
+    $invCandidates = @()
+    try {
+        if ($MyInvocation) {
+            if ($MyInvocation.Line) {
+                $invCandidates += $MyInvocation.Line
+            }
+        }
+    } catch {}
+    try {
+        $hist = Get-History -Count 5 -ErrorAction SilentlyContinue
+        if ($hist) {
+            foreach ($h in $hist) {
+                if ($h.CommandLine) { $invCandidates += $h.CommandLine }
+            }
+        }
+    } catch {}
+
+    foreach ($line in $invCandidates) {
+        if ($line -match 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)/install\.ps1') {
+            $Version = $Matches[1]
+            break
+        }
+    }
+}
+
+$isPinned = $false
+$cleanPinned = $null
 if ($Version) {
-    $cleanVer = $Version -replace "^v", ""
-    $candidateVersions.Add($cleanVer)
+    $cleanPinned = $Version -replace "^v", ""
+    $candidateVersions.Add($cleanPinned)
+    $isPinned = $true
+    Write-Step "Respecting pinned release version: v$cleanPinned"
 }
 
 Write-Step "Discovering available release versions from GitHub..."
-$apiEndpoints = @(
-    "https://api.github.com/repos/$Repo/releases?per_page=10",
+$apiEndpoints = @()
+if ($isPinned) {
+    $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
+    $apiEndpoints += "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
+}
+$apiEndpoints += @(
+    "https://api.github.com/repos/$Repo/releases?per_page=30",
     "https://api.github.com/repos/$Repo/releases/latest",
-    "https://api.github.com/repos/$UpstreamRepo/releases?per_page=10",
+    "https://api.github.com/repos/$UpstreamRepo/releases?per_page=30",
     "https://api.github.com/repos/$UpstreamRepo/releases/latest"
 )
 
@@ -655,21 +709,37 @@ foreach ($endpoint in $apiEndpoints) {
             foreach ($rel in $resp) {
                 if ($rel.tag_name) {
                     $tagVer = $rel.tag_name -replace "^v", ""
-                    if (-not $candidateVersions.Contains($tagVer)) {
-                        $candidateVersions.Add($tagVer)
-                    }
                     if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
                         $releaseMetadataMap[$tagVer] = $rel
                     }
+                    if (-not $isPinned) {
+                        if (-not $candidateVersions.Contains($tagVer)) {
+                            $candidateVersions.Add($tagVer)
+                        }
+                    } else {
+                        try {
+                            $pVer = Convert-ToSemVer $cleanPinned
+                            $cVer = Convert-ToSemVer $tagVer
+                            if ($cVer -lt $pVer) {
+                                if (-not $candidateVersions.Contains($tagVer)) {
+                                    $candidateVersions.Add($tagVer)
+                                }
+                            }
+                        } catch {}
+                    }
                 }
             }
-        } elseif ($resp -and $resp.tag_name) {
-            $tagVer = $resp.tag_name -replace "^v", ""
-            if (-not $candidateVersions.Contains($tagVer)) {
-                $candidateVersions.Add($tagVer)
-            }
-            if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                $releaseMetadataMap[$tagVer] = $resp
+        } elseif ($resp) {
+            if ($resp.tag_name) {
+                $tagVer = $resp.tag_name -replace "^v", ""
+                if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                    $releaseMetadataMap[$tagVer] = $resp
+                }
+                if (-not $isPinned) {
+                    if (-not $candidateVersions.Contains($tagVer)) {
+                        $candidateVersions.Add($tagVer)
+                    }
+                }
             }
         }
     } catch {}
@@ -677,10 +747,23 @@ foreach ($endpoint in $apiEndpoints) {
 }
 
 # Fallback known historical releases
-$knownFallbacks = @("4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0")
+$knownFallbacks = @("4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
 foreach ($kb in $knownFallbacks) {
-    if (-not $candidateVersions.Contains($kb)) {
-        $candidateVersions.Add($kb)
+    if ($candidateVersions.Count -ge 4) { break }
+    if (-not $isPinned) {
+        if (-not $candidateVersions.Contains($kb)) {
+            $candidateVersions.Add($kb)
+        }
+    } else {
+        try {
+            $pVer = Convert-ToSemVer $cleanPinned
+            $kVer = Convert-ToSemVer $kb
+            if ($kVer -lt $pVer) {
+                if (-not $candidateVersions.Contains($kb)) {
+                    $candidateVersions.Add($kb)
+                }
+            }
+        } catch {}
     }
 }
 

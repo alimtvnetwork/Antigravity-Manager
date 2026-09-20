@@ -1,3 +1,9 @@
+## v4.40.0 — 2026-09-20 (support pinned installer version detection and multi-version fallback ladder)
+
+**Scope:** Version bump. support pinned installer version detection and multi-version fallback ladder.
+
+---
+
 ## v4.39.0 — 2026-09-20 (add hidden terminal mode, 4-version installer fallback, auto-switch prompt preservation & vector branding)
 
 **Scope:** Version bump. add hidden terminal mode, 4-version installer fallback, auto-switch prompt preservation & vector branding.
