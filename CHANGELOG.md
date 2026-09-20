@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.45.0 (2026-09-20)**:
+        -   **[Release v4.45.0] Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme.
     *   **v4.44.1 (2026-09-20)**:
         -   **[Release v4.44.1] Fix Rust proxy compile dependencies, TokenManager session unbind, and complete multi-platform release**:
             -   **Update System**: Automated release and version synchronization across all manifests.

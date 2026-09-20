@@ -1,3 +1,9 @@
+## v4.45.0 — 2026-09-20 (Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme)
+
+**Scope:** Version bump. Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme.
+
+---
+
 ## v4.44.1 — 2026-09-20 (Fix Rust proxy compile dependencies, TokenManager session unbind, and complete multi-platform release)
 
 **Scope:** Version bump. Fix Rust proxy compile dependencies, TokenManager session unbind, and complete multi-platform release.
