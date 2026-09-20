@@ -178,3 +178,51 @@ function buildContextJson(error: CapturedError): string | null {
 export function generateJsonReport(error: CapturedError): string {
   return JSON.stringify(error, null, 2);
 }
+
+export function generateAllErrorsMarkdownReport(errors: CapturedError[]): string {
+  const sections: string[] = [];
+  sections.push(`# Error Manager Diagnostics History Report`);
+  sections.push(`**Application:** ${APP_INFO.name} (${APP_INFO.version})`);
+  sections.push(`**Generated At:** ${new Date().toLocaleString()}`);
+  sections.push(`**Total Captured Errors:** ${errors.length}`);
+  sections.push(`\n---\n`);
+
+  if (errors.length === 0) {
+    sections.push(`*No errors currently recorded in history.*`);
+    return sections.join('\n\n');
+  }
+
+  errors.forEach((err, idx) => {
+    sections.push(`## [Error #${idx + 1}] ${err.code} — ${err.message}`);
+    sections.push(`- **Timestamp:** ${err.createdAt}`);
+    sections.push(`- **Severity Level:** ${err.level}`);
+    if (err.endpoint) {
+      sections.push(`- **Endpoint:** \`${err.method || 'INVOKE'}\` ${err.endpoint}`);
+    }
+    if (err.route) {
+      sections.push(`- **Route / Page:** ${err.route}`);
+    }
+    if (err.details) {
+      sections.push(`- **Details:** ${err.details}`);
+    }
+    if (err.triggerAction || err.triggerComponent) {
+      sections.push(`- **Trigger:** ${err.triggerComponent || ''} ${err.triggerAction ? `(${err.triggerAction})` : ''}`);
+    }
+
+    const backendSection = buildBackendDiagnosticSection(err);
+    if (backendSection) {
+      sections.push(`### Backend Diagnostics\n\`\`\`\n${backendSection}\n\`\`\``);
+    }
+    if (err.stackTrace) {
+      sections.push(`### Stack Trace\n\`\`\`\n${err.stackTrace.trim()}\n\`\`\``);
+    }
+    const fixes = getSuggestedFixes(err.code);
+    if (fixes.length > 0) {
+      sections.push(`### Suggested Troubleshooting Steps\n${fixes.map((f) => `- ${f}`).join('\n')}`);
+    }
+    sections.push(`\n---\n`);
+  });
+
+  return sections.join('\n\n');
+}
+

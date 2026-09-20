@@ -178,3 +178,28 @@ a {
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
 }
+
+/* Error Manager History Card Contrast & Theme Isolation */
+.error-history-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.error-history-card:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.dark .error-history-card,
+[data-theme="dark"] .error-history-card {
+  background-color: #1e293b !important;
+  border-color: rgba(51, 65, 85, 0.8) !important;
+  color: #f8fafc !important;
+}
+
+.dark .error-history-card:hover,
+[data-theme="dark"] .error-history-card:hover {
+  background-color: #273549 !important;
+  border-color: rgba(71, 85, 105, 0.9) !important;
+}
