@@ -52,6 +52,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Optimize Windows Runner I/O
+        if: matrix.platform == 'windows-2025'
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          Set-MpPreference -ExclusionPath "${{ github.workspace }}"
+
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
@@ -102,6 +109,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Optimize Windows Runner I/O
+        if: matrix.platform == 'windows-2025'
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          Set-MpPreference -ExclusionPath "${{ github.workspace }}"
 
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')

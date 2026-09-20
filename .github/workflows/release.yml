@@ -34,17 +34,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Optimize Windows Runner I/O
+        if: matrix.platform == 'windows-2025'
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          Set-MpPreference -ExclusionPath "${{ github.workspace }}"
+
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update --fix-missing
-          sudo apt-get install -y --fix-missing libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils || (sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils)
-
+          sudo apt-get install -y --fix-missing libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils mold clang || (sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils mold clang)
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || (contains(matrix.args, 'aarch64') && 'aarch64-unknown-linux-gnu' || '') }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri"
+          cache-all-crates: "true"
 
       - name: Node.js setup
         uses: actions/setup-node@v4
@@ -75,6 +87,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: npm run tauri build -- ${{ matrix.args }}
 
       # 3. 处理 macOS 架构重命名冲突 (解决 422 Already Exists)
