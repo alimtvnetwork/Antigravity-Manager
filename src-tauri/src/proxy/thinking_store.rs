@@ -775,18 +775,18 @@ impl ThinkingStore {
             });
             let has_function_call = parts.iter().any(|p| p.get("functionCall").is_some());
 
-            // 核心法则：只有出现 tool_call 才有签名，任何没有 tool_call 的纯文本签名统一用哨兵占位；
-            // 匹配的时候以 tool_id 精确锚定，匹配不上统一用哨兵占位
-            if has_function_call {
-                if let Some(sig) = rec.signature.as_ref().filter(|s| is_real_signature(s)) {
-                    thought_part["thoughtSignature"] = json!(sig);
+            if let Some(sig) = rec.signature.as_ref().filter(|s| is_real_signature(s)) {
+                thought_part["thoughtSignature"] = json!(sig);
+                if has_function_call {
                     for part in parts.iter_mut() {
                         if part.get("functionCall").is_some() {
                             part["thoughtSignature"] = json!(sig);
                         }
                     }
-                } else {
-                    thought_part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
+                }
+            } else {
+                thought_part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
+                if has_function_call {
                     for part in parts.iter_mut() {
                         if part.get("functionCall").is_some() {
                             if !part_has_signature(part) {
@@ -795,9 +795,6 @@ impl ThinkingStore {
                         }
                     }
                 }
-            } else {
-                // 纯文本轮次（无 tool_call）：任何没有 tool_call 的签名，严格使用哨兵占位！
-                thought_part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
             }
             parts.insert(0, thought_part);
             restored += 1;
