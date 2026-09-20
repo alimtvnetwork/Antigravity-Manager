@@ -1,3 +1,9 @@
+## v4.39.0 — 2026-09-20 (add hidden terminal mode, 4-version installer fallback, auto-switch prompt preservation & vector branding)
+
+**Scope:** Version bump. add hidden terminal mode, 4-version installer fallback, auto-switch prompt preservation & vector branding.
+
+---
+
 ## v4.38.1 — 2026-09-20 (Fix unclosed delimiter in OpenAI handler for v4.38.1 release)
 
 **Scope:** Version bump. Fix unclosed delimiter in OpenAI handler for v4.38.1 release.

@@ -7,9 +7,25 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use uuid::Uuid;
+
+static MEMORY_ACTIVE_PROMPTS: OnceLock<Mutex<HashMap<String, ActivePrompt>>> = OnceLock::new();
+
+fn get_memory_prompts_map() -> &'static Mutex<HashMap<String, ActivePrompt>> {
+    MEMORY_ACTIVE_PROMPTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Retrieve an active prompt from in-memory cache if available
+pub fn get_memory_prompt(prompt_id: &str) -> Option<ActivePrompt> {
+    if let Ok(map) = get_memory_prompts_map().lock() {
+        return map.get(prompt_id).cloned();
+    }
+    None
+}
 
 /// Represents an active or running project workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -280,6 +296,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
         for prompt_text in extracted_prompts {
             let prompt_id = Uuid::new_v4().to_string();
+            let prompt_model = Some("gemini-pro".to_string());
             let result = conn.execute(
                 "INSERT INTO active_prompts 
                  (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
@@ -290,7 +307,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     instance_id,
                     &project.repo_path,
                     &prompt_text,
-                    "gemini-pro",
+                    &prompt_model,
                     &project.id,
                     now,
                     now,
@@ -299,6 +316,21 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
             if result.is_ok() {
                 backed_up_count += 1;
+                let active_prompt = ActivePrompt {
+                    id: prompt_id.clone(),
+                    project_id: project.id.clone(),
+                    instance_id: instance_id.to_string(),
+                    repo_path: project.repo_path.clone(),
+                    prompt_content: prompt_text,
+                    model: prompt_model,
+                    session_id: Some(project.id.clone()),
+                    status: "backed_up".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                };
+                if let Ok(mut map) = get_memory_prompts_map().lock() {
+                    map.insert(prompt_id, active_prompt);
+                }
             }
         }
     }
@@ -351,6 +383,20 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             prompt.id, prompt.repo_path
         ));
 
+        // Write disk resume snapshot file inside project repo directory
+        let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
+        let payload = serde_json::json!({
+            "prompt_id": prompt.id,
+            "project_id": prompt.project_id,
+            "instance_id": instance_id,
+            "prompt_content": prompt.prompt_content,
+            "model": prompt.model,
+            "dispatched_at": now,
+        });
+        if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            let _ = fs::write(&task_file, json_str);
+        }
+
         // Mark prompt as dispatched directly in the state database
         let updated = conn.execute(
             "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
@@ -359,6 +405,12 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
         if updated.is_ok() {
             dispatched_count += 1;
+            if let Ok(mut map) = get_memory_prompts_map().lock() {
+                if let Some(p) = map.get_mut(&prompt.id) {
+                    p.status = "dispatched".to_string();
+                    p.updated_at = now;
+                }
+            }
         }
     }
 

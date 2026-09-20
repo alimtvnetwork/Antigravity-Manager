@@ -29,6 +29,7 @@ TOOLTIP="Antigravity Manager Tool By Alim"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases"
 UPSTREAM_API="https://api.github.com/repos/${UPSTREAM_REPO}/releases"
 FALLBACK_STABLE_VERSION="4.7.6"
+PINNED_VERSION="__PINNED_VERSION__"
 
 # Helper functions with left indentation
 info()    { echo -e "${INDENT}${BLUE}[INFO]${NC} $1"; }
@@ -202,66 +203,82 @@ detect_current_version() {
     fi
 }
 
-# Resolve target version
+# Resolve target version with 4-candidate fallback queue
 get_version() {
     _is_valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; }
 
+    if [[ -z "${VERSION:-}" ]]; then
+        if [[ -n "$PINNED_VERSION" && "$PINNED_VERSION" != "__PINNED_VERSION__" ]]; then
+            VERSION="$PINNED_VERSION"
+            info "Respecting pinned installer version: v$VERSION"
+        elif [[ "${BASH_EXECUTION_STRING:-}" =~ releases/download/v?([0-9]+\.[0-9]+\.[0-9]+[^/]*)/ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            info "Detected pinned version from download URL: v$VERSION"
+        fi
+    fi
+
+    CANDIDATE_VERSIONS=()
+
     if [[ -n "${VERSION:-}" ]]; then
-        RELEASE_VERSION="${VERSION#v}"
-        info "Target version (user specified): v$RELEASE_VERSION"
-        return
-    fi
-
-    info "Discovering latest release version from GitHub..."
-
-    # Method 1: GitHub API on primary repo
-    local response
-    if response=$(curl -fsSL --max-time 8 -H "User-Agent: Antigravity-Installer" "${GITHUB_API}/latest" 2>/dev/null); then
-        RELEASE_VERSION=$(echo "$response" | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
-        if _is_valid_version "${RELEASE_VERSION:-}"; then
-            info "Target release version: v$RELEASE_VERSION"
-            return
+        local user_ver="${VERSION#v}"
+        if _is_valid_version "$user_ver"; then
+            CANDIDATE_VERSIONS+=("$user_ver")
+            info "Target version: v$user_ver"
         fi
     fi
 
-    # Method 2: Upstream GitHub API
-    if response=$(curl -fsSL --max-time 8 -H "User-Agent: Antigravity-Installer" "${UPSTREAM_API}/latest" 2>/dev/null); then
-        RELEASE_VERSION=$(echo "$response" | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
-        if _is_valid_version "${RELEASE_VERSION:-}"; then
-            info "Target release version: v$RELEASE_VERSION"
-            return
+    info "Discovering available release versions from GitHub..."
+
+    local api_urls=(
+        "${GITHUB_API}?per_page=10"
+        "${UPSTREAM_API}?per_page=10"
+    )
+
+    for api_url in "${api_urls[@]}"; do
+        local resp
+        if resp=$(curl -fsSL --max-time 6 -H "User-Agent: Antigravity-Installer" "$api_url" 2>/dev/null); then
+            local tags
+            tags=$(echo "$resp" | grep '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]' || true)
+            while IFS= read -r tag; do
+                if _is_valid_version "$tag"; then
+                    local already_in=0
+                    for cv in "${CANDIDATE_VERSIONS[@]}"; do
+                        if [[ "$cv" == "$tag" ]]; then
+                            already_in=1
+                            break
+                        fi
+                    done
+                    if [[ $already_in -eq 0 ]]; then
+                        CANDIDATE_VERSIONS+=("$tag")
+                    fi
+                fi
+                if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
+                    break 2
+                fi
+            done <<< "$tags"
         fi
-    fi
+    done
 
-    # Method 3: Primary GitHub Releases redirect
-    local final_url
-    final_url=$(curl -fsSL --max-time 8 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null | tr -d '[:space:]\r\n')
-    if [[ -n "$final_url" && "$final_url" =~ /tag/v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
-        RELEASE_VERSION="${BASH_REMATCH[1]}"
-        info "Target release version: v$RELEASE_VERSION"
-        return
-    fi
+    # Fallback ladder
+    local fallbacks=("4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.7.6")
+    for fb in "${fallbacks[@]}"; do
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
+            break
+        fi
+        local already_in=0
+        for cv in "${CANDIDATE_VERSIONS[@]}"; do
+            if [[ "$cv" == "$fb" ]]; then
+                already_in=1
+                break
+            fi
+        done
+        if [[ $already_in -eq 0 ]]; then
+            CANDIDATE_VERSIONS+=("$fb")
+        fi
+    done
 
-    # Method 4: Upstream GitHub Releases redirect
-    final_url=$(curl -fsSL --max-time 8 -o /dev/null -w '%{url_effective}' "https://github.com/${UPSTREAM_REPO}/releases/latest" 2>/dev/null | tr -d '[:space:]\r\n')
-    if [[ -n "$final_url" && "$final_url" =~ /tag/v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
-        RELEASE_VERSION="${BASH_REMATCH[1]}"
-        info "Target release version: v$RELEASE_VERSION"
-        return
-    fi
-
-    # Method 5: Upstream updater.json
-    local updater_ver
-    updater_ver=$(curl -fsSL --max-time 6 "https://github.com/${UPSTREAM_REPO}/releases/latest/download/updater.json" 2>/dev/null | grep '"version"' | head -n1 | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
-    if _is_valid_version "${updater_ver:-}"; then
-        RELEASE_VERSION="$updater_ver"
-        info "Target release version: v$RELEASE_VERSION"
-        return
-    fi
-
-    # Fallback to known stable release with assets
-    RELEASE_VERSION="$FALLBACK_STABLE_VERSION"
-    warn "Could not resolve latest release dynamically, falling back to v${RELEASE_VERSION}"
+    CANDIDATE_VERSIONS=("${CANDIDATE_VERSIONS[@]:0:4}")
+    RELEASE_VERSION="${CANDIDATE_VERSIONS[0]}"
 }
 
 # Display migration path
@@ -471,12 +488,16 @@ download_installer() {
     done
 
     if [[ "$download_success" -eq 0 ]]; then
-        error "All download candidates failed. Please verify your network connection or specify a version: VERSION=4.7.6 curl -fsSL ... | bash"
+        warn "All download sources failed for release v${RELEASE_VERSION}."
+        return 1
     fi
 
     if [[ "${DRY_RUN:-0}" != "1" && ! -s "$DOWNLOAD_PATH" ]]; then
-        error "Downloaded package file is empty or missing: $DOWNLOAD_PATH"
+        warn "Downloaded package file is empty or missing: $DOWNLOAD_PATH"
+        return 1
     fi
+
+    return 0
 }
 
 # Remove any pre-existing previous tool packages
@@ -815,16 +836,49 @@ main() {
     fi
 
     display_migration
-    build_download_url
-    download_installer
 
-    # Previous versions are uninstalled ONLY AFTER new package download succeeds
-    remove_previous_installation
+    local max_attempts=4
+    local attempt=0
+    local installed_ok=0
 
-    case "$PLATFORM" in
-        linux) install_linux ;;
-        macos) install_macos ;;
-    esac
+    for cand_ver in "${CANDIDATE_VERSIONS[@]}"; do
+        attempt=$((attempt + 1))
+        if [[ $attempt -gt $max_attempts ]]; then
+            break
+        fi
+
+        echo ""
+        step "Installation attempt $attempt of $max_attempts: Release v$cand_ver"
+        RELEASE_VERSION="$cand_ver"
+        build_download_url
+
+        if download_installer; then
+            remove_previous_installation
+            local inst_res=0
+            case "$PLATFORM" in
+                linux) install_linux || inst_res=$? ;;
+                macos) install_macos || inst_res=$? ;;
+            esac
+
+            if [[ $inst_res -eq 0 ]]; then
+                installed_ok=1
+                success "Installation of v$cand_ver verified successfully!"
+                break
+            else
+                warn "Installation failed for v$cand_ver (exit code: $inst_res)."
+            fi
+        else
+            warn "Download failed for release v$cand_ver."
+        fi
+
+        if [[ $attempt -lt $max_attempts ]]; then
+            info "Falling back to previous release version in sequence..."
+        fi
+    done
+
+    if [[ $installed_ok -eq 0 ]]; then
+        error "All $max_attempts attempts failed. I fail, so I cannot do anything."
+    fi
 
     # Explicit post-install cleanup of downloaded packages
     cleanup

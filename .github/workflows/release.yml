@@ -349,12 +349,12 @@ jobs:
           \) -print0 | while IFS= read -r -d '' file; do
             cp "$file" release-files/
           done
-          # Copy standalone installer scripts so they are published as release assets
+          # Copy standalone installer scripts and stamp pinned release version
           if [ -f install.ps1 ]; then
-            cp install.ps1 release-files/
+            sed "s/__PINNED_VERSION__/$VER/g" install.ps1 > release-files/install.ps1
           fi
           if [ -f install.sh ]; then
-            cp install.sh release-files/
+            sed "s/__PINNED_VERSION__/$VER/g" install.sh > release-files/install.sh
             chmod +x release-files/install.sh
           fi
           # Provide friendly alias names for direct setup/installer downloads

@@ -239,9 +239,9 @@ pub struct AutoProfileSwitcherConfig {
 impl Default for AutoProfileSwitcherConfig {
     fn default() -> Self {
         Self {
-            is_enabled: false,
+            is_enabled: true,
             check_interval_seconds: 60,
-            low_quota_threshold_percent: 15.0,
+            low_quota_threshold_percent: 10.0,
             target_model: "gemini-pro".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,

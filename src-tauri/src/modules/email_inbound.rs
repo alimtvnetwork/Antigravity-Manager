@@ -6,6 +6,7 @@
 
 use crate::modules::email_sender::{self, EmailStream};
 use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
+use crate::utils::command::CommandExtWrapper;
 use chrono::Utc;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -652,10 +653,20 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
     }
 
     #[cfg(target_os = "windows")]
-    let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-Command", cmd_str])
-        .output()
-        .map_err(|e| format!("Failed to run command on Windows: {}", e))?;
+    let output = {
+        let mut cmd = Command::new("powershell.exe");
+        cmd.creation_flags_windows().args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            cmd_str,
+        ]);
+        cmd.output().map_err(|e| format!("Failed to run command on Windows: {}", e))?
+    };
 
     #[cfg(not(target_os = "windows"))]
     let output = Command::new("sh")

@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.39.0 (2026-09-20)**:
+        -   **[Hidden Terminal, Multi-Version Fallback, Auto-Switch & Branding] Zero Window Flashes, 4-Attempt Fallback, Prompt Preservation & Vector Logos**:
+            -   **Hidden Background Terminal Execution**: Enforced `CREATE_NO_WINDOW` (0x08000000) flags and `-WindowStyle Hidden` on all Windows PowerShell invocations, completely eliminating terminal popups and flashes during startup update checks and CLI execution.
+            -   **Idempotent Shortcut Creation**: Hardened `install.ps1` to verify if Desktop, Start Menu, and Taskbar shortcuts exist before creating them, never recreating or overwriting existing shortcuts.
+            -   **Intelligent 4-Version Installer Fallback Ladder**: Enhanced `install.ps1`, `install.sh`, and `deploy/arch/install.sh` with a 4-version sequential fallback try-catch mechanism that gracefully steps down to previous releases when latest download fails before reporting exhaustion.
+            -   **Pinned Version Support**: Added automatic URL and invocation detection for pinned version installations (`releases/download/vX.Y.Z/...`) across PowerShell and Bash installers.
+            -   **Low-Quota (<10%) Auto-Switching & Prompt Preservation**: Enabled auto-profile switcher by default with 10.0% threshold, added multi-factor candidate scoring, and implemented dual memory + disk prompt snapshotting (`.antigravity_resume_task.json`) and direct dispatch upon rotation.
+            -   **Compact Update Card & Vector Branding Showcase**: Replaced bulky notification with sleek floating card, and updated root README with responsive vector SVGs (`logo.svg`, `logo-dark.svg`) and transparent icon suite.
     *   **v4.38.1 (2026-09-20)**:
         -   **[Release v4.38.1] Fix unclosed delimiter in OpenAI handler for v4.38.1 release**:
             -   **Update System**: Automated release and version synchronization across all manifests.

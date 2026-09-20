@@ -114,6 +114,12 @@ fn get_version_windows(exe_path: &PathBuf) -> Result<AntigravityVersion, String>
     let output = cmd
         .creation_flags_windows()
         .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
             "-Command",
             &format!(
                 "(Get-Item '{}').VersionInfo.FileVersion",

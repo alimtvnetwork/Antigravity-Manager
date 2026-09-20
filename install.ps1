@@ -51,6 +51,9 @@ $ErrorActionPreference = "Stop"
 # Suppress noisy WebRequest progress bar in PowerShell
 $ProgressPreference = 'SilentlyContinue'
 
+# Pinned version placeholder (stamped during release packaging or detected from download URL)
+$PinnedVersion = "__PINNED_VERSION__"
+
 $Repo = "alimtvnetwork/Antigravity-Manager"
 $UpstreamRepo = "lbjlaq/Antigravity-Manager"
 $AppName = "Agm Tool By Alim"
@@ -113,6 +116,17 @@ function Invoke-IndentedCommand {
     }
     $global:LASTEXITCODE = $exitCode
     return $exitCode
+}
+
+# Resolve Pinned Version or URL invocation
+if (-not $Version) {
+    if ($PinnedVersion -and $PinnedVersion -ne "__PINNED_VERSION__") {
+        $Version = $PinnedVersion
+        Write-Step "Respecting pinned installer version: v$Version"
+    } elseif ($MyInvocation.Line -match 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+[^/]*)/') {
+        $Version = $Matches[1]
+        Write-Step "Detected pinned version from download URL: v$Version"
+    }
 }
 
 # Resolve Architecture
@@ -265,9 +279,13 @@ function Pin-TaskbarShortcut {
         } catch {}
     }
 
-    # Method 1: Create or update shortcut directly in User Pinned Taskbar directory
+    # Method 1: Create shortcut in User Pinned Taskbar directory if not present
     if (Test-Path $TaskbarDir) {
         $pinnedShortcut = Join-Path $TaskbarDir "$ShortcutName.lnk"
+        if (Test-Path $pinnedShortcut) {
+            Write-Step "Taskbar shortcut already exists: $pinnedShortcut"
+            return
+        }
         try {
             $WshShell = New-Object -ComObject WScript.Shell
             $sc = $WshShell.CreateShortcut($pinnedShortcut)
@@ -481,123 +499,6 @@ if ($CheckUpdate) {
     return
 }
 
-# --- INSTALL FLOW ---
-Write-Host ""
-Write-Host ""
-Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
-Write-Host "$LeftPadding    $FullName Installer" -ForegroundColor Cyan
-Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Step 1: Resolve Release Version
-$TargetVersion = $Version
-if ($TargetVersion) {
-    $TargetVersion = $TargetVersion -replace "^v", ""
-    # Attempt to resolve asset metadata for explicitly pinned version
-    try {
-        $tagEndpoint = "https://api.github.com/repos/$Repo/releases/tags/v$TargetVersion"
-        $releaseData = Invoke-RestMethod -Uri $tagEndpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-    } catch {
-        try {
-            $tagEndpoint = "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$TargetVersion"
-            $releaseData = Invoke-RestMethod -Uri $tagEndpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-        } catch {}
-    }
-} else {
-    Write-Step "Discovering latest release version from GitHub..."
-    $apiEndpoints = @(
-        "https://api.github.com/repos/$Repo/releases",
-        "https://api.github.com/repos/$Repo/releases/latest",
-        "https://api.github.com/repos/$UpstreamRepo/releases",
-        "https://api.github.com/repos/$UpstreamRepo/releases/latest"
-    )
-
-    foreach ($endpoint in $apiEndpoints) {
-        try {
-            $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 8
-            if ($resp -is [System.Array] -and $resp.Count -gt 0) {
-                # Pick newest release that already has uploaded assets
-                $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
-                if (-not $candidate) { $candidate = $resp[0] }
-                if ($candidate -and $candidate.tag_name) {
-                    $releaseData = $candidate
-                    $TargetVersion = $releaseData.tag_name -replace "^v", ""
-                    break
-                }
-            } elseif ($resp -and $resp.tag_name) {
-                $releaseData = $resp
-                $TargetVersion = $releaseData.tag_name -replace "^v", ""
-                break
-            }
-        } catch {
-            # Try next endpoint
-        }
-    }
-
-    # Fallback to updater.json
-    if (-not $TargetVersion) {
-        try {
-            $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
-            if ($updater -and $updater.version) {
-                $TargetVersion = $updater.version -replace "^v", ""
-            }
-        } catch {}
-    }
-
-    if (-not $TargetVersion) {
-        $TargetVersion = "4.30.0"
-        Write-Warn "Could not resolve latest tag from API, falling back to default v$TargetVersion"
-    }
-}
-
-if ($Update) {
-    $curr = Get-InstalledVersion
-    if ($curr -and $TargetVersion -and $curr -eq $TargetVersion) {
-        Write-Success "Already on the latest version ($curr)."
-        return
-    }
-}
-
-$CurrentVersion = Get-InstalledVersion
-
-if ($CurrentVersion) {
-    Write-Step "Current installed version: v$CurrentVersion"
-    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
-    if ($CurrentVersion -eq $TargetVersion) {
-        Write-Step "Migration mode           : Reinstalling / Updating v$TargetVersion"
-    } else {
-        Write-Step "Migration path           : v$CurrentVersion -> v$TargetVersion"
-    }
-} else {
-    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
-    Write-Step "Installation mode        : Fresh installation (v$TargetVersion)"
-}
-
-# Remove previous installations and clean obsolete paths
-Remove-PreviousInstallations
-
-# Step 2: Determine Asset URL
-$matchedAsset = $null
-
-if ($releaseData -and $releaseData.assets) {
-    # 1. Prioritize architecture-specific NSIS setup EXE
-    $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
-    # 2. Other Windows executables
-    if (-not $matchedAsset) {
-        $matchedAsset = $releaseData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
-    }
-}
-
-if ($matchedAsset) {
-    $DownloadUrl = $matchedAsset.browser_download_url
-} else {
-    # Direct NSIS setup asset URL fallback
-    $ExeAsset = "agm-alim_${TargetVersion}_${Arch}-setup.exe"
-    $DownloadUrl = "https://github.com/$Repo/releases/download/v${TargetVersion}/$ExeAsset"
-}
-
-Write-Step "Download source: $DownloadUrl"
-
 function Get-Aria2cPath {
     $cmd = Get-Command aria2c.exe -ErrorAction SilentlyContinue
     if (-not $cmd) {
@@ -708,9 +609,11 @@ function Invoke-FastDownload {
     try {
         Invoke-WebRequest -Uri $Url -OutFile $DestinationPath -UseBasicParsing
         $ProgressPreference = $prevProgress
-        if ((Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
-            Write-Success "Download completed via Invoke-WebRequest."
-            return $true
+        if (Test-Path $DestinationPath) {
+            if ((Get-Item $DestinationPath).Length -gt 0) {
+                Write-Success "Download completed via Invoke-WebRequest."
+                return $true
+            }
         }
     } catch {
         $ProgressPreference = $prevProgress
@@ -720,95 +623,262 @@ function Invoke-FastDownload {
     return $false
 }
 
-# Step 3: Execute Installation
-if ($DryRun) {
-    Write-Warn "[DRY RUN] Would download $DownloadUrl"
-    Write-Warn "[DRY RUN] Would execute/install into $InstallDir"
-    if (-not $NoPath) { Write-Warn "[DRY RUN] Would append $InstallDir to User PATH" }
-    if (-not $NoShortcut) { Write-Warn "[DRY RUN] Would create Desktop & Start Menu shortcuts" }
-    Write-Success "[DRY RUN] Dry run completed successfully."
-    return
+# --- INSTALL FLOW ---
+Write-Host ""
+Write-Host ""
+Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
+Write-Host "$LeftPadding    $FullName Installer" -ForegroundColor Cyan
+Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Step 1: Discover Available Release Versions & Build 4-Candidate Queue
+$candidateVersions = [System.Collections.Generic.List[string]]::new()
+$releaseMetadataMap = @{}
+
+if ($Version) {
+    $cleanVer = $Version -replace "^v", ""
+    $candidateVersions.Add($cleanVer)
 }
 
-$TempDir = [System.IO.Path]::GetTempPath()
-$DownloadedFile = Join-Path $TempDir ($DownloadUrl -split "/" | Select-Object -Last 1)
+Write-Step "Discovering available release versions from GitHub..."
+$apiEndpoints = @(
+    "https://api.github.com/repos/$Repo/releases?per_page=10",
+    "https://api.github.com/repos/$Repo/releases/latest",
+    "https://api.github.com/repos/$UpstreamRepo/releases?per_page=10",
+    "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+)
 
-Write-Step "Downloading release package..."
-$downloaded = Invoke-FastDownload -Url $DownloadUrl -DestinationPath $DownloadedFile
-if (-not $downloaded) {
-    Write-Warn "Primary download failed. Attempting upstream fallback..."
-    $UpstreamDownloadUrl = $DownloadUrl -replace [regex]::Escape($Repo), $UpstreamRepo
-    $downloaded = Invoke-FastDownload -Url $UpstreamDownloadUrl -DestinationPath $DownloadedFile
-    if (-not $downloaded) {
-        Write-Err "Upstream fallback download also failed."
-        exit 1
-    }
-}
-
-if (-not (Test-Path $DownloadedFile)) {
-    Write-Err "Downloaded file not found at: $DownloadedFile"
-    exit 1
-}
-
-# Create Target Directory
-if (-not (Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-}
-
-Write-Step "Running installer ($DownloadedFile)..."
-$installExit = Invoke-IndentedCommand -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir")
-Write-Success "Installer finished with exit code $installExit"
-Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
-
-# Locate Main Executable
-$ExePath = Join-Path $InstallDir $BinaryName
-if (-not (Test-Path $ExePath)) {
-    $altNames = @(
-        "agm-alim.exe",
-        "AGM by Alim.exe",
-        "Anti-Gravity Tools by Alim.exe",
-        "Anti-Gravity Tools.exe",
-        "antigravity-tools.exe",
-        "Antigravity Tools.exe"
-    )
-    foreach ($name in $altNames) {
-        $candidate = Join-Path $InstallDir $name
-        if (Test-Path $candidate) {
-            $ExePath = $candidate
-            $BinaryName = $name
-            break
-        }
-    }
-}
-if (-not (Test-Path $ExePath)) {
-    $found = Get-ChildItem -Path $InstallDir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
-    if ($found) {
-        $ExePath = $found.FullName
-        $BinaryName = $found.Name
-    }
-}
-if (-not (Test-Path $ExePath)) {
-    $commonDirs = @(
-        (Join-Path $env:LOCALAPPDATA "Programs\agm-alim"),
-        (Join-Path $env:LOCALAPPDATA "Programs\AGM by Alim"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
-        (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
-        (Join-Path $env:ProgramFiles "agm-alim"),
-        (Join-Path $env:ProgramFiles "AGM by Alim"),
-        (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim")
-    )
-    foreach ($dir in $commonDirs) {
-        if (Test-Path $dir) {
-            $found = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" } | Select-Object -First 1
-            if ($found) {
-                $InstallDir = $dir
-                $ExePath = $found.FullName
-                $BinaryName = $found.Name
-                break
+foreach ($endpoint in $apiEndpoints) {
+    try {
+        $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+        if ($resp -is [System.Array]) {
+            foreach ($rel in $resp) {
+                if ($rel.tag_name) {
+                    $tagVer = $rel.tag_name -replace "^v", ""
+                    if (-not $candidateVersions.Contains($tagVer)) {
+                        $candidateVersions.Add($tagVer)
+                    }
+                    if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                        $releaseMetadataMap[$tagVer] = $rel
+                    }
+                }
+            }
+        } elseif ($resp -and $resp.tag_name) {
+            $tagVer = $resp.tag_name -replace "^v", ""
+            if (-not $candidateVersions.Contains($tagVer)) {
+                $candidateVersions.Add($tagVer)
+            }
+            if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                $releaseMetadataMap[$tagVer] = $resp
             }
         }
+    } catch {}
+    if ($candidateVersions.Count -ge 4) { break }
+}
+
+# Fallback known historical releases
+$knownFallbacks = @("4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0")
+foreach ($kb in $knownFallbacks) {
+    if (-not $candidateVersions.Contains($kb)) {
+        $candidateVersions.Add($kb)
     }
+}
+
+# Build strict 4-version queue
+$versionQueue = @()
+foreach ($v in $candidateVersions) {
+    if ($versionQueue.Count -lt 4) {
+        $versionQueue += $v
+    }
+}
+
+$TargetVersion = $versionQueue[0]
+
+if ($Update) {
+    $curr = Get-InstalledVersion
+    if ($curr) {
+        if ($curr -eq $TargetVersion) {
+            Write-Success "Already on the latest version ($curr)."
+            return
+        }
+    }
+}
+
+$CurrentVersion = Get-InstalledVersion
+if ($CurrentVersion) {
+    Write-Step "Current installed version: v$CurrentVersion"
+    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
+    if ($CurrentVersion -eq $TargetVersion) {
+        Write-Step "Migration mode           : Reinstalling / Updating v$TargetVersion"
+    } else {
+        Write-Step "Migration path           : v$CurrentVersion -> v$TargetVersion"
+    }
+} else {
+    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
+    Write-Step "Installation mode        : Fresh installation (v$TargetVersion)"
+}
+
+# Step 2: Intelligent Multi-Version Try-Catch Installation Ladder (Up to 4 attempts)
+$maxAttempts = 4
+$attempt = 0
+$installedOk = $false
+$installedVersion = $null
+$ExePath = $null
+
+foreach ($candVersion in $versionQueue) {
+    $attempt++
+    if ($attempt -gt $maxAttempts) {
+        break
+    }
+
+    Write-Host ""
+    Write-Step "=== Installation Attempt $attempt of ${maxAttempts}: Release v$candVersion ==="
+
+    try {
+        $relData = $releaseMetadataMap[$candVersion]
+        if (-not $relData) {
+            try {
+                $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+            } catch {
+                try {
+                    $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                } catch {}
+            }
+        }
+
+        $matchedAsset = $null
+        if ($relData) {
+            if ($relData.assets) {
+                $matchedAsset = $relData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
+                if (-not $matchedAsset) {
+                    $matchedAsset = $relData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
+                }
+            }
+        }
+
+        if ($matchedAsset) {
+            $DownloadUrl = $matchedAsset.browser_download_url
+        } else {
+            $DownloadUrl = "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_${Arch}-setup.exe"
+        }
+
+        Write-Step "Package download URL: $DownloadUrl"
+
+        if ($DryRun) {
+            Write-Warn "[DRY RUN] Would download $DownloadUrl"
+            Write-Warn "[DRY RUN] Would execute/install into $InstallDir"
+            if (-not $NoPath) { Write-Warn "[DRY RUN] Would append $InstallDir to User PATH" }
+            if (-not $NoShortcut) { Write-Warn "[DRY RUN] Would configure Desktop & Start Menu shortcuts" }
+            Write-Success "[DRY RUN] Dry run completed successfully."
+            return
+        }
+
+        $TempDir = [System.IO.Path]::GetTempPath()
+        $DownloadedFile = Join-Path $TempDir ($DownloadUrl -split "/" | Select-Object -Last 1)
+
+        Write-Step "Downloading release package..."
+        $downloaded = Invoke-FastDownload -Url $DownloadUrl -DestinationPath $DownloadedFile
+        if (-not $downloaded) {
+            Write-Warn "Primary download failed. Attempting upstream fallback..."
+            $UpstreamDownloadUrl = $DownloadUrl -replace [regex]::Escape($Repo), $UpstreamRepo
+            $downloaded = Invoke-FastDownload -Url $UpstreamDownloadUrl -DestinationPath $DownloadedFile
+        }
+
+        if (-not $downloaded) {
+            throw "Failed to download release package for v$candVersion"
+        }
+
+        if (-not (Test-Path $DownloadedFile)) {
+            throw "Downloaded package not found at: $DownloadedFile"
+        }
+
+        if ((Get-Item $DownloadedFile).Length -lt 1024) {
+            throw "Downloaded package is empty or corrupt (<1KB)"
+        }
+
+        # Safe removal of previous installation only after new file verified
+        Remove-PreviousInstallations
+
+        if (-not (Test-Path $InstallDir)) {
+            New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+        }
+
+        Write-Step "Executing installer package ($DownloadedFile)..."
+        $installExit = Invoke-IndentedCommand -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir")
+        Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
+
+        # Locate and verify main executable
+        $detectedExe = Join-Path $InstallDir $BinaryName
+        if (-not (Test-Path $detectedExe)) {
+            $altNames = @(
+                "agm-alim.exe",
+                "AGM by Alim.exe",
+                "Anti-Gravity Tools by Alim.exe",
+                "Anti-Gravity Tools.exe",
+                "antigravity-tools.exe",
+                "Antigravity Tools.exe"
+            )
+            foreach ($an in $altNames) {
+                $chk = Join-Path $InstallDir $an
+                if (Test-Path $chk) {
+                    $detectedExe = $chk
+                    $BinaryName = $an
+                    break
+                }
+            }
+        }
+        if (-not (Test-Path $detectedExe)) {
+            $found = Get-ChildItem -Path $InstallDir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
+            if ($found) {
+                $detectedExe = $found.FullName
+                $BinaryName = $found.Name
+            }
+        }
+        if (-not (Test-Path $detectedExe)) {
+            $commonDirs = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\agm-alim"),
+                (Join-Path $env:LOCALAPPDATA "Programs\AGM by Alim"),
+                (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
+                (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
+                (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
+                (Join-Path $env:ProgramFiles "agm-alim"),
+                (Join-Path $env:ProgramFiles "AGM by Alim"),
+                (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim")
+            )
+            foreach ($dir in $commonDirs) {
+                if (Test-Path $dir) {
+                    $found = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse | Where-Object { $_.Name -notlike "*uninstall*" } | Select-Object -First 1
+                    if ($found) {
+                        $InstallDir = $dir
+                        $detectedExe = $found.FullName
+                        $BinaryName = $found.Name
+                        break
+                    }
+                }
+            }
+        }
+
+        if (-not (Test-Path $detectedExe)) {
+            throw "Main executable not found in $InstallDir after running installer package"
+        }
+
+        # Success!
+        $ExePath = $detectedExe
+        $TargetVersion = $candVersion
+        $installedOk = $true
+        Write-Success "Installation of v$candVersion verified successfully!"
+        break
+    } catch {
+        Write-Warn "Attempt $attempt failed for release v${candVersion}: $($_.Exception.Message)"
+        if ($attempt -lt $maxAttempts) {
+            Write-Step "Falling back to previous release version in sequence..."
+        }
+    }
+}
+
+if (-not $installedOk) {
+    Write-Err "All $maxAttempts attempts failed. I fail, so I cannot do anything."
+    exit 1
 }
 
 # Step 4: Configure User PATH
@@ -826,72 +896,60 @@ if (-not $NoPath) {
 }
 
 # Step 5: Create Shortcuts
-if (-not $NoShortcut -and (Test-Path $ExePath)) {
-    Write-Step "Configuring Application Shortcuts..."
-    try {
-        $WshShell = New-Object -ComObject WScript.Shell
-
-        # Clean any remaining legacy shortcut on Desktop or Start Menu
-        $oldLnks = @("AGM by Alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
-        foreach ($old in $oldLnks) {
-            $f1 = Join-Path $DesktopDir $old
-            if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
-            $f2 = Join-Path $StartMenuDir $old
-            if (Test-Path $f2) { Remove-Item -Path $f2 -Force -ErrorAction SilentlyContinue }
-            $f3 = Join-Path $TaskbarDir $old
-            if (Test-Path $f3) { Remove-Item -Path $f3 -Force -ErrorAction SilentlyContinue }
-        }
-
-        # Start Menu
-        if (-not (Test-Path $StartMenuDir)) {
-            New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
-        }
-        $needsSmShortcut = $true
-        if (Test-Path $StartMenuShortcut) {
+if (-not $NoShortcut) {
+    if ($ExePath) {
+        if (Test-Path $ExePath) {
+            Write-Step "Configuring Application Shortcuts..."
             try {
-                $existingSm = $WshShell.CreateShortcut($StartMenuShortcut)
-                if ($existingSm.TargetPath -eq $ExePath) {
-                    $needsSmShortcut = $false
-                    Write-Step "Start Menu shortcut already configured: $StartMenuShortcut"
+                $WshShell = New-Object -ComObject WScript.Shell
+
+                # Clean any remaining legacy shortcut on Desktop or Start Menu
+                $oldLnks = @("AGM by Alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
+                foreach ($old in $oldLnks) {
+                    $f1 = Join-Path $DesktopDir $old
+                    if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
+                    $f2 = Join-Path $StartMenuDir $old
+                    if (Test-Path $f2) { Remove-Item -Path $f2 -Force -ErrorAction SilentlyContinue }
+                    $f3 = Join-Path $TaskbarDir $old
+                    if (Test-Path $f3) { Remove-Item -Path $f3 -Force -ErrorAction SilentlyContinue }
                 }
-            } catch {}
-        }
-        if ($needsSmShortcut) {
-            $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
-            $smShortcut.TargetPath = $ExePath
-            $smShortcut.WorkingDirectory = $InstallDir
-            $smShortcut.Description = $Tooltip
-            $smShortcut.Save()
-            Write-Success "Created Start Menu shortcut: $StartMenuShortcut"
-        }
 
-        # Desktop
-        if (Test-Path $DesktopDir) {
-            $needsDtShortcut = $true
-            if (Test-Path $DesktopShortcut) {
-                try {
-                    $existingDt = $WshShell.CreateShortcut($DesktopShortcut)
-                    if ($existingDt.TargetPath -eq $ExePath) {
-                        $needsDtShortcut = $false
-                        Write-Step "Desktop shortcut already configured: $DesktopShortcut"
+                # Start Menu
+                if (-not (Test-Path $StartMenuDir)) {
+                    New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
+                }
+                if (Test-Path $StartMenuShortcut) {
+                    Write-Step "Start Menu shortcut already exists: $StartMenuShortcut"
+                } else {
+                    $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
+                    $smShortcut.TargetPath = $ExePath
+                    $smShortcut.WorkingDirectory = $InstallDir
+                    $smShortcut.Description = $Tooltip
+                    $smShortcut.Save()
+                    Write-Success "Created Start Menu shortcut: $StartMenuShortcut"
+                }
+
+                # Desktop
+                if (Test-Path $DesktopDir) {
+                    if (Test-Path $DesktopShortcut) {
+                        Write-Step "Desktop shortcut already exists: $DesktopShortcut"
+                    } else {
+                        $dtShortcut = $WshShell.CreateShortcut($DesktopShortcut)
+                        $dtShortcut.TargetPath = $ExePath
+                        $dtShortcut.WorkingDirectory = $InstallDir
+                        $dtShortcut.Description = $Tooltip
+                        $dtShortcut.Save()
+                        Write-Success "Created Desktop shortcut: $DesktopShortcut"
                     }
-                } catch {}
+                }
+            } catch {
+                Write-Warn "Could not create shortcuts: $_"
             }
-            if ($needsDtShortcut) {
-                $dtShortcut = $WshShell.CreateShortcut($DesktopShortcut)
-                $dtShortcut.TargetPath = $ExePath
-                $dtShortcut.WorkingDirectory = $InstallDir
-                $dtShortcut.Description = $Tooltip
-                $dtShortcut.Save()
-                Write-Success "Created Desktop shortcut: $DesktopShortcut"
-            }
-        }
-    } catch {
-        Write-Warn "Could not create shortcuts: $_"
-    }
 
-    # Step 6: Taskbar Pinning (Windows 10, Windows 11, Windows Server)
-    Pin-TaskbarShortcut -TargetExe $ExePath -TargetWorkDir $InstallDir -ShortcutSource $StartMenuShortcut
+            # Step 6: Taskbar Pinning (Windows 10, Windows 11, Windows Server)
+            Pin-TaskbarShortcut -TargetExe $ExePath -TargetWorkDir $InstallDir -ShortcutSource $StartMenuShortcut
+        }
+    }
 }
 
 Write-Host ""

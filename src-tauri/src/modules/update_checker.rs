@@ -1,4 +1,5 @@
 use crate::modules::logger;
+use crate::utils::command::CommandExtWrapper;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -518,20 +519,26 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let script_cmd = if std::path::Path::new("install.ps1").exists() {
-            "powershell -ExecutionPolicy Bypass -File .\\install.ps1 -CheckUpdate".to_string()
-        } else {
-            "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& { $script = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($script)) -CheckUpdate }\"".to_string()
-        };
+        let mut ps_cmd = tokio::process::Command::new("powershell");
+        ps_cmd.creation_flags_windows().args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+        ]);
 
-        let output = tokio::process::Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
+        if std::path::Path::new("install.ps1").exists() {
+            ps_cmd.args(["-File", ".\\install.ps1", "-CheckUpdate"]);
+        } else {
+            ps_cmd.args([
                 "-Command",
-                &script_cmd,
-            ])
+                "& { $script = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($script)) -CheckUpdate }",
+            ]);
+        }
+
+        let output = ps_cmd
             .output()
             .await
             .map_err(|e| format!("Failed to run powershell update check: {}", e))?;
@@ -588,17 +595,28 @@ pub async fn run_installer_update() -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let cmd = if std::path::Path::new("install.ps1").exists() {
-            "powershell -ExecutionPolicy Bypass -File .\\install.ps1 -Update".to_string()
+        let mut ps_cmd = tokio::process::Command::new("powershell");
+        ps_cmd.creation_flags_windows().args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+        ]);
+
+        if std::path::Path::new("install.ps1").exists() {
+            ps_cmd.args(["-File", ".\\install.ps1", "-Update"]);
         } else {
-            "powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex\"".to_string()
-        };
+            ps_cmd.args([
+                "-Command",
+                "irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex",
+            ]);
+        }
 
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(300),
-            tokio::process::Command::new("powershell")
-                .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &cmd])
-                .output(),
+            ps_cmd.output(),
         )
         .await;
 

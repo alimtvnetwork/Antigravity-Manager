@@ -111,6 +111,51 @@ struct ProfileCandidate {
     pub account_id: String,
     pub email: String,
     pub quota_percent: f64,
+    pub score: f64,
+}
+
+/// Multi-factor scoring for candidate accounts matching instanceService
+fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    let mut score = 0.0;
+
+    // 1. Idle time factor (Longest time not used, or never used)
+    let has_never_used = acc.last_used.map_or(true, |v| v == 0);
+    if has_never_used {
+        score += 100000.0;
+    } else if let Some(last_used) = acc.last_used {
+        let idle_hours = ((now_sec - last_used) as f64 / 3600.0).max(0.0);
+        score += (idle_hours * 1000.0).min(50000.0);
+    }
+
+    // 2. Lowest remaining quota factor
+    let mut lowest_remaining = 100.0;
+    if let Some(quota) = acc.quota.as_ref() {
+        for m in &quota.models {
+            let pct = m.percentage as f64;
+            if pct < lowest_remaining {
+                lowest_remaining = pct;
+            }
+        }
+    }
+    score += lowest_remaining * 200.0;
+
+    // 3. Target model bonus
+    if let Some(quota) = calculate_account_quota(acc, target_model) {
+        score += quota * 100.0;
+    }
+
+    // 4. Subscription tier bonus
+    let tier = acc
+        .quota
+        .as_ref()
+        .and_then(|q| q.subscription_tier.as_ref())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+    if tier.contains("pro") || tier.contains("ultra") {
+        score += 10000.0;
+    }
+
+    score
 }
 
 /// Find next best candidate profile with healthy quota
@@ -120,6 +165,7 @@ fn select_next_best_profile(
     threshold: f64,
 ) -> Result<Option<ProfileCandidate>, String> {
     let registry = instance::load_registry()?;
+    let now_sec = chrono::Utc::now().timestamp();
     let mut candidates = Vec::new();
 
     for inst in &registry.instances {
@@ -132,26 +178,31 @@ fn select_next_best_profile(
         };
 
         if let Ok(acc) = account::load_account(acc_id) {
-            if acc.disabled || acc.validation_blocked {
+            if acc.disabled {
+                continue;
+            }
+            if acc.validation_blocked {
                 continue;
             }
 
             let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
             if quota > threshold {
+                let score = score_candidate_account(&acc, target_model, now_sec);
                 candidates.push(ProfileCandidate {
                     instance_id: inst.id.clone(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
+                    score,
                 });
             }
         }
     }
 
-    // Sort descending by remaining quota percentage
+    // Sort descending by multi-factor score
     candidates.sort_by(|a, b| {
-        b.quota_percent
-            .partial_cmp(&a.quota_percent)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -164,23 +215,28 @@ fn select_next_best_profile(
     let mut account_candidates = Vec::new();
 
     for acc in all_accounts {
-        if acc.disabled || acc.validation_blocked {
+        if acc.disabled {
+            continue;
+        }
+        if acc.validation_blocked {
             continue;
         }
         let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
         if quota > threshold {
-            account_candidates.push((acc, quota));
+            let score = score_candidate_account(&acc, target_model, now_sec);
+            account_candidates.push((acc, quota, score));
         }
     }
 
-    account_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    account_candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
-    if let Some((best_acc, quota)) = account_candidates.into_iter().next() {
+    if let Some((best_acc, quota, score)) = account_candidates.into_iter().next() {
         return Ok(Some(ProfileCandidate {
             instance_id: current_instance_id.to_string(),
             account_id: best_acc.id,
             email: best_acc.email,
             quota_percent: quota,
+            score,
         }));
     }
 

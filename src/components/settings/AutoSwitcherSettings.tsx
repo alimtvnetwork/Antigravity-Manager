@@ -21,9 +21,9 @@ interface AutoSwitcherSettingsProps {
 }
 
 const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
-    is_enabled: false,
+    is_enabled: true,
     check_interval_seconds: 60,
-    low_quota_threshold_percent: 15.0,
+    low_quota_threshold_percent: 10.0,
     target_model: 'gemini-pro',
     has_auto_resume: true,
     cooldown_seconds: 180,

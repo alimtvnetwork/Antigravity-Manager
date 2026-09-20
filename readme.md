@@ -1,11 +1,15 @@
 <p align="center">
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager">
-    <img
-      src="public/images/antigravity-manager-icon.png"
-      alt="Antigravity Tools brand icon — Enterprise AI Account Management and High-Performance Protocol Proxy Gateway"
-      width="160"
-      height="160"
-    />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/icons-svg/logo-dark.svg" />
+      <source media="(prefers-color-scheme: light)" srcset="assets/icons-svg/logo.svg" />
+      <img
+        src="assets/icons-svg/logo.svg"
+        alt="Antigravity Tools brand logo — Enterprise AI Account Management and High-Performance Protocol Proxy Gateway"
+        width="160"
+        height="160"
+      />
+    </picture>
   </a>
 </p>
 
@@ -18,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.38.1-3B82F6?style=flat-square" alt="Version 4.38.1">
+    <img src="https://img.shields.io/badge/Version-4.39.0-3B82F6?style=flat-square" alt="Version 4.39.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -57,6 +61,7 @@
 <p align="center">
   <a href="#-screenshot--gui-overview">📸 GUI Overview</a> •
   <a href="#%EF%B8%8F-install-scripts">🛠️ Install Scripts</a> •
+  <a href="#-brand-identity-logos--icons">🎨 Logos &amp; Icons</a> •
   <a href="#-about-this-repo">📖 About</a> •
   <a href="#-for-ai-agents">🤖 For AI Agents</a> •
   <a href="#-key-features--capabilities">🌟 Key Features</a> •
@@ -393,6 +398,31 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ---
 
+## 🎨 Brand Identity, Logos & Icons
+
+Antigravity Tools features an abstract AG monogram with a broken orbit and levitating core, symbolizing controlled lift, high performance, and liberation from manual cloud console gravity. All branding assets follow strict transparent alpha-channel standards.
+
+### Vector Logos
+
+| Primary Logo (Light/Neutral) | Dark Surface Logo | Monochrome White |
+| :---: | :---: | :---: |
+| <img src="assets/icons-svg/logo.svg" width="140" alt="Primary Antigravity Tools Logo" /> | <img src="assets/icons-svg/logo-dark.svg" width="140" alt="Antigravity Tools Logo for Dark Surfaces" /> | <img src="assets/icons-svg/logo-white.svg" width="140" alt="White Monochrome Antigravity Tools Logo" /> |
+| `assets/icons-svg/logo.svg` | `assets/icons-svg/logo-dark.svg` | `assets/icons-svg/logo-white.svg` |
+
+### Transparent App Icons
+
+Every raster icon is exported with a 100% transparent background (`#00000000`) for seamless rendering across desktop docks, taskbars, and web interfaces:
+
+| 52 px (Small) | 128 px (Standard) | 256 px (Retina) | 512 px (High-DPI) |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/icons-image/logo-052.png" width="52" alt="52px Antigravity Tools Icon" /> | <img src="assets/icons-image/logo-128.png" width="128" alt="128px Antigravity Tools Icon" /> | <img src="assets/icons-image/logo-256.png" width="160" alt="256px Antigravity Tools Icon" /> | <img src="assets/icons-image/logo-512.png" width="180" alt="512px Antigravity Tools Icon" /> |
+| `logo-052.png` | `logo-128.png` | `logo-256.png` | `logo-512.png` |
+
+> [!TIP]
+> Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
+
+---
+
 ## 🤝 Contributing & Original Authors
 
 We extend our sincere thanks to all creators, developers, and open-source contributors who have contributed to the inception, evolution, and maintenance of Antigravity Manager:
@@ -435,7 +465,11 @@ We extend our sincere thanks to all creators, developers, and open-source contri
 
 <p align="center">
   <a href="https://riseup-asia.com/">
-    <img src="public/images/antigravity-manager-icon.png" width="90" alt="Riseup Asia LLC Sponsor Logo" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/icons-svg/logo-dark.svg" />
+      <source media="(prefers-color-scheme: light)" srcset="assets/icons-svg/logo.svg" />
+      <img src="assets/icons-svg/logo.svg" width="90" alt="Riseup Asia LLC Sponsor Logo" />
+    </picture>
     <br/>
     <strong>Riseup Asia LLC</strong>
   </a>

@@ -100,9 +100,9 @@ function Settings() {
         hidden_menu_items: [],  // Menu display settings: do not hide any menu items by default
         instance_clone_mode: 'full',
         auto_profile_switcher: {
-            is_enabled: false,
+            is_enabled: true,
             check_interval_seconds: 60,
-            low_quota_threshold_percent: 15.0,
+            low_quota_threshold_percent: 10.0,
             target_model: 'gemini-pro',
             has_auto_resume: true,
             cooldown_seconds: 180,
