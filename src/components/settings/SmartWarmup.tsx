@@ -28,7 +28,7 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
 
     const handleEnabledChange = (enabled: boolean) => {
         let newConfig = { ...config, enabled };
-        // 如果开启预热且勾选列表为空，则默认勾选所有核心模型
+        // If warmup enabled and selection is empty, default select all core models
         if (enabled && (!config.monitored_models || config.monitored_models.length === 0)) {
             newConfig.monitored_models = warmupModelsOptions.map(o => o.id);
         }
@@ -40,7 +40,7 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
         let newModels: string[];
 
         if (currentModels.includes(model)) {
-            // 必须勾选其中一个，不能全取消
+            // Must select at least one, cannot deselect all
             if (currentModels.length <= 1) return;
             newModels = currentModels.filter(m => m !== model);
         } else {
@@ -62,10 +62,10 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
                     </div>
                     <div>
                         <div className="font-bold text-gray-900 dark:text-gray-100">
-                            {t('settings.warmup.title', '7天周配额智能预热')}
+                            {t('settings.warmup.title', '7-Day Weekly Quota Smart Warmup')}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {t('settings.warmup.desc', '在各账号的 7 天周配额到达重置时间后自动唤醒 1 次，启动当周计时器，零多余消耗。')}
+                            {t('settings.warmup.desc', 'Automatically wakes once when the 7-day weekly quota reset time is reached to start the weekly timer, with zero excess usage.')}
                         </p>
                     </div>
                 </div>
@@ -85,7 +85,7 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
                     <div className="space-y-3">
                         <div>
                             <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-2">
-                                {t('settings.warmup.monitored_models_label', '预热模型范围')}
+                                {t('settings.warmup.monitored_models_label', 'Warmup Model Scope')}
                             </label>
                             <div className="grid grid-cols-4 gap-2">
                                 {warmupModelsOptions.map((model) => {
@@ -115,7 +115,7 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
                                 })}
                             </div>
                             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 leading-relaxed">
-                                {t('settings.warmup.monitored_models_desc', '勾选需要预热的模型。在周配额到达重置时间后将自动唤醒 1 次启动新周期。')}
+                                {t('settings.warmup.monitored_models_desc', 'Select models to warm up. Automatically wakes once when the weekly quota reset time is reached to start the new cycle.')}
                             </p>
                         </div>
                     </div>

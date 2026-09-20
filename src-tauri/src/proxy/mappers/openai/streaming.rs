@@ -1,4 +1,4 @@
-// OpenAI 流式转换
+// OpenAI streaming mapper
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
@@ -8,13 +8,13 @@ use std::pin::Pin;
 use tracing::debug;
 use uuid::Uuid;
 
-/// 保存 thoughtSignature 到会话缓存
+/// Store thoughtSignature to session cache
 pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize) {
     if sig.is_empty() {
         return;
     }
 
-    // 2. [CRITICAL] 存储到 Session 隔离缓存 (对齐 Claude 协议)
+    // 2. [CRITICAL] Store to Session isolated cache (align with Claude protocol)
     crate::proxy::SignatureCache::global().cache_session_signature(
         session_id,
         sig.to_string(),
@@ -22,7 +22,7 @@ pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize
     );
 
     tracing::debug!(
-        "[ThoughtSig] 存储 Session 签名 (sid: {}, len: {}, msg_count: {})",
+        "[ThoughtSig] Stored Session signature (sid: {}, len: {}, msg_count: {})",
         session_id,
         sig.len(),
         message_count
@@ -98,7 +98,7 @@ where
                                             }
 
                                             if let Some(candidates) = actual_data.get("candidates").and_then(|c| c.as_array()) {
-                                                // [DEBUG] 打印原始 candidate 以排查空回复问题
+                                                // [DEBUG] Log raw candidate to investigate empty reply issues
                                                 if candidates.len() > 0 {
                                                      tracing::debug!("[Stream-Debug] Raw Candidate: {:?}", candidates[0]);
                                                 }
@@ -114,7 +114,7 @@ where
                                                             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                                                                 let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
                                                                 if is_thought_part {
-                                                                    // thought 内容只写入 thought_out（给支持 reasoning_content 的客户端），防止客户端重复显示思维过程
+                                                                    // Only write thought content to thought_out (for clients supporting reasoning_content) to prevent duplicate display
                                                                     thought_out.push_str(&clean_text);
                                                                 }
                                                                 else { content_out.push_str(&clean_text); }
@@ -136,7 +136,7 @@ where
                                                                     let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                     let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                    // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                                                                    // [FIX #1575 & #3430] Normalize and sanitize tool parameter names and required fields for shell/PowerShell
                                                                     super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                     let final_name = super::response::resolve_shell_tool_name(name, &client_tool_names);
@@ -191,7 +191,7 @@ where
                                                         if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                             let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                             if !query_list.is_empty() {
-                                                                grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                                                                grounding_text.push_str("\n\n---\n**🔍 Searched for:** ");
                                                                 grounding_text.push_str(&query_list.join(", "));
                                                             }
                                                         }
@@ -199,13 +199,13 @@ where
                                                             let mut links = Vec::new();
                                                             for (i, chunk) in chunks.iter().enumerate() {
                                                                 if let Some(web) = chunk.get("web") {
-                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
+                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
                                                                     let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                     links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                                 }
                                                             }
                                                             if !links.is_empty() {
-                                                                grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                                                                grounding_text.push_str("\n\n**🌐 Sources:**\n");
                                                                 grounding_text.push_str(&links.join("\n"));
                                                             }
                                                         }
@@ -224,18 +224,18 @@ where
                                                         _ => "stop",
                                                     });
 
-                                                    // [FIX #1575] 如果发射了工具调用，强制设置为 tool_calls
-                                                    // 解决 Gemini 返回 STOP 但有工具调用时，OpenAI 客户端认为对话已结束的问题
+                                                    // [FIX #1575] If tool calls were emitted, force finish_reason to tool_calls
+                                                    // Prevents OpenAI clients from closing dialogue when Gemini returns STOP with tool calls
                                                     let finish_reason = if !emitted_tool_calls.is_empty() && gemini_finish_reason.is_some() {
                                                         Some("tool_calls")
                                                     } else {
                                                         gemini_finish_reason
                                                     };
 
-                                                    // [FIX MALFORMED_FUNCTION_CALL] 若模型试图调用未配置的内部工具或格式异常导致提前中断，
-                                                    // 且未生成正文内容，自动注入友好提示，避免客户端显示空白
+                                                    // [FIX MALFORMED_FUNCTION_CALL] If model aborted due to unconfigured internal tools or format error
+                                                    // and emitted no content, inject helpful notice to avoid blank response
                                                     if is_malformed_function_call && content_out.is_empty() && !has_emitted_content {
-                                                        content_out.push_str("很抱歉，当前模型在尝试调取实时信息时遇到了格式异常。若需要查询实时天气或最新资讯，请尝试使用联网模式（模型名带 -online 后缀）或配置天气/搜索插件。");
+                                                        content_out.push_str("We apologize, but the model encountered a format anomaly while attempting to retrieve real-time information. To query real-time weather or news, please use online mode (-online suffix) or configure a search plugin.");
                                                     }
 
                                                     if !thought_out.is_empty() {
@@ -755,7 +755,7 @@ where
                                                                 let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                 let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                                                                // [FIX #1575 & #3430] Normalize and sanitize tool parameter names and required fields for shell/PowerShell
                                                                 super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                 let args_str = serde_json::to_string(&args).unwrap_or_default();
@@ -841,7 +841,7 @@ where
                                                                     );
                                                                     if accumulated_text.is_empty() {
                                                                         accumulated_text = format!(
-                                                                            "apply_patch 格式非法，已停止执行以避免重复失败。第 {line} 行：{message}"
+                                                                            "apply_patch format invalid, execution stopped to prevent repeated failures. Line {line}: {message}"
                                                                         );
                                                                     }
                                                                     continue;
@@ -926,13 +926,13 @@ where
                                                     }
                                                 }
 
-                                                // 处理 groundingMetadata (搜索引文)
+                                                // Process groundingMetadata (search citations)
                                                 if let Some(grounding) = candidate.get("groundingMetadata") {
                                                     let mut grounding_text = String::new();
                                                     if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                         let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                         if !query_list.is_empty() {
-                                                            grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                                                            grounding_text.push_str("\n\n---\n**🔍 Searched for:** ");
                                                             grounding_text.push_str(&query_list.join(", "));
                                                         }
                                                     }
@@ -940,13 +940,13 @@ where
                                                         let mut links = Vec::new();
                                                         for (i, chunk) in chunks.iter().enumerate() {
                                                             if let Some(web) = chunk.get("web") {
-                                                                let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
+                                                                let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
                                                                 let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                 links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                             }
                                                         }
                                                         if !links.is_empty() {
-                                                            grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                                                            grounding_text.push_str("\n\n**🌐 Sources:**\n");
                                                             grounding_text.push_str(&links.join("\n"));
                                                         }
                                                     }

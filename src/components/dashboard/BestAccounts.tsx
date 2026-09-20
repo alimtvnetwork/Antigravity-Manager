@@ -10,7 +10,7 @@ interface BestAccountsProps {
 
 import { useTranslation } from 'react-i18next';
 
-/** 从 quota_groups 中提取 5h 或 Weekly 桶百分比 (0-100) */
+/** Extract 5h or Weekly bucket percentage (0-100) from quota_groups */
 function getBucketPercentage(
     quotaGroups: QuotaGroup[] | undefined,
     category: 'gemini' | 'claude',
@@ -44,8 +44,8 @@ function getBucketPercentage(
 }
 
 /**
- * 计算模型综合有效配额
- * 自动识别：双桶 (取 min 短板) / 免费账号仅周桶 (取周) / 仅 5h 桶 (取 5h)
+ * Calculate model composite effective quota
+ * Auto-detect: Dual-bucket (take min bottleneck) / Free account weekly-only / 5h-only fallback
  */
 function calculateEffectiveQuota(
     fiveHourFromModel: number | null,
@@ -55,17 +55,17 @@ function calculateEffectiveQuota(
     const fiveHour = fiveHourFromGroup !== null ? fiveHourFromGroup : fiveHourFromModel;
     const weekly = weeklyFromGroup;
 
-    // 情况 1: 双桶都存在 (Pro/Ultra 账号) -> 木桶短板 min(5h, weekly)
+    // Case 1: Dual buckets exist (Pro/Ultra account) -> Bottleneck min(5h, weekly)
     if (fiveHour !== null && weekly !== null) {
         return Math.min(fiveHour, weekly);
     }
 
-    // 情况 2: 仅有周额度 (免费账号 / Free Tier) -> 直接以周额度为准
+    // Case 2: Only weekly bucket exists (Free tier) -> Base on weekly quota directly
     if (weekly !== null) {
         return weekly;
     }
 
-    // 情况 3: 仅有 5h 额度 (单桶回退) -> 以 5h 额度为准
+    // Case 3: Only 5h bucket exists (single-bucket fallback) -> Base on 5h quota
     if (fiveHour !== null) {
         return fiveHour;
     }
@@ -75,7 +75,7 @@ function calculateEffectiveQuota(
 
 function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProps) {
     const { t } = useTranslation();
-    // 1. 获取按综合有效配额排序的列表 (排除当前账号及已禁用账号)
+    // 1. Get list sorted by composite effective quota (exclude current and disabled accounts)
     const geminiSorted = accounts
         .filter(a => a.id !== currentAccountId && !a.disabled && !a.proxy_disabled)
         .map(a => {
@@ -87,10 +87,10 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
             const effectivePro = calculateEffectiveQuota(pro5hModel, weeklyGroup, fiveHourGroup);
             const effectiveFlash = calculateEffectiveQuota(flash5hModel, weeklyGroup, fiveHourGroup);
 
-            // 综合评分：Pro 权重更高 (70%)，Flash 权重 30%
+            // Composite score: Pro has higher weight (70%), Flash has 30%
             let score = Math.round(effectivePro * 0.7 + effectiveFlash * 0.3);
 
-            // 若周额度见底 (<= 5%)，直接淘汰
+            // If weekly quota is depleted (<= 5%), eliminate directly
             if (weeklyGroup !== null && weeklyGroup <= 5) {
                 score = 0;
             }
@@ -112,7 +112,7 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
 
             let score = calculateEffectiveQuota(claude5hModel, weeklyGroup, fiveHourGroup);
 
-            // 若周额度见底 (<= 5%)，直接淘汰
+            // If weekly quota is depleted (<= 5%), eliminate directly
             if (weeklyGroup !== null && weeklyGroup <= 5) {
                 score = 0;
             }
@@ -128,29 +128,35 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
     let bestGemini = geminiSorted[0];
     let bestClaude = claudeSorted[0];
 
-    // 2. 如果推荐是同一个账号，且有其他选择，尝试寻找最优的"不同账号"组合
+    // 2. If recommended accounts are identical and alternatives exist, find optimal distinct account pair
     if (bestGemini && bestClaude && bestGemini.id === bestClaude.id) {
         const nextGemini = geminiSorted[1];
         const nextClaude = claudeSorted[1];
 
-        // 方案A: 保持 Gemini 最优，换 Claude 次优
-        // 方案B: 换 Gemini 次优，保持 Claude 最优
-        // 比较标准：两者配额之和最大化 (或者优先保住 100% 的那个)
+        // Option A: Keep Gemini optimal, switch Claude to runner-up
+        // Option B: Switch Gemini to runner-up, keep Claude optimal
+        // Evaluation criterion: maximize sum of quotas (or prioritize preserving 100%)
 
         const scoreA = bestGemini.quotaVal + (nextClaude?.quotaVal || 0);
         const scoreB = (nextGemini?.quotaVal || 0) + bestClaude.quotaVal;
 
-        if (nextClaude && (!nextGemini || scoreA >= scoreB)) {
-            // 选方案A：换 Claude
-            bestClaude = nextClaude;
-        } else if (nextGemini) {
-            // 选方案B：换 Gemini
+        if (!nextGemini) {
+            if (nextClaude) {
+                bestClaude = nextClaude;
+            }
+        } else if (nextClaude) {
+            if (scoreA >= scoreB) {
+                bestClaude = nextClaude;
+            } else {
+                bestGemini = nextGemini;
+            }
+        } else {
             bestGemini = nextGemini;
         }
-        // 如果都没有次优解（例如只有一个账号），则保持原样
+        // If no runner-up available (e.g. only 1 account), keep as-is
     }
 
-    // 构造最终用于显示的视图模型 (兼容原有渲染逻辑)
+    // Construct final view model for display (compatible with existing rendering logic)
     const bestGeminiRender = bestGemini ? { ...bestGemini, geminiQuota: bestGemini.quotaVal } : undefined;
     const bestClaudeRender = bestClaude ? { ...bestClaude, claudeQuota: bestClaude.quotaVal } : undefined;
 
@@ -162,7 +168,7 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
             </h2>
 
             <div className="space-y-2 flex-1">
-                {/* Gemini 最佳 */}
+                {/* Gemini Best */}
                 {bestGeminiRender && (
                     <div className="flex items-center justify-between p-2.5 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/30">
                         <div className="flex-1 min-w-0">
@@ -177,7 +183,7 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
                     </div>
                 )}
 
-                {/* Claude 最佳 */}
+                {/* Claude Best */}
                 {bestClaudeRender && (
                     <div className="flex items-center justify-between p-2.5 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg border border-cyan-100 dark:border-cyan-900/30">
                         <div className="flex-1 min-w-0">
@@ -192,7 +198,7 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
                     </div>
                 )}
 
-                {(!bestGeminiRender && !bestClaudeRender) && (
+                {!bestGeminiRender && !bestClaudeRender && (
                     <div className="text-center py-4 text-gray-400 text-sm">
                         {t('accounts.no_data')}
                     </div>
@@ -204,10 +210,16 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
                     <button
                         className="w-full px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition-colors"
                         onClick={() => {
-                            // 优先切换到配额更高的账号
+                            // Prioritize switching to account with higher quota
                             let targetId = bestGeminiRender?.id;
-                            if (bestClaudeRender && (!bestGeminiRender || bestClaudeRender.claudeQuota > bestGeminiRender.geminiQuota)) {
-                                targetId = bestClaudeRender.id;
+                            if (!bestGeminiRender) {
+                                if (bestClaudeRender) {
+                                    targetId = bestClaudeRender.id;
+                                }
+                            } else if (bestClaudeRender) {
+                                if (bestClaudeRender.claudeQuota > bestGeminiRender.geminiQuota) {
+                                    targetId = bestClaudeRender.id;
+                                }
                             }
 
                             if (onSwitch && targetId) {
@@ -221,7 +233,6 @@ function BestAccounts({ accounts, currentAccountId, onSwitch }: BestAccountsProp
             )}
         </div>
     );
-
 }
 
 export default BestAccounts;

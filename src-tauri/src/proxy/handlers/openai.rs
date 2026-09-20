@@ -12,7 +12,7 @@ use crate::proxy::mappers::openai::{
     transform_openai_request, transform_openai_request_with_session, transform_openai_response,
     OpenAIContent, OpenAIContentBlock, OpenAIMessage, OpenAIRequest, OpenAIResponse,
 };
-// use crate::proxy::upstream::client::UpstreamClient; // 通过 state 获取
+// use crate::proxy::upstream::client::UpstreamClient; // Obtained via state
 use crate::proxy::debug_logger;
 use crate::proxy::server::AppState;
 use crate::proxy::upstream::client::mask_email;
@@ -1777,15 +1777,20 @@ pub async fn handle_chat_completions(
     let original_body =
         debug_logger::is_enabled(&debug_cfg).then(|| debug_value_without_inline_data(&body));
 
-    // [NEW] 自动检测并转换 Responses 格式
-    // 如果请求包含 instructions 或 input 但没有 messages，则认为是 Responses 格式
-    let is_responses_format = !body.get("messages").is_some()
-        && (body.get("instructions").is_some() || body.get("input").is_some());
+    // [NEW] Automatically detect and convert Responses format
+    // If request contains instructions or input but no messages, consider it Responses format
+    let has_messages = body.get("messages").is_some();
+    let has_responses_payload = body.get("instructions").is_some() || body.get("input").is_some();
+    let is_responses_format = if has_messages {
+        false
+    } else {
+        has_responses_payload
+    };
 
     if is_responses_format {
         debug!("Detected Responses API format, converting to Chat Completions format");
 
-        // 转换 instructions 为 system message
+        // Convert instructions to system message
         if let Some(instructions) = body.get("instructions").and_then(|v| v.as_str()) {
             if !instructions.is_empty() {
                 let system_msg = json!({
@@ -1793,19 +1798,19 @@ pub async fn handle_chat_completions(
                     "content": instructions
                 });
 
-                // 初始化 messages 数组
-                if !body.get("messages").is_some() {
+                // Initialize messages array
+                if body.get("messages").is_none() {
                     body["messages"] = json!([]);
                 }
 
-                // 将 system message 插入到开头
+                // Insert system message at the beginning
                 if let Some(messages) = body.get_mut("messages").and_then(|v| v.as_array_mut()) {
                     messages.insert(0, system_msg);
                 }
             }
         }
 
-        // 转换 input 为 user message（如果存在）
+        // Convert input to user message (if present)
         if let Some(input) = body.get("input") {
             let user_msg = if input.is_string() {
                 json!({
@@ -1813,7 +1818,7 @@ pub async fn handle_chat_completions(
                     "content": input.as_str().unwrap_or("")
                 })
             } else {
-                // input 是数组格式，暂时简化处理
+                // input is array format, simplify temporarily
                 json!({
                     "role": "user",
                     "content": input.to_string()
@@ -1886,7 +1891,7 @@ pub async fn handle_chat_completions(
             .await;
         }
 
-        // [FIX] 使用原始 body 副本记录日志，确保不丢失任何字段
+        // [FIX] Log using original body clone to ensure no fields are lost
         let original_payload = json!({
             "kind": "original_request",
             "protocol": "openai",
@@ -1995,7 +2000,7 @@ pub async fn handle_chat_completions(
     let client_tool_names =
         crate::proxy::mappers::openai::request::extract_client_tool_names(&openai_req.tools);
 
-    // 1. 获取 UpstreamClient (Clone handle)
+    // 1. Obtain UpstreamClient (Clone handle)
     let upstream = state.upstream.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
@@ -2011,7 +2016,7 @@ pub async fn handle_chat_completions(
     let mut failure_statuses = FailureStatusTracker::default();
     let mut used_attempts = 0;
 
-    // 2. 模型路由解析 (移到循环外以支持在所有路径返回 X-Mapped-Model)
+    // 2. Model route resolution (moved outside loop to support returning X-Mapped-Model on all paths)
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
         &openai_req.model,
         &*state.custom_mapping.read().await,
@@ -2031,7 +2036,7 @@ pub async fn handle_chat_completions(
         retry_credentials.is_some(),
     ) {
         let norm_start = std::time::Instant::now();
-        // 将 OpenAI 工具转为 Value 数组以便探测联网
+        // Convert OpenAI tools to Value array for web search detection
         let tools_val: Option<Vec<Value>> = openai_req
             .tools
             .as_ref()
@@ -2046,11 +2051,11 @@ pub async fn handle_chat_completions(
             None, // body
         );
 
-        // 3. 提取 SessionId (粘性指纹)
+        // 3. Extract SessionId (sticky fingerprint)
         let session_id = session_scope.store_key.clone();
 
-        // 4. 获取 Token (使用准确的 request_type)
-        // 关键：在重试尝试时根据 force_rotate 决定是否轮换账号
+        // 4. Obtain Token (using accurate request_type)
+        // Key: determine whether to rotate account based on force_rotate during retries
         let (access_token, project_id, email, account_id, _wait_ms) =
             if let Some(credentials) = retry_credentials.take() {
                 credentials
@@ -2104,7 +2109,7 @@ pub async fn handle_chat_completions(
                 }
             };
 
-        // [NEW v4.1.29] 获取完整 Token 对象用于动态规格查询
+        // [NEW v4.1.29] Obtain full Token object for dynamic spec querying
         let proxy_token = token_manager.get_token_by_id(&account_id);
         let mapped_model = token_manager
             .resolve_dynamic_model_for_account(&account_id, &mapped_model)
@@ -2113,7 +2118,7 @@ pub async fn handle_chat_completions(
         last_email = Some(email.clone());
         info!("✓ Using account: {} (type: {})", email, config.request_type);
 
-        // 4. 转换请求 (返回内容包含 session_id, message_count, prefix_hash)
+        // 4. Transform request (returns session_id, message_count, prefix_hash)
         let tf_start = std::time::Instant::now();
         let (mut gemini_body, session_id, message_count, _prefix_hash) = transform_openai_request(
             &openai_req,
@@ -2169,7 +2174,7 @@ pub async fn handle_chat_completions(
             serialized_json_len(&gemini_body)
         );
 
-        // 5. 发送请求
+        // 5. Send request
         let client_wants_stream = openai_req.stream;
         let force_stream_internally = !client_wants_stream;
         let actual_stream = client_wants_stream || force_stream_internally;
@@ -2228,7 +2233,7 @@ pub async fn handle_chat_completions(
             }
         };
 
-        // [NEW] 记录端点降级日志到 debug 文件
+        // [NEW] Record endpoint fallback log to debug file
         if !call_result.fallback_attempts.is_empty() && debug_logger::is_enabled(&debug_cfg) {
             let fallback_entries: Vec<Value> = call_result
                 .fallback_attempts
@@ -2261,11 +2266,11 @@ pub async fn handle_chat_completions(
         }
 
         let response = call_result.response;
-        // [NEW] 提取实际请求的上游端点 URL，用于日志记录和排查
+        // [NEW] Extract actual requested upstream endpoint URL for logging and diagnostics
         let upstream_url = response.url().to_string();
         let status = response.status();
         if status.is_success() {
-            // 5. 处理流式 vs 非流式
+            // 5. Process streaming vs non-streaming
             if actual_stream {
                 use axum::body::Body;
                 use axum::response::Response;
@@ -2376,7 +2381,7 @@ pub async fn handle_chat_completions(
                     )
                     .chain(openai_stream);
 
-                // [NEW] 针对 OpenAI 流增加 300 秒空闲超时保护
+                // [NEW] Added 300s idle timeout protection for OpenAI stream
                 let image_permit_for_stream = image_permit.take();
                 let track_image_success = config.request_type == "image_gen";
                 let image_success_manager = token_manager.clone();
@@ -2443,7 +2448,7 @@ pub async fn handle_chat_completions(
                 );
 
                 if client_wants_stream {
-                    // [MULTI-TURN] 保存本次对话的 messages 到 session store（/v1/chat/completions）
+                    // [MULTI-TURN] Save conversation messages to session store (/v1/chat/completions)
                     {
                         let save_msgs = openai_req
                             .messages
@@ -2471,7 +2476,7 @@ pub async fn handle_chat_completions(
                             crate::proxy::http_session_store::save_session(rid, entry).await;
                         });
                     }
-                    // 客户端请求流式，返回 SSE
+                    // Client requested streaming, return SSE
                     let body = Body::from_stream(combined_stream);
                     return Ok(Response::builder()
                         .header("Content-Type", "text/event-stream")
@@ -2490,8 +2495,8 @@ pub async fn handle_chat_completions(
                         .unwrap()
                         .into_response());
                 } else {
-                    // 客户端请求非流式，但内部强制转为流式
-                    // 收集流数据并聚合为 JSON
+                    // Client requested non-streaming, internally converted to streaming
+                    // Collect stream data and aggregate to JSON
                     use crate::proxy::mappers::openai::collector::collect_stream_to_json;
 
                     match collect_stream_to_json(combined_stream).await {
@@ -2556,8 +2561,8 @@ pub async fn handle_chat_completions(
 
             crate::proxy::thinking_store::capture_gemini_response(&session_id, &gemini_resp);
 
-            // [CACHE] 从 Gemini 响应中提取缓存信息，关闭反馈循环
-            // 兼容两种格式: cachedContentTokenCount (旧), total_cached_tokens (新)
+            // [CACHE] Extract cache information from Gemini response to close feedback loop
+            // Compatible with two formats: cachedContentTokenCount (legacy), total_cached_tokens (new)
             if let Some(usage) = gemini_resp.get("usageMetadata") {
                 let cached = usage
                     .get("total_cached_tokens")
@@ -2567,7 +2572,7 @@ pub async fn handle_chat_completions(
                 if cached > 0 {
                     let cm = crate::proxy::cache_manager::global_cache_manager();
                     cm.record_implicit_hit(&_prefix_hash);
-                    // [CACHE] 分层统计日志
+                    // [CACHE] Layered statistics log
                     let stats = cm.get_layer_stats();
                     tracing::info!(
                         "[Cache-Opt] Implicit cache HIT: prefix_hash={} cached_tokens={} | L1(SI): {}/{}, L2(Tools): {}/{}, L3(Prefix): {}/{}",
@@ -2624,7 +2629,7 @@ pub async fn handle_chat_completions(
                 .into_response());
         }
 
-        // 处理特定错误并重试
+        // Handle specific errors and retry
         failure_statuses.record(status);
         let status_code = status.as_u16();
         let retry_after = response
@@ -2638,7 +2643,7 @@ pub async fn handle_chat_completions(
             .unwrap_or_else(|_| format!("HTTP {}", status_code));
         last_error = format!("HTTP {}: {}", status_code, error_text);
 
-        // [New] 打印错误报文日志
+        // [New] Print error payload log
         tracing::error!(
             "[OpenAI-Upstream] Error Response {}: {}",
             status_code,
@@ -2667,7 +2672,7 @@ pub async fn handle_chat_completions(
             .await;
         }
 
-        // 确定重试策略
+        // Determine retry strategy
         let strategy = retry_state.determine_strategy(
             &account_id,
             status_code,
@@ -2699,7 +2704,7 @@ pub async fn handle_chat_completions(
                 .await;
         }
 
-        // 3. 标记限流状态(用于 UI 显示)
+        // 3. Mark rate limit status (for UI display)
         if config.request_type != "image_gen" && should_mark_limited {
             // [FIX] Use async version with model parameter for fine-grained rate limiting
             token_manager
@@ -2713,7 +2718,7 @@ pub async fn handle_chat_completions(
                 .await;
         }
 
-        // [FIX] 403 时优先检测 VALIDATION_REQUIRED 并设置 is_forbidden / validation_block 状态，确保及时提取 URL 与更新 UI
+        // [FIX] For 403, detect VALIDATION_REQUIRED first and set is_forbidden / validation_block status to ensure prompt URL extraction and UI updates
         if status_code == 403 {
             if let Some(acc_id) = token_manager.get_account_id_by_email(&email) {
                 if error_text.contains("VALIDATION_REQUIRED")
@@ -2736,14 +2741,14 @@ pub async fn handle_chat_completions(
                     }
                 }
 
-                // 设置 is_forbidden 状态并持久化
+                // Set is_forbidden status and persist
                 if let Err(e) = token_manager.set_forbidden(&acc_id, &error_text).await {
                     tracing::error!("Failed to set forbidden status: {}", e);
                 }
             }
         }
 
-        // 执行退避
+        // Execute backoff
         if apply_retry_strategy(
             strategy.clone(),
             attempt,
@@ -2773,7 +2778,7 @@ pub async fn handle_chat_completions(
                 }
             }
 
-            // 判断是否需要轮换账号
+            // Determine whether account rotation is needed
             if !should_rotate_account(status_code, Some(&strategy)) {
                 debug!(
                     "[{}] Keeping same account for status {} (Grace Retry or Server Issue)",
@@ -2794,7 +2799,7 @@ pub async fn handle_chat_completions(
             continue;
         }
 
-        // [NEW] 处理 400 错误 (Thinking 签名失效)
+        // [NEW] Handle 400 error (Thinking signature invalidation)
         if status_code == 400
             && (error_text.contains("Invalid `signature`")
                 || error_text.contains("thinking.signature")
@@ -2806,13 +2811,13 @@ pub async fn handle_chat_completions(
                 email
             );
 
-            // [FIX #3391] 彻底清除 thinking 配置并去除 -thinking 模型后缀，确保下一轮重试时完全关闭思考
+            // [FIX #3391] Completely clear thinking configuration and strip -thinking model suffix to ensure thinking is disabled on next retry
             openai_req.thinking = None;
             if openai_req.model.ends_with("-thinking") {
                 openai_req.model = openai_req.model.trim_end_matches("-thinking").to_string();
             }
 
-            // 追加修复提示词到最后一条用户消息
+            // Append recovery prompt to the last user message
             if let Some(last_msg) = openai_req.messages.last_mut() {
                 if last_msg.role == "user" {
                     let repair_prompt = "\n\n[System Recovery] Your previous output contained an invalid signature. Please regenerate the response without the corrupted signature block.";
@@ -2834,12 +2839,12 @@ pub async fn handle_chat_completions(
                 }
             }
 
-            continue; // 重试
+            continue; // Retry
         }
 
-        // [FIX session-1M] 上游按 sessionId 在服务端累计会话输入,长工具循环会把累计推过 1M,
-        // 之后该 sessionId 的所有请求都 400 "input token count exceeds ... 1048576"。
-        // 给 (账号, 对话) 的 sessionId 升代并立即重试:新 sessionId = 上游全新会话,对话无感恢复。
+        // [FIX session-1M] Upstream accumulates session input on the server by sessionId; long tool loops push total over 1M,
+        // after which all requests for that sessionId return 400 "input token count exceeds ... 1048576".
+        // Bump the generation of (account, conversation) sessionId and retry immediately: new sessionId = fresh upstream session.
         if status_code == 400 && error_text.contains("exceeds the maximum number of tokens") {
             let fingerprint = SessionManager::extract_openai_session_id(&openai_req);
             let generation = crate::proxy::common::session::bump_session(&account_id, &fingerprint);
@@ -2847,10 +2852,10 @@ pub async fn handle_chat_completions(
                 "[OpenAI] Upstream session token accumulation exceeded 1M on account {}. sessionId bumped to generation {}, retrying with a fresh upstream session.",
                 email, generation
             );
-            continue; // 重试:下一轮 transform 时读取新代数,派生全新 sessionId
+            continue; // Retry: next transform pass reads new generation and derives fresh sessionId
         }
 
-        // 404 等由于模型配置或路径错误的 HTTP 异常，直接报错，不进行无效轮换
+        // Non-retryable HTTP errors like 404 (due to model config or path errors) fail immediately without wasteful rotation
         error!(
             "OpenAI Upstream non-retryable error {} on account {}: {}",
             status_code, email, error_text
@@ -2873,7 +2878,7 @@ pub async fn handle_chat_completions(
             .into_response());
     }
 
-    // 所有尝试均失败：仅当全部结构化失败状态均为 429 时返回 429
+    // All attempts exhausted: return 429 only if all structured failure statuses are 429
     let final_status = failure_statuses.final_status();
     let headers = crate::proxy::handlers::common::build_token_error_headers(
         Some(mapped_model.as_str()),
@@ -2891,53 +2896,28 @@ pub async fn handle_chat_completions(
 
 // --- Codex GUIDANCE PROMPTS ---
 
-const APPLY_PATCH_CHAT_PATH_SYSTEM_GUIDANCE_ZH: &str = concat!(
-    "[apply_patch chat-path 指引 — 由 codex-app-transfer adapter 注入,因为上游 lark 语法约束在 chat function-call provider 上不可用]\n",
+const APPLY_PATCH_CHAT_PATH_SYSTEM_GUIDANCE: &str = concat!(
+    "[apply_patch chat-path guidance — injected by codex-app-transfer adapter]\n",
     "\n",
-    "**务必使用 `apply_patch` tool 写文件内容** —— 新建文件、单行编辑、整文件重写都一样。**绝不使用 shell `cat <<EOF > file` / `printf '<content>' > file` / `echo '<content>' > file` / 任何 `>` 重定向来写实际文件内容** —— 这样做会绕过 Codex diff UI 和审计 trail。**同样,绝不使用 `sed -i` / `perl -i` / `ed`、或 shell 按行号删除(如 `sed -i 'N,Md' file`)来编辑或删除已有文件内容** —— 就地 shell 编辑器绕过 diff UI,且对多次编辑间的行号漂移很脆弱(按过期行号删会切错、损坏文件)。(新建或空文件用 `*** Add File: <path>` —— 不要用 shell 重定向。)**优先外科式针对性编辑**:要改/替换已有内容时,只发改动那几行的 `-`(旧)和 `+`(新),保持每个 hunk 最小;且**不要**把增删空行作为编辑的一部分,除非空行本身就是改动(空行 `+`/`-` 位置歧义、可能静默 apply 失败)。**删除内容 —— 即便是跨很多行的大段连续块 —— 也用 apply_patch hunk 里的 `-` 行表达,或用 `*** Delete File: <path>` 删整个文件;不要因为块大就改用 `sed`/`python` 按行范围删除。** 对同一文件的多处不相邻编辑可以放进**一次** apply_patch 调用、分成多个 hunk。**不要**整段重新生成再追加,**不要**因为改了一部分就整文件重写。整文件替换(同一 patch 内 `*** Delete File: <path>` + `*** Add File: <path>`、每行前缀 `+`)**仅限**真正需要时:新建全新内容,或几乎每行都不同。\n",
+    "Always use the `apply_patch` tool to write file content — creating new files, single-line edits, and full file updates alike. Never use shell `cat <<EOF > file` / `printf '<content>' > file` / `echo '<content>' > file` or any `>` redirection to write actual file content. Similarly, never use `sed -i` / `perl -i` / `ed` or shell line deletion to edit existing files. For surgical edits, specify only the changed lines with `-` (old) and `+` (new), keeping each hunk minimal.\n",
     "\n",
-    "调用 `apply_patch` tool 时,遵循以下基于非 OpenAI chat provider 实战观察总结的规则:\n",
+    "When calling the `apply_patch` tool, adhere to the following rules:\n",
     "\n",
-    "1. 推荐的 Update File 形式是**最简形态**:仅 `-line`(要删的行,byte-exact)和 `+line`(新行)直接跟在 `*** Update File: <path>` 之后 —— 无 `@@`、无 context 行。",
-    "凡是 `-` 行在文件里**唯一**时(简单单行编辑、配置改动、function 签名等绝大多数场景皆是)就用这个形态。例:\n",
-    "  *** Update File: src/config.py\n",
-    "  -DEBUG = False\n",
-    "  +DEBUG = True\n",
-    "若 `-` 行单独**有歧义**(同一行文本在文件多处出现),在上方/下方加空格前缀的 context 行(` line`)钉住它。",
-    "若 context 行也不足以消歧,再在独立行上加**单端** `@@ <header>` 标记(`@@ class Foo`、`@@ def bar():`、`@@ fn main() {`)。",
-    "**绝不加尾随 `@@`**(`@@ <header> @@` 是错的)—— Codex Desktop 的 V4A applier 会把尾随 `@@` 当字面文本,报 `Failed to find context '... @@'`。",
-    "深层嵌套消歧时用**多个** `@@` 行各占一行(例如 `@@ class Outer\\n@@ def inner():`),每条都是单端。\n",
+    "1. The recommended Update File format is the simplest form: only `-line` (exact line to delete) and `+line` (new line) directly following `*** Update File: <path>` without `@@` or context lines when the line is unique in the file.\n",
+    "2. Add File does not use `@@` markers or hunks. Follow `*** Add File: <path>` with every line prefixed by `+`.\n",
+    "3. Every `-` line and context line must match the file byte-for-byte.\n",
+    "4. Do not combine `*** Add File:` and `*** Update File:` for the same path within a single patch.\n",
+    "5. New or empty files must use `*** Add File: <path>`.\n",
+    "6. Context lines must already exist in the file.\n",
+    "7. If an update fails with `Failed to find context`, inspect the file and rebuild the patch.\n",
+    "8. `*** Begin Patch` must be the very first line of the input string.\n",
+    "9. `*** Update File: <old>` + `*** Move to: <new>` requires at least one hunk.\n",
+    "10. Be careful when modifying memory files to ensure concurrency consistency.\n",
     "\n",
-    "2. Add File **不用** `@@` 标记、**不用** hunk。`*** Add File: <path>` 之后,新文件**每一行内容**(包括空行,写成单个 `+` 占一行)都前缀 `+`。没 `+` 前缀的原始源码(例如直接写 `def main():`)会触发 `'def main():' is not a valid hunk header` 错误。",
-    "但结构标记 `*** Begin Patch` / `*** Add File:` / `*** End Patch` **不是内容,不加前缀**。尤其**绝不给终止符加前缀**(`+*** End Patch` 是错的):带 `+` 的终止符会被当成内容行,在新建文件末尾留下一行字面 `*** End Patch`。\n",
-    "\n",
-    "3. 每个 `-` 行和空格前缀的 context 行**必须**跟文件 byte-for-byte 一致(同样的前导 whitespace,不能 trim 尾随空格,字符完全相同)。不确定时先用 shell 跑 `cat <path>` 或 `sed -n '1,80p' <path>` 查一下,再用真实字节组 patch。靠猜会触发 `Failed to find context '<your guess>'` 错误。\n",
-    "\n",
-    "3a. 行前缀是**单字符**,前缀和内容之间**没有空格**:写 `-DEBUG = False`(不是 `- DEBUG = False`)、`+DEBUG = True`(不是 `+ DEBUG = True`),context 行 ` keepme`(单个前导空格)。Codex Desktop V4A applier 可能容忍多余空格,但其它 apply_patch 实现严格 —— 前缀写紧凑。\n",
-    "\n",
-    "4. **不要**在同一 patch 内对同一路径同时用 `*** Add File: <path>` 和 `*** Update File: <path>`。Update 步骤会在 Add 步骤落盘前读文件,看到空文件后失败。要么 (a) 让 `*** Add File:` 一次性写最终内容,要么 (b) 拆成两个独立的 `apply_patch` 调用。\n",
-    "\n",
-    "5. 新建或空文件用 `*** Add File: <path>`、每行前缀 `+`(不要用 `*** Update File:`,也不要用 shell 重定向)。\n",
-    "\n",
-    "6. 多行文件里,**没有**对应 `-` 行的孤立 `+` 行会**追加**在上文 context 之下 —— **不会**替换任何已有行。要修改已有行,**必须**同时包含 `-` 行(删旧内容)和 `+` 行(加新内容)。",
-    "空格前缀的 context 行是拿来**跟文件匹配**的、绝不新增 —— 它必须已存在于文件中。要引入全新行,前缀 `+`;把文件里还没有的行写成 context(或不加前缀)会得到一个无实际改动、apply 失败或 `Failed to find context` 的 hunk。\n",
-    "\n",
-    "7. Update 报 `Failed to find context` 时,说明 `-`/context 行跟文件 byte 对不上 —— 重新 `cat <path>` / `sed -n` 读文件、把这些行改成完全一致,再重试**同一个**针对性 Update。**不要**升级成整文件重写/重新追加,把编辑保持在改动的那几行。",
-    "在**一次**回合里对**同一文件**做多处编辑时,每个已应用的 hunk 都会改变文件内容 —— 把相关编辑放进**一个** patch 的多个 hunk,或在多次独立调用之间重新读文件。某个 `-` 行不再匹配,可能是它**已经被删掉**(被前一个 hunk、或本回合更早的编辑)—— 重发同一删除前先确认它还在,别盲目重试。\n",
-    "\n",
-    "8. `*** Begin Patch` **必须**是 `input` 字符串的字面第一行 —— 不能有前导空格,前面不能有其它内容,绝不能直接写 `*** Add File:` 或任何操作 header。漏了会触发 `invalid patch: The first line of the patch must be '*** Begin Patch'`。\n",
-    "\n",
-    "9. `*** Update File: <old>` + `*** Move to: <new>` **要求**至少一个 hunk(带 `-`/`+` 行或 `*** End of File` 标记)。空的 Update+Move 块会报 `Update file hunk for path '<old>' is empty`。**纯重命名不改内容**时,在同一 patch 内用 `*** Delete File: <old>` + `*** Add File: <new>`(把原内容每行前缀 `+` 复制过去)。**重命名同时改内容**时,保留 Update+Move 并写真实的 `-`/`+` hunk。\n",
-    "\n",
-    "10. 编辑 memory 文件(如 `~/.codex/memories/MEMORY.md`)要格外小心:并发进程可能在你上次读它、到你的 patch 落地之间重写该文件。打 patch **前立即** `cat` 该文件,让每个 `-`/context 行都是**当前**文件里存在的行,并用最小唯一锚点(如单个 `@@ <section header>` + 只写你实际改的那几行)。过期的 `-` 行 —— 内容已被并发固化(consolidation)改掉 —— 会报 `Failed to find context`;失败时重新读、按当前字节重建,而不是重试过期 patch。\n",
-    "\n",
-    "遵循这些规则可以避免 retry 风暴,提升首次尝试的成功率。"
+    "Following these rules avoids retry storms and optimizes first-attempt success."
 );
 
-const WEB_TOOLS_SYSTEM_GUIDANCE_ZH: &str = "联网获取信息时(实时事实 / 价格 / 文档 / 新闻 / 版本号 / 任何你不确定或可能已过时的内容),**优先用 `web_search` 和 `web_fetch` 工具,不要用 shell 的 curl / wget / python 去抓 URL 或搜索引擎**。本机对外网访问受限,shell 直连通常被防火墙 / 反爬拦截(返回空或 403),会白费多轮尝试、最后只能靠可能过时的记忆作答;而这两个工具经代理(浏览器 TLS 指纹 + headless 渲染)能真正抓到。用法:先 `web_search(query)` 找信息源,再用 `web_fetch(url)` 读该页**完整正文**(返回全文、自己读)。之前抓过的某 URL 若在对话历史里被折叠 / 压缩、需要回看完整原文, 用 `read_url_local(url)` 从本地缓存取回, 不必重新联网。";
-
-const CHINESE_LANGUAGE_DIRECTIVE: &str =
-    "**请始终使用简体中文回复用户**(代码、命令、标识符、文件路径等技术内容保持原文,不要翻译)。";
+const WEB_TOOLS_SYSTEM_GUIDANCE: &str = "When retrieving information from the web (real-time facts, prices, documentation, news, version numbers, or anything uncertain), prefer `web_search` and `web_fetch` tools rather than shell curl/wget. Use `web_search(query)` to find sources, and `web_fetch(url)` to read the full page content.";
 
 fn tools_register_apply_patch(body: &Value) -> bool {
     let Some(tools) = body.get("tools").and_then(Value::as_array) else {
@@ -2974,18 +2954,16 @@ fn tools_register_web_fetch(body: &Value) -> bool {
 }
 
 fn apply_patch_chat_guidance_message() -> Value {
-    let content =
-        format!("{CHINESE_LANGUAGE_DIRECTIVE}\n\n{APPLY_PATCH_CHAT_PATH_SYSTEM_GUIDANCE_ZH}");
     serde_json::json!({
         "role": "system",
-        "content": content,
+        "content": APPLY_PATCH_CHAT_PATH_SYSTEM_GUIDANCE,
     })
 }
 
 fn web_tools_guidance_message() -> Value {
     serde_json::json!({
         "role": "system",
-        "content": WEB_TOOLS_SYSTEM_GUIDANCE_ZH,
+        "content": WEB_TOOLS_SYSTEM_GUIDANCE,
     })
 }
 
@@ -2995,8 +2973,8 @@ fn responses_store_enabled(body: &Value) -> bool {
     body.get("store").and_then(Value::as_bool) != Some(false)
 }
 
-/// 处理 Legacy Completions API (/v1/completions)
-/// 将 Prompt 转换为 Chat Message 格式，复用 handle_chat_completions
+/// Handle Legacy Completions API (/v1/completions)
+/// Convert prompt to Chat Message format, reusing handle_chat_completions
 pub async fn handle_completions(
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     State(state): State<AppState>,
@@ -3018,9 +2996,9 @@ pub async fn handle_completions(
     let is_codex_style = body.get("input").is_some() || body.get("instructions").is_some();
     let store_response = responses_store_enabled(&body);
 
-    // [MULTI-TURN] 支持 previous_response_id 链式历史恢复
-    // 当客户端通过 HTTP POST /v1/responses 传入 previous_response_id 时，
-    // 从服务器端 session store 取出上一轮的历史，合并到本轮的 input 中
+    // [MULTI-TURN] Support previous_response_id chained history recovery
+    // When client passes previous_response_id via HTTP POST /v1/responses,
+    // retrieve previous turn history from server-side session store and merge into current input
     let previous_response_id = body
         .get("previous_response_id")
         .and_then(|v| v.as_str())
@@ -3045,7 +3023,7 @@ pub async fn handle_completions(
                 _ => None,
             })
             .unwrap_or_default();
-        // 完整回放先裁掉最新用户轮次之前的内联媒体，再执行硬限制校验。
+        // For full replay, strip inline media before the latest user turn before enforcing hard limits.
         omit_media_before_latest_user_turn(&mut existing_input);
 
         let merged = if let Some(ref prev_id) = previous_response_id {
@@ -3229,7 +3207,7 @@ pub async fn handle_completions(
                             .and_then(Value::as_str)
                             .map(str::to_string);
 
-                        // 构造消息内容：如果有图像则使用数组格式
+                        // Construct message content: use array format if images are present
                         let mut message = if image_parts.is_empty() {
                             let content = prefix_with_step_marker(step_marker, joined_text);
                             json!({
@@ -3473,7 +3451,7 @@ pub async fn handle_completions(
     // Handle "instructions" + "input" (Codex style) -> system + user messages
     // This is critical because `transform_openai_request` expects `messages` to be populated.
 
-    // [FIX] 检查是否已经有 messages (被第一次标准化处理过)
+    // [FIX] Check whether messages are already present (already normalized in a first pass)
     let has_codex_fields = body.get("instructions").is_some() || body.get("input").is_some();
     let already_normalized = body
         .get("messages")
@@ -3481,118 +3459,119 @@ pub async fn handle_completions(
         .map(|arr| !arr.is_empty())
         .unwrap_or(false);
 
-    // 只有在未标准化时才进行简单转换
-    if has_codex_fields && !already_normalized {
-        tracing::debug!("[Codex] Performing simple normalization (messages not yet populated)");
+    // Only perform simple conversion if not already normalized
+    if !already_normalized {
+        if has_codex_fields {
+            tracing::debug!("[Codex] Performing simple normalization (messages not yet populated)");
 
-        let mut messages = Vec::new();
+            let mut messages = Vec::new();
 
-        // instructions -> system message
-        if let Some(inst) = body.get("instructions").and_then(|v| v.as_str()) {
-            if !inst.is_empty() {
-                messages.push(json!({
-                    "role": "system",
-                    "content": inst
-                }));
+            // instructions -> system message
+            if let Some(inst) = body.get("instructions").and_then(|v| v.as_str()) {
+                if !inst.is_empty() {
+                    messages.push(json!({
+                        "role": "system",
+                        "content": inst
+                    }));
+                }
             }
-        }
 
-        // input -> user message (支持对象数组形式的对话历史)
-        if let Some(input) = body.get("input") {
-            if let Some(s) = input.as_str() {
-                messages.push(json!({
-                    "role": "user",
-                    "content": s
-                }));
-            } else if let Some(arr) = input.as_array() {
-                // 判断是消息对象数组还是简单的内容块/字符串数组
-                let is_message_array = arr
-                    .first()
-                    .and_then(|v| v.as_object())
-                    .map(|obj| obj.contains_key("role") || obj.contains_key("type"))
-                    .unwrap_or(false);
+            // input -> user message (supports conversation history in array-of-objects format)
+            if let Some(input) = body.get("input") {
+                if let Some(s) = input.as_str() {
+                    messages.push(json!({
+                        "role": "user",
+                        "content": s
+                    }));
+                } else if let Some(arr) = input.as_array() {
+                    // Determine whether this is an array of message objects or simple content blocks/strings
+                    let is_message_array = arr
+                        .first()
+                        .and_then(|v| v.as_object())
+                        .map(|obj| obj.contains_key("role") || obj.contains_key("type"))
+                        .unwrap_or(false);
 
-                if is_message_array {
-                    // 深度识别：像处理 messages 一样处理 input 数组，并自动映射 Responses API 的工具流
-                    for item in arr {
-                        if let Some(obj) = item.as_object() {
-                            let item_type = responses_input_item_type(item);
-                            if !item_type.is_empty() {
-                                match item_type {
-                                    "message" => {
-                                        let role = obj
-                                            .get("role")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("user");
-                                        let content =
-                                            obj.get("content").cloned().unwrap_or(json!(""));
-                                        messages.push(json!({ "role": role, "content": content }));
-                                    }
-                                    "function_call" | "custom_tool_call" => {
-                                        let call_id = obj
-                                            .get("call_id")
-                                            .or_else(|| obj.get("id"))
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("");
-                                        let name =
-                                            obj.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                        let mut arguments = obj
-                                            .get("arguments")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("")
-                                            .to_string();
-                                        if item_type == "custom_tool_call" {
-                                            if let Some(input) =
-                                                obj.get("input").and_then(|v| v.as_str())
-                                            {
-                                                arguments = serde_json::to_string(
-                                                    &json!({ "input": input }),
-                                                )
-                                                .unwrap_or_else(|_| "{}".to_string());
-                                            }
+                    if is_message_array {
+                        // Deep detection: process input array like messages, auto-mapping Responses API tool flow
+                        for item in arr {
+                            if let Some(obj) = item.as_object() {
+                                let item_type = responses_input_item_type(item);
+                                if !item_type.is_empty() {
+                                    match item_type {
+                                        "message" => {
+                                            let role = obj
+                                                .get("role")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("user");
+                                            let content =
+                                                obj.get("content").cloned().unwrap_or(json!(""));
+                                            messages.push(json!({ "role": role, "content": content }));
                                         }
-                                        messages.push(json!({
-                                            "role": "assistant",
-                                            "content": "",
-                                            "tool_calls": [{
-                                                "id": if call_id.is_empty() { "call_unknown" } else { call_id },
-                                                "type": "function",
-                                                "function": { "name": name, "arguments": arguments },
-                                            }],
-                                        }));
+                                        "function_call" | "custom_tool_call" => {
+                                            let call_id = obj
+                                                .get("call_id")
+                                                .or_else(|| obj.get("id"))
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
+                                            let name =
+                                                obj.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                            let mut arguments = obj
+                                                .get("arguments")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("")
+                                                .to_string();
+                                            if item_type == "custom_tool_call" {
+                                                if let Some(input) =
+                                                    obj.get("input").and_then(|v| v.as_str())
+                                                {
+                                                    arguments = serde_json::to_string(
+                                                        &json!({ "input": input }),
+                                                    )
+                                                    .unwrap_or_else(|_| "{}".to_string());
+                                                }
+                                            }
+                                            messages.push(json!({
+                                                "role": "assistant",
+                                                "content": "",
+                                                "tool_calls": [{
+                                                    "id": if call_id.is_empty() { "call_unknown" } else { call_id },
+                                                    "type": "function",
+                                                    "function": { "name": name, "arguments": arguments },
+                                                }],
+                                            }));
+                                        }
+                                        "function_call_output" | "custom_tool_call_output" => {
+                                            let call_id = obj
+                                                .get("call_id")
+                                                .or_else(|| obj.get("tool_call_id"))
+                                                .or_else(|| obj.get("id"))
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
+                                            let output_value =
+                                                obj.get("output").cloned().unwrap_or(json!(""));
+                                            let output_str = if let Some(s) = output_value.as_str() {
+                                                s.to_string()
+                                            } else {
+                                                output_value.to_string()
+                                            };
+                                            messages.push(json!({
+                                                "role": "tool",
+                                                "tool_call_id": call_id,
+                                                "content": output_str,
+                                            }));
+                                        }
+                                        _ => {
+                                            messages.push(item.clone());
+                                        }
                                     }
-                                    "function_call_output" | "custom_tool_call_output" => {
-                                        let call_id = obj
-                                            .get("call_id")
-                                            .or_else(|| obj.get("tool_call_id"))
-                                            .or_else(|| obj.get("id"))
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("");
-                                        let output_value =
-                                            obj.get("output").cloned().unwrap_or(json!(""));
-                                        let output_str = if let Some(s) = output_value.as_str() {
-                                            s.to_string()
-                                        } else {
-                                            output_value.to_string()
-                                        };
-                                        messages.push(json!({
-                                            "role": "tool",
-                                            "tool_call_id": call_id,
-                                            "content": output_str,
-                                        }));
-                                    }
-                                    _ => {
-                                        messages.push(item.clone());
-                                    }
+                                    continue;
                                 }
-                                continue;
                             }
+                            messages.push(item.clone());
                         }
-                        messages.push(item.clone());
-                    }
-                } else {
-                    // 降级处理：传统的字符串或混合内容拼接
-                    let content = arr
+                    } else {
+                        // Fallback: conventional string or mixed content concatenation
+                        let content = arr
                         .iter()
                         .map(|v| {
                             if let Some(s) = v.as_str() {
@@ -3654,8 +3633,8 @@ pub async fn handle_completions(
         }
     }
 
-    // [FIX] 在 openai_req 反序列化之前，从 body 中捕获原始 input 和 instructions
-    // 用于后续 session 保存时，保留完整的工具调用历史（而非从 openai_req.messages 重建丢失信息）
+    // [FIX] Capture raw input and instructions from body before openai_req deserialization
+    // Preserves complete tool call history for subsequent session saving (rather than losing info rebuilding from openai_req.messages)
     let normalized_interaction_ledger = body.get("_interaction_ledger").cloned();
     let (session_save_input, session_save_instructions) = if let Some(obj) = body.as_object_mut() {
         let input = bounded_session_input.take().unwrap_or_default();
@@ -3972,8 +3951,8 @@ pub async fn handle_completions(
         retry_credentials.is_some(),
     ) {
         let norm_start = std::time::Instant::now();
-        // 3. 模型配置解析
-        // 将 OpenAI 工具转为 Value 数组以便探测联网
+        // 3. Model config resolution
+        // Convert OpenAI tools to Value array for web search detection
         let tools_val: Option<Vec<Value>> = openai_req
             .tools
             .as_ref()
@@ -3988,8 +3967,8 @@ pub async fn handle_completions(
             None, // body
         );
 
-        // 3. 提取 SessionId (复用)
-        // [New] 使用 TokenManager 内部逻辑提取 session_id，支持粘性调度
+        // 3. Extract SessionId (reuse)
+        // [New] Use TokenManager internal logic to extract session_id, supporting sticky routing
         let session_id_str = session_id_str.clone();
         let session_id = Some(session_id_str.as_str());
 
@@ -4163,7 +4142,7 @@ pub async fn handle_completions(
         let upstream_url = response.url().to_string();
         let status = response.status();
         if status.is_success() {
-            // [智能限流] 请求成功，重置该账号的连续失败计数
+            // [Smart Rate Limiting] Request succeeded, reset consecutive failure count for account
             token_manager.mark_account_success(&email);
 
             if list_response {
@@ -4303,7 +4282,7 @@ pub async fn handle_completions(
                         converted_meta,
                     );
 
-                    // 仅当转换器产生 response.completed 时保存本轮增量及必要输出。
+                    // Save current turn delta and necessary outputs only when converter produces response.completed.
                     if let Some(completion_rx) = session_completion_rx {
                         let save_parent = session_parent;
                         let save_input = session_save_input;
@@ -4736,7 +4715,7 @@ pub async fn handle_completions(
             error_text
         );
 
-        // 3. 标记限流状态(用于 UI 显示)
+        // 3. Mark rate limit status (for UI display)
         if status_code == 429 || status_code == 529 || status_code == 503 || status_code == 500 {
             token_manager
                 .mark_rate_limited_async(
@@ -4757,7 +4736,7 @@ pub async fn handle_completions(
             false,
         );
 
-        // 执行退备
+        // Execute backoff
         if apply_retry_strategy(
             strategy.clone(),
             attempt,
@@ -4779,7 +4758,7 @@ pub async fn handle_completions(
             force_rotate = should_rotate_account(status_code, Some(&strategy));
             continue;
         } else {
-            // 不可重试
+            // Non-retryable
             return (
                 status,
                 [
@@ -4792,7 +4771,7 @@ pub async fn handle_completions(
         }
     }
 
-    // 所有尝试均失败
+    // All attempts exhausted
     let final_status = failure_statuses.final_status();
     let headers = crate::proxy::handlers::common::build_token_error_headers(
         Some(mapped_model.as_str()),
@@ -4833,7 +4812,7 @@ pub async fn handle_list_models(State(state): State<AppState>) -> impl IntoRespo
 }
 
 /// OpenAI Images API: POST /v1/images/generations
-/// 处理图像生成请求，转换为 Gemini API 格式
+/// Handle image generation request, converting to Gemini API format
 pub async fn handle_chat_redirection(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -5002,7 +4981,7 @@ pub async fn handle_images_generations_internal(
     state: AppState,
     body: Value,
 ) -> Result<(String, Value), (StatusCode, String, Option<String>)> {
-    // 1. 解析请求参数
+    // 1. Parse request parameters
     let prompt = body.get("prompt").and_then(|v| v.as_str()).ok_or((
         StatusCode::BAD_REQUEST,
         "Missing 'prompt' field".to_string(),
@@ -5048,14 +5027,14 @@ pub async fn handle_images_generations_internal(
         "[Images] Received generation request"
     );
 
-    // 2. 使用 common_utils 解析图片配置（统一逻辑，支持动态计算宽高比和 quality 映射）
+    // 2. Parse image config using common_utils (unified logic supporting dynamic aspect ratio and quality mapping)
     let (image_config, clean_model_name) =
         crate::proxy::mappers::common_utils::try_parse_image_config_with_params(
             model, size, quality, image_size,
         )
         .map_err(|message| (StatusCode::BAD_REQUEST, message, None))?;
 
-    // 3. Prompt Enhancement（保留原有逻辑）
+    // 3. Prompt Enhancement (preserve original logic)
     let mut final_prompt = prompt.to_string();
     if quality == Some("hd") {
         final_prompt.push_str(", (high quality, highly detailed, 4k resolution, hdr)");
@@ -5067,8 +5046,8 @@ pub async fn handle_images_generations_internal(
     }
     let contents_parts = build_image_contents(final_prompt, &input_images, None);
 
-    // 4. 并发发送请求
-    // 注意：不再在外部获取 Token，而是移入 Task 内部并在重试时获取
+    // 4. Send requests concurrently
+    // Note: Token is no longer acquired externally, but moved inside Task and acquired on retry
     let upstream = state.upstream.clone();
     let token_manager = state.token_manager.clone();
     let image_scheduler = state.image_scheduler.clone();
@@ -5086,7 +5065,7 @@ pub async fn handle_images_generations_internal(
         let upstream = upstream.clone();
         let token_manager = token_manager.clone();
         let contents_parts = contents_parts.clone();
-        let image_config = image_config.clone(); // 使用解析后的完整配置
+        let image_config = image_config.clone(); // Use parsed full config
         let _response_format = response_format.to_string();
 
         let model_to_use = clean_model_name.clone();
@@ -5171,8 +5150,8 @@ pub async fn handle_images_generations_internal(
                             "parts": contents_parts
                         }],
                         "generationConfig": {
-                            "candidateCount": 1, // 强制单张
-                            "imageConfig": image_config // ✅ 使用完整配置（包含 aspectRatio 和 imageSize）
+                            "candidateCount": 1, // Single image
+                            "imageConfig": image_config // Use complete config (including aspectRatio and imageSize)
                         },
                         "safetySettings": [
                             { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "OFF" },
@@ -5333,7 +5312,7 @@ pub async fn handle_images_generations_internal(
         });
     }
 
-    // 5. 收集结果
+    // 5. Collect results
     let mut images: Vec<Value> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut used_email: Option<String> = None;
@@ -5409,7 +5388,7 @@ pub async fn handle_images_generations_internal(
         return Err((status, error_msg, attempted));
     }
 
-    // 部分成功时记录警告
+    // Log warning on partial success
     if !errors.is_empty() {
         tracing::warn!(
             "[Images] Partial success: {} out of {} requests succeeded. Errors: {}",
@@ -5425,13 +5404,13 @@ pub async fn handle_images_generations_internal(
         n
     );
 
-    // 6. 构建 OpenAI 格式响应
+    // 6. Build OpenAI format response
     let openai_response = json!({
         "created": chrono::Utc::now().timestamp(),
         "data": images
     });
 
-    // [FIX] 图像生成成功后触发配额刷新 (Issue #1995)
+    // [FIX] Trigger quota refresh after successful image generation (Issue #1995)
     tokio::spawn(async move {
         let _ = account::refresh_all_quotas_logic().await;
     });
@@ -5588,8 +5567,8 @@ pub async fn handle_images_edits(
     }
     let contents_parts = build_image_contents(final_prompt, &input_images, mask_data.as_ref());
 
-    // 4. 并发发送请求
-    // 注意：不再在外部获取 Token，而是移入 Task 内部
+    // 4. Send requests concurrently
+    // Note: Token is no longer acquired externally, but moved inside Task
     let upstream = state.upstream.clone();
     let token_manager = state.token_manager.clone();
     let image_scheduler = state.image_scheduler.clone();
@@ -5621,7 +5600,7 @@ pub async fn handle_images_edits(
                 max_attempts,
                 retry_credentials.is_some(),
             ) {
-                // 4.1 获取 Token
+                // 4.1 Acquire Token
                 let (access_token, project_id, email, account_id, _wait_ms) =
                     if let Some(credentials) = retry_credentials.take() {
                         credentials
@@ -5700,7 +5679,7 @@ pub async fn handle_images_edits(
                                     false,
                                 )
                             });
-                            // 429/500/503 等错误进行标记和重试
+                            // Mark and retry 429/500/503 errors
                             let should_mark_limited =
                                 status_code == 429 || status_code == 503 || status_code == 500;
                             let needs_quota_refresh = if should_mark_limited {
@@ -6351,7 +6330,7 @@ fn normalize_response_subsequent_request(
     }
     validate_responses_input_image_limits(payload.get("input"))?;
 
-    // [FIX] 拦截 compaction 和完整历史替换事件
+    // [FIX] Intercept compaction and complete history replacement events
     if should_replace_websocket_transcript(&payload) {
         if let Some(obj) = payload.as_object_mut() {
             obj.remove("type");
@@ -6362,9 +6341,9 @@ fn normalize_response_subsequent_request(
         return Ok(payload);
     }
 
-    // [FIX] 始终走完整的 merge 逻辑，废弃 transcript replacement 分支
-    // 旧逻辑在检测到 function_call/assistant 时直接替换整个历史，导致多轮对话历史丢失
-    // 正确做法：last_request.input + last_response_output + new payload.input 全部合并
+    // [FIX] Always use full merge logic; obsolete transcript replacement branch
+    // Legacy logic replaced entire history upon detecting function_call/assistant, causing multi-turn history loss
+    // Proper approach: merge last_request.input + last_response_output + new payload.input
     let mut last_request = state.last_request.take().expect("checked above");
     let mut merged_input = last_request
         .as_object_mut()
@@ -6375,13 +6354,13 @@ fn normalize_response_subsequent_request(
         })
         .unwrap_or_default();
 
-    // 上一轮请求的 input 已按所有权移入 merged_input。
-    // 2. 上一轮 response 的 output items（assistant 回复、工具调用等）
+    // Previous request input moved into merged_input by ownership.
+    // 2. Previous response output items (assistant replies, tool calls, etc.)
     if let Value::Array(items) = std::mem::take(&mut state.last_response_output) {
         merged_input.extend(items);
     }
 
-    // 3. 本轮新的 input items（用户消息、工具调用结果等）
+    // 3. New input items for this turn (user messages, tool call outputs, etc.)
     let current_input = payload
         .as_object_mut()
         .and_then(|obj| obj.remove("input"))
@@ -6990,7 +6969,7 @@ async fn translate_openai_chunk_to_ws(
                                 ),
                             );
                             if !tc_name.is_empty() {
-                                // 临时插入一个包含 name 的 Value，最终会被 finalize_ws_events 里的完整 Value 覆盖
+                                // Temporarily insert a Value containing name, which will eventually be overwritten by full Value in finalize_ws_events
                                 insert_cached_tool_call(call_id, json!({ "name": tc_name }));
                             }
                         }

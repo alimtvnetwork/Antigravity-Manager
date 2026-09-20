@@ -7,7 +7,7 @@
 use crate::modules::email_vault_db::{self, EmailAccount};
 use base64::prelude::*;
 use chrono::Utc;
-use native_tls::{TlsConnector, TlsStream};
+use boring2::ssl::{SslConnector, SslMethod, SslStream, SslVerifyMode};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
@@ -16,7 +16,7 @@ use uuid::Uuid;
 /// Stream wrapper supporting both plaintext TCP and TLS streams
 pub enum EmailStream {
     Plain(TcpStream),
-    Tls(TlsStream<TcpStream>),
+    Tls(SslStream<TcpStream>),
 }
 
 impl Read for EmailStream {
@@ -48,12 +48,14 @@ impl EmailStream {
     pub fn upgrade_to_tls(self, host: &str) -> Result<Self, String> {
         match self {
             EmailStream::Plain(tcp) => {
-                let connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .danger_accept_invalid_hostnames(true)
-                    .build()
+                let mut builder = SslConnector::builder(SslMethod::tls())
                     .map_err(|e| format!("Failed to create TLS connector: {}", e))?;
+                builder.set_verify(SslVerifyMode::NONE);
+                let connector = builder.build();
                 let tls = connector
+                    .configure()
+                    .map_err(|e| format!("Failed to configure TLS: {}", e))?
+                    .verify_hostname(false)
                     .connect(host, tcp)
                     .map_err(|e| format!("TLS handshake failed with '{}': {}", host, e))?;
                 Ok(EmailStream::Tls(tls))

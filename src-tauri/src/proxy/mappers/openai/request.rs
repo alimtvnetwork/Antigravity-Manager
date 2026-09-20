@@ -709,7 +709,7 @@ pub fn transform_openai_request_with_session(
             // Handle tool calls (assistant message)
             if let Some(tool_calls) = &msg.tool_calls {
                 for (_index, tc) in tool_calls.iter().enumerate() {
-                    /* 暂时移除：防止 Codex CLI 界面碎片化
+                    /* Temporarily removed: prevent Codex CLI UI fragmentation
                     if index == 0 && parts.is_empty() {
                          if mapped_model.contains("gemini-3") {
                               parts.push(json!({"text": "Thinking Process: Determining necessary tool actions."}));

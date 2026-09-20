@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-/// 剥离所有标记为思维块的内容 (thought: true)
+/// Strip all blocks marked as thinking content (thought: true)
 pub fn strip_all_thinking_blocks(contents: Vec<Value>) -> Vec<Value> {
     contents
         .into_iter()
@@ -24,24 +24,24 @@ pub fn strip_all_thinking_blocks(contents: Vec<Value>) -> Vec<Value> {
         .collect()
 }
 
-/// 针对思维模型关闭工具循环
-/// 先剥离思考块，然后注入合成的 Model 确认和 User 继续指令
+/// Close tool loop for thinking models
+/// First strip thinking blocks, then inject synthetic Model confirmation and User continue instructions
 #[allow(dead_code)]
 pub fn close_tool_loop_for_thinking(contents: Vec<Value>) -> Vec<Value> {
     let mut stripped = strip_all_thinking_blocks(contents);
 
-    // 如果没有内容了，返回空
+    // If no content left, return empty
     if stripped.is_empty() {
         return stripped;
     }
 
-    // 合成模型消息：工具执行完成
+    // Synthesize model message: tool execution completed
     stripped.push(json!({
         "role": "model",
         "parts": [{"text": "[Tool execution completed.]"}]
     }));
 
-    // 合成用户消息：提示继续
+    // Synthesize user message: prompt continue
     stripped.push(json!({
         "role": "user",
         "parts": [{"text": "[Continue]"}]

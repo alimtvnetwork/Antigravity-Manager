@@ -1,5 +1,5 @@
-// 429 重试策略
-// Duration 解析
+// 429 Retry Strategy
+// Duration Parsing
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -45,7 +45,7 @@ static RETRY_HINT_KEYS: Lazy<std::collections::HashSet<&'static str>> = Lazy::ne
     .collect()
 });
 
-/// 解析 Duration 字符串 (e.g., "1.5s", "200ms", "1h16m0.667s")
+/// Parse duration string (e.g., "1.5s", "200ms", "1h16m0.667s")
 pub fn parse_duration_ms(duration_str: &str) -> Option<u64> {
     let mut total_ms: f64 = 0.0;
     let mut matched = false;
@@ -99,7 +99,7 @@ impl ParsedRetryDelay {
     }
 }
 
-/// 从 Retry-After 或 429 错误中提取原始 retry delay (深度递归解析)
+/// Extract raw retry delay from Retry-After or 429 error (deep recursive parsing)
 pub fn parse_retry_delay(error_text: &str, retry_after: Option<&str>) -> Option<u64> {
     parse_retry_delay_with_source(error_text, retry_after).map(|delay| delay.raw_ms)
 }
@@ -108,7 +108,7 @@ pub fn parse_retry_delay_with_source(
     error_text: &str,
     retry_after: Option<&str>,
 ) -> Option<ParsedRetryDelay> {
-    // 1. Retry-After delta-seconds，也兼容已有的 duration 字符串来源
+    // 1. Retry-After delta-seconds, also compatible with existing duration string sources
     if let Some(value) = retry_after.map(str::trim).filter(|value| !value.is_empty()) {
         if let Ok(seconds) = value.parse::<u64>() {
             return seconds.checked_mul(1000).map(|raw_ms| ParsedRetryDelay {
@@ -124,7 +124,7 @@ pub fn parse_retry_delay_with_source(
         }
     }
 
-    // 2. 结构化 JSON 字段优先，避免把 JSON 中的 retryDelay 当作响应文字。
+    // 2. Structured JSON fields take priority, avoiding treating retryDelay in JSON as response text.
     if let Ok(json) = serde_json::from_str(error_text) {
         if let Some(raw_ms) = extract_structured_delay_recursive(&json, 0, false) {
             return Some(ParsedRetryDelay {
@@ -134,7 +134,7 @@ pub fn parse_retry_delay_with_source(
         }
     }
 
-    // 3. 仅从响应文字中提取自然语言时长。
+    // 3. Extract natural language duration only from response text.
     for re in RE_TEXT_DELAY_PATTERNS.iter() {
         if let Some(cap) = re.captures(error_text) {
             if let Some(delay) = parse_duration_ms(&cap[1]) {
@@ -148,18 +148,31 @@ pub fn parse_retry_delay_with_source(
     None
 }
 
-/// Preserve the pre-state-machine delay parsing used by the Claude handler.
-pub(crate) fn parse_legacy_retry_delay(error_text: &str) -> Option<u64> {
+pub fn parse_retry_delay_legacy_with_source(
+    error_text: &str,
+    retry_after: Option<&str>,
+) -> Option<ParsedRetryDelay> {
+    if let Some(delay) = parse_retry_delay_with_source(error_text, retry_after) {
+        return Some(delay);
+    }
+
     for re in RE_LEGACY_DELAY_PATTERNS.iter() {
         if let Some(cap) = re.captures(error_text) {
             if let Some(delay) = parse_duration_ms(&cap[1]) {
-                return Some(delay);
+                return Some(ParsedRetryDelay {
+                    raw_ms: delay,
+                    source: RetryDelaySource::ResponseText,
+                });
             }
         }
     }
 
-    let delay = if let Ok(json) = serde_json::from_str(error_text) {
-        extract_structured_delay_recursive(&json, 0, true)
+    None
+}
+
+pub fn parse_retry_delay_legacy(error_text: &str, retry_after: Option<&str>) -> Option<u64> {
+    let delay = if let Some(delay) = parse_retry_delay_legacy_with_source(error_text, retry_after) {
+        Some(delay.raw_ms)
     } else {
         None
     };
@@ -167,7 +180,7 @@ pub(crate) fn parse_legacy_retry_delay(error_text: &str) -> Option<u64> {
     delay.map(|delay_ms| delay_ms.saturating_add(1500))
 }
 
-/// 递归提取结构化延迟
+/// Recursively extract structured delay
 fn extract_structured_delay_recursive(
     value: &serde_json::Value,
     depth: usize,
@@ -179,22 +192,22 @@ fn extract_structured_delay_recursive(
 
     match value {
         serde_json::Value::Object(map) => {
-            // 检查当前对象是否本身就是一个 Duration 对象 (seconds/nanos)
+            // Check if current object is itself a Duration object (seconds/nanos)
             if let Some(d) = parse_structured_duration_object(value) {
                 return Some(d);
             }
 
-            // 递归扫描子字段
+            // Recursively scan subfields
             for (key, val) in map {
-                // 模糊 Key 匹配 (转小写, 去除分隔符)
+                // Fuzzy Key matching (convert to lowercase, remove separators)
                 let normalized_key = key.to_lowercase().replace('-', "").replace('_', "");
                 if RETRY_HINT_KEYS.contains(normalized_key.as_str()) {
-                    // 如果命中了 Hint Key，直接尝试解析其内容
+                    // If matched Hint Key, attempt to parse its content directly
                     if let Some(d) = parse_structured_duration_value(val) {
                         return Some(d);
                     }
                 }
-                // 继续深度搜索
+                // Continue deep search
                 if let Some(d) =
                     extract_structured_delay_recursive(val, depth + 1, parse_unkeyed_strings)
                 {
@@ -218,7 +231,7 @@ fn extract_structured_delay_recursive(
     None
 }
 
-/// 解析强类型的 Duration 对象 (Google 格式: {seconds: 1, nanos: 0})
+/// Parse strongly-typed Duration object (Google format: {seconds: 1, nanos: 0})
 fn parse_structured_duration_object(value: &serde_json::Value) -> Option<u64> {
     let obj = value.as_object()?;
     let seconds = obj
@@ -239,7 +252,7 @@ fn parse_structured_duration_object(value: &serde_json::Value) -> Option<u64> {
     None
 }
 
-/// 解析各种可能包含时长信息的 Value
+/// Parse various Values that may contain duration information
 fn parse_structured_duration_value(value: &serde_json::Value) -> Option<u64> {
     match value {
         serde_json::Value::String(s) => parse_duration_ms(s),
@@ -249,8 +262,8 @@ fn parse_structured_duration_value(value: &serde_json::Value) -> Option<u64> {
     }
 }
 
-/// [NEW] 判断是否应当执行 Grace Retry (原地重试)
-/// 当 429 报错提示的重置时间在 5s 内，则原地重试比切换账号更有利。
+/// Determine whether to perform Grace Retry (in-place retry).
+/// When the reset time in the 429 error is within 5s, retrying in-place is preferable to switching accounts.
 pub fn should_grace_retry(duration_ms: u64) -> bool {
     duration_ms > 0 && duration_ms <= 5000
 }

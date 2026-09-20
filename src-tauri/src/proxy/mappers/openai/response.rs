@@ -1,4 +1,4 @@
-// OpenAI 协议响应转换模块
+// OpenAI protocol response conversion module
 use super::models::*;
 use serde_json::Value;
 
@@ -26,7 +26,7 @@ pub fn is_workflow_tool(tool_name: &str) -> bool {
 }
 
 /// Standardize and sanitize tool parameters for shell, PowerShell, DSH (DeepSeek Harness), etc.
-/// 1. 将 cmd / code / script / shell_command / input 等别名重命名为 command
+/// 1. Rename aliases cmd / code / script / shell_command / input etc. to command
 /// 2. [DSH tool-pwsh / tool-bash & WorkBuddy]：
 ///    - DSH strictly validates that both `command` (string) and `description` (string) exist and are non-empty.
 ///    - If model placed command in description/text/prompt while command is missing, extract command.
@@ -274,60 +274,60 @@ pub fn transform_openai_response(
     let empty_set = std::collections::HashSet::new();
     let client_tool_names = client_tool_names.unwrap_or(&empty_set);
 
-    // 解包 response 字段
+    // Unwrap response field
     let raw = gemini_response.get("response").unwrap_or(gemini_response);
 
     let mut choices = Vec::new();
 
-    // 支持多候选结果 (n > 1)
+    // Support multiple candidate results (n > 1)
     if let Some(candidates) = raw.get("candidates").and_then(|c| c.as_array()) {
         for (idx, candidate) in candidates.iter().enumerate() {
             let mut content_out = String::new();
             let mut thought_out = String::new();
             let mut tool_calls = Vec::new();
 
-            // 提取 content 和 tool_calls
+            // Extract content and tool_calls
             if let Some(parts) = candidate
                 .get("content")
                 .and_then(|c| c.get("parts"))
                 .and_then(|p| p.as_array())
             {
                 for part in parts {
-                    // 捕获 thoughtSignature (Gemini 3 工具调用必需)
+                    // Capture thoughtSignature (required for Gemini 3 tool calls)
                     if let Some(sig) = part
                         .get("thoughtSignature")
                         .or(part.get("thought_signature"))
                         .and_then(|s| s.as_str())
                     {
                         if let Some(sid) = session_id {
-                            super::streaming::store_thought_signature(sig, sid, message_count);
+                             super::streaming::store_thought_signature(sig, sid, message_count);
                         }
                     }
 
-                    // 检查该 part 是否是思考内容 (thought: true)
+                    // Check if part is thought content (thought: true)
                     let is_thought_part = part
                         .get("thought")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
 
-                    // 文本部分
+                    // Text part
                     if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                         if is_thought_part {
-                            // thought: true 时，text 是思考内容
+                            // When thought: true, text is thinking content
                             thought_out.push_str(text);
                         } else {
-                            // 正常内容
+                            // Regular content
                             content_out.push_str(text);
                         }
                     }
 
-                    // 工具调用部分
+                    // Tool call part
                     if let Some(fc) = part.get("functionCall") {
                         let name = fc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                         let mut args_json =
                             fc.get("args").unwrap_or(&serde_json::json!({})).clone();
 
-                        // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                        // [FIX #1575 & #3430] Normalize and sanitize tool parameter names and required fields for shell/PowerShell
                         normalize_and_sanitize_tool_args(name, &mut args_json);
 
                         let mut arguments_str = args_json.to_string();
@@ -351,7 +351,7 @@ pub fn transform_openai_response(
                                     content_out.push('\n');
                                 }
                                 content_out.push_str(&format!(
-                                    "apply_patch 格式非法，已停止执行以避免重复失败。第 {line} 行：{message}"
+                                    "apply_patch format invalid, execution stopped to prevent repeated failures. Line {line}: {message}"
                                 ));
                                 continue;
                             }
@@ -388,7 +388,7 @@ pub fn transform_openai_response(
                         });
                     }
 
-                    // 图片处理 (响应中直接返回图片的情况)
+                    // Image handling (direct image returns in response)
                     if let Some(img) = part.get("inlineData") {
                         let mime_type = img
                             .get("mimeType")
@@ -401,7 +401,7 @@ pub fn transform_openai_response(
                         }
                     }
 
-                    // 处理原生代码执行 (executableCode)
+                    // Handle native code execution (executableCode)
                     if let Some(exec_code) = part.get("executableCode") {
                         let lang = exec_code
                             .get("language")
@@ -417,7 +417,7 @@ pub fn transform_openai_response(
                         }
                     }
 
-                    // 处理代码执行结果 (codeExecutionResult)
+                    // Handle code execution results (codeExecutionResult)
                     if let Some(exec_result) = part.get("codeExecutionResult") {
                         let output = exec_result
                             .get("output")
@@ -436,21 +436,21 @@ pub fn transform_openai_response(
                 }
             }
 
-            // 提取并处理该候选结果的联网搜索引文 (Grounding Metadata)
+            // Extract and handle search citations (Grounding Metadata)
             if let Some(grounding) = candidate.get("groundingMetadata") {
                 let mut grounding_text = String::new();
 
-                // 1. 处理搜索词
+                // 1. Process search query
                 if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array())
                 {
                     let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                     if !query_list.is_empty() {
-                        grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                        grounding_text.push_str("\n\n---\n**🔍 Searched for:** ");
                         grounding_text.push_str(&query_list.join(", "));
                     }
                 }
 
-                // 2. 处理来源链接 (Chunks)
+                // 2. Process source links (Chunks)
                 if let Some(chunks) = grounding.get("groundingChunks").and_then(|c| c.as_array()) {
                     let mut links = Vec::new();
                     for (i, chunk) in chunks.iter().enumerate() {
@@ -458,14 +458,14 @@ pub fn transform_openai_response(
                             let title = web
                                 .get("title")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("网页来源");
+                                .unwrap_or("Web source");
                             let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                             links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                         }
                     }
 
                     if !links.is_empty() {
-                        grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                        grounding_text.push_str("\n\n**🌐 Sources:**\n");
                         grounding_text.push_str(&links.join("\n"));
                     }
                 }
@@ -475,18 +475,18 @@ pub fn transform_openai_response(
                 }
             }
 
-            // 提取传统的 citationMetadata
+            // Extract legacy citationMetadata
             if let Some(citation) = candidate.get("citationMetadata") {
                 if let Some(sources) = citation.get("citationSources").and_then(|s| s.as_array()) {
                     let mut links = Vec::new();
                     for (i, source) in sources.iter().enumerate() {
                         if let Some(uri) = source.get("uri").and_then(|v| v.as_str()) {
-                            // 由于有时没有 title，直接用 URI 当标题
+                            // If title is missing, use URI as title
                             links.push(format!("[{}] [{}]({})", i + 1, uri, uri));
                         }
                     }
                     if !links.is_empty() {
-                        content_out.push_str("\n\n**📚 引用来源：**\n");
+                        content_out.push_str("\n\n**📚 Citations:**\n");
                         content_out.push_str(&links.join("\n"));
                     }
                 }
@@ -507,14 +507,14 @@ pub fn transform_openai_response(
                 .unwrap_or("stop");
 
             let refusal_val = if finish_reason == "content_filter" {
-                Some("生成由于安全策略或背诵保护被中止".to_string())
+                Some("Generation stopped due to safety policy or recitation checks.".to_string())
             } else {
                 None
             };
 
-            // [FIX MALFORMED_FUNCTION_CALL] 避免客户端空白
+            // [FIX MALFORMED_FUNCTION_CALL] Avoid blank response
             if is_malformed_function_call && content_out.is_empty() {
-                content_out.push_str("很抱歉，当前模型在尝试调取实时信息时遇到了格式异常。若需要查询实时天气或最新资讯，请尝试使用联网模式（模型名带 -online 后缀）或配置天气/搜索插件。");
+                content_out.push_str("We apologize, but the model encountered a format anomaly while attempting to retrieve real-time information. To query real-time weather or news, please use online mode (-online suffix) or configure a search plugin.");
             }
 
             choices.push(Choice {
@@ -546,14 +546,14 @@ pub fn transform_openai_response(
         }
     }
 
-    // 如果 candidates 为空，但存在 promptFeedback（被安全拦截），伪造一个被拒绝的 choice
+    // If candidates is empty but promptFeedback exists (blocked by safety), forge a refused choice
     if choices.is_empty() {
         if let Some(feedback) = raw.get("promptFeedback") {
             let reason = feedback
                 .get("blockReason")
                 .and_then(|v| v.as_str())
                 .unwrap_or("UNKNOWN");
-            let refusal_msg = format!("请求由于安全策略被拦截 (blockReason: {})", reason);
+            let refusal_msg = format!("Request blocked by safety policy (blockReason: {})", reason);
             choices.push(Choice {
                 index: 0,
                 message: OpenAIMessage {
@@ -739,14 +739,14 @@ mod tests {
     fn test_normalize_and_sanitize_tool_args_powershell_missing_command_with_description() {
         // [Issue #3430] WorkBuddy PowerShell tool call with only description
         let mut args = json!({
-            "description": "列出目录内容"
+            "description": "List directory contents"
         });
         normalize_and_sanitize_tool_args("PowerShell", &mut args);
         assert_eq!(
             args["command"],
-            "echo \"[OK: Action logged - 列出目录内容]\""
+            "echo \"[OK: Action logged - List directory contents]\""
         );
-        assert_eq!(args["description"], "列出目录内容");
+        assert_eq!(args["description"], "List directory contents");
     }
 
     #[test]
@@ -781,7 +781,7 @@ mod tests {
                         "functionCall": {
                             "name": "PowerShell",
                             "args": {
-                                "description": "查看当前系统信息"
+                                "description": "View current system information"
                             }
                         }
                     }]
@@ -799,7 +799,7 @@ mod tests {
             serde_json::from_str(&tool_calls[0].function.as_ref().unwrap().arguments).unwrap();
         assert_eq!(
             parsed_args["command"],
-            "echo \"[OK: Action logged - 查看当前系统信息]\""
+            "echo \"[OK: Action logged - View current system information]\""
         );
     }
 

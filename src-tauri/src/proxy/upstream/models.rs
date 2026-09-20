@@ -1,4 +1,4 @@
-// 上游 API 模型
+// Upstream API Models
 #[allow(dead_code)]
 pub struct UpstreamModels {
     // TODO: Phase 3

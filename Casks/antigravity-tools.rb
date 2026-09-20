@@ -13,10 +13,10 @@ cask "antigravity-tools" do
 
     app "agm-alim.app"
 
-    postflight_steps do
-      run "/usr/bin/xattr",
-          args:         ["-rd", "com.apple.quarantine", "#{appdir}/agm-alim.app"],
-          must_succeed: false
+    postflight do
+      system_command "/usr/bin/xattr",
+                     args:         ["-rd", "com.apple.quarantine", "#{appdir}/agm-alim.app"],
+                     must_succeed: false
     end
 
     zap trash: [
@@ -33,8 +33,8 @@ cask "antigravity-tools" do
     url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/agm-alim_#{version}_#{arch}.AppImage"
     binary "agm-alim_#{version}_#{arch}.AppImage", target: "agm-alim"
 
-    preflight_steps do
-      set_permissions "agm-alim_#{version}_#{arch}.AppImage", "0755"
+    preflight do
+      set_permissions "#{staged_path}/agm-alim_#{version}_#{arch}.AppImage", "0755"
     end
   end
 end
