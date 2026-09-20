@@ -614,11 +614,8 @@ pub async fn run_installer_update() -> Result<String, String> {
             ]);
         }
 
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(300),
-            ps_cmd.output(),
-        )
-        .await;
+        let result =
+            tokio::time::timeout(std::time::Duration::from_secs(300), ps_cmd.output()).await;
 
         let output = match result {
             Ok(Ok(o)) => o,

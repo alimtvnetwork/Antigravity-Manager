@@ -3505,7 +3505,8 @@ pub async fn handle_completions(
                                                 .unwrap_or("user");
                                             let content =
                                                 obj.get("content").cloned().unwrap_or(json!(""));
-                                            messages.push(json!({ "role": role, "content": content }));
+                                            messages
+                                                .push(json!({ "role": role, "content": content }));
                                         }
                                         "function_call" | "custom_tool_call" => {
                                             let call_id = obj
@@ -3513,8 +3514,10 @@ pub async fn handle_completions(
                                                 .or_else(|| obj.get("id"))
                                                 .and_then(|v| v.as_str())
                                                 .unwrap_or("");
-                                            let name =
-                                                obj.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                            let name = obj
+                                                .get("name")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
                                             let mut arguments = obj
                                                 .get("arguments")
                                                 .and_then(|v| v.as_str())
@@ -3549,7 +3552,8 @@ pub async fn handle_completions(
                                                 .unwrap_or("");
                                             let output_value =
                                                 obj.get("output").cloned().unwrap_or(json!(""));
-                                            let output_str = if let Some(s) = output_value.as_str() {
+                                            let output_str = if let Some(s) = output_value.as_str()
+                                            {
                                                 s.to_string()
                                             } else {
                                                 output_value.to_string()
@@ -3572,18 +3576,18 @@ pub async fn handle_completions(
                     } else {
                         // Fallback: conventional string or mixed content concatenation
                         let content = arr
-                        .iter()
-                        .map(|v| {
-                            if let Some(s) = v.as_str() {
-                                s.to_string()
-                            } else if v.is_object() {
-                                v.to_string()
-                            } else {
-                                "".to_string()
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
+                            .iter()
+                            .map(|v| {
+                                if let Some(s) = v.as_str() {
+                                    s.to_string()
+                                } else if v.is_object() {
+                                    v.to_string()
+                                } else {
+                                    "".to_string()
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
 
                         if !content.is_empty() {
                             messages.push(json!({

@@ -665,7 +665,8 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
             "-Command",
             cmd_str,
         ]);
-        cmd.output().map_err(|e| format!("Failed to run command on Windows: {}", e))?
+        cmd.output()
+            .map_err(|e| format!("Failed to run command on Windows: {}", e))?
     };
 
     #[cfg(not(target_os = "windows"))]

@@ -6,8 +6,8 @@
 
 use crate::modules::email_vault_db::{self, EmailAccount};
 use base64::prelude::*;
-use chrono::Utc;
 use boring2::ssl::{SslConnector, SslMethod, SslStream, SslVerifyMode};
+use chrono::Utc;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
