@@ -3541,6 +3541,25 @@ impl TokenManager {
         tracing::debug!("Scheduling configuration updated: {:?}", *config);
     }
 
+    /// Unbind session and clear last used account on 429/529
+    pub async fn unbind_session_and_clear_last_used(&self, session_id: Option<&str>) {
+        if let Some(sid) = session_id {
+            self.session_accounts.remove(sid);
+        }
+        let mut last_used = self.last_used_account.lock().await;
+        *last_used = None;
+    }
+
+    /// Get valid token count
+    pub fn tokens_count(&self) -> usize {
+        self.tokens.len()
+    }
+
+    /// Get active scheduling mode
+    pub async fn get_scheduling_mode(&self) -> crate::proxy::sticky_config::SchedulingMode {
+        self.sticky_config.read().await.mode
+    }
+
     // / [NEW]
     pub async fn update_circuit_breaker_config(&self, config: crate::models::CircuitBreakerConfig) {
         let mut lock = self.circuit_breaker_config.write().await;

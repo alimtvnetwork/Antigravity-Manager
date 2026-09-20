@@ -113,6 +113,10 @@ fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     let _ = conn.execute(
+        "ALTER TABLE thinking_records ADD COLUMN primary_tool_id TEXT",
+        [],
+    );
+    let _ = conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_session ON thinking_records (session_key, created_at ASC)",
         [],
     );
@@ -126,6 +130,14 @@ fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     );
     let _ = conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_accessed ON thinking_records (last_accessed ASC)",
+        [],
+    );
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_thinking_rec_primary_tool ON thinking_records (session_key, primary_tool_id) WHERE primary_tool_id IS NOT NULL",
+        [],
+    );
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_thinking_rec_sig ON thinking_records (session_key, signature) WHERE signature IS NOT NULL",
         [],
     );
     conn.execute(
@@ -532,6 +544,8 @@ pub fn save_thinking_record(
     let packed_thought = pack_thought(thought);
     let signature = persist_signature(signature);
 
+    let primary_tool_id = tool_ids.first().map(|s| s.as_str());
+
     // Align with in-memory ThinkingStore: only merge consecutive chunks of the
     // current (latest) turn. Never rewrite an older turn that happens to share
     // a fingerprint (e.g. two "hello" replies in the same session).
@@ -546,14 +560,15 @@ pub fn save_thinking_record(
     let updated = if let Some(id) = latest_id {
         conn.execute(
             "UPDATE thinking_records
-             SET thought = ?1, signature = ?2, tool_ids = ?3, tool_names = '[]', visible = ?4, created_at = ?5
-             WHERE id = ?6 AND fingerprint = ?7",
+             SET thought = ?1, signature = ?2, tool_ids = ?3, tool_names = '[]', visible = ?4, created_at = ?5, primary_tool_id = ?6
+             WHERE id = ?7 AND fingerprint = ?8",
             params![
                 packed_thought.as_slice(),
                 signature,
                 &tool_ids_json,
                 visible_persist,
                 now,
+                primary_tool_id,
                 id,
                 fingerprint,
             ],
@@ -565,8 +580,8 @@ pub fn save_thinking_record(
 
     if updated == 0 {
         conn.execute(
-            "INSERT INTO thinking_records (session_key, fingerprint, thought, signature, tool_ids, tool_names, visible, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, '[]', ?6, ?7)",
+            "INSERT INTO thinking_records (session_key, fingerprint, thought, signature, tool_ids, tool_names, visible, created_at, primary_tool_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, '[]', ?6, ?7, ?8)",
             params![
                 session_key,
                 fingerprint,
@@ -575,6 +590,7 @@ pub fn save_thinking_record(
                 &tool_ids_json,
                 visible_persist,
                 now,
+                primary_tool_id,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -636,6 +652,198 @@ pub fn load_thinking_records(session_key: &str) -> Result<Vec<PersistedThinkingR
         }
     }
     Ok(result)
+}
+
+pub fn load_thinking_by_tool_id(
+    session_key: &str,
+    tool_id: &str,
+) -> Result<Option<PersistedThinkingRecord>, String> {
+    if session_key.is_empty() {
+        return Ok(None);
+    }
+    if tool_id.is_empty() {
+        return Ok(None);
+    }
+    let conn = thinking_db()?;
+
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT fingerprint, thought, signature, tool_ids, tool_names, visible
+             FROM thinking_records
+             WHERE session_key = ?1 AND primary_tool_id = ?2
+             ORDER BY id DESC LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt
+        .query_map(params![session_key, tool_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    if let Some(Ok((fp, thought_raw, signature, tool_ids_str, tool_names_str, visible))) =
+        rows.next()
+    {
+        let tool_ids: Vec<String> = serde_json::from_str(&tool_ids_str).unwrap_or_default();
+        let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
+        return Ok(Some(PersistedThinkingRecord {
+            fingerprint: fp,
+            thought: unpack_thought(&thought_raw),
+            signature: persist_signature(signature.as_deref()).map(str::to_string),
+            tool_ids,
+            tool_names,
+            visible,
+        }));
+    }
+
+    let mut fallback_stmt = conn
+        .prepare_cached(
+            "SELECT fingerprint, thought, signature, tool_ids, tool_names, visible
+             FROM thinking_records
+             WHERE session_key = ?1 AND tool_ids LIKE ?2
+             ORDER BY id DESC LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let like_pattern = format!("%\"{}\"%", tool_id);
+    let mut fallback_rows = fallback_stmt
+        .query_map(params![session_key, like_pattern], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    if let Some(Ok((fp, thought_raw, signature, tool_ids_str, tool_names_str, visible))) =
+        fallback_rows.next()
+    {
+        let tool_ids: Vec<String> = serde_json::from_str(&tool_ids_str).unwrap_or_default();
+        let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
+        Ok(Some(PersistedThinkingRecord {
+            fingerprint: fp,
+            thought: unpack_thought(&thought_raw),
+            signature: persist_signature(signature.as_deref()).map(str::to_string),
+            tool_ids,
+            tool_names,
+            visible,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn load_thinking_by_signature(
+    session_key: &str,
+    signature: &str,
+) -> Result<Option<PersistedThinkingRecord>, String> {
+    if session_key.is_empty() {
+        return Ok(None);
+    }
+    if signature.is_empty() {
+        return Ok(None);
+    }
+    let conn = thinking_db()?;
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT fingerprint, thought, signature, tool_ids, tool_names, visible
+             FROM thinking_records
+             WHERE session_key = ?1 AND signature = ?2
+             ORDER BY id DESC LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt
+        .query_map(params![session_key, signature], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    if let Some(Ok((fp, thought_raw, signature, tool_ids_str, tool_names_str, visible))) =
+        rows.next()
+    {
+        let tool_ids: Vec<String> = serde_json::from_str(&tool_ids_str).unwrap_or_default();
+        let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
+        Ok(Some(PersistedThinkingRecord {
+            fingerprint: fp,
+            thought: unpack_thought(&thought_raw),
+            signature: persist_signature(signature.as_deref()).map(str::to_string),
+            tool_ids,
+            tool_names,
+            visible,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn load_thinking_by_fingerprint(
+    session_key: &str,
+    fingerprint: &str,
+) -> Result<Option<PersistedThinkingRecord>, String> {
+    if session_key.is_empty() {
+        return Ok(None);
+    }
+    if fingerprint.is_empty() {
+        return Ok(None);
+    }
+    let conn = thinking_db()?;
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT fingerprint, thought, signature, tool_ids, tool_names, visible
+             FROM thinking_records
+             WHERE session_key = ?1 AND fingerprint = ?2
+             ORDER BY id DESC LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt
+        .query_map(params![session_key, fingerprint], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    if let Some(Ok((fp, thought_raw, signature, tool_ids_str, tool_names_str, visible))) =
+        rows.next()
+    {
+        let tool_ids: Vec<String> = serde_json::from_str(&tool_ids_str).unwrap_or_default();
+        let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
+        Ok(Some(PersistedThinkingRecord {
+            fingerprint: fp,
+            thought: unpack_thought(&thought_raw),
+            signature: persist_signature(signature.as_deref()).map(str::to_string),
+            tool_ids,
+            tool_names,
+            visible,
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn touch_thinking_session(session_key: &str) -> Result<usize, String> {

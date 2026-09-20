@@ -1515,3 +1515,110 @@ pub fn model_keeps_thinking_without_signature(mapped_model: &str) -> bool {
     let m = mapped_model.to_lowercase();
     m.contains("flash") || m.contains("gemini-pro-agent")
 }
+
+/// Fallback text for transit payloads
+pub const TRANSIT_DEFENSE_FALLBACK_TEXT: &str = "Please continue your analysis.";
+
+/// Ensure gemini payload ends with user turn and valid parts
+pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
+    let contents = if let Some(contents) = body
+        .get_mut("request")
+        .and_then(|r| r.get_mut("contents"))
+        .and_then(|c| c.as_array_mut())
+    {
+        contents
+    } else if let Some(contents) = body.get_mut("contents").and_then(|c| c.as_array_mut()) {
+        contents
+    } else {
+        return false;
+    };
+
+    let mut modified = false;
+
+    // Defense 1: empty contents
+    if contents.is_empty() {
+        tracing::warn!("[Defense] Gemini contents array is empty, appending fallback user turn");
+        contents.push(json!({
+            "role": "user",
+            "parts": [{ "text": TRANSIT_DEFENSE_FALLBACK_TEXT }]
+        }));
+        return true;
+    }
+
+    // Defense 2: fix empty parts in intermediate turns
+    for turn in contents.iter_mut() {
+        let is_model = turn
+            .get("role")
+            .and_then(|r| r.as_str())
+            .map(|r| r == "model" || r == "assistant")
+            .unwrap_or(false);
+        if let Some(parts) = turn.get_mut("parts").and_then(|p| p.as_array_mut()) {
+            if parts.is_empty() {
+                modified = true;
+                if is_model {
+                    parts.push(json!({ "text": "..." }));
+                } else {
+                    parts.push(json!({ "text": TRANSIT_DEFENSE_FALLBACK_TEXT }));
+                }
+            }
+        }
+    }
+
+    // Defense 3: check last turn
+    let need_append_user = if let Some(last_turn) = contents.last_mut() {
+        let role = last_turn.get("role").and_then(|r| r.as_str()).unwrap_or("");
+        if role == "model" || role == "assistant" {
+            true
+        } else {
+            if let Some(parts) = last_turn.get_mut("parts").and_then(|p| p.as_array_mut()) {
+                let has_substantive_part = parts.iter().any(|part| {
+                    if part.get("functionCall").is_some()
+                        || part.get("functionResponse").is_some()
+                        || part.get("inlineData").is_some()
+                        || part.get("fileData").is_some()
+                    {
+                        return true;
+                    }
+                    if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
+                        let t = text.trim();
+                        if t.is_empty() {
+                            false
+                        } else if t == "(no content)" || t == "·" {
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                });
+
+                if !has_substantive_part {
+                    tracing::warn!(
+                        "[Defense] Last user turn has no substantive content, normalizing to '{}'",
+                        TRANSIT_DEFENSE_FALLBACK_TEXT
+                    );
+                    *parts = vec![json!({ "text": TRANSIT_DEFENSE_FALLBACK_TEXT })];
+                    modified = true;
+                }
+            }
+            false
+        }
+    } else {
+        false
+    };
+
+    if need_append_user {
+        tracing::warn!(
+            "[Defense] Gemini payload ended with model turn, appending user turn with '{}'",
+            TRANSIT_DEFENSE_FALLBACK_TEXT
+        );
+        contents.push(json!({
+            "role": "user",
+            "parts": [{ "text": TRANSIT_DEFENSE_FALLBACK_TEXT }]
+        }));
+        modified = true;
+    }
+
+    modified
+}
