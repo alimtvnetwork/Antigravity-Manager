@@ -1,21 +1,21 @@
 cask "antigravity-tools" do
-  version "4.29.0"
+  version "4.34.0"
   sha256 :no_check
 
-  name "Antigravity Tools"
-  desc "Professional Account Management for AI Services"
+  name "Antigravity Manager Tools By Alim"
+  desc "Enterprise-Grade AI Account Management and Protocol Proxy Gateway"
   homepage "https://github.com/alimtvnetwork/Antigravity-Manager"
 
   on_macos do
     arch intel: "x64", arm: "aarch64"
 
-    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.dmg"
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/agm-alim_#{version}_#{arch}.dmg"
 
-    app "Antigravity Tools.app"
+    app "agm-alim.app"
 
     postflight_steps do
       run "/usr/bin/xattr",
-          args:         ["-rd", "com.apple.quarantine", "{{appdir}}/Antigravity Tools.app"],
+          args:         ["-rd", "com.apple.quarantine", "#{appdir}/agm-alim.app"],
           must_succeed: false
     end
 
@@ -30,11 +30,11 @@ cask "antigravity-tools" do
   on_linux do
     arch arm: "aarch64", intel: "amd64"
 
-    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Tools_#{version}_#{arch}.AppImage"
-    binary "Antigravity.Tools_#{version}_#{arch}.AppImage", target: "antigravity-tools"
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/agm-alim_#{version}_#{arch}.AppImage"
+    binary "agm-alim_#{version}_#{arch}.AppImage", target: "agm-alim"
 
     preflight_steps do
-      set_permissions "Antigravity.Tools_{{version}}_{{arch}}.AppImage", "0755"
+      set_permissions "agm-alim_#{version}_#{arch}.AppImage", "0755"
     end
   end
 end

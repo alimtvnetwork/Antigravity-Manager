@@ -1,5 +1,7 @@
-// Mappers 模块 - 协议转换器
-// 协议转换器模块
+// Mappers Module - Protocol Converters
+// Protocol converter module
+
+pub mod prompt_sanitizer;
 
 pub mod caveman_cleaner;
 pub mod claude;

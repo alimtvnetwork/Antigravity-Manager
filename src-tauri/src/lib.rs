@@ -48,7 +48,7 @@ fn should_enable_tray() -> bool {
     #[cfg(target_os = "linux")]
     {
         if is_wayland_session() && !env_flag_enabled("ANTIGRAVITY_FORCE_TRAY") {
-            // 智能自适应检测：检查系统中是否存在有效的 AppIndicator / StatusNotifier 动态链接库
+            // Smart adaptive detection: check if valid AppIndicator / StatusNotifier dynamic library exists
             let has_appindicator = [
                 "/usr/lib/x86_64-linux-gnu/libayatana-appindicator3.so.1",
                 "/usr/lib/x86_64-linux-gnu/libappindicator3.so.1",
@@ -296,8 +296,8 @@ pub fn run() {
             match modules::config::load_app_config() {
                 Ok(mut config) => {
                     let mut modified = false;
-                    // Headless/docker 默认允许 LAN 访问（绑定 0.0.0.0）
-                    // 若设置 ABV_BIND_LOCAL_ONLY，则仅绑定 127.0.0.1
+                    // Headless/docker defaults to LAN access (binds 0.0.0.0)
+                    // If ABV_BIND_LOCAL_ONLY is set, binds only 127.0.0.1
                     let bind_local_only = std::env::var("ABV_BIND_LOCAL_ONLY")
                         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
                         .unwrap_or(false);
@@ -316,8 +316,8 @@ pub fn run() {
                         modified = true;
                     }
 
-                    // [NEW] 支持通过环境变量注入 API Key
-                    // 优先级：ABV_API_KEY > API_KEY > 配置文件
+                    // [NEW] Support API Key injection via environment variable
+                    // Priority: ABV_API_KEY > API_KEY > configuration file
                     let env_key = std::env::var("ABV_API_KEY")
                         .or_else(|_| std::env::var("API_KEY"))
                         .ok();
@@ -330,8 +330,8 @@ pub fn run() {
                         }
                     }
 
-                    // [NEW] 支持通过环境变量注入 Web UI 密码
-                    // 优先级：ABV_WEB_PASSWORD > WEB_PASSWORD > 配置文件
+                    // [NEW] Support Web UI password injection via environment variable
+                    // Priority: ABV_WEB_PASSWORD > WEB_PASSWORD > configuration file
                     let env_web_password = std::env::var("ABV_WEB_PASSWORD")
                         .or_else(|_| std::env::var("WEB_PASSWORD"))
                         .ok();
@@ -344,8 +344,8 @@ pub fn run() {
                         }
                     }
 
-                    // [NEW] 支持通过环境变量注入鉴权模式
-                    // 优先级：ABV_AUTH_MODE > AUTH_MODE > 配置文件
+                    // [NEW] Support auth mode injection via environment variable
+                    // Priority: ABV_AUTH_MODE > AUTH_MODE > configuration file
                     let env_auth_mode = std::env::var("ABV_AUTH_MODE")
                         .or_else(|_| std::env::var("AUTH_MODE"))
                         .ok();
@@ -502,7 +502,15 @@ pub fn run() {
                 }
             }
 
-            // 立即启动管理服务器 (8045)，以便 Web 端能访问
+            // Windows: asynchronously heal desktop and start menu shortcut icons and refresh shell
+            #[cfg(target_os = "windows")]
+            {
+                std::thread::spawn(|| {
+                    crate::utils::win_shortcut::heal_shortcuts_native();
+                });
+            }
+
+            // Immediately start management server (8045) for Web access
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 // Load config
@@ -512,7 +520,7 @@ pub fn run() {
                     let integration =
                         crate::modules::integration::SystemManager::Desktop(handle.clone());
 
-                    // 1. 确保管理后台开启
+                    // 1. Ensure admin dashboard is running
                     if let Err(e) = commands::proxy::ensure_admin_server(
                         config.proxy.clone(),
                         &state,
@@ -529,7 +537,7 @@ pub fn run() {
                         );
                     }
 
-                    // 2. 自动启动转发逻辑
+                    // 2. Automatically start proxy routing if configured
                     if config.proxy.auto_start {
                         if let Err(e) = commands::proxy::internal_start_proxy_service(
                             config.proxy,
@@ -545,7 +553,7 @@ pub fn run() {
                         }
                     }
                 } else {
-                    // 配置加载失败不能再被静默吞掉：否则重启后“服务没起来”时无任何痕迹可查。
+                    // Config load failures must be logged with high visibility
                     error!(
                         "Failed to load app config at startup; admin server and proxy service were NOT started. \
                          Fix or reset the config file and restart the app."
@@ -562,7 +570,7 @@ pub fn run() {
             modules::auto_switcher::start_auto_switcher();
             info!("Auto profile switcher daemon initialized.");
 
-            // [PHASE 1] 已整合至 Axum 端口 (8045)，不再单独启动 19527 端口
+            // [PHASE 1] Integrated into main Axum port (8045), port 19527 no longer started separately
             info!("Management API integrated into main proxy server (port 8045)");
 
             Ok(())
@@ -707,7 +715,7 @@ pub fn run() {
             // HTTP API settings commands
             commands::get_http_api_settings,
             commands::save_http_api_settings,
-            // Token 统计命令
+            // Token statistics commands
             commands::get_token_stats_hourly,
             commands::get_token_stats_daily,
             commands::get_token_stats_weekly,

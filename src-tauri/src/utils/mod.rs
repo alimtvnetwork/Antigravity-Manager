@@ -3,3 +3,4 @@ pub mod crypto;
 pub mod fs;
 pub mod http;
 pub mod protobuf;
+pub mod win_shortcut;

@@ -5,12 +5,12 @@ use std::path::Path;
 pub struct VideoProcessor;
 
 impl VideoProcessor {
-    /// 检测视频 MIME 类型
+    /// Detect video MIME type from filename extension
     pub fn detect_mime_type(filename: &str) -> Result<String, String> {
         let ext = Path::new(filename)
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or("无法获取文件扩展名")?;
+            .ok_or("Cannot determine file extension")?;
 
         match ext.to_lowercase().as_str() {
             "mp4" | "m4v" => Ok("video/mp4".to_string()),
@@ -21,23 +21,23 @@ impl VideoProcessor {
             "flv" => Ok("video/x-flv".to_string()),
             "mkv" => Ok("video/x-matroska".to_string()),
             "3gp" => Ok("video/3gpp".to_string()),
-            _ => Err(format!("不支持的视频格式: {}", ext)),
+            _ => Err(format!("Unsupported video format: {}", ext)),
         }
     }
 
-    /// 将视频数据编码为 Base64
+    /// Encode video bytes to standard Base64
     pub fn encode_to_base64(video_data: &[u8]) -> String {
         general_purpose::STANDARD.encode(video_data)
     }
 
-    /// 判断文件是否超过内联大小建议限制 (20MB)
+    /// Check if video exceeds recommended inline size limit (20MB)
     pub fn exceeds_size_limit(size_bytes: usize) -> bool {
         const MAX_SIZE: usize = 20 * 1024 * 1024; // 20MB
         size_bytes > MAX_SIZE
     }
 }
 
-/// 将格式字符串归一化为 Gemini 支持的视频 MIME 类型
+/// Normalize video format string to standard Gemini-supported video MIME type
 pub fn normalize_video_mime(format: &str) -> String {
     let f = format.trim().to_lowercase();
     let bare = f.strip_prefix("video/").unwrap_or(&f);
@@ -54,18 +54,18 @@ pub fn normalize_video_mime(format: &str) -> String {
     }
 }
 
-/// 根据文件路径/URL 的扩展名推断视频 MIME，失败时回退到 video/mp4
+/// Infer video MIME type from file path or URL extension, fallback to video/mp4
 fn mime_from_path(path: &str) -> String {
     let clean = path.split(['?', '#']).next().unwrap_or(path);
     VideoProcessor::detect_mime_type(clean).unwrap_or_else(|_| "video/mp4".to_string())
 }
 
-/// 把 OpenAI 风格的视频引用转换为 Gemini part
-/// 支持四种来源：
+/// Convert OpenAI-style video reference to Gemini part
+/// Supports four sources:
 ///   * `data:video/mp4;base64,...`  -> inlineData
 ///   * `http(s)://...`              -> fileData (fileUri)
-///   * `file:///path` 或本地路径     -> 读盘后 inlineData
-///   * 裸 base64                     -> inlineData (需要 declared_mime)
+///   * `file:///path` or local path -> read file to inlineData
+///   * raw base64                   -> inlineData (requires declared_mime)
 pub fn video_part_from_source(src: &str, declared_mime: Option<&str>) -> Option<Value> {
     let declared = declared_mime.map(normalize_video_mime);
 
@@ -84,13 +84,13 @@ pub fn video_part_from_source(src: &str, declared_mime: Option<&str>) -> Option<
         return Some(json!({ "inlineData": { "mimeType": mime, "data": data } }));
     }
 
-    // 2) 远程 URL：交给 Gemini 侧拉取
+    // 2) Remote URL: delegate fetch to Gemini upstream
     if src.starts_with("http://") || src.starts_with("https://") {
         let mime = declared.unwrap_or_else(|| mime_from_path(src));
         return Some(json!({ "fileData": { "fileUri": src, "mimeType": mime } }));
     }
 
-    // 3) 本地文件 (file:// 或普通路径)
+    // 3) Local filesystem path (file:// or raw file path)
     let looks_like_path =
         src.starts_with("file://") || (src.len() < 4096 && Path::new(src).is_file());
     if looks_like_path {
@@ -111,7 +111,7 @@ pub fn video_part_from_source(src: &str, declared_mime: Option<&str>) -> Option<
             Ok(bytes) => {
                 if VideoProcessor::exceeds_size_limit(bytes.len()) {
                     tracing::warn!(
-                        "[Video] 本地视频超过 20MB ({} bytes)，仍会尝试内联上传: {}",
+                        "[Video] Local video exceeds 20MB ({} bytes), attempting inline upload anyway: {}",
                         bytes.len(),
                         file_path
                     );
@@ -119,7 +119,7 @@ pub fn video_part_from_source(src: &str, declared_mime: Option<&str>) -> Option<
                 let mime = declared.unwrap_or_else(|| mime_from_path(&file_path));
                 let b64 = VideoProcessor::encode_to_base64(&bytes);
                 tracing::debug!(
-                    "[Video] 已加载本地视频 {} ({} bytes, {})",
+                    "[Video] Loaded local video {} ({} bytes, {})",
                     file_path,
                     bytes.len(),
                     mime
@@ -127,13 +127,13 @@ pub fn video_part_from_source(src: &str, declared_mime: Option<&str>) -> Option<
                 return Some(json!({ "inlineData": { "mimeType": mime, "data": b64 } }));
             }
             Err(e) => {
-                tracing::warn!("[Video] 读取本地视频失败 {}: {}", file_path, e);
+                tracing::warn!("[Video] Failed to read local video {}: {}", file_path, e);
                 return None;
             }
         }
     }
 
-    // 4) 裸 base64
+    // 4) Raw base64 string
     if src.is_empty() {
         return None;
     }
@@ -146,7 +146,7 @@ fn warn_if_oversized(base64_len: usize, mime: &str) {
     let raw = (base64_len * 3) / 4;
     if VideoProcessor::exceeds_size_limit(raw) {
         tracing::warn!(
-            "[Video] 内联视频 {} 约 {} bytes，超过 20MB 建议上限",
+            "[Video] Inline video {} is approx {} bytes, exceeding recommended 20MB limit",
             mime,
             raw
         );
