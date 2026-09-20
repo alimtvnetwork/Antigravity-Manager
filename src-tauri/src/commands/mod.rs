@@ -452,7 +452,7 @@ pub async fn save_config(
         config.proxy.experimental.log_retention_days,
         config.proxy.experimental.thinking_store_enabled,
         config.proxy.experimental.thinking_retention_days,
-        config.proxy.experimental.thinking_max_memory_turns,
+        Some(config.proxy.experimental.thinking_max_memory_turns),
     );
 
     // 热更新正在运行的服务
@@ -502,7 +502,7 @@ pub async fn save_config(
             config.proxy.experimental.log_retention_days,
             config.proxy.experimental.thinking_store_enabled,
             config.proxy.experimental.thinking_retention_days,
-            config.proxy.experimental.thinking_max_memory_turns,
+            Some(config.proxy.experimental.thinking_max_memory_turns),
         );
         crate::proxy::config::update_global_thresholds(
             config.proxy.experimental.context_compression_threshold_l1,
