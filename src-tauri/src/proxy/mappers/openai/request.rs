@@ -358,7 +358,7 @@ pub fn transform_openai_request_with_session(
 
     // [ported] normalized thinking and budget parameters
     // [ported] normalized thinking and budget parameters
-    let mut actual_include_thinking = !is_under_v3 && (is_thinking_model || force_server_thinking);
+    let actual_include_thinking = !is_under_v3 && (is_thinking_model || force_server_thinking);
 
     // [ported] normalized thinking and budget parameters
     // Responses may pass previous_response_id as signature_read_key; always fall back to
@@ -745,18 +745,16 @@ pub fn transform_openai_request_with_session(
                     }
                     */
 
-                    let mut args_str = String::new();
-                    let mut func_name = String::new();
-
-                    if let Some(func) = &tc.function {
-                        args_str = func.arguments.clone();
-                        func_name = func.name.clone();
+                    let (mut args_str, func_name) = if let Some(func) = &tc.function {
+                        (func.arguments.clone(), func.name.clone())
                     } else if let Some(op) = &tc.operation {
-                        func_name = "apply_patch".to_string();
-                        args_str = serde_json::to_string(op).unwrap_or_else(|_| "{}".to_string());
+                        (
+                            serde_json::to_string(op).unwrap_or_else(|_| "{}".to_string()),
+                            "apply_patch".to_string(),
+                        )
                     } else {
                         continue;
-                    }
+                    };
 
                     if !is_latest && args_str.len() > 1000 && !is_apply_patch_tool_name(&func_name)
                     {
@@ -1186,7 +1184,7 @@ pub fn transform_openai_request_with_session(
     crate::proxy::mappers::common_utils::deep_clean_undefined(&mut inner_request, 0);
 
     // 4. Handle Tools (Merged Cleaning)
-    let is_codex_style = request.model.contains("codex")
+    let _is_codex_style = request.model.contains("codex")
         || request.model.contains("realtime")
         || request.instructions.is_some()
         || request.input.is_some();

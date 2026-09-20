@@ -98,47 +98,29 @@ impl FailureStatusTracker {
     }
 }
 
-/// 根据错误状态码和错误信息确定重试策略
-pub fn determine_retry_strategy(
+/// 根据错误状态码和错误信息确定重试策略（支持自定义是否允许 Grace Retry）
+pub fn determine_retry_strategy_with_grace(
     status_code: u16,
     error_text: &str,
     retried_without_thinking: bool,
+    allow_grace_retry: bool,
 ) -> RetryStrategy {
-    if status_code == 429 {
-        let lower = error_text.to_lowercase();
-        let is_hard_quota_exhausted = lower.contains("resource_exhausted")
-            || lower.contains("quota_exhausted")
-            || lower.contains("exceeded your current quota")
-            || lower.contains("insufficient_quota");
-
-        // [FIX] 硬配额耗尽必须立即轮换账号，绝不走 Grace Retry
-        if is_hard_quota_exhausted {
-            return RetryStrategy::FixedDelay(Duration::from_millis(50));
-        }
-
-        return match crate::proxy::upstream::retry::parse_legacy_retry_delay(error_text) {
-            Some(delay_ms) if delay_ms > 0 && delay_ms <= 2000 => {
-                let actual_delay = delay_ms.saturating_add(100);
-                tracing::info!(
-                    "Grace Retry Triggered: Delay {}ms is within window, using same account",
-                    actual_delay
-                );
-                RetryStrategy::GraceRetry(Duration::from_millis(actual_delay))
-            }
-            Some(delay_ms) => RetryStrategy::FixedDelay(Duration::from_millis(
-                delay_ms.saturating_add(200).min(30_000),
-            )),
-            None => RetryStrategy::LinearBackoff { base_ms: 5000 },
-        };
-    }
-
     determine_retry_strategy_inner(
         status_code,
         error_text,
         None,
         retried_without_thinking,
-        true,
+        allow_grace_retry,
     )
+}
+
+/// 根据错误状态码和错误信息确定重试策略（默认允许 Grace Retry）
+pub fn determine_retry_strategy(
+    status_code: u16,
+    error_text: &str,
+    retried_without_thinking: bool,
+) -> RetryStrategy {
+    determine_retry_strategy_with_grace(status_code, error_text, retried_without_thinking, true)
 }
 
 fn determine_retry_strategy_inner(
