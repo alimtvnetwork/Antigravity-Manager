@@ -1,3 +1,9 @@
+## v4.44.1 — 2026-09-20 (Fix Rust proxy compile dependencies, TokenManager session unbind, and complete multi-platform release)
+
+**Scope:** Version bump. Fix Rust proxy compile dependencies, TokenManager session unbind, and complete multi-platform release.
+
+---
+
 ## v4.44.0 — 2026-09-20 (Sync upstream v3 proxy, quota, thinking store, and cache stability fixes)
 
 **Scope:** Version bump. Sync upstream v3 proxy, quota, thinking store, and cache stability fixes.
