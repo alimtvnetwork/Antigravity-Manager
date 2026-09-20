@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.46.0 (2026-09-20)**:
+        -   **[Release v4.46.0] Fix thinking store signature preservation and error manager enhancements**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix thinking store signature preservation and error manager enhancements.
     *   **v4.45.0 (2026-09-20)**:
         -   **[Release v4.45.0] Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme**:
             -   **Update System**: Automated release and version synchronization across all manifests.

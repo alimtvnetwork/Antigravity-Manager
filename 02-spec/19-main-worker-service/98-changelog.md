@@ -1,3 +1,9 @@
+## v4.46.0 — 2026-09-20 (Fix thinking store signature preservation and error manager enhancements)
+
+**Scope:** Version bump. Fix thinking store signature preservation and error manager enhancements.
+
+---
+
 ## v4.45.0 — 2026-09-20 (Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme)
 
 **Scope:** Version bump. Enhance error diagnostics with full data copy, per-section copy, error removal, and high-contrast slate theme.
