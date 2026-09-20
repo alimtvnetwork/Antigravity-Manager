@@ -280,6 +280,7 @@ interface ErrorStoreState {
   navigateQueue: (direction: 'prev' | 'next') => void;
   closeErrorModal: () => void;
   clearRecentErrors: () => void;
+  removeError: (id: string) => void;
 }
 
 export const useErrorStore = create<ErrorStoreState>((set, get) => ({
@@ -361,6 +362,43 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
       errorQueue: [],
       selectedError: null,
       isModalOpen: false,
+    });
+  },
+
+  removeError: (id: string): void => {
+    const { recentErrors, errorQueue, selectedError, currentQueueIndex, isModalOpen } = get();
+    const updatedRecent = recentErrors.filter((e) => e.id !== id);
+    const updatedQueue = errorQueue.filter((e) => e.id !== id);
+
+    let nextSelected: CapturedError | null = selectedError;
+    let nextIndex = currentQueueIndex;
+    let nextModalOpen = isModalOpen;
+
+    const isSelectedTarget = Boolean(selectedError && selectedError.id === id);
+    if (isSelectedTarget) {
+      if (updatedQueue.length > 0) {
+        nextIndex = Math.min(currentQueueIndex, updatedQueue.length - 1);
+        nextSelected = updatedQueue[nextIndex];
+      } else {
+        nextSelected = null;
+        nextIndex = 0;
+        nextModalOpen = false;
+      }
+    } else if (nextSelected) {
+      const idx = updatedQueue.findIndex((e) => e.id === nextSelected?.id);
+      if (idx !== -1) {
+        nextIndex = idx;
+      } else {
+        nextIndex = 0;
+      }
+    }
+
+    set({
+      recentErrors: updatedRecent,
+      errorQueue: updatedQueue,
+      selectedError: nextSelected,
+      currentQueueIndex: nextIndex,
+      isModalOpen: nextModalOpen,
     });
   },
 }));

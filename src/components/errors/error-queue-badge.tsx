@@ -60,7 +60,7 @@ export function ErrorQueueBadge(): React.ReactNode {
           "relative flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all duration-200 cursor-pointer text-xs",
           hasErrors
             ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 shadow-xs"
-            : "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 border border-transparent"
+            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent"
         )}
         title={
           hasErrors
@@ -79,7 +79,7 @@ export function ErrorQueueBadge(): React.ReactNode {
             "text-[10px] font-mono font-bold px-1 py-0.2 rounded leading-tight",
             hasErrors
               ? "bg-rose-600 text-white"
-              : "bg-gray-200/70 dark:bg-white/10 text-gray-600 dark:text-gray-400"
+              : "bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700"
           )}
         >
           {errorCount > 99 ? '99+' : errorCount}

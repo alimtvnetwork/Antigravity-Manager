@@ -226,3 +226,131 @@ export function generateAllErrorsMarkdownReport(errors: CapturedError[]): string
   return sections.join('\n\n');
 }
 
+export function generateComprehensiveAllDataReport(error: CapturedError): string {
+  const sections: string[] = [];
+
+  sections.push(`# Comprehensive Error Diagnostic Report`);
+  sections.push(`**Application:** ${APP_INFO.name} (${APP_INFO.version})`);
+  sections.push(`**Error ID:** ${error.id}`);
+  sections.push(`**Code:** ${error.code}`);
+  sections.push(`**Severity Level:** ${error.level.toUpperCase()}`);
+  sections.push(`**Captured At:** ${error.createdAt}`);
+  if (error.requestedAt) {
+    sections.push(`**Requested At:** ${error.requestedAt}`);
+  }
+
+  sections.push(`\n---\n`);
+  sections.push(`## 1. Error Message & Details`);
+  sections.push(`**Message:**\n${error.message}`);
+  if (error.details) {
+    sections.push(`**Details:**\n${error.details}`);
+  }
+
+  sections.push(`\n## 2. Trigger & Location`);
+  if (error.route) {
+    sections.push(`- **Route / Page:** \`${error.route}\``);
+  }
+  if (error.routeComponent) {
+    sections.push(`- **Route Component:** \`${error.routeComponent}\``);
+  }
+  if (error.triggerComponent) {
+    sections.push(`- **Trigger Component:** \`${error.triggerComponent}\``);
+  }
+  if (error.triggerAction) {
+    sections.push(`- **Trigger Action:** \`${error.triggerAction}\``);
+  }
+  if (error.context?.source) {
+    sections.push(`- **Source:** \`${String(error.context.source)}\``);
+  }
+
+  if (error.endpoint || error.method) {
+    sections.push(`\n## 3. Network / IPC Request`);
+    sections.push(`- **Method:** \`${error.method || 'INVOKE'}\``);
+    sections.push(`- **Endpoint:** \`${error.endpoint || 'N/A'}\``);
+    if (error.responseStatus) {
+      sections.push(`- **Response Status:** ${error.responseStatus}`);
+    }
+    if (error.requestBody) {
+      sections.push(`- **Request Body:**\n\`\`\`json\n${error.requestBody}\n\`\`\``);
+    }
+  }
+
+  const hasClicks = Boolean(error.uiClickPath && error.uiClickPath.length > 0);
+  if (error.uiClickPathArrow || hasClicks) {
+    sections.push(`\n## 4. User Interaction Flow`);
+    if (error.uiClickPathArrow) {
+      sections.push(`\`\`\`\n${error.uiClickPathArrow}\n\`\`\``);
+    }
+    if (hasClicks && error.uiClickPath) {
+      const clickLines = error.uiClickPath.map(
+        (c, idx) =>
+          `${idx + 1}. [${new Date(c.timestamp).toLocaleTimeString()}] ${c.action} on \`${c.element}\`${c.text ? ` ("${c.text}")` : ''}${c.componentName ? ` in <${c.componentName}>` : ''}`
+      );
+      sections.push(clickLines.join('\n'));
+    }
+  }
+
+  const backendDiag = buildBackendDiagnosticSection(error);
+  if (backendDiag) {
+    sections.push(`\n## 5. Backend Diagnostics & Rust Stack`);
+    sections.push(`\`\`\`\n${backendDiag}\n\`\`\``);
+  }
+
+  if (error.envelopeErrors) {
+    sections.push(`\n## 6. Structured Envelope Errors`);
+    if (error.envelopeErrors.BackendMessage) {
+      sections.push(`- **Backend Message:** ${error.envelopeErrors.BackendMessage}`);
+    }
+    const hasBackendEnvelope = Boolean(error.envelopeErrors.Backend && error.envelopeErrors.Backend.length > 0);
+    if (hasBackendEnvelope && error.envelopeErrors.Backend) {
+      sections.push(`- **Backend Errors:**\n\`\`\`\n${error.envelopeErrors.Backend.join('\n')}\n\`\`\``);
+    }
+    const hasFrontendEnvelope = Boolean(error.envelopeErrors.Frontend && error.envelopeErrors.Frontend.length > 0);
+    if (hasFrontendEnvelope && error.envelopeErrors.Frontend) {
+      sections.push(`- **Frontend Errors:**\n\`\`\`\n${error.envelopeErrors.Frontend.join('\n')}\n\`\`\``);
+    }
+    const hasDelegatedEnvelope = Boolean(error.envelopeErrors.DelegatedServiceErrorStack && error.envelopeErrors.DelegatedServiceErrorStack.length > 0);
+    if (hasDelegatedEnvelope && error.envelopeErrors.DelegatedServiceErrorStack) {
+      sections.push(`- **Delegated Service Errors:**\n\`\`\`\n${error.envelopeErrors.DelegatedServiceErrorStack.join('\n')}\n\`\`\``);
+    }
+  }
+
+  const hasFrames = Boolean(error.parsedFrames && error.parsedFrames.length > 0);
+  if (error.stackTrace || hasFrames) {
+    sections.push(`\n## 7. Frontend Stack Trace`);
+    if (hasFrames && error.parsedFrames) {
+      const frameLines = error.parsedFrames.map(
+        (f) => `- \`${f.function}\` at ${f.file}:${f.line}${f.column ? `:${f.column}` : ''} ${f.isInternal ? '(internal)' : ''}`
+      );
+      sections.push(frameLines.join('\n'));
+    }
+    if (error.stackTrace) {
+      sections.push(`\n**Raw Stack:**\n\`\`\`\n${error.stackTrace.trim()}\n\`\`\``);
+    }
+  }
+
+  const hasInvocation = Boolean(error.invocationChain && error.invocationChain.length > 0);
+  if (hasInvocation && error.invocationChain) {
+    sections.push(`\n## 8. Invocation Chain`);
+    sections.push(error.invocationChain.map((fn, i) => `${i + 1}. \`${fn}\``).join('\n'));
+  }
+
+  const contextJson = buildContextJson(error);
+  if (contextJson) {
+    sections.push(`\n## 9. Full Context Payload`);
+    sections.push(`\`\`\`json\n${contextJson}\n\`\`\``);
+  }
+
+  sections.push(`\n## 10. Raw Error Object (JSON)`);
+  sections.push(`\`\`\`json\n${JSON.stringify(error, null, 2)}\n\`\`\``);
+
+  const fixes = getSuggestedFixes(error.code);
+  if (fixes.length > 0) {
+    sections.push(`\n## 11. Recommended Fixes`);
+    sections.push(fixes.map((f) => `- ${f}`).join('\n'));
+  }
+
+  return sections.join('\n\n');
+}
+
+

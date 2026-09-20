@@ -22,7 +22,7 @@ interface ErrorHistoryDrawerProps {
 }
 
 export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps): React.ReactNode {
-  const { recentErrors, openErrorModal, clearRecentErrors } = useErrorStore();
+  const { recentErrors, openErrorModal, clearRecentErrors, removeError } = useErrorStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -31,6 +31,12 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   if (!isOpen) {
     return null;
   }
+
+  const handleRemoveSingle = (error: CapturedError, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeError(error.id);
+    showToast(`Removed error [${error.code}] from history`, 'info');
+  };
 
   const query = searchQuery.trim().toLowerCase();
   const filteredErrors = recentErrors.filter((err) => {
@@ -292,6 +298,15 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
                             <span className="text-[10px]">Copy</span>
                           </>
                         )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveSingle(err, e)}
+                        className="p-1 rounded-md text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer border border-transparent hover:border-red-200 dark:hover:border-red-900/40"
+                        title="Remove this error from history"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
 
                       <button
