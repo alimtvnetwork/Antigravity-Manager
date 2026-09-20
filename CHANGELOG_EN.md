@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.35.0 (2026-09-20)**:
+        -   **[Release v4.35.0] Enable Auto Sync Current Account by default with 5-minute polling interval**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Enable Auto Sync Current Account by default with 5-minute polling interval.
     *   **v4.34.0 (2026-09-20)**:
         -   **[Release v4.34.0] Fix Linux Tauri OpenSSL static linking with vendored feature and release v4.34.0**:
             -   **Update System**: Automated release and version synchronization across all manifests.

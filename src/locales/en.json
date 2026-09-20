@@ -682,7 +682,8 @@
       "update_dialog_title": "New Version Available",
       "update_confirm_desc": "A new version is available. Would you like to download and update now? The app will automatically restart once downloaded.",
       "current_version": "Current Version",
-      "latest_version_label": "Latest Version"
+      "latest_version_label": "Latest Version",
+      "web_mode_limitation": "(Not supported in Web mode)"
     },
     "advanced_thinking": {
       "title": "Advanced Thinking & Global Config",

@@ -49,7 +49,7 @@ function Settings() {
         theme: 'system',
         auto_refresh: false,
         refresh_interval: 15,
-        auto_sync: false,
+        auto_sync: true,
         sync_interval: 5,
         proxy: {
             enabled: false,
@@ -97,7 +97,7 @@ function Settings() {
             enabled: false,
             backoff_steps: [30, 60, 120, 300, 600]
         },
-        hidden_menu_items: [],  // 菜单显示设置：默认不隐藏任何菜单项
+        hidden_menu_items: [],  // Menu display settings: do not hide any menu items by default
         instance_clone_mode: 'full',
         auto_profile_switcher: {
             is_enabled: false,
@@ -144,12 +144,12 @@ function Settings() {
     useEffect(() => {
         loadConfig();
 
-        // 获取真实数据目录路径
+        // Get actual data directory path
         invoke<string>('get_data_dir_path')
             .then(path => setDataDirPath(normalizeDataDirDisplay(path)))
             .catch(err => console.error('Failed to get data dir:', err));
 
-        // 加载更新设置
+        // Load update settings
         invoke<{ auto_check: boolean; last_check_time: number; check_interval_hours: number }>('get_update_settings')
             .then(settings => {
                 setFormData(prev => ({
@@ -160,21 +160,21 @@ function Settings() {
             })
             .catch(err => console.error('Failed to load update settings:', err));
 
-        // 获取真实的开机自启状态
+        // Get actual auto launch status
         invoke<boolean>('is_auto_launch_enabled')
             .then(enabled => {
                 setFormData(prev => ({ ...prev, auto_launch: enabled }));
             })
             .catch(err => console.error('Failed to get auto launch status:', err));
 
-        // 获取应用真实版本号
+        // Get actual app version
         if (isTauri()) {
             import('@tauri-apps/api/app').then(({ getVersion }) => {
                 getVersion().then(v => setAppVersion(v)).catch(() => {});
             });
         }
 
-        // 检测是否通过 Homebrew Cask 安装 (仅 Tauri 环境)
+        // Check if installed via Homebrew Cask (Tauri environment only)
         if (isTauri()) {
             invoke<boolean>('check_homebrew_installation')
                 .then(installed => setIsBrewInstalled(installed))
@@ -189,11 +189,11 @@ function Settings() {
         }
     }, [config]);
 
-    // 删除自动启用调试控制台的逻辑 - 改为用户手动控制
+    // User-controlled debug console logic
 
     const handleSave = async () => {
         try {
-            // 校验：如果启用了上游代理但没有填写地址，给出提示
+            // Validation: prompt if upstream proxy is enabled without an address
             const proxyEnabled = formData.proxy?.upstream_proxy?.enabled;
             const proxyUrl = formData.proxy?.upstream_proxy?.url?.trim();
             if (proxyEnabled && !proxyUrl) {
@@ -204,7 +204,7 @@ function Settings() {
             await saveConfig(formData);
             showToast(t('common.saved'), 'success');
 
-            // 如果修改了代理配置，提示用户需要重启
+            // If proxy configuration changed, prompt user that restart may be required
             if (proxyEnabled && proxyUrl) {
                 showToast(t('proxy.config.upstream_proxy.restart_hint'), 'info');
             }
@@ -342,7 +342,7 @@ function Settings() {
 
     const handleDetectAntigravityPath = async () => {
         try {
-            const command = isTauri() ? 'get_antigravity_path' : 'get_antigravity_path'; // 后端已统一
+            const command = isTauri() ? 'get_antigravity_path' : 'get_antigravity_path'; // Backend unified
             const path = await invoke<string>(command, { bypassConfig: true });
             setFormData({ ...formData, antigravity_executable: path });
             showToast(t('settings.advanced.antigravity_path_detected'), 'success');
@@ -493,9 +493,9 @@ function Settings() {
     return (
         <div className="h-full w-full overflow-y-auto">
             <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-7xl mx-auto">
-                {/* 顶部工具栏：Tab 导航和保存按钮 */}
+                {/* Top toolbar: Tab navigation and save button */}
                 <div className="flex justify-between items-center">
-                    {/* Tab 导航 - 采用顶部导航栏样式：外层灰色容器 */}
+                    {/* Tab navigation */}
                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1 w-fit">
                         <button
                             className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'general'
@@ -571,14 +571,14 @@ function Settings() {
                     </button>
                 </div>
 
-                {/* 设置表单 */}
+                {/* Settings form */}
                 <div className="bg-white dark:bg-base-100 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-base-200">
-                    {/* 通用设置 */}
+                    {/* General settings */}
                     {activeTab === 'general' && (
                         <div className="space-y-6">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-base-content">{t('settings.general.title')}</h2>
 
-                            {/* 语言选择 */}
+                            {/* Language selection */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-2">{t('settings.general.language')}</label>
                                 <select
@@ -604,7 +604,7 @@ function Settings() {
                                 </select>
                             </div>
 
-                            {/* 主题选择 */}
+                            {/* Theme selection */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-2">{t('settings.general.theme')}</label>
                                 <select
@@ -622,13 +622,13 @@ function Settings() {
                                 </select>
                             </div>
 
-                            {/* 开机自动启动 */}
+                            {/* Auto launch on system startup */}
                             <div>
                                 <div className="flex justify-between items-center mb-2">
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content">{t('settings.general.auto_launch')}</label>
                                     {!isTauri() && (
                                         <span className="text-xs text-orange-500 dark:text-orange-400">
-                                            {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                            {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                         </span>
                                     )}
                                 </div>
@@ -653,7 +653,7 @@ function Settings() {
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.general.auto_launch_desc')}</p>
                             </div>
 
-                            {/* 自动检查更新 */}
+                            {/* Auto check for updates */}
                             <>
                                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
                                     <div>
@@ -686,7 +686,7 @@ function Settings() {
                                     </label>
                                 </div>
 
-                                {/* 检查间隔 */}
+                                {/* Check interval */}
                                 {formData.auto_check_update && (
                                     <div className="ml-4">
                                         <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-2">{t('settings.general.update_check_interval')}</label>
@@ -716,7 +716,7 @@ function Settings() {
                                     </div>
                                 )}
 
-                                {/* 菜单显示设置 */}
+                                {/* Menu display settings */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.menu.title')}</h3>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -748,20 +748,20 @@ function Settings() {
                                                                 ? [...hiddenItems, item.path]
                                                                 : hiddenItems.filter(p => p !== item.path);
 
-                                                            // 乐观更新 UI
+                                                            // Optimistic UI update
                                                             const newConfig = {
                                                                 ...formData,
                                                                 hidden_menu_items: newHiddenItems
                                                             };
                                                             setFormData(newConfig);
 
-                                                            // 尝试保存
+                                                            // Attempt save
                                                             try {
                                                                 await saveConfig(newConfig);
                                                             } catch (error) {
-                                                                // 保存失败，回滚到原始快照
+                                                                // Save failed, rollback to original snapshot
                                                                 setFormData(originalConfig);
-                                                                showToast(`保存失败，已恢复设置: ${error}`, 'error');
+                                                                showToast(`Save failed, restored settings: ${error}`, 'error');
                                                             }
                                                         }
                                                     }}
@@ -775,7 +775,7 @@ function Settings() {
                                                         }
                                                     `}
                                                 >
-                                                    {/* 选中标记 */}
+                                                    {/* Selected checkmark */}
                                                     {isVisible && (
                                                         <div className="absolute top-2 right-2 text-blue-500">
                                                             <CheckCircle2 size={16} fill="currentColor" className="text-white dark:text-base-100" />
@@ -811,7 +811,7 @@ function Settings() {
                                     </p>
                                 </div>
 
-                                {/* 实例克隆模式设置 */}
+                                {/* Instance clone mode settings */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-1">
                                         {t('settings.instance.clone_mode_title', 'Instance Duplication Mode')}
@@ -839,10 +839,10 @@ function Settings() {
                         </div>
                     )}
 
-                    {/* 账号设置 */}
+                    {/* Account settings */}
                     {activeTab === 'account' && (
                         <div className="space-y-4 animate-in fade-in duration-500">
-                            {/* 自动刷新配额 */}
+                            {/* Auto refresh quota */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
@@ -891,7 +891,7 @@ function Settings() {
                                 </div>
                             </div>
 
-                            {/* 自动获取当前账号 */}
+                            {/* Auto sync current account */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-emerald-200 transition-all duration-300 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
@@ -929,7 +929,7 @@ function Settings() {
                                 )}
                             </div>
 
-                            {/* 7天周配额智能预热 (Smart Warmup) */}
+                            {/* Smart Warmup */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-orange-200 transition-all duration-300 shadow-sm">
                                 <SmartWarmup
                                     config={formData.scheduled_warmup}
@@ -949,7 +949,7 @@ function Settings() {
                                 />
                             </div>
 
-                            {/* 自动配额轮换与任务恢复 (Auto Profile Switcher) */}
+                            {/* Auto Profile Switcher */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm">
                                 <AutoSwitcherSettings
                                     config={formData.auto_profile_switcher}
@@ -968,7 +968,7 @@ function Settings() {
                                 />
                             </div>
 
-                            {/* 配额保护 (Quota Protection) */}
+                            {/* Quota Protection */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-rose-200 transition-all duration-300 shadow-sm">
                                 <QuotaProtection
                                     config={formData.quota_protection}
@@ -976,7 +976,7 @@ function Settings() {
                                         const updates: any = {
                                             quota_protection: newConfig
                                         };
-                                        // 联动逻辑：开启配额保护时，强制开启后台自动刷新 (不仅仅是预热)
+                                        // When quota protection is enabled, enforce background auto-refresh
                                         if (newConfig.enabled) {
                                             updates.auto_refresh = true;
                                         }
@@ -997,7 +997,7 @@ function Settings() {
                                 />
                             </div>
 
-                            {/* 配额关注列表 (Pinned Quota Models) */}
+                            {/* Pinned Quota Models */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-indigo-200 transition-all duration-300 shadow-sm">
                                 <PinnedQuotaModels
                                     config={formData.pinned_quota_models}
@@ -1010,11 +1010,11 @@ function Settings() {
                         </div>
                     )}
 
-                    {/* 高级设置 */}
+                    {/* Advanced settings */}
                     {activeTab === 'advanced' && (
                         <>
                             <div className="space-y-4">
-                                {/* 默认导出路径 */}
+                                {/* Default export path */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">{t('settings.advanced.export_path')}</label>
                                     <div className="flex gap-2">
@@ -1041,14 +1041,14 @@ function Settings() {
                                             </button>
                                         ) : (
                                             <span className="self-center text-xs text-gray-400 dark:text-gray-500 italic px-2">
-                                                {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                                {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                             </span>
                                         )}
                                     </div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.advanced.default_export_path_desc')}</p>
                                 </div>
 
-                                {/* 数据目录 */}
+                                {/* Data directory */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">{t('settings.advanced.data_dir')}</label>
                                     <div className="flex gap-2">
@@ -1076,14 +1076,14 @@ function Settings() {
                                             </>
                                         ) : (
                                             <span className="self-center text-xs text-gray-400 dark:text-gray-500 italic px-2">
-                                                {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                                {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                             </span>
                                         )}
                                     </div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.advanced.data_dir_desc')}</p>
                                 </div>
 
-                                {/* 反重力程序路径 */}
+                                {/* Antigravity executable path */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
                                         {t('settings.advanced.antigravity_path')}
@@ -1119,7 +1119,7 @@ function Settings() {
                                             </button>
                                         ) : (
                                             <span className="self-center text-xs text-gray-400 dark:text-gray-500 italic px-2">
-                                                {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                                {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                             </span>
                                         )}
                                     </div>
@@ -1128,7 +1128,7 @@ function Settings() {
                                     </p>
                                 </div>
 
-                                {/* Antigravity CLI (agy) 程序路径 */}
+                                {/* Antigravity CLI (agy) executable path */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
                                         {t('settings.advanced.antigravity_cli_path', 'Antigravity CLI (agy) Path')}
@@ -1138,7 +1138,7 @@ function Settings() {
                                             type="text"
                                             className="flex-1 px-4 py-4 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 text-gray-900 dark:text-base-content font-medium"
                                             value={formData.antigravity_cli_executable || ''}
-                                            placeholder={t('settings.advanced.antigravity_cli_path_placeholder', '未设置 (将使用自动探测)')}
+                                            placeholder={t('settings.advanced.antigravity_cli_path_placeholder', 'Not set (will auto-detect)')}
                                             onChange={(e) => setFormData({ ...formData, antigravity_cli_executable: e.target.value })}
                                         />
                                         {formData.antigravity_cli_executable && (
@@ -1164,23 +1164,23 @@ function Settings() {
                                             </button>
                                         ) : (
                                             <span className="self-center text-xs text-gray-400 dark:text-gray-500 italic px-2">
-                                                {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                                {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                             </span>
                                         )}
                                     </div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                                        {t('settings.advanced.antigravity_cli_path_desc', '设置您的命令行客户端 (agy) 的可执行文件路径，用于一键解除账号限制。')}
+                                        {t('settings.advanced.antigravity_cli_path_desc', 'Set the executable path for the command line client (agy) to bypass account restrictions.')}
                                     </p>
 
-                                    {/* 新增：解密/修补准入限制一键修补按钮 */}
+                                    {/* Patch account eligibility button */}
                                     <div className={`mt-3 flex items-center gap-4 p-3 rounded-lg border ${formData.antigravity_cli_executable ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
                                         <div className="flex-1">
                                             <h4 className={`text-sm font-semibold ${formData.antigravity_cli_executable ? 'text-blue-900 dark:text-blue-200' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                {t('settings.advanced.patch_eligibility_title', '账号准入限制解除')}
+                                                {t('settings.advanced.patch_eligibility_title', 'Bypass Account Eligibility Check')}
                                             </h4>
                                             <p className={`text-xs mt-0.5 ${formData.antigravity_cli_executable ? 'text-blue-700 dark:text-blue-300/80' : 'text-gray-400 dark:text-gray-500'}`}>
-                                                {t('settings.advanced.patch_eligibility_desc', '新版 agy 二进制强制拦截未授权账号，此操作一键跳过本地准入拦截检查。')}
-                                                {!formData.antigravity_cli_executable && " (需先在上方设置或探测路径)"}
+                                                {t('settings.advanced.patch_eligibility_desc', 'Newer agy client versions enforce account checks. This operation dynamically patches it to skip checks.')}
+                                                {!formData.antigravity_cli_executable && " (Requires path to be set or detected above)"}
                                             </p>
                                         </div>
                                         <button
@@ -1196,12 +1196,12 @@ function Settings() {
                                                 }
                                             }}
                                         >
-                                            {t('settings.advanced.patch_btn', '一键解除')}
+                                            {t('settings.advanced.patch_btn', 'Bypass Check')}
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Antigravity IDE 程序路径 */}
+                                {/* Antigravity IDE executable path */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
                                         {t('settings.advanced.antigravity_ide_path', 'Antigravity IDE Path')}
@@ -1231,7 +1231,7 @@ function Settings() {
                                             </button>
                                         ) : (
                                             <span className="self-center text-xs text-gray-400 dark:text-gray-500 italic px-2">
-                                                {t('settings.web_mode_limitation', '(Web 模式不支持)')}
+                                                {t('settings.web_mode_limitation', '(Not supported in Web mode)')}
                                             </span>
                                         )}
                                     </div>
@@ -1240,7 +1240,7 @@ function Settings() {
                                     </p>
                                 </div>
 
-                                {/* 反重力程序启动参数 */}
+                                {/* Antigravity startup arguments */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
                                         {t('settings.advanced.antigravity_args')}
@@ -1276,7 +1276,7 @@ function Settings() {
                                     </p>
                                 </div>
 
-                                {/* 日志缓存清理 */}
+                                {/* Clear log cache */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-4">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.advanced.logs_title')}</h3>
                                     <div className="bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-lg p-3 mb-3">
@@ -1292,7 +1292,7 @@ function Settings() {
                                     </div>
                                 </div>
 
-                                {/* Antigravity 缓存清理 */}
+                                {/* Clear Antigravity cache */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-4">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.advanced.antigravity_cache_title')}</h3>
                                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-lg p-3 mb-3">
@@ -1394,10 +1394,10 @@ function Settings() {
                     )}
 
 
-                    {/* 调试设置 */}
+                    {/* Debug settings */}
                     {activeTab === 'debug' && (
                         <div className="space-y-4 animate-in fade-in duration-500">
-                            {/* 标题和开关 */}
+                            {/* Title and toggle */}
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-lg font-semibold text-gray-900 dark:text-base-content">
@@ -1421,7 +1421,7 @@ function Settings() {
                                 </label>
                             </div>
 
-                            {/* 控制台或提示 */}
+                            {/* Console or placeholder */}
                             {isEnabled ? (
                                 <div className="h-[calc(100vh-320px)] min-h-[400px]">
                                     <DebugConsole embedded />
@@ -1441,7 +1441,7 @@ function Settings() {
                         </div>
                     )}
 
-                    {/* 代理设置 */}
+                    {/* Proxy settings */}
                     {activeTab === 'proxy' && (
                         <div className="space-y-4 animate-in fade-in duration-300">
                             <ProxyPoolSettings
@@ -1478,7 +1478,7 @@ function Settings() {
                                 }}
                             />
 
-                            {/* [FIX #1701] 恢复全局上游代理设置 */}
+                            {/* [FIX #1701] Global upstream proxy settings */}
                             <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 -mr-12 -mt-12 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors"></div>
                                 <div className="flex items-center justify-between mb-5 relative z-10">

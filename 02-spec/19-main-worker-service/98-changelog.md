@@ -1,3 +1,9 @@
+## v4.35.0 — 2026-09-20 (Enable Auto Sync Current Account by default with 5-minute polling interval)
+
+**Scope:** Version bump. Enable Auto Sync Current Account by default with 5-minute polling interval.
+
+---
+
 ## v4.34.0 — 2026-09-20 (Fix Linux Tauri OpenSSL static linking with vendored feature and release v4.34.0)
 
 **Scope:** Version bump. Fix Linux Tauri OpenSSL static linking with vendored feature and release v4.34.0.

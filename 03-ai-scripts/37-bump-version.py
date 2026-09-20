@@ -41,6 +41,7 @@ TAURI_CONF = REPO_ROOT / "src-tauri" / "tauri.conf.json"
 CARGO_TOML = REPO_ROOT / "src-tauri" / "Cargo.toml"
 SPEC19_CHANGELOG = REPO_ROOT / "02-spec" / "19-main-worker-service" / "98-changelog.md"
 TEMPLATE_VERSION = REPO_ROOT / "prompt-version.template.json"
+HOMEBREW_CASK = REPO_ROOT / "Casks" / "antigravity-tools.rb"
 
 
 def run_cmd(cmd, cwd=None, check=True, capture_output=True):
@@ -230,6 +231,34 @@ def update_template_version(next_version, dry_run=False):
     print(f"[*] Updated prompt-version.template.json -> {next_version}")
 
 
+def update_homebrew_cask(next_version, dry_run=False):
+    """Updates version in Casks/antigravity-tools.rb."""
+    if not HOMEBREW_CASK.is_file():
+        return
+
+    with open(HOMEBREW_CASK, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    new_content = re.sub(
+        r'(version\s+")[^"]+(")',
+        rf'\g<1>{next_version}\g<2>',
+        content,
+        count=1
+    )
+
+    if new_content == content:
+        return
+
+    if dry_run:
+        print(f"[DRY RUN] Would update Casks/antigravity-tools.rb to {next_version}")
+        return
+
+    with open(HOMEBREW_CASK, "w", encoding="utf-8", newline="\n") as f:
+        f.write(new_content)
+
+    print(f"[*] Updated Casks/antigravity-tools.rb -> {next_version}")
+
+
 def update_readme_pins(current_ver, next_version, dry_run=False):
     """Pins new version in readme.md badges and text references."""
     if not README_MD.is_file():
@@ -360,6 +389,7 @@ def execute_bump(tier="minor", explicit_version=None, scope=None, dry_run=False)
     update_tauri_conf(next_ver, dry_run=dry_run)
     update_cargo_toml(next_ver, dry_run=dry_run)
     update_template_version(next_ver, dry_run=dry_run)
+    update_homebrew_cask(next_ver, dry_run=dry_run)
     update_readme_pins(current_ver, next_ver, dry_run=dry_run)
     update_changelogs(next_ver, bump_scope, today_str, dry_run=dry_run)
     run_repo_sync_if_available(dry_run=dry_run)
