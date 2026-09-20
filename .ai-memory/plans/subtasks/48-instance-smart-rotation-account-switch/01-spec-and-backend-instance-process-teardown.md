@@ -3,7 +3,7 @@
 ## Status: Completed
 
 ## Parent Plan
-[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/pending/48-instance-smart-rotation-account-switch.md)
+[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/completed/48-instance-smart-rotation-account-switch.md)
 
 ## Goal
 Implement thorough, reliable backend process teardown for instance profiles based on their specific filesystem location and `--user-data-dir` argument.

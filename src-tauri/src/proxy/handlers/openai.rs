@@ -6636,14 +6636,25 @@ fn convert_codex_to_openai_request(mut body: Value) -> Value {
                         .unwrap_or("user")
                         .to_string();
                     let (text_parts, image_parts) = responses_message_parts(&mut item);
+                    let joined_text = text_parts.join("\n");
+                    if is_codex_transcript_only_assistant_message(&item, &joined_text) {
+                        continue;
+                    }
+
+                    if role == "assistant" {
+                        if joined_text.trim().is_empty() {
+                            if image_parts.is_empty() {
+                                continue;
+                            }
+                        }
+                    }
 
                     if image_parts.is_empty() {
-                        let content = prefix_with_step_marker(step_marker, text_parts.join("\n"));
+                        let content = prefix_with_step_marker(step_marker, joined_text);
                         messages.push(json!({ "role": role, "content": content }));
                     } else {
                         let mut content_blocks = Vec::new();
-                        let marker_text =
-                            prefix_with_step_marker(step_marker, text_parts.join("\n"));
+                        let marker_text = prefix_with_step_marker(step_marker, joined_text);
                         if !marker_text.is_empty() {
                             content_blocks.push(json!({ "type": "text", "text": marker_text }));
                         }

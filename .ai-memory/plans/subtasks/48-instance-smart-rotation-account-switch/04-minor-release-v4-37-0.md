@@ -3,7 +3,7 @@
 ## Status: Completed
 
 ## Parent Plan
-[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/pending/48-instance-smart-rotation-account-switch.md)
+[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/completed/48-instance-smart-rotation-account-switch.md)
 
 ## Goal
 Execute version bump from `4.36.0` to `4.37.0` across all project manifests and finalize the automated release ceremony.

@@ -3,7 +3,7 @@
 ## Status: Completed
 
 ## Parent Plan
-[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/pending/48-instance-smart-rotation-account-switch.md)
+[Plan 48: Instance Smart Rotation, Process Termination, Account Selection Algorithm & Minor Release v4.37.0](.ai-memory/plans/completed/48-instance-smart-rotation-account-switch.md)
 
 ## Goal
 Implement candidate account scoring, selection, and live quota refresh verification based on 4-hour idle recency, refill runway (e.g. 6 days until reset), and headroom.

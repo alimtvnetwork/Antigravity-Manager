@@ -317,7 +317,8 @@ pub fn merge_consecutive_messages(messages: &mut Vec<Message>) {
 
 /// 转换 Claude 请求为 Gemini v1internal 格式
 
-/// [FIX #709] Reorder serialized Gemini parts to ensure thinking blocks are first
+/// [FIX #709] Reorder serialized Gemini parts to ensure thinking blocks are first,
+/// deduplicate multiple thinking blocks to at most ONE per model turn, and clean out raw dot placeholders.
 fn reorder_gemini_parts(parts: &mut Vec<Value>) {
     if parts.len() <= 1 {
         return;
@@ -329,13 +330,18 @@ fn reorder_gemini_parts(parts: &mut Vec<Value>) {
     let mut other_parts = Vec::new();
 
     for part in parts.drain(..) {
-        if part.get("thought").and_then(|t| t.as_bool()) == Some(true) {
+        let is_thought = part
+            .get("thought")
+            .and_then(|t| t.as_bool())
+            .unwrap_or(false);
+        if is_thought {
             thinking_parts.push(part);
         } else if part.get("functionCall").is_some() {
             tool_parts.push(part);
         } else if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
-            // Filter empty text parts that might have been created during merging
-            if !text.trim().is_empty() && text != "(no content)" {
+            let t = text.trim();
+            // Filter empty / dummy text parts that might have been created during merging or from client dot echo
+            if !t.is_empty() && t != "(no content)" && t != "·" {
                 text_parts.push(part);
             }
         } else {
@@ -343,7 +349,29 @@ fn reorder_gemini_parts(parts: &mut Vec<Value>) {
         }
     }
 
-    parts.extend(thinking_parts);
+    // Keep at most ONE thinking block per model turn (the one with longest text or real signature)
+    if thinking_parts.len() > 1 {
+        let best_thought = thinking_parts.into_iter().max_by_key(|p| {
+            let sig_len = p
+                .get("thoughtSignature")
+                .or_else(|| p.get("thought_signature"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.len())
+                .unwrap_or(0);
+            let text_len = p
+                .get("text")
+                .and_then(|t| t.as_str())
+                .map(|t| t.len())
+                .unwrap_or(0);
+            (sig_len, text_len)
+        });
+        if let Some(t) = best_thought {
+            parts.push(t);
+        }
+    } else if let Some(t) = thinking_parts.pop() {
+        parts.push(t);
+    }
+
     parts.extend(text_parts);
     parts.extend(other_parts);
     parts.extend(tool_parts);
@@ -1319,126 +1347,86 @@ fn build_contents(
                             .or(last_thought_signature.as_ref())
                             .cloned()
                             .or_else(|| {
-                                // Try session-based signature cache at specific msg_index first (Layer 3)
-                                crate::proxy::SignatureCache::global().get_session_signature_at(session_id, msg_index)
-                                    .map(|s| {
-                                        tracing::debug!(
-                                            "[Claude-Request] Recovered signature from SESSION cache at turn {} (session: {}, len: {})",
-                                            msg_index, session_id, s.len()
-                                        );
-                                        s
-                                    })
-                            })
-                            .or_else(|| {
-                                // Fallback to latest session signature
-                                crate::proxy::SignatureCache::global().get_session_signature(session_id)
-                                    .map(|s| {
-                                        tracing::debug!(
-                                            "[Claude-Request] Recovered latest signature from SESSION cache (session: {}, len: {})",
-                                            session_id, s.len()
-                                        );
-                                        s
-                                    })
-                            })
-                            .or_else(|| {
-                                // Try tool-specific signature cache (Layer 1)
-                                crate::proxy::SignatureCache::global().get_tool_signature(id)
-                                    .map(|s| {
-                                        tracing::info!("[Claude-Request] Recovered signature from TOOL cache for tool_id: {}", id);
-                                        s
-                                    })
-                            })
-                            .or_else(|| {
-                                // [DEPRECATED] Global store fallback - kept for backward compatibility
-                                let global_sig = get_thought_signature();
-                                if global_sig.is_some() {
-                                    tracing::warn!(
-                                        "[Claude-Request] Using deprecated GLOBAL thought_signature fallback (length: {}). \
-                                         This indicates session cache miss.",
-                                        global_sig.as_ref().unwrap().len()
-                                    );
-                                }
-                                global_sig
+                                // Strictly isolated to this turn: NEVER fall back to latest session or global store!
+                                crate::proxy::SignatureCache::global()
+                                    .get_session_signature_at(session_id, msg_index)
                             });
-                        // [FIX #752] Validate signature before using
-                        // Only add thoughtSignature if we have a valid and compatible one
+
+                        let is_google_cloud = mapped_model.starts_with("projects/");
+                        let is_claude_model = mapped_model.to_lowercase().contains("claude");
+                        let is_special_model = is_google_cloud || is_claude_model;
+                        let needs_sentinel = if is_special_model {
+                            false
+                        } else {
+                            is_thinking_enabled || model_keeps_thinking_without_signature(&mapped_model)
+                        };
+
+                        let mut signature_assigned = false;
                         if let Some(sig) = final_sig {
-                            // [NEW] If this is a retry, do NOT backfill signatures to avoid issues.
                             if is_retry && signature.is_none() {
                                 tracing::warn!("[Tool-Signature] Skipping signature backfill for tool_use: {} during retry.", id);
+                            } else if sig == SENTINEL_SIGNATURE {
+                                if !is_special_model {
+                                    part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
+                                    signature_assigned = true;
+                                }
+                            } else if sig.len() < MIN_SIGNATURE_LENGTH {
+                                tracing::warn!(
+                                    "[Tool-Signature] Signature too short for tool_use: {} (len: {} < {}), skipping.",
+                                    id, sig.len(), MIN_SIGNATURE_LENGTH
+                                );
                             } else {
-                                // Check signature length first - if it's too short, it's definitely invalid
-                                if sig.len() < MIN_SIGNATURE_LENGTH {
-                                    tracing::warn!(
-                                        "[Tool-Signature] Signature too short for tool_use: {} (len: {} < {}), skipping.",
-                                        id, sig.len(), MIN_SIGNATURE_LENGTH
-                                    );
-                                } else {
-                                    // Check signature compatibility (optional for tool_use)
-                                    let cached_family = crate::proxy::SignatureCache::global()
-                                        .get_signature_family(&sig);
+                                let cached_family = crate::proxy::SignatureCache::global()
+                                    .get_signature_family(&sig);
 
-                                    let should_use_sig = match cached_family {
-                                        Some(family) => {
-                                            // For tool_use, check compatibility
-                                            if is_model_compatible(&family, mapped_model) {
-                                                true
-                                            } else {
-                                                tracing::warn!(
-                                                    "[Tool-Signature] Incompatible signature for tool_use: {} (Family: {}, Target: {})",
-                                                    id, family, mapped_model
-                                                );
-                                                false
-                                            }
+                                let should_use_sig = match cached_family {
+                                    Some(family) => {
+                                        if crate::proxy::mappers::common_utils::is_model_compatible(&family, mapped_model) {
+                                            true
+                                        } else if is_claude_model {
+                                            family.to_lowercase().contains("claude")
+                                        } else {
+                                            tracing::warn!(
+                                                "[Tool-Signature] Incompatible signature for tool_use: {} (Family: {}, Target: {})",
+                                                id, family, mapped_model
+                                            );
+                                            false
                                         }
-                                        None => {
-                                            // For JSON tool calling compatibility, if signature is long enough but unknown,
-                                            // we should trust it rather than drop it
-                                            if sig.len() >= MIN_SIGNATURE_LENGTH {
-                                                tracing::debug!(
-                                                    "[Tool-Signature] Unknown signature origin but valid length (len: {}) for tool_use: {}, using as-is for JSON tool calling.",
-                                                    sig.len(), id
-                                                );
-                                                true
-                                            } else {
-                                                // Unknown and too short: only use in non-thinking mode
-                                                if is_thinking_enabled {
-                                                    tracing::warn!(
-                                                        "[Tool-Signature] Unknown signature origin and too short for tool_use: {} (len: {}). Dropping in thinking mode.",
-                                                        id, sig.len()
-                                                    );
-                                                    false
-                                                } else {
-                                                    // In non-thinking mode, allow unknown signatures
-                                                    true
-                                                }
-                                            }
-                                        }
-                                    };
-                                    if should_use_sig {
-                                        part["thoughtSignature"] = json!(sig);
-                                        part["thought_signature"] = json!(sig);
                                     }
+                                    None => {
+                                        if sig.len() >= MIN_SIGNATURE_LENGTH {
+                                            tracing::debug!(
+                                                "[Tool-Signature] Unknown signature origin but valid length (len: {}) for tool_use: {}, using as-is for JSON tool calling.",
+                                                sig.len(), id
+                                            );
+                                            true
+                                        } else if is_thinking_enabled {
+                                            tracing::warn!(
+                                                "[Tool-Signature] Unknown signature origin and too short for tool_use: {} (len: {}). Dropping in thinking mode.",
+                                                id, sig.len()
+                                            );
+                                            false
+                                        } else {
+                                            true
+                                        }
+                                    }
+                                };
+                                if should_use_sig {
+                                    part["thoughtSignature"] = json!(sig);
+                                    part["thought_signature"] = json!(sig);
+                                    signature_assigned = true;
                                 }
                             }
-                        } else {
-                            // Missing signature: Gemini Flash / agent models reject
-                            // functionCall without thought_signature even when thinking
-                            // was disabled as a fallback. Always inject the sentinel
-                            // for those models (Vertex AI still rejects it).
-                            let is_google_cloud = mapped_model.starts_with("projects/");
-                            let needs_sentinel = !is_google_cloud
-                                && (is_thinking_enabled
-                                    || model_keeps_thinking_without_signature(&mapped_model));
+                        }
+
+                        if !signature_assigned {
                             if needs_sentinel {
                                 tracing::info!(
-                                    "[Tool-Signature] Adding GEMINI_SKIP_SIGNATURE for tool_use: {} (model: {})",
+                                    "[Tool-Signature] Adding SENTINEL_SIGNATURE for tool_use: {} (model: {})",
                                     id, mapped_model
                                 );
-                                part["thoughtSignature"] =
-                                    json!("skip_thought_signature_validator");
-                                part["thought_signature"] =
-                                    json!("skip_thought_signature_validator");
+                                part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
+                                part["thought_signature"] = json!(SENTINEL_SIGNATURE);
                             }
                         }
                         parts.push(part);

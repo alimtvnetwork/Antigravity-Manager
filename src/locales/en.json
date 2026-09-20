@@ -1,6 +1,6 @@
 {
   "common": {
-    "app_name": "Agm Tool By Alim",
+    "app_name": "Antigravity Tools",
     "loading": "Loading...",
     "empty": "Empty",
     "load_more": "Load More",
@@ -435,7 +435,7 @@
       "auto_launch": "Launch at Startup",
       "auto_launch_enabled": "Enabled",
       "auto_launch_disabled": "Disabled",
-      "auto_launch_desc": "Automatically launch Agm Tool By Alim when system starts",
+      "auto_launch_desc": "Automatically launch Antigravity Tools when system starts",
       "auto_check_update": "Auto Check for Updates",
       "auto_check_update_desc": "Automatically check for new versions on startup",
       "auto_check_update_enabled": "Auto check enabled",
@@ -729,7 +729,7 @@
       "long_prompt_warning": "Prompt is quite long (over 2000 chars) and may consume significant context space."
     },
     "branding": {
-      "title": "Antigravity Manager Tools By Alim",
+      "title": "Antigravity Tools",
       "subtitle": "Professional Account Management"
     }
   },
@@ -747,7 +747,7 @@
   "proxy": {
     "title": "API Proxy Service",
     "error": {
-      "load_failed": "Failed to load configuration"
+      "load_failed": "Failed to load"
     },
     "status": {
       "running": "Service Running",
@@ -1499,8 +1499,8 @@
     "downloading": "Downloading update in background...",
     "restarting": "Restarting application...",
     "auto_update": "Auto Update",
-    "restart_prompt": "Update downloaded and ready to install. Restart now?",
-    "btn_restart": "Restart",
+    "restart_prompt": "Update is ready. Restart the app to apply changes.",
+    "btn_restart": "Restart Now",
     "btn_later": "Later",
     "toast": {
       "not_ready": "Update artifacts are not ready yet. Will retry later.",

@@ -457,21 +457,40 @@ pub async fn fetch_quota_with_cache(
                                 };
 
                                 if matches_group {
-                                    // Look for 5h bucket first, then fallback to any bucket
-                                    let target_bucket = group
-                                        .buckets
-                                        .iter()
-                                        .find(|b| {
-                                            let win = b.window.to_lowercase();
-                                            let bid = b.bucket_id.to_lowercase();
-                                            win.contains("5h")
-                                                || bid.contains("5h")
-                                                || win.contains("hour")
-                                                || bid.contains("hour")
-                                        })
-                                        .or_else(|| group.buckets.first());
+                                    // Find 5h bucket and weekly bucket to compute effective available quota
+                                    let bucket_5h = group.buckets.iter().find(|b| {
+                                        let win = b.window.to_lowercase();
+                                        let bid = b.bucket_id.to_lowercase();
+                                        win.contains("5h")
+                                            || bid.contains("5h")
+                                            || win.contains("hour")
+                                            || bid.contains("hour")
+                                    });
+                                    let bucket_weekly = group.buckets.iter().find(|b| {
+                                        let win = b.window.to_lowercase();
+                                        let bid = b.bucket_id.to_lowercase();
+                                        win.contains("week")
+                                            || bid.contains("week")
+                                            || win.contains("7d")
+                                            || bid.contains("7d")
+                                    });
 
-                                    if let Some(b) = target_bucket {
+                                    let chosen_bucket = match (bucket_5h, bucket_weekly) {
+                                        (Some(h), Some(w)) => {
+                                            // If weekly quota is exhausted (<= 0.001), model is limited by weekly quota to 0%, use weekly reset
+                                            if w.remaining_fraction <= 0.001 {
+                                                Some(w)
+                                            } else {
+                                                // When weekly quota is not exhausted, always use 5h bucket to accurately reflect 5h rolling quota and reset
+                                                Some(h)
+                                            }
+                                        }
+                                        (Some(h), None) => Some(h),
+                                        (None, Some(w)) => Some(w),
+                                        _ => group.buckets.first(),
+                                    };
+
+                                    if let Some(b) = chosen_bucket {
                                         model.percentage =
                                             (b.remaining_fraction * 100.0).round() as i32;
                                         if !b.reset_time.is_empty() {

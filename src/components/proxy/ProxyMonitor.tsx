@@ -165,7 +165,7 @@ const LogTable: React.FC<LogTableProps> = ({
             {/* Empty state */}
             {!loading && logs.length === 0 && (
                 <div className="flex items-center justify-center p-8 text-gray-400 dark:text-gray-500 text-sm">
-                    {t('monitor.table.empty') || 'No request records'}
+                    {t('monitor.table.empty') || '暂无请求记录'}
                 </div>
             )}
         </div>
@@ -174,7 +174,7 @@ const LogTable: React.FC<LogTableProps> = ({
 
 
 // ==========================================
-// Concise mode intelligent extraction and mapping algorithm
+// 简要模式智能提取与映射算法
 // ==========================================
 function extractConcisePayload(
     rawStr: string | undefined,
@@ -192,42 +192,45 @@ function extractConcisePayload(
         return rawStr;
     }
 
-    // Tool declarations (preserves full Schema for inspecting parameters)
+    // 工具声明 (完整保留 Schema，方便开发者查看工具拼接与入参定义)
     const simplifyTools = (tools: any): any => {
         if (!Array.isArray(tools)) return undefined;
         return tools;
     };
 
-    // Simplify tool calls (preserves name, id, arguments / args)
+    // 简化工具调用 (统一规范为: id, type: 'function', function: { name, arguments })
     const simplifyToolCalls = (toolCalls: any): any => {
         if (!Array.isArray(toolCalls)) return undefined;
         return toolCalls.map((tc: any) => {
             if (!tc || typeof tc !== 'object') return tc;
             const res: any = {};
             if (tc.id) res.id = tc.id;
-            if (tc.type) res.type = tc.type;
+            res.type = tc.type || 'function';
             if (tc.function && typeof tc.function === 'object') {
                 res.function = {
                     name: tc.function.name,
                     arguments: tc.function.arguments !== undefined ? tc.function.arguments : {}
                 };
             } else {
-                if (tc.name) res.name = tc.name;
-                if (tc.input !== undefined) res.input = tc.input;
-                if (tc.args !== undefined) res.args = tc.args;
+                const name = tc.name || tc.function?.name || 'unknown';
+                const args = tc.arguments !== undefined ? tc.arguments : (tc.args !== undefined ? tc.args : (tc.input !== undefined ? tc.input : {}));
+                res.function = {
+                    name,
+                    arguments: args
+                };
             }
             return res;
         });
     };
 
-    // Simplify message content (Claude / OpenAI parts)
+    // 简化消息内容 (Claude / OpenAI parts)
     const simplifyContent = (content: any): any => {
         if (typeof content === 'string') return content;
         if (Array.isArray(content)) {
             return content.map((item: any) => {
                 if (typeof item === 'string') return item;
                 if (!item || typeof item !== 'object') return item;
-                // Claude tool_use block
+                // Claude tool_use 块
                 if (item.type === 'tool_use') {
                     return {
                         type: 'tool_use',
@@ -236,7 +239,7 @@ function extractConcisePayload(
                         input: item.input !== undefined ? item.input : {}
                     };
                 }
-                // Claude tool_result block
+                // Claude tool_result 块
                 if (item.type === 'tool_result') {
                     return {
                         type: 'tool_result',
@@ -245,7 +248,7 @@ function extractConcisePayload(
                         ...(item.is_error !== undefined ? { is_error: item.is_error } : {})
                     };
                 }
-                // Claude thinking block and signature
+                // Claude thinking 块与签名
                 if (item.type === 'thinking') {
                     return {
                         type: 'thinking',
@@ -256,14 +259,14 @@ function extractConcisePayload(
                         ...(item.thinking_signature !== undefined ? { thinking_signature: item.thinking_signature } : {})
                     };
                 }
-                // Claude redacted_thinking block
+                // Claude redacted_thinking 块
                 if (item.type === 'redacted_thinking') {
                     return {
                         type: 'redacted_thinking',
                         data: item.data
                     };
                 }
-                // Text block
+                // 文本块
                 if (item.type === 'text') {
                     return item;
                 }
@@ -273,7 +276,7 @@ function extractConcisePayload(
         return content;
     };
 
-    // Simplify messages list
+    // 简化消息列表
     const simplifyMessages = (messages: any): any => {
         if (!Array.isArray(messages)) return undefined;
         return messages.map((m: any) => {
@@ -310,7 +313,7 @@ function extractConcisePayload(
         });
     };
 
-    // Simplify Gemini turns (contents)
+    // 简化 Gemini 轮次 (contents)
     const simplifyGeminiContents = (contents: any): any => {
         if (!Array.isArray(contents)) return undefined;
         return contents.map((c: any) => {
@@ -320,7 +323,7 @@ function extractConcisePayload(
                 res.parts = c.parts.map((p: any) => {
                     if (!p || typeof p !== 'object') return p;
 
-                    // 1. Prioritize tool calls (functionCall) preserving name, ID, args, and thought signature
+                    // 1. 优先识别工具调用 (functionCall) 并保留其名称、ID、参数与携带的加密思考签名
                     if (p.functionCall) {
                         const fcPart: any = {
                             functionCall: {
@@ -336,7 +339,7 @@ function extractConcisePayload(
                         return fcPart;
                     }
 
-                    // 2. Prioritize tool responses (functionResponse) preserving name, ID, response, and signature
+                    // 2. 优先识别工具响应 (functionResponse) 并保留其名称、ID、返回值与携带的签名
                     if (p.functionResponse) {
                         const frPart: any = {
                             functionResponse: {
@@ -352,7 +355,7 @@ function extractConcisePayload(
                         return frPart;
                     }
 
-                    // 3. Independent thinking block (pure reasoning, without tool calls)
+                    // 3. 独立思考块 (纯思考过程，不带工具调用)
                     if (p.thought !== undefined || p.thought_signature !== undefined || p.thoughtSignature !== undefined || p.signature !== undefined) {
                         const tPart: any = {};
                         if (p.thought !== undefined) tPart.thought = p.thought;
@@ -363,7 +366,7 @@ function extractConcisePayload(
                         return tPart;
                     }
 
-                    // 4. Regular text block
+                    // 4. 普通文本块
                     if (p.text !== undefined) {
                         return { text: p.text };
                     }
@@ -375,7 +378,7 @@ function extractConcisePayload(
         });
     };
 
-    // Simplify system prompt (Gemini / Anthropic)
+    // 简化系统提示词 (Gemini / Anthropic)
     const simplifySystemInstruction = (sys: any): any => {
         if (!sys || typeof sys !== 'object') return sys;
         if (Array.isArray(sys.parts)) {
@@ -390,7 +393,7 @@ function extractConcisePayload(
         return sys;
     };
 
-    // Extract token usage and cache hit rate
+    // 提取用量与缓存命中率
     const simplifyUsage = (usage: any): any => {
         if (!usage || typeof usage !== 'object') return undefined;
         const res: any = {};
@@ -405,9 +408,9 @@ function extractConcisePayload(
             cached = usage.input_tokens_details.cached_tokens;
         }
 
-        // Calculate total context input tokens
-        // 1. Anthropic protocol: input_tokens represents uncached delta, total = input_tokens + cache_read_input_tokens
-        // 2. Historical log compatibility: self-healing sum if cached exceeds raw input
+        // 计算全量上下文输入 Token (Total Context Input)
+        // 1. Anthropic 官方协议: input_tokens 仅代表未缓存增量，总上下文 = input_tokens + cache_read_input_tokens
+        // 2. 兼容历史日志: 若 cached > rawInput，说明 rawInput 存的是未缓存差值，做自愈加和
         let totalInput = rawInput != null ? Number(rawInput) : undefined;
         if (cached != null && totalInput != null && cached > totalInput) {
             totalInput = totalInput + Number(cached);
@@ -441,7 +444,7 @@ function extractConcisePayload(
 
     const concise: any = {};
 
-    // Preserve session identifiers (requestId, sessionId, trace_id, etc.)
+    // 保留用于标识思考块/会话的单行标识 (支持 requestId, sessionId, trace_id 等)
     const candidateSessionId =
         obj.requestId ||
         obj.request?.sessionId ||
@@ -453,10 +456,10 @@ function extractConcisePayload(
         concise._session_thinking_id = candidateSessionId;
     }
 
-    // Model
+    // 模型
     if (obj.model) concise.model = obj.model;
 
-    // Thinking config (enabled, budget, effort, summary)
+    // 思考模型配置 (开启、预算、effort、summary)
     if (obj.thinking !== undefined) concise.thinking = obj.thinking;
     if (obj.reasoning_effort !== undefined) concise.reasoning_effort = obj.reasoning_effort;
     if (obj.reasoning !== undefined) concise.reasoning = obj.reasoning;
@@ -467,47 +470,47 @@ function extractConcisePayload(
         concise.thinkingConfig = obj.thinkingConfig;
     }
 
-    // System prompt
+    // 系统提示词
     if (obj.system !== undefined) concise.system = obj.system;
     if (obj.systemInstruction !== undefined) concise.systemInstruction = simplifySystemInstruction(obj.systemInstruction);
 
-    // Messages (OpenAI / Claude)
+    // 对话主体 (OpenAI / Claude)
     if (obj.messages) {
         concise.messages = simplifyMessages(obj.messages);
     }
 
-    // Contents (Gemini)
+    // 对话主体 (Gemini)
     if (obj.contents) {
         concise.contents = simplifyGeminiContents(obj.contents);
     }
 
-    // Tools
+    // 工具声明
     if (obj.tools) {
         concise.tools = simplifyTools(obj.tools);
     }
 
-    // Request wrapper layer for nested payload
+    // Antigravity 专用的 request 嵌套包装层 (核心：正确映射原中转报文的嵌套层级)
     if (obj.request && typeof obj.request === 'object') {
         const innerReq: any = {};
 
-        // Session identifiers
+        // 单行会话标识
         if (obj.request.sessionId) {
             innerReq.sessionId = obj.request.sessionId;
         }
 
-        // Thinking config (thinkingConfig / generationConfig)
+        // 思考配置 (thinkingConfig / generationConfig)
         if (obj.request.generationConfig?.thinkingConfig !== undefined) {
             innerReq.thinkingConfig = obj.request.generationConfig.thinkingConfig;
         } else if (obj.request.thinkingConfig !== undefined) {
             innerReq.thinkingConfig = obj.request.thinkingConfig;
         }
 
-        // System prompt
+        // 系统提示词
         if (obj.request.systemInstruction !== undefined) {
             innerReq.systemInstruction = simplifySystemInstruction(obj.request.systemInstruction);
         }
 
-        // Dialogue turns and thinking blocks
+        // 对话主体与思考块 (Gemini contents 或 Claude messages)
         if (obj.request.contents) {
             innerReq.contents = simplifyGeminiContents(obj.request.contents);
         }
@@ -515,7 +518,7 @@ function extractConcisePayload(
             innerReq.messages = simplifyMessages(obj.request.messages);
         }
 
-        // Tools
+        // 工具声明
         if (obj.request.tools) {
             innerReq.tools = simplifyTools(obj.request.tools);
         }
@@ -523,53 +526,146 @@ function extractConcisePayload(
         concise.request = innerReq;
     }
 
-    // Response: thinking blocks and signatures
+    // 响应：思考块与思考签名 (顶层响应或非流式)
     if (obj.thinking !== undefined) concise.thinking = obj.thinking;
     if (obj.thinking_signature !== undefined) concise.thinking_signature = obj.thinking_signature;
     if (obj.thought_signature !== undefined) concise.thought_signature = obj.thought_signature;
     if (obj.signature !== undefined) concise.signature = obj.signature;
+    if (obj.thoughtSignature !== undefined) concise.thoughtSignature = obj.thoughtSignature;
+    if (obj._timing !== undefined) concise._timing = obj._timing;
 
-    // Response: Choices / Candidates / aggregate response
-    if (obj.choices && Array.isArray(obj.choices)) {
-        concise.choices = obj.choices.map((c: any) => {
-            const choiceRes: any = { index: c.index };
-            if (c.finish_reason) choiceRes.finish_reason = c.finish_reason;
-            if (c.message) {
-                choiceRes.message = {
-                    role: c.message.role,
-                    ...(c.message.reasoning_content !== undefined ? { reasoning_content: c.message.reasoning_content } : {}),
-                    ...(c.message.thinking !== undefined ? { thinking: c.message.thinking } : {}),
-                    ...(c.message.thinking_signature !== undefined ? { thinking_signature: c.message.thinking_signature } : {}),
-                    ...(c.message.thought_signature !== undefined ? { thought_signature: c.message.thought_signature } : {}),
-                    ...(c.message.signature !== undefined ? { signature: c.message.signature } : {}),
-                    ...(c.message.content !== undefined ? { content: c.message.content } : {}),
-                    ...(c.message.tool_calls ? { tool_calls: simplifyToolCalls(c.message.tool_calls) } : {})
-                };
-            } else if (c.delta) {
-                choiceRes.delta = {
-                    role: c.delta.role,
-                    ...(c.delta.reasoning_content !== undefined ? { reasoning_content: c.delta.reasoning_content } : {}),
-                    ...(c.delta.thinking !== undefined ? { thinking: c.delta.thinking } : {}),
-                    ...(c.delta.thinking_signature !== undefined ? { thinking_signature: c.delta.thinking_signature } : {}),
-                    ...(c.delta.thought_signature !== undefined ? { thought_signature: c.delta.thought_signature } : {}),
-                    ...(c.delta.signature !== undefined ? { signature: c.delta.signature } : {}),
-                    ...(c.delta.content !== undefined ? { content: c.delta.content } : {}),
-                    ...(c.delta.tool_calls ? { tool_calls: simplifyToolCalls(c.delta.tool_calls) } : {})
-                };
+    // 🌟 响应报文规范化提取：若为 response，优先将 choices / candidates / content 数组扁平化提升为顶层统一结构
+    if (kind === 'response') {
+        if (obj.choices && Array.isArray(obj.choices) && obj.choices.length > 0) {
+            const first = obj.choices[0];
+            const msg = first?.message || first?.delta;
+            if (msg) {
+                if (concise.thinking === undefined) {
+                    const th = msg.reasoning_content || msg.thinking;
+                    if (th) concise.thinking = th;
+                }
+                if (concise.thinking_signature === undefined) {
+                    const sig = msg.thoughtSignature || msg.thought_signature || msg.signature;
+                    if (sig) concise.thinking_signature = sig;
+                }
+                if (concise.content === undefined && msg.content !== undefined) {
+                    concise.content = typeof msg.content === 'string' ? msg.content : simplifyContent(msg.content);
+                }
+                if (concise.tool_calls === undefined && msg.tool_calls) {
+                    concise.tool_calls = simplifyToolCalls(msg.tool_calls);
+                }
             }
-            return choiceRes;
-        });
+        } else if (obj.candidates && Array.isArray(obj.candidates) && obj.candidates.length > 0) {
+            const parts = obj.candidates[0]?.content?.parts;
+            if (Array.isArray(parts)) {
+                let thText = '';
+                let normalText = '';
+                let sigText = '';
+                const extractedTools: any[] = [];
+                for (const p of parts) {
+                    if (p.text) {
+                        if (p.thought) thText += p.text;
+                        else normalText += p.text;
+                    }
+                    const s = p.thoughtSignature || p.thought_signature || p.signature || p.functionCall?.thoughtSignature || p.functionCall?.thought_signature;
+                    if (s) {
+                        if (!sigText) sigText = s;
+                    }
+                    if (p.functionCall) {
+                        extractedTools.push({
+                            id: p.functionCall.id || '',
+                            type: 'function',
+                            function: {
+                                name: p.functionCall.name || 'unknown',
+                                arguments: p.functionCall.args !== undefined ? (typeof p.functionCall.args === 'string' ? p.functionCall.args : JSON.stringify(p.functionCall.args)) : '{}'
+                            }
+                        });
+                    }
+                }
+                if (concise.thinking === undefined && thText) concise.thinking = thText;
+                if (concise.thinking_signature === undefined && sigText) concise.thinking_signature = sigText;
+                if (concise.content === undefined && normalText) concise.content = normalText;
+                if (concise.tool_calls === undefined && extractedTools.length > 0) concise.tool_calls = simplifyToolCalls(extractedTools);
+            }
+        } else if (Array.isArray(obj.content)) {
+            if (!obj.messages && !obj.choices) {
+            let thText = '';
+            let sigText = '';
+            let normalText = '';
+            const extractedTools: any[] = [];
+            for (const item of obj.content) {
+                if (item && typeof item === 'object') {
+                    if (item.type === 'thinking') {
+                        if (item.thinking) thText += item.thinking;
+                        const s = item.signature || item.thought_signature || item.thoughtSignature;
+                        if (s) {
+                        if (!sigText) sigText = s;
+                    }
+                    } else if (item.type === 'text' && item.text) {
+                        normalText += item.text;
+                    } else if (item.type === 'tool_use') {
+                        extractedTools.push({
+                            id: item.id || '',
+                            type: 'function',
+                            function: {
+                                name: item.name || 'unknown',
+                                arguments: item.input !== undefined ? (typeof item.input === 'string' ? item.input : JSON.stringify(item.input)) : '{}'
+                            }
+                        });
+                    }
+                }
+            }
+            if (concise.thinking === undefined && thText) concise.thinking = thText;
+            if (concise.thinking_signature === undefined && sigText) concise.thinking_signature = sigText;
+            if (concise.content === undefined && normalText) concise.content = normalText;
+            if (concise.tool_calls === undefined && extractedTools.length > 0) concise.tool_calls = simplifyToolCalls(extractedTools);
+            }
+        }
     }
 
-    if (obj.candidates && Array.isArray(obj.candidates)) {
-        concise.candidates = obj.candidates.map((cand: any) => {
-            const candRes: any = {};
-            if (cand.finishReason) candRes.finishReason = cand.finishReason;
-            if (cand.content) {
-                candRes.content = simplifyGeminiContents([cand.content])?.[0] || cand.content;
-            }
-            return candRes;
-        });
+    // 响应：Choices / Candidates / 聚合响应 (若为 request 或未扁平化提取的 response，保留 choices/candidates)
+    if (kind !== 'response' || (!concise.content && !concise.tool_calls && !concise.thinking)) {
+        if (obj.choices && Array.isArray(obj.choices)) {
+            concise.choices = obj.choices.map((c: any) => {
+                const choiceRes: any = { index: c.index };
+                if (c.finish_reason) choiceRes.finish_reason = c.finish_reason;
+                if (c.message) {
+                    choiceRes.message = {
+                        role: c.message.role,
+                        ...(c.message.reasoning_content !== undefined ? { reasoning_content: c.message.reasoning_content } : {}),
+                        ...(c.message.thinking !== undefined ? { thinking: c.message.thinking } : {}),
+                        ...(c.message.thinking_signature !== undefined ? { thinking_signature: c.message.thinking_signature } : {}),
+                        ...(c.message.thought_signature !== undefined ? { thought_signature: c.message.thought_signature } : {}),
+                        ...(c.message.signature !== undefined ? { signature: c.message.signature } : {}),
+                        ...(c.message.content !== undefined ? { content: c.message.content } : {}),
+                        ...(c.message.tool_calls ? { tool_calls: simplifyToolCalls(c.message.tool_calls) } : {})
+                    };
+                } else if (c.delta) {
+                    choiceRes.delta = {
+                        role: c.delta.role,
+                        ...(c.delta.reasoning_content !== undefined ? { reasoning_content: c.delta.reasoning_content } : {}),
+                        ...(c.delta.thinking !== undefined ? { thinking: c.delta.thinking } : {}),
+                        ...(c.delta.thinking_signature !== undefined ? { thinking_signature: c.delta.thinking_signature } : {}),
+                        ...(c.delta.thought_signature !== undefined ? { thought_signature: c.delta.thought_signature } : {}),
+                        ...(c.delta.signature !== undefined ? { signature: c.delta.signature } : {}),
+                        ...(c.delta.content !== undefined ? { content: c.delta.content } : {}),
+                        ...(c.delta.tool_calls ? { tool_calls: simplifyToolCalls(c.delta.tool_calls) } : {})
+                    };
+                }
+                return choiceRes;
+            });
+        }
+
+        if (obj.candidates && Array.isArray(obj.candidates)) {
+            concise.candidates = obj.candidates.map((cand: any) => {
+                const candRes: any = {};
+                if (cand.finishReason) candRes.finishReason = cand.finishReason;
+                if (cand.content) {
+                    candRes.content = simplifyGeminiContents([cand.content])?.[0] || cand.content;
+                }
+                return candRes;
+            });
+        }
     }
 
     if (obj.input !== undefined) {
@@ -585,17 +681,23 @@ function extractConcisePayload(
         concise.instructions = obj.instructions;
     }
 
-    if (obj.content !== undefined && !obj.messages && !obj.choices && !obj.request) {
-        concise.content = simplifyContent(obj.content);
+    if (obj.content !== undefined) {
+        if (!obj.messages && !obj.choices && !obj.request) {
+            concise.content = simplifyContent(obj.content);
+        }
     }
-    if (obj.reasoning_content !== undefined && !obj.messages && !obj.choices) {
-        concise.reasoning_content = obj.reasoning_content;
+    if (obj.reasoning_content !== undefined) {
+        if (!obj.messages && !obj.choices) {
+            concise.reasoning_content = obj.reasoning_content;
+        }
     }
-    if (obj.tool_calls && !obj.messages && !obj.choices) {
-        concise.tool_calls = simplifyToolCalls(obj.tool_calls);
+    if (obj.tool_calls) {
+        if (!obj.messages && !obj.choices) {
+            concise.tool_calls = simplifyToolCalls(obj.tool_calls);
+        }
     }
 
-    // Usage and caching
+    // 用量与缓存
     const usage = simplifyUsage(obj.usage || obj.usageMetadata);
     if (usage) {
         concise.usage = usage;
@@ -775,40 +877,40 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
     const stages = useMemo(() => [
         {
             key: 'clean',
-            label: t('monitor.timing.clean', 'Clean'),
-            desc: t('monitor.timing.clean_desc', 'Cache control cleanup / role merging / history pruning'),
+            label: t('monitor.timing.clean', '会话清洗 (Clean)'),
+            desc: t('monitor.timing.clean_desc', '清理缓存控制 / 合并同角色 / 历史提纯'),
             sec: timing.cleanSec,
             color: 'bg-indigo-500',
             textColor: 'text-indigo-600 dark:text-indigo-400',
         },
         {
             key: 'norm',
-            label: t('monitor.timing.norm', 'Normalize'),
-            desc: t('monitor.timing.norm_desc', 'Model mapping / account scheduling / protocol conversion'),
+            label: t('monitor.timing.norm', '中转归一 (Normalize)'),
+            desc: t('monitor.timing.norm_desc', '模型映射 / 账号调度 / 跨协议转换'),
             sec: timing.normSec,
             color: 'bg-purple-500',
             textColor: 'text-purple-600 dark:text-purple-400',
         },
         {
             key: 'thinking',
-            label: t('monitor.timing.thinking', 'ThinkingStore'),
-            desc: t('monitor.timing.thinking_desc', 'Persist thinking chain and restore historical signatures'),
+            label: t('monitor.timing.thinking', '思维块回填 (ThinkingStore)'),
+            desc: t('monitor.timing.thinking_desc', '持久化思维链及补齐商业Agent历史签名'),
             sec: timing.thinkingSec,
             color: 'bg-amber-500',
             textColor: 'text-amber-600 dark:text-amber-400',
         },
         {
             key: 'ttft',
-            label: t('monitor.timing.ttft', 'TTFT'),
-            desc: t('monitor.timing.ttft_desc', 'Time to first token / response chunk'),
+            label: t('monitor.timing.ttft', '等待首包 (TTFT)'),
+            desc: t('monitor.timing.ttft_desc', '网关上送至接收首个数据包 (含首Token/思考块)'),
             sec: timing.ttftSec,
             color: 'bg-emerald-500',
             textColor: 'text-emerald-600 dark:text-emerald-400',
         },
         {
             key: 'stream',
-            label: t('monitor.timing.stream', 'Stream'),
-            desc: t('monitor.timing.stream_desc', 'Stream transmission from first chunk to completion'),
+            label: t('monitor.timing.stream', '流式传输 (Stream)'),
+            desc: t('monitor.timing.stream_desc', '首个数据块到达至整条流式响应完成'),
             sec: timing.streamSec,
             color: 'bg-sky-500',
             textColor: 'text-sky-600 dark:text-sky-400',
@@ -818,12 +920,12 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
         const lines: string[] = [];
-        if (timing.cleanSec !== undefined) lines.push(`Clean: ${formatSeconds(timing.cleanSec)}`);
-        if (timing.normSec !== undefined) lines.push(`Normalize: ${formatSeconds(timing.normSec)}`);
-        if (timing.thinkingSec !== undefined) lines.push(`ThinkingStore: ${formatSeconds(timing.thinkingSec)}`);
-        if (timing.ttftSec !== undefined) lines.push(`TTFT: ${formatSeconds(timing.ttftSec)}`);
-        if (timing.streamSec !== undefined) lines.push(`Stream: ${formatSeconds(timing.streamSec)}`);
-        lines.push(`Total Duration: ${formatSeconds(timing.totalSec)}`);
+        if (timing.cleanSec !== undefined) lines.push(`会话清洗 (Clean)：${formatSeconds(timing.cleanSec)}`);
+        if (timing.normSec !== undefined) lines.push(`中转归一 (Normalize)：${formatSeconds(timing.normSec)}`);
+        if (timing.thinkingSec !== undefined) lines.push(`思维块回填 (ThinkingStore)：${formatSeconds(timing.thinkingSec)}`);
+        if (timing.ttftSec !== undefined) lines.push(`等待首包 (TTFT)：${formatSeconds(timing.ttftSec)}`);
+        if (timing.streamSec !== undefined) lines.push(`流式传输 (Stream)：${formatSeconds(timing.streamSec)}`);
+        lines.push(`总耗时：${formatSeconds(timing.totalSec)}`);
 
         onCopyText(lines.join('\n'));
         setIsCopied(true);
@@ -837,10 +939,10 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
                     <div className="flex items-center gap-2">
                         <Clock size={13} className="text-gray-500 dark:text-gray-400 shrink-0" />
                         <span className="text-xs font-bold tracking-wider text-gray-700 dark:text-gray-200 shrink-0 whitespace-nowrap">
-                            {t('monitor.timing.title', 'Stage Timing Diagnostics')}
+                            {t('monitor.timing.title', '耗时诊断')}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                            {t('monitor.timing.total', 'Total Duration')}: {formatSeconds(timing.totalSec)}
+                            {t('monitor.timing.total', '总耗时')}: {formatSeconds(timing.totalSec)}
                         </span>
                     </div>
                 </div>
@@ -860,11 +962,11 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
                 <div className="flex items-center gap-2 min-w-0">
                     <Clock size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="text-xs font-bold tracking-wider text-emerald-950 dark:text-emerald-100 shrink-0 whitespace-nowrap">
-                        {t('monitor.timing.title', 'Stage Timing Diagnostics')}
+                        {t('monitor.timing.title', '耗时诊断')}
                     </span>
                     {!isExpanded && totalSec > 0 && (
                         <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                            {t('monitor.timing.total', 'Total Duration')}: {formatSeconds(timing.totalSec)}
+                            {t('monitor.timing.total', '总耗时')}: {formatSeconds(timing.totalSec)}
                         </span>
                     )}
                 </div>
@@ -874,16 +976,16 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
                         type="button"
                         onClick={handleCopy}
                         className="btn btn-ghost btn-xs h-6 px-2 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/15 text-[11px] font-semibold gap-1"
-                        title={isCopied ? t('common.copied', 'Copied') : t('common.copy', 'Copy')}
+                        title={isCopied ? t('common.copied', '已复制') : t('common.copy', '复制')}
                     >
                         {isCopied ? <CheckCircle size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                        <span>{isCopied ? t('common.copied', 'Copied') : t('common.copy', 'Copy')}</span>
+                        <span>{isCopied ? t('common.copied', '已复制') : t('common.copy', '复制')}</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => setIsExpanded((prev) => !prev)}
                         className="btn btn-ghost btn-xs p-1 h-6 min-h-0 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/15"
-                        title={isExpanded ? 'Collapse diagnostics' : 'Expand diagnostics'}
+                        title={isExpanded ? '收起耗时诊断' : '展开耗时诊断'}
                     >
                         <ChevronDown size={14} className={`transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
                     </button>
@@ -954,7 +1056,7 @@ const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ timing, o
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                                 <span className="text-emerald-950 dark:text-emerald-100 text-xs font-bold">
-                                    {t('monitor.timing.total', 'Total Duration')}
+                                    {t('monitor.timing.total', '总耗时')}
                                 </span>
                             </div>
                             <div className="flex items-baseline gap-2 shrink-0 text-right font-mono">
@@ -981,7 +1083,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     const [stats, setStats] = useState<ProxyStats>({ total_requests: 0, success_count: 0, error_count: 0 });
     const [filter, setFilter] = useState('');
     const [accountFilter, setAccountFilter] = useState('');
-    // [FIX] Use ref to store latest filter criteria to avoid setInterval closure issues
+    // [FIX] 使用 ref 存储最新的筛选条件，避免 setInterval 闭包问题
     const filterRef = useRef(filter);
     const accountFilterRef = useRef(accountFilter);
     const currentPageRef = useRef(1);
@@ -993,7 +1095,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     const [showMetadata, setShowMetadata] = useState(true);
     const [copiedCard, setCopiedCard] = useState<string | null>(null);
 
-    // Log storage and maintenance configuration state
+    // 日志存储与维护配置状态
     const [showLogSettings, setShowLogSettings] = useState(false);
     const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
     const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -1024,7 +1126,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     };
 
-    // Global shortcut Ctrl+F: focus main filter search bar when focus is outside payload cards
+    // 全局快捷键 Ctrl+F：当焦点在报文卡片之外时，聚焦主界面的全局过滤搜索框
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
@@ -1185,7 +1287,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     const goToPage = (page: number) => {
         if (page >= 1 && page <= totalPages && page !== currentPage) {
             setCurrentPage(page);
-            currentPageRef.current = page; // [FIX] Sync ref
+            currentPageRef.current = page; // [FIX] 同步 ref
             loadData(page, filter, accountFilter);
         }
     };
@@ -1232,7 +1334,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
                 const newLog = event.payload;
 
-                // Remove body to reduce memory footprint
+                // 移除 body 以减少内存占用
                 const logSummary = {
                     ...newLog,
                     request_body: undefined,
@@ -1249,7 +1351,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
                 pendingLogsRef.current.push(logSummary);
 
-                // Debounce: batch update every 500ms
+                // 防抖:每 500ms 批量更新一次
                 if (updateTimeout) clearTimeout(updateTimeout);
                 updateTimeout = window.setTimeout(async () => {
                     if (!isMountedRef.current) return;
@@ -1287,14 +1389,16 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
         };
         setupListener();
 
-        // Web mode fallback: enable polling if not running under Tauri desktop
+        // Web 模式補強：如果不是 Tauri 環境，則啟用定時輪詢
         let pollInterval: number | null = null;
         if (!isTauri()) {
             console.debug('[ProxyMonitor] Web mode detected, starting auto-poll (10s)');
             pollInterval = window.setInterval(() => {
-                if (isMountedRef.current && !loading) {
-                    // [FIX] Use ref.current to get latest filter criteria
-                    loadData(currentPageRef.current, filterRef.current, accountFilterRef.current);
+                if (isMountedRef.current) {
+                    if (!loading) {
+                        // [FIX] 使用 ref.current 获取最新的筛选条件
+                        loadData(currentPageRef.current, filterRef.current, accountFilterRef.current);
+                    }
                 }
             }, 10000);
         }
@@ -1322,7 +1426,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     useEffect(() => {
         setCurrentPage(1);
         loadData(1, filter, accountFilter);
-        // [FIX] Sync ref value for setInterval
+        // [FIX] 同步 ref 值，供 setInterval 使用
         filterRef.current = filter;
         accountFilterRef.current = accountFilter;
         currentPageRef.current = 1;
@@ -1366,7 +1470,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
     const updateLogRetentionField = (field: 'max_body_age_hours' | 'max_storage_gb' | 'max_rows', value: number) => {
         if (!appConfig) return;
-        const currentRetention = appConfig.proxy?.log_retention || { max_body_age_hours: 24, max_storage_gb: 0.5, max_age_days: 30, max_rows: 100000 };
+        const currentRetention = appConfig.proxy?.log_retention || { max_body_age_hours: 24, max_storage_gb: 0.5, max_rows: 100000 };
         const safeVal = field === 'max_storage_gb'
             ? Math.max(0.1, isNaN(value) ? 0.5 : value)
             : Math.max(1, isNaN(value) ? 1 : value);
@@ -1501,12 +1605,12 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                 ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30'
                                 : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
                         }`}
-                        title={t('common.settings', { defaultValue: 'Settings' })}
-                        aria-label={t('common.settings', { defaultValue: 'Settings' })}
+                        title={t('common.settings', { defaultValue: '设置' })}
+                        aria-label={t('common.settings', { defaultValue: '设置' })}
                     >
                         <Settings size={16} />
                     </button>
-                    <button onClick={clearLogs} className="btn btn-sm btn-ghost text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('monitor.actions.clear_all_requests', { defaultValue: 'Clear Request Logs' })}>
+                    <button onClick={clearLogs} className="btn btn-sm btn-ghost text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('monitor.actions.clear_all_requests', { defaultValue: '清空请求日志' })}>
                         <Trash2 size={16} />
                     </button>
                 </div>
@@ -1537,7 +1641,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                 </div>
             </div>
 
-            {/* Log storage and maintenance configuration drawer */}
+            {/* 日志存储与维护展开配置面板 */}
             {showLogSettings && appConfig && (
                 <div className="bg-gray-50/90 dark:bg-base-200 border-b border-gray-200 dark:border-base-300 p-4 space-y-3.5 shadow-xs">
                     {/* Panel Header */}
@@ -1545,10 +1649,10 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                         <div className="flex items-center gap-2">
                             <Database size={16} className="text-blue-600 dark:text-blue-400" />
                             <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                {t('monitor.settings.title', { defaultValue: 'Log Storage & Maintenance Settings' })}
+                                {t('monitor.settings.title', { defaultValue: '日志存储周期与维护设置' })}
                             </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                                {t('monitor.settings.subtitle', { defaultValue: 'Manage request log retention, sliding window, and disk storage' })}
+                                {t('monitor.settings.subtitle', { defaultValue: '统一管理请求日志保留天数、思考块滑动窗口与磁盘空间回收' })}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1560,10 +1664,10 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                         ? 'bg-emerald-600 hover:bg-emerald-700'
                                         : 'bg-blue-600 hover:bg-blue-700'
                                 }`}
-                                title="Save all log and thinking store configuration"
+                                title="保存全部日志与思考块配置"
                             >
                                 <Check size={13} />
-                                <span>{saveSuccess ? t('common.saved', { defaultValue: 'Saved' }) : (isSavingConfig ? t('common.saving', { defaultValue: 'Saving...' }) : t('common.save', { defaultValue: 'Save & Apply' }))}</span>
+                                <span>{saveSuccess ? t('common.saved', { defaultValue: '已生效' }) : (isSavingConfig ? t('common.saving', { defaultValue: '保存中...' }) : t('common.save', { defaultValue: '全部保存并热生效' }))}</span>
                             </button>
                             <button
                                 onClick={() => setShowLogSettings(false)}
@@ -1576,22 +1680,22 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
                     {/* 2-Column Balanced Settings Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        {/* 1. Request logs and payload retention policy */}
+                        {/* 1. 请求日志与报文保留策略 */}
                         <div className="p-3.5 bg-white dark:bg-base-100 rounded-xl border border-gray-200/90 dark:border-base-200 shadow-xs flex flex-col justify-between space-y-3">
                             <div className="space-y-3">
                                 <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
                                     <Clock size={13} className="text-indigo-500 dark:text-indigo-400" />
-                                    {t('monitor.settings.retention_title', { defaultValue: 'Request Log & Payload Retention Policy (Sliding Window)' })}
+                                    {t('monitor.settings.retention_title', { defaultValue: '请求日志与报文保留策略 (滑动窗口)' })}
                                 </span>
                                 <div className="space-y-2.5">
-                                    {/* Storage capacity limit */}
+                                    {/* 空间上限 */}
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
                                             <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                                                {t('proxy.config.log_retention_storage_gb', { defaultValue: 'Log Storage Limit (GB)' })}
+                                                {t('proxy.config.log_retention_storage_gb', { defaultValue: '日志保留空间上限 (GB)' })}
                                             </label>
                                             <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                                {t('proxy.config.log_retention_current_usage', { defaultValue: 'Current Database Size' })}: <strong className="font-mono text-gray-700 dark:text-gray-200">{dbDiskSizeBytes !== null ? formatBytes(dbDiskSizeBytes) : '...'}</strong>
+                                                {t('proxy.config.log_retention_current_usage', { defaultValue: '当前库占用' })}: <strong className="font-mono text-gray-700 dark:text-gray-200">{dbDiskSizeBytes !== null ? formatBytes(dbDiskSizeBytes) : '...'}</strong>
                                             </span>
                                         </div>
                                         <input
@@ -1604,15 +1708,15 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                             className="input input-xs input-bordered bg-gray-50 dark:bg-base-200 border-gray-300 dark:border-base-300 text-gray-800 dark:text-white w-full font-mono text-xs focus:border-blue-500"
                                         />
                                         <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
-                                            {t('proxy.config.log_retention_storage_gb_desc', { defaultValue: 'Managed automatically by capacity limit sliding window. When reached, oldest 30% of records are cleaned.' })}
+                                            {t('proxy.config.log_retention_storage_gb_desc', { defaultValue: '完全由容量上限滑动窗口托管，保留完整报文不被提前掏空；达到上限自动淘汰最尾部 30% 记录' })}
                                         </p>
                                     </div>
 
-                                    {/* Max retention rows and payload storage mode */}
+                                    {/* 最大保留条数与报文模式并排 */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
-                                                {t('proxy.config.log_retention_rows', { defaultValue: 'Max Retention Rows' })}
+                                                {t('proxy.config.log_retention_rows', { defaultValue: '最大保留条数' })}
                                             </label>
                                             <input
                                                 type="number"
@@ -1625,34 +1729,34 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
-                                                {t('proxy.config.experimental.payload_storage_mode_label', { defaultValue: 'Payload Storage Mode' })}
+                                                {t('proxy.config.experimental.payload_storage_mode_label', { defaultValue: '监控报文存储模式' })}
                                             </label>
                                             <select
                                                 className="select select-xs select-bordered bg-gray-50 dark:bg-base-200 border-gray-300 dark:border-base-300 text-gray-800 dark:text-white w-full text-xs"
                                                 value={appConfig.proxy.experimental?.payload_storage_mode || 'simple'}
                                                 onChange={(e) => updateExperimentalField('payload_storage_mode', e.target.value)}
                                             >
-                                                <option value="simple">{t('proxy.config.experimental.payload_mode_simple', { defaultValue: 'Simple Mode (Recommended)' })}</option>
-                                                <option value="full">{t('proxy.config.experimental.payload_mode_full', { defaultValue: 'Full Mode (Debugging)' })}</option>
+                                                <option value="simple">{t('proxy.config.experimental.payload_mode_simple', { defaultValue: '简要模式 (推荐)' })}</option>
+                                                <option value="full">{t('proxy.config.experimental.payload_mode_full', { defaultValue: '完整原文 (排错)' })}</option>
                                             </select>
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                                        {t('proxy.config.experimental.payload_storage_mode_desc', { defaultValue: 'Simple mode omits tool arguments and images to save disk space; switch to full mode for deep debugging.' })}
+                                        {t('proxy.config.experimental.payload_storage_mode_desc', { defaultValue: '简要模式避免工具参数与图片撑爆日志库；排错时可切完整模式。' })}
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 2. Maintenance and cleanup actions */}
+                        {/* 2. 维护与清理操作 */}
                         <div className="p-3.5 bg-white dark:bg-base-100 rounded-xl border border-gray-200/90 dark:border-base-200 shadow-xs flex flex-col justify-between space-y-3">
                             <div>
                                 <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5 mb-1.5">
                                     <HardDrive size={13} className="text-amber-500 dark:text-amber-400" />
-                                    {t('monitor.settings.maintenance_title', { defaultValue: 'Log Maintenance & Cleanup' })}
+                                    {t('monitor.settings.maintenance_title', { defaultValue: '日志维护与空间清理' })}
                                 </span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                                    {t('settings.advanced.logs_desc', { defaultValue: 'Clear log cache files or wipe historical request records to free disk space.' })}
+                                    {t('settings.advanced.logs_desc', { defaultValue: '清理应用产生的日志缓存文件或清空全部历史请求记录，释放磁盘空间。' })}
                                 </p>
                             </div>
                             <div className="space-y-2 pt-2">
@@ -1662,7 +1766,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                     className="btn btn-xs w-full btn-outline btn-warning gap-1.5 text-xs font-semibold"
                                 >
                                     <Trash2 size={12} />
-                                    {t('settings.advanced.clear_logs', { defaultValue: 'Clear Log Cache' })}
+                                    {t('settings.advanced.clear_logs', { defaultValue: '清理日志缓存文件' })}
                                 </button>
                                 <button
                                     type="button"
@@ -1670,11 +1774,11 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                     className="btn btn-xs w-full btn-outline btn-error gap-1.5 text-xs font-semibold"
                                 >
                                     <Trash2 size={12} />
-                                    {t('monitor.actions.clear_all_requests', { defaultValue: 'Clear All Request History' })}
+                                    {t('monitor.actions.clear_all_requests', { defaultValue: '清空全部历史请求' })}
                                 </button>
                                 {cacheClearedSuccess && (
                                     <p className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium">
-                                        ✓ {t('settings.advanced.logs_cleared', { defaultValue: 'Log Cache Cleared' })}
+                                        ✓ {t('settings.advanced.logs_cleared', { defaultValue: '日志缓存已清理' })}
                                     </p>
                                 )}
                             </div>
@@ -1758,7 +1862,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                 <span className="font-mono font-bold text-gray-900 dark:text-white text-sm shrink-0">{selectedLog.method}</span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-lg hidden sm:inline" title={selectedLog.url}>{selectedLog.url}</span>
                             </div>
-                            <button onClick={() => setSelectedLog(null)} className="btn btn-ghost btn-sm btn-circle text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200" aria-label="Close"><X size={18} /></button>
+                            <button onClick={() => setSelectedLog(null)} className="btn btn-ghost btn-sm btn-circle text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200" aria-label="关闭"><X size={18} /></button>
                         </div>
 
                         {/* Modal Content */}
@@ -1846,7 +1950,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                             }`}
                                         >
                                             <Sparkles size={13} className={payloadViewMode === 'concise' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'} />
-                                            <span>{t('monitor.details.concise_mode', 'Concise Mode')}</span>
+                                            <span>{t('monitor.details.concise_mode', '简要模式')}</span>
                                         </button>
                                         <button
                                             type="button"
@@ -1858,13 +1962,13 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                             }`}
                                         >
                                             <FileCode2 size={13} className={payloadViewMode === 'full' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'} />
-                                            <span>{t('monitor.details.full_mode', 'Full Mode')}</span>
+                                            <span>{t('monitor.details.full_mode', '完整模式')}</span>
                                         </button>
                                     </div>
                                     <span className="hidden sm:inline-block text-[11px] text-gray-500 dark:text-gray-400">
                                         {payloadViewMode === 'concise'
-                                            ? t('monitor.details.concise_desc', 'Tool arguments and verbose metadata omitted, highlighting thinking, tokens, and messages')
-                                            : 'Display raw unclipped payload'}
+                                            ? t('monitor.details.concise_desc', '已为您精简工具参数与冗余字段，突出思考块、用量与对话主体')
+                                            : '显示原始完整未修剪报文'}
                                     </span>
                                 </div>
 
@@ -1873,10 +1977,10 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                         type="button"
                                         onClick={() => setShowMetadata((prev) => !prev)}
                                         className="btn btn-xs btn-ghost text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200 gap-1 text-[11px]"
-                                        title={showMetadata ? 'Collapse metadata to maximize payload view' : 'Expand metadata view'}
+                                        title={showMetadata ? '折叠元数据以增大报文视野' : '展开元数据信息'}
                                     >
                                         {showMetadata ? <EyeOff size={13} /> : <Eye size={13} />}
-                                        <span>{showMetadata ? 'Collapse Metadata' : 'Expand Metadata'}</span>
+                                        <span>{showMetadata ? '收起元数据' : '展开元数据'}</span>
                                     </button>
                                 </div>
                             </div>
@@ -1885,14 +1989,14 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0 overflow-hidden">
                                 <VirtualizedPayloadViewer
                                     cardId="req"
-                                    title={t('monitor.details.request_payload', 'Request Payload')}
+                                    title={t('monitor.details.request_payload', '请求报文 (Request)')}
                                     badge="REQUEST"
                                     badgeStyle="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800/60"
                                     rawPayload={selectedLog.request_body}
                                     concisePayload={conciseRequestBody}
                                     headersJson={selectedLog.request_headers}
                                     viewMode={payloadViewMode}
-                                    emptyPlaceholder={t('monitor.details.payload_empty', 'No request payload')}
+                                    emptyPlaceholder={t('monitor.details.payload_empty', '无请求报文')}
                                     onCopy={async (text) => {
                                         const success = await copyToClipboard(text);
                                         if (success) {
@@ -1904,14 +2008,14 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                 />
                                 <VirtualizedPayloadViewer
                                     cardId="upstream"
-                                    title={t('monitor.details.upstream_request_payload', 'Forwarded Request Payload')}
+                                    title={t('monitor.details.upstream_request_payload', '中转报文 (Forwarded)')}
                                     badge="FORWARDED"
                                     badgeStyle="bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
                                     rawPayload={selectedLog.upstream_request_body}
                                     concisePayload={conciseUpstreamBody}
                                     headersJson={selectedLog.upstream_request_headers}
                                     viewMode={payloadViewMode}
-                                    emptyPlaceholder={t('monitor.details.no_upstream_payload', 'No forwarded payload (direct forwarding or unrecorded)')}
+                                    emptyPlaceholder={t('monitor.details.no_upstream_payload', '无中转报文 (直接转发或未记录)')}
                                     onCopy={async (text) => {
                                         const success = await copyToClipboard(text);
                                         if (success) {
@@ -1923,14 +2027,14 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
                                 />
                                 <VirtualizedPayloadViewer
                                     cardId="resp"
-                                    title={t('monitor.details.response_payload', 'Response Payload')}
+                                    title={t('monitor.details.response_payload', '响应报文 (Response)')}
                                     badge="RESPONSE"
                                     badgeStyle="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
                                     rawPayload={selectedLog.response_body}
                                     concisePayload={conciseResponseBody}
                                     headersJson={selectedLog.response_headers}
                                     viewMode={payloadViewMode}
-                                    emptyPlaceholder={t('monitor.details.payload_empty', 'No response payload')}
+                                    emptyPlaceholder={t('monitor.details.payload_empty', '无响应报文')}
                                     duration={selectedLog.duration}
                                     timingNode={timingNode}
                                     onCopy={async (text) => {
@@ -1961,11 +2065,11 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
             <ModalDialog
                 isOpen={isClearCacheModalOpen}
-                title={t('settings.advanced.clear_logs_title', { defaultValue: 'Confirm Clear Log Cache' })}
-                message={t('settings.advanced.clear_logs_msg', { defaultValue: 'Are you sure you want to clear all log cache files? This will not affect historical request logs or account data.' })}
+                title={t('settings.advanced.clear_logs_title', { defaultValue: '清理日志缓存确认' })}
+                message={t('settings.advanced.clear_logs_msg', { defaultValue: '确定要清理所有日志缓存文件吗？这不会影响历史请求记录和账号数据。' })}
                 type="confirm"
-                confirmText={t('common.clear', { defaultValue: 'Clear' })}
-                cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
+                confirmText={t('common.clear', { defaultValue: '清理' })}
+                cancelText={t('common.cancel', { defaultValue: '取消' })}
                 isDestructive={true}
                 onConfirm={handleClearCache}
                 onCancel={() => setIsClearCacheModalOpen(false)}

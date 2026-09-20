@@ -165,6 +165,51 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         return account.protected_models?.includes(key);
     };
 
+    // Calculate model effective quota (considering weekly quota constraints)
+    const getModelEffectiveQuota = (modelId: string, modelData?: { percentage: number; reset_time?: string }) => {
+        if (!account.quota?.quota_groups || account.quota.quota_groups.length === 0) {
+            return {
+                percentage: modelData?.percentage || 0,
+                resetTime: modelData?.reset_time,
+                isWeeklyConstrained: false,
+            };
+        }
+        const nameLower = modelId.toLowerCase();
+        const isClaudeOrGpt = nameLower.startsWith('claude') || nameLower.startsWith('gpt');
+        const isGemini = nameLower.startsWith('gemini');
+
+        for (const group of account.quota.quota_groups) {
+            const gname = group.display_name.toLowerCase();
+            const isOtherProvider = gname.includes('claude') || gname.includes('gpt') || gname.includes('3p');
+            const matches = isClaudeOrGpt
+                ? isOtherProvider
+                : isGemini
+                ? gname.includes('gemini') || !isOtherProvider
+                : false;
+
+            if (matches) {
+                const weeklyBucket = group.buckets.find(b =>
+                    b.window?.toLowerCase().includes('week') || b.bucket_id?.toLowerCase().includes('week') || b.window?.toLowerCase().includes('7d')
+                );
+                if (weeklyBucket) {
+                    if ((weeklyBucket.remaining_fraction ?? 1) <= 0.001) {
+                        return {
+                            percentage: 0,
+                            resetTime: weeklyBucket.reset_time,
+                            isWeeklyConstrained: true,
+                        };
+                    }
+                }
+            }
+        }
+
+        return {
+            percentage: modelData?.percentage || 0,
+            resetTime: modelData?.reset_time,
+            isWeeklyConstrained: false,
+        };
+    };
+
     return (
         <div className={cn(
             "flex flex-col p-3 rounded-xl border transition-all duration-150 hover:shadow-md",
@@ -317,17 +362,21 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                 />
                             ))
                         ) : (
-                            displayModels.map((model) => (
-                                <QuotaItem
-                                    key={model.id}
-                                    label={model.label}
-                                    percentage={model.data?.percentage || 0}
-                                    resetTime={model.data?.reset_time}
-                                    isProtected={isModelProtected(model.protectedKey)}
-                                    liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
-                                    Icon={model.Icon}
-                                />
-                            ))
+                            displayModels.map((model) => {
+                                const effective = getModelEffectiveQuota(model.id, model.data);
+                                return (
+                                    <QuotaItem
+                                        key={model.id}
+                                        label={model.label}
+                                        percentage={effective.percentage}
+                                        resetTime={effective.resetTime}
+                                        isProtected={isModelProtected(model.protectedKey)}
+                                        liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
+                                        isWeeklyConstrained={effective.isWeeklyConstrained}
+                                        Icon={model.Icon}
+                                    />
+                                );
+                            })
                         )}
                     </div>
                 )}

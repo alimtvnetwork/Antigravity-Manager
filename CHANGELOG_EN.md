@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.44.0 (2026-09-20)**:
+        -   **[Release v4.44.0] Sync upstream v3 proxy, quota, thinking store, and cache stability fixes**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Sync upstream v3 proxy, quota, thinking store, and cache stability fixes.
     *   **v4.43.0 (2026-09-20)**:
         -   **[Release v4.43.0] Accelerate release CI/CD with Rust dependency caching and parallel codegen units**:
             -   **Update System**: Automated release and version synchronization across all manifests.

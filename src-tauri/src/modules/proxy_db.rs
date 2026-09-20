@@ -330,12 +330,19 @@ pub fn init_db() -> Result<(), String> {
         "ALTER TABLE request_logs ADD COLUMN response_headers TEXT",
         [],
     );
+    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN session_id TEXT", []);
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_timestamp ON request_logs (timestamp DESC)",
         [],
     )
     .map_err(|e| e.to_string())?;
+
+    // Composite index: session and timestamp desc
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_session_timestamp ON request_logs (session_id, timestamp DESC)",
+        [],
+    );
 
     // Add status index for faster stats queries
     conn.execute(
@@ -431,6 +438,7 @@ fn map_request_log_row(row: &rusqlite::Row) -> rusqlite::Result<ProxyRequestLog>
         request_headers: row.get(19).unwrap_or(None),
         upstream_request_headers: row.get(20).unwrap_or(None),
         response_headers: row.get(21).unwrap_or(None),
+        session_id: row.get(22).unwrap_or(None),
     })
 }
 
@@ -876,6 +884,7 @@ fn save_log_with_connection(
             &log.error,
             &log.protocol,
             &log.username,
+            &log.session_id,
         ]
         .iter()
         .filter_map(|s| s.as_ref())
@@ -910,8 +919,8 @@ fn save_log_with_connection(
     make_room(conn, budget, log_bytes)?;
 
     conn.execute(
-        "INSERT INTO request_logs (id, timestamp, method, url, status, duration, model, error, request_body, upstream_request_body, response_body, input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username, request_headers, upstream_request_headers, response_headers)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+        "INSERT INTO request_logs (id, timestamp, method, url, status, duration, model, error, request_body, upstream_request_body, response_body, input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username, request_headers, upstream_request_headers, response_headers, session_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
         params![
             log.id,
             log.timestamp,
@@ -935,6 +944,7 @@ fn save_log_with_connection(
             log.request_headers,
             log.upstream_request_headers,
             log.response_headers,
+            log.session_id,
         ],
     ).map_err(|e| e.to_string())?;
 
@@ -950,7 +960,8 @@ pub fn get_logs_summary(limit: usize, offset: usize) -> Result<Vec<ProxyRequestL
             "SELECT id, timestamp, method, url, status, duration, model, substr(error, 1, 1024),
                 NULL as request_body, NULL as upstream_request_body, NULL as response_body,
                 input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers
+                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers,
+                session_id
          FROM request_logs 
          ORDER BY timestamp DESC 
          LIMIT ?1 OFFSET ?2",
@@ -1006,7 +1017,8 @@ pub fn get_log_detail(log_id: &str) -> Result<ProxyRequestLog, String> {
             "SELECT id, timestamp, method, url, status, duration, model, error,
                 request_body, upstream_request_body, response_body, input_tokens, output_tokens,
                 cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                request_headers, upstream_request_headers, response_headers
+                request_headers, upstream_request_headers, response_headers,
+                session_id
          FROM request_logs
          WHERE id = ?1",
         )
@@ -1359,10 +1371,36 @@ pub fn limit_max_logs(max_count: usize) -> Result<usize, String> {
 }
 
 pub fn clear_logs() -> Result<(), String> {
+    let _guard = LOG_WRITE_LOCK.lock().map_err(|e| e.to_string())?;
     let conn = connect_db()?;
     conn.execute("DELETE FROM request_logs", [])
         .map_err(|e| e.to_string())?;
+    // Full vacuum to reclaim all disk space immediately
+    let _ = conn.execute("VACUUM", []);
+    let _ = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE");
     Ok(())
+}
+
+/// 全量清空思考块数据库 (仅清空 thinking_records / thinking_sessions / tool_signatures，绝不触碰 request_logs 日志)
+pub fn clear_all_thinking_data() -> Result<usize, String> {
+    let mut total_deleted = 0;
+    // 1. 清空 thinking_store.db 中的记录与会话
+    let conn = thinking_db()?;
+    let deleted = conn
+        .execute("DELETE FROM thinking_records", [])
+        .map_err(|e| e.to_string())?;
+    total_deleted += deleted;
+    let _ = conn.execute("DELETE FROM thinking_sessions", []);
+    let _ = conn.execute("VACUUM", []);
+
+    // 2. 清空 proxy_logs.db 中残留的历史工具签名表与陈旧思考表 (绝不触碰 request_logs)
+    if let Ok(log_conn) = connect_db() {
+        let _ = log_conn.execute("DELETE FROM tool_signatures", []);
+        let _ = log_conn.execute("DELETE FROM thinking_records", []);
+        let _ = log_conn.execute("DELETE FROM thinking_sessions", []);
+    }
+
+    Ok(total_deleted)
 }
 
 /// Get total count of logs in database
@@ -1422,7 +1460,8 @@ pub fn get_logs_filtered(
         "SELECT id, timestamp, method, url, status, duration, model, substr(error, 1, 1024),
                 NULL as request_body, NULL as upstream_request_body, NULL as response_body,
                 input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers
+                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers,
+                session_id
          FROM request_logs
          WHERE (status < 200 OR status >= 400)
          ORDER BY timestamp DESC
@@ -1431,7 +1470,8 @@ pub fn get_logs_filtered(
         "SELECT id, timestamp, method, url, status, duration, model, substr(error, 1, 1024),
                 NULL as request_body, NULL as upstream_request_body, NULL as response_body,
                 input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers
+                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers,
+                session_id
          FROM request_logs
          ORDER BY timestamp DESC
          LIMIT ?1 OFFSET ?2"
@@ -1439,20 +1479,21 @@ pub fn get_logs_filtered(
         "SELECT id, timestamp, method, url, status, duration, model, substr(error, 1, 1024),
                 NULL as request_body, NULL as upstream_request_body, NULL as response_body,
                 input_tokens, output_tokens, cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers
+                NULL as request_headers, NULL as upstream_request_headers, NULL as response_headers,
+                session_id
          FROM request_logs
-         WHERE (url LIKE ?3 OR method LIKE ?3 OR model LIKE ?3 OR CAST(status AS TEXT) LIKE ?3 OR account_email LIKE ?3 OR client_ip LIKE ?3)
+         WHERE (url LIKE ?3 OR method LIKE ?3 OR model LIKE ?3 OR CAST(status AS TEXT) LIKE ?3 OR account_email LIKE ?3 OR client_ip LIKE ?3 OR session_id LIKE ?3)
          ORDER BY timestamp DESC
          LIMIT ?1 OFFSET ?2"
     };
 
-    let logs: Vec<ProxyRequestLog> = if filter.is_empty() && !errors_only {
+    let logs: Vec<ProxyRequestLog> = if errors_only {
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
         let logs_iter = stmt
             .query_map([limit, offset], map_request_log_row)
             .map_err(|e| e.to_string())?;
         logs_iter.filter_map(|r| r.ok()).collect()
-    } else if errors_only {
+    } else if filter.is_empty() {
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
         let logs_iter = stmt
             .query_map([limit, offset], map_request_log_row)
@@ -1481,7 +1522,8 @@ pub fn get_all_logs_for_export() -> Result<Vec<ProxyRequestLog>, String> {
             "SELECT id, timestamp, method, url, status, duration, model, error,
                 request_body, upstream_request_body, response_body, input_tokens, output_tokens,
                 cached_tokens, account_email, mapped_model, protocol, client_ip, username,
-                request_headers, upstream_request_headers, response_headers
+                request_headers, upstream_request_headers, response_headers,
+                session_id
          FROM request_logs
          ORDER BY timestamp DESC",
         )

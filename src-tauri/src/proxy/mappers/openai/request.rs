@@ -498,6 +498,13 @@ pub fn transform_openai_request_with_session(
     // [ported] normalized thinking and budget parameters
     let total_messages = request.messages.len();
     let recent_message_window = 24usize;
+    // Find the index of the last assistant message in messages (absolute index)
+    let last_assistant_msg_idx = request
+        .messages
+        .iter()
+        .enumerate()
+        .rposition(|(_, m)| m.role == "assistant");
+
     let contents: Vec<Value> = request
         .messages
         .iter()
@@ -532,6 +539,8 @@ pub fn transform_openai_request_with_session(
                         "..."
                     };
 
+                    let is_last_assistant = Some(msg_index) == last_assistant_msg_idx;
+
                     // [ported] normalized thinking and budget parameters
                     let effective_sig = if is_responses_api {
                         let mut sig_opt = None;
@@ -551,7 +560,26 @@ pub fn transform_openai_request_with_session(
                             }
                         }
                         if sig_opt.is_none() {
-                            sig_opt = thought_sig.clone();
+                            if let Some(ref tcs) = msg.tool_calls {
+                                for tc in tcs {
+                                    if let Some(s) = crate::proxy::SignatureCache::global().get_tool_signature(&tc.id) {
+                                        sig_opt = Some(s);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if sig_opt.is_none() {
+                            // Only latest assistant adopts global thought_sig; earlier turns freeze signatures
+                            if is_last_assistant {
+                                sig_opt = thought_sig.clone();
+                            } else {
+                                sig_opt = crate::proxy::SignatureCache::global()
+                                    .get_session_signature_at(&session_id, msg_index);
+                            }
+                            if sig_opt.is_none() {
+                                sig_opt = Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE.to_string());
+                            }
                         }
                         sig_opt.unwrap_or_else(|| crate::proxy::thinking_store::SENTINEL_SIGNATURE.to_string())
                     } else {

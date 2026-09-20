@@ -1,3 +1,9 @@
+## v4.44.0 — 2026-09-20 (Sync upstream v3 proxy, quota, thinking store, and cache stability fixes)
+
+**Scope:** Version bump. Sync upstream v3 proxy, quota, thinking store, and cache stability fixes.
+
+---
+
 ## v4.43.0 — 2026-09-20 (Accelerate release CI/CD with Rust dependency caching and parallel codegen units)
 
 **Scope:** Version bump. Accelerate release CI/CD with Rust dependency caching and parallel codegen units.
