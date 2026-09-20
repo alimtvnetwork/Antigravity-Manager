@@ -1,3 +1,9 @@
+## v4.34.0 — 2026-09-20 (Fix Linux Tauri OpenSSL static linking with vendored feature and release v4.34.0)
+
+**Scope:** Version bump. Fix Linux Tauri OpenSSL static linking with vendored feature and release v4.34.0.
+
+---
+
 ## v4.33.0 — 2026-09-20 (Fix Rust compilation in instance launch scope and release v4.33.0)
 
 **Scope:** Version bump. Fix Rust compilation in instance launch scope and release v4.33.0.
