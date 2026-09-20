@@ -1,3 +1,9 @@
+## v4.38.1 — 2026-09-20 (Fix unclosed delimiter in OpenAI handler for v4.38.1 release)
+
+**Scope:** Version bump. Fix unclosed delimiter in OpenAI handler for v4.38.1 release.
+
+---
+
 ## v4.38.0 — 2026-09-20 (Installer output tab indentation and 80-split 500KB aria2c download acceleration)
 
 **Scope:** Version bump. Installer output tab indentation and 80-split 500KB aria2c download acceleration.

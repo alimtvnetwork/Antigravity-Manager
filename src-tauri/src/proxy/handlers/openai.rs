@@ -3585,6 +3585,15 @@ pub async fn handle_completions(
                         .collect::<Vec<_>>()
                         .join("\n");
 
+                        if !content.is_empty() {
+                            messages.push(json!({
+                                "role": "user",
+                                "content": content
+                            }));
+                        }
+                    }
+                } else {
+                    let content = input.to_string();
                     if !content.is_empty() {
                         messages.push(json!({
                             "role": "user",
@@ -3592,23 +3601,15 @@ pub async fn handle_completions(
                         }));
                     }
                 }
-            } else {
-                let content = input.to_string();
-                if !content.is_empty() {
-                    messages.push(json!({
-                        "role": "user",
-                        "content": content
-                    }));
-                }
-            };
-        }
+            }
 
-        if let Some(obj) = body.as_object_mut() {
-            tracing::debug!(
-                "[Codex] Injecting normalized messages: {} messages",
-                messages.len()
-            );
-            obj.insert("messages".to_string(), Value::Array(messages));
+            if let Some(obj) = body.as_object_mut() {
+                tracing::debug!(
+                    "[Codex] Injecting normalized messages: {} messages",
+                    messages.len()
+                );
+                obj.insert("messages".to_string(), Value::Array(messages));
+            }
         }
     } else if already_normalized {
         tracing::debug!(

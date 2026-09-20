@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.38.1 (2026-09-20)**:
+        -   **[Release v4.38.1] Fix unclosed delimiter in OpenAI handler for v4.38.1 release**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix unclosed delimiter in OpenAI handler for v4.38.1 release.
     *   **v4.38.0 (2026-09-20)**:
         -   **[Release v4.38.0] Installer output tab indentation and 80-split 500KB aria2c download acceleration**:
             -   **Update System**: Automated release and version synchronization across all manifests.
