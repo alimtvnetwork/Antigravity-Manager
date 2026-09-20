@@ -1,7 +1,7 @@
 {
   "version": "4.31.0",
-  "name": "antigravity-tools",
-  "description": "Antigravity Tools",
+  "name": "agm-alim",
+  "description": "Antigravity Manager Tools By Alim",
   "type": "module",
   "private": true,
   "scripts": {

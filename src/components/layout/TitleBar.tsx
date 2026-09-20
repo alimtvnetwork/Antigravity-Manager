@@ -112,7 +112,7 @@ export default function TitleBar() {
                         </button>
                     </div>
                     <div className="flex-1 h-full flex items-center justify-center" data-tauri-drag-region>
-                        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">AGM by Alim</span>
+                        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400" title="Antigravity Manager Tools By Alim">Agm Tool By Alim</span>
                     </div>
                     <div className="w-16 h-full" data-tauri-drag-region />
                 </>
@@ -120,12 +120,12 @@ export default function TitleBar() {
                 /* Windows & Linux Fluent Caption Controls */
                 <>
                     {/* Left: App Branding Pill */}
-                    <div className="flex items-center gap-2 px-3 h-full pointer-events-none" data-tauri-drag-region>
+                    <div className="flex items-center gap-2 px-3 h-full pointer-events-none" data-tauri-drag-region title="Antigravity Manager Tools By Alim">
                         <div className="w-3.5 h-3.5 rounded-sm bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-[9px] font-black text-white shadow-xs">
                             A
                         </div>
                         <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 tracking-tight">
-                            AGM by Alim
+                            Agm Tool By Alim
                         </span>
                         <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-gray-200/60 dark:bg-base-200 text-gray-500 font-medium">
                             v{versionData.version || versionData.Version || '4.31.0'}

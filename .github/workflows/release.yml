@@ -97,22 +97,27 @@ jobs:
           # 进入产物目录
           cd src-tauri/target/*/release/bundle/macos/
 
-          # 重命名 .app.tar.gz 和 .sig
-          if [ -f "Antigravity Tools.app.tar.gz" ]; then
-            mv "Antigravity Tools.app.tar.gz" "Antigravity Tools_${ARCH}.app.tar.gz"
-            mv "Antigravity Tools.app.tar.gz.sig" "Antigravity Tools_${ARCH}.app.tar.gz.sig"
-            echo "Renamed assets to append Arch: $ARCH"
-          fi
+          # Rename .app.tar.gz and .sig to append architecture suffix
+          for tar_file in *.app.tar.gz; do
+            if [ -f "$tar_file" ] && [[ "$tar_file" != *"_${ARCH}.app.tar.gz"* ]]; then
+              base="${tar_file%.app.tar.gz}"
+              mv "$tar_file" "${base}_${ARCH}.app.tar.gz"
+              if [ -f "${tar_file}.sig" ]; then
+                mv "${tar_file}.sig" "${base}_${ARCH}.app.tar.gz.sig"
+              fi
+              echo "Renamed $tar_file to ${base}_${ARCH}.app.tar.gz"
+            fi
+          done
 
-          # 更新对应的 updater.json (指向重命名后的文件)
+          # Update updater json reference if present
           UPDATER_JSON="../../../updater/install.json"
           if [ ! -f "$UPDATER_JSON" ]; then
              UPDATER_JSON=$(find ../../../updater -name "*.json" | head -n 1)
           fi
 
-          if [ -f "$UPDATER_JSON" ]; then
-            echo "Updating $UPDATER_JSON to use renamed assets..."
-            sed -i '' "s/Antigravity%20Tools.app.tar.gz/Antigravity%20Tools_${ARCH}.app.tar.gz/g" "$UPDATER_JSON"
+          if [ -n "$UPDATER_JSON" ] && [ -f "$UPDATER_JSON" ]; then
+            echo "Updating $UPDATER_JSON with renamed assets..."
+            sed -i.bak "s/\.app\.tar\.gz/_${ARCH}.app.tar.gz/g" "$UPDATER_JSON" 2>/dev/null || true
           fi
 
       # 1. 上传 updater.json 到 Artifacts (供后续合并使用)
@@ -212,12 +217,16 @@ jobs:
           echo "" >> release_notes.md
           echo "---" >> release_notes.md
           echo "" >> release_notes.md
+          CHANGELOG_SOURCE="CHANGELOG_EN.md"
+          if [ ! -f "$CHANGELOG_SOURCE" ]; then
+            CHANGELOG_SOURCE="CHANGELOG.md"
+          fi
           awk -v ver="$VERSION" '
             BEGIN { capture=0 }
             $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*" ver { capture=1; next }
             capture && $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*v" { capture=0; exit }
             capture { print }
-          ' CHANGELOG.md | sed 's/^[[:space:]]\{8\}//' >> release_notes.md
+          ' "$CHANGELOG_SOURCE" | sed 's/^[[:space:]]\{8\}//' >> release_notes.md
           if [ ! -s release_notes.md ]; then
             echo "See the assets to download this version and install." >> release_notes.md
           fi
@@ -242,6 +251,19 @@ jobs:
             fi
           }
 
+          # Helper: resolve actual generated asset file name from artifacts
+          get_asset_name() {
+            local pattern="$1"
+            local fallback="$2"
+            local asset_file
+            asset_file=$(find all-artifacts -name "$pattern" -type f 2>/dev/null | head -1)
+            if [ -n "$asset_file" ] && [ -f "$asset_file" ]; then
+              basename "$asset_file"
+            else
+              echo "$fallback"
+            fi
+          }
+
           # Read signatures for each platform
           MACOS_AARCH64_SIG=$(read_sig "*_aarch64.app.tar.gz.sig")
           MACOS_X64_SIG=$(read_sig "*_x64.app.tar.gz.sig")
@@ -249,16 +271,21 @@ jobs:
           LINUX_AMD64_SIG=$(read_sig "*_amd64.AppImage.sig")
           LINUX_AARCH64_SIG=$(read_sig "*_aarch64.AppImage.sig")
 
+          # Read matching asset filenames for each platform
+          MACOS_AARCH64_ASSET=$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")
+          MACOS_X64_ASSET=$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")
+          WINDOWS_NSIS_ASSET=$(get_asset_name "*_x64-setup.exe" "agm-alim_${VER}_x64-setup.exe")
+          LINUX_AMD64_ASSET=$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")
+          LINUX_AARCH64_ASSET=$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")
+
           echo "Signatures found:"
-          [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES" || echo "  macOS aarch64: NO"
-          [ -n "$MACOS_X64_SIG" ] && echo "  macOS x64: YES" || echo "  macOS x64: NO"
-          [ -n "$WINDOWS_NSIS_SIG" ] && echo "  Windows x64: YES" || echo "  Windows x64: NO"
-          [ -n "$LINUX_AMD64_SIG" ] && echo "  Linux amd64: YES" || echo "  Linux amd64: NO"
-          [ -n "$LINUX_AARCH64_SIG" ] && echo "  Linux aarch64: YES" || echo "  Linux aarch64: NO"
+          [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES ($MACOS_AARCH64_ASSET)" || echo "  macOS aarch64: NO"
+          [ -n "$MACOS_X64_SIG" ] && echo "  macOS x64: YES ($MACOS_X64_ASSET)" || echo "  macOS x64: NO"
+          [ -n "$WINDOWS_NSIS_SIG" ] && echo "  Windows x64: YES ($WINDOWS_NSIS_ASSET)" || echo "  Windows x64: NO"
+          [ -n "$LINUX_AMD64_SIG" ] && echo "  Linux amd64: YES ($LINUX_AMD64_ASSET)" || echo "  Linux amd64: NO"
+          [ -n "$LINUX_AARCH64_SIG" ] && echo "  Linux aarch64: YES ($LINUX_AARCH64_ASSET)" || echo "  Linux aarch64: NO"
 
           # Build updater.json with platform-specific download URLs and signatures
-          # macOS: arch-suffixed filenames (no version in name)
-          # Windows/Linux: version included in filename
           jq -n \
             --arg version "$VER" \
             --arg notes "See release page for details" \
@@ -269,30 +296,34 @@ jobs:
             --arg win_nsis_sig "$WINDOWS_NSIS_SIG" \
             --arg linux_amd64_sig "$LINUX_AMD64_SIG" \
             --arg linux_a64_sig "$LINUX_AARCH64_SIG" \
-            --arg ver "$VER" \
+            --arg mac_a64_asset "$MACOS_AARCH64_ASSET" \
+            --arg mac_x64_asset "$MACOS_X64_ASSET" \
+            --arg win_nsis_asset "$WINDOWS_NSIS_ASSET" \
+            --arg linux_amd64_asset "$LINUX_AMD64_ASSET" \
+            --arg linux_a64_asset "$LINUX_AARCH64_ASSET" \
             '{
               version: $version,
               notes: $notes,
               pub_date: $pub_date,
               platforms: {
                 "darwin-aarch64": {
-                  url: "\($dl)/Antigravity.Tools_aarch64.app.tar.gz",
+                  url: "\($dl)/\($mac_a64_asset)",
                   signature: $mac_a64_sig
                 },
                 "darwin-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_x64.app.tar.gz",
+                  url: "\($dl)/\($mac_x64_asset)",
                   signature: $mac_x64_sig
                 },
                 "windows-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_x64-setup.exe",
+                  url: "\($dl)/\($win_nsis_asset)",
                   signature: $win_nsis_sig
                 },
                 "linux-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_amd64.AppImage",
+                  url: "\($dl)/\($linux_amd64_asset)",
                   signature: $linux_amd64_sig
                 },
                 "linux-aarch64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_aarch64.AppImage",
+                  url: "\($dl)/\($linux_a64_asset)",
                   signature: $linux_a64_sig
                 }
               }
@@ -337,7 +368,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           allowUpdates: true
-          name: "Antigravity Tools ${{ github.ref_name }}"
+          name: "Antigravity Manager Tools By Alim ${{ github.ref_name }}"
           bodyFile: "release_notes.md"
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: "release-files/*,updater.json"

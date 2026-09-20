@@ -1,6 +1,6 @@
 {
   "common": {
-    "app_name": "AGM by Alim",
+    "app_name": "Agm Tool By Alim",
     "loading": "Loading...",
     "empty": "Empty",
     "load_more": "Load More",
@@ -702,7 +702,7 @@
       "long_prompt_warning": "Prompt is quite long (over 2000 chars) and may consume significant context space."
     },
     "branding": {
-      "title": "AGM by Alim",
+      "title": "Antigravity Manager Tools By Alim",
       "subtitle": "Professional Account Management"
     }
   },

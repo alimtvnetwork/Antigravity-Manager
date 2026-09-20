@@ -8,7 +8,8 @@
     "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
   },
   "Version": "4.31.0",
-  "Title": "AGM by Alim",
+  "Title": "Agm Tool By Alim",
+  "FullName": "Antigravity Manager Tools By Alim",
   "RepoSlug": "alimtvnetwork/Antigravity-Manager",
   "RepoUrl": "https://github.com/alimtvnetwork/Antigravity-Manager",
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",

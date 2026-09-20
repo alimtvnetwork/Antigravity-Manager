@@ -20,8 +20,12 @@ NC='\033[0m' # No Color
 
 REPO="alimtvnetwork/Antigravity-Manager"
 UPSTREAM_REPO="lbjlaq/Antigravity-Manager"
-APP_NAME="Anti-Gravity Tools"
+APP_NAME="Agm Tool By Alim"
+FULL_NAME="Antigravity Manager Tools By Alim"
 APP_ID="com.lbjlaq.antigravity-tools"
+BINARY_NAME="agm-alim"
+DESKTOP_NAME="Agm - Alim"
+TOOLTIP="Antigravity Manager Tool By Alim"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases"
 UPSTREAM_API="https://api.github.com/repos/${UPSTREAM_REPO}/releases"
 FALLBACK_STABLE_VERSION="4.7.6"
@@ -537,6 +541,7 @@ pin_ubuntu_dock() {
 
     local desktop_id=""
     local candidates=(
+        "agm-alim.desktop"
         "anti-gravity-tools-by-alim.desktop"
         "anti-gravity-tools.desktop"
         "antigravity-tools.desktop"
@@ -551,14 +556,14 @@ pin_ubuntu_dock() {
     done
 
     if [[ -z "$desktop_id" ]]; then
-        desktop_id="anti-gravity-tools-by-alim.desktop"
+        desktop_id="agm-alim.desktop"
     fi
 
     if command -v gsettings &>/dev/null; then
         local current_favs
         current_favs=$(gsettings get org.gnome.shell favorite-apps 2>/dev/null || echo "")
         if [[ -n "$current_favs" && "$current_favs" != *"$desktop_id"* ]]; then
-            info "Pinning ${APP_NAME} to Ubuntu taskbar / dock..."
+            info "Pinning ${DESKTOP_NAME} to Ubuntu taskbar / dock..."
             local new_favs
             if [[ "$current_favs" == "[]" || "$current_favs" == "@as []" ]]; then
                 new_favs="['${desktop_id}']"
@@ -566,14 +571,14 @@ pin_ubuntu_dock() {
                 new_favs=$(echo "$current_favs" | sed "s/]/, '${desktop_id}']/")
             fi
             run gsettings set org.gnome.shell favorite-apps "$new_favs" 2>/dev/null || true
-            success "Pinned ${APP_NAME} to Ubuntu dock."
+            success "Pinned ${DESKTOP_NAME} (${TOOLTIP}) to Ubuntu dock."
         fi
     fi
 }
 
 # Install on Linux
 install_linux() {
-    step "Installing ${APP_NAME}..."
+    step "Installing ${FULL_NAME}..."
 
     local sudo_cmd=""
     if command -v sudo &>/dev/null && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
@@ -595,10 +600,28 @@ install_linux() {
             local install_dir="${HOME}/.local/bin"
             run mkdir -p "$install_dir"
             run chmod +x "$DOWNLOAD_PATH"
-            run cp "$DOWNLOAD_PATH" "${install_dir}/antigravity-tools"
+            run cp "$DOWNLOAD_PATH" "${install_dir}/${BINARY_NAME}"
+            run ln -sf "${install_dir}/${BINARY_NAME}" "${install_dir}/antigravity-tools" 2>/dev/null || true
+
+            # Create standard freedesktop .desktop launcher
+            local apps_dir="${HOME}/.local/share/applications"
+            mkdir -p "$apps_dir"
+            cat <<EOF > "${apps_dir}/agm-alim.desktop"
+[Desktop Entry]
+Name=${DESKTOP_NAME}
+Comment=${TOOLTIP}
+GenericName=${TOOLTIP}
+Exec=${install_dir}/${BINARY_NAME} %U
+Icon=${BINARY_NAME}
+Terminal=false
+Type=Application
+Categories=Utility;Development;
+StartupWMClass=${BINARY_NAME}
+EOF
+            chmod +x "${apps_dir}/agm-alim.desktop"
 
             if [[ ":$PATH:" != *":${install_dir}:"* ]]; then
-                warn "Add ${install_dir} to your PATH to run antigravity-tools from anywhere"
+                warn "Add ${install_dir} to your PATH to run ${BINARY_NAME} from anywhere"
 
                 local shell_name rc_file export_line
                 shell_name="$(basename "${SHELL:-/bin/bash}")"
@@ -624,7 +647,7 @@ install_linux() {
 
     pin_ubuntu_dock
 
-    success "${APP_NAME} installed successfully!"
+    success "${FULL_NAME} installed successfully!"
 }
 
 # Install on macOS

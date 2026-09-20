@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AGM by Alim",
+  "productName": "agm-alim",
   "version": "4.31.0",
   "identifier": "com.lbjlaq.antigravity-tools",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "AGM by Alim",
+        "title": "Antigravity Manager Tools By Alim",
         "width": 1024,
         "height": 700,
         "decorations": false,

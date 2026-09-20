@@ -437,7 +437,7 @@ fn wrap_email_card(
     </div>
     <div class="footer">
       Machine: <strong>{}</strong> &nbsp;|&nbsp; Local IP: <strong>{}</strong><br>
-      Automated Mailbox Dispatcher · AGM by Alim
+      Automated Mailbox Dispatcher · Antigravity Manager Tools By Alim
     </div>
   </div>
 </body>

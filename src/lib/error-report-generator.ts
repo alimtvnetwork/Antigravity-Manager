@@ -9,7 +9,7 @@ const rawVersion = versionData.version || versionData.Version || '4.29.0';
 const formattedVersion = rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
 
 const APP_INFO = {
-  name: 'AGM by Alim',
+  name: 'Agm Tool By Alim',
   version: formattedVersion,
 };
 

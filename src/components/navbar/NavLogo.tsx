@@ -29,7 +29,7 @@ export function NavLogo() {
     const displayVersion = hasVPrefix ? appVersion : `v${appVersion}`;
 
     return (
-        <Link to="/" draggable="false" className="flex w-full min-w-0 items-center gap-2 text-xl font-semibold text-gray-900 dark:text-slate-100">
+        <Link to="/" draggable="false" title="Antigravity Manager Tools By Alim" className="flex w-full min-w-0 items-center gap-2 text-xl font-semibold text-gray-900 dark:text-slate-100">
             <div className="relative flex items-center justify-center">
                 <img
                     src={LogoIcon}
@@ -39,7 +39,7 @@ export function NavLogo() {
                 />
             </div>
 
-            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-slate-100 whitespace-nowrap">{t('common.app_name', 'AGM by Alim')}</span>
+            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-slate-100 whitespace-nowrap">{t('common.app_name', 'Agm Tool By Alim')}</span>
 
             <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 shrink-0 leading-none">
                 {displayVersion}

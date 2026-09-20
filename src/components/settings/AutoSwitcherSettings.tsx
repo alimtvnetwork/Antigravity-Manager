@@ -234,7 +234,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             </div>
                         </div>
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                            AGM by Alim
+                            Agm Tool By Alim
                         </span>
                     </div>
 
@@ -308,7 +308,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 {t('settings.auto_switcher.step5_title', 'How to use: ')}
                             </span>
                             <span className="text-blue-900/80 dark:text-blue-300">
-                                {t('settings.auto_switcher.step5_desc', 'Toggle on the Auto Profile Switcher switch above. Keep AGM by Alim running in the background or minimized to the system tray. Your editor will automatically cycle between fresh quota pools 24/7 without losing task context.')}
+                                {t('settings.auto_switcher.step5_desc', 'Toggle on the Auto Profile Switcher switch above. Keep Agm Tool By Alim running in the background or minimized to the system tray. Your editor will automatically cycle between fresh quota pools 24/7 without losing task context.')}
                             </span>
                         </div>
                     </div>
