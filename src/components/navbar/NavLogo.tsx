@@ -39,7 +39,10 @@ export function NavLogo() {
                 />
             </div>
 
-            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-slate-100 whitespace-nowrap">{t('common.app_name', 'Agm Tool By Alim')}</span>
+            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-slate-100 whitespace-nowrap">
+                <span className="inline sm:hidden">AGM</span>
+                <span className="hidden sm:inline">{t('common.app_name', 'Agm Tool By Alim')}</span>
+            </span>
 
             <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 shrink-0 leading-none">
                 {displayVersion}

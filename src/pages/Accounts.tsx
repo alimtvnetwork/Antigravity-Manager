@@ -149,7 +149,7 @@ function Accounts() {
           showToast(msg, "success");
         } else {
           showToast(
-            t("accounts.warmup_all_triggered", "全量预热任务已触发"),
+            t("accounts.warmup_all_triggered", "All accounts warmup task triggered"),
             "success",
           );
         }
@@ -185,7 +185,7 @@ function Accounts() {
   const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
     const saved = localStorage.getItem("accounts_page_size");
     return saved ? parseInt(saved) : null;
-  }); // 本地分页大小状态
+  }); // Local pagination size preference
 
   // Save page size preference
   useEffect(() => {
@@ -194,40 +194,40 @@ function Accounts() {
     }
   }, [localPageSize]);
 
-  // 动态计算分页条数
+  // Dynamically calculate page size
   const ITEMS_PER_PAGE = useMemo(() => {
-    // 优先使用本地设置的分页大小
+    // Prioritize local pagination size
     if (localPageSize && localPageSize > 0) {
       return localPageSize;
     }
 
-    // 其次使用用户配置的固定值
+    // Fallback to user configured fixed value
     if (config?.accounts_page_size && config.accounts_page_size > 0) {
       return config.accounts_page_size;
     }
 
-    // 回退到原有的动态计算逻辑
+    // Fallback to dynamic calculation logic
     if (!containerSize.height) return viewMode === "grid" ? 6 : 8;
 
     if (viewMode === "list") {
-      const headerHeight = 36; // 缩深后的表头高度
-      const rowHeight = 72; // 包含多行模型信息后的实际行高
-      // 计算能容纳多少行, 默认最低 10 行
+      const headerHeight = 36; // Compact header height
+      const rowHeight = 72; // Row height with multi-model details
+      // Calculate capacity, default min 10 rows
       const autoFitCount = Math.floor(
         (containerSize.height - headerHeight) / rowHeight,
       );
       return Math.max(10, autoFitCount);
     } else {
-      const cardHeight = 180; // AccountCard 实际高度 (含间距)
+      const cardHeight = 180; // AccountCard height with padding
       const gap = 16; // gap-4
 
-      // 匹配 Tailwind 断点逻辑
+      // Match Tailwind breakpoint logic
       let cols = 1;
       if (containerSize.width >= 1200)
-        cols = 4; // xl (约为 1280 左右)
+        cols = 4; // xl (~1280px)
       else if (containerSize.width >= 900)
-        cols = 3; // lg (约为 1024 左右)
-      else if (containerSize.width >= 600) cols = 2; // md (约为 768 左右)
+        cols = 3; // lg (~1024px)
+      else if (containerSize.width >= 600) cols = 2; // md (~768px)
 
       const rows = Math.max(
         1,
@@ -246,14 +246,14 @@ function Accounts() {
     setCurrentPage(1);
   }, [viewMode]);
 
-  // 搜索过滤逻辑
+  // Search filter logic
   const searchedAccounts = useMemo(() => {
     if (!searchQuery) return accounts;
     const lowQuery = searchQuery.toLowerCase();
     return accounts.filter((a) => a.email.toLowerCase().includes(lowQuery));
   }, [accounts, searchQuery]);
 
-  // 计算各筛选状态下的数量 (基于搜索结果)
+  // Count filtered status numbers (based on search result)
   const filterCounts = useMemo(() => {
     return {
       all: searchedAccounts.length,
@@ -270,7 +270,7 @@ function Accounts() {
     };
   }, [searchedAccounts]);
 
-  // 过滤和搜索最终结果
+  // Filter and search final results
   const filteredAccounts = useMemo(() => {
     let result = searchedAccounts;
 
@@ -302,7 +302,7 @@ function Accounts() {
     setCurrentPage(page);
   };
 
-  // 清空选择当过滤改变 并重置分页
+  // Clear selection and reset page when filter changes
   useEffect(() => {
     setSelectedIds(new Set());
     setCurrentPage(1);
@@ -319,7 +319,7 @@ function Accounts() {
   };
 
   const handleToggleAll = () => {
-    // 全选当前页的所有项
+    // Select all items on current page
     const currentIds = paginatedAccounts.map((a) => a.id);
     const allSelected = currentIds.every((id) => selectedIds.has(id));
 
@@ -488,7 +488,7 @@ function Accounts() {
       const details: string[] = [];
 
       if (isBatch) {
-        // 批量刷新选中
+        // Batch refresh selected accounts
         const ids = Array.from(selectedIds);
         setRefreshingIds(new Set(ids));
 
@@ -507,7 +507,7 @@ function Accounts() {
           }
         });
       } else {
-        // 刷新所有
+        // Refresh all accounts
         setRefreshingIds(new Set(accounts.map((a) => a.id)));
         const stats = await useAccountStore.getState().refreshAllQuotas();
         if (stats) {
@@ -589,7 +589,7 @@ function Accounts() {
         await invoke("save_text_file", { path, content });
         showToast(`${t("common.success")} ${path}`, "success");
       } else {
-        // Web 模式：使用浏览器下载
+        // Web mode: download via browser
         const blob = new Blob([content], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -712,7 +712,7 @@ function Accounts() {
         showToast(t("accounts.import_fail", { error: String(error) }), "error");
       }
     } else {
-      // Web 模式: 触发隐藏的 file input
+      // Web mode: trigger hidden file input
       fileInputRef.current?.click();
     }
   };
@@ -730,7 +730,7 @@ function Accounts() {
       console.error("Import failed:", error);
       showToast(t("accounts.import_fail", { error: String(error) }), "error");
     } finally {
-      // 重置 input,允许重复选择同一文件
+      // Reset input to allow selecting same file again
       event.target.value = "";
     }
   };
@@ -749,8 +749,8 @@ function Accounts() {
   };
 
   return (
-    <div className="h-full flex flex-col px-4 sm:px-6 pt-2 pb-4 gap-3 max-w-7xl mx-auto w-full">
-      {/* 测试按钮 - 在最顶部 */}
+    <div className="h-full flex flex-col px-4 sm:px-6 pt-2 pb-4 gap-3 max-w-7xl mx-auto w-full min-w-0">
+      {/* File input for import */}
       <input
         ref={fileInputRef}
         type="file"
@@ -759,204 +759,205 @@ function Accounts() {
         onChange={handleFileChange}
       />
 
-      {/* 顶部工具栏:搜索、过滤和操作按钮 */}
-      <div className="flex-none flex items-center gap-2">
-        {/* 搜索框 - 响应式:大屏显示输入框,小屏显示图标 */}
-        <div className="hidden lg:block flex-none w-40 relative transition-all focus-within:w-48">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder={t('accounts.search_placeholder')}
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+      {/* Top action bar: search, filters, and action buttons */}
+      <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 min-w-0 w-full">
+        {/* Left controls: search, window, view mode, quota filter */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
+          {/* Search box - responsive */}
+          <div className="hidden lg:block flex-none w-40 relative transition-all focus-within:w-48">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder={t('accounts.search_placeholder')}
+              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-        {/* 搜索按钮 - 小屏显示 */}
-        <div className="lg:hidden relative">
-          {!isSearchExpanded ? (
-            <button
-              onClick={() => {
-                setIsSearchExpanded(true);
-                setTimeout(() => searchInputRef.current?.focus(), 100);
-              }}
-              className="p-2 bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 rounded-lg transition-colors"
-              title={t('accounts.search_placeholder')}
-            >
-              <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-            </button>
-          ) : (
-            <div className="absolute left-0 top-0 z-10 w-64 flex items-center gap-1">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={t('accounts.search_placeholder')}
-                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-lg"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onBlur={() => setIsSearchExpanded(false)}
-                />
+          {/* Search button - small screens */}
+          <div className="lg:hidden relative">
+            {!isSearchExpanded ? (
+              <button
+                onClick={() => {
+                  setIsSearchExpanded(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }}
+                className="p-2 bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 rounded-lg transition-colors"
+                title={t('accounts.search_placeholder')}
+              >
+                <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+              </button>
+            ) : (
+              <div className="absolute left-0 top-0 z-10 w-64 flex items-center gap-1">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder={t('accounts.search_placeholder')}
+                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-lg"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onBlur={() => setIsSearchExpanded(false)}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Quota window toggle (5H / Weekly) */}
+          <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0 items-center">
+            <button
+              className={cn(
+                "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
+                quotaWindow === "5h"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+              )}
+              onClick={() => setQuotaWindow("5h")}
+              title={t("accounts.quota_window_5h", "5-hour rolling quota")}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>5H</span>
+            </button>
+            <button
+              className={cn(
+                "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
+                quotaWindow === "weekly"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+              )}
+              onClick={() => setQuotaWindow("weekly")}
+              title={t("accounts.quota_window_weekly", "7-day weekly quota")}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{t("accounts.quota_window_weekly_short", "Weekly")}</span>
+            </button>
+          </div>
+
+          {/* View mode switcher */}
+          <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0">
+            <button
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                viewMode === "list"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+              )}
+              onClick={() => setViewMode("list")}
+              title={t("accounts.views.list")}
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                viewMode === "grid"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+              )}
+              onClick={() => setViewMode("grid")}
+              title={t("accounts.views.grid")}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Quota tier filter pills */}
+          <div className="flex gap-0.5 bg-gray-100/80 dark:bg-base-200 p-1 rounded-xl border border-gray-200/50 dark:border-white/5 shrink-0">
+            {/* All */}
+            <button
+              className={cn(
+                "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
+                filter === 'all'
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
+              )}
+              onClick={() => setFilter('all')}
+              title={`${t('accounts.all')} (${filterCounts.all})`}
+            >
+              <span className="hidden md:inline">{t('accounts.all')}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                filter === 'all'
+                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              )}>
+                {filterCounts.all}
+              </span>
+            </button>
+
+            {/* PRO */}
+            <button
+              className={cn(
+                "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
+                filter === 'pro'
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
+              )}
+              onClick={() => setFilter('pro')}
+              title={`${t('accounts.pro')} (${filterCounts.pro})`}
+            >
+              <span className="hidden md:inline">{t('accounts.pro')}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                filter === 'pro'
+                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              )}>
+                {filterCounts.pro}
+              </span>
+            </button>
+
+            {/* ULTRA */}
+            <button
+              className={cn(
+                "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
+                filter === 'ultra'
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
+              )}
+              onClick={() => setFilter('ultra')}
+              title={`${t('accounts.ultra')} (${filterCounts.ultra})`}
+            >
+              <span className="hidden md:inline">{t('accounts.ultra')}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                filter === 'ultra'
+                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              )}>
+                {filterCounts.ultra}
+              </span>
+            </button>
+
+            {/* FREE */}
+            <button
+              className={cn(
+                "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
+                filter === 'free'
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
+              )}
+              onClick={() => setFilter('free')}
+              title={`${t('accounts.free')} (${filterCounts.free})`}
+            >
+              <span className="hidden md:inline">{t('accounts.free')}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                filter === 'free'
+                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              )}>
+                {filterCounts.free}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* 配额周期切换 (5H / 7天周配额) */}
-        <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0 items-center">
-          <button
-            className={cn(
-              "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
-              quotaWindow === "5h"
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-            )}
-            onClick={() => setQuotaWindow("5h")}
-            title={t("accounts.quota_window_5h", "5小时滑动配额")}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>5H</span>
-          </button>
-          <button
-            className={cn(
-              "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
-              quotaWindow === "weekly"
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-            )}
-            onClick={() => setQuotaWindow("weekly")}
-            title={t("accounts.quota_window_weekly", "7天周配额")}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{t("accounts.quota_window_weekly_short", "周配额")}</span>
-          </button>
-        </div>
-
-        {/* 视图切换按钮组 */}
-        <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0">
-          <button
-            className={cn(
-              "p-1.5 rounded-md transition-all",
-              viewMode === "list"
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-            )}
-            onClick={() => setViewMode("list")}
-            title={t("accounts.views.list")}
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            className={cn(
-              "p-1.5 rounded-md transition-all",
-              viewMode === "grid"
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-            )}
-            onClick={() => setViewMode("grid")}
-            title={t("accounts.views.grid")}
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 过滤按钮组 - 图标化响应式 */}
-        <div className="flex gap-0.5 bg-gray-100/80 dark:bg-base-200 p-1 rounded-xl border border-gray-200/50 dark:border-white/5 shrink-0">
-          {/* 全部 */}
-          <button
-            className={cn(
-              "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
-              filter === 'all'
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-            )}
-            onClick={() => setFilter('all')}
-            title={`${t('accounts.all')} (${filterCounts.all})`}
-          >
-            <span className="hidden md:inline">{t('accounts.all')}</span>
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
-              filter === 'all'
-                ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            )}>
-              {filterCounts.all}
-            </span>
-          </button>
-
-          {/* PRO */}
-          <button
-            className={cn(
-              "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
-              filter === 'pro'
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-            )}
-            onClick={() => setFilter('pro')}
-            title={`${t('accounts.pro')} (${filterCounts.pro})`}
-          >
-            <span className="hidden md:inline">{t('accounts.pro')}</span>
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
-              filter === 'pro'
-                ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            )}>
-              {filterCounts.pro}
-            </span>
-          </button>
-
-          {/* ULTRA */}
-          <button
-            className={cn(
-              "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
-              filter === 'ultra'
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-            )}
-            onClick={() => setFilter('ultra')}
-            title={`${t('accounts.ultra')} (${filterCounts.ultra})`}
-          >
-            <span className="hidden md:inline">{t('accounts.ultra')}</span>
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
-              filter === 'ultra'
-                ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            )}>
-              {filterCounts.ultra}
-            </span>
-          </button>
-
-          {/* FREE */}
-          <button
-            className={cn(
-              "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
-              filter === 'free'
-                ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-            )}
-            onClick={() => setFilter('free')}
-            title={`${t('accounts.free')} (${filterCounts.free})`}
-          >
-            <span className="hidden md:inline">{t('accounts.free')}</span>
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
-              filter === 'free'
-                ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            )}>
-              {filterCounts.free}
-            </span>
-          </button>
-        </div>
-
-        <div className="flex-1 min-w-[8px]"></div>
-
-        {/* 操作按钮组 */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Action buttons group */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <AddAccountDialog onAdd={handleAddAccount} showText={false} />
 
           {selectedIds.size > 0 && (
@@ -1033,7 +1034,7 @@ function Accounts() {
             title={
               selectedIds.size > 0
                 ? t("accounts.warmup_selected", { count: selectedIds.size })
-                : t("accounts.warmup_all", "一键预热所有账号")
+                : t("accounts.warmup_all", "Warm up all accounts")
             }
           >
             <Sparkles
@@ -1044,7 +1045,7 @@ function Accounts() {
                 ? t("common.loading")
                 : selectedIds.size > 0
                   ? t("accounts.warmup_selected", { count: selectedIds.size })
-                  : t("accounts.warmup_all", "一键预热")}
+                  : t("accounts.warmup_all", "Warm up all")}
             </span>
           </button>
 
@@ -1091,7 +1092,7 @@ function Accounts() {
         </div>
       </div>
 
-      {/* 账号列表内容区域 */}
+      {/* Account list content area */}
       <div className="flex-1 min-h-0 relative" ref={containerRef}>
         {viewMode === "list" ? (
           <div className="h-full bg-white dark:bg-base-100 rounded-2xl shadow-sm border border-gray-100 dark:border-base-200 flex flex-col overflow-hidden">
@@ -1154,7 +1155,7 @@ function Accounts() {
         )}
       </div>
 
-      {/* 极简分页 - 无边框浮动样式 */}
+      {/* Minimalist floating pagination */}
       {filteredAccounts.length > 0 && (
         <div className="flex-none">
           <Pagination
@@ -1165,7 +1166,7 @@ function Accounts() {
             itemsPerPage={ITEMS_PER_PAGE}
             onPageSizeChange={(newSize) => {
               setLocalPageSize(newSize);
-              setCurrentPage(1); // 重置到第一页
+              setCurrentPage(1); // Reset to first page
             }}
             pageSizeOptions={[10, 20, 50, 100]}
           />
@@ -1246,35 +1247,35 @@ function Accounts() {
         isOpen={isWarmupConfirmOpen}
         title={
           selectedIds.size > 0
-            ? t("accounts.dialog.batch_warmup_title", "批量手动预热")
-            : t("accounts.dialog.warmup_all_title", "全量手动预热")
+            ? t("accounts.dialog.batch_warmup_title", "Batch Manual Warmup")
+            : t("accounts.dialog.warmup_all_title", "Warm Up All Accounts")
         }
         message={
           selectedIds.size > 0
             ? t(
               "accounts.dialog.batch_warmup_msg",
-              "确定要为选中的 {{count}} 个账号立即触发预热吗？",
+              "Are you sure you want to trigger warmup for the {{count}} selected accounts?",
               { count: selectedIds.size },
             )
             : t(
               "accounts.dialog.warmup_all_msg",
-              "确定要立即为所有符合条件的账号触发预热任务吗？这将向 Google 服务发送极小流量。",
+              "Are you sure you want to trigger warmup for all eligible accounts? This sends minimal traffic to Google services.",
             )
         }
         type="confirm"
-        confirmText={t("accounts.warmup_now", "立即预热")}
+        confirmText={t("accounts.warmup_now", "Warm Up Now")}
         isDestructive={false}
         onConfirm={handleWarmupAll}
         onCancel={() => setIsWarmupConfirmOpen(false)}
       />
 
-      {/* 账号详情弹窗 */}
+      {/* Account details dialog */}
       <AccountDetailsDialog
         account={detailsAccount}
         onClose={() => setDetailsAccount(null)}
       />
 
-      {/* 账号错误详情弹窗 */}
+      {/* Account error dialog */}
       <AccountErrorDialog
         account={accounts.find(a => a.id === errorAccountId) || null}
         onClose={() => setErrorAccountId(null)}

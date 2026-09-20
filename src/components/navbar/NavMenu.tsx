@@ -11,12 +11,12 @@ interface NavMenuProps {
 }
 
 /**
- * 导航菜单组件 - 单菜单按钮紧凑布局
+ * Navigation menu component - compact single menu button layout
  *
- * 布局策略:
- * - 中间只保留一个高集成度的 Menu 按钮，显示当前激活页面的图标与名称
- * - 点击呼出下拉弹层，包含所有导航页面，极大节省顶栏空间
- * - 确保 InstanceSelector 与设置按钮在任何屏幕下都有充足呼吸空间，绝不超出窗口边界
+ * Layout strategy:
+ * - Retain a single highly integrated Menu button in the center displaying the active page icon and label
+ * - Clicking opens dropdown with all nav items, saving top bar space
+ * - Ensures InstanceSelector and settings buttons have ample room across screen sizes
  */
 export function NavMenu({ navItems }: NavMenuProps) {
     const location = useLocation();
@@ -27,10 +27,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
     useClickOutside(menuRef, () => setIsMenuOpen(false));
 
-    // 过滤隐藏的菜单项
+    // Filter hidden menu items
     const visibleNavItems = navItems.filter(item => !isMenuItemHidden(item.path));
 
-    // 查找当前激活的导航项
+    // Find currently active navigation item
     const currentItem = visibleNavItems.find(item => isActive(location.pathname, item.path)) || visibleNavItems[0];
     const CurrentIcon = currentItem ? currentItem.icon : Menu;
 
@@ -49,7 +49,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 导航下拉菜单 */}
+            {/* Navigation dropdown menu */}
             {isMenuOpen && (
                 <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
                     <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">

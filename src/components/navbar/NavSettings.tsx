@@ -1,5 +1,6 @@
-import { Sun, Moon, LogOut, Minimize2 } from 'lucide-react';
+import { Sun, Moon, LogOut, Minimize2, Minus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
@@ -13,11 +14,11 @@ interface NavSettingsProps {
 }
 
 /**
- * 设置按钮组件 - 独立处理响应式
+ * Settings button component - handles responsiveness independently
  *
- * 响应式策略:
- * - ≥ 768px (md): 独立按钮(主题 + 语言)
- * - < 768px: 更多下拉菜单
+ * Responsive strategy:
+ * - ≥ 480px: standalone buttons (mini view, theme, language, window controls)
+ * - < 480px: more dropdown menu
  */
 export function NavSettings({
     theme,
@@ -28,6 +29,22 @@ export function NavSettings({
     const { t } = useTranslation();
     const { setMiniView } = useViewStore();
 
+    const handleMinimize = async () => {
+        try {
+            await getCurrentWindow().minimize();
+        } catch (e) {
+            console.error('Failed to minimize window:', e);
+        }
+    };
+
+    const handleClose = async () => {
+        try {
+            await getCurrentWindow().close();
+        } catch (e) {
+            console.error('Failed to close window:', e);
+        }
+    };
+
     const handleLogout = () => {
         sessionStorage.removeItem('abv_admin_api_key');
         localStorage.removeItem('abv_admin_api_key');
@@ -36,9 +53,9 @@ export function NavSettings({
 
     return (
         <>
-            {/* 独立按钮 (≥ 480px) */}
+            {/* Standalone buttons (≥ 480px) */}
             <div className="hidden min-[480px]:flex items-center gap-1.5 md:gap-2">
-                {/* 迷你视图切换按钮 */}
+                {/* Mini view toggle button */}
                 <button
                     onClick={() => setMiniView(true)}
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
@@ -47,7 +64,7 @@ export function NavSettings({
                     <Minimize2 className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
                 </button>
 
-                {/* 主题切换按钮 */}
+                {/* Theme toggle button */}
                 <button
                     onClick={onThemeToggle}
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
@@ -60,26 +77,51 @@ export function NavSettings({
                     )}
                 </button>
 
-                {/* 语言切换下拉菜单 */}
+                {/* Language switch dropdown */}
                 <LanguageDropdown
                     currentLanguage={currentLanguage}
                     languages={LANGUAGES}
                     onLanguageChange={onLanguageChange}
                 />
 
-                {/* 登出按钮 - 仅 Web 模式显示 */}
+                {/* Window controls (Minimize, Close) - Tauri only */}
+                {isTauri() && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleMinimize}
+                            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
+                            title={t('common.minimize', 'Minimize')}
+                            aria-label="Minimize"
+                        >
+                            <Minus className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer group"
+                            title={t('common.close', 'Close')}
+                            aria-label="Close"
+                        >
+                            <X className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors" />
+                        </button>
+                    </>
+                )}
+
+                {/* Logout button - Web mode only */}
                 {!isTauri() && (
                     <button
                         onClick={handleLogout}
                         className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
-                        title={t('nav.logout', '登出')}
+                        title={t('nav.logout', 'Logout')}
                     >
                         <LogOut className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400" />
                     </button>
                 )}
             </div>
 
-            {/* 更多菜单 (< 480px) */}
+            {/* More menu (< 480px) */}
             <div className="min-[480px]:hidden">
                 <MoreDropdown
                     theme={theme}

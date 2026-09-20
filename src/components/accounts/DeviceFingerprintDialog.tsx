@@ -141,7 +141,7 @@ export default function DeviceFingerprintDialog({ account, onClose }: DeviceFing
     const renderProfile = (profile?: DeviceProfile) => {
         if (!profile) return <span className="text-xs text-gray-400">{t('common.empty') || 'None'}</span>;
         return (
-            <div className="grid grid-cols-1 gap-2 text-xs font-mono text-gray-600 dark:text-gray-300">
+            <div className="grid grid-cols-1 gap-2 text-xs font-mono text-gray-600 dark:text-gray-300 break-all">
                 <div><span className="font-semibold">machineId:</span> {profile.machine_id}</div>
                 <div><span className="font-semibold">macMachineId:</span> {profile.mac_machine_id}</div>
                 <div><span className="font-semibold">devDeviceId:</span> {profile.dev_device_id}</div>
@@ -156,10 +156,10 @@ export default function DeviceFingerprintDialog({ account, onClose }: DeviceFing
         <div className="modal modal-open z-[120]">
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[130]" />
             <div className="modal-box relative max-w-3xl bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100 dark:border-base-200 bg-gray-50/50 dark:bg-base-200/50 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-base-content">{t('accounts.device_fingerprint_dialog.title')}</h3>
-                        <div className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-base-200 border border-gray-200 dark:border-base-300 text-xs font-mono text-gray-500 dark:text-gray-400">
+                <div className="px-6 py-5 border-b border-gray-100 dark:border-base-200 bg-gray-50/50 dark:bg-base-200/50 flex justify-between items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-base-content shrink-0">{t('accounts.device_fingerprint_dialog.title')}</h3>
+                        <div className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-base-200 border border-gray-200 dark:border-base-300 text-xs font-mono text-gray-500 dark:text-gray-400 min-w-0 truncate max-w-[140px] sm:max-w-xs">
                             {account.email}
                         </div>
                     </div>

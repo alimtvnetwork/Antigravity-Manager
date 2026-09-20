@@ -626,7 +626,7 @@ export default function EmailNotificationSettings() {
                                     <th className="py-2 px-2.5 font-semibold">IMAP Host</th>
                                     <th className="py-2 px-2.5 font-semibold">Enc</th>
                                     <th className="py-2 px-2.5 font-semibold">Role</th>
-                                    <th className="py-2 px-2.5 font-semibold text-right">Actions</th>
+                                    <th className="py-2 px-2.5 font-semibold text-right whitespace-nowrap min-w-[230px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -661,7 +661,7 @@ export default function EmailNotificationSettings() {
                                                 </button>
                                             )}
                                         </td>
-                                        <td className="py-2 px-2.5 text-right space-x-1">
+                                        <td className="py-2 px-2.5 text-right space-x-1 whitespace-nowrap min-w-[230px]">
                                             <button
                                                 onClick={() => handleTestSmtp(acc.id)}
                                                 disabled={testingAccountId === acc.id}

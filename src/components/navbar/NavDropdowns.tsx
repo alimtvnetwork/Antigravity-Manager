@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2 } from 'lucide-react';
+import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2, Minus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { NavItem, Language } from './constants';
 import { isTauri } from '../../utils/env';
 import { useViewStore } from '../../stores/useViewStore';
@@ -193,6 +194,24 @@ export function MoreDropdown({
         setIsOpen(false);
     };
 
+    const handleMinimize = async () => {
+        setIsOpen(false);
+        try {
+            await getCurrentWindow().minimize();
+        } catch (e) {
+            console.error('Failed to minimize window:', e);
+        }
+    };
+
+    const handleClose = async () => {
+        setIsOpen(false);
+        try {
+            await getCurrentWindow().close();
+        } catch (e) {
+            console.error('Failed to close window:', e);
+        }
+    };
+
     const handleLogout = () => {
         sessionStorage.removeItem('abv_admin_api_key');
         localStorage.removeItem('abv_admin_api_key');
@@ -259,6 +278,27 @@ export function MoreDropdown({
                             )}
                         </button>
                     ))}
+
+                    {/* Window controls fallback - Tauri only */}
+                    {isTauri() && (
+                        <>
+                            <div className="my-1 border-t border-gray-100 dark:border-slate-800"></div>
+                            <button
+                                onClick={handleMinimize}
+                                className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 cursor-pointer"
+                            >
+                                <Minus className="w-4 h-4" />
+                                <span>{t('common.minimize', 'Minimize')}</span>
+                            </button>
+                            <button
+                                onClick={handleClose}
+                                className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 dark:text-red-400 cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                                <span>{t('common.close', 'Close')}</span>
+                            </button>
+                        </>
+                    )}
 
                     {/* Logout button - Web mode only */}
                     {!isTauri() && (

@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from '../navbar/Navbar';
-import TitleBar from './TitleBar';
 import BackgroundTaskRunner from '../common/BackgroundTaskRunner';
 import ToastContainer from '../common/ToastContainer';
 import { useViewStore } from '../../stores/useViewStore';
@@ -62,7 +61,6 @@ function Layout() {
 
     return (
         <div className="h-screen flex flex-col bg-[#FAFBFC] dark:bg-base-300">
-            <TitleBar />
             <BackgroundTaskRunner />
             <ToastContainer />
             <Navbar />

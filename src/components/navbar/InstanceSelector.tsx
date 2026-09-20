@@ -360,7 +360,7 @@ export function InstanceSelector() {
                         type="button"
                         disabled={!topCandidate}
                         onClick={() => handleDoublePlay(activeInstance?.config.id)}
-                        className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="hidden md:flex p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         title={tooltipText}
                     >
                         <FastForward className="w-3.5 h-3.5 fill-current" />
@@ -378,7 +378,7 @@ export function InstanceSelector() {
                         setIsEditOpen(true);
                     }
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
+                className="hidden lg:flex p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
                 title={t('instances.edit_current', 'Rename current instance profile')}
             >
                 <Pencil className="w-3.5 h-3.5" />
@@ -392,7 +392,7 @@ export function InstanceSelector() {
                     setCloneMode(config?.instance_clone_mode || 'full');
                     setIsCopyOpen(true);
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
+                className="hidden lg:flex p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
                 title={t('instances.copy_current', 'Duplicate current instance profile')}
             >
                 <Copy className="w-3.5 h-3.5" />
@@ -408,7 +408,7 @@ export function InstanceSelector() {
                         setIsDeleteOpen(true);
                     }
                 }}
-                className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+                className={`hidden xl:flex p-1.5 rounded-lg transition-colors shrink-0 ${
                     isDefaultActive
                         ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-40'
                         : 'text-gray-600 dark:text-gray-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer'

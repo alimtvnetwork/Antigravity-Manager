@@ -177,7 +177,7 @@ function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
   ];
 
   return (
-    <div className="flex border-b border-gray-200 dark:border-slate-800 px-6 gap-2 bg-gray-50/20 dark:bg-slate-900/40">
+    <div className="flex border-b border-gray-200 dark:border-slate-800 px-6 gap-2 bg-gray-50/20 dark:bg-slate-900/40 overflow-x-auto scrollbar-none">
       {tabs.map((tab) => {
         const selected = activeTab === tab.id;
         return (
@@ -185,7 +185,7 @@ function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
             key={tab.id}
             onClick={() => onSelect(tab.id)}
             className={cn(
-              'flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors cursor-pointer',
+              'flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 whitespace-nowrap',
               selected
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-bold'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'

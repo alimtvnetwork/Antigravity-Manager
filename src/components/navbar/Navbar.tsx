@@ -1,7 +1,8 @@
 import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { isLinux } from '../../utils/env';
+import { isLinux, isTauri } from '../../utils/env';
 import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
@@ -34,6 +35,39 @@ function Navbar() {
     ];
 
 
+    // Window dragging and double click maximize handlers
+    const handleMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+        if (!isTauri()) return;
+        const target = e.target as HTMLElement;
+        if (target.closest('.no-drag')) return;
+        if (target.closest('button')) return;
+        if (target.closest('a')) return;
+        if (target.closest('input')) return;
+        if (target.closest('select')) return;
+        if (target.closest('textarea')) return;
+        try {
+            getCurrentWindow().startDragging();
+        } catch (err) {
+            console.error('Failed to start dragging window:', err);
+        }
+    };
+
+    const handleDoubleClick = async (e: React.MouseEvent<HTMLElement>) => {
+        if (!isTauri()) return;
+        const target = e.target as HTMLElement;
+        if (target.closest('.no-drag')) return;
+        if (target.closest('button')) return;
+        if (target.closest('a')) return;
+        if (target.closest('input')) return;
+        if (target.closest('select')) return;
+        if (target.closest('textarea')) return;
+        try {
+            await getCurrentWindow().toggleMaximize();
+        } catch (err) {
+            console.error('Failed to toggle maximize window:', err);
+        }
+    };
+
     // Theme toggle logic (with View Transition animation)
     const toggleTheme = async (event: React.MouseEvent<HTMLButtonElement>) => {
         if (!config) return;
@@ -41,49 +75,52 @@ function Navbar() {
         const newTheme = config.theme === 'light' ? 'dark' : 'light';
 
         // Use View Transition API if supported, but skip on Linux (may cause crash)
-        if ('startViewTransition' in document && !isLinux()) {
-            const x = event.clientX;
-            const y = event.clientY;
-            const endRadius = Math.hypot(
-                Math.max(x, window.innerWidth - x),
-                Math.max(y, window.innerHeight - y)
-            );
-
-            // @ts-ignore
-            const transition = document.startViewTransition(async () => {
-                saveConfig({
-                    ...config,
-                    theme: newTheme,
-                    language: config.language
-                }, true);
-            });
-
-            transition.ready.then(() => {
-                const isDarkMode = newTheme === 'dark';
-                const clipPath = isDarkMode
-                    ? [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`]
-                    : [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
-
-                document.documentElement.animate(
-                    {
-                        clipPath: clipPath
-                    },
-                    {
-                        duration: 500,
-                        easing: 'ease-in-out',
-                        fill: 'forwards',
-                        pseudoElement: isDarkMode ? '::view-transition-old(root)' : '::view-transition-new(root)'
-                    }
+        if (!isLinux()) {
+            if ('startViewTransition' in document) {
+                const x = event.clientX;
+                const y = event.clientY;
+                const endRadius = Math.hypot(
+                    Math.max(x, window.innerWidth - x),
+                    Math.max(y, window.innerHeight - y)
                 );
-            });
-        } else {
-            // Fallback: direct switch (Linux or browsers without View Transition)
-            await saveConfig({
-                ...config,
-                theme: newTheme,
-                language: config.language
-            }, true);
+
+                // @ts-ignore
+                const transition = document.startViewTransition(async () => {
+                    saveConfig({
+                        ...config,
+                        theme: newTheme,
+                        language: config.language
+                    }, true);
+                });
+
+                transition.ready.then(() => {
+                    const isDarkMode = newTheme === 'dark';
+                    const clipPath = isDarkMode
+                        ? [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`]
+                        : [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
+
+                    document.documentElement.animate(
+                        {
+                            clipPath: clipPath
+                        },
+                        {
+                            duration: 500,
+                            easing: 'ease-in-out',
+                            fill: 'forwards',
+                            pseudoElement: isDarkMode ? '::view-transition-old(root)' : '::view-transition-new(root)'
+                        }
+                    );
+                });
+                return;
+            }
         }
+
+        // Fallback: direct switch (Linux or browsers without View Transition)
+        await saveConfig({
+            ...config,
+            theme: newTheme,
+            language: config.language
+        }, true);
     };
 
     // Language change logic
@@ -99,26 +136,46 @@ function Navbar() {
 
     return (
         <nav
+            data-tauri-drag-region
+            onMouseDown={handleMouseDown}
+            onDoubleClick={handleDoubleClick}
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80"
+            className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80 select-none"
         >
-
-            <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
+            <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }} data-tauri-drag-region>
                 {/* Flexbox layout */}
-                <div className="flex items-center justify-between h-14 gap-2 md:gap-3">
+                <div className="flex items-center justify-between h-14 gap-2 md:gap-3" data-tauri-drag-region>
                     {/* Logo & Error Manager Badge */}
-                    <div className="shrink-0 flex items-center gap-1.5 min-w-0">
+                    <div
+                        className="no-drag shrink-0 flex items-center gap-1.5 min-w-0"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                    >
                         <NavLogo />
                         <ErrorQueueBadge />
                     </div>
 
+                    {/* Center draggable spacer */}
+                    <div className="flex-1 h-full min-w-2" data-tauri-drag-region />
+
                     {/* Compact nav menu */}
-                    <div className="flex-1 flex justify-center min-w-0 px-1">
+                    <div
+                        className="no-drag shrink-0 flex justify-center min-w-0 px-1"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                    >
                         <NavMenu navItems={navItems} />
                     </div>
 
+                    {/* Center draggable spacer */}
+                    <div className="flex-1 h-full min-w-2" data-tauri-drag-region />
+
                     {/* Instance selector and settings (docked) */}
-                    <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                    <div
+                        className="no-drag flex items-center gap-1.5 md:gap-2 shrink-0"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                    >
                         <InstanceSelector />
                         <NavSettings
                             theme={(config?.theme as 'light' | 'dark') || 'light'}
@@ -127,7 +184,6 @@ function Navbar() {
                             onLanguageChange={handleLanguageChange}
                         />
                     </div>
-
                 </div>
             </div>
         </nav>
