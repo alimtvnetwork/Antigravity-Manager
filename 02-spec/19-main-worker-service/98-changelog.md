@@ -1,3 +1,9 @@
+## v4.37.0 — 2026-09-20 (Instance smart rotation process teardown and candidate account switch)
+
+**Scope:** Version bump. Instance smart rotation process teardown and candidate account switch.
+
+---
+
 ## v4.36.0 — 2026-09-20 (Fix LogRetentionConfig type definitions and rust formatting)
 
 **Scope:** Version bump. Fix LogRetentionConfig type definitions and rust formatting.

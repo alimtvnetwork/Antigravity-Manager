@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../stores/error-store';
 import type { Account } from '../types/account';
+import { parseFlexibleDate } from '../utils/format';
 
 export interface InstanceConfig {
     id: string;
@@ -302,3 +303,159 @@ export function formatTimeAgo(timestampSec?: number): string {
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
 }
+
+export interface SmartCandidateResult {
+    account: Account;
+    score: number;
+    idleHours: number;
+    daysUntilRefill: number;
+    quotaPercentage: number;
+}
+
+/**
+ * Smart Candidate Account Scoring & Selection
+ * 1. Filter healthy accounts (not disabled, not forbidden, not validation blocked).
+ * 2. Exclude current profile's account if alternative accounts exist.
+ * 3. 4-Hour Inactivity Factor: Accounts not used in past 4h (or never used) receive highest priority.
+ * 4. Refill Runway: Longest runway until quota reset (e.g. 6 days) receives top priority.
+ * 5. Quota Headroom: Highest percentage remaining across models (100% full headroom).
+ */
+export function findSmartRotationAccount(
+    accounts: Account[],
+    currentAccountId?: string
+): SmartCandidateResult | null {
+    const eligible = accounts.filter(acc => {
+        const isDisabled = Boolean(acc.disabled);
+        if (isDisabled) return false;
+        const isForbidden = Boolean(acc.quota?.is_forbidden);
+        if (isForbidden) return false;
+        const isBlocked = Boolean(acc.validation_blocked);
+        if (isBlocked) return false;
+        return true;
+    });
+
+    const hasEligible = eligible.length > 0;
+    if (!hasEligible) return null;
+
+    let pool = eligible;
+    const hasMultiple = eligible.length > 1;
+    if (hasMultiple) {
+        if (currentAccountId) {
+            const others = eligible.filter(a => a.id !== currentAccountId);
+            const hasOthers = others.length > 0;
+            if (hasOthers) {
+                pool = others;
+            }
+        }
+    }
+
+    const nowMs = Date.now();
+    const nowSec = Math.floor(nowMs / 1000);
+
+    const scored: SmartCandidateResult[] = pool.map(acc => {
+        let score = 0;
+
+        // Factor A: 4-Hour Inactivity Recency (Top priority)
+        let idleHours = 999;
+        const hasNoLastUsed = !acc.last_used;
+        const isLastUsedZero = acc.last_used === 0;
+        if (hasNoLastUsed) {
+            idleHours = 999;
+            score += 100000;
+        } else if (isLastUsedZero) {
+            idleHours = 999;
+            score += 100000;
+        } else {
+            const idleSec = Math.max(0, nowSec - acc.last_used);
+            idleHours = idleSec / 3600;
+            const isFourHoursIdle = idleSec >= 4 * 3600;
+            if (isFourHoursIdle) {
+                score += 100000;
+                score += Math.min(20000, idleHours * 500);
+            } else {
+                score += Math.max(0, idleHours * 1000);
+            }
+        }
+
+        // Factor B: Refill Runway (Longest time until reset / weekly refill, e.g. 6 days)
+        let maxRefillDays = 0;
+        const models = acc.quota?.models || [];
+        for (const m of models) {
+            if (m.reset_time) {
+                const resetDate = parseFlexibleDate(m.reset_time);
+                if (resetDate) {
+                    const diffMs = resetDate.getTime() - nowMs;
+                    if (diffMs > 0) {
+                        const days = diffMs / (1000 * 60 * 60 * 24);
+                        if (days > maxRefillDays) {
+                            maxRefillDays = days;
+                        }
+                    }
+                }
+            }
+        }
+
+        const groups = acc.quota?.quota_groups || [];
+        for (const g of groups) {
+            for (const b of g.buckets || []) {
+                if (b.reset_time) {
+                    const resetDate = parseFlexibleDate(b.reset_time);
+                    if (resetDate) {
+                        const diffMs = resetDate.getTime() - nowMs;
+                        if (diffMs > 0) {
+                            const days = diffMs / (1000 * 60 * 60 * 24);
+                            if (days > maxRefillDays) {
+                                maxRefillDays = days;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const hasSixDaysRunway = maxRefillDays >= 6;
+        if (hasSixDaysRunway) {
+            score += 50000;
+        }
+        score += Math.min(50000, Math.floor(maxRefillDays * 8000));
+
+        // Factor C: Quota Headroom (Remaining percentage across models)
+        let avgPercentage = 100;
+        const hasModels = models.length > 0;
+        if (hasModels) {
+            let totalPct = 0;
+            let count = 0;
+            for (const m of models) {
+                if (typeof m.percentage === 'number') {
+                    totalPct += m.percentage;
+                    count += 1;
+                }
+            }
+            const hasCount = count > 0;
+            if (hasCount) {
+                avgPercentage = Math.round(totalPct / count);
+            }
+        }
+        score += avgPercentage * 200;
+
+        // Factor D: Subscription Tier bonus
+        const tier = (acc.quota?.subscription_tier || '').toLowerCase();
+        if (tier.includes('ultra')) {
+            score += 3000;
+        } else if (tier.includes('pro')) {
+            score += 2000;
+        }
+
+        return {
+            account: acc,
+            score,
+            idleHours: Math.round(idleHours * 10) / 10,
+            daysUntilRefill: Math.round(maxRefillDays * 10) / 10,
+            quotaPercentage: avgPercentage,
+        };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0] || null;
+}
+

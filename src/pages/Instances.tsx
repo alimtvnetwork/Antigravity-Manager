@@ -24,11 +24,11 @@ import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
-import { findBestRotationProfile, formatTimeAgo } from '../services/instanceService';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
+import { showToast } from '../components/common/ToastContainer';
 
 const INSTANCE_THEMES = [
     {
@@ -102,7 +102,7 @@ export default function Instances() {
         cloneInstanceExecutable,
         closeInstance,
         setActiveInstance,
-        rotateToNextBestProfile,
+        smartRotateProfileAccount,
     } = useInstanceStore();
 
     const {
@@ -692,31 +692,26 @@ export default function Instances() {
                                                     <span>Launch</span>
                                                 </button>
                                             )}
-                                            {/* Double Play Button with Candidate Tooltip */}
-                                            {(() => {
-                                                const candidate = findBestRotationProfile(instances, inst.config.id);
-                                                const tooltip = candidate
-                                                    ? `Double Play: Switch & launch ${candidate.config.name} (Last used: ${formatTimeAgo(candidate.config.last_used)})`
-                                                    : 'Double Play: No idle profile available';
-                                                return (
-                                                    <button
-                                                        disabled={!candidate}
-                                                        onClick={async () => {
-                                                            try {
-                                                                const rotated = await rotateToNextBestProfile(inst.config.id);
-                                                                alert(`Rotated to profile: ${rotated.config.name}`);
-                                                            } catch (e: any) {
-                                                                setActionError(e?.toString() || 'Rotation failed');
-                                                            }
-                                                        }}
-                                                        className="btn btn-xs btn-primary btn-outline gap-1 disabled:opacity-40 cursor-pointer"
-                                                        title={tooltip}
-                                                    >
-                                                        <FastForward className="w-3 h-3" />
-                                                        <span>Double Play</span>
-                                                    </button>
-                                                );
-                                            })()}
+                                            {/* Smart Switch Button with Process Teardown & Candidate Refill Runway */}
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const result = await smartRotateProfileAccount(inst.config.id);
+                                                        const runwayInfo = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
+                                                        showToast(
+                                                            `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayInfo}`,
+                                                            'success'
+                                                        );
+                                                    } catch (e: any) {
+                                                        setActionError(e?.toString() || 'Smart switch failed');
+                                                    }
+                                                }}
+                                                className="btn btn-xs btn-primary btn-outline gap-1 cursor-pointer"
+                                                title="Smart Switch: Close process, pick account with longest refill runway, and switch"
+                                            >
+                                                <FastForward className="w-3 h-3" />
+                                                <span>Smart Switch</span>
+                                            </button>
                                             <button
                                                 onClick={() => handleCloneExecutable(inst.config.id)}
                                                 className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400 cursor-pointer"

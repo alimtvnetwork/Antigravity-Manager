@@ -34,6 +34,7 @@ interface InstanceState {
     importInstancesJson: (jsonContent: string) => Promise<InstanceConfig[]>;
     smartPlayInstance: (instanceId?: string) => Promise<{ accountEmail: string; instanceName: string }>;
     rotateToNextBestProfile: (sourceInstanceId?: string) => Promise<InstanceStatus>;
+    smartRotateProfileAccount: (targetInstanceId?: string) => Promise<{ accountEmail: string; instanceName: string; daysUntilRefill: number }>;
 }
 
 export const useInstanceStore = create<InstanceState>((set, get) => ({
@@ -306,4 +307,59 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             throw err;
         }
     },
+
+    smartRotateProfileAccount: async (targetInstanceId?: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const instId = targetInstanceId || get().activeInstanceId || 'default';
+            const cur = get().instances.find(i => i.config.id === instId);
+            const instanceName = cur?.config.name || instId;
+            const currentAccountId = cur?.config.bound_account_id;
+
+            // 1. Close running processes from target profile directory first
+            await instanceService.closeInstance(instId);
+
+            // 2. Discover accounts
+            const { useAccountStore } = await import('./useAccountStore');
+            let accounts = useAccountStore.getState().accounts;
+            const hasAccounts = accounts.length > 0;
+            if (!hasAccounts) {
+                await useAccountStore.getState().fetchAccounts();
+                accounts = useAccountStore.getState().accounts;
+            }
+
+            // 3. Score candidate accounts (4h inactivity + refill runway + quota headroom)
+            const candidate = instanceService.findSmartRotationAccount(accounts, currentAccountId);
+            if (!candidate) {
+                set({ isLoading: false });
+                throw new Error('No healthy candidate account found for rotation');
+            }
+
+            // 4. Live quota refresh on candidate account to verify active status
+            await useAccountStore.getState().refreshQuota(candidate.account.id);
+
+            // 5. Inject verified account tokens into target profile state.vscdb and launch
+            await instanceService.switchAccountToInstance(candidate.account.id, instId);
+
+            // 6. Refresh instance and account states
+            await Promise.all([
+                get().fetchInstances(true),
+                useAccountStore.getState().fetchCurrentAccount(),
+                useAccountStore.getState().fetchAccounts(),
+            ]);
+
+            set({ activeInstanceId: instId, isLoading: false });
+
+            return {
+                accountEmail: candidate.account.email,
+                instanceName,
+                daysUntilRefill: candidate.daysUntilRefill,
+            };
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to smart rotate profile' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.smartRotateProfileAccount' });
+            throw err;
+        }
+    },
 }));
+

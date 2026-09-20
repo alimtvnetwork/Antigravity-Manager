@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.37.0 (2026-09-20)**:
+        -   **[Release v4.37.0] Instance smart rotation process teardown and candidate account switch**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Instance smart rotation process teardown and candidate account switch.
     *   **v4.36.0 (2026-09-20)**:
         -   **[Release v4.36.0] Fix LogRetentionConfig type definitions and rust formatting**:
             -   **Update System**: Automated release and version synchronization across all manifests.

@@ -22,7 +22,7 @@ import { cn } from '../../utils/cn';
 import { isTauri } from '../../utils/env';
 import { request as invoke } from '../../utils/request';
 import { showToast } from '../common/ToastContainer';
-import { findBestRotationProfile, formatTimeAgo, type InstanceStatus } from '../../services/instanceService';
+import { type InstanceStatus } from '../../services/instanceService';
 
 export function InstanceSelector() {
     const { t } = useTranslation();
@@ -40,7 +40,7 @@ export function InstanceSelector() {
         exportInstancesJson,
         importInstancesJson,
         smartPlayInstance,
-        rotateToNextBestProfile,
+        smartRotateProfileAccount,
     } = useInstanceStore();
 
     const config = useConfigStore(state => state.config);
@@ -267,13 +267,17 @@ export function InstanceSelector() {
         }
     };
 
-    const handleDoublePlay = async (sourceId?: string) => {
+    const handleSmartRotate = async (sourceId?: string) => {
         try {
-            const rotated = await rotateToNextBestProfile(sourceId);
-            showToast(t('instances.rotated_toast', `Rotated & launched profile: ${rotated.config.name}`), 'success');
+            const result = await smartRotateProfileAccount(sourceId);
+            const runwayText = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
+            showToast(
+                t('instances.smart_switched_toast', `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayText}`),
+                'success'
+            );
             setIsOpen(false);
         } catch (e: any) {
-            console.error('Failed to rotate profile:', e);
+            console.error('Failed to smart rotate profile:', e);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -349,18 +353,17 @@ export function InstanceSelector() {
                 )}
             </button>
 
-            {/* 2b. Top Action Bar: Double Play (Smart Profile Rotation) */}
+            {/* 2b. Top Action Bar: Smart Switch (Process Teardown & Smart Account Rotation) */}
             {(() => {
-                const topCandidate = findBestRotationProfile(instances, activeInstance?.config.id);
-                const tooltipText = topCandidate
-                    ? `Double Play: Switch & launch ${topCandidate.config.name} (Used: ${formatTimeAgo(topCandidate.config.last_used)})`
-                    : 'Double Play: No idle profile available';
+                const tooltipText = t(
+                    'instances.smart_switch_tooltip',
+                    'Smart Switch: Close running process, pick account with longest refill runway, and switch profile'
+                );
                 return (
                     <button
                         type="button"
-                        disabled={!topCandidate}
-                        onClick={() => handleDoublePlay(activeInstance?.config.id)}
-                        className="hidden md:flex p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        onClick={() => handleSmartRotate(activeInstance?.config.id)}
+                        className="hidden md:flex p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer"
                         title={tooltipText}
                     >
                         <FastForward className="w-3.5 h-3.5 fill-current" />
@@ -569,28 +572,19 @@ export function InstanceSelector() {
                                                 </button>
                                             </div>
 
-                                            {/* Slot 2: Item Double Play */}
+                                            {/* Slot 2: Item Smart Switch */}
                                             <div className="w-6 h-6 flex items-center justify-center">
-                                                {(() => {
-                                                    const rowCandidate = findBestRotationProfile(instances, inst.config.id);
-                                                    const rowTooltip = rowCandidate
-                                                        ? `Double Play: Switch & launch ${rowCandidate.config.name} (Used: ${formatTimeAgo(rowCandidate.config.last_used)})`
-                                                        : 'Double Play: No idle profile available';
-                                                    return (
-                                                        <button
-                                                            type="button"
-                                                            disabled={!rowCandidate}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDoublePlay(inst.config.id);
-                                                            }}
-                                                            className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                                                            title={rowTooltip}
-                                                        >
-                                                            <FastForward className="w-3 h-3 fill-current" />
-                                                        </button>
-                                                    );
-                                                })()}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSmartRotate(inst.config.id);
+                                                    }}
+                                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer flex items-center justify-center"
+                                                    title={t('instances.smart_switch_tooltip', 'Smart Switch: Close process, pick account with longest refill runway, and switch')}
+                                                >
+                                                    <FastForward className="w-3 h-3 fill-current" />
+                                                </button>
                                             </div>
 
                                             {/* Slot 3: Item Rename */}

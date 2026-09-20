@@ -18,7 +18,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.36.0-3B82F6?style=flat-square" alt="Version 4.36.0">
+    <img src="https://img.shields.io/badge/Version-4.37.0-3B82F6?style=flat-square" alt="Version 4.37.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">

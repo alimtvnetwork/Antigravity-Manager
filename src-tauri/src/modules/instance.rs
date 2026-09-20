@@ -145,7 +145,8 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || exe.contains("antigravity")
             || args_str.contains("antigravity")
             || exe.contains("/tmp/.mount_")
-            || name == "apprun";
+            || name == "apprun"
+            || args_str.contains(clean_target);
 
         if !is_antigravity {
             continue;
@@ -748,7 +749,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             let _ = Command::new("taskkill")
-                .args(["/F", "/PID", &pid.to_string()])
+                .args(["/F", "/T", "/PID", &pid.to_string()])
                 .creation_flags(0x08000000)
                 .output();
         }
