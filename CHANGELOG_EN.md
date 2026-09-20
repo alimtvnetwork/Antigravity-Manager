@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.42.0 (2026-09-20)**:
+        -   **[Release v4.42.0] Enforce pinned release detection and dedicated release section**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Enforce pinned release detection and dedicated release section.
     *   **v4.41.0 (2026-09-20)**:
         -   **[Release v4.41.0] installer tab indentation, 80 aria2c splits & rust compile fixes**:
             -   **Update System**: Automated release and version synchronization across all manifests.

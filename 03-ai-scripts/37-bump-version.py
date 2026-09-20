@@ -270,6 +270,16 @@ def update_readme_pins(current_ver, next_version, dry_run=False):
     escaped_curr = re.escape(current_ver)
     new_content = re.sub(rf"Version-{escaped_curr}", f"Version-{next_version}", content)
     new_content = re.sub(rf"alt=\"Version {escaped_curr}\"", f'alt="Version {next_version}"', new_content)
+    new_content = re.sub(
+        r"releases/download/v[0-9]+\.[0-9]+\.[0-9]+[^/]*/",
+        f"releases/download/v{next_version}/",
+        new_content,
+    )
+    new_content = re.sub(
+        r"e\.g\.\s*v[0-9]+\.[0-9]+\.[0-9]+[^)]*\)",
+        f"e.g. v{next_version})",
+        new_content,
+    )
 
     if new_content == content:
         new_content = re.sub(rf"\bv?{escaped_curr}\b", f"v{next_version}", content)

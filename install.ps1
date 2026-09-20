@@ -118,15 +118,93 @@ function Invoke-IndentedCommand {
     return $exitCode
 }
 
-# Resolve Pinned Version or URL invocation
-if (-not $Version) {
-    if ($PinnedVersion -and $PinnedVersion -ne "__PINNED_VERSION__") {
-        $Version = $PinnedVersion
-        Write-Step "Respecting pinned installer version: v$Version"
-    } elseif ($MyInvocation.Line -match 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+[^/]*)/') {
-        $Version = $Matches[1]
-        Write-Step "Detected pinned version from download URL: v$Version"
+function Get-InvocationHistoryCandidates {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    try {
+        if ($MyInvocation) {
+            if ($MyInvocation.Line) { $candidates.Add($MyInvocation.Line) }
+            if ($MyInvocation.Statement) { $candidates.Add($MyInvocation.Statement) }
+        }
+    } catch {}
+    try {
+        $hist = Get-History -Count 10 -ErrorAction SilentlyContinue
+        if ($hist) {
+            foreach ($h in $hist) {
+                if ($h.CommandLine) { $candidates.Add($h.CommandLine) }
+            }
+        }
+    } catch {}
+    try {
+        $rlPath = (Get-PSReadLineOption -ErrorAction SilentlyContinue).HistorySavePath
+        if ($rlPath) {
+            if (Test-Path $rlPath) {
+                $lastLines = Get-Content -Path $rlPath -Tail 20 -ErrorAction SilentlyContinue
+                if ($lastLines) {
+                    foreach ($line in $lastLines) {
+                        if ($line) { $candidates.Add($line) }
+                    }
+                }
+            }
+        }
+    } catch {}
+    try {
+        $rlItems = [Microsoft.PowerShell.PSConsoleReadLine]::GetHistoryItems()
+        if ($rlItems) {
+            $lastItems = $rlItems | Select-Object -Last 10
+            foreach ($item in $lastItems) {
+                if ($item) { $candidates.Add("$item") }
+            }
+        }
+    } catch {}
+    try {
+        $envCmd = [System.Environment]::CommandLine
+        if ($envCmd) { $candidates.Add($envCmd) }
+    } catch {}
+    try {
+        $curProc = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
+        if ($curProc) {
+            if ($curProc.CommandLine) { $candidates.Add($curProc.CommandLine) }
+            if ($curProc.ParentProcessId) {
+                $parentProc = Get-CimInstance Win32_Process -Filter "ProcessId = $($curProc.ParentProcessId)" -ErrorAction SilentlyContinue
+                if ($parentProc) {
+                    if ($parentProc.CommandLine) { $candidates.Add($parentProc.CommandLine) }
+                }
+            }
+        }
+    } catch {}
+    return $candidates
+}
+
+function Resolve-PinnedVersion {
+    param(
+        [string]$ExplicitVersion,
+        [string]$BakedVersion
+    )
+    if ($ExplicitVersion) {
+        return ($ExplicitVersion -replace "^v", "")
     }
+    if ($BakedVersion) {
+        if ($BakedVersion -ne "__PINNED_VERSION__") {
+            Write-Step "Respecting pinned installer version: v$BakedVersion"
+            return ($BakedVersion -replace "^v", "")
+        }
+    }
+    $entries = Get-InvocationHistoryCandidates
+    $regex = 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)(/|$|\s|"|' + "')"
+    foreach ($entry in $entries) {
+        if ($entry -match $regex) {
+            $detected = $Matches[1]
+            Write-Step "Detected pinned version from download URL: v$detected"
+            return $detected
+        }
+    }
+    return $null
+}
+
+# Resolve Pinned Version or URL invocation
+$resolvedPin = Resolve-PinnedVersion -ExplicitVersion $Version -BakedVersion $PinnedVersion
+if ($resolvedPin) {
+    $Version = $resolvedPin
 }
 
 # Resolve Architecture
@@ -664,38 +742,11 @@ Write-Host ""
 $candidateVersions = [System.Collections.Generic.List[string]]::new()
 $releaseMetadataMap = @{}
 
-# Check pinned version: 1) explicit -Version, 2) release-stamped $PinnedVersion, 3) URL invocation detection
+# Ensure pinned version resolution is finalized
 if (-not $Version) {
-    if ($PinnedVersion) {
-        if ($PinnedVersion -ne "__PINNED_VERSION__") {
-            $Version = $PinnedVersion
-        }
-    }
-}
-
-if (-not $Version) {
-    $invCandidates = @()
-    try {
-        if ($MyInvocation) {
-            if ($MyInvocation.Line) {
-                $invCandidates += $MyInvocation.Line
-            }
-        }
-    } catch {}
-    try {
-        $hist = Get-History -Count 5 -ErrorAction SilentlyContinue
-        if ($hist) {
-            foreach ($h in $hist) {
-                if ($h.CommandLine) { $invCandidates += $h.CommandLine }
-            }
-        }
-    } catch {}
-
-    foreach ($line in $invCandidates) {
-        if ($line -match 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)/install\.ps1') {
-            $Version = $Matches[1]
-            break
-        }
+    $resolvedPin = Resolve-PinnedVersion -ExplicitVersion $Version -BakedVersion $PinnedVersion
+    if ($resolvedPin) {
+        $Version = $resolvedPin
     }
 }
 

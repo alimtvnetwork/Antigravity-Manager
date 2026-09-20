@@ -10,12 +10,54 @@ UPSTREAM_REPO="lbjlaq/Antigravity-Manager"
 
 echo "🚀 Resolving release information..."
 
-if [ -z "${VERSION:-}" ]; then
+resolve_pinned_version() {
+    if [ -n "${VERSION:-}" ]; then
+        return 0
+    fi
     if [ -n "$PINNED_VERSION" ] && [ "$PINNED_VERSION" != "__PINNED_VERSION__" ]; then
         VERSION="$PINNED_VERSION"
         echo "📌 Respecting pinned version: v$VERSION"
+        return 0
     fi
-fi
+
+    local candidates=()
+    if [ -n "${BASH_EXECUTION_STRING:-}" ]; then
+        candidates+=("$BASH_EXECUTION_STRING")
+    fi
+    if [ -n "${PPID:-}" ] && [ -f "/proc/$PPID/cmdline" ]; then
+        candidates+=("$(tr '\0' ' ' < "/proc/$PPID/cmdline" 2>/dev/null || true)")
+    fi
+    if [ -f "/proc/$$/cmdline" ]; then
+        candidates+=("$(tr '\0' ' ' < "/proc/$$/cmdline" 2>/dev/null || true)")
+    fi
+    if command -v ps >/dev/null 2>&1; then
+        if [ -n "${PPID:-}" ]; then
+            candidates+=("$(ps -p "$PPID" -o args= 2>/dev/null || ps -f -p "$PPID" 2>/dev/null || true)")
+        fi
+        local my_pgid
+        my_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || true)
+        if [ -n "$my_pgid" ]; then
+            candidates+=("$(ps -o args= -g "$my_pgid" 2>/dev/null || true)")
+        fi
+    fi
+    if [ -f "${HOME:-}/.bash_history" ]; then
+        candidates+=("$(tail -n 15 "${HOME}/.bash_history" 2>/dev/null || true)")
+    fi
+    if [ -f "${HOME:-}/.zsh_history" ]; then
+        candidates+=("$(tail -n 15 "${HOME}/.zsh_history" 2>/dev/null || true)")
+    fi
+
+    local regex='releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)(/|$|[[:space:]]|"|'"')"
+    for entry in "${candidates[@]}"; do
+        if [[ "$entry" =~ $regex ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            echo "📌 Detected pinned version from download URL: v$VERSION"
+            return 0
+        fi
+    done
+}
+
+resolve_pinned_version
 
 CANDIDATES=()
 if [ -n "${VERSION:-}" ]; then

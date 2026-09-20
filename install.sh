@@ -203,19 +203,67 @@ detect_current_version() {
     fi
 }
 
+# Resolve pinned version from baked placeholder, environment, or URL invocation
+resolve_pinned_version() {
+    if [[ -n "${VERSION:-}" ]]; then
+        return 0
+    fi
+    if [[ -n "${PINNED_VERSION:-}" && "$PINNED_VERSION" != "__PINNED_VERSION__" ]]; then
+        VERSION="$PINNED_VERSION"
+        info "Respecting pinned installer version: v$VERSION"
+        return 0
+    fi
+
+    local candidates=()
+
+    # 1. BASH_EXECUTION_STRING
+    if [[ -n "${BASH_EXECUTION_STRING:-}" ]]; then
+        candidates+=("$BASH_EXECUTION_STRING")
+    fi
+
+    # 2. Parent and Self process cmdlines (/proc on Linux)
+    if [[ -n "${PPID:-}" && -f "/proc/$PPID/cmdline" ]]; then
+        candidates+=("$(tr '\0' ' ' < "/proc/$PPID/cmdline" 2>/dev/null || true)")
+    fi
+    if [[ -f "/proc/$$/cmdline" ]]; then
+        candidates+=("$(tr '\0' ' ' < "/proc/$$/cmdline" 2>/dev/null || true)")
+    fi
+
+    # 3. Process inspection via ps (Linux, macOS, BSD)
+    if command -v ps >/dev/null 2>&1; then
+        if [[ -n "${PPID:-}" ]]; then
+            candidates+=("$(ps -p "$PPID" -o args= 2>/dev/null || ps -f -p "$PPID" 2>/dev/null || true)")
+        fi
+        local my_pgid
+        my_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || true)
+        if [[ -n "$my_pgid" ]]; then
+            candidates+=("$(ps -o args= -g "$my_pgid" 2>/dev/null || true)")
+        fi
+    fi
+
+    # 4. Interactive shell history (bash / zsh)
+    if [[ -f "${HOME:-}/.bash_history" ]]; then
+        candidates+=("$(tail -n 15 "${HOME}/.bash_history" 2>/dev/null || true)")
+    fi
+    if [[ -f "${HOME:-}/.zsh_history" ]]; then
+        candidates+=("$(tail -n 15 "${HOME}/.zsh_history" 2>/dev/null || true)")
+    fi
+
+    local regex='releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)(/|$|[[:space:]]|"|'"')"
+    for entry in "${candidates[@]}"; do
+        if [[ "$entry" =~ $regex ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            info "Detected pinned version from download URL: v$VERSION"
+            return 0
+        fi
+    done
+}
+
 # Resolve target version with 4-candidate fallback queue
 get_version() {
     _is_valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; }
 
-    if [[ -z "${VERSION:-}" ]]; then
-        if [[ -n "$PINNED_VERSION" && "$PINNED_VERSION" != "__PINNED_VERSION__" ]]; then
-            VERSION="$PINNED_VERSION"
-            info "Respecting pinned installer version: v$VERSION"
-        elif [[ "${BASH_EXECUTION_STRING:-}" =~ releases/download/v?([0-9]+\.[0-9]+\.[0-9]+[^/]*)/ ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            info "Detected pinned version from download URL: v$VERSION"
-        fi
-    fi
+    resolve_pinned_version
 
     local is_pinned=0
     CANDIDATE_VERSIONS=()

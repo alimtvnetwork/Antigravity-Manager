@@ -202,17 +202,27 @@ jobs:
           echo "Extracting release notes for version $VERSION"
           echo "## Quick Install ${VERSION}" > release_notes.md
           echo "" >> release_notes.md
-          echo "### Windows (PowerShell 5.1+)" >> release_notes.md
+          echo "### Latest Release (Auto-Updating)" >> release_notes.md
+          echo "#### Windows (PowerShell 5.1+)" >> release_notes.md
           echo '```powershell' >> release_notes.md
           echo "irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" >> release_notes.md
-          echo "# Or pinned version:" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Linux / macOS (Bash)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Pinned Version (${VERSION})" >> release_notes.md
+          echo "To install and lock to this exact release:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Windows (PowerShell 5.1+)" >> release_notes.md
+          echo '```powershell' >> release_notes.md
           echo "irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
-          echo "### Linux / macOS (Bash)" >> release_notes.md
+          echo "#### Linux / macOS (Bash)" >> release_notes.md
           echo '```bash' >> release_notes.md
-          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
-          echo "# Or pinned version:" >> release_notes.md
           echo "curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
@@ -349,13 +359,21 @@ jobs:
           \) -print0 | while IFS= read -r -d '' file; do
             cp "$file" release-files/
           done
-          # Copy standalone installer scripts so they are published as release assets
+          # Copy standalone installer scripts and bake pinned release version into assets
+          VER="${GITHUB_REF_NAME#v}"
+          if [ -z "$VER" ]; then
+            VER="${VERSION#v}"
+          fi
           if [ -f install.ps1 ]; then
-            cp install.ps1 release-files/
+            sed "s/__PINNED_VERSION__/${VER}/g" install.ps1 > release-files/install.ps1
           fi
           if [ -f install.sh ]; then
-            cp install.sh release-files/
+            sed "s/__PINNED_VERSION__/${VER}/g" install.sh > release-files/install.sh
             chmod +x release-files/install.sh
+          fi
+          if [ -f deploy/arch/install.sh ]; then
+            sed "s/__PINNED_VERSION__/${VER}/g" deploy/arch/install.sh > release-files/arch-install.sh
+            chmod +x release-files/arch-install.sh
           fi
           # Provide friendly alias names for direct setup/installer downloads
           cd release-files
