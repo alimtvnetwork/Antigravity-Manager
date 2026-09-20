@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.33.0 (2026-09-20)**:
+        -   **[Release v4.33.0] Fix Rust compilation in instance launch scope and release v4.33.0**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix Rust compilation in instance launch scope and release v4.33.0.
     *   **v4.32.0 (2026-09-20)**:
         -   **[Release v4.32.0] Tool branding standardization, installer padding, migration display, and aria2c acceleration**:
             -   **Update System**: Automated release and version synchronization across all manifests.

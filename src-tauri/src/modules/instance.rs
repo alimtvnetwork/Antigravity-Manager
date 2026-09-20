@@ -429,6 +429,8 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     let bound_acc = config.bound_account_id.clone();
     save_registry(&registry).map_err(crate::error::AppError::Config)?;
 
+    let target_data_path = PathBuf::from(&data_dir);
+
     // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb
     if let Some(ref account_id) = bound_acc {
         if let Ok(account) = crate::modules::account::load_account(account_id) {
@@ -461,7 +463,6 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     }
 
     // Clean any orphaned lock files in the target instance data directory
-    let target_data_path = PathBuf::from(&data_dir);
     let has_target_dir = target_data_path.exists();
     if has_target_dir {
         let code_lock = target_data_path.join("code.lock");

@@ -24,3 +24,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [20-rustfmt-and-email-compile-errors-rca.md](.ai-memory/cicd-issues/20-rustfmt-and-email-compile-errors-rca.md)
 - [21-relative-path-and-newline-styling-rca.md](.ai-memory/cicd-issues/21-relative-path-and-newline-styling-rca.md)
 - [22-typescript-unused-vars-modal-props-and-rustfmt-rca.md](.ai-memory/cicd-issues/22-typescript-unused-vars-modal-props-and-rustfmt-rca.md)
+- [23-instance-launch-scope-variable-rca.md](.ai-memory/cicd-issues/23-instance-launch-scope-variable-rca.md)
