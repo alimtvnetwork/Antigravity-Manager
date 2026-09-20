@@ -40,6 +40,7 @@ Root index for the entire specification tree. Each top-level folder contains a d
 | 17 | [Consolidated Guidelines](./17-consolidated-guidelines/01-index.md) | AI-readable summaries of every major spec module |
 | 18 | [WP Plugin Conventions](./18-wp-plugin-how-to/01-index.md) | WordPress plugin architecture, admin UI, and REST API |
 | 19 | [Main Worker Service Architecture](./19-main-worker-service/01-index.md) | Split-tier architecture, credential-blind proxy, and backup nodes |
+| 20 | [Instance Management](./20-instance-management/01-index.md) | Multi-instance isolation, process lifecycle, SQLite state injection |
 
 ### App-Specific (21+)
 

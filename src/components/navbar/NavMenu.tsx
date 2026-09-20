@@ -39,7 +39,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
             <button
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 text-gray-800 dark:text-gray-200 transition-all border border-gray-200/60 dark:border-base-100 shadow-xs active:scale-95"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 transition-colors border border-gray-200/60 dark:border-slate-700 shadow-xs"
                 title={t('common.menu', 'Menu')}
             >
                 <CurrentIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -51,7 +51,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
             {/* 导航下拉菜单 */}
             {isMenuOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-base-200 rounded-xl shadow-xl border border-gray-200 dark:border-base-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
                     <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                         {t('common.navigation', 'Navigation')}
                     </div>
@@ -65,7 +65,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                                     draggable="false"
                                     onClick={() => setIsMenuOpen(false)}
                                     className={`
-                                        w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-gray-50 dark:hover:bg-base-100 transition-colors
+                                        w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors
                                         ${isSelected
                                             ? 'text-blue-600 dark:text-blue-400 font-medium bg-blue-50/60 dark:bg-blue-900/20'
                                             : 'text-gray-700 dark:text-gray-300'

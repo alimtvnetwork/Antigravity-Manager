@@ -59,7 +59,7 @@ export function ErrorModal(): React.ReactNode {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-base-100 border border-gray-200 dark:border-base-300 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden text-gray-900 dark:text-gray-100">
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden text-gray-900 dark:text-slate-100">
         <ModalHeader
           error={selectedError}
           queueLength={errorQueue.length}
@@ -109,7 +109,7 @@ function ModalHeader({
   const isWarn = error.level === 'warn';
 
   return (
-    <div className="px-6 py-4 border-b border-gray-200 dark:border-base-300 flex items-center justify-between bg-gray-50/50 dark:bg-base-200/50">
+    <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50">
       <div className="flex items-center gap-3">
         {isErr && <AlertCircle className="w-6 h-6 text-red-500 shrink-0" />}
         {isWarn && <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />}
@@ -120,11 +120,11 @@ function ModalHeader({
             <span className="font-mono text-xs px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
               {error.code}
             </span>
-            <span className="text-xs text-gray-500 font-mono">
+            <span className="text-xs text-gray-500 dark:text-slate-400 font-mono">
               {new Date(error.createdAt).toLocaleTimeString()}
             </span>
           </div>
-          <h3 className="text-base font-semibold leading-tight mt-1 line-clamp-1">
+          <h3 className="text-base font-semibold leading-tight mt-1 line-clamp-1 text-gray-900 dark:text-slate-100">
             {error.message}
           </h3>
         </div>
@@ -132,20 +132,20 @@ function ModalHeader({
 
       <div className="flex items-center gap-2">
         {queueLength > 1 && (
-          <div className="flex items-center gap-1 mr-2 px-2 py-1 rounded-lg bg-gray-100 dark:bg-base-300 text-xs font-medium">
+          <div className="flex items-center gap-1 mr-2 px-2 py-1 rounded-lg bg-gray-100 dark:bg-slate-800 text-xs font-medium">
             <button
               onClick={() => onNavigate('prev')}
-              className="p-0.5 hover:bg-gray-200 dark:hover:bg-base-200 rounded"
+              className="p-0.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded text-gray-600 dark:text-slate-300"
               title="Previous error"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <span className="px-1 font-mono">
+            <span className="px-1 font-mono text-gray-700 dark:text-slate-300">
               {queueIndex + 1} / {queueLength}
             </span>
             <button
               onClick={() => onNavigate('next')}
-              className="p-0.5 hover:bg-gray-200 dark:hover:bg-base-200 rounded"
+              className="p-0.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded text-gray-600 dark:text-slate-300"
               title="Next error"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -154,7 +154,7 @@ function ModalHeader({
         )}
         <button
           onClick={onClose}
-          className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-base-200 transition-colors"
+          className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -177,7 +177,7 @@ function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
   ];
 
   return (
-    <div className="flex border-b border-gray-200 dark:border-base-300 px-6 gap-2 bg-gray-50/20 dark:bg-base-200/20">
+    <div className="flex border-b border-gray-200 dark:border-slate-800 px-6 gap-2 bg-gray-50/20 dark:bg-slate-900/40">
       {tabs.map((tab) => {
         const selected = activeTab === tab.id;
         return (
@@ -235,7 +235,7 @@ function OverviewTab({
       </div>
 
       {error.uiClickPathArrow && (
-        <div className="p-4 rounded-xl bg-gray-50 dark:bg-base-200/60 border border-gray-200 dark:border-base-300">
+        <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-800">
           <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
             User Interaction Flow
           </h4>
@@ -278,7 +278,7 @@ function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
   return (
     <div className="space-y-4">
       {error.endpoint && (
-        <div className="flex items-center gap-2 text-xs font-mono p-2.5 rounded-lg bg-gray-100 dark:bg-base-200">
+        <div className="flex items-center gap-2 text-xs font-mono p-2.5 rounded-lg bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
           <span className="font-semibold text-blue-600 dark:text-blue-400">
             {error.method || 'INVOKE'}
           </span>
@@ -291,7 +291,7 @@ function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
         </div>
       )}
 
-      <div className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto">
+      <div className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto border border-gray-800">
         <div className="text-gray-400 mb-2 font-bold uppercase text-[10px] tracking-wider">
           Rust Backend Diagnostics
         </div>
@@ -328,14 +328,14 @@ function StackTab({ error }: { error: CapturedError }): React.ReactNode {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-500">
+        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
           {hasFrames ? `${frames.length} Frame(s) Captured` : 'Raw Stack Trace'}
         </span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleCopyStack}
-            className="text-xs text-blue-500 hover:underline font-medium"
+            className="text-xs text-blue-500 hover:underline font-medium cursor-pointer"
           >
             Copy Stack
           </button>
@@ -343,7 +343,7 @@ function StackTab({ error }: { error: CapturedError }): React.ReactNode {
             <button
               type="button"
               onClick={() => setShowRaw(!showRaw)}
-              className="text-xs text-blue-500 hover:underline font-medium"
+              className="text-xs text-blue-500 hover:underline font-medium cursor-pointer"
             >
               {showRaw ? 'Show Formatted Table' : 'Show Raw Stack'}
             </button>
@@ -352,27 +352,27 @@ function StackTab({ error }: { error: CapturedError }): React.ReactNode {
       </div>
 
       {showRaw || !hasFrames ? (
-        <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-80 whitespace-pre-wrap leading-relaxed">
+        <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-80 whitespace-pre-wrap leading-relaxed border border-gray-800">
           {rawStack}
         </pre>
       ) : (
-        <div className="border border-gray-200 dark:border-base-300 rounded-xl overflow-hidden">
+        <div className="border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-gray-50 dark:bg-base-200 text-gray-500 border-b border-gray-200 dark:border-base-300">
+            <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-slate-700">
               <tr>
                 <th className="p-2.5">Function</th>
                 <th className="p-2.5">File</th>
                 <th className="p-2.5">Line</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-base-300">
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
               {frames.map((f, i) => (
                 <tr key={i} className={f.isInternal ? 'opacity-40' : 'font-semibold'}>
                   <td className="p-2.5 text-blue-600 dark:text-blue-400">{f.function}</td>
                   <td className="p-2.5 text-gray-600 dark:text-gray-300 truncate max-w-xs">
                     {f.file}
                   </td>
-                  <td className="p-2.5 text-gray-500">{f.line}</td>
+                  <td className="p-2.5 text-gray-500 dark:text-slate-400">{f.line}</td>
                 </tr>
               ))}
             </tbody>
@@ -398,7 +398,7 @@ function ContextTab({ error }: { error: CapturedError }): React.ReactNode {
   );
 
   return (
-    <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-80">
+    <pre className="p-4 rounded-xl bg-gray-900 text-gray-100 font-mono text-xs overflow-x-auto max-h-80 border border-gray-800">
       {json}
     </pre>
   );
@@ -418,11 +418,11 @@ function ModalFooter({
   onClose,
 }: ModalFooterProps): React.ReactNode {
   return (
-    <div className="px-6 py-4 border-t border-gray-200 dark:border-base-300 flex items-center justify-between bg-gray-50/50 dark:bg-base-200/50">
+    <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/50">
       <div className="flex items-center gap-2">
         <button
           onClick={onCopyAi}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
         >
           {copiedAi ? <Check className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
           <span>{copiedAi ? 'Copied AI Report!' : 'Copy Error for AI'}</span>
@@ -430,7 +430,7 @@ function ModalFooter({
 
         <button
           onClick={onCopyJson}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-base-300 border border-gray-300 dark:border-base-300 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-300 dark:border-slate-700 transition-colors cursor-pointer"
         >
           <Copy className="w-3.5 h-3.5" />
           <span>Copy JSON</span>
@@ -439,7 +439,7 @@ function ModalFooter({
 
       <button
         onClick={onClose}
-        className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200 transition-colors"
+        className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
       >
         Dismiss
       </button>

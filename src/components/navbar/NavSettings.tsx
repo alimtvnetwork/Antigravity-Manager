@@ -41,7 +41,7 @@ export function NavSettings({
                 {/* 迷你视图切换按钮 */}
                 <button
                     onClick={() => setMiniView(true)}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
+                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
                     title={t('nav.mini_view', 'Mini View')}
                 >
                     <Minimize2 className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
@@ -50,7 +50,7 @@ export function NavSettings({
                 {/* 主题切换按钮 */}
                 <button
                     onClick={onThemeToggle}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
+                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
                     title={theme === 'light' ? t('nav.theme_to_dark') : t('nav.theme_to_light')}
                 >
                     {theme === 'light' ? (
@@ -71,7 +71,7 @@ export function NavSettings({
                 {!isTauri() && (
                     <button
                         onClick={handleLogout}
-                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all duration-150 ease-out active:scale-95 shadow-xs cursor-pointer"
+                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-colors duration-150 ease-out shadow-xs cursor-pointer"
                         title={t('nav.logout', '登出')}
                     >
                         <LogOut className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400" />

@@ -325,3 +325,26 @@ pub fn write_service_machine_id(
 
     Ok(())
 }
+
+/// Clear auth session tokens and user status from an isolated state.vscdb
+pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
+    if !db_path.exists() {
+        return Ok(());
+    }
+    let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let _ = conn.execute(
+        "DELETE FROM ItemTable WHERE key IN (?, ?, ?, ?, ?)",
+        [
+            "antigravityUnifiedStateSync.oauthToken",
+            "antigravityUnifiedStateSync.userStatus",
+            "antigravityUnifiedStateSync.enterprisePreferences",
+            "jetskiStateSync.agentManagerInitState",
+            "antigravityOnboarding",
+        ],
+    );
+    crate::modules::logger::log_info(&format!(
+        "[DB] Sanitized session in isolated database: {}",
+        db_path.display()
+    ));
+    Ok(())
+}

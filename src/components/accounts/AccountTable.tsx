@@ -1060,13 +1060,15 @@ function AccountTable({
                                     </button>
 
                                     {/* Gemini / Claude 视图切换药丸按钮 */}
-                                    <div className="inline-flex items-center p-0.5 rounded-md bg-gray-200/70 dark:bg-base-300/80 text-[9px] font-semibold text-gray-500 dark:text-gray-400">
+                                    <div className="inline-flex items-center p-0.5 rounded-lg bg-gray-200/90 dark:bg-slate-900 border border-gray-300/80 dark:border-slate-800 text-[10px] font-semibold">
                                         <button
                                             type="button"
                                             onClick={() => setModelFilter('both')}
                                             className={cn(
-                                                "px-1.5 py-0.5 rounded transition-all",
-                                                modelFilter === 'both' ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
+                                                modelFilter === 'both'
+                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
+                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Show both Gemini and Claude"
                                         >
@@ -1076,8 +1078,10 @@ function AccountTable({
                                             type="button"
                                             onClick={() => setModelFilter('gemini')}
                                             className={cn(
-                                                "px-1.5 py-0.5 rounded transition-all",
-                                                modelFilter === 'gemini' ? "bg-white dark:bg-base-100 text-emerald-600 dark:text-emerald-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
+                                                modelFilter === 'gemini'
+                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
+                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Gemini"
                                         >
@@ -1087,8 +1091,10 @@ function AccountTable({
                                             type="button"
                                             onClick={() => setModelFilter('claude')}
                                             className={cn(
-                                                "px-1.5 py-0.5 rounded transition-all",
-                                                modelFilter === 'claude' ? "bg-white dark:bg-base-100 text-purple-600 dark:text-purple-400 shadow-xs" : "hover:text-gray-900 dark:hover:text-gray-200"
+                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
+                                                modelFilter === 'claude'
+                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
+                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Claude"
                                         >

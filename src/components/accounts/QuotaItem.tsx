@@ -63,7 +63,7 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
 
     return (
         <div className={cn(
-            "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 group/quota",
+            "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-200/80 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-900/60 group/quota",
             showLiveIssue && "border-amber-400/70 dark:border-amber-500/70 bg-amber-50/80 dark:bg-amber-950/30 ring-1 ring-amber-400/30",
             liveState.isActive && "border-rose-400/70 dark:border-rose-500/70 bg-rose-50/80 dark:bg-rose-950/30 ring-rose-400/30",
             className
@@ -83,7 +83,7 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
             <div className="relative z-10 w-full flex items-center text-[10px] font-mono leading-none gap-1.5">
                 {/* Model Name */}
                 <span className={cn(
-                    "flex-1 min-w-0 text-gray-500 dark:text-gray-400 font-bold truncate text-left flex items-center gap-1",
+                    "flex-1 min-w-0 text-gray-700 dark:text-slate-200 font-bold truncate text-left flex items-center gap-1",
                     showLiveIssue && "text-amber-700 dark:text-amber-300",
                     liveState.isActive && "text-rose-700 dark:text-rose-300"
                 )} title={showLiveIssue ? liveLimitTitle : label}>
@@ -108,7 +108,7 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
                             {formatTimeRemaining(resetTime)}
                         </span>
                     ) : (
-                        <span className="text-gray-300 dark:text-gray-600 italic scale-90">N/A</span>
+                        <span className="text-gray-400 dark:text-slate-500 italic text-[9px]">N/A</span>
                     )}
                 </div>
 

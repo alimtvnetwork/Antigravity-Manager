@@ -53,7 +53,7 @@ export function LanguageDropdown({
         <div className={`relative ${className}`} ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-colors"
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
                 title={t('settings.general.language')}
             >
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
@@ -63,12 +63,12 @@ export function LanguageDropdown({
 
             {/* 下拉菜单 */}
             {isOpen && (
-                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-32 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-32 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
                     {languages.map((lang) => (
                         <button
                             key={lang.code}
                             onClick={() => handleLanguageChange(lang.code)}
-                            className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-base-100 transition-colors ${currentLanguage === lang.code
+                            className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${currentLanguage === lang.code
                                 ? 'text-blue-500 font-medium bg-blue-50 dark:bg-blue-900/10'
                                 : 'text-gray-700 dark:text-gray-300'
                                 }`}
@@ -124,7 +124,7 @@ export function NavigationDropdown({
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
             >
                 <CurrentIcon className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                 {/* 根据 showLabel 控制文字显示 */}
@@ -138,14 +138,14 @@ export function NavigationDropdown({
 
             {/* 下拉菜单 */}
             {isOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-xl border-2 border-gray-200 dark:border-gray-700 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border-2 border-gray-200 dark:border-slate-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
                     {navItems.map((item) => (
                         <Link
                             key={item.path}
                             to={item.path}
                             draggable="false"
                             onClick={handleNavItemClick}
-                            className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-base-100 transition-colors ${isActive(item.path)
+                            className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${isActive(item.path)
                                 ? 'text-blue-500 font-medium bg-blue-50 dark:bg-blue-900/10'
                                 : 'text-gray-700 dark:text-gray-300'
                                 }`}
@@ -203,7 +203,7 @@ export function MoreDropdown({
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 flex items-center justify-center transition-colors"
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
                 title={t('nav.more', '更多')}
             >
                 <MoreVertical className="w-5 h-5 text-gray-700 dark:text-gray-300" />
@@ -211,14 +211,14 @@ export function MoreDropdown({
 
             {/* 下拉菜单 */}
             {isOpen && (
-                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-40 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-base-200 rounded-xl shadow-lg border border-gray-100 dark:border-base-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-40 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
                     {/* 迷你视图 */}
                     <button
                         onClick={() => {
                             setMiniView(true);
                             setIsOpen(false);
                         }}
-                        className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-base-100 transition-colors text-gray-700 dark:text-gray-300"
+                        className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300"
                     >
                         <Minimize2 className="w-4 h-4" />
                         <span>{t('nav.mini_view', 'Mini View')}</span>
@@ -227,7 +227,7 @@ export function MoreDropdown({
                     {/* 主题切换 */}
                     <button
                         onClick={handleThemeToggle}
-                        className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-base-100 transition-colors text-gray-700 dark:text-gray-300"
+                        className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300"
                     >
                         {theme === 'light' ? (
                             <Moon className="w-4 h-4" />
@@ -238,14 +238,14 @@ export function MoreDropdown({
                     </button>
 
                     {/* 分隔线 */}
-                    <div className="my-1 border-t border-gray-100 dark:border-base-100"></div>
+                    <div className="my-1 border-t border-gray-100 dark:border-slate-800"></div>
 
                     {/* 语言选择 */}
                     {languages.map((lang) => (
                         <button
                             key={lang.code}
                             onClick={() => handleLanguageChange(lang.code)}
-                            className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-base-100 transition-colors ${currentLanguage === lang.code
+                            className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${currentLanguage === lang.code
                                 ? 'text-blue-500 font-medium bg-blue-50 dark:bg-blue-900/10'
                                 : 'text-gray-700 dark:text-gray-300'
                                 }`}
@@ -263,7 +263,7 @@ export function MoreDropdown({
                     {/* 登出按钮 - 仅 Web 模式显示 */}
                     {!isTauri() && (
                         <>
-                            <div className="my-1 border-t border-gray-100 dark:border-base-100"></div>
+                            <div className="my-1 border-t border-gray-100 dark:border-slate-800"></div>
                             <button
                                 onClick={handleLogout}
                                 className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 dark:text-red-400"

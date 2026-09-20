@@ -60,7 +60,7 @@ export function ErrorQueueBadge(): React.ReactNode {
           "relative flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all duration-200 cursor-pointer text-xs",
           hasErrors
             ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 shadow-xs"
-            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-base-200 border border-transparent"
+            : "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 border border-transparent"
         )}
         title={
           hasErrors

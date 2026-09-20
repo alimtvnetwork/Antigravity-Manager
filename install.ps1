@@ -51,8 +51,8 @@ $ErrorActionPreference = "Stop"
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
 $UpstreamRepo = "lbjlaq/Antigravity-Manager"
-$AppName = "Anti-Gravity Tools by Alim"
-$BinaryName = "Anti-Gravity Tools by Alim.exe"
+$AppName = "AGM by Alim"
+$BinaryName = "AGM by Alim.exe"
 
 function Write-Step {
     param([string]$Message)
@@ -102,7 +102,8 @@ function Remove-LegacyUpstreamInstallation {
     $legacyProcesses = Get-Process | Where-Object {
         $_.ProcessName -eq "antigravity-tools" -or
         $_.ProcessName -eq "Anti-Gravity Tools" -or
-        $_.ProcessName -eq "Anti-Gravity Tools by Alim"
+        $_.ProcessName -eq "Anti-Gravity Tools by Alim" -or
+        $_.ProcessName -eq "AGM by Alim"
     }
     if ($legacyProcesses) {
         Write-Step "Stopping running Antigravity Tools processes..."
@@ -180,10 +181,13 @@ function Remove-LegacyUpstreamInstallation {
     $legacyShortcuts = @(
         (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
         (Join-Path $StartMenuDir "antigravity-tools.lnk"),
+        (Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"),
         (Join-Path $DesktopDir "Antigravity Tools.lnk"),
         (Join-Path $DesktopDir "antigravity-tools.lnk"),
+        (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
         (Join-Path $TaskbarDir "Antigravity Tools.lnk"),
-        (Join-Path $TaskbarDir "antigravity-tools.lnk")
+        (Join-Path $TaskbarDir "antigravity-tools.lnk"),
+        (Join-Path $TaskbarDir "Anti-Gravity Tools by Alim.lnk")
     )
     foreach ($sc in $legacyShortcuts) {
         if (Test-Path $sc) {
@@ -521,6 +525,7 @@ Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 $ExePath = Join-Path $InstallDir $BinaryName
 if (-not (Test-Path $ExePath)) {
     $altNames = @(
+        "AGM by Alim.exe",
         "Anti-Gravity Tools by Alim.exe",
         "Anti-Gravity Tools.exe",
         "antigravity-tools.exe",
@@ -544,8 +549,11 @@ if (-not (Test-Path $ExePath)) {
 }
 if (-not (Test-Path $ExePath)) {
     $commonDirs = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\AGM by Alim"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
         (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
+        (Join-Path $env:ProgramFiles "AGM by Alim"),
         (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim")
     )
     foreach ($dir in $commonDirs) {
@@ -577,29 +585,63 @@ if (-not $NoPath) {
 
 # Step 5: Create Shortcuts
 if (-not $NoShortcut -and (Test-Path $ExePath)) {
-    Write-Step "Creating Application Shortcuts..."
+    Write-Step "Configuring Application Shortcuts..."
     try {
         $WshShell = New-Object -ComObject WScript.Shell
+
+        # Clean any remaining legacy shortcut on Desktop or Start Menu
+        $legacyDeskLnk = Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"
+        if (Test-Path $legacyDeskLnk) {
+            Remove-Item -Path $legacyDeskLnk -Force -ErrorAction SilentlyContinue
+        }
+        $legacyStartLnk = Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"
+        if (Test-Path $legacyStartLnk) {
+            Remove-Item -Path $legacyStartLnk -Force -ErrorAction SilentlyContinue
+        }
 
         # Start Menu
         if (-not (Test-Path $StartMenuDir)) {
             New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
         }
-        $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
-        $smShortcut.TargetPath = $ExePath
-        $smShortcut.WorkingDirectory = $InstallDir
-        $smShortcut.Description = "Antigravity Tools - AI Account & Instance Management"
-        $smShortcut.Save()
-        Write-Success "Created Start Menu shortcut: $StartMenuShortcut"
+        $needsSmShortcut = $true
+        if (Test-Path $StartMenuShortcut) {
+            try {
+                $existingSm = $WshShell.CreateShortcut($StartMenuShortcut)
+                if ($existingSm.TargetPath -eq $ExePath) {
+                    $needsSmShortcut = $false
+                    Write-Step "Start Menu shortcut already configured: $StartMenuShortcut"
+                }
+            } catch {}
+        }
+        if ($needsSmShortcut) {
+            $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
+            $smShortcut.TargetPath = $ExePath
+            $smShortcut.WorkingDirectory = $InstallDir
+            $smShortcut.Description = "AGM by Alim - AI Account & Instance Management"
+            $smShortcut.Save()
+            Write-Success "Created Start Menu shortcut: $StartMenuShortcut"
+        }
 
         # Desktop
         if (Test-Path $DesktopDir) {
-            $dtShortcut = $WshShell.CreateShortcut($DesktopShortcut)
-            $dtShortcut.TargetPath = $ExePath
-            $dtShortcut.WorkingDirectory = $InstallDir
-            $dtShortcut.Description = "Antigravity Tools"
-            $dtShortcut.Save()
-            Write-Success "Created Desktop shortcut: $DesktopShortcut"
+            $needsDtShortcut = $true
+            if (Test-Path $DesktopShortcut) {
+                try {
+                    $existingDt = $WshShell.CreateShortcut($DesktopShortcut)
+                    if ($existingDt.TargetPath -eq $ExePath) {
+                        $needsDtShortcut = $false
+                        Write-Step "Desktop shortcut already configured: $DesktopShortcut"
+                    }
+                } catch {}
+            }
+            if ($needsDtShortcut) {
+                $dtShortcut = $WshShell.CreateShortcut($DesktopShortcut)
+                $dtShortcut.TargetPath = $ExePath
+                $dtShortcut.WorkingDirectory = $InstallDir
+                $dtShortcut.Description = "AGM by Alim"
+                $dtShortcut.Save()
+                Write-Success "Created Desktop shortcut: $DesktopShortcut"
+            }
         }
     } catch {
         Write-Warn "Could not create shortcuts: $_"

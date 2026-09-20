@@ -7,10 +7,112 @@
 use crate::modules::email_vault_db::{self, EmailAccount};
 use base64::prelude::*;
 use chrono::Utc;
+use native_tls::{TlsConnector, TlsStream};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 use uuid::Uuid;
+
+/// Stream wrapper supporting both plaintext TCP and TLS streams
+pub enum EmailStream {
+    Plain(TcpStream),
+    Tls(TlsStream<TcpStream>),
+}
+
+impl Read for EmailStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            EmailStream::Plain(s) => s.read(buf),
+            EmailStream::Tls(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for EmailStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            EmailStream::Plain(s) => s.write(buf),
+            EmailStream::Tls(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            EmailStream::Plain(s) => s.flush(),
+            EmailStream::Tls(s) => s.flush(),
+        }
+    }
+}
+
+impl EmailStream {
+    pub fn upgrade_to_tls(self, host: &str) -> Result<Self, String> {
+        match self {
+            EmailStream::Plain(tcp) => {
+                let connector = TlsConnector::builder()
+                    .danger_accept_invalid_certs(true)
+                    .danger_accept_invalid_hostnames(true)
+                    .build()
+                    .map_err(|e| format!("Failed to create TLS connector: {}", e))?;
+                let tls = connector
+                    .connect(host, tcp)
+                    .map_err(|e| format!("TLS handshake failed with '{}': {}", host, e))?;
+                Ok(EmailStream::Tls(tls))
+            }
+            EmailStream::Tls(_) => Ok(self),
+        }
+    }
+
+    pub fn set_read_timeout(&self, timeout: Option<Duration>) -> Result<(), String> {
+        match self {
+            EmailStream::Plain(s) => s.set_read_timeout(timeout).map_err(|e| e.to_string()),
+            EmailStream::Tls(s) => s
+                .get_ref()
+                .set_read_timeout(timeout)
+                .map_err(|e| e.to_string()),
+        }
+    }
+
+    pub fn set_write_timeout(&self, timeout: Option<Duration>) -> Result<(), String> {
+        match self {
+            EmailStream::Plain(s) => s.set_write_timeout(timeout).map_err(|e| e.to_string()),
+            EmailStream::Tls(s) => s
+                .get_ref()
+                .set_write_timeout(timeout)
+                .map_err(|e| e.to_string()),
+        }
+    }
+}
+
+pub fn is_implicit_tls_smtp(port: u16, encryption_type: &str) -> bool {
+    if port == 465 {
+        return true;
+    }
+    let enc = encryption_type.trim();
+    if enc.eq_ignore_ascii_case("SSL") {
+        return true;
+    }
+    if enc.eq_ignore_ascii_case("SMTPS") {
+        return true;
+    }
+    false
+}
+
+pub fn is_starttls_smtp(port: u16, encryption_type: &str) -> bool {
+    if is_implicit_tls_smtp(port, encryption_type) {
+        return false;
+    }
+    if port == 587 {
+        return true;
+    }
+    let enc = encryption_type.trim();
+    if enc.eq_ignore_ascii_case("STARTTLS") {
+        return true;
+    }
+    if enc.eq_ignore_ascii_case("TLS") {
+        return true;
+    }
+    false
+}
 
 /// Result of an email delivery attempt
 #[derive(Debug, Clone)]
@@ -117,7 +219,7 @@ pub fn send_via_account_credentials(
         })?;
 
     // Establish TCP connection with timeout
-    let mut stream =
+    let tcp_stream =
         TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10)).map_err(|e| {
             format!(
                 "TCP connection to SMTP server '{}:{}' failed: {}",
@@ -125,46 +227,66 @@ pub fn send_via_account_credentials(
             )
         })?;
 
-    stream
+    tcp_stream
         .set_read_timeout(Some(Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
-    stream
+    tcp_stream
         .set_write_timeout(Some(Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
+
+    let is_implicit = is_implicit_tls_smtp(account.smtp_port, &account.encryption_type);
+    let mut stream = if is_implicit {
+        EmailStream::Plain(tcp_stream).upgrade_to_tls(&account.smtp_host)?
+    } else {
+        EmailStream::Plain(tcp_stream)
+    };
 
     // Read greeting
     read_smtp_response(&mut stream)?;
 
     // Send EHLO
-    send_smtp_cmd(&mut stream, "EHLO localhost")?;
+    send_smtp_cmd(&mut stream, "EHLO localhost", false)?;
     read_smtp_response(&mut stream)?;
+
+    let is_starttls = is_starttls_smtp(account.smtp_port, &account.encryption_type);
+    if is_starttls {
+        send_smtp_cmd(&mut stream, "STARTTLS", false)?;
+        read_smtp_response(&mut stream)?;
+        stream = stream.upgrade_to_tls(&account.smtp_host)?;
+        send_smtp_cmd(&mut stream, "EHLO localhost", false)?;
+        read_smtp_response(&mut stream)?;
+    }
 
     // Handle authentication if password exists
     if !password.is_empty() {
-        send_smtp_cmd(&mut stream, "AUTH LOGIN")?;
+        send_smtp_cmd(&mut stream, "AUTH LOGIN", false)?;
         read_smtp_response(&mut stream)?;
 
         let b64_user = BASE64_STANDARD.encode(&account.email);
-        send_smtp_cmd(&mut stream, &b64_user)?;
+        send_smtp_cmd(&mut stream, &b64_user, false)?;
         read_smtp_response(&mut stream)?;
 
         let b64_pass = BASE64_STANDARD.encode(&password);
-        send_smtp_cmd(&mut stream, &b64_pass)?;
+        send_smtp_cmd(&mut stream, &b64_pass, true)?;
         read_smtp_response(&mut stream)?;
     }
 
     // MAIL FROM
-    send_smtp_cmd(&mut stream, &format!("MAIL FROM:<{}>", account.email))?;
+    send_smtp_cmd(
+        &mut stream,
+        &format!("MAIL FROM:<{}>", account.email),
+        false,
+    )?;
     read_smtp_response(&mut stream)?;
 
     // RCPT TO
     for rcpt in recipients {
-        send_smtp_cmd(&mut stream, &format!("RCPT TO:<{}>", rcpt))?;
+        send_smtp_cmd(&mut stream, &format!("RCPT TO:<{}>", rcpt), false)?;
         read_smtp_response(&mut stream)?;
     }
 
     // DATA
-    send_smtp_cmd(&mut stream, "DATA")?;
+    send_smtp_cmd(&mut stream, "DATA", false)?;
     read_smtp_response(&mut stream)?;
 
     // Build MIME payload
@@ -178,33 +300,79 @@ pub fn send_via_account_credentials(
     read_smtp_response(&mut stream)?;
 
     // QUIT
-    let _ = send_smtp_cmd(&mut stream, "QUIT");
+    let _ = send_smtp_cmd(&mut stream, "QUIT", false);
     Ok(())
 }
 
-/// Send single SMTP command line
-fn send_smtp_cmd(stream: &mut TcpStream, cmd: &str) -> Result<(), String> {
+/// Send single SMTP command line with optional credential redaction on error
+fn send_smtp_cmd(stream: &mut EmailStream, cmd: &str, is_sensitive: bool) -> Result<(), String> {
     let line = format!("{}\r\n", cmd);
-    stream
-        .write_all(line.as_bytes())
-        .map_err(|e| format!("Failed to send SMTP command '{}': {}", cmd, e))
+    stream.write_all(line.as_bytes()).map_err(|e| {
+        if is_sensitive {
+            format!("Failed to send SMTP command '<REDACTED>': {}", e)
+        } else {
+            format!("Failed to send SMTP command '{}': {}", cmd, e)
+        }
+    })
 }
 
 /// Read SMTP response and verify status code (< 400 is success)
-fn read_smtp_response(stream: &mut TcpStream) -> Result<String, String> {
+fn read_smtp_response(stream: &mut EmailStream) -> Result<String, String> {
+    let mut total_resp = String::new();
     let mut buf = [0u8; 1024];
-    let n = stream
-        .read(&mut buf)
-        .map_err(|e| format!("Failed to read SMTP response: {}", e))?;
 
-    let resp = String::from_utf8_lossy(&buf[0..n]).to_string();
-    if resp.len() >= 3 {
-        let code = resp[0..3].parse::<u16>().unwrap_or(500);
-        if code >= 400 {
-            return Err(format!("SMTP server error: {}", resp.trim()));
+    loop {
+        let n = stream
+            .read(&mut buf)
+            .map_err(|e| format!("Failed to read SMTP response: {}", e))?;
+        if n == 0 {
+            break;
+        }
+        let chunk = String::from_utf8_lossy(&buf[0..n]);
+        total_resp.push_str(&chunk);
+
+        let mut is_done = false;
+        for line in total_resp.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.len() == 3 {
+                let is_digits = trimmed.chars().all(|c| c.is_ascii_digit());
+                if is_digits {
+                    is_done = true;
+                }
+            }
+            if trimmed.len() >= 4 {
+                let code_part = &trimmed[0..3];
+                let sep = &trimmed[3..4];
+                let is_digits = code_part.chars().all(|c| c.is_ascii_digit());
+                if is_digits {
+                    if sep == " " {
+                        is_done = true;
+                    }
+                }
+            }
+        }
+        if is_done {
+            break;
         }
     }
-    Ok(resp)
+
+    if total_resp.is_empty() {
+        return Err("Empty response from SMTP server".to_string());
+    }
+
+    let mut last_code = 200u16;
+    for line in total_resp.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.len() >= 3 {
+            if let Ok(code) = trimmed[0..3].parse::<u16>() {
+                last_code = code;
+            }
+        }
+    }
+    if last_code >= 400 {
+        return Err(format!("SMTP server error: {}", total_resp.trim()));
+    }
+    Ok(total_resp)
 }
 
 /// Build full MIME email message with anti-spam formatting

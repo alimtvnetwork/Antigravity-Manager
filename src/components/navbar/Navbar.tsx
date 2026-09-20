@@ -101,7 +101,7 @@ function Navbar() {
     return (
         <nav
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="py-1.5 transition-all duration-200 bg-[#FAFBFC] dark:bg-base-300"
+            className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80"
         >
 
             <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>

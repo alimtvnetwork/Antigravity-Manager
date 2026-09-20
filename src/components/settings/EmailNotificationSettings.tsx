@@ -479,14 +479,14 @@ export default function EmailNotificationSettings() {
     return (
         <div className="space-y-4">
             {/* Mailboxes Card */}
-            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2">
+                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2">
                             <Server className="w-4 h-4 text-blue-500" />
                             Email Accounts & Mailbox Pool
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
                             Mailbox pool with default sender prioritization and automatic failover swapping.
                         </p>
                     </div>
@@ -515,7 +515,7 @@ export default function EmailNotificationSettings() {
                             </button>
 
                             {isActionsOpen && (
-                                <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-base-100 border border-gray-200 dark:border-base-300 rounded-xl shadow-lg z-50 py-1 divide-y divide-gray-100 dark:divide-base-300 animate-in fade-in slide-in-from-top-1">
+                                <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 divide-y divide-gray-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1">
                                     <div className="py-1">
                                         <button
                                             type="button"
@@ -523,7 +523,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 handleExport('json');
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <FileJson className="w-3.5 h-3.5 text-amber-500" />
                                             <span>Export JSON</span>
@@ -534,7 +534,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 handleExport('csv');
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <FileText className="w-3.5 h-3.5 text-blue-500" />
                                             <span>Export CSV</span>
@@ -545,7 +545,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 handleExport('xlsx');
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
                                             <span>Export Excel</span>
@@ -556,7 +556,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 setIsImportModalOpen(true);
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <Upload className="w-3.5 h-3.5 text-indigo-500" />
                                             <span>Import Accounts</span>
@@ -569,7 +569,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 handleBackupDb();
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <Database className="w-3.5 h-3.5 text-purple-500" />
                                             <span>Backup Vault DB</span>
@@ -580,7 +580,7 @@ export default function EmailNotificationSettings() {
                                                 setIsActionsOpen(false);
                                                 handleRestoreDb();
                                             }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-base-200 flex items-center gap-2 transition-colors cursor-pointer"
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5 text-cyan-500" />
                                             <span>Restore Vault DB</span>
@@ -603,14 +603,14 @@ export default function EmailNotificationSettings() {
                 </div>
 
                 {accounts.length === 0 ? (
-                    <div className="py-6 px-4 text-center border border-dashed border-gray-200 dark:border-base-300 rounded-xl flex flex-col items-center justify-center">
-                        <Mail className="w-6 h-6 text-gray-300 dark:text-gray-600 mx-auto mb-1.5" />
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">No mailboxes configured in vault</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 mb-3">Add an SMTP/IMAP account to enable dispatch and remote command execution</p>
+                    <div className="py-6 px-4 text-center border border-dashed border-gray-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center bg-gray-50/50 dark:bg-slate-900/40">
+                        <Mail className="w-6 h-6 text-gray-400 dark:text-slate-500 mx-auto mb-1.5" />
+                        <p className="text-xs font-medium text-gray-600 dark:text-slate-300">No mailboxes configured in vault</p>
+                        <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5 mb-3">Add an SMTP/IMAP account to enable dispatch and remote command execution</p>
                         <button
                             type="button"
                             onClick={handleOpenAddAccount}
-                            className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all flex items-center gap-1.5 shadow-sm hover:scale-[1.02] cursor-pointer"
+                            className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Mailbox</span>
@@ -620,7 +620,7 @@ export default function EmailNotificationSettings() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="border-b border-gray-200 dark:border-base-300 text-gray-500 dark:text-gray-400">
+                                <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
                                     <th className="py-2 px-2.5 font-semibold">Alias & Email</th>
                                     <th className="py-2 px-2.5 font-semibold">SMTP Host</th>
                                     <th className="py-2 px-2.5 font-semibold">IMAP Host</th>
@@ -629,43 +629,43 @@ export default function EmailNotificationSettings() {
                                     <th className="py-2 px-2.5 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-base-200">
+                            <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                                 {accounts.map((acc) => (
-                                    <tr key={acc.id} className="hover:bg-gray-50/50 dark:hover:bg-base-200/50 transition-colors">
-                                        <td className="py-1.5 px-2.5">
-                                            <div className="font-semibold text-gray-800 dark:text-gray-200 leading-tight">{acc.alias}</div>
-                                            <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">{acc.email}</div>
+                                    <tr key={acc.id} className="hover:bg-gray-100/70 dark:hover:bg-slate-800/80 transition-colors group">
+                                        <td className="py-2 px-2.5">
+                                            <div className="font-semibold text-gray-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-white leading-tight transition-colors">{acc.alias}</div>
+                                            <div className="text-[11px] text-gray-500 dark:text-slate-400 group-hover:text-gray-700 dark:group-hover:text-slate-200 leading-tight transition-colors">{acc.email}</div>
                                         </td>
-                                        <td className="py-1.5 px-2.5 font-mono text-gray-600 dark:text-gray-300">
+                                        <td className="py-2 px-2.5 font-mono text-gray-600 dark:text-slate-300 group-hover:text-gray-900 dark:group-hover:text-slate-100 transition-colors">
                                             {acc.smtp_host}:{acc.smtp_port}
                                         </td>
-                                        <td className="py-1.5 px-2.5 font-mono text-gray-600 dark:text-gray-300">
+                                        <td className="py-2 px-2.5 font-mono text-gray-600 dark:text-slate-300 group-hover:text-gray-900 dark:group-hover:text-slate-100 transition-colors">
                                             {acc.imap_host}:{acc.imap_port}
                                         </td>
-                                        <td className="py-1.5 px-2.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-base-300 text-gray-700 dark:text-gray-300 text-[10px] font-mono">
+                                        <td className="py-2 px-2.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 text-gray-700 dark:text-slate-300 text-[10px] font-mono">
                                                 {acc.encryption_type}
                                             </span>
                                         </td>
-                                        <td className="py-1.5 px-2.5">
+                                        <td className="py-2 px-2.5">
                                             {acc.is_default ? (
-                                                <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-semibold">
+                                                <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50 text-[10px] font-semibold">
                                                     Default Sender
                                                 </span>
                                             ) : (
                                                 <button
                                                     onClick={() => handleSetDefault(acc.id)}
-                                                    className="text-[10px] text-gray-400 hover:text-blue-600 underline cursor-pointer"
+                                                    className="text-[10px] text-gray-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
                                                 >
                                                     Set Default
                                                 </button>
                                             )}
                                         </td>
-                                        <td className="py-1.5 px-2.5 text-right space-x-1">
+                                        <td className="py-2 px-2.5 text-right space-x-1">
                                             <button
                                                 onClick={() => handleTestSmtp(acc.id)}
                                                 disabled={testingAccountId === acc.id}
-                                                className="px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 text-[10px] font-medium cursor-pointer transition-colors"
+                                                className="px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200/60 dark:border-sky-800/50 text-[10px] font-medium cursor-pointer transition-colors"
                                                 title="Test Outbound SMTP"
                                             >
                                                 Test SMTP
@@ -673,20 +673,20 @@ export default function EmailNotificationSettings() {
                                             <button
                                                 onClick={() => handleTestImap(acc.id)}
                                                 disabled={testingAccountId === acc.id}
-                                                className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 text-[10px] font-medium cursor-pointer transition-colors"
+                                                className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200/60 dark:border-indigo-800/50 text-[10px] font-medium cursor-pointer transition-colors"
                                                 title="Test Inbound IMAP"
                                             >
                                                 Test IMAP
                                             </button>
                                             <button
                                                 onClick={() => handleOpenEditAccount(acc)}
-                                                className="px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-base-200 text-gray-600 dark:text-gray-300 text-[10px] cursor-pointer transition-colors"
+                                                className="px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 text-[10px] cursor-pointer transition-colors"
                                             >
                                                 Edit
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteAccount(acc.id)}
-                                                className="px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 text-[10px] cursor-pointer transition-colors"
+                                                className="px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 text-[10px] cursor-pointer transition-colors"
                                             >
                                                 <Trash2 className="w-3 h-3 inline" />
                                             </button>
@@ -700,12 +700,12 @@ export default function EmailNotificationSettings() {
             </div>
 
             {/* Notification Recipients Card */}
-            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2 mb-1">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2 mb-1">
                     <Send className="w-4 h-4 text-emerald-500" />
                     Notification Recipients
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
                     External user email addresses and distribution groups that receive sensor alerts and telemetry.
                 </p>
 
@@ -715,18 +715,18 @@ export default function EmailNotificationSettings() {
                         placeholder="Recipient Email (e.g. user@domain.com)"
                         value={newRecipientEmail}
                         onChange={(e) => setNewRecipientEmail(e.target.value)}
-                        className="flex-1 px-3 py-2 text-xs border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                         type="text"
                         placeholder="Group (e.g. dev, ops, default)"
                         value={newRecipientGroup}
                         onChange={(e) => setNewRecipientGroup(e.target.value)}
-                        className="w-36 px-3 py-2 text-xs border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-36 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
                         onClick={handleAddRecipient}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer"
                     >
                         Add Recipient
                     </button>
@@ -736,35 +736,35 @@ export default function EmailNotificationSettings() {
                     {recipients.map((rec) => (
                         <div
                             key={rec.id}
-                            className="bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs"
+                            className="bg-gray-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs"
                         >
-                            <span className="font-medium text-gray-700 dark:text-gray-200">{rec.email}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 dark:bg-base-300 text-gray-600 dark:text-gray-400 rounded">
+                            <span className="font-medium text-gray-700 dark:text-slate-200">{rec.email}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded font-mono">
                                 {rec.group_name}
                             </span>
                             <button
                                 onClick={() => handleDeleteRecipient(rec.id)}
-                                className="text-gray-400 hover:text-red-500"
+                                className="text-gray-400 hover:text-red-500 cursor-pointer"
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>
                         </div>
                     ))}
                     {recipients.length === 0 && (
-                        <span className="text-xs text-gray-400 italic">No recipients registered. Alerts will be skipped.</span>
+                        <span className="text-xs text-gray-400 dark:text-slate-500 italic">No recipients registered. Alerts will be skipped.</span>
                     )}
                 </div>
             </div>
 
             {/* Watcher Daemon & Sensors Card */}
-            <div className="bg-white dark:bg-base-100 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-base-200 space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-base-content flex items-center gap-2">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-purple-500" />
                             Background Watcher Daemon & Multi-Trigger Sensors
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
                             Configure automatic quota monitoring, idle workspace detection, and remote mailbox commands.
                         </p>
                     </div>
@@ -781,8 +781,8 @@ export default function EmailNotificationSettings() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-base-200 border border-gray-100 dark:border-base-300 space-y-3">
-                        <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 space-y-3">
+                        <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 block">
                             Telemetry & Sensor Loop Interval
                         </label>
                         <div className="flex items-center gap-3">
@@ -796,17 +796,17 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="flex-1 accent-blue-600"
                             />
-                            <span className="text-xs font-bold text-blue-600 w-16 text-right">
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 w-16 text-right">
                                 {settings.polling_interval_minutes} min
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-[11px] text-gray-400 dark:text-slate-400">
                             Interval for telemetry collection and quota/idle workspace sensor sampling.
                         </p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-base-200 border border-gray-100 dark:border-base-300 space-y-3">
-                        <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 space-y-3">
+                        <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 block">
                             Inbound Mailbox Check Interval
                         </label>
                         <div className="flex items-center gap-3">
@@ -823,22 +823,22 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="flex-1 accent-blue-600"
                             />
-                            <span className="text-xs font-bold text-blue-600 w-16 text-right">
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 w-16 text-right">
                                 {settings.inbox_check_interval_minutes} min
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-[11px] text-gray-400 dark:text-slate-400">
                             Frequency of reading the last 5 unread instructions via IMAP.
                         </p>
                     </div>
                 </div>
 
                 {/* Sensor Toggles */}
-                <div className="space-y-3 border-t border-gray-100 dark:border-base-200 pt-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Sensor Notification Triggers</h4>
+                <div className="space-y-3 border-t border-gray-100 dark:border-slate-800 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Sensor Notification Triggers</h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_quota_drop"
@@ -848,13 +848,13 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_quota_drop" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_quota_drop" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Quota Drop Alert</div>
-                                <div className="text-[11px] text-gray-400">Trigger when credit &lt; 15%</div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Trigger when credit &lt; 15%</div>
                             </label>
                         </div>
 
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_ws_switch"
@@ -864,13 +864,13 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_ws_switch" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_ws_switch" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Workspace Switch Notice</div>
-                                <div className="text-[11px] text-gray-400">Email notice before auto-rotation</div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Email notice before auto-rotation</div>
                             </label>
                         </div>
 
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_idle_ws"
@@ -880,20 +880,20 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_idle_ws" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_idle_ws" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Idle Workspace Alert</div>
-                                <div className="text-[11px] text-gray-400">Ask for prompt when queue is empty</div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Ask for prompt when queue is empty</div>
                             </label>
                         </div>
                     </div>
                 </div>
 
                 {/* Remote Execution Toggles */}
-                <div className="space-y-3 border-t border-gray-100 dark:border-base-200 pt-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Inbound Mailbox Command Capabilities</h4>
+                <div className="space-y-3 border-t border-gray-100 dark:border-slate-800 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Inbound Mailbox Command Capabilities</h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_allow_prompt"
@@ -903,13 +903,13 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_allow_prompt" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_allow_prompt" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Prompt Injection</div>
-                                <div className="text-[11px] text-gray-400">Match <code>Project: &lt;name&gt;</code></div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Match <code>Project: &lt;name&gt;</code></div>
                             </label>
                         </div>
 
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_allow_cli"
@@ -919,13 +919,13 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_allow_cli" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_allow_cli" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">CLI Execution</div>
-                                <div className="text-[11px] text-gray-400">Match <code>exec: &lt;ip&gt;</code></div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Match <code>exec: &lt;ip&gt;</code></div>
                             </label>
                         </div>
 
-                        <div className="p-3 rounded-lg border border-gray-200 dark:border-base-300 flex items-start gap-2.5">
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 id="chk_allow_instance"
@@ -935,18 +935,18 @@ export default function EmailNotificationSettings() {
                                 }
                                 className="mt-0.5 rounded text-blue-600"
                             />
-                            <label htmlFor="chk_allow_instance" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="chk_allow_instance" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Instance Launch / Rotate</div>
-                                <div className="text-[11px] text-gray-400">Match <code>instance: new</code></div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Match <code>instance: new</code></div>
                             </label>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-base-200">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800">
                     <button
                         onClick={handleTriggerManualCheck}
-                        className="px-4 py-2 text-xs font-medium border border-gray-200 dark:border-base-300 hover:bg-gray-50 dark:hover:bg-base-200 rounded-lg transition-colors flex items-center gap-1.5"
+                        className="px-4 py-2 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                         <Send className="w-3.5 h-3.5 text-blue-500" />
                         Dispatch Test Cheat Sheet
@@ -955,7 +955,7 @@ export default function EmailNotificationSettings() {
                     <button
                         onClick={handleSaveSettings}
                         disabled={isSaving}
-                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm"
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm cursor-pointer"
                     >
                         {isSaving ? 'Saving Settings...' : 'Save Watcher Settings'}
                     </button>
@@ -992,7 +992,7 @@ export default function EmailNotificationSettings() {
                                 navigator.clipboard.writeText(instructions);
                                 showToast('AI instructions copied to clipboard', 'success');
                             }}
-                            className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-base-100 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer hover:scale-105"
+                            className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                             title="Copy AI Instructions to Clipboard"
                         >
                             <Copy className="w-3 h-3" />
@@ -1001,13 +1001,13 @@ export default function EmailNotificationSettings() {
                     </div>
 
                     <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+                        <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">Email Address</label>
                         <input
                             type="email"
                             placeholder="e.g. ai-agm-tool-v2@hire-seoexperts.com"
                             value={editingAccount.email}
                             onChange={(e) => handleEmailChange(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         {emailFormatStatus === 'valid' && (
                             <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
@@ -1024,20 +1024,20 @@ export default function EmailNotificationSettings() {
                     </div>
 
                     <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Account Alias</label>
+                        <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">Account Alias</label>
                         <input
                             type="text"
                             placeholder="e.g. Primary Gmail, Alerts Mailer"
                             value={editingAccount.alias}
                             onChange={(e) => setEditingAccount({ ...editingAccount, alias: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
                     <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">
                             Password / App Password
-                            {editingAccount.id && <span className="text-gray-400 ml-1 font-normal">(Leave blank to keep existing)</span>}
+                            {editingAccount.id && <span className="text-gray-400 dark:text-slate-500 ml-1 font-normal">(Leave blank to keep existing)</span>}
                         </label>
                         <div className="relative">
                             <input
@@ -1045,58 +1045,58 @@ export default function EmailNotificationSettings() {
                                 placeholder={editingAccount.id ? '••••••••' : 'Application password / secret'}
                                 value={editingAccount.password || ''}
                                 onChange={(e) => setEditingAccount({ ...editingAccount, password: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <Key className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-2.5" />
                         </div>
-                        <p className="text-[11px] text-gray-400 mt-1">
+                        <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
                             Stored in isolated split database <code>email_passwords.db</code> with salted SSH RSA identity and machine-bound encryption.
                         </p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
                         <div className="col-span-2">
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Outgoing Server (SMTP Host)</label>
+                            <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">Outgoing Server (SMTP Host)</label>
                             <input
                                 type="text"
                                 value={editingAccount.smtp_host}
                                 onChange={(e) => setEditingAccount({ ...editingAccount, smtp_host: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                         <div>
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Port</label>
+                            <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">SMTP Port</label>
                             <input
                                 type="number"
                                 value={editingAccount.smtp_port}
                                 onChange={(e) =>
                                     setEditingAccount({ ...editingAccount, smtp_port: parseInt(e.target.value) || 465 })
                                 }
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                     </div>
                     {/* SMTP Port Preset Pills */}
                     <div className="flex items-center gap-1.5 -mt-1.5">
-                        <span className="text-[10px] text-gray-400">Presets:</span>
+                        <span className="text-[10px] text-gray-400 dark:text-slate-400">Presets:</span>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 465, encryption_type: 'SSL' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 465 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 465 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             465 (SSL)
                         </button>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 587, encryption_type: 'TLS' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 587 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 587 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             587 (TLS)
                         </button>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, smtp_port: 25, encryption_type: 'NONE' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 25 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.smtp_port === 25 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             25 (Plain)
                         </button>
@@ -1104,58 +1104,58 @@ export default function EmailNotificationSettings() {
 
                     <div className="grid grid-cols-3 gap-3">
                         <div className="col-span-2">
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Incoming Server (IMAP Host)</label>
+                            <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">Incoming Server (IMAP Host)</label>
                             <input
                                 type="text"
                                 value={editingAccount.imap_host}
                                 onChange={(e) => setEditingAccount({ ...editingAccount, imap_host: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                         <div>
-                            <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">IMAP Port</label>
+                            <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">IMAP Port</label>
                             <input
                                 type="number"
                                 value={editingAccount.imap_port}
                                 onChange={(e) =>
                                     setEditingAccount({ ...editingAccount, imap_port: parseInt(e.target.value) || 993 })
                                 }
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                     </div>
                     {/* IMAP Port Preset Pills */}
                     <div className="flex items-center gap-1.5 -mt-1.5">
-                        <span className="text-[10px] text-gray-400">Presets:</span>
+                        <span className="text-[10px] text-gray-400 dark:text-slate-400">Presets:</span>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, imap_port: 993, encryption_type: 'SSL' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 993 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 993 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             993 (IMAP SSL)
                         </button>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, imap_port: 143, encryption_type: 'TLS' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 143 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 143 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             143 (IMAP)
                         </button>
                         <button
                             type="button"
                             onClick={() => setEditingAccount({ ...editingAccount, imap_port: 995, encryption_type: 'SSL' })}
-                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 995 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-base-300 dark:border-base-200 dark:text-gray-300 hover:bg-gray-100'}`}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded border transition-colors cursor-pointer ${editingAccount.imap_port === 995 ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/50 dark:border-blue-700 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                         >
                             995 (POP3)
                         </button>
                     </div>
 
                     <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Encryption Type</label>
+                        <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">Encryption Type</label>
                         <select
                             value={editingAccount.encryption_type}
                             onChange={(e) => setEditingAccount({ ...editingAccount, encryption_type: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                         >
                             <option value="SSL">SSL / TLS (Recommended for Custom Domain)</option>
                             <option value="TLS">TLS (Recommended for Gmail / Outlook)</option>
@@ -1307,7 +1307,7 @@ export default function EmailNotificationSettings() {
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="px-2.5 py-1 text-[11px] font-medium bg-gray-100 dark:bg-base-300 hover:bg-gray-200 dark:hover:bg-base-200 rounded text-gray-700 dark:text-gray-200 flex items-center gap-1.5"
+                                className="px-2.5 py-1 text-[11px] font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                                 <Upload className="w-3 h-3 text-blue-500" />
                                 Browse File
@@ -1316,7 +1316,7 @@ export default function EmailNotificationSettings() {
                     </div>
 
                     <div>
-                        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block font-medium text-gray-700 dark:text-slate-300 mb-1">
                             Paste or Load {importFormat.toUpperCase()} Content
                         </label>
                         <textarea
@@ -1324,7 +1324,7 @@ export default function EmailNotificationSettings() {
                             value={importPayload}
                             onChange={(e) => setImportPayload(e.target.value)}
                             placeholder={`Paste your ${importFormat.toUpperCase()} here or click Browse File...`}
-                            className="w-full px-3 py-2 font-mono text-[11px] border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 font-mono text-[11px] border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
                 </div>

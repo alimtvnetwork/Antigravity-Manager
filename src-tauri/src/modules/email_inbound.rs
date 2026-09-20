@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use crate::modules::email_sender;
+use crate::modules::email_sender::{self, EmailStream};
 use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
 use chrono::Utc;
 use std::io::{Read, Write};
@@ -678,6 +678,40 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
     }
 }
 
+pub fn is_implicit_tls_imap(port: u16, encryption_type: &str) -> bool {
+    if port == 993 {
+        return true;
+    }
+    if port == 995 {
+        return true;
+    }
+    let enc = encryption_type.trim();
+    if enc.eq_ignore_ascii_case("SSL") {
+        return true;
+    }
+    if enc.eq_ignore_ascii_case("IMAPS") {
+        return true;
+    }
+    false
+}
+
+pub fn is_starttls_imap(port: u16, encryption_type: &str) -> bool {
+    if is_implicit_tls_imap(port, encryption_type) {
+        return false;
+    }
+    if port == 143 {
+        return true;
+    }
+    let enc = encryption_type.trim();
+    if enc.eq_ignore_ascii_case("STARTTLS") {
+        return true;
+    }
+    if enc.eq_ignore_ascii_case("TLS") {
+        return true;
+    }
+    false
+}
+
 /// Poll unread messages via IMAP connection
 pub fn poll_unread_messages(
     account: &EmailAccount,
@@ -702,7 +736,7 @@ pub fn poll_unread_messages(
             )
         })?;
 
-    let mut stream =
+    let tcp_stream =
         TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10)).map_err(|e| {
             format!(
                 "IMAP connection to '{}:{}' failed: {}",
@@ -710,18 +744,35 @@ pub fn poll_unread_messages(
             )
         })?;
 
-    stream
+    tcp_stream
         .set_read_timeout(Some(Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
 
+    let is_implicit = is_implicit_tls_imap(account.imap_port, &account.encryption_type);
+    let mut stream = if is_implicit {
+        EmailStream::Plain(tcp_stream).upgrade_to_tls(&account.imap_host)?
+    } else {
+        EmailStream::Plain(tcp_stream)
+    };
+
     // Read greeting
     let _ = read_imap_response(&mut stream);
+
+    let is_starttls = is_starttls_imap(account.imap_port, &account.encryption_type);
+    if is_starttls {
+        send_imap_cmd(&mut stream, "A00", "STARTTLS", false)?;
+        let starttls_resp = read_imap_response(&mut stream)?;
+        if starttls_resp.contains("OK") {
+            stream = stream.upgrade_to_tls(&account.imap_host)?;
+        }
+    }
 
     // Login
     send_imap_cmd(
         &mut stream,
         "A01",
         &format!("LOGIN \"{}\" \"{}\"", account.email, password),
+        true,
     )?;
     let login_resp = read_imap_response(&mut stream)?;
     if !login_resp.contains("OK") {
@@ -729,11 +780,11 @@ pub fn poll_unread_messages(
     }
 
     // Select Inbox
-    send_imap_cmd(&mut stream, "A02", "SELECT INBOX")?;
+    send_imap_cmd(&mut stream, "A02", "SELECT INBOX", false)?;
     let _ = read_imap_response(&mut stream);
 
     // Search Unseen
-    send_imap_cmd(&mut stream, "A03", "SEARCH UNSEEN")?;
+    send_imap_cmd(&mut stream, "A03", "SEARCH UNSEEN", false)?;
     let search_resp = read_imap_response(&mut stream)?;
 
     let mut ids: Vec<&str> = search_resp
@@ -759,6 +810,7 @@ pub fn poll_unread_messages(
                 "FETCH {} (BODY[HEADER.FIELDS (SUBJECT FROM MESSAGE-ID)] BODY[TEXT])",
                 id
             ),
+            false,
         )?;
         let fetch_resp = read_imap_response(&mut stream)?;
         if let Some(msg) = parse_raw_fetch_response(&fetch_resp) {
@@ -766,18 +818,27 @@ pub fn poll_unread_messages(
         }
     }
 
-    let _ = send_imap_cmd(&mut stream, "A99", "LOGOUT");
+    let _ = send_imap_cmd(&mut stream, "A99", "LOGOUT", false);
     Ok(messages)
 }
 
-fn send_imap_cmd(stream: &mut TcpStream, tag: &str, cmd: &str) -> Result<(), String> {
+fn send_imap_cmd(
+    stream: &mut EmailStream,
+    tag: &str,
+    cmd: &str,
+    is_sensitive: bool,
+) -> Result<(), String> {
     let line = format!("{} {}\r\n", tag, cmd);
-    stream
-        .write_all(line.as_bytes())
-        .map_err(|e| format!("Failed to send IMAP command '{}': {}", cmd, e))
+    stream.write_all(line.as_bytes()).map_err(|e| {
+        if is_sensitive {
+            format!("Failed to send IMAP command '{} <REDACTED>': {}", tag, e)
+        } else {
+            format!("Failed to send IMAP command '{} {}': {}", tag, cmd, e)
+        }
+    })
 }
 
-fn read_imap_response(stream: &mut TcpStream) -> Result<String, String> {
+fn read_imap_response(stream: &mut EmailStream) -> Result<String, String> {
     let mut buf = [0u8; 4096];
     let n = stream.read(&mut buf).unwrap_or(0);
     Ok(String::from_utf8_lossy(&buf[0..n]).to_string())

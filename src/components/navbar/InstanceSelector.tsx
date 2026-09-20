@@ -308,7 +308,7 @@ export function InstanceSelector() {
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors border border-gray-200/60 dark:border-base-100 shrink-0 cursor-pointer"
+                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors border border-gray-200/60 dark:border-slate-700 shrink-0 cursor-pointer"
                 title={t('instances.selector_tooltip', 'Select active Antigravity instance')}
             >
                 <span
@@ -331,10 +331,10 @@ export function InstanceSelector() {
                         handleSmartPlay(activeInstance?.config.id);
                     }
                 }}
-                className={`p-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                className={`p-1.5 rounded-lg transition-colors duration-150 shrink-0 flex items-center gap-1 cursor-pointer ${
                     isActiveRunning
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 border border-emerald-200 dark:border-emerald-800'
-                        : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs hover:scale-105 active:scale-95'
+                        : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs'
                 }`}
                 title={
                     isActiveRunning
@@ -360,7 +360,7 @@ export function InstanceSelector() {
                         type="button"
                         disabled={!topCandidate}
                         onClick={() => handleDoublePlay(activeInstance?.config.id)}
-                        className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs hover:scale-105 active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         title={tooltipText}
                     >
                         <FastForward className="w-3.5 h-3.5 fill-current" />
@@ -378,7 +378,7 @@ export function InstanceSelector() {
                         setIsEditOpen(true);
                     }
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0 cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
                 title={t('instances.edit_current', 'Rename current instance profile')}
             >
                 <Pencil className="w-3.5 h-3.5" />
@@ -392,7 +392,7 @@ export function InstanceSelector() {
                     setCloneMode(config?.instance_clone_mode || 'full');
                     setIsCopyOpen(true);
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0 cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
                 title={t('instances.copy_current', 'Duplicate current instance profile')}
             >
                 <Copy className="w-3.5 h-3.5" />
@@ -429,7 +429,7 @@ export function InstanceSelector() {
                     setNewInstanceName('');
                     setIsCreateOpen(true);
                 }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-base-100 transition-colors shrink-0 cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
                 title={t('instances.create_new', 'Create new isolated instance profile')}
             >
                 <Plus className="w-3.5 h-3.5" />
@@ -438,11 +438,11 @@ export function InstanceSelector() {
             {/* Dropdown Menu Popup (Strictly Above Page Content) */}
             {isOpen && (
                 <div
-                    className="absolute top-full right-0 mt-1.5 w-80 max-w-[calc(100vw-32px)] rounded-xl shadow-2xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-2 z-[9999] animate-in fade-in zoom-in-95"
+                    className="absolute top-full right-0 mt-1.5 w-80 max-w-[calc(100vw-32px)] rounded-xl shadow-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95"
                     style={{ isolation: 'isolate' }}
                 >
                     {/* Dropdown Header Bar with Import / Export Actions */}
-                    <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-base-100/60 pb-1.5">
+                    <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 pb-1.5">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                             {t('instances.title', 'Profiles')}
                         </span>
@@ -450,7 +450,7 @@ export function InstanceSelector() {
                             <button
                                 type="button"
                                 onClick={handleImportProfiles}
-                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-base-100 transition-colors cursor-pointer"
+                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 title={t('instances.import_json', 'Import Profiles (JSON)')}
                             >
                                 <Upload className="w-3.5 h-3.5" />
@@ -458,7 +458,7 @@ export function InstanceSelector() {
                             <button
                                 type="button"
                                 onClick={handleExportProfiles}
-                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-base-100 transition-colors cursor-pointer"
+                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 title={t('instances.export_json', 'Export Profiles (JSON)')}
                             >
                                 <Download className="w-3.5 h-3.5" />
@@ -475,7 +475,7 @@ export function InstanceSelector() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder={t('instances.search_placeholder', 'Search profiles...')}
-                                className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                     </div>
@@ -603,7 +603,7 @@ export function InstanceSelector() {
                                                         setEditInstanceName(inst.config.name);
                                                         setIsEditOpen(true);
                                                     }}
-                                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-base-100 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-slate-800 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
                                                     title={t('instances.edit_title', 'Rename profile')}
                                                 >
                                                     <Pencil className="w-3 h-3" />
@@ -637,7 +637,7 @@ export function InstanceSelector() {
                     </div>
 
                     {/* Footer Bar: Smart Play / Run Selected Profile */}
-                    <div className="p-2 border-t border-gray-100 dark:border-base-100">
+                    <div className="p-2 border-t border-gray-100 dark:border-slate-800">
                         <button
                             type="button"
                             disabled={launchingId === activeInstance?.config.id}
@@ -648,10 +648,10 @@ export function InstanceSelector() {
                                     handleSmartPlay(activeInstance?.config.id);
                                 }
                             }}
-                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                                 isActiveRunning
                                     ? 'bg-red-50 dark:bg-red-950/30 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/40'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs hover:scale-[1.01]'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 hover:brightness-105 text-white shadow-xs'
                             }`}
                         >
                             {isActiveRunning ? (
@@ -673,10 +673,10 @@ export function InstanceSelector() {
             {/* Create Instance Modal */}
             {isCreateOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-base-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3">
                             <Laptop className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
                                 {t('instances.create_modal_title', 'Create New Profile')}
                             </h3>
                         </div>
@@ -686,7 +686,7 @@ export function InstanceSelector() {
                             value={newInstanceName}
                             onChange={(e) => setNewInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg mb-4 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
                             autoFocus
                         />
                         <div className="flex justify-end gap-2">
@@ -713,10 +713,10 @@ export function InstanceSelector() {
             {/* Duplicate Instance Modal with Full Directory Copy Toggle */}
             {isCopyOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3">
                             <Copy className="w-5 h-5 text-indigo-600" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
                                 {t('instances.copy_modal_title', 'Duplicate Profile')}
                             </h3>
                         </div>
@@ -730,12 +730,12 @@ export function InstanceSelector() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg mb-3 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-3 text-xs"
                             autoFocus
                         />
 
                         {/* Clone Mode Selection */}
-                        <div className="mb-4 bg-gray-50 dark:bg-base-100 p-2.5 rounded-xl border border-gray-200/60 dark:border-base-300">
+                        <div className="mb-4 bg-gray-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-gray-200/60 dark:border-slate-700">
                             <span className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
                                 {t('instances.clone_mode_label', 'Duplication Scope')}
                             </span>
@@ -804,10 +804,10 @@ export function InstanceSelector() {
             {/* Edit / Rename Instance Modal */}
             {isEditOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-base-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3">
                             <Pencil className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
                                 {t('instances.edit_modal_title', 'Rename Profile')}
                             </h3>
                         </div>
@@ -817,7 +817,7 @@ export function InstanceSelector() {
                             value={editInstanceName}
                             onChange={(e) => setEditInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg mb-4 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
                             autoFocus
                         />
                         <div className="flex justify-end gap-2">
@@ -844,10 +844,10 @@ export function InstanceSelector() {
             {/* Delete Instance Modal */}
             {isDeleteOpen && deleteTarget && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-base-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3 text-red-600">
                             <AlertTriangle className="w-5 h-5" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
                                 {t('instances.delete_modal_title', 'Delete Profile')}
                             </h3>
                         </div>

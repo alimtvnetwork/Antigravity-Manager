@@ -279,6 +279,16 @@ pub fn copy_instance(
             // Full directory copy (default): copies entire instance data tree while skipping volatile locks/caches
             let _ = copy_dir_recursive(&src_path, &dst_path);
         }
+
+        // Sanitize cloned session so the new profile starts with clean authentication state
+        let cloned_db = dst_path
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        let has_cloned_db = cloned_db.exists();
+        if has_cloned_db {
+            let _ = crate::modules::db::sanitize_session(&cloned_db);
+        }
     }
 
     Ok(new_instance)
@@ -419,10 +429,34 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     let bound_acc = config.bound_account_id.clone();
     save_registry(&registry).map_err(crate::error::AppError::Config)?;
 
-    // If an account is bound to this instance profile, sync its token to the system keyring
+    // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb
     if let Some(ref account_id) = bound_acc {
         if let Ok(account) = crate::modules::account::load_account(account_id) {
             let _ = crate::modules::integration::write_to_system_keyring(&account);
+
+            let db_dir = target_data_path.join("User").join("globalStorage");
+            let has_db_dir = db_dir.exists();
+            if !has_db_dir {
+                let _ = fs::create_dir_all(&db_dir);
+            }
+            let db_path = db_dir.join("state.vscdb");
+            let _ = crate::modules::db::inject_token(
+                &db_path,
+                &account.token.access_token,
+                &account.token.refresh_token,
+                account.token.expiry_timestamp,
+                &account.email,
+                account.token.is_gcp_tos,
+                account.token.project_id.as_deref(),
+                account.token.id_token.as_deref(),
+                account.token.oauth_client_key.as_deref(),
+                None,
+            );
+
+            if let Some(ref profile) = account.device_profile {
+                let _ =
+                    crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            }
         }
     }
 
@@ -456,7 +490,16 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             crate::modules::process::detect_antigravity_with_diagnostics(None)?
         }
     } else {
-        crate::modules::process::detect_antigravity_with_diagnostics(None)?
+        let is_custom_instance = !is_default;
+        if is_custom_instance {
+            if let Ok(cloned) = clone_instance_executable(instance_id) {
+                PathBuf::from(cloned)
+            } else {
+                crate::modules::process::detect_antigravity_with_diagnostics(None)?
+            }
+        } else {
+            crate::modules::process::detect_antigravity_with_diagnostics(None)?
+        }
     };
 
     // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
@@ -590,12 +633,15 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let cloned_path = {
         let parent_dir = base_exe.parent().unwrap_or(&instance_bin_dir);
         let target_in_parent = parent_dir.join(format!("Antigravity-{}.exe", instance_id));
-        // Try hardlink in the application directory so all DLLs/assets are naturally resolved
-        let link_result = std::fs::hard_link(&base_exe, &target_in_parent);
-        if link_result.is_ok() {
+        let has_target = target_in_parent.exists();
+        if has_target {
+            target_in_parent
+        } else if std::fs::hard_link(&base_exe, &target_in_parent).is_ok() {
+            target_in_parent
+        } else if std::fs::copy(&base_exe, &target_in_parent).is_ok() {
             target_in_parent
         } else {
-            // If hardlink fails (e.g. read-only Program Files), create a launcher cmd script in instance bin
+            // If hardlink and copy fail (e.g. read-only Program Files), create a launcher cmd script in instance bin
             let launcher_cmd = instance_bin_dir.join(format!("launch-{}.cmd", instance_id));
             let script_content = format!(
                 "@echo off\r\nstart \"\" \"{}\" %*\r\n",
