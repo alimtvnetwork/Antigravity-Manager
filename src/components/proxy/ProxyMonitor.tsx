@@ -1366,7 +1366,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
     const updateLogRetentionField = (field: 'max_body_age_hours' | 'max_storage_gb' | 'max_rows', value: number) => {
         if (!appConfig) return;
-        const currentRetention = appConfig.proxy?.log_retention || { max_body_age_hours: 24, max_storage_gb: 0.5, max_rows: 100000 };
+        const currentRetention = appConfig.proxy?.log_retention || { max_body_age_hours: 24, max_storage_gb: 0.5, max_age_days: 30, max_rows: 100000 };
         const safeVal = field === 'max_storage_gb'
             ? Math.max(0.1, isNaN(value) ? 0.5 : value)
             : Math.max(1, isNaN(value) ? 1 : value);

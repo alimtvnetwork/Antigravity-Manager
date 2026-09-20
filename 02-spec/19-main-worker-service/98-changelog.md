@@ -1,3 +1,9 @@
+## v4.36.0 — 2026-09-20 (Fix LogRetentionConfig type definitions and rust formatting)
+
+**Scope:** Version bump. Fix LogRetentionConfig type definitions and rust formatting.
+
+---
+
 ## v4.35.0 — 2026-09-20 (Enable Auto Sync Current Account by default with 5-minute polling interval)
 
 **Scope:** Version bump. Enable Auto Sync Current Account by default with 5-minute polling interval.

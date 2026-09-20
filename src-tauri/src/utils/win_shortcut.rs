@@ -307,10 +307,7 @@ fn heal_single_shortcut(lnk_path: &Path) -> bool {
 
         let mut updated = false;
         let is_empty_icon = icon_str.is_empty() || icon_str == ",0";
-        if is_empty_icon
-            && !target_str.is_empty()
-            && target_str.to_lowercase().ends_with(".exe")
-        {
+        if is_empty_icon && !target_str.is_empty() && target_str.to_lowercase().ends_with(".exe") {
             let mut target_u16: Vec<u16> = OsStr::new(&target_str).encode_wide().collect();
             target_u16.push(0);
             if ((*sl_vtbl).set_icon_location)(shell_link_ptr, target_u16.as_ptr(), 0) == 0 {

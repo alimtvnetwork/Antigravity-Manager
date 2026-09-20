@@ -31,14 +31,10 @@ export interface ProxyConfig {
 
 export interface LogRetentionConfig {
     max_body_age_hours: number;
-    max_age_days: number;
+    max_age_days?: number;
     max_rows: number;
-}
-
-export interface LogRetentionConfig {
-    max_body_age_hours: number;
-    max_age_days: number;
-    max_rows: number;
+    max_storage_gb?: number;
+    max_disk_mb?: number;
 }
 
 // ============================================================================

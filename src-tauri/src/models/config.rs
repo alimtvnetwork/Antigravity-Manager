@@ -277,7 +277,8 @@ mod tests {
         assert_eq!(config.sync_interval, 5);
 
         // Deserializing JSON without auto_sync should default to true
-        let json_str = r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
+        let json_str =
+            r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
         let restored: AppConfig = serde_json::from_str(json_str).unwrap();
         assert!(restored.auto_sync);
         assert_eq!(restored.sync_interval, 5);

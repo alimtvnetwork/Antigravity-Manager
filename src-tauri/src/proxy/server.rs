@@ -103,7 +103,7 @@ pub struct AppState {
     pub switching: Arc<RwLock<bool>>, // [NEW] Account switching state lock to prevent concurrent switches
     pub integration: crate::modules::integration::SystemManager, // [NEW] System integration implementation
     pub account_service: Arc<crate::modules::account_service::AccountService>, // [NEW] Account management service layer
-    pub security: Arc<RwLock<crate::proxy::ProxySecurityConfig>>,              // [NEW] Security configuration state
+    pub security: Arc<RwLock<crate::proxy::ProxySecurityConfig>>, // [NEW] Security configuration state
     pub cloudflared_state: Arc<crate::commands::cloudflared::CloudflaredState>, // [NEW] Cloudflared plugin state
     pub is_running: Arc<RwLock<bool>>, // [NEW] Service running state flag
     pub port: u16,                     // [NEW] Local listening port
@@ -493,7 +493,10 @@ impl AxumServer {
         self.upstream
             .set_user_agent_override(config.user_agent_override.clone())
             .await;
-        tracing::info!("User-Agent configuration hot-reloaded: {:?}", config.user_agent_override);
+        tracing::info!(
+            "User-Agent configuration hot-reloaded: {:?}",
+            config.user_agent_override
+        );
     }
 
     pub async fn set_running(&self, running: bool) {
@@ -973,7 +976,10 @@ impl AxumServer {
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(100 * 1024 * 1024); // Default 100MB
-        tracing::info!("Request body size limit: {} MB", max_body_size / 1024 / 1024);
+        tracing::info!(
+            "Request body size limit: {} MB",
+            max_body_size / 1024 / 1024
+        );
 
         let app = Router::new()
             .nest("/api", admin_routes)
@@ -1782,19 +1788,19 @@ async fn admin_save_config(
     // AppState  。
     // ，  AppState  。
 
-    // 
+    //
     {
         let mut mapping = state.custom_mapping.write().await;
         *mapping = new_config.clone().proxy.custom_mapping;
     }
 
-    // 
+    //
     {
         let mut proxy = state.upstream_proxy.write().await;
         *proxy = new_config.clone().proxy.upstream_proxy;
     }
 
-    // 
+    //
     {
         let mut security = state.security.write().await;
         *security = crate::proxy::ProxySecurityConfig::from_proxy_config(&new_config.proxy);
@@ -1806,7 +1812,7 @@ async fn admin_save_config(
         *zai = new_config.clone().proxy.zai;
     }
 
-    // 
+    //
     {
         let mut exp = state.experimental.write().await;
         *exp = new_config.clone().proxy.experimental;
@@ -1933,7 +1939,10 @@ async fn admin_start_proxy_service(State(state): State<AppState>) -> impl IntoRe
 
     // 2.   ( )
     if let Err(e) = state.token_manager.load_accounts().await {
-        logger::log_error(&format!("[API] Failed to enable service and load accounts: {}", e));
+        logger::log_error(&format!(
+            "[API] Failed to enable service and load accounts: {}",
+            e
+        ));
     }
 
     let mut running = state.is_running.write().await;
@@ -2018,7 +2027,10 @@ async fn admin_clear_rate_limit(
 ) -> impl IntoResponse {
     let cleared = state.token_manager.clear_rate_limit(&account_id);
     if cleared {
-        logger::log_info(&format!("[API] Cleared rate limit records for account {}", account_id));
+        logger::log_info(&format!(
+            "[API] Cleared rate limit records for account {}",
+            account_id
+        ));
         StatusCode::OK
     } else {
         StatusCode::NOT_FOUND
@@ -2049,7 +2061,7 @@ async fn admin_set_preferred_account(
 
 async fn admin_fetch_zai_models(
     Path(_id): Path<String>,
-    Json(payload): Json<serde_json::Value>, // 
+    Json(payload): Json<serde_json::Value>, //
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     // ， ，  zai
     // fetch_zai_models  ，
@@ -2692,7 +2704,7 @@ async fn admin_clear_token_stats() -> impl IntoResponse {
 }
 
 async fn admin_get_update_settings() -> impl IntoResponse {
-    // 
+    //
     match crate::modules::update_checker::load_update_settings() {
         Ok(s) => Json(serde_json::to_value(s).unwrap_or_default()),
         Err(_) => Json(serde_json::json!({
@@ -2855,7 +2867,7 @@ async fn admin_toggle_proxy_status(
         )
     })?;
 
-    // 
+    //
     let _ = state.token_manager.reload_account(&account_id).await;
 
     Ok(StatusCode::OK)

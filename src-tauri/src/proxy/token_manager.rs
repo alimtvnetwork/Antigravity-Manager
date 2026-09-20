@@ -90,7 +90,8 @@ async fn update_account_json(
     let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let _account_write = crate::modules::account::lock_account_file_updates()?;
-        let raw = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+        let raw =
+            std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
         let mut content: serde_json::Value =
             serde_json::from_str(&raw).map_err(|e| format!("Failed to parse JSON: {}", e))?;
         update(&mut content);
@@ -143,7 +144,7 @@ pub struct TokenManager {
     sticky_config: Arc<tokio::sync::RwLock<StickySessionConfig>>, // ：
     session_accounts: Arc<DashMap<String, String>>, // ：  (SessionID -> AccountID)
     preferred_account_id: Arc<tokio::sync::RwLock<Option<String>>>, // [FIX #820]  ID（ ）
-    health_scores: Arc<DashMap<String, f32>>,                       // account_id -> health_score
+    health_scores: Arc<DashMap<String, f32>>,  // account_id -> health_score
     circuit_breaker_config: Arc<tokio::sync::RwLock<crate::models::CircuitBreakerConfig>>, // [NEW]
 
     // [NEW]  。
@@ -260,7 +261,10 @@ impl TokenManager {
         let accounts_dir = self.resolved_data_dir().join("accounts");
 
         if !accounts_dir.exists() {
-            return Err(format!("Accounts directory does not exist: {:?}", accounts_dir));
+            return Err(format!(
+                "Accounts directory does not exist: {:?}",
+                accounts_dir
+            ));
         }
 
         // Reload should reflect current on-disk state (accounts can be added/removed/disabled).
@@ -273,8 +277,8 @@ impl TokenManager {
             *last_used = None;
         }
 
-        let entries =
-            std::fs::read_dir(&accounts_dir).map_err(|e| format!("Failed to read accounts directory: {}", e))?;
+        let entries = std::fs::read_dir(&accounts_dir)
+            .map_err(|e| format!("Failed to read accounts directory: {}", e))?;
 
         let mut count = 0;
 
@@ -289,7 +293,7 @@ impl TokenManager {
                 continue;
             }
 
-            // 
+            //
             match self.load_single_account(&path).await {
                 Ok(Some(token)) => {
                     let account_id = token.account_id.clone();
@@ -297,7 +301,7 @@ impl TokenManager {
                     count += 1;
                 }
                 Ok(None) => {
-                    // 
+                    //
                 }
                 Err(e) => {
                     tracing::warn!("Failed to load account {:?}: {}", path, e);
@@ -448,7 +452,8 @@ impl TokenManager {
 
     // /
     async fn load_single_account(&self, path: &PathBuf) -> Result<Option<ProxyToken>, String> {
-        let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
 
         let mut account: serde_json::Value =
             serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
@@ -527,7 +532,7 @@ impl TokenManager {
             }
         }
 
-        // 
+        //
         if account
             .get("disabled")
             .and_then(|v| v.as_bool())
@@ -551,7 +556,7 @@ impl TokenManager {
         }
 
         // -
-        // 
+        //
         if self.check_and_protect_quota(&mut account, path).await {
             tracing::debug!(
                 "Account skipped due to quota protection: {:?} (email={})",
@@ -581,7 +586,10 @@ impl TokenManager {
             return Ok(None);
         }
 
-        let account_id = account["id"].as_str().ok_or("Missing id field")?.to_string();
+        let account_id = account["id"]
+            .as_str()
+            .ok_or("Missing id field")?
+            .to_string();
 
         let email = account["email"]
             .as_str()
@@ -600,7 +608,9 @@ impl TokenManager {
             .ok_or("Missing refresh_token")?
             .to_string();
 
-        let expires_in = token_obj["expires_in"].as_i64().ok_or("Missing expires_in")?;
+        let expires_in = token_obj["expires_in"]
+            .as_i64()
+            .ok_or("Missing expires_in")?;
 
         let timestamp = token_obj["expiry_timestamp"]
             .as_i64()
@@ -788,7 +798,7 @@ impl TokenManager {
                     .await;
                 }
             }
-            return false; // 
+            return false; //
         }
 
         // 2.
@@ -948,7 +958,7 @@ impl TokenManager {
     // / #
     // / * `account_path` -   JSON
     // / * `model_name` -  （ ）
-    #[allow(dead_code)] // 
+    #[allow(dead_code)] //
     fn get_model_quota_from_json(account_path: &PathBuf, model_name: &str) -> Option<i32> {
         let content = std::fs::read_to_string(account_path).ok()?;
         let account: serde_json::Value = serde_json::from_str(&content).ok()?;
@@ -1325,7 +1335,7 @@ impl TokenManager {
 
         let pick1 = rng.gen_range(0..pool_size);
         let pick2 = rng.gen_range(0..pool_size);
-        // 
+        //
         let pick2 = if pick2 == pick1 {
             (pick1 + 1) % pool_size
         } else {
@@ -1335,7 +1345,7 @@ impl TokenManager {
         let c1 = available[pick1];
         let c2 = available[pick2];
 
-        // 
+        //
         let selected = if c1.remaining_quota.unwrap_or(0) >= c2.remaining_quota.unwrap_or(0) {
             c1
         } else {
@@ -1362,10 +1372,10 @@ impl TokenManager {
     pub async fn graceful_shutdown(&self, timeout: std::time::Duration) {
         tracing::info!("Initiating graceful shutdown of background tasks...");
 
-        // 
+        //
         self.cancel_token.cancel();
 
-        // 
+        //
         match tokio::time::timeout(timeout, self.abort_background_tasks()).await {
             Ok(_) => tracing::info!("All background tasks cleaned up gracefully"),
             Err(_) => tracing::warn!(
@@ -1566,7 +1576,7 @@ impl TokenManager {
 
         // [NEW] 1.   (Capability Filter)
 
-        // 
+        //
         const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10
 
         // ID
@@ -1574,7 +1584,7 @@ impl TokenManager {
             crate::proxy::common::model_mapping::normalize_to_standard_id(target_model)
                 .unwrap_or_else(|| target_model.to_string());
 
-        // 
+        //
         // " "，  Opus 4.6
         let candidate_count_before = tokens_snapshot.len();
 
@@ -1601,7 +1611,7 @@ impl TokenManager {
             // Priority 0:   (ULTRA > PRO > FREE)
             // ：  Ultra -> Pro -> Free
             // ，
-            // 
+            //
             let tier_priority = |tier: &Option<String>| {
                 let t = tier.as_deref().unwrap_or("").to_lowercase();
                 if t.contains("ultra") {
@@ -1686,7 +1696,7 @@ impl TokenManager {
         // ===== [FIX #820]  ：  =====
         let preferred_id = self.preferred_account_id.read().await.clone();
         if let Some(ref pref_id) = preferred_id {
-            // 
+            //
             if let Some(preferred_token) = tokens_snapshot
                 .iter()
                 .find(|t| &t.account_id == pref_id)
@@ -1776,7 +1786,7 @@ impl TokenManager {
                                             token.email
                                         );
                                     } else {
-                                        // 
+                                        //
                                         tracing::debug!(
                                             "Token for account {} expiring soon ({}s), refreshing...",
                                             token.email,
@@ -2058,7 +2068,7 @@ impl TokenManager {
 
                 // ，  P2C   ( )
                 if target_token.is_none() {
-                    // 
+                    //
                     let mut non_limited: Vec<ProxyToken> = Vec::new();
                     for t in &tokens_snapshot {
                         if !self
@@ -2097,7 +2107,7 @@ impl TokenManager {
                 // C: P2C   ( )
                 tracing::debug!("🔄 [Mode C] P2C selection from {} candidates", total);
 
-                // 
+                //
                 let mut non_limited: Vec<ProxyToken> = Vec::new();
                 for t in &tokens_snapshot {
                     if !self
@@ -2127,7 +2137,7 @@ impl TokenManager {
                 Some(t) => t,
                 None => {
                     // :
-                    // 
+                    //
                     let min_wait = tokens_snapshot
                         .iter()
                         .filter_map(|t| {
@@ -2151,10 +2161,10 @@ impl TokenManager {
                                 wait_sec, wait_ms
                             );
 
-                            // 
+                            //
                             tokio::time::sleep(tokio::time::Duration::from_millis(wait_ms)).await;
 
-                            // 
+                            //
                             let mut retry_token = None;
                             for token in &tokens_snapshot {
                                 if attempted.contains(&token.account_id)
@@ -2186,10 +2196,10 @@ impl TokenManager {
                                     tokens_snapshot.len()
                                 );
 
-                                // 
+                                //
                                 self.rate_limit_tracker.clear_for_optimistic_reset();
 
-                                // 
+                                //
                                 let final_token = tokens_snapshot.iter().find(|t| {
                                     !attempted.contains(&t.account_id)
                                         && !(quota_protection_enabled
@@ -2253,12 +2263,15 @@ impl TokenManager {
 
                 let _guard = refresh_mu.lock().await;
 
-                // 
+                //
                 let latest_token_opt = self.tokens.get(&token.account_id).map(|r| r.clone());
                 if let Some(latest) = latest_token_opt {
                     if now < latest.timestamp - TOKEN_REFRESH_BUFFER_SECS {
                         token = latest.clone();
-                        tracing::debug!("Account {} refreshed by concurrent thread in loop, skipping", token.email);
+                        tracing::debug!(
+                            "Account {} refreshed by concurrent thread in loop, skipping",
+                            token.email
+                        );
                     } else {
                         tracing::debug!(
                             "Token for account {} expiring soon, executing primary refresh...",
@@ -2404,7 +2417,10 @@ impl TokenManager {
 
                 if is_new {
                     // “ ”
-                    tracing::debug!("Account {} starting [SingleFlight] ProjectID probe...", token.email);
+                    tracing::debug!(
+                        "Account {} starting [SingleFlight] ProjectID probe...",
+                        token.email
+                    );
 
                     let result =
                         match crate::proxy::project_resolver::fetch_project_id(&token.access_token)
@@ -2522,7 +2538,7 @@ impl TokenManager {
                 if quota_group != "image_gen" {
                     let mut last_used = self.last_used_account.lock().await;
                     if new_account_id.is_empty() {
-                        // 
+                        //
                         *last_used = None;
                     } else {
                         *last_used = Some((new_account_id, new_time));
@@ -2636,7 +2652,7 @@ impl TokenManager {
         &self,
         email: &str,
     ) -> Result<(String, String, String, String, u64), String> {
-        // 
+        //
         let token_info = {
             let mut found = None;
             for entry in self.tokens.iter() {
@@ -2693,14 +2709,14 @@ impl TokenManager {
                 tracing::info!("[Warmup] Token refresh successful for {}", email);
                 let new_now = chrono::Utc::now().timestamp();
 
-                // 
+                //
                 if let Some(mut entry) = self.tokens.get_mut(&account_id) {
                     entry.access_token = token_response.access_token.clone();
                     entry.expires_in = token_response.expires_in;
                     entry.timestamp = new_now;
                 }
 
-                // 
+                //
                 let _ = self
                     .save_refreshed_token(&account_id, &token_response)
                     .await;
@@ -2870,7 +2886,7 @@ impl TokenManager {
     /// }
     /// ```
     pub async fn has_available_account(&self, _quota_group: &str, target_model: &str) -> bool {
-        // 
+        //
         let quota_protection_enabled = crate::modules::config::load_app_config()
             .map(|cfg| cfg.quota_protection.enabled)
             .unwrap_or(false);
@@ -2898,7 +2914,7 @@ impl TokenManager {
                 continue;
             }
 
-            // 
+            //
             tracing::debug!(
                 "[Fallback Check] Found available account: {} for model {}",
                 token.email,
@@ -2907,7 +2923,7 @@ impl TokenManager {
             return true;
         }
 
-        // 
+        //
         tracing::info!(
             "[Fallback Check] No available Google accounts for model {}, fallback should be triggered",
             target_model
@@ -3030,7 +3046,10 @@ impl TokenManager {
         let (access_token, account_id) = match (access_token, account_id) {
             (Some(token), Some(id)) => (token, id),
             _ => {
-                tracing::warn!("Cannot find access_token for account {}, unable to refresh quota in real-time", email);
+                tracing::warn!(
+                    "Cannot find access_token for account {}, unable to refresh quota in real-time",
+                    email
+                );
                 return false;
             }
         };
@@ -3358,7 +3377,10 @@ impl TokenManager {
             return;
         }
 
-        tracing::warn!("Account {} unable to obtain quota reset time, using exponential backoff", account_id);
+        tracing::warn!(
+            "Account {} unable to obtain quota reset time, using exponential backoff",
+            account_id
+        );
         self.record_rate_limit_atomic(
             &account_id,
             status,
@@ -3613,7 +3635,7 @@ impl TokenManager {
                 Some(email_clone.clone()),
                 Some(project_id),
                 None,  // session_id
-                false, // 
+                false, //
                 token_info.id_token,
             )
             .with_oauth_client_key(token_info.oauth_client_key.clone());
@@ -5013,7 +5035,7 @@ mod tests {
         let candidates = vec![low_quota, high_quota];
         let attempted: HashSet<String> = HashSet::new();
 
-        // 
+        //
         for _ in 0..10 {
             let result = manager.select_with_p2c(&candidates, &attempted, "claude-sonnet", false);
             assert!(result.is_some());
@@ -5063,7 +5085,7 @@ mod tests {
 
     #[test]
     fn test_p2c_single_candidate() {
-        // 
+        //
         let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
         let token = create_test_token("single@test.com", Some("PRO"), 1.0, None, Some(50));
@@ -5117,16 +5139,16 @@ mod tests {
             ULTRA_REQUIRED_MODELS.iter().any(|m| lower.contains(m))
         }
 
-        // 
+        //
         assert!(is_ultra_required_model("claude-opus-4-6"));
         assert!(is_ultra_required_model("claude-opus-4-5"));
-        assert!(is_ultra_required_model("Claude-Opus-4-6")); // 
-        assert!(is_ultra_required_model("CLAUDE-OPUS-4-5")); // 
-        assert!(is_ultra_required_model("opus")); // 
+        assert!(is_ultra_required_model("Claude-Opus-4-6")); //
+        assert!(is_ultra_required_model("CLAUDE-OPUS-4-5")); //
+        assert!(is_ultra_required_model("opus")); //
         assert!(is_ultra_required_model("opus-4-6-latest"));
         assert!(is_ultra_required_model("models/claude-opus-4-6"));
 
-        // 
+        //
         assert!(!is_ultra_required_model("claude-sonnet-4-5"));
         assert!(!is_ultra_required_model("claude-sonnet"));
         assert!(!is_ultra_required_model("gemini-1.5-flash"));
@@ -5139,7 +5161,7 @@ mod tests {
     fn test_ultra_priority_for_high_end_models() {
         const RESET_TIME_THRESHOLD_SECS: i64 = 600;
 
-        // 
+        //
         fn compare_tokens_for_model(
             a: &ProxyToken,
             b: &ProxyToken,
@@ -5339,7 +5361,7 @@ mod tests {
             });
         }
 
-        // 
+        //
         let ultra_high =
             create_test_token("ultra_high@test.com", Some("ULTRA"), 1.0, None, Some(80));
         let ultra_low = create_test_token("ultra_low@test.com", Some("ULTRA"), 1.0, None, Some(20));

@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.36.0 (2026-09-20)**:
+        -   **[Release v4.36.0] Fix LogRetentionConfig type definitions and rust formatting**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix LogRetentionConfig type definitions and rust formatting.
     *   **v4.35.0 (2026-09-20)**:
         -   **[Release v4.35.0] Enable Auto Sync Current Account by default with 5-minute polling interval**:
             -   **Update System**: Automated release and version synchronization across all manifests.
