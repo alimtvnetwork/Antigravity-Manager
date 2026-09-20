@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.38.0 (2026-09-20)**:
+        -   **[Release v4.38.0] Installer output tab indentation and 80-split 500KB aria2c download acceleration**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Installer output tab indentation and 80-split 500KB aria2c download acceleration.
     *   **v4.37.0 (2026-09-20)**:
         -   **[Release v4.37.0] Instance smart rotation process teardown and candidate account switch**:
             -   **Update System**: Automated release and version synchronization across all manifests.

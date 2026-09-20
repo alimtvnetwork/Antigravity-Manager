@@ -1,3 +1,9 @@
+## v4.38.0 — 2026-09-20 (Installer output tab indentation and 80-split 500KB aria2c download acceleration)
+
+**Scope:** Version bump. Installer output tab indentation and 80-split 500KB aria2c download acceleration.
+
+---
+
 ## v4.37.0 — 2026-09-20 (Instance smart rotation process teardown and candidate account switch)
 
 **Scope:** Version bump. Instance smart rotation process teardown and candidate account switch.

@@ -45,6 +45,21 @@ run() {
     fi
 }
 
+run_indented() {
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        echo -e "${INDENT}${YELLOW}[DRY-RUN]${NC} $*"
+        return 0
+    fi
+    echo ""
+    local exit_code=0
+    set +e
+    "$@" 2>&1 | sed $'s/^/\t/'
+    exit_code="${PIPESTATUS[0]}"
+    set -e
+    echo ""
+    return "$exit_code"
+}
+
 # Show help
 show_help() {
     echo ""
@@ -384,10 +399,10 @@ download_file() {
         return 1
     fi
 
-    # Try aria2c with 16 split parallel connections
+    # Try aria2c with 80 parallel split connections and 500KB chunks
     if [[ -n "${ARIA2C_BIN:-}" && -x "$ARIA2C_BIN" ]]; then
-        info "Downloading with aria2c (16 parallel split connections)..."
-        if "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 16 -j 16 -k 1M \
+        info "Downloading with aria2c (80 parallel split connections, 500KB chunks)..."
+        if run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
             --allow-overwrite=true \
             --auto-file-renaming=false \
             --summary-interval=1 \
@@ -404,7 +419,7 @@ download_file() {
 
     # Fallback to curl
     info "Downloading with curl..."
-    if curl -fSL --progress-bar -o "$full_path" "$url"; then
+    if run_indented curl -fSL --progress-bar --connect-timeout 10 --retry 3 -o "$full_path" "$url"; then
         if [[ -f "$full_path" && -s "$full_path" ]]; then
             return 0
         fi
@@ -514,18 +529,18 @@ remove_previous_installation() {
         case "$PKG_MANAGER" in
             apt)
                 if dpkg -s "$APP_ID" &>/dev/null; then
-                    run $sudo_cmd apt-get remove -y "$APP_ID" 2>/dev/null || run $sudo_cmd dpkg -r "$APP_ID" 2>/dev/null || true
+                    run_indented $sudo_cmd apt-get remove -y "$APP_ID" 2>/dev/null || run_indented $sudo_cmd dpkg -r "$APP_ID" 2>/dev/null || true
                 fi
                 if dpkg -s antigravity-tools &>/dev/null; then
-                    run $sudo_cmd apt-get remove -y antigravity-tools 2>/dev/null || run $sudo_cmd dpkg -r antigravity-tools 2>/dev/null || true
+                    run_indented $sudo_cmd apt-get remove -y antigravity-tools 2>/dev/null || run_indented $sudo_cmd dpkg -r antigravity-tools 2>/dev/null || true
                 fi
                 ;;
             dnf|yum)
                 if rpm -q "$APP_ID" &>/dev/null; then
-                    run $sudo_cmd "${PKG_MANAGER}" remove -y "$APP_ID" 2>/dev/null || true
+                    run_indented $sudo_cmd "${PKG_MANAGER}" remove -y "$APP_ID" 2>/dev/null || true
                 fi
                 if rpm -q antigravity-tools &>/dev/null; then
-                    run $sudo_cmd "${PKG_MANAGER}" remove -y antigravity-tools 2>/dev/null || true
+                    run_indented $sudo_cmd "${PKG_MANAGER}" remove -y antigravity-tools 2>/dev/null || true
                 fi
                 ;;
         esac
@@ -583,14 +598,14 @@ install_linux() {
 
     case "$PKG_MANAGER" in
         apt)
-            run $sudo_cmd dpkg -i "$DOWNLOAD_PATH"
-            run $sudo_cmd apt-get install -f -y  # Fix dependencies if needed
+            run_indented $sudo_cmd dpkg -i "$DOWNLOAD_PATH"
+            run_indented $sudo_cmd apt-get install -f -y  # Fix dependencies if needed
             ;;
         dnf)
-            run $sudo_cmd dnf install -y "$DOWNLOAD_PATH"
+            run_indented $sudo_cmd dnf install -y "$DOWNLOAD_PATH"
             ;;
         yum)
-            run $sudo_cmd yum install -y "$DOWNLOAD_PATH"
+            run_indented $sudo_cmd yum install -y "$DOWNLOAD_PATH"
             ;;
         appimage)
             local install_dir="${HOME}/.local/bin"

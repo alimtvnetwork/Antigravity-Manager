@@ -25,12 +25,38 @@ if [ -z "$URL_X86_64" ] || [ -z "$URL_AARCH64" ]; then
     exit 1
 fi
 
+run_indented() {
+    echo ""
+    local exit_code=0
+    set +e
+    "$@" 2>&1 | sed $'s/^/\t/'
+    exit_code="${PIPESTATUS[0]}"
+    set -e
+    echo ""
+    return "$exit_code"
+}
+
+download_asset() {
+    local url="$1"
+    local output="$2"
+    if command -v aria2c &>/dev/null; then
+        run_indented aria2c --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
+            --allow-overwrite=true \
+            --auto-file-renaming=false \
+            --summary-interval=1 \
+            --console-log-level=warn \
+            -o "$output" "$url"
+    else
+        run_indented curl -fSL --progress-bar --connect-timeout 10 --retry 3 -o "$output" "$url"
+    fi
+}
+
 echo "🔍 Downloading assets to calculate checksums..."
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-wget -q "$URL_X86_64" -O x86_64.deb
-wget -q "$URL_AARCH64" -O aarch64.deb
+download_asset "$URL_X86_64" "x86_64.deb"
+download_asset "$URL_AARCH64" "aarch64.deb"
 
 SHA_X86_64=$(sha256sum x86_64.deb | cut -d' ' -f1)
 SHA_AARCH64=$(sha256sum aarch64.deb | cut -d' ' -f1)
@@ -48,7 +74,7 @@ sed -e "s/\${_pkgver}/$PKGVER/g" \
     PKGBUILD.template > PKGBUILD
 
 echo "🛠️ Starting installation via makepkg..."
-makepkg -si --noconfirm
+run_indented makepkg -si --noconfirm
 
 echo "✅ Installation complete!"
 cd - > /dev/null

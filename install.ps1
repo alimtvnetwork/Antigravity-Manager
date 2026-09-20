@@ -80,6 +80,41 @@ function Write-Err {
     Write-Host "$LeftPadding[ERROR] $Message" -ForegroundColor Red
 }
 
+function Invoke-IndentedCommand {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [string]$Indent = "`t"
+    )
+
+    Write-Host ""
+    $exitCode = 0
+    try {
+        & $FilePath @ArgumentList 2>&1 | ForEach-Object {
+            $line = "$_"
+            if ($line.Trim().Length -gt 0) {
+                Write-Host "$Indent$line"
+            }
+        }
+        $exitCode = $LASTEXITCODE
+    } catch {
+        Write-Host "$Indent[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+        if ($LASTEXITCODE) {
+            if ($LASTEXITCODE -ne 0) {
+                $exitCode = $LASTEXITCODE
+            } else {
+                $exitCode = 1
+            }
+        } else {
+            $exitCode = 1
+        }
+    } finally {
+        Write-Host ""
+    }
+    $global:LASTEXITCODE = $exitCode
+    return $exitCode
+}
+
 # Resolve Architecture
 if (-not $Arch) {
     if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64" -or $env:PROCESSOR_ARCHITEW6432 -eq "ARM64") {
@@ -146,8 +181,8 @@ function Remove-PreviousInstallations {
                     try {
                         $uninstClean = $entry.UninstallString.Trim('"')
                         if (Test-Path $uninstClean) {
-                            $p = Start-Process -FilePath $uninstClean -ArgumentList "/S", "/currentuser" -Wait -PassThru
-                            Write-Success "Previous uninstaller completed (exit code: $($p.ExitCode))"
+                            $uninstExit = Invoke-IndentedCommand -FilePath $uninstClean -ArgumentList @("/S", "/currentuser")
+                            Write-Success "Previous uninstaller completed (exit code: $uninstExit)"
                         }
                     } catch {
                         Write-Warn "Could not execute uninstaller: $_"
@@ -179,7 +214,7 @@ function Remove-PreviousInstallations {
                 if (Test-Path $uninstExe) {
                     Write-Step "Running uninstaller in $pdir..."
                     try {
-                        Start-Process -FilePath $uninstExe -ArgumentList "/S" -Wait -ErrorAction SilentlyContinue
+                        Invoke-IndentedCommand -FilePath $uninstExe -ArgumentList @("/S")
                     } catch {}
                 }
                 Write-Step "Cleaning previous installation folder: $pdir"
@@ -610,17 +645,17 @@ function Invoke-FastDownload {
         Remove-Item -Path $aria2Control -Force -ErrorAction SilentlyContinue
     }
 
-    # 1. Try aria2c with 16 parallel split connections and IPv6 fallback disabled
+    # 1. Try aria2c with 80 parallel split connections and 500KB chunks
     $aria2Bin = Get-Aria2cPath
     if ($aria2Bin) {
-        Write-Step "Accelerating download with aria2c (16 parallel connections)..."
+        Write-Step "Accelerating download with aria2c (80 splits, 500KB chunks)..."
         try {
             $ariaArgs = @(
                 "--disable-ipv6=true",
                 "-x", "16",
-                "-s", "16",
+                "-s", "80",
                 "-j", "16",
-                "-k", "1M",
+                "-k", "500K",
                 "--file-allocation=none",
                 "--allow-overwrite=true",
                 "--auto-file-renaming=false",
@@ -630,13 +665,16 @@ function Invoke-FastDownload {
                 "-o", "$destFile",
                 "$Url"
             )
-            $p = Start-Process -FilePath $aria2Bin -ArgumentList $ariaArgs -Wait -PassThru -NoNewWindow
-            if ($p.ExitCode -eq 0 -and (Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
-                Write-Success "Download completed via aria2c."
-                return $true
-            } else {
-                Write-Warn "aria2c finished with code $($p.ExitCode); falling back to secondary downloader..."
+            $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs
+            if ($ariaExit -eq 0) {
+                if (Test-Path $DestinationPath) {
+                    if ((Get-Item $DestinationPath).Length -gt 0) {
+                        Write-Success "Download completed via aria2c."
+                        return $true
+                    }
+                }
             }
+            Write-Warn "aria2c finished with code $ariaExit; falling back to secondary downloader..."
         } catch {
             Write-Warn "aria2c encountered an error: $_. Falling back..."
         }
@@ -649,11 +687,15 @@ function Invoke-FastDownload {
     if ($curl) {
         Write-Step "Downloading with curl..."
         try {
-            $curlArgs = @("-fSL", "--progress-bar", "-o", $DestinationPath, $Url)
-            $p = Start-Process -FilePath $curl.Source -ArgumentList $curlArgs -Wait -PassThru -NoNewWindow
-            if ($p.ExitCode -eq 0 -and (Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
-                Write-Success "Download completed via curl."
-                return $true
+            $curlArgs = @("-fSL", "--progress-bar", "--connect-timeout", "10", "--retry", "3", "-o", $DestinationPath, $Url)
+            $curlExit = Invoke-IndentedCommand -FilePath $curl.Source -ArgumentList $curlArgs
+            if ($curlExit -eq 0) {
+                if (Test-Path $DestinationPath) {
+                    if ((Get-Item $DestinationPath).Length -gt 0) {
+                        Write-Success "Download completed via curl."
+                        return $true
+                    }
+                }
             }
         } catch {}
     }
@@ -714,8 +756,8 @@ if (-not (Test-Path $InstallDir)) {
 }
 
 Write-Step "Running installer ($DownloadedFile)..."
-$installProc = Start-Process -FilePath $DownloadedFile -ArgumentList "/S", "/D=$InstallDir" -Wait -PassThru
-Write-Success "Installer finished with exit code $($installProc.ExitCode)"
+$installExit = Invoke-IndentedCommand -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir")
+Write-Success "Installer finished with exit code $installExit"
 Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 
 # Locate Main Executable
