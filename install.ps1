@@ -101,20 +101,20 @@ $DesktopDir = [Environment]::GetFolderPath("Desktop")
 $DesktopShortcut = Join-Path $DesktopDir "$ShortcutName.lnk"
 $TaskbarDir = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
 
-function Remove-LegacyUpstreamInstallation {
-    Write-Step "Checking for legacy or upstream (lbjlaq/Antigravity-Manager) installations..."
+function Remove-PreviousInstallations {
+    Write-Step "Checking for previous installations..."
 
-    # 1. Stop any running Antigravity Tools processes
-    $legacyProcesses = Get-Process | Where-Object {
+    # 1. Stop any running tool processes across all previous names
+    $runningProcesses = Get-Process | Where-Object {
         $_.ProcessName -eq "agm-alim" -or
         $_.ProcessName -eq "antigravity-tools" -or
         $_.ProcessName -eq "Anti-Gravity Tools" -or
         $_.ProcessName -eq "Anti-Gravity Tools by Alim" -or
         $_.ProcessName -eq "AGM by Alim"
     }
-    if ($legacyProcesses) {
-        Write-Step "Stopping running Antigravity Tools processes..."
-        foreach ($proc in $legacyProcesses) {
+    if ($runningProcesses) {
+        Write-Step "Closing active application processes..."
+        foreach ($proc in $runningProcesses) {
             try {
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             } catch {}
@@ -122,7 +122,7 @@ function Remove-LegacyUpstreamInstallation {
         Start-Sleep -Milliseconds 800
     }
 
-    # 2. Check Windows Registry Uninstall entries
+    # 2. Check Windows Registry Uninstall entries for all previous app names
     $regPaths = @(
         "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -131,27 +131,23 @@ function Remove-LegacyUpstreamInstallation {
 
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
-            ($_.Publisher -match "lbjlaq") -or
-            ($_.DisplayName -eq "Antigravity Tools") -or
-            ($_.DisplayName -eq "AGM by Alim") -or
-            ($_.InstallLocation -match "Antigravity Tools")
+            $_.DisplayName -match '^(Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
         }
 
         if ($entries) {
             foreach ($entry in $entries) {
                 # Skip if already our brand in the exact target install dir
-                if ($entry.DisplayName -eq $AppName -or $entry.DisplayName -eq $FullName) {
+                if ($entry.InstallLocation -and (Resolve-Path $entry.InstallLocation -ErrorAction SilentlyContinue).Path -eq (Resolve-Path $InstallDir -ErrorAction SilentlyContinue).Path) {
                     continue
                 }
 
-                Write-Step "Found legacy installation: $($entry.DisplayName) by $($entry.Publisher)"
+                Write-Step "Uninstalling previous version ($($entry.DisplayName))..."
                 if ($entry.UninstallString) {
-                    Write-Step "Executing legacy uninstaller: $($entry.UninstallString)"
                     try {
                         $uninstClean = $entry.UninstallString.Trim('"')
                         if (Test-Path $uninstClean) {
                             $p = Start-Process -FilePath $uninstClean -ArgumentList "/S", "/currentuser" -Wait -PassThru
-                            Write-Success "Legacy uninstaller completed (exit code: $($p.ExitCode))"
+                            Write-Success "Previous uninstaller completed (exit code: $($p.ExitCode))"
                         }
                     } catch {
                         Write-Warn "Could not execute uninstaller: $_"
@@ -161,8 +157,8 @@ function Remove-LegacyUpstreamInstallation {
         }
     }
 
-    # 3. Clean legacy directory paths if still existing
-    $legacyDirs = @(
+    # 3. Clean previous directory paths if still existing
+    $prevDirs = @(
         (Join-Path $env:LOCALAPPDATA "Antigravity Tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
@@ -170,47 +166,53 @@ function Remove-LegacyUpstreamInstallation {
         (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
         (Join-Path $env:ProgramFiles "Antigravity Tools"),
         (Join-Path $env:ProgramFiles "AGM by Alim"),
-        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools")
+        (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim"),
+        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools"),
+        (Join-Path ${env:ProgramFiles(x86)} "AGM by Alim"),
+        (Join-Path ${env:ProgramFiles(x86)} "Anti-Gravity Tools by Alim")
     )
 
-    foreach ($ldir in $legacyDirs) {
-        if (Test-Path $ldir) {
-            if ($ldir -ne $InstallDir) {
-                $uninstExe = Join-Path $ldir "uninstall.exe"
+    foreach ($pdir in $prevDirs) {
+        if (Test-Path $pdir) {
+            if ($pdir -ne $InstallDir) {
+                $uninstExe = Join-Path $pdir "uninstall.exe"
                 if (Test-Path $uninstExe) {
-                    Write-Step "Running uninstaller in $ldir..."
+                    Write-Step "Running uninstaller in $pdir..."
                     try {
                         Start-Process -FilePath $uninstExe -ArgumentList "/S" -Wait -ErrorAction SilentlyContinue
                     } catch {}
                 }
-                Write-Step "Purging legacy directory: $ldir"
-                Remove-Item -Path $ldir -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Step "Cleaning previous installation folder: $pdir"
+                Remove-Item -Path $pdir -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
     }
 
-    # 4. Clean legacy shortcuts from Start Menu, Desktop, and Taskbar
-    $legacyShortcuts = @(
+    # 4. Clean previous shortcuts from Start Menu, Desktop, and Taskbar
+    $prevShortcuts = @(
         (Join-Path $StartMenuDir "AGM by Alim.lnk"),
         (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
         (Join-Path $StartMenuDir "antigravity-tools.lnk"),
         (Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"),
+        (Join-Path $StartMenuDir "Anti-Gravity Tools.lnk"),
         (Join-Path $DesktopDir "AGM by Alim.lnk"),
         (Join-Path $DesktopDir "Antigravity Tools.lnk"),
         (Join-Path $DesktopDir "antigravity-tools.lnk"),
         (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
+        (Join-Path $DesktopDir "Anti-Gravity Tools.lnk"),
         (Join-Path $TaskbarDir "AGM by Alim.lnk"),
         (Join-Path $TaskbarDir "Antigravity Tools.lnk"),
         (Join-Path $TaskbarDir "antigravity-tools.lnk"),
-        (Join-Path $TaskbarDir "Anti-Gravity Tools by Alim.lnk")
+        (Join-Path $TaskbarDir "Anti-Gravity Tools by Alim.lnk"),
+        (Join-Path $TaskbarDir "Anti-Gravity Tools.lnk")
     )
-    foreach ($sc in $legacyShortcuts) {
+    foreach ($sc in $prevShortcuts) {
         if (Test-Path $sc) {
             Remove-Item -Path $sc -Force -ErrorAction SilentlyContinue
         }
     }
 
-    Write-Success "Legacy cleanup complete."
+    Write-Success "Previous installation cleanup complete."
 }
 
 function Pin-TaskbarShortcut {
@@ -318,13 +320,67 @@ if ($Uninstall) {
 }
 
 function Get-InstalledVersion {
-    $targetExe = Join-Path $InstallDir $BinaryName
-    if (Test-Path $targetExe) {
-        try {
-            $ver = (Get-Item $targetExe).VersionInfo.ProductVersion
-            if ($ver) { return ($ver -replace '^v', '').Trim() }
-        } catch {}
+    # 1. Check current configured install directory
+    $candidateExes = @(
+        (Join-Path $InstallDir $BinaryName),
+        (Join-Path $InstallDir "agm-alim.exe"),
+        (Join-Path $InstallDir "AGM by Alim.exe"),
+        (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
+        (Join-Path $InstallDir "antigravity-tools.exe"),
+        (Join-Path $InstallDir "Antigravity Tools.exe")
+    )
+    foreach ($exe in $candidateExes) {
+        if (Test-Path $exe) {
+            try {
+                $ver = (Get-Item $exe).VersionInfo.ProductVersion
+                if ($ver) { return ($ver -replace '^v', '').Trim() }
+            } catch {}
+        }
     }
+
+    # 2. Check previous installation directories
+    $prevDirs = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\agm-alim"),
+        (Join-Path $env:LOCALAPPDATA "Programs\AGM by Alim"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
+        (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
+        (Join-Path $env:LOCALAPPDATA "Antigravity Tools"),
+        (Join-Path $env:ProgramFiles "agm-alim"),
+        (Join-Path $env:ProgramFiles "AGM by Alim"),
+        (Join-Path $env:ProgramFiles "Antigravity Tools"),
+        (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim"),
+        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools")
+    )
+    foreach ($dir in $prevDirs) {
+        if (Test-Path $dir) {
+            $foundExe = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
+            if ($foundExe) {
+                try {
+                    $ver = $foundExe.VersionInfo.ProductVersion
+                    if ($ver) { return ($ver -replace '^v', '').Trim() }
+                } catch {}
+            }
+        }
+    }
+
+    # 3. Check Windows Registry Uninstall entries
+    $regPaths = @(
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    foreach ($regPath in $regPaths) {
+        $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
+            $_.DisplayName -match '^(Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
+        }
+        foreach ($entry in $entries) {
+            if ($entry.DisplayVersion) {
+                return ($entry.DisplayVersion -replace '^v', '').Trim()
+            }
+        }
+    }
+
     return ""
 }
 
@@ -467,10 +523,23 @@ if ($Update) {
     }
 }
 
-# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy installations
-Remove-LegacyUpstreamInstallation
+$CurrentVersion = Get-InstalledVersion
 
-Write-Success "Target release version: v$TargetVersion (Architecture: $Arch)"
+if ($CurrentVersion) {
+    Write-Step "Current installed version: v$CurrentVersion"
+    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
+    if ($CurrentVersion -eq $TargetVersion) {
+        Write-Step "Migration mode           : Reinstalling / Updating v$TargetVersion"
+    } else {
+        Write-Step "Migration path           : v$CurrentVersion -> v$TargetVersion"
+    }
+} else {
+    Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
+    Write-Step "Installation mode        : Fresh installation (v$TargetVersion)"
+}
+
+# Remove previous installations and clean obsolete paths
+Remove-PreviousInstallations
 
 # Step 2: Determine Asset URL
 $matchedAsset = $null

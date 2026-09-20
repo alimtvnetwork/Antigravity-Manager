@@ -204,7 +204,7 @@ get_version() {
     if response=$(curl -fsSL --max-time 8 -H "User-Agent: Antigravity-Installer" "${GITHUB_API}/latest" 2>/dev/null); then
         RELEASE_VERSION=$(echo "$response" | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
         if _is_valid_version "${RELEASE_VERSION:-}"; then
-            info "Latest version (primary repo): v$RELEASE_VERSION"
+            info "Target release version: v$RELEASE_VERSION"
             return
         fi
     fi
@@ -213,7 +213,7 @@ get_version() {
     if response=$(curl -fsSL --max-time 8 -H "User-Agent: Antigravity-Installer" "${UPSTREAM_API}/latest" 2>/dev/null); then
         RELEASE_VERSION=$(echo "$response" | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
         if _is_valid_version "${RELEASE_VERSION:-}"; then
-            info "Latest version (upstream repo): v$RELEASE_VERSION"
+            info "Target release version: v$RELEASE_VERSION"
             return
         fi
     fi
@@ -223,7 +223,7 @@ get_version() {
     final_url=$(curl -fsSL --max-time 8 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null | tr -d '[:space:]\r\n')
     if [[ -n "$final_url" && "$final_url" =~ /tag/v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
         RELEASE_VERSION="${BASH_REMATCH[1]}"
-        info "Latest version (from redirect): v$RELEASE_VERSION"
+        info "Target release version: v$RELEASE_VERSION"
         return
     fi
 
@@ -231,7 +231,7 @@ get_version() {
     final_url=$(curl -fsSL --max-time 8 -o /dev/null -w '%{url_effective}' "https://github.com/${UPSTREAM_REPO}/releases/latest" 2>/dev/null | tr -d '[:space:]\r\n')
     if [[ -n "$final_url" && "$final_url" =~ /tag/v?([0-9]+\.[0-9]+\.[0-9]+) ]]; then
         RELEASE_VERSION="${BASH_REMATCH[1]}"
-        info "Latest version (from upstream redirect): v$RELEASE_VERSION"
+        info "Target release version: v$RELEASE_VERSION"
         return
     fi
 
@@ -240,7 +240,7 @@ get_version() {
     updater_ver=$(curl -fsSL --max-time 6 "https://github.com/${UPSTREAM_REPO}/releases/latest/download/updater.json" 2>/dev/null | grep '"version"' | head -n1 | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]\r\n')
     if _is_valid_version "${updater_ver:-}"; then
         RELEASE_VERSION="$updater_ver"
-        info "Latest version (from updater.json): v$RELEASE_VERSION"
+        info "Target release version: v$RELEASE_VERSION"
         return
     fi
 
@@ -258,9 +258,15 @@ display_migration() {
     local to_ver="v${RELEASE_VERSION#v}"
 
     echo ""
-    info "Current Version   : ${from_ver}"
-    info "Target Version    : ${to_ver}"
-    info "Migration Path    : ${from_ver} -> ${to_ver}"
+    info "Current installed version: ${from_ver}"
+    info "Target release version   : ${to_ver}"
+    if [[ "$from_ver" == "None (Fresh Install)" ]]; then
+        info "Installation mode        : Fresh installation (${to_ver})"
+    elif [[ "$from_ver" == "$to_ver" ]]; then
+        info "Migration mode           : Reinstalling / Updating ${to_ver}"
+    else
+        info "Migration path           : ${from_ver} -> ${to_ver}"
+    fi
     echo ""
 }
 
@@ -458,9 +464,9 @@ download_installer() {
     fi
 }
 
-# Remove any pre-existing lbjlaq/Antigravity-Manager or legacy packages
+# Remove any pre-existing previous tool packages
 # NOTE: Executed ONLY AFTER new package has been successfully downloaded and verified!
-remove_legacy_upstream_installation() {
+remove_previous_installation() {
     if [[ "$PLATFORM" != "linux" ]]; then
         return
     fi
@@ -497,8 +503,8 @@ remove_legacy_upstream_installation() {
     done
 
     if [[ "$has_legacy" -eq 1 ]]; then
-        step "Handling Legacy Installation"
-        info "Uninstalling the old tool (by original developer)..."
+        step "Cleaning Previous Tool Installation"
+        info "Uninstalling previous version..."
 
         local sudo_cmd=""
         if command -v sudo &>/dev/null && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
@@ -529,7 +535,7 @@ remove_legacy_upstream_installation() {
                 run rm -f "$lb" 2>/dev/null || run $sudo_cmd rm -f "$lb" 2>/dev/null || true
             fi
         done
-        success "Old tool uninstalled successfully."
+        success "Previous version uninstalled successfully."
     fi
 }
 
@@ -797,8 +803,8 @@ main() {
     build_download_url
     download_installer
 
-    # Old tool by original developer is removed ONLY AFTER new package download succeeds
-    remove_legacy_upstream_installation
+    # Previous versions are uninstalled ONLY AFTER new package download succeeds
+    remove_previous_installation
 
     case "$PLATFORM" in
         linux) install_linux ;;
