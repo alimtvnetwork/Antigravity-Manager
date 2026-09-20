@@ -381,7 +381,7 @@ download_file() {
     # Try aria2c with 16 split parallel connections
     if [[ -n "${ARIA2C_BIN:-}" && -x "$ARIA2C_BIN" ]]; then
         info "Downloading with aria2c (16 parallel split connections)..."
-        if "$ARIA2C_BIN" -x 16 -s 16 -j 16 -k 1M \
+        if "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 16 -j 16 -k 1M \
             --allow-overwrite=true \
             --auto-file-renaming=false \
             --summary-interval=1 \
@@ -769,7 +769,7 @@ main() {
     echo ""
     echo ""
     echo -e "${INDENT}${BLUE}========================================${NC}"
-    echo -e "${INDENT}${BLUE}    ${APP_NAME} Installer${NC}"
+    echo -e "${INDENT}${BLUE}    ${FULL_NAME} Installer${NC}"
     echo -e "${INDENT}${BLUE}========================================${NC}"
     echo ""
 
@@ -813,6 +813,7 @@ main() {
     success "Installation complete!"
     echo ""
     info "Launch '${APP_NAME}' from your application menu or terminal."
+    echo ""
     echo ""
 }
 

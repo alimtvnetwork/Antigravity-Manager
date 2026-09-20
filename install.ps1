@@ -48,6 +48,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Suppress noisy WebRequest progress bar in PowerShell
+$ProgressPreference = 'SilentlyContinue'
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
 $UpstreamRepo = "lbjlaq/Antigravity-Manager"
@@ -56,25 +58,26 @@ $FullName = "Antigravity Manager Tools By Alim"
 $BinaryName = "agm-alim.exe"
 $ShortcutName = "Agm - Alim"
 $Tooltip = "Antigravity Manager Tool By Alim"
+$LeftPadding = "    "
 
 function Write-Step {
     param([string]$Message)
-    Write-Host "[*] $Message" -ForegroundColor Cyan
+    Write-Host "$LeftPadding[*] $Message" -ForegroundColor Cyan
 }
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "[OK] $Message" -ForegroundColor Green
+    Write-Host "$LeftPadding[OK] $Message" -ForegroundColor Green
 }
 
 function Write-Warn {
     param([string]$Message)
-    Write-Host "[!] $Message" -ForegroundColor Yellow
+    Write-Host "$LeftPadding[!] $Message" -ForegroundColor Yellow
 }
 
 function Write-Err {
     param([string]$Message)
-    Write-Host "[ERROR] $Message" -ForegroundColor Red
+    Write-Host "$LeftPadding[ERROR] $Message" -ForegroundColor Red
 }
 
 # Resolve Architecture
@@ -272,9 +275,10 @@ function Pin-TaskbarShortcut {
 # --- UNINSTALL FLOW ---
 if ($Uninstall) {
     Write-Host ""
-    Write-Host "========================================" -ForegroundColor Magenta
-    Write-Host "    $AppName Uninstaller" -ForegroundColor Magenta
-    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "$LeftPadding========================================" -ForegroundColor Magenta
+    Write-Host "$LeftPadding    $FullName Uninstaller" -ForegroundColor Magenta
+    Write-Host "$LeftPadding========================================" -ForegroundColor Magenta
     Write-Host ""
 
     if ($DryRun) {
@@ -388,9 +392,10 @@ if ($CheckUpdate) {
 
 # --- INSTALL FLOW ---
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "    $AppName Portable Installer" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
+Write-Host "$LeftPadding    $FullName Installer" -ForegroundColor Cyan
+Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Step 1: Resolve Release Version
@@ -483,11 +488,126 @@ if ($matchedAsset) {
     $DownloadUrl = $matchedAsset.browser_download_url
 } else {
     # Direct NSIS setup asset URL fallback
-    $ExeAsset = "Anti-Gravity.Tools.by.Alim_${TargetVersion}_${Arch}-setup.exe"
+    $ExeAsset = "agm-alim_${TargetVersion}_${Arch}-setup.exe"
     $DownloadUrl = "https://github.com/$Repo/releases/download/v${TargetVersion}/$ExeAsset"
 }
 
 Write-Step "Download source: $DownloadUrl"
+
+function Get-Aria2cPath {
+    $cmd = Get-Command aria2c.exe -ErrorAction SilentlyContinue
+    if (-not $cmd) {
+        $cmd = Get-Command aria2c -ErrorAction SilentlyContinue
+    }
+    if ($cmd) {
+        return $cmd.Source
+    }
+
+    $commonPaths = @(
+        "C:\ProgramData\chocolatey\bin\aria2c.exe",
+        "$env:LOCALAPPDATA\Programs\aria2\aria2c.exe",
+        "$env:ProgramFiles\aria2\aria2c.exe",
+        "${env:ProgramFiles(x86)}\aria2\aria2c.exe",
+        "$env:USERPROFILE\scoop\shims\aria2c.exe",
+        (Join-Path $env:TEMP "aria2c.exe")
+    )
+    foreach ($p in $commonPaths) {
+        if (Test-Path $p) {
+            return $p
+        }
+    }
+
+    return $null
+}
+
+function Invoke-FastDownload {
+    param(
+        [string]$Url,
+        [string]$DestinationPath
+    )
+
+    $destDir = Split-Path -Parent $DestinationPath
+    $destFile = Split-Path -Leaf $DestinationPath
+
+    if (-not (Test-Path $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
+
+    if (Test-Path $DestinationPath) {
+        Remove-Item -Path $DestinationPath -Force -ErrorAction SilentlyContinue
+    }
+    $aria2Control = "$DestinationPath.aria2"
+    if (Test-Path $aria2Control) {
+        Remove-Item -Path $aria2Control -Force -ErrorAction SilentlyContinue
+    }
+
+    # 1. Try aria2c with 16 parallel split connections and IPv6 fallback disabled
+    $aria2Bin = Get-Aria2cPath
+    if ($aria2Bin) {
+        Write-Step "Accelerating download with aria2c (16 parallel connections)..."
+        try {
+            $ariaArgs = @(
+                "--disable-ipv6=true",
+                "-x", "16",
+                "-s", "16",
+                "-j", "16",
+                "-k", "1M",
+                "--file-allocation=none",
+                "--allow-overwrite=true",
+                "--auto-file-renaming=false",
+                "--summary-interval=1",
+                "--console-log-level=warn",
+                "--dir=$destDir",
+                "-o", "$destFile",
+                "$Url"
+            )
+            $p = Start-Process -FilePath $aria2Bin -ArgumentList $ariaArgs -Wait -PassThru -NoNewWindow
+            if ($p.ExitCode -eq 0 -and (Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
+                Write-Success "Download completed via aria2c."
+                return $true
+            } else {
+                Write-Warn "aria2c finished with code $($p.ExitCode); falling back to secondary downloader..."
+            }
+        } catch {
+            Write-Warn "aria2c encountered an error: $_. Falling back..."
+        }
+    } else {
+        Write-Step "aria2c not found; proceeding with standard download stream..."
+    }
+
+    # 2. Try curl.exe (built into modern Windows)
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if ($curl) {
+        Write-Step "Downloading with curl..."
+        try {
+            $curlArgs = @("-fSL", "--progress-bar", "-o", $DestinationPath, $Url)
+            $p = Start-Process -FilePath $curl.Source -ArgumentList $curlArgs -Wait -PassThru -NoNewWindow
+            if ($p.ExitCode -eq 0 -and (Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
+                Write-Success "Download completed via curl."
+                return $true
+            }
+        } catch {}
+    }
+
+    # 3. Fallback to Invoke-WebRequest
+    Write-Step "Downloading with Invoke-WebRequest..."
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls13
+    $prevProgress = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $DestinationPath -UseBasicParsing
+        $ProgressPreference = $prevProgress
+        if ((Test-Path $DestinationPath) -and (Get-Item $DestinationPath).Length -gt 0) {
+            Write-Success "Download completed via Invoke-WebRequest."
+            return $true
+        }
+    } catch {
+        $ProgressPreference = $prevProgress
+        Write-Warn "Invoke-WebRequest failed: $_"
+    }
+
+    return $false
+}
 
 # Step 3: Execute Installation
 if ($DryRun) {
@@ -503,17 +623,13 @@ $TempDir = [System.IO.Path]::GetTempPath()
 $DownloadedFile = Join-Path $TempDir ($DownloadUrl -split "/" | Select-Object -Last 1)
 
 Write-Step "Downloading release package..."
-try {
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls13
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $DownloadedFile -UseBasicParsing
-} catch {
-    Write-Warn "Primary download failed: $_. Attempting upstream fallback..."
+$downloaded = Invoke-FastDownload -Url $DownloadUrl -DestinationPath $DownloadedFile
+if (-not $downloaded) {
+    Write-Warn "Primary download failed. Attempting upstream fallback..."
     $UpstreamDownloadUrl = $DownloadUrl -replace [regex]::Escape($Repo), $UpstreamRepo
-    try {
-        Invoke-WebRequest -Uri $UpstreamDownloadUrl -OutFile $DownloadedFile -UseBasicParsing
-        Write-Success "Downloaded successfully from upstream: $UpstreamDownloadUrl"
-    } catch {
-        Write-Err "Upstream fallback download also failed: $_"
+    $downloaded = Invoke-FastDownload -Url $UpstreamDownloadUrl -DestinationPath $DownloadedFile
+    if (-not $downloaded) {
+        Write-Err "Upstream fallback download also failed."
         exit 1
     }
 }
@@ -669,8 +785,9 @@ if (-not $NoShortcut -and (Test-Path $ExePath)) {
 
 Write-Host ""
 Write-Success "Installation of $FullName v$TargetVersion completed successfully!"
-Write-Host "Target Directory: $InstallDir" -ForegroundColor Gray
-Write-Host "Executable:       $ExePath" -ForegroundColor Gray
+Write-Host "${LeftPadding}Target Directory: $InstallDir" -ForegroundColor Gray
+Write-Host "${LeftPadding}Executable:       $ExePath" -ForegroundColor Gray
 Write-Host ""
-Write-Host "You can now launch '$ShortcutName' directly or run '$BinaryName' from any terminal." -ForegroundColor Green
+Write-Host "${LeftPadding}You can now launch '$ShortcutName' directly or run '$BinaryName' from any terminal." -ForegroundColor Green
+Write-Host ""
 Write-Host ""
