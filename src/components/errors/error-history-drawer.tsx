@@ -10,7 +10,10 @@ import {
   Download,
 } from 'lucide-react';
 import { useErrorStore, type CapturedError } from '../../stores/error-store';
-import { generateAllErrorsMarkdownReport } from '../../lib/error-report-generator';
+import {
+  generateAllErrorsMarkdownReport,
+  generateCompactReport,
+} from '../../lib/error-report-generator';
 import { showToast } from '../common/ToastContainer';
 
 interface ErrorHistoryDrawerProps {
@@ -22,6 +25,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   const { recentErrors, openErrorModal, clearRecentErrors } = useErrorStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   if (!isOpen) {
@@ -41,6 +45,22 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
 
   const handleSelectError = (error: CapturedError) => {
     openErrorModal(error, 'stack');
+  };
+
+  const handleCopySingle = async (error: CapturedError, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = generateCompactReport(error);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(error.id);
+      setTimeout(() => {
+        setCopiedId((curr) => (curr === error.id ? null : curr));
+      }, 2000);
+      showToast(`Copied [${error.code}] diagnostic report!`, 'success');
+    } catch (err) {
+      console.error('Failed to copy single error report:', err);
+      showToast('Failed to copy error report', 'error');
+    }
   };
 
   const handleCopyAll = async () => {
@@ -232,26 +252,58 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
-                      {time}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                        {time}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 line-clamp-2 break-words leading-relaxed">
                     {err.message}
                   </p>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                    <span className="truncate">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-0.5">
+                    <span className="truncate max-w-[150px] sm:max-w-[180px]">
                       {err.parsedFrames && err.parsedFrames.length > 0
                         ? `${err.parsedFrames.length} stack frame(s)`
                         : err.backendStackTrace
                         ? 'Backend stack'
                         : 'Inspect diagnostics'}
                     </span>
-                    <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-all font-semibold shrink-0">
-                      Details <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopySingle(err, e)}
+                        className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 transition-colors flex items-center gap-1 text-[11px] font-medium border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 cursor-pointer shadow-2xs"
+                        title="Copy this error's diagnostic report as Markdown"
+                      >
+                        {copiedId === err.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">
+                              Copied!
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                            <span className="text-[10px]">Copy</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectError(err)}
+                        className="px-2 py-1 rounded-md text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-center gap-0.5 font-semibold text-[11px] cursor-pointer"
+                        title="Inspect stack trace and full diagnostics"
+                      >
+                        <span>Details</span>
+                        <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
