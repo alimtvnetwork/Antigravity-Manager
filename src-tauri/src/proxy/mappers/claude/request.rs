@@ -1343,7 +1343,8 @@ fn build_contents(
                         // Priority: Client -> Context -> Session Cache -> Tool Cache -> Global Store (deprecated)
                         // [CRITICAL FIX] Do NOT use skip_thought_signature_validator for Vertex AI
                         // Vertex AI rejects this sentinel value, so we only add thoughtSignature if we have a real one
-                        let final_sig = signature.as_ref()
+                        let final_sig = signature
+                            .as_ref()
                             .or(last_thought_signature.as_ref())
                             .cloned()
                             .or_else(|| {
@@ -1358,7 +1359,8 @@ fn build_contents(
                         let needs_sentinel = if is_special_model {
                             false
                         } else {
-                            is_thinking_enabled || model_keeps_thinking_without_signature(&mapped_model)
+                            is_thinking_enabled
+                                || model_keeps_thinking_without_signature(&mapped_model)
                         };
 
                         let mut signature_assigned = false;
@@ -1381,7 +1383,10 @@ fn build_contents(
 
                                 let should_use_sig = match cached_family {
                                     Some(family) => {
-                                        if crate::proxy::mappers::common_utils::is_model_compatible(&family, mapped_model) {
+                                        if crate::proxy::mappers::common_utils::is_model_compatible(
+                                            &family,
+                                            mapped_model,
+                                        ) {
                                             true
                                         } else if is_claude_model {
                                             family.to_lowercase().contains("claude")

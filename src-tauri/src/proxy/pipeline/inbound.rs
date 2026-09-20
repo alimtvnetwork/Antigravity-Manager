@@ -41,7 +41,9 @@ impl InboundThinkingPipeline {
                             .unwrap_or(false);
                         let is_thought = if has_explicit_thought {
                             true
-                        } else if part.get("functionCall").is_none() && part.get("functionResponse").is_none() {
+                        } else if part.get("functionCall").is_none()
+                            && part.get("functionResponse").is_none()
+                        {
                             part.get("thoughtSignature").is_some()
                         } else {
                             false
@@ -121,7 +123,8 @@ impl InboundThinkingPipeline {
                             }
                         } else {
                             // Non-thinking part: plain text / progress commentary or functionCall
-                            let is_call = part.get("functionCall").is_some() || part.get("functionResponse").is_some();
+                            let is_call = part.get("functionCall").is_some()
+                                || part.get("functionResponse").is_some();
                             let is_plain_text = if is_call {
                                 false
                             } else {
@@ -234,7 +237,10 @@ mod tests {
             .get("thought")
             .and_then(Value::as_bool)
             .unwrap_or(false));
-        assert_eq!(parts[1]["text"], "Checking gateway and backend connection config.");
+        assert_eq!(
+            parts[1]["text"],
+            "Checking gateway and backend connection config."
+        );
         assert!(parts[2].get("functionCall").is_some());
     }
 
@@ -300,7 +306,10 @@ mod tests {
             .get("thought")
             .and_then(Value::as_bool)
             .unwrap_or(false));
-        assert_eq!(parts[0]["text"], "Analyzed case data, preparing to invoke tool.");
+        assert_eq!(
+            parts[0]["text"],
+            "Analyzed case data, preparing to invoke tool."
+        );
         assert_eq!(parts[1]["text"], "Executing check now.");
         assert!(parts[2].get("functionCall").is_some());
     }

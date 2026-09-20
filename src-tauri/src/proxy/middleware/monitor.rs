@@ -411,7 +411,8 @@ fn consolidate_non_streaming_response(
         || raw_json.get("tool_calls").is_some()
         || raw_json.get("_session_thinking_id").is_some();
     if has_consolidated_fields {
-        let has_no_raw_wrappers = raw_json.get("choices").is_none() && raw_json.get("candidates").is_none();
+        let has_no_raw_wrappers =
+            raw_json.get("choices").is_none() && raw_json.get("candidates").is_none();
         if has_no_raw_wrappers {
             return None;
         }
@@ -1150,11 +1151,15 @@ pub async fn monitor_middleware(
                                     if let Some(delta_str) = delta_json {
                                         if idx < tool_calls.len() {
                                             if !tool_calls[idx].is_null() {
-                                                let old_args = tool_calls[idx]["function"]["arguments"]
+                                                let old_args = tool_calls[idx]["function"]
+                                                    ["arguments"]
                                                     .as_str()
                                                     .unwrap_or("");
                                                 tool_calls[idx]["function"]["arguments"] =
-                                                    Value::String(format!("{}{}", old_args, delta_str));
+                                                    Value::String(format!(
+                                                        "{}{}",
+                                                        old_args, delta_str
+                                                    ));
                                             }
                                         }
                                     }

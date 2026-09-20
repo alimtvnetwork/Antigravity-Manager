@@ -741,12 +741,10 @@ impl ThinkingStore {
                 continue;
             };
 
-            let has_unvalidated_function_call = parts
-                .iter()
-                .any(|p| match p.get("functionCall") {
-                    Some(_) => !part_has_signature(p),
-                    None => false,
-                });
+            let has_unvalidated_function_call = parts.iter().any(|p| match p.get("functionCall") {
+                Some(_) => !part_has_signature(p),
+                None => false,
+            });
 
             let missing_sig_on_parts = match rec.signature {
                 Some(_) => !parts.iter().any(|p| part_has_signature(p)),
