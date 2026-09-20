@@ -94,5 +94,5 @@ tempfile = "3.10"
 opt-level = 3
 codegen-units = 16
 lto = "thin"
-strip = "debuginfo"
 panic = "abort"
+strip = "symbols"
