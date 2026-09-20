@@ -166,40 +166,40 @@ Okay. Few issues. First of all, the email is not getting connected. So obviously
 
 ## Extracted Actionable Task List
 
-- [ ] **Task 1: Email SMTP/IMAP Connection Fix & Port 465 Implicit TLS Architecture**
+- [x] **Task 1: Email SMTP/IMAP Connection Fix & Port 465 Implicit TLS Architecture**
   - Fix E8002 `os error 10060` connection timeout on port 465 (SMTPS implicit TLS vs port 587 STARTTLS).
   - Ensure immediate TLS handshake on port 465 instead of waiting for plaintext SMTP greeting banner.
   - Implement adaptive fallback / port negotiation (465 SSL vs 587 STARTTLS vs 25 Plain).
   - Verify IMAP connection on port 993 (implicit TLS) and port 143 (STARTTLS).
   - Include all diagnostic variables in error returns except raw password (host, port, encryption type, timeout ms, DNS resolution status).
-- [ ] **Task 2: Error Manager History Drawer Dark Theme & Contrast Fix (`wywzgopdbam-.png`)**
+- [x] **Task 2: Error Manager History Drawer Dark Theme & Contrast Fix (`wywzgopdbam-.png`)**
   - Fix white card background (`bg-white`) in Error Manager History drawer.
   - Apply dark theme styling (`bg-base-200`, dark border, high-contrast readable text).
   - Eliminate whitish text on white card bug in drawer items and debug logs.
-- [ ] **Task 3: Email Accounts Table Row Hover Contrast Fix (`v0xney9qk5im.png`)**
+- [x] **Task 3: Email Accounts Table Row Hover Contrast Fix (`v0xney9qk5im.png`)**
   - Replace washed-out gray hover background in Email Accounts table with sleek dark mode highlight (`hover:bg-white/5` or `hover:bg-base-200/50`).
   - Guarantee high-contrast text readability on hover across alias, email, SMTP host, IMAP host, and action buttons.
-- [ ] **Task 4: Model Quota Filter Button Styling & Highlight (`media_1789867681981.png` & `gxdoer2wu_qt.png`)**
+- [x] **Task 4: Model Quota Filter Button Styling & Highlight (`media_1789867681981.png` & `gxdoer2wu_qt.png`)**
   - Redesign `All | Gemini | Claude` segmented control in AccountTable header.
   - Fix washed-out low contrast unselected state.
   - Implement prominent highlight for selected state with amber/yellow accent text and refined badge styling.
   - Fix dark green + white text contrast issue on Claude/Gemini quota badges.
-- [ ] **Task 5: CSS3 Smooth Transition System (Eliminate Font Zooming & Layout Shifts)**
+- [x] **Task 5: CSS3 Smooth Transition System (Eliminate Font Zooming & Layout Shifts)**
   - Remove all font size increases, letter-spacing expansions, and scale distortions (`scale-105`, font zoom) on hover.
   - Implement smooth CSS3 transitions for background color, border color, and progress fills without layout shifts.
-- [ ] **Task 6: Desktop & Start Menu Shortcut De-Duplication (`slfmyzcbt_vw.png`)**
+- [x] **Task 6: Desktop & Start Menu Shortcut De-Duplication (`slfmyzcbt_vw.png`)**
   - In `install.ps1`, verify whether target shortcut already exists before creation.
   - Automatically detect and purge legacy shortcut names (`Anti-Gravity Tools by Alim.lnk`).
   - Prevent duplicate desktop icons and maintain clean single-icon presence.
-- [ ] **Task 7: Root Cause Analysis (RCA) on Instance Switching & Same Email Bug (`zsyn-rd_prqv.png` & `alfal6p0fewd.png`)**
+- [x] **Task 7: Root Cause Analysis (RCA) on Instance Switching & Same Email Bug (`zsyn-rd_prqv.png` & `alfal6p0fewd.png`)**
   - Write detailed RCA on why launching/switching instances resulted in both instances retaining the same email address (`ashleyescobarzu@gmail.com`).
   - Trace Antigravity IDE storage architecture: `storage.json`, state databases, Electron userData, Chromium cache, and executable isolation.
   - Fix instance copy, account injection, and launch isolation (including dedicated binary copying if required).
-- [ ] **Task 8: CI/CD Release Pipeline Duration Bottleneck Analysis**
+- [x] **Task 8: CI/CD Release Pipeline Duration Bottleneck Analysis**
   - Analyze GitHub Actions workflows (`.github/workflows/ci.yml` and `release.yml`).
   - Identify bottleneck steps (Linux WebKit dependencies, multi-platform matrix runs, unsigned Tauri build redundancy, Cargo cache efficacy).
   - Document actionable optimizations to dramatically reduce CI/CD release times.
-- [ ] **Task 9: Local Rapid Development Runner (`run.ps1`)**
+- [x] **Task 9: Local Rapid Development Runner (`run.ps1`)**
   - Author repository-root `run.ps1` script for instant local development and testing without requiring remote release builds.
 ## Master Architectural Plan & System Design
 
@@ -266,4 +266,25 @@ Okay. Few issues. First of all, the email is not getting connected. So obviously
 2. **Zero Transform Scaling on Buttons:** Bounding box dimensions must remain fixed on hover/active states. All button micro-interactions must use CSS3 color/fill/border transitions only; `transform: scale()` is strictly prohibited to prevent font blurring and layout shifts.
 3. **Implicit vs Explicit TLS Port Enforcement:** SMTPS (port 465) and IMAPS (port 993) MUST initiate TLS handshakes immediately after socket connection without expecting a plaintext greeting banner. Plaintext/STARTTLS ports (587, 143) must follow standard greeting -> STARTTLS -> TLS handshake -> authentication flow.
 4. **Isolated SQLite Token Injection on Launch:** When an instance is launched, the bound account's OAuth token must be injected into that specific instance's `state.vscdb`, guaranteeing that the Electron/Antigravity IDE instance displays and authenticates with its own assigned account.
+
+---
+
+## Consolidated Execution Summary
+
+- **Task Start:** Triggered by user error report `ad4b0611-81c8-460f-abaf-e61c4964d2e5` (`E8002`, `os error 10060`), UI contrast bug screenshots, duplicate shortcut reports, instance account switching bug report, and release bottleneck analysis request.
+- **Workflow Version:** `[V2] Parent Task N-Step Continuous Loop & Multi-Agent Orchestration` (v2.2.0).
+- **Total Execution Steps / Loops:** 16 self-loops across Phase 1 (Planning & Research) and Phase 2 (Disjoint Parallel Execution & Verification).
+- **Total Subtasks Completed:** 8/8 (100%).
+  1. Subtask 1: Email TLS Backend, Port 465 SMTPS, Port 993 IMAPS, and Credential Redaction (`src-tauri/src/modules/email_sender.rs`, `email_inbound.rs`).
+  2. Subtask 2: Error Manager History Drawer & Modal Dark Mode Contrast Fix (`src/components/errors/error-history-drawer.tsx`, `error-modal.tsx`).
+  3. Subtask 3: Email Accounts Table Row Hover Contrast Fix (`src/components/settings/EmailNotificationSettings.tsx`).
+  4. Subtask 4: Model Quota Filter Button Amber Highlight & Quota Badges (`src/components/accounts/AccountTable.tsx`, `QuotaItem.tsx`).
+  5. Subtask 5: CSS3 Smooth Transitions & Scale Transform Elimination (`src/components/navbar/InstanceSelector.tsx`, `NavMenu.tsx`, `NavSettings.tsx`, `NavLogo.tsx`, `Navbar.tsx`).
+  6. Subtask 6: Desktop Shortcut De-Duplication & Legacy Purge (`install.ps1`).
+  7. Subtask 7: Instance Account Switching & SQLite Token Injection Fix + 4-Part RCA (`src-tauri/src/modules/instance.rs`, `db.rs`, `02-spec/20-instance-management/01-instance-switching-rca.md`, `.ai-memory/issues/45-instance-switching-rca.md`).
+  8. Subtask 8: CI/CD Bottleneck Analysis & Local Dev Script (`run.ps1`, `02-spec/12-cicd-pipeline-workflows/23-release-bottleneck-analysis.md`, `.ai-memory/issues/46-cicd-release-bottlenecks.md`).
+- **Verification Outcomes:**
+  - `powershell -File .\run.ps1 -Check` -> TypeScript check passed, Rust formatting check passed (Exit Code 0).
+  - Live TLS handshake tested against `mail.hire-seoexperts.com:465` and `mail.hire-seoexperts.com:993` -> Succeeded.
+  - Zero compiler warnings, zero broken references.
 
