@@ -1,3 +1,9 @@
+## v4.43.0 — 2026-09-20 (Accelerate release CI/CD with Rust dependency caching and parallel codegen units)
+
+**Scope:** Version bump. Accelerate release CI/CD with Rust dependency caching and parallel codegen units.
+
+---
+
 ## v4.42.0 — 2026-09-20 (Enforce pinned release detection and dedicated release section)
 
 **Scope:** Version bump. Enforce pinned release detection and dedicated release section.

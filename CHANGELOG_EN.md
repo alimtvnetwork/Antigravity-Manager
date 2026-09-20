@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.43.0 (2026-09-20)**:
+        -   **[Release v4.43.0] Accelerate release CI/CD with Rust dependency caching and parallel codegen units**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Accelerate release CI/CD with Rust dependency caching and parallel codegen units.
     *   **v4.42.0 (2026-09-20)**:
         -   **[Release v4.42.0] Enforce pinned release detection and dedicated release section**:
             -   **Update System**: Automated release and version synchronization across all manifests.
