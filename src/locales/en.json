@@ -415,7 +415,7 @@
       "auto_launch": "Launch at Startup",
       "auto_launch_enabled": "Enabled",
       "auto_launch_disabled": "Disabled",
-      "auto_launch_desc": "Automatically launch Antigravity Tools when system starts",
+      "auto_launch_desc": "Automatically launch Agm Tool By Alim when system starts",
       "auto_check_update": "Auto Check for Updates",
       "auto_check_update_desc": "Automatically check for new versions on startup",
       "auto_check_update_enabled": "Auto check enabled",

@@ -539,29 +539,19 @@ pin_ubuntu_dock() {
         return
     fi
 
-    local desktop_id=""
-    local candidates=(
-        "agm-alim.desktop"
-        "anti-gravity-tools-by-alim.desktop"
-        "anti-gravity-tools.desktop"
-        "antigravity-tools.desktop"
-        "com.lbjlaq.antigravity-tools.desktop"
-    )
-
-    for c in "${candidates[@]}"; do
-        if [[ -f "/usr/share/applications/$c" || -f "${HOME}/.local/share/applications/$c" ]]; then
-            desktop_id="$c"
-            break
-        fi
-    done
-
-    if [[ -z "$desktop_id" ]]; then
-        desktop_id="agm-alim.desktop"
-    fi
+    local desktop_id="agm-alim.desktop"
 
     if command -v gsettings &>/dev/null; then
         local current_favs
         current_favs=$(gsettings get org.gnome.shell favorite-apps 2>/dev/null || echo "")
+
+        # Replace any legacy desktop entries in favorite-apps
+        for old in "anti-gravity-tools-by-alim.desktop" "anti-gravity-tools.desktop" "antigravity-tools.desktop" "com.lbjlaq.antigravity-tools.desktop"; do
+            if [[ "$current_favs" == *"$old"* ]]; then
+                current_favs=$(echo "$current_favs" | sed "s/'$old'/'$desktop_id'/g")
+            fi
+        done
+
         if [[ -n "$current_favs" && "$current_favs" != *"$desktop_id"* ]]; then
             info "Pinning ${DESKTOP_NAME} to Ubuntu taskbar / dock..."
             local new_favs
@@ -644,6 +634,30 @@ EOF
             fi
             ;;
     esac
+
+    # Ensure user application entry exists with exact customized Name and Tooltip
+    local apps_dir="${HOME}/.local/share/applications"
+    mkdir -p "$apps_dir"
+    local bin_cmd
+    bin_cmd=$(command -v "${BINARY_NAME}" 2>/dev/null || echo "${HOME}/.local/bin/${BINARY_NAME}")
+    cat <<EOF > "${apps_dir}/agm-alim.desktop"
+[Desktop Entry]
+Name=${DESKTOP_NAME}
+Comment=${TOOLTIP}
+GenericName=${TOOLTIP}
+Exec=${bin_cmd} %U
+Icon=${BINARY_NAME}
+Terminal=false
+Type=Application
+Categories=Utility;Development;
+StartupWMClass=${BINARY_NAME}
+EOF
+    chmod +x "${apps_dir}/agm-alim.desktop"
+
+    # Purge legacy .desktop entries
+    for old_desktop in "anti-gravity-tools-by-alim.desktop" "anti-gravity-tools.desktop" "antigravity-tools.desktop" "com.lbjlaq.antigravity-tools.desktop"; do
+        rm -f "${apps_dir}/${old_desktop}" 2>/dev/null || true
+    done
 
     pin_ubuntu_dock
 

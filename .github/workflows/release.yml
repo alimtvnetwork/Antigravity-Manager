@@ -139,15 +139,16 @@ jobs:
           }
           $outDir = "src-tauri/target/release/bundle/zip"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          $exePath = "src-tauri/target/release/antigravity-tools.exe"
+          $exePath = "src-tauri/target/release/agm-alim.exe"
           if (-not (Test-Path $exePath)) {
             $found = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*setup*" -and $_.Name -notlike "*build*" } | Select-Object -First 1
             if ($found) { $exePath = $found.FullName }
           }
           if (Test-Path $exePath) {
-            $zipName = "Antigravity.Tools_${ver}_windows_x64.zip"
+            $zipName = "agm-alim_${ver}_windows_x64.zip"
             Compress-Archive -Path $exePath -DestinationPath "$outDir/$zipName" -Force
-            Write-Host "Successfully packaged portable ZIP: $outDir/$zipName"
+            Copy-Item -Path $exePath -Destination "$outDir/agm-alim.exe" -Force
+            Write-Host "Successfully packaged portable ZIP: $outDir/$zipName and standalone agm-alim.exe"
           } else {
             Write-Warning "Executable not found for portable zip at $exePath"
           }
@@ -356,8 +357,13 @@ jobs:
             cp install.sh release-files/
             chmod +x release-files/install.sh
           fi
-          # Generate SHA-256 checksums
+          # Provide friendly alias names for direct setup/installer downloads
           cd release-files
+          setup_file=$(find . -maxdepth 1 -name "agm-alim*setup.exe" | head -n 1)
+          if [ -n "$setup_file" ] && [ -f "$setup_file" ]; then
+            cp "$setup_file" agm-alim-setup.exe
+          fi
+          # Generate SHA-256 checksums
           sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true
           cd ..
           find release-files -maxdepth 1 -type f -print

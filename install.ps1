@@ -227,13 +227,13 @@ function Pin-TaskbarShortcut {
 
     # Method 1: Create or update shortcut directly in User Pinned Taskbar directory
     if (Test-Path $TaskbarDir) {
-        $pinnedShortcut = Join-Path $TaskbarDir "$AppName.lnk"
+        $pinnedShortcut = Join-Path $TaskbarDir "$ShortcutName.lnk"
         try {
             $WshShell = New-Object -ComObject WScript.Shell
             $sc = $WshShell.CreateShortcut($pinnedShortcut)
             $sc.TargetPath = $TargetExe
             $sc.WorkingDirectory = $TargetWorkDir
-            $sc.Description = $AppName
+            $sc.Description = $Tooltip
             $sc.Save()
             Write-Success "Pinned shortcut created in Taskbar directory: $pinnedShortcut"
         } catch {

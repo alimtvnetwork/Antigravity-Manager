@@ -5,6 +5,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-tauri:
     permissions:
@@ -18,12 +21,12 @@ jobs:
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
           - platform: "macos-latest"
-            args: "--target universal-apple-darwin"
+            args: "--target universal-apple-darwin --bundles app"
           - platform: "ubuntu-22.04"
             args: ""
           - platform: "ubuntu-24.04-arm"
             args: ""
-          - platform: "windows-latest"
+          - platform: "windows-2025"
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -34,9 +37,9 @@ jobs:
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev
-          sudo apt-get install -y libnm-dev xdg-utils
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y --fix-missing libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils || (sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libsoup-3.0-dev javascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev libnm-dev xdg-utils)
+
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -51,6 +54,22 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm install --legacy-peer-deps
+
+      - name: Disable updater artifacts without signing key
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            Write-Host "Updater signing key is configured; keeping updater artifacts enabled."
+            exit 0
+          }
+
+          $configPath = "src-tauri/tauri.conf.json"
+          $config = Get-Content -Raw $configPath | ConvertFrom-Json
+          $config.bundle.createUpdaterArtifacts = $false
+          $config | ConvertTo-Json -Depth 32 | Set-Content -Path $configPath -Encoding UTF8
+          Write-Host "No updater signing key configured; disabled updater artifacts for this build."
 
       - name: Build the app
         env:
@@ -78,22 +97,27 @@ jobs:
           # 进入产物目录
           cd src-tauri/target/*/release/bundle/macos/
 
-          # 重命名 .app.tar.gz 和 .sig
-          if [ -f "Antigravity Tools.app.tar.gz" ]; then
-            mv "Antigravity Tools.app.tar.gz" "Antigravity Tools_${ARCH}.app.tar.gz"
-            mv "Antigravity Tools.app.tar.gz.sig" "Antigravity Tools_${ARCH}.app.tar.gz.sig"
-            echo "Renamed assets to append Arch: $ARCH"
-          fi
+          # Rename .app.tar.gz and .sig to append architecture suffix
+          for tar_file in *.app.tar.gz; do
+            if [ -f "$tar_file" ] && [[ "$tar_file" != *"_${ARCH}.app.tar.gz"* ]]; then
+              base="${tar_file%.app.tar.gz}"
+              mv "$tar_file" "${base}_${ARCH}.app.tar.gz"
+              if [ -f "${tar_file}.sig" ]; then
+                mv "${tar_file}.sig" "${base}_${ARCH}.app.tar.gz.sig"
+              fi
+              echo "Renamed $tar_file to ${base}_${ARCH}.app.tar.gz"
+            fi
+          done
 
-          # 更新对应的 updater.json (指向重命名后的文件)
+          # Update updater json reference if present
           UPDATER_JSON="../../../updater/install.json"
           if [ ! -f "$UPDATER_JSON" ]; then
              UPDATER_JSON=$(find ../../../updater -name "*.json" | head -n 1)
           fi
 
-          if [ -f "$UPDATER_JSON" ]; then
-            echo "Updating $UPDATER_JSON to use renamed assets..."
-            sed -i '' "s/Antigravity%20Tools.app.tar.gz/Antigravity%20Tools_${ARCH}.app.tar.gz/g" "$UPDATER_JSON"
+          if [ -n "$UPDATER_JSON" ] && [ -f "$UPDATER_JSON" ]; then
+            echo "Updating $UPDATER_JSON with renamed assets..."
+            sed -i.bak "s/\.app\.tar\.gz/_${ARCH}.app.tar.gz/g" "$UPDATER_JSON" 2>/dev/null || true
           fi
 
       # 1. 上传 updater.json 到 Artifacts (供后续合并使用)
@@ -102,7 +126,32 @@ jobs:
         with:
           name: updater-json-${{ matrix.platform }}-${{ strategy.job-index }}
           path: src-tauri/target/**/release/bundle/updater/*.json
-          if-no-files-found: warn
+          if-no-files-found: ignore
+
+      # 打包 Windows 便携版 ZIP (直接可执行文件免安装包)
+      - name: Package portable binary archive (Windows)
+        if: matrix.platform == 'windows-2025'
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          if ([string]::IsNullOrWhiteSpace($ver) -or $ver -eq "main") {
+            $ver = (Get-Content package.json | ConvertFrom-Json).version
+          }
+          $outDir = "src-tauri/target/release/bundle/zip"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $exePath = "src-tauri/target/release/agm-alim.exe"
+          if (-not (Test-Path $exePath)) {
+            $found = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*setup*" -and $_.Name -notlike "*build*" } | Select-Object -First 1
+            if ($found) { $exePath = $found.FullName }
+          }
+          if (Test-Path $exePath) {
+            $zipName = "agm-alim_${ver}_windows_x64.zip"
+            Compress-Archive -Path $exePath -DestinationPath "$outDir/$zipName" -Force
+            Copy-Item -Path $exePath -Destination "$outDir/agm-alim.exe" -Force
+            Write-Host "Successfully packaged portable ZIP: $outDir/$zipName and standalone agm-alim.exe"
+          } else {
+            Write-Warning "Executable not found for portable zip at $exePath"
+          }
 
       # 2. 上传安装包到 Artifacts (供后续统一发布任务下载)
       - name: Upload Release Artifacts
@@ -115,6 +164,7 @@ jobs:
             src-tauri/target/**/release/bundle/appimage/*.AppImage
             src-tauri/target/**/release/bundle/msi/*.msi
             src-tauri/target/**/release/bundle/nsis/*.exe
+            src-tauri/target/**/release/bundle/zip/*.zip
             src-tauri/target/**/release/bundle/rpm/*.rpm
             src-tauri/target/**/release/bundle/macos/*.app.tar.gz
             src-tauri/target/**/release/bundle/macos/*.app.tar.gz.sig
@@ -129,6 +179,7 @@ jobs:
   publish-release:
     needs: build-tauri
     runs-on: ubuntu-latest
+    if: always() && !cancelled() && needs.build-tauri.result != 'cancelled'
     permissions:
       contents: write
     steps:
@@ -144,17 +195,41 @@ jobs:
           merge-multiple: true
 
       - name: Extract Release Notes
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          VERSION="${{ github.ref_name }}"
           echo "Extracting release notes for version $VERSION"
+          echo "## Quick Install ${VERSION}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Windows (PowerShell 5.1+)" >> release_notes.md
+          echo '```powershell' >> release_notes.md
+          echo "irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" >> release_notes.md
+          echo "# Or pinned version:" >> release_notes.md
+          echo "irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Linux / macOS (Bash)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
+          echo "# Or pinned version:" >> release_notes.md
+          echo "curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "---" >> release_notes.md
+          echo "" >> release_notes.md
+          CHANGELOG_SOURCE="CHANGELOG_EN.md"
+          if [ ! -f "$CHANGELOG_SOURCE" ]; then
+            CHANGELOG_SOURCE="CHANGELOG.md"
+          fi
           awk -v ver="$VERSION" '
             BEGIN { capture=0 }
             $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*" ver { capture=1; next }
             capture && $0 ~ "^[[:space:]]*[*+-][[:space:]]+\\*\\*v" { capture=0; exit }
             capture { print }
-          ' README.md | sed 's/^[[:space:]]\{8\}//' > release_notes.md
+          ' "$CHANGELOG_SOURCE" | sed 's/^[[:space:]]\{8\}//' >> release_notes.md
           if [ ! -s release_notes.md ]; then
-            echo "See the assets to download this version and install." > release_notes.md
+            echo "See the assets to download this version and install." >> release_notes.md
           fi
 
       - name: Build updater.json from signatures
@@ -177,6 +252,19 @@ jobs:
             fi
           }
 
+          # Helper: resolve actual generated asset file name from artifacts
+          get_asset_name() {
+            local pattern="$1"
+            local fallback="$2"
+            local asset_file
+            asset_file=$(find all-artifacts -name "$pattern" -type f 2>/dev/null | head -1)
+            if [ -n "$asset_file" ] && [ -f "$asset_file" ]; then
+              basename "$asset_file"
+            else
+              echo "$fallback"
+            fi
+          }
+
           # Read signatures for each platform
           MACOS_AARCH64_SIG=$(read_sig "*_aarch64.app.tar.gz.sig")
           MACOS_X64_SIG=$(read_sig "*_x64.app.tar.gz.sig")
@@ -184,16 +272,21 @@ jobs:
           LINUX_AMD64_SIG=$(read_sig "*_amd64.AppImage.sig")
           LINUX_AARCH64_SIG=$(read_sig "*_aarch64.AppImage.sig")
 
+          # Read matching asset filenames for each platform
+          MACOS_AARCH64_ASSET=$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")
+          MACOS_X64_ASSET=$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")
+          WINDOWS_NSIS_ASSET=$(get_asset_name "*_x64-setup.exe" "agm-alim_${VER}_x64-setup.exe")
+          LINUX_AMD64_ASSET=$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")
+          LINUX_AARCH64_ASSET=$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")
+
           echo "Signatures found:"
-          [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES" || echo "  macOS aarch64: NO"
-          [ -n "$MACOS_X64_SIG" ] && echo "  macOS x64: YES" || echo "  macOS x64: NO"
-          [ -n "$WINDOWS_NSIS_SIG" ] && echo "  Windows x64: YES" || echo "  Windows x64: NO"
-          [ -n "$LINUX_AMD64_SIG" ] && echo "  Linux amd64: YES" || echo "  Linux amd64: NO"
-          [ -n "$LINUX_AARCH64_SIG" ] && echo "  Linux aarch64: YES" || echo "  Linux aarch64: NO"
+          [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES ($MACOS_AARCH64_ASSET)" || echo "  macOS aarch64: NO"
+          [ -n "$MACOS_X64_SIG" ] && echo "  macOS x64: YES ($MACOS_X64_ASSET)" || echo "  macOS x64: NO"
+          [ -n "$WINDOWS_NSIS_SIG" ] && echo "  Windows x64: YES ($WINDOWS_NSIS_ASSET)" || echo "  Windows x64: NO"
+          [ -n "$LINUX_AMD64_SIG" ] && echo "  Linux amd64: YES ($LINUX_AMD64_ASSET)" || echo "  Linux amd64: NO"
+          [ -n "$LINUX_AARCH64_SIG" ] && echo "  Linux aarch64: YES ($LINUX_AARCH64_ASSET)" || echo "  Linux aarch64: NO"
 
           # Build updater.json with platform-specific download URLs and signatures
-          # macOS: arch-suffixed filenames (no version in name)
-          # Windows/Linux: version included in filename
           jq -n \
             --arg version "$VER" \
             --arg notes "See release page for details" \
@@ -204,30 +297,34 @@ jobs:
             --arg win_nsis_sig "$WINDOWS_NSIS_SIG" \
             --arg linux_amd64_sig "$LINUX_AMD64_SIG" \
             --arg linux_a64_sig "$LINUX_AARCH64_SIG" \
-            --arg ver "$VER" \
+            --arg mac_a64_asset "$MACOS_AARCH64_ASSET" \
+            --arg mac_x64_asset "$MACOS_X64_ASSET" \
+            --arg win_nsis_asset "$WINDOWS_NSIS_ASSET" \
+            --arg linux_amd64_asset "$LINUX_AMD64_ASSET" \
+            --arg linux_a64_asset "$LINUX_AARCH64_ASSET" \
             '{
               version: $version,
               notes: $notes,
               pub_date: $pub_date,
               platforms: {
                 "darwin-aarch64": {
-                  url: "\($dl)/Antigravity.Tools_aarch64.app.tar.gz",
+                  url: "\($dl)/\($mac_a64_asset)",
                   signature: $mac_a64_sig
                 },
                 "darwin-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_x64.app.tar.gz",
+                  url: "\($dl)/\($mac_x64_asset)",
                   signature: $mac_x64_sig
                 },
                 "windows-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_x64-setup.exe",
+                  url: "\($dl)/\($win_nsis_asset)",
                   signature: $win_nsis_sig
                 },
                 "linux-x86_64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_amd64.AppImage",
+                  url: "\($dl)/\($linux_amd64_asset)",
                   signature: $linux_amd64_sig
                 },
                 "linux-aarch64": {
-                  url: "\($dl)/Antigravity.Tools_\($ver)_aarch64.AppImage",
+                  url: "\($dl)/\($linux_a64_asset)",
                   signature: $linux_a64_sig
                 }
               }
@@ -236,16 +333,51 @@ jobs:
           echo "Generated updater.json:"
           cat updater.json
 
+      - name: Collect release files and generate checksums
+        run: |
+          mkdir -p release-files
+          find all-artifacts -type f \( \
+            -name "*.dmg" -o \
+            -name "*.deb" -o \
+            -name "*.AppImage" -o \
+            -name "*.msi" -o \
+            -name "*.exe" -o \
+            -name "*.zip" -o \
+            -name "*.rpm" -o \
+            -name "*.app.tar.gz" -o \
+            -name "*.sig" \
+          \) -print0 | while IFS= read -r -d '' file; do
+            cp "$file" release-files/
+          done
+          # Copy standalone installer scripts so they are published as release assets
+          if [ -f install.ps1 ]; then
+            cp install.ps1 release-files/
+          fi
+          if [ -f install.sh ]; then
+            cp install.sh release-files/
+            chmod +x release-files/install.sh
+          fi
+          # Provide friendly alias names for direct setup/installer downloads
+          cd release-files
+          setup_file=$(find . -maxdepth 1 -name "agm-alim*setup.exe" | head -n 1)
+          if [ -n "$setup_file" ] && [ -f "$setup_file" ]; then
+            cp "$setup_file" agm-alim-setup.exe
+          fi
+          # Generate SHA-256 checksums
+          sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true
+          cd ..
+          find release-files -maxdepth 1 -type f -print
+
       # 使用 ncipollo/release-action 进行统一发布，支持稳健覆盖
       - name: Create or Update GitHub Release
         uses: ncipollo/release-action@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           allowUpdates: true
-          name: "Antigravity Tools ${{ github.ref_name }}"
+          name: "Antigravity Manager Tools By Alim ${{ github.ref_name }}"
           bodyFile: "release_notes.md"
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "all-artifacts/**/*,updater.json"
+          artifacts: "release-files/*,updater.json"
           artifactErrorsFailBuild: false
           replacesArtifacts: true
           makeLatest: legacy

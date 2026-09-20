@@ -72,6 +72,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 
     // 5. Build tray icon
     let _ = TrayIconBuilder::with_id("main")
+        .tooltip("Antigravity Manager Tool By Alim")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .icon(icon)

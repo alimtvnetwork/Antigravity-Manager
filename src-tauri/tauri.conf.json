@@ -29,6 +29,8 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": false,
+    "shortDescription": "Antigravity Manager Tool By Alim",
+    "longDescription": "Antigravity Manager Tools By Alim",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
