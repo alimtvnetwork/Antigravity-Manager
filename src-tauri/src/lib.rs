@@ -866,6 +866,17 @@ pub fn run() {
             commands::trigger_manual_email_check,
             commands::dispatch_email_test_ping,
             commands::test_execute_cli_command,
+            // Supabase Cross-Node Synchronization commands
+            commands::get_supabase_config,
+            commands::save_supabase_config,
+            commands::test_supabase_endpoint,
+            commands::get_supabase_schema_sql,
+            commands::export_supabase_config,
+            commands::import_supabase_config,
+            commands::acquire_account_lease,
+            commands::release_account_lease,
+            commands::list_active_account_leases,
+            commands::get_local_node_info,
         ])
 
 

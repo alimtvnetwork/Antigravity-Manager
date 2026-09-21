@@ -25,6 +25,9 @@ pub use instance::*;
 // 导出 email 命令
 pub mod email;
 pub use email::*;
+// 导出 supabase 命令
+pub mod supabase;
+pub use supabase::*;
 
 /// 列出所有账号
 #[tauri::command]

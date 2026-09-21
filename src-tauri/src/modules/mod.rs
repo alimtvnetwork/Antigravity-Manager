@@ -18,6 +18,7 @@ pub mod instance;
 pub mod http_api;
 pub mod i18n;
 pub mod integration;
+pub mod iterative_codec;
 pub mod log_bridge;
 pub mod logger;
 pub mod migration;
@@ -29,11 +30,17 @@ pub mod quota;
 pub mod repo_db;
 pub mod scheduler;
 pub mod security_db;
+pub mod supabase_client;
+pub mod supabase_command_queue;
+pub mod supabase_pruner;
+pub mod supabase_schema;
+pub mod supabase_sync;
 pub mod token_stats;
 pub mod tray;
 pub mod update_checker;
 pub mod user_token_db;
 pub mod version;
+pub mod workspace_lease_manager;
 
 use crate::models;
 

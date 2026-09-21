@@ -63,6 +63,7 @@ import { MODEL_CONFIG, sortModels } from '../../config/modelConfig';
 import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
+import { supabaseService, WorkspaceLease } from '../../services/supabaseService';
 
 // ============================================================================
 // 类型定义
@@ -348,6 +349,19 @@ function AccountRowContent({
         return instances.find((inst) => inst.config.bound_email === account.email || inst.config.bound_account_id === account.id);
     }, [instances, account.email, account.id]);
 
+    const [leaseInfo, setLeaseInfo] = useState<WorkspaceLease | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        supabaseService.listActiveLeases().then(leases => {
+            if (isMounted) {
+                const found = leases.find(l => l.account_id === account.id);
+                setLeaseInfo(found || null);
+            }
+        }).catch(() => {});
+        return () => { isMounted = false; };
+    }, [account.id]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -583,6 +597,16 @@ function AccountRowContent({
                                     boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
                                 )} />
                                 <span>{boundInstance.config.name}</span>
+                            </span>
+                        )}
+                        {/* 远程节点租赁徽章 */}
+                        {leaseInfo && (
+                            <span
+                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[9px] font-bold shadow-xs border border-purple-200/50 dark:border-purple-800/50 cursor-default"
+                                title={`Leased by Node: ${leaseInfo.node_alias} (${leaseInfo.profile_name})`}
+                            >
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>{leaseInfo.node_alias}</span>
                             </span>
                         )}
                         {/* 自定义标签 */}
