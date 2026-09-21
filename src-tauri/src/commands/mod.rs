@@ -221,12 +221,18 @@ pub async fn get_current_account() -> Result<Option<Account>, String> {
             let has_token = token_trimmed.len() > 0;
             if has_token {
                 if let Ok(accounts) = modules::list_accounts() {
-                    if let Some(matching) = accounts.into_iter().find(|a| a.token.refresh_token == token_trimmed) {
+                    if let Some(matching) = accounts
+                        .into_iter()
+                        .find(|a| a.token.refresh_token == token_trimmed)
+                    {
                         modules::logger::log_info(&format!(
                             "   Auto-bound current account from editor DB: {}",
                             matching.email
                         ));
-                        let _ = modules::account::set_current_account_id_with_target(&matching.id, current_target);
+                        let _ = modules::account::set_current_account_id_with_target(
+                            &matching.id,
+                            current_target,
+                        );
                         return Ok(Some(matching));
                     }
                 }

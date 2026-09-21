@@ -276,6 +276,8 @@ CI_JOBS_MATRIX: dict[str, list[str]] = {
     "Sequence Integrity Check (AI Scripts)": [sys.executable, "03-ai-scripts/21-sequence-integrity-linter.py"],
     "Misspell Check": [sys.executable, "03-ai-scripts/27-misspell-auditor.py"],
     "Boolean Naming Check": [sys.executable, "03-ai-scripts/08-naming-autofixer.py"],
+    "Rust Format Check": ["cargo", "fmt", "--manifest-path", "src-tauri/Cargo.toml", "--", "--check"],
+    "TypeScript Check": ["node", "node_modules/typescript/bin/tsc", "--noEmit"],
 }
 
 # --- Module-Level Directory & File Constants ---
