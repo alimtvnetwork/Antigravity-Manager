@@ -60,11 +60,26 @@ export const ensureFullViewState = async () => {
     if (!isTauri()) return;
     try {
         const win = getCurrentWindow();
-        const size = await win.outerSize();
-        // If window is suspiciously narrow (likely leftover from Mini View), restore default size
-        if (size.width < 500) {
-            await win.setSize(new LogicalSize(1200, 800));
-            await win.center();
+        const isMin = await win.isMinimized().catch(() => false);
+        if (isMin) {
+            await win.unminimize().catch(() => {});
+        }
+        const pos = await win.outerPosition().catch(() => null);
+        if (pos) {
+            const isOffscreenX = pos.x < -1000;
+            const isOffscreenY = pos.y < -1000;
+            if (isOffscreenX || isOffscreenY) {
+                await win.center().catch(() => {});
+            }
+        }
+        const size = await win.outerSize().catch(() => null);
+        if (size) {
+            const isTooNarrow = size.width < 500;
+            const isTooShort = size.height < 400;
+            if (isTooNarrow || isTooShort) {
+                await win.setSize(new LogicalSize(1200, 800)).catch(() => {});
+                await win.center().catch(() => {});
+            }
         }
         // Enforce custom title bar (frameless) for Full View
         await win.setDecorations(false);
@@ -72,5 +87,28 @@ export const ensureFullViewState = async () => {
         await win.setAlwaysOnTop(false);
     } catch (error) {
         console.error('Failed to ensure full view state:', error);
+    }
+};
+
+/**
+ * Unminimize, heal off-screen position and focus window safely
+ */
+export const unminimizeAndFocusWindow = async () => {
+    if (!isTauri()) return;
+    try {
+        const win = getCurrentWindow();
+        await win.show().catch(() => {});
+        await win.unminimize().catch(() => {});
+        const pos = await win.outerPosition().catch(() => null);
+        if (pos) {
+            const isOffscreenX = pos.x < -1000;
+            const isOffscreenY = pos.y < -1000;
+            if (isOffscreenX || isOffscreenY) {
+                await win.center().catch(() => {});
+            }
+        }
+        await win.setFocus().catch(() => {});
+    } catch (error) {
+        console.error('Failed to unminimize and focus window:', error);
     }
 };

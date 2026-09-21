@@ -90,8 +90,8 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
     return (
         <tr className={cn(
-            "group transition-all duration-150 border-b border-gray-100 dark:border-base-200",
-            isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-4 border-l-amber-400 dark:border-l-amber-400 font-medium" : "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-2 hover:border-l-amber-400/80",
+            "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
+            isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-amber-400 dark:border-l-amber-400 font-medium" : "border-l-transparent hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-amber-400/80",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
@@ -154,14 +154,14 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             const tier = account.quota.subscription_tier.toLowerCase();
                             if (tier.includes('ultra')) {
                                 return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-opacity cursor-default">
                                         <Gem className="w-2.5 h-2.5 fill-current" />
                                         ULTRA
                                     </span>
                                 );
                             } else if (tier.includes('pro')) {
                                 return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-opacity cursor-default">
                                         <Diamond className="w-2.5 h-2.5 fill-current" />
                                         PRO
                                     </span>

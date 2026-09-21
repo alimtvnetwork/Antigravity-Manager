@@ -227,7 +227,8 @@ fn scan_and_heal_dir(dir: &Path, changed: &mut bool) {
             } else if path.is_file() {
                 if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                     let lower = file_name.to_lowercase();
-                    let is_matched_name = lower.contains("antigravity")
+                    let is_matched_name = lower.contains("agm by alim")
+                        || lower.contains("antigravity")
                         || lower.contains("agm")
                         || lower.contains("agm-alim");
                     if is_matched_name && lower.ends_with(".lnk") {

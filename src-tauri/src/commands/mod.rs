@@ -208,12 +208,34 @@ pub async fn get_current_account() -> Result<Option<Account>, String> {
     let account_id = modules::get_current_account_id()?;
 
     if let Some(id) = account_id {
-        // modules::logger::log_info(&format!("   Found current account ID: {}", id));
-        modules::load_account(&id).map(Some)
-    } else {
-        modules::logger::log_info("   No current account set");
-        Ok(None)
+        if let Ok(account) = modules::load_account(&id) {
+            return Ok(Some(account));
+        }
     }
+
+    // Fallback: Check if editor DB has an active refresh token matching one of our saved accounts
+    if let Ok(index) = modules::account::load_account_index() {
+        let current_target = index.current_target_ide.as_deref();
+        if let Ok(db_token) = modules::migration::get_refresh_token_from_db(current_target) {
+            let token_trimmed = db_token.trim();
+            let has_token = token_trimmed.len() > 0;
+            if has_token {
+                if let Ok(accounts) = modules::list_accounts() {
+                    if let Some(matching) = accounts.into_iter().find(|a| a.token.refresh_token == token_trimmed) {
+                        modules::logger::log_info(&format!(
+                            "   Auto-bound current account from editor DB: {}",
+                            matching.email
+                        ));
+                        let _ = modules::account::set_current_account_id_with_target(&matching.id, current_target);
+                        return Ok(Some(matching));
+                    }
+                }
+            }
+        }
+    }
+
+    modules::logger::log_info("   No current account set");
+    Ok(None)
 }
 
 /// 导出账号（包含 refresh_token）

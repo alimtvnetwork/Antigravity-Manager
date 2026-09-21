@@ -341,6 +341,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 5. Inject verified account tokens into target profile state.vscdb and launch
             await instanceService.switchAccountToInstance(candidate.account.id, instId);
 
+            // 5b. If target instance is default or active IDE instance, also switch active editor account directly
+            const isDefaultTarget = instId === 'default';
+            const isActiveTarget = instId === get().activeInstanceId;
+            if (isDefaultTarget || isActiveTarget) {
+                await useAccountStore.getState().switchAccount(candidate.account.id);
+            }
+
             // 6. Refresh instance and account states
             await Promise.all([
                 get().fetchInstances(true),

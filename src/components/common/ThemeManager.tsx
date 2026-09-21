@@ -15,7 +15,21 @@ export default function ThemeManager() {
             // Show window after a short delay to ensure React has painted
             setTimeout(async () => {
                 if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-                    await getCurrentWindow().show();
+                    const win = getCurrentWindow();
+                    const isMin = await win.isMinimized().catch(() => false);
+                    if (isMin) {
+                        await win.unminimize().catch(() => {});
+                    }
+                    const pos = await win.outerPosition().catch(() => null);
+                    if (pos) {
+                        const isOffscreenX = pos.x < -1000;
+                        const isOffscreenY = pos.y < -1000;
+                        if (isOffscreenX || isOffscreenY) {
+                            await win.center().catch(() => {});
+                        }
+                    }
+                    await win.show().catch(() => {});
+                    await win.setFocus().catch(() => {});
                 }
             }, 100);
         };

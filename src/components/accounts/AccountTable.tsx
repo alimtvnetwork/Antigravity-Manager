@@ -74,6 +74,7 @@ interface AccountTableProps {
     onToggleSelect: (id: string) => void;
     onToggleAll: () => void;
     currentAccountId: string | null;
+    currentAccountEmail?: string | null;
     switchingAccountId: string | null;
     onSwitch: (accountId: string, targetIde?: string) => void;
     onRefresh: (accountId: string) => void;
@@ -251,10 +252,10 @@ function SortableAccountRow({
             ref={setNodeRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group transition-all duration-150 border-b border-gray-100 dark:border-base-200",
-                isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-4 border-l-amber-400 dark:border-l-amber-400 font-medium" : "",
+                "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
+                isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-amber-400 dark:border-l-amber-400 font-medium" : "border-l-transparent",
                 isDragging ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg" : "",
-                !isDragging ? "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-2 hover:border-l-amber-400/80" : ""
+                !isDragging ? "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-amber-400/80" : ""
             )}
         >
             {/* 拖拽手柄 */}
@@ -897,6 +898,7 @@ function AccountTable({
     onToggleSelect,
     onToggleAll,
     currentAccountId,
+    currentAccountEmail,
     switchingAccountId,
     onSwitch,
     onRefresh,
@@ -912,6 +914,20 @@ function AccountTable({
     quotaWindow,
 }: AccountTableProps) {
     const { t } = useTranslation();
+
+    const isAccountCurrent = (acc: Account) => {
+        const isIdMatch = Boolean(currentAccountId && acc.id === currentAccountId);
+        if (isIdMatch) {
+            return true;
+        }
+        const isEmailMatch = Boolean(
+            currentAccountEmail && acc.email && acc.email.toLowerCase() === currentAccountEmail.toLowerCase()
+        );
+        if (isEmailMatch) {
+            return true;
+        }
+        return false;
+    };
 
     const [modelFilter, setModelFilter] = useState<'both' | 'gemini' | 'claude'>('both');
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -1132,7 +1148,7 @@ function AccountTable({
                                     account={account}
                                     selected={selectedIds.has(account.id)}
                                     isRefreshing={refreshingIds.has(account.id)}
-                                    isCurrent={account.id === currentAccountId}
+                                    isCurrent={isAccountCurrent(account)}
                                     isSwitching={account.id === switchingAccountId}
                                     isDragging={account.id === activeId}
                                     onSelect={() => onToggleSelect(account.id)}
@@ -1178,7 +1194,7 @@ function AccountTable({
                                     </td>
                                     <AccountRowContent
                                         account={activeAccount}
-                                        isCurrent={activeAccount.id === currentAccountId}
+                                        isCurrent={isAccountCurrent(activeAccount)}
                                         isRefreshing={refreshingIds.has(activeAccount.id)}
                                         isSwitching={activeAccount.id === switchingAccountId}
                                         onSwitch={() => { }}

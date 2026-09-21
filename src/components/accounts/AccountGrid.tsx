@@ -8,6 +8,7 @@ interface AccountGridProps {
     refreshingIds: Set<string>;
     onToggleSelect: (id: string) => void;
     currentAccountId: string | null;
+    currentAccountEmail?: string | null;
     switchingAccountId: string | null;
     onSwitch: (accountId: string, targetIde?: string) => void;
     onRefresh: (accountId: string) => void;
@@ -23,8 +24,23 @@ interface AccountGridProps {
 }
 
 
-function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, switchingAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountGridProps) {
+function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountGridProps) {
     const { t } = useTranslation();
+
+    const isAccountCurrent = (acc: Account) => {
+        const isIdMatch = Boolean(currentAccountId && acc.id === currentAccountId);
+        if (isIdMatch) {
+            return true;
+        }
+        const isEmailMatch = Boolean(
+            currentAccountEmail && acc.email && acc.email.toLowerCase() === currentAccountEmail.toLowerCase()
+        );
+        if (isEmailMatch) {
+            return true;
+        }
+        return false;
+    };
+
     if (accounts.length === 0) {
         return (
             <div className="bg-white dark:bg-base-100 rounded-2xl p-12 shadow-sm border border-gray-100 dark:border-base-200 text-center">
@@ -43,7 +59,7 @@ function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, cur
                     selected={selectedIds.has(account.id)}
                     isRefreshing={refreshingIds.has(account.id)}
                     onSelect={() => onToggleSelect(account.id)}
-                    isCurrent={account.id === currentAccountId}
+                    isCurrent={isAccountCurrent(account)}
                     isSwitching={account.id === switchingAccountId}
                     onSwitch={(targetIde?: string) => onSwitch(account.id, targetIde)}
                     onRefresh={() => onRefresh(account.id)}

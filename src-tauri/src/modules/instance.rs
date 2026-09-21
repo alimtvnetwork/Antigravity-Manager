@@ -810,7 +810,22 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
 /// Get currently active instance ID
 pub fn get_active_instance_id() -> Result<String, String> {
     let registry = load_registry()?;
-    Ok(registry.active_instance_id)
+    let active_exists = registry
+        .instances
+        .iter()
+        .any(|i| i.id == registry.active_instance_id);
+    if active_exists {
+        return Ok(registry.active_instance_id);
+    }
+    // Fallback: check if any instance is currently running
+    for inst in &registry.instances {
+        let pids = find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+        let is_running = !pids.is_empty();
+        if is_running {
+            return Ok(inst.id.clone());
+        }
+    }
+    Ok("default".to_string())
 }
 
 /// Set currently active instance ID

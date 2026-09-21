@@ -44,6 +44,7 @@ function Accounts() {
     accounts,
     currentAccount,
     fetchAccounts,
+    fetchCurrentAccount,
     addAccount,
     deleteAccount,
     deleteAccounts,
@@ -81,6 +82,12 @@ function Accounts() {
   useEffect(() => {
     localStorage.setItem('accounts_quota_window', quotaWindow);
   }, [quotaWindow]);
+
+  // Fetch accounts and active current account on mount
+  useEffect(() => {
+    fetchAccounts();
+    fetchCurrentAccount();
+  }, [fetchAccounts, fetchCurrentAccount]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deviceAccount, setDeviceAccount] = useState<Account | null>(null);
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
@@ -1104,6 +1111,7 @@ function Accounts() {
                 onToggleSelect={handleToggleSelect}
                 onToggleAll={handleToggleAll}
                 currentAccountId={currentAccount?.id || null}
+                currentAccountEmail={currentAccount?.email || null}
                 switchingAccountId={switchingAccountId}
                 onSwitch={handleSwitch}
                 onRefresh={handleRefresh}
@@ -1133,6 +1141,7 @@ function Accounts() {
               refreshingIds={refreshingIds}
               onToggleSelect={handleToggleSelect}
               currentAccountId={currentAccount?.id || null}
+              currentAccountEmail={currentAccount?.email || null}
               switchingAccountId={switchingAccountId}
               onSwitch={handleSwitch}
               onRefresh={handleRefresh}

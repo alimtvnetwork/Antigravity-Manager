@@ -56,11 +56,11 @@ $PinnedVersion = "__PINNED_VERSION__"
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
 $UpstreamRepo = "lbjlaq/Antigravity-Manager"
-$AppName = "Agm Tool By Alim"
+$AppName = "AGM by Alim"
 $FullName = "Antigravity Manager Tools By Alim"
 $BinaryName = "agm-alim.exe"
-$ShortcutName = "Agm - Alim"
-$Tooltip = "Antigravity Manager Tool By Alim"
+$ShortcutName = "AGM by Alim"
+$Tooltip = "AGM by Alim"
 $LeftPadding = "    "
 
 function Write-Step {
@@ -1057,7 +1057,7 @@ if (-not $NoShortcut) {
                 $WshShell = New-Object -ComObject WScript.Shell
 
                 # Clean any remaining legacy shortcut on Desktop or Start Menu
-                $oldLnks = @("AGM by Alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
+                $oldLnks = @("Agm - Alim.lnk", "agm-alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
                 foreach ($old in $oldLnks) {
                     $f1 = Join-Path $DesktopDir $old
                     if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
@@ -1099,8 +1099,8 @@ if (-not $NoShortcut) {
                 Write-Warn "Could not create shortcuts: $_"
             }
 
-            # Step 6: Taskbar Pinning (Windows 10, Windows 11, Windows Server)
-            Pin-TaskbarShortcut -TargetExe $ExePath -TargetWorkDir $InstallDir -ShortcutSource $StartMenuShortcut
+            # Step 6: Taskbar Pinning disabled per user specification.
+            # Preserves user's existing pinned taskbar items without duplicate or broken pinned shortcuts.
         }
     }
 }

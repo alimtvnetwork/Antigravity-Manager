@@ -83,6 +83,35 @@ fn credential_state(value: &str) -> &'static str {
     }
 }
 
+pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
+    let _ = window.show();
+    let _ = window.unminimize();
+    if let Ok(pos) = window.outer_position() {
+        let is_offscreen_x = pos.x < -1000;
+        let is_offscreen_y = pos.y < -1000;
+        if is_offscreen_x || is_offscreen_y {
+            let _ = window.center();
+        }
+    }
+    if let Ok(size) = window.outer_size() {
+        let is_too_narrow = size.width < 500;
+        let is_too_short = size.height < 400;
+        if is_too_narrow || is_too_short {
+            let _ = window.set_size(tauri::LogicalSize::new(1200, 800));
+            let _ = window.center();
+        }
+    }
+    let _ = window.set_focus();
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::Manager;
+        window
+            .app_handle()
+            .set_activation_policy(tauri::ActivationPolicy::Regular)
+            .unwrap_or(());
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn nvidia_proprietary_loaded() -> bool {
     std::path::Path::new("/dev/nvidia0").exists()
@@ -442,12 +471,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = app.get_webview_window("main").map(|window| {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-                #[cfg(target_os = "macos")]
-                app.set_activation_policy(tauri::ActivationPolicy::Regular)
-                    .unwrap_or(());
+                restore_and_focus_window(&window);
             });
         }))
         .manage(commands::proxy::ProxyServiceState::new())
@@ -491,8 +515,15 @@ pub fn run() {
                 info!("Tray disabled for this session");
             }
 
-            // Explicitly set window icon for main window on Windows/Linux
+            // Explicitly set window icon for main window on Windows/Linux and heal restored offscreen coordinates
             if let Some(window) = app.get_webview_window("main") {
+                if let Ok(pos) = window.outer_position() {
+                    let is_offscreen_x = pos.x < -1000;
+                    let is_offscreen_y = pos.y < -1000;
+                    if is_offscreen_x || is_offscreen_y {
+                        let _ = window.center();
+                    }
+                }
                 let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
                 if let Ok(img) = image::load_from_memory(icon_bytes) {
                     let rgba = img.to_rgba8();
