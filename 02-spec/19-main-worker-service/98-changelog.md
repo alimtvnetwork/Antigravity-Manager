@@ -1,3 +1,9 @@
+## v4.47.1 — 2026-09-21 (Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27))
+
+**Scope:** Version bump. Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27).
+
+---
+
 ## v4.47.0 — 2026-09-21 (Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization)
 
 **Scope:** Version bump. Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization.

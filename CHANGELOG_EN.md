@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.47.1 (2026-09-21)**:
+        -   **[Release v4.47.1] Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27)**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27).
     *   **v4.47.0 (2026-09-21)**:
         -   **[Release v4.47.0] Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization**:
             -   **Update System**: Automated release and version synchronization across all manifests.
