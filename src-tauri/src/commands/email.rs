@@ -271,3 +271,61 @@ pub async fn dispatch_email_test_ping(project_name: Option<String>) -> AppResult
         proj, res.used_account_email
     ))
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CliExecResult {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub success: bool,
+    pub machine_name: String,
+    pub machine_ip: String,
+}
+
+#[tauri::command]
+pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResult> {
+    let cmd_str = command.trim();
+    if cmd_str.is_empty() {
+        return Err(AppError::Validation("Command cannot be empty".to_string()));
+    }
+
+    #[cfg(target_os = "windows")]
+    let output = {
+        let mut cmd = std::process::Command::new("powershell.exe");
+        crate::utils::command::CommandExtWrapper::creation_flags_windows(&mut cmd).args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            cmd_str,
+        ]);
+        cmd.output().map_err(|e| {
+            AppError::Execution(format!("Failed to execute PowerShell on Windows: {}", e))
+        })?
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let output = std::process::Command::new("sh")
+        .args(["-c", cmd_str])
+        .output()
+        .map_err(|e| AppError::Execution(format!("Failed to execute command on Unix: {}", e)))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit_code = output.status.code().unwrap_or(-1);
+    let success = output.status.success();
+    let machine_name = email_watcher::detect_machine_name();
+    let machine_ip = email_watcher::detect_local_ip();
+
+    Ok(CliExecResult {
+        exit_code,
+        stdout,
+        stderr,
+        success,
+        machine_name,
+        machine_ip,
+    })
+}

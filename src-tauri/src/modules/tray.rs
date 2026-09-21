@@ -202,17 +202,21 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                 _ => {}
             }
         })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click {
                 button: MouseButton::Left,
                 ..
-            } = event
-            {
+            }
+            | TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } => {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
                     crate::restore_and_focus_window(&window);
                 }
             }
+            _ => {}
         })
         .build(app)?;
 

@@ -117,7 +117,7 @@ impl Default for EmailNotificationSettings {
             is_enabled: false,
             polling_interval_minutes: 3,
             inbox_check_interval_minutes: 1,
-            baseline_polling_interval_minutes: 4,
+            baseline_polling_interval_minutes: 5,
             active_awaiting_interval_seconds: 10,
             notify_on_quota_drop: true,
             quota_drop_threshold_percent: 15,

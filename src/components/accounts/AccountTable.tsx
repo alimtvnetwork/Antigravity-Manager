@@ -627,8 +627,8 @@ function AccountRowContent({
                 </div>
             </td>
 
-            {/* 模型配额列 */}
-            <td className="hidden xl:table-cell px-2 py-0.5 align-middle">
+            {/* 模型配额列 (永久可见，禁止隐藏) */}
+            <td className="px-2 py-0.5 align-middle">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-2 py-1 px-3 rounded-lg border group/error",
@@ -734,7 +734,8 @@ function AccountRowContent({
 
             {/* 操作列 */}
             <td className={cn(
-                "px-1 py-0.5 sticky right-0 z-10 w-[100px] 2xl:w-[260px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
+                "px-1 py-0.5 sticky right-0 w-[100px] 2xl:w-[260px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
+                (showActionMenu || showInstanceMenu) ? "z-40" : "z-10",
                 // 动态高对比高亮处理
                 isCurrent
                     ? "bg-[#fffbeb] dark:bg-[#131b2e]"
@@ -1157,7 +1158,7 @@ function AccountTable({
                                 />
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
-                            <th className="hidden xl:table-cell px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[320px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[200px] whitespace-nowrap">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"

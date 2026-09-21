@@ -8,6 +8,7 @@ import {
     FileText,
     Bot,
     HelpCircle,
+    Terminal,
 } from 'lucide-react';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
@@ -62,8 +63,53 @@ const SAMPLE_AI_PROMPT = `Generate a JSON array of email mailboxes for AGM (Anti
 
 Output only valid JSON array.`;
 
+const SAMPLE_INBOUND_COMMANDS = [
+    {
+        title: 'PowerShell Service Inspection',
+        description: 'Inspect running system, WSL, and Docker services on target node.',
+        subject: 'Run Diagnostics [Node: <node_name>]',
+        body: `exec: <node_name>\npowershell: Get-Service -Name '*wsl*', '*docker*', '*hyper*' -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType`,
+        command: `powershell: Get-Service -Name '*wsl*', '*docker*', '*hyper*' -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType`,
+    },
+    {
+        title: 'PowerShell Top Memory Processes',
+        description: 'Identify the top memory-consuming processes on target node.',
+        subject: 'Process Check [Node: <node_name>]',
+        body: `exec: <node_name>\npowershell: Get-Process | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 10 -Property Name, Id, @{Name="MB";Expression={[math]::round($_.WorkingSet64/1MB,2)}}`,
+        command: `powershell: Get-Process | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 10 -Property Name, Id, @{Name="MB";Expression={[math]::round($_.WorkingSet64/1MB,2)}}`,
+    },
+    {
+        title: 'GitMap Repository Health Scan',
+        description: 'Trigger autonomous repository health and branch scanning via GitMap CLI.',
+        subject: 'GitMap Health [Node: <node_name>]',
+        body: `exec: <node_name>\ngitmap scan`,
+        command: `gitmap scan`,
+    },
+    {
+        title: 'GitMap Pipeline Status Check',
+        description: 'Verify current pipeline runs and pending tasks via GitMap CLI.',
+        subject: 'Pipeline Check [Node: <node_name>]',
+        body: `exec: <node_name>\ngitmap status`,
+        command: `gitmap status`,
+    },
+    {
+        title: 'Antigravity AI Prompt Injection',
+        description: 'Queue an AI instructions prompt directly into the active Antigravity workspace.',
+        subject: 'AI Task: Fix CI/CD [Node: <node_name>]',
+        body: `Project: Antigravity-Manager\nPlease analyze recent build failures in .github/workflows/ci.yml and optimize test run times.`,
+        command: `Project: Antigravity-Manager\nPlease analyze recent build failures in .github/workflows/ci.yml and optimize test run times.`,
+    },
+    {
+        title: 'Instance Rotation Trigger',
+        description: 'Force Antigravity Manager to launch a fresh clean browser instance.',
+        subject: 'Rotate Instance [Node: <node_name>]',
+        body: `instance: new`,
+        command: `instance: new`,
+    },
+];
+
 export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
-    const [activeTab, setActiveTab] = useState<'json' | 'csv' | 'prompt'>('json');
+    const [activeTab, setActiveTab] = useState<'json' | 'csv' | 'prompt' | 'commands'>('json');
     const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
     const handleCopy = (text: string, tabName: string) => {
@@ -141,6 +187,17 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                     >
                         <Bot className="w-3.5 h-3.5" />
                         <span>AI Prompt Template</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('commands')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                            activeTab === 'commands'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
+                        }`}
+                    >
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>Inbound Commands</span>
                     </button>
                 </div>
 
@@ -223,6 +280,66 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                             <pre className="p-3 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed whitespace-pre-wrap">
                                 {SAMPLE_AI_PROMPT}
                             </pre>
+                        </div>
+                    )}
+
+                    {activeTab === 'commands' && (
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                            <div className="p-2.5 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-[11px] text-emerald-800 dark:text-emerald-300">
+                                <div className="font-semibold mb-0.5">Email Routing &amp; Syntax Guide</div>
+                                <div>• Include <code className="font-mono font-bold text-emerald-700 dark:text-emerald-300">[Node: &lt;machine_name&gt;]</code> or <code className="font-mono font-bold text-emerald-700 dark:text-emerald-300">[IP: &lt;ip&gt;]</code> in the email subject.</div>
+                                <div>• Body must specify target with <code className="font-mono font-bold">exec: &lt;node&gt;</code> or <code className="font-mono font-bold">Project: &lt;project&gt;</code>.</div>
+                                <div>• Command outputs and exit codes are emailed back automatically.</div>
+                            </div>
+
+                            <div className="space-y-2.5">
+                                {SAMPLE_INBOUND_COMMANDS.map((cmd, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="p-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-900 dark:text-slate-100 text-xs">
+                                                    {cmd.title}
+                                                </h4>
+                                                <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                                                    {cmd.description}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy(cmd.command, `cmd-${idx}`)}
+                                                    className="px-2 py-1 text-[10px] font-medium border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                                    title="Copy Raw Command"
+                                                >
+                                                    {copiedTab === `cmd-${idx}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                                    <span>Command</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy(`Subject: ${cmd.subject}\n\n${cmd.body}`, `email-${idx}`)}
+                                                    className="px-2 py-1 text-[10px] font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                                    title="Copy Full Email Message"
+                                                >
+                                                    {copiedTab === `email-${idx}` ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
+                                                    <span>Email Body</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gray-900 rounded-lg p-2 font-mono text-[10px] text-gray-200 space-y-1 overflow-x-auto">
+                                            <div className="text-gray-400">
+                                                <span className="text-gray-500 select-none">Subject: </span>{cmd.subject}
+                                            </div>
+                                            <div className="text-emerald-400 whitespace-pre-wrap">
+                                                {cmd.body}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

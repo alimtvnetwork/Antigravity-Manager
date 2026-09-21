@@ -67,9 +67,14 @@ export function NavSettings({
     const handleToggleMaximize = async () => {
         try {
             const win = getCurrentWindow();
-            await win.toggleMaximize();
-            const max = await win.isMaximized();
-            setIsMaximized(max);
+            const isMax = await win.isMaximized();
+            if (isMax) {
+                await win.unminimize();
+                setIsMaximized(false);
+            } else {
+                await win.maximize();
+                setIsMaximized(true);
+            }
         } catch (e) {
             console.error('Failed to toggle maximize window:', e);
         }

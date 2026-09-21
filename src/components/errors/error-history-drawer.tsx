@@ -58,7 +58,6 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
   const [copyFormat, setCopyFormat] = useState<'markdown' | 'json'>('markdown');
   const [showFormatMenu, setShowFormatMenu] = useState(false);
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
@@ -135,7 +134,6 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
     }
     const markdown = redactSensitiveText(generateAllErrorsMarkdownReport(recentErrors));
     try {
-      setDownloading(true);
       const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -146,11 +144,9 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setTimeout(() => setDownloading(false), 1200);
       showToast('Downloaded error history report (.md)!', 'success');
     } catch (err) {
       console.error('Failed to download markdown report:', err);
-      setDownloading(false);
       showToast('Failed to download report', 'error');
     }
   };
@@ -182,119 +178,133 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
           </div>
 
           <div className="flex items-center gap-1">
-            {recentErrors.length > 0 && (
-              <>
-                {/* Copy All with format selection */}
-                <div className="relative flex items-center shrink-0">
+            {/* Copy All with format selection - permanently visible */}
+            <div className="relative flex items-center shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyAll}
+                disabled={recentErrors.length === 0}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-l-lg transition-colors flex items-center gap-1.5 text-xs border border-r-0 border-slate-200 dark:border-slate-700",
+                  recentErrors.length === 0
+                    ? "opacity-40 cursor-not-allowed text-slate-400 bg-slate-50 dark:bg-slate-800"
+                    : "text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                )}
+                title={recentErrors.length === 0 ? "No errors to copy" : `Copy all error logs (${copyFormat === 'markdown' ? 'Markdown' : 'JSON'})`}
+              >
+                {copiedAll ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                )}
+                <span className="text-[11px] font-semibold">
+                  {copiedAll ? 'Copied' : `Copy All (${copyFormat === 'markdown' ? 'MD' : 'JSON'})`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFormatMenu(!showFormatMenu)}
+                disabled={recentErrors.length === 0}
+                className={cn(
+                  "p-1.5 rounded-r-lg transition-colors border border-slate-200 dark:border-slate-700",
+                  recentErrors.length === 0
+                    ? "opacity-40 cursor-not-allowed text-slate-400"
+                    : "text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                )}
+                title="Change copy format (Markdown or JSON)"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {showFormatMenu && (
+                <div className="absolute top-full right-0 mt-1 w-36 rounded-xl shadow-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-1 z-50 animate-in fade-in zoom-in-95">
                   <button
                     type="button"
-                    onClick={handleCopyAll}
-                    className="px-2 py-1.5 rounded-l-lg text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs cursor-pointer border border-r-0 border-slate-200 dark:border-slate-700"
-                    title={`Copy all error logs (${copyFormat === 'markdown' ? 'Markdown' : 'JSON'})`}
-                  >
-                    {copiedAll ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
+                    onClick={() => { setCopyFormat('markdown'); setShowFormatMenu(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
+                      copyFormat === 'markdown' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
                     )}
-                    <span className="text-[11px] font-medium hidden sm:inline">
-                      {copiedAll ? 'Copied' : `Copy All (${copyFormat === 'markdown' ? 'MD' : 'JSON'})`}
-                    </span>
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Markdown (.md)</span>
+                    </div>
+                    {copyFormat === 'markdown' ? <Check className="w-3 h-3" /> : null}
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => setShowFormatMenu(!showFormatMenu)}
-                    className="p-1.5 rounded-r-lg text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
-                    title="Change copy format (Markdown or JSON)"
+                    onClick={() => { setCopyFormat('json'); setShowFormatMenu(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
+                      copyFormat === 'json' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
+                    )}
                   >
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-
-                  {showFormatMenu && (
-                    <div className="absolute top-full right-0 mt-1 w-36 rounded-xl shadow-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-1 z-50 animate-in fade-in zoom-in-95">
-                      <button
-                        type="button"
-                        onClick={() => { setCopyFormat('markdown'); setShowFormatMenu(false); }}
-                        className={cn(
-                          "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
-                          copyFormat === 'markdown' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Markdown (.md)</span>
-                        </div>
-                        {copyFormat === 'markdown' ? <Check className="w-3 h-3" /> : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setCopyFormat('json'); setShowFormatMenu(false); }}
-                        className={cn(
-                          "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
-                          copyFormat === 'json' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <FileCode className="w-3.5 h-3.5" />
-                          <span>JSON (.json)</span>
-                        </div>
-                        {copyFormat === 'json' ? <Check className="w-3 h-3" /> : null}
-                      </button>
+                    <div className="flex items-center gap-1.5">
+                      <FileCode className="w-3.5 h-3.5" />
+                      <span>JSON (.json)</span>
                     </div>
-                  )}
+                    {copyFormat === 'json' ? <Check className="w-3 h-3" /> : null}
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                  <button
+                    type="button"
+                    onClick={() => { setShowFormatMenu(false); handleDownloadMd(); }}
+                    className="w-full px-3 py-1.5 text-xs text-left flex items-center gap-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download (.md)</span>
+                  </button>
                 </div>
+              )}
+            </div>
 
+            {/* Clear Button */}
+            {isConfirmingClear ? (
+              <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/40 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50 animate-in fade-in duration-150 shrink-0">
                 <button
                   type="button"
-                  onClick={handleDownloadMd}
-                  disabled={downloading}
-                  className="px-2 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 disabled:opacity-50"
-                  title="Download all error logs as a single .md file"
+                  onClick={() => {
+                    clearRecentErrors();
+                    setIsConfirmingClear(false);
+                    showToast('Cleared all error history', 'info');
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer shadow-xs"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-medium hidden sm:inline">Export .md</span>
+                  Confirm Clear
                 </button>
-
-                {/* Enhanced Clear button with explicit confirmation */}
-                {isConfirmingClear ? (
-                  <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/40 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50 animate-in fade-in duration-150 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearRecentErrors();
-                        setIsConfirmingClear(false);
-                        showToast('Cleared all error history', 'info');
-                      }}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer shadow-xs"
-                    >
-                      Confirm Clear
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsConfirmingClear(false)}
-                      className="px-1 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmingClear(true)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Clear error history"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingClear(false)}
+                  className="px-1 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsConfirmingClear(true)}
+                disabled={recentErrors.length === 0}
+                className={cn(
+                  "p-1.5 rounded-lg transition-colors border border-transparent shrink-0",
+                  recentErrors.length === 0
+                    ? "opacity-30 cursor-not-allowed text-slate-400"
+                    : "text-slate-500 hover:text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200 dark:hover:border-red-900/40 cursor-pointer"
                 )}
-              </>
+                title={recentErrors.length === 0 ? "No errors to clear" : "Clear all error history"}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
+
+            {/* Close drawer button */}
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Close history drawer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+              title="Close drawer"
             >
               <X className="w-4 h-4" />
             </button>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Mail, ArrowLeft, Cpu, Radio } from 'lucide-react';
+import { Mail, ArrowLeft, Cpu, Radio, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
-import { getEmailWatcherStatus, WatcherStatus } from '../services/emailService';
+import { getEmailWatcherStatus, WatcherStatus, getEmailSettings, saveEmailSettings } from '../services/emailService';
+import { showToast } from '../components/common/ToastContainer';
 
 /**
  * Email Management & Alerts Page
@@ -14,12 +15,43 @@ import { getEmailWatcherStatus, WatcherStatus } from '../services/emailService';
 export default function Email() {
     const { t } = useTranslation();
     const [watcherStatus, setWatcherStatus] = useState<WatcherStatus | null>(null);
+    const [isEditingNode, setIsEditingNode] = useState(false);
+    const [nodeNameInput, setNodeNameInput] = useState('');
 
     useEffect(() => {
         getEmailWatcherStatus()
             .then(setWatcherStatus)
             .catch(console.error);
     }, []);
+
+    const handleStartEditNode = () => {
+        setNodeNameInput(watcherStatus?.machine_name || '');
+        setIsEditingNode(true);
+    };
+
+    const handleSaveNodeName = async () => {
+        const trimmed = nodeNameInput.trim();
+        if (!trimmed) {
+            setIsEditingNode(false);
+            return;
+        }
+        try {
+            const currentSettings = await getEmailSettings();
+            await saveEmailSettings({
+                ...currentSettings,
+                local_machine_name: trimmed,
+            });
+            const updatedStatus = await getEmailWatcherStatus();
+            setWatcherStatus({
+                ...updatedStatus,
+                machine_name: trimmed,
+            });
+            setIsEditingNode(false);
+            showToast(`Node name updated to "${trimmed}"`, 'success');
+        } catch (e: any) {
+            showToast('Failed to save node name: ' + (e?.message || e), 'error');
+        }
+    };
 
     return (
         <div className="h-full w-full overflow-y-auto">
@@ -37,12 +69,51 @@ export default function Email() {
 
                             {/* Telemetry badges */}
                             <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                                <div className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-medium text-[11px] flex items-center gap-1">
-                                    <Cpu className="w-3 h-3 text-emerald-500" />
-                                    <span>Node: <strong>{watcherStatus?.machine_name || 'Detecting...'}</strong></span>
-                                </div>
+                                {isEditingNode ? (
+                                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 border border-emerald-500/80 px-1.5 py-0.5 rounded-md text-[11px] shadow-xs">
+                                        <Cpu className="w-3 h-3 text-emerald-500 shrink-0" />
+                                        <span className="text-slate-500 font-medium">Node:</span>
+                                        <input
+                                            type="text"
+                                            value={nodeNameInput}
+                                            onChange={(e) => setNodeNameInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleSaveNodeName();
+                                                if (e.key === 'Escape') setIsEditingNode(false);
+                                            }}
+                                            autoFocus
+                                            placeholder="Node name"
+                                            className="w-28 px-1 py-0 text-xs bg-white dark:bg-slate-900 border border-emerald-400 rounded text-slate-900 dark:text-slate-100 font-bold focus:outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveNodeName}
+                                            className="p-0.5 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 rounded transition-colors cursor-pointer"
+                                            title="Save node name"
+                                        >
+                                            <Check className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingNode(false)}
+                                            className="p-0.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded transition-colors cursor-pointer"
+                                            title="Cancel"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div
+                                        onDoubleClick={handleStartEditNode}
+                                        className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-medium text-[11px] flex items-center gap-1 cursor-pointer select-none hover:border-emerald-500/60 dark:hover:border-emerald-500/60 transition-colors group/node shadow-2xs"
+                                        title="Double-click to edit machine node name"
+                                    >
+                                        <Cpu className="w-3 h-3 text-emerald-500 shrink-0" />
+                                        <span>Node: <strong className="group-hover/node:underline">{watcherStatus?.machine_name || 'Detecting...'}</strong></span>
+                                    </div>
+                                )}
                                 <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-md font-mono text-[11px] flex items-center gap-1">
-                                    <Radio className="w-3 h-3 text-sky-500" />
+                                    <Radio className="w-3 h-3 text-sky-500 shrink-0" />
                                     <span>IP: <strong>{watcherStatus?.machine_ip || '127.0.0.1'}</strong></span>
                                 </div>
                             </div>

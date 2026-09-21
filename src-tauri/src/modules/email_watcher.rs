@@ -70,8 +70,13 @@ pub fn detect_local_ip() -> String {
     "127.0.0.1".to_string()
 }
 
-/// Detect local machine hostname
+/// Detect local machine hostname or saved custom node name
 pub fn detect_machine_name() -> String {
+    if let Ok(settings) = email_vault_db::get_email_settings() {
+        if !settings.local_machine_name.trim().is_empty() {
+            return settings.local_machine_name.trim().to_string();
+        }
+    }
     if let Ok(name) = std::env::var("COMPUTERNAME") {
         if !name.trim().is_empty() {
             return name.trim().to_string();
@@ -99,9 +104,9 @@ pub async fn get_watcher_status() -> WatcherStatus {
 fn determine_inbox_interval(settings: &email_vault_db::EmailNotificationSettings) -> i64 {
     let is_awaiting = is_awaiting_reply();
     if is_awaiting {
-        return settings.active_awaiting_interval_seconds.clamp(5, 10) as i64;
+        return settings.active_awaiting_interval_seconds.clamp(5, 30) as i64;
     }
-    let minutes = settings.baseline_polling_interval_minutes.clamp(2, 4);
+    let minutes = settings.baseline_polling_interval_minutes.clamp(1, 15);
     (minutes * 60) as i64
 }
 

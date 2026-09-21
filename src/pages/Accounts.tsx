@@ -769,7 +769,7 @@ function Accounts() {
       {/* Top action bar: search, filters, and action buttons */}
       <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 min-w-0 w-full">
         {/* Left controls: search, window, view mode, quota filter */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
           {/* Search box - responsive */}
           <div className="hidden lg:block flex-none w-40 relative transition-all focus-within:w-48">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -790,7 +790,7 @@ function Accounts() {
                   setIsSearchExpanded(true);
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }}
-                className="p-2 bg-gray-100 dark:bg-base-200 hover:bg-gray-200 dark:hover:bg-base-100 rounded-lg transition-colors"
+                className="p-2 bg-gray-100/40 dark:bg-white/[0.04] hover:bg-gray-200/60 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
                 title={t('accounts.search_placeholder')}
               >
                 <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
@@ -813,11 +813,11 @@ function Accounts() {
             )}
           </div>
 
-          {/* Quota window toggle (5H / Weekly) */}
-          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
+          {/* Quota window toggle (5H / Weekly) - Flat continuous grouping */}
+          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all",
+                "h-7 px-2.5 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all",
                 quotaWindow === "5h"
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
@@ -830,7 +830,7 @@ function Accounts() {
             </button>
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all",
+                "h-7 px-2.5 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all",
                 quotaWindow === "weekly"
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
@@ -843,8 +843,8 @@ function Accounts() {
             </button>
           </div>
 
-          {/* View mode switcher */}
-          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
+          {/* View mode switcher - Flat continuous grouping */}
+          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
             <button
               className={cn(
                 "h-7 w-7 inline-flex items-center justify-center rounded-md transition-all",
@@ -871,12 +871,12 @@ function Accounts() {
             </button>
           </div>
 
-          {/* Quota tier filter pills */}
-          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
+          {/* Quota tier filter pills - Flat continuous grouping */}
+          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
             {/* All */}
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
+                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'all'
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
@@ -886,7 +886,7 @@ function Accounts() {
             >
               <span>{t('accounts.all')}</span>
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'all'
                   ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
@@ -898,7 +898,7 @@ function Accounts() {
             {/* PRO */}
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
+                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'pro'
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
@@ -908,7 +908,7 @@ function Accounts() {
             >
               <span>{t('accounts.pro')}</span>
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'pro'
                   ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
@@ -920,7 +920,7 @@ function Accounts() {
             {/* ULTRA */}
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
+                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'ultra'
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
@@ -930,7 +930,7 @@ function Accounts() {
             >
               <span>{t('accounts.ultra')}</span>
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'ultra'
                   ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
@@ -942,7 +942,7 @@ function Accounts() {
             {/* FREE */}
             <button
               className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
+                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'free'
                   ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
@@ -952,7 +952,7 @@ function Accounts() {
             >
               <span>{t('accounts.free')}</span>
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
+                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'free'
                   ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"

@@ -321,17 +321,18 @@ pub fn execute_inbound_action(
         }
         InboundAction::CliExecution { target_ip, command } => {
             action_str = "cli_exec".to_string();
-            // Check IP match
+            // Check IP or Node Name match
             let ip_matches = target_ip.is_empty()
                 || target_ip == "any"
                 || target_ip == "localhost"
-                || target_ip == local_machine_ip;
+                || target_ip == local_machine_ip
+                || target_ip.eq_ignore_ascii_case(local_machine_name);
 
             if !ip_matches {
                 status = "rejected".to_string();
                 result_summary = format!(
-                    "Command IP mismatch: target '{}' != local '{}'",
-                    target_ip, local_machine_ip
+                    "Command target mismatch: target '{}' != local IP '{}' / node '{}'",
+                    target_ip, local_machine_ip, local_machine_name
                 );
                 let reply_content = format!(
                     r#"<p><span class="badge badge-warn">IP MISMATCH</span></p>

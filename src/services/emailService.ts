@@ -321,3 +321,24 @@ export async function dispatchEmailTestPing(projectName?: string): Promise<strin
         throw e;
     }
 }
+
+export interface CliExecResult {
+    exit_code: number;
+    stdout: string;
+    stderr: string;
+    success: boolean;
+    machine_name: string;
+    machine_ip: string;
+}
+
+export async function testExecuteCliCommand(command: string): Promise<CliExecResult> {
+    try {
+        return await invoke('test_execute_cli_command', { command });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.testExecuteCliCommand',
+            endpoint: 'test_execute_cli_command',
+        });
+        throw e;
+    }
+}

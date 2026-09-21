@@ -86,6 +86,11 @@ fn credential_state(value: &str) -> &'static str {
 pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
     let _ = window.show();
     let _ = window.unminimize();
+    if let Ok(is_min) = window.is_minimized() {
+        if is_min {
+            let _ = window.unminimize();
+        }
+    }
     if let Ok(pos) = window.outer_position() {
         let is_offscreen_x = pos.x < -1000;
         let is_offscreen_y = pos.y < -1000;
@@ -102,6 +107,12 @@ pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
         }
     }
     let _ = window.set_focus();
+    #[cfg(target_os = "windows")]
+    {
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(false);
+        let _ = window.set_focus();
+    }
     #[cfg(target_os = "macos")]
     {
         use tauri::Manager;
@@ -854,6 +865,7 @@ pub fn run() {
             commands::get_email_watcher_status,
             commands::trigger_manual_email_check,
             commands::dispatch_email_test_ping,
+            commands::test_execute_cli_command,
         ])
 
 
