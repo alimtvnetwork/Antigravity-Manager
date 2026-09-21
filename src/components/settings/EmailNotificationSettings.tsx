@@ -19,6 +19,7 @@ import {
     CheckCircle2,
     AlertCircle,
     Loader2,
+    Zap,
 } from 'lucide-react';
 import AiSampleTemplatesModal from './ai-sample-templates-modal';
 import {
@@ -44,6 +45,7 @@ import {
     backupEmailDb,
     restoreEmailDb,
     triggerManualEmailCheck,
+    dispatchEmailTestPing,
 } from '../../services/emailService';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
@@ -56,6 +58,8 @@ export default function EmailNotificationSettings() {
         is_enabled: false,
         polling_interval_minutes: 3,
         inbox_check_interval_minutes: 1,
+        baseline_polling_interval_minutes: 4,
+        active_awaiting_interval_seconds: 10,
         notify_on_quota_drop: true,
         quota_drop_threshold_percent: 15,
         notify_on_workspace_switch: true,
@@ -68,6 +72,7 @@ export default function EmailNotificationSettings() {
         updated_at: 0,
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [isPinging, setIsPinging] = useState(false);
 
     // Account modal state
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -462,6 +467,18 @@ export default function EmailNotificationSettings() {
         }
     };
 
+    const handleDispatchPingTest = async () => {
+        setIsPinging(true);
+        try {
+            const res = await dispatchEmailTestPing();
+            showToast(res, 'success');
+        } catch (e: any) {
+            showToast('Ping test failed: ' + (e?.message || e), 'error');
+        } finally {
+            setIsPinging(false);
+        }
+    };
+
     const trimmedEmail = editingAccount.email.trim();
     let emailFormatStatus: 'empty' | 'invalid' | 'valid' = 'empty';
     if (trimmedEmail.length > 0) {
@@ -783,6 +800,60 @@ export default function EmailNotificationSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 space-y-3">
                         <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 block">
+                            Baseline Polling Interval (Idle Cadence)
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="range"
+                                min={2}
+                                max={4}
+                                value={settings.baseline_polling_interval_minutes || 4}
+                                onChange={(e) =>
+                                    setSettings({
+                                        ...settings,
+                                        baseline_polling_interval_minutes: parseInt(e.target.value) || 4,
+                                    })
+                                }
+                                className="flex-1 accent-blue-600"
+                            />
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 w-16 text-right">
+                                {settings.baseline_polling_interval_minutes || 4} min
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 dark:text-slate-400">
+                            Standard background frequency for monitoring incoming email instructions.
+                        </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 space-y-3">
+                        <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 block">
+                            Active Awaiting Interval (Fast Adaptive)
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="range"
+                                min={5}
+                                max={10}
+                                value={settings.active_awaiting_interval_seconds || 10}
+                                onChange={(e) =>
+                                    setSettings({
+                                        ...settings,
+                                        active_awaiting_interval_seconds: parseInt(e.target.value) || 10,
+                                    })
+                                }
+                                className="flex-1 accent-blue-600"
+                            />
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 w-16 text-right">
+                                {settings.active_awaiting_interval_seconds || 10} sec
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 dark:text-slate-400">
+                            High-speed 5–10s polling interval when awaiting reply after outbound dispatch.
+                        </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 space-y-3">
+                        <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 block">
                             Telemetry & Sensor Loop Interval
                         </label>
                         <div className="flex items-center gap-3">
@@ -943,19 +1014,36 @@ export default function EmailNotificationSettings() {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800">
-                    <button
-                        onClick={handleTriggerManualCheck}
-                        className="px-4 py-2 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                        <Send className="w-3.5 h-3.5 text-blue-500" />
-                        Dispatch Test Cheat Sheet
-                    </button>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleTriggerManualCheck}
+                            className="px-4 py-2 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <Send className="w-3.5 h-3.5 text-blue-500" />
+                            Dispatch Test Cheat Sheet
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDispatchPingTest}
+                            disabled={isPinging}
+                            className="px-4 py-2 text-xs font-medium border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100/50 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        >
+                            {isPinging ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                            )}
+                            Dispatch Ping Command Test
+                        </button>
+                    </div>
 
                     <button
+                        type="button"
                         onClick={handleSaveSettings}
                         disabled={isSaving}
-                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm cursor-pointer"
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm cursor-pointer disabled:opacity-60"
                     >
                         {isSaving ? 'Saving Settings...' : 'Save Watcher Settings'}
                     </button>

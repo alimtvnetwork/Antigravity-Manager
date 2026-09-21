@@ -5,9 +5,12 @@ import {
   Trash2,
   Search,
   ChevronRight,
+  ChevronDown,
   Copy,
   Check,
   Download,
+  FileCode,
+  FileText,
 } from 'lucide-react';
 import { useErrorStore, type CapturedError } from '../../stores/error-store';
 import {
@@ -15,10 +18,39 @@ import {
   generateCompactReport,
 } from '../../lib/error-report-generator';
 import { showToast } from '../common/ToastContainer';
+import { cn } from '../../utils/cn';
 
 interface ErrorHistoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+function redactSensitiveText(text: string): string {
+  return text
+    .replace(/(Bearer\s+)[A-Za-z0-9\-._~+/]+=*/gi, '$1[REDACTED_TOKEN]')
+    .replace(/(1\/\/[A-Za-z0-9\-._~+/]+=*)/g, '[REDACTED_REFRESH_TOKEN]')
+    .replace(/("(?:token|refresh_token|access_token|password|secret|apiKey|api_key|authorization)"\s*:\s*)"[^"]+"/gi, '$1"[REDACTED]"');
+}
+
+function redactErrorObject(error: CapturedError): Record<string, unknown> {
+  const sanitized = JSON.parse(JSON.stringify(error));
+  const sensitiveKeys = new Set(['token', 'refresh_token', 'access_token', 'password', 'secret', 'authorization', 'api_key', 'apikey']);
+
+  const sanitizeRecursive = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      if (sensitiveKeys.has(key.toLowerCase())) {
+        obj[key] = '[REDACTED]';
+      } else if (typeof obj[key] === 'string') {
+        obj[key] = redactSensitiveText(obj[key]);
+      } else if (typeof obj[key] === 'object') {
+        sanitizeRecursive(obj[key]);
+      }
+    }
+  };
+
+  sanitizeRecursive(sanitized);
+  return sanitized;
 }
 
 export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps): React.ReactNode {
@@ -27,6 +59,9 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [copyFormat, setCopyFormat] = useState<'markdown' | 'json'>('markdown');
+  const [showFormatMenu, setShowFormatMenu] = useState(false);
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
 
   if (!isOpen) {
     return null;
@@ -55,7 +90,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
 
   const handleCopySingle = async (error: CapturedError, e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = generateCompactReport(error);
+    const text = redactSensitiveText(generateCompactReport(error));
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(error.id);
@@ -74,12 +109,19 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
       showToast('No errors to copy', 'info');
       return;
     }
-    const markdown = generateAllErrorsMarkdownReport(recentErrors);
+    const isMarkdown = copyFormat === 'markdown';
+    const text = isMarkdown
+      ? redactSensitiveText(generateAllErrorsMarkdownReport(recentErrors))
+      : JSON.stringify(recentErrors.map(redactErrorObject), null, 2);
+
     try {
-      await navigator.clipboard.writeText(markdown);
+      await navigator.clipboard.writeText(text);
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
-      showToast(`Copied ${recentErrors.length} error logs to clipboard (Markdown)!`, 'success');
+      showToast(
+        `Copied ${recentErrors.length} error logs to clipboard (${isMarkdown ? 'Markdown' : 'JSON'})!`,
+        'success'
+      );
     } catch (err) {
       console.error('Failed to copy error logs:', err);
       showToast('Failed to copy to clipboard', 'error');
@@ -91,7 +133,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
       showToast('No errors to download', 'info');
       return;
     }
-    const markdown = generateAllErrorsMarkdownReport(recentErrors);
+    const markdown = redactSensitiveText(generateAllErrorsMarkdownReport(recentErrors));
     try {
       setDownloading(true);
       const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
@@ -142,21 +184,66 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
           <div className="flex items-center gap-1">
             {recentErrors.length > 0 && (
               <>
-                <button
-                  type="button"
-                  onClick={handleCopyAll}
-                  className="px-2 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                  title="Copy all error logs as Markdown"
-                >
-                  {copiedAll ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
+                {/* Copy All with format selection */}
+                <div className="relative flex items-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCopyAll}
+                    className="px-2 py-1.5 rounded-l-lg text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 text-xs cursor-pointer border border-r-0 border-slate-200 dark:border-slate-700"
+                    title={`Copy all error logs (${copyFormat === 'markdown' ? 'Markdown' : 'JSON'})`}
+                  >
+                    {copiedAll ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    <span className="text-[11px] font-medium hidden sm:inline">
+                      {copiedAll ? 'Copied' : `Copy All (${copyFormat === 'markdown' ? 'MD' : 'JSON'})`}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowFormatMenu(!showFormatMenu)}
+                    className="p-1.5 rounded-r-lg text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
+                    title="Change copy format (Markdown or JSON)"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+
+                  {showFormatMenu && (
+                    <div className="absolute top-full right-0 mt-1 w-36 rounded-xl shadow-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-1 z-50 animate-in fade-in zoom-in-95">
+                      <button
+                        type="button"
+                        onClick={() => { setCopyFormat('markdown'); setShowFormatMenu(false); }}
+                        className={cn(
+                          "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
+                          copyFormat === 'markdown' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Markdown (.md)</span>
+                        </div>
+                        {copyFormat === 'markdown' ? <Check className="w-3 h-3" /> : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setCopyFormat('json'); setShowFormatMenu(false); }}
+                        className={cn(
+                          "w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer",
+                          copyFormat === 'json' ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <FileCode className="w-3.5 h-3.5" />
+                          <span>JSON (.json)</span>
+                        </div>
+                        {copyFormat === 'json' ? <Check className="w-3 h-3" /> : null}
+                      </button>
+                    </div>
                   )}
-                  <span className="text-[11px] font-medium hidden sm:inline">
-                    {copiedAll ? 'Copied' : 'Copy All'}
-                  </span>
-                </button>
+                </div>
 
                 <button
                   type="button"
@@ -169,14 +256,38 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
                   <span className="text-[11px] font-medium hidden sm:inline">Export .md</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={clearRecentErrors}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Clear error history"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Enhanced Clear button with explicit confirmation */}
+                {isConfirmingClear ? (
+                  <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/40 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50 animate-in fade-in duration-150 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearRecentErrors();
+                        setIsConfirmingClear(false);
+                        showToast('Cleared all error history', 'info');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer shadow-xs"
+                    >
+                      Confirm Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingClear(false)}
+                      className="px-1 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingClear(true)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Clear error history"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </>
             )}
             <button
@@ -282,16 +393,21 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
                       <button
                         type="button"
                         onClick={(e) => handleCopySingle(err, e)}
-                        className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 transition-colors flex items-center gap-1 text-[11px] font-medium border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 cursor-pointer shadow-2xs"
+                        className={cn(
+                          "px-2 py-1 rounded-md transition-all duration-200 flex items-center gap-1 text-[11px] font-medium border cursor-pointer shadow-2xs",
+                          copiedId === err.id
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 scale-105"
+                            : "text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60"
+                        )}
                         title="Copy this error's diagnostic report as Markdown"
                       >
                         {copiedId === err.id ? (
-                          <>
+                          <div className="flex items-center gap-1 animate-in fade-in zoom-in-75 duration-200">
                             <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
                               Copied!
                             </span>
-                          </>
+                          </div>
                         ) : (
                           <>
                             <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />

@@ -226,26 +226,48 @@ pub async fn get_email_watcher_status() -> AppResult<WatcherStatus> {
     Ok(email_watcher::get_watcher_status().await)
 }
 
-#[tauri::command]
-pub async fn trigger_manual_email_check() -> AppResult<String> {
-    let m_name = email_watcher::detect_machine_name();
-    let m_ip = email_watcher::detect_local_ip();
-    let (subj, body) = email_sender::render_help_email(&m_name, &m_ip);
-
+fn get_active_recipient_emails() -> Result<Vec<String>, AppError> {
     let recipients = email_vault_db::list_notify_recipients().map_err(AppError::Email)?;
     let active_emails: Vec<String> = recipients
         .into_iter()
         .filter(|r| r.is_active)
         .map(|r| r.email)
         .collect();
-
     if active_emails.is_empty() {
         return Err(AppError::Email(
             "No active notification recipients configured".to_string(),
         ));
     }
+    Ok(active_emails)
+}
+
+#[tauri::command]
+pub async fn trigger_manual_email_check() -> AppResult<String> {
+    let active_emails = get_active_recipient_emails()?;
+    let m_name = email_watcher::detect_machine_name();
+    let m_ip = email_watcher::detect_local_ip();
+    let (subj, body) = email_sender::render_help_email(&m_name, &m_ip);
 
     email_sender::dispatch_email_with_failover(&subj, &body, &active_emails)
         .map(|res| format!("Dispatched alert via account '{}'", res.used_account_email))
         .map_err(AppError::Email)
+}
+
+#[tauri::command]
+pub async fn dispatch_email_test_ping(project_name: Option<String>) -> AppResult<String> {
+    let active_emails = get_active_recipient_emails()?;
+    let proj = project_name.unwrap_or_else(|| "Antigravity-Workspace".to_string());
+    let m_name = email_watcher::detect_machine_name();
+    let m_ip = email_watcher::detect_local_ip();
+    let now = chrono::Utc::now().timestamp();
+    let (subj, body) = email_sender::render_test_ping_email(&proj, &m_name, &m_ip, now);
+
+    let res = email_sender::dispatch_email_with_failover(&subj, &body, &active_emails)
+        .map_err(AppError::Email)?;
+    email_watcher::activate_awaiting_reply(300);
+
+    Ok(format!(
+        "Dispatched test ping for '{}' via '{}'. Fast polling active (5m).",
+        proj, res.used_account_email
+    ))
 }

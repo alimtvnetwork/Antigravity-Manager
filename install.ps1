@@ -92,7 +92,9 @@ function Invoke-IndentedCommand {
 
     Write-Host ""
     $exitCode = 0
+    $prevEap = $ErrorActionPreference
     try {
+        $ErrorActionPreference = 'Continue'
         & $FilePath @ArgumentList 2>&1 | ForEach-Object {
             $line = "$_"
             if ($line.Trim().Length -gt 0) {
@@ -112,6 +114,7 @@ function Invoke-IndentedCommand {
             $exitCode = 1
         }
     } finally {
+        $ErrorActionPreference = $prevEap
         Write-Host ""
     }
     $global:LASTEXITCODE = $exitCode
@@ -634,17 +637,17 @@ function Invoke-FastDownload {
         Remove-Item -Path $aria2Control -Force -ErrorAction SilentlyContinue
     }
 
-    # 1. Try aria2c with 80 parallel split connections and 500KB chunks
+    # 1. Try aria2c with 80 parallel split connections and 1MB chunks
     $aria2Bin = Get-Aria2cPath
     if ($aria2Bin) {
-        Write-Step "Accelerating download with aria2c (80 splits, 500KB chunks)..."
+        Write-Step "Accelerating download with aria2c (80 splits, 1MB chunks)..."
         try {
             $ariaArgs = @(
                 "--disable-ipv6=true",
                 "-x", "16",
                 "-s", "80",
                 "-j", "16",
-                "-k", "500K",
+                "-k", "1M",
                 "--file-allocation=none",
                 "--allow-overwrite=true",
                 "--auto-file-renaming=false",
@@ -655,25 +658,6 @@ function Invoke-FastDownload {
                 "$Url"
             )
             $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs
-            if ($ariaExit -eq 28) {
-                Write-Step "Adapting aria2c segment size to 1MB minimum threshold (80 splits)..."
-                $ariaArgs1M = @(
-                    "--disable-ipv6=true",
-                    "-x", "16",
-                    "-s", "80",
-                    "-j", "16",
-                    "-k", "1M",
-                    "--file-allocation=none",
-                    "--allow-overwrite=true",
-                    "--auto-file-renaming=false",
-                    "--summary-interval=1",
-                    "--console-log-level=warn",
-                    "--dir=$destDir",
-                    "-o", "$destFile",
-                    "$Url"
-                )
-                $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs1M
-            }
             if ($ariaExit -eq 0) {
                 if (Test-Path $DestinationPath) {
                     if ((Get-Item $DestinationPath).Length -gt 0) {

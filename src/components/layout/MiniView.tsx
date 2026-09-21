@@ -195,22 +195,24 @@ export default function MiniView() {
     };
 
     return (
-        <div className="h-screen w-full flex items-center justify-center bg-transparent">
+        <div className="h-screen w-full flex items-center justify-center bg-transparent transform-gpu" style={{ contain: 'layout paint' }}>
             {/* Main Container - 300px fixed width */}
             <motion.div
                 ref={containerRef}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="w-[300px] flex flex-col bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md shadow-2xl overflow-hidden border-x border-y border-gray-200/50 dark:border-white/10 sm:rounded-2xl"
+                style={{ contain: 'layout paint' }}
+                className="w-[300px] flex flex-col bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md shadow-2xl overflow-hidden border-x border-y border-gray-200/50 dark:border-white/10 sm:rounded-2xl transform-gpu"
             >
-                {/* Header / Drag Region */}
+                {/* Header / Drag Region with double click restore support */}
                 <div
-                    className="flex-none flex items-center justify-between px-4 py-1 bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 select-none"
+                    className="flex-none flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 select-none cursor-default"
                     onMouseDown={handleMouseDown}
+                    onDoubleClick={handleMaximize}
                     data-tauri-drag-region
                 >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white overflow-hidden">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900 dark:text-white overflow-hidden min-w-0">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)] animate-pulse shrink-0" />
                         <span className="truncate" title={currentAccount?.email}>
                             {currentAccount?.email?.split('@')[0] || 'No Account'}
@@ -218,25 +220,26 @@ export default function MiniView() {
                     </div>
 
                     <div
-                        className="flex items-center gap-1 no-drag shrink-0"
+                        className="flex items-center gap-1.5 no-drag shrink-0 ml-2"
                         onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
                     >
                         <button
                             onClick={handleRefresh}
-                            className={clsx(
-                                "p-2 rounded-lg hover:bg-gray-200/50 dark:hover:bg-white/10 transition-colors"
-                            )}
+                            className="p-1 rounded-md hover:bg-gray-200/50 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400 cursor-pointer"
                             title={t('common.refresh', 'Refresh')}
                         >
-                            <RefreshCw size={14} className={clsx(isRefreshing && "animate-spin text-blue-500")} />
+                            <RefreshCw size={13} className={clsx(isRefreshing && "animate-spin text-blue-500")} />
                         </button>
-                        <div className="w-px h-3 bg-gray-300 dark:bg-white/20 mx-1" />
+
+                        {/* High-visibility accented Restore button */}
                         <button
                             onClick={handleMaximize}
-                            className="p-2 rounded-lg hover:bg-gray-200/50 dark:hover:bg-white/10 transition-colors text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-                            title={t('common.maximize', 'Full View')}
+                            className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white flex items-center gap-1 text-[11px] font-semibold transition-all duration-150 shadow-xs cursor-pointer"
+                            title={t('common.restore', 'Restore')}
                         >
-                            <Maximize2 size={14} />
+                            <Maximize2 size={11} />
+                            <span>{t('common.restore', 'Restore')}</span>
                         </button>
                     </div>
                 </div>

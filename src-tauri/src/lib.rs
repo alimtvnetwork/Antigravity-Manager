@@ -853,6 +853,7 @@ pub fn run() {
             commands::restore_email_db,
             commands::get_email_watcher_status,
             commands::trigger_manual_email_check,
+            commands::dispatch_email_test_ping,
         ])
 
 

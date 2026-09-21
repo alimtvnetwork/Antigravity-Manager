@@ -79,6 +79,14 @@ pub struct NotifyRecipientInput {
     pub is_active: Option<bool>,
 }
 
+fn default_baseline_polling() -> u32 {
+    4
+}
+
+fn default_active_awaiting() -> u32 {
+    10
+}
+
 /// Email watcher & notification settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailNotificationSettings {
@@ -86,6 +94,10 @@ pub struct EmailNotificationSettings {
     pub is_enabled: bool,
     pub polling_interval_minutes: u32,
     pub inbox_check_interval_minutes: u32,
+    #[serde(default = "default_baseline_polling")]
+    pub baseline_polling_interval_minutes: u32,
+    #[serde(default = "default_active_awaiting")]
+    pub active_awaiting_interval_seconds: u32,
     pub notify_on_quota_drop: bool,
     pub quota_drop_threshold_percent: u32,
     pub notify_on_workspace_switch: bool,
@@ -105,6 +117,8 @@ impl Default for EmailNotificationSettings {
             is_enabled: false,
             polling_interval_minutes: 3,
             inbox_check_interval_minutes: 1,
+            baseline_polling_interval_minutes: 4,
+            active_awaiting_interval_seconds: 10,
             notify_on_quota_drop: true,
             quota_drop_threshold_percent: 15,
             notify_on_workspace_switch: true,
@@ -224,6 +238,8 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
             is_enabled INTEGER NOT NULL DEFAULT 0,
             polling_interval_minutes INTEGER NOT NULL DEFAULT 3,
             inbox_check_interval_minutes INTEGER NOT NULL DEFAULT 1,
+            baseline_polling_interval_minutes INTEGER NOT NULL DEFAULT 4,
+            active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10,
             notify_on_quota_drop INTEGER NOT NULL DEFAULT 1,
             quota_drop_threshold_percent INTEGER NOT NULL DEFAULT 15,
             notify_on_workspace_switch INTEGER NOT NULL DEFAULT 1,
@@ -238,6 +254,15 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|e| format!("Failed to create email_notification_settings table: {}", e))?;
+
+    let _ = conn.execute(
+        "ALTER TABLE email_notification_settings ADD COLUMN baseline_polling_interval_minutes INTEGER NOT NULL DEFAULT 4",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE email_notification_settings ADD COLUMN active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10",
+        [],
+    );
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS email_inbound_audit_log (
@@ -606,51 +631,55 @@ pub fn delete_notify_recipient(id: &str) -> Result<(), String> {
 // Notification Settings CRUD
 // ---------------------------------------------------------------------------
 
+fn map_settings_row(r: &rusqlite::Row) -> rusqlite::Result<EmailNotificationSettings> {
+    let is_en: i32 = r.get(1)?;
+    let p_int: u32 = r.get(2)?;
+    let in_int: u32 = r.get(3)?;
+    let base_p: u32 = r.get(4).unwrap_or(4);
+    let act_s: u32 = r.get(5).unwrap_or(10);
+    let n_quota: i32 = r.get(6)?;
+    let q_drop: u32 = r.get(7)?;
+    let n_ws: i32 = r.get(8)?;
+    let n_idle: i32 = r.get(9)?;
+    let a_prompt: i32 = r.get(10)?;
+    let a_cli: i32 = r.get(11)?;
+    let a_inst: i32 = r.get(12)?;
+    Ok(EmailNotificationSettings {
+        id: r.get(0)?,
+        is_enabled: is_en > 0,
+        polling_interval_minutes: p_int,
+        inbox_check_interval_minutes: in_int,
+        baseline_polling_interval_minutes: base_p,
+        active_awaiting_interval_seconds: act_s,
+        notify_on_quota_drop: n_quota > 0,
+        quota_drop_threshold_percent: q_drop,
+        notify_on_workspace_switch: n_ws > 0,
+        notify_on_idle_workspace: n_idle > 0,
+        allow_remote_prompt_execution: a_prompt > 0,
+        allow_remote_cli_execution: a_cli > 0,
+        allow_remote_instance_rotation: a_inst > 0,
+        local_machine_name: r.get(13)?,
+        local_machine_ip: r.get(14)?,
+        updated_at: r.get(15)?,
+    })
+}
+
 /// Load notification settings
 pub fn get_notification_settings() -> Result<EmailNotificationSettings, String> {
     let conn = connect_vault_db()?;
+    let sql = "SELECT id, is_enabled, polling_interval_minutes, inbox_check_interval_minutes,
+                      baseline_polling_interval_minutes, active_awaiting_interval_seconds,
+                      notify_on_quota_drop, quota_drop_threshold_percent, notify_on_workspace_switch,
+                      notify_on_idle_workspace, allow_remote_prompt_execution, allow_remote_cli_execution,
+                      allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at
+               FROM email_notification_settings WHERE id = 'global'";
     let mut stmt = conn
-        .prepare(
-            "SELECT id, is_enabled, polling_interval_minutes, inbox_check_interval_minutes,
-                    notify_on_quota_drop, quota_drop_threshold_percent, notify_on_workspace_switch,
-                    notify_on_idle_workspace, allow_remote_prompt_execution, allow_remote_cli_execution,
-                    allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at
-             FROM email_notification_settings WHERE id = 'global'",
-        )
-        .map_err(|e| format!("Failed to prepare settings query: {}", e))?;
-
+        .prepare(sql)
+        .map_err(|e| format!("Query prepare failed: {}", e))?;
     let row = stmt
-        .query_row([], |r| {
-            let is_en: i32 = r.get(1)?;
-            let p_int: u32 = r.get(2)?;
-            let in_int: u32 = r.get(3)?;
-            let n_quota: i32 = r.get(4)?;
-            let q_drop: u32 = r.get(5)?;
-            let n_ws: i32 = r.get(6)?;
-            let n_idle: i32 = r.get(7)?;
-            let a_prompt: i32 = r.get(8)?;
-            let a_cli: i32 = r.get(9)?;
-            let a_inst: i32 = r.get(10)?;
-            Ok(EmailNotificationSettings {
-                id: r.get(0)?,
-                is_enabled: is_en > 0,
-                polling_interval_minutes: p_int,
-                inbox_check_interval_minutes: in_int,
-                notify_on_quota_drop: n_quota > 0,
-                quota_drop_threshold_percent: q_drop,
-                notify_on_workspace_switch: n_ws > 0,
-                notify_on_idle_workspace: n_idle > 0,
-                allow_remote_prompt_execution: a_prompt > 0,
-                allow_remote_cli_execution: a_cli > 0,
-                allow_remote_instance_rotation: a_inst > 0,
-                local_machine_name: r.get(11)?,
-                local_machine_ip: r.get(12)?,
-                updated_at: r.get(13)?,
-            })
-        })
+        .query_row([], map_settings_row)
         .optional()
         .map_err(|e| format!("Failed to query notification settings: {}", e))?;
-
     Ok(row.unwrap_or_default())
 }
 
@@ -690,14 +719,17 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
     conn.execute(
         "INSERT INTO email_notification_settings
          (id, is_enabled, polling_interval_minutes, inbox_check_interval_minutes,
+          baseline_polling_interval_minutes, active_awaiting_interval_seconds,
           notify_on_quota_drop, quota_drop_threshold_percent, notify_on_workspace_switch,
           notify_on_idle_workspace, allow_remote_prompt_execution, allow_remote_cli_execution,
           allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at)
-         VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
             is_enabled = excluded.is_enabled,
             polling_interval_minutes = excluded.polling_interval_minutes,
             inbox_check_interval_minutes = excluded.inbox_check_interval_minutes,
+            baseline_polling_interval_minutes = excluded.baseline_polling_interval_minutes,
+            active_awaiting_interval_seconds = excluded.active_awaiting_interval_seconds,
             notify_on_quota_drop = excluded.notify_on_quota_drop,
             quota_drop_threshold_percent = excluded.quota_drop_threshold_percent,
             notify_on_workspace_switch = excluded.notify_on_workspace_switch,
@@ -712,6 +744,8 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
             is_en,
             settings.polling_interval_minutes,
             settings.inbox_check_interval_minutes,
+            settings.baseline_polling_interval_minutes,
+            settings.active_awaiting_interval_seconds,
             n_quota,
             settings.quota_drop_threshold_percent,
             n_ws,

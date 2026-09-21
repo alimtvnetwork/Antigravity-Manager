@@ -170,9 +170,9 @@ function Navbar() {
                     {/* Center draggable spacer */}
                     <div className="flex-1 h-full min-w-2" data-tauri-drag-region />
 
-                    {/* Instance selector and settings (docked) */}
+                    {/* Instance selector and settings (docked to far right) */}
                     <div
-                        className="no-drag flex items-center gap-1.5 md:gap-2 shrink-0"
+                        className="no-drag flex items-center gap-1.5 md:gap-2 shrink-0 z-50 ml-auto"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >

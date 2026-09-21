@@ -814,12 +814,12 @@ function Accounts() {
           </div>
 
           {/* Quota window toggle (5H / Weekly) */}
-          <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0 items-center">
+          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
             <button
               className={cn(
-                "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all",
                 quotaWindow === "5h"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
               )}
               onClick={() => setQuotaWindow("5h")}
@@ -830,9 +830,9 @@ function Accounts() {
             </button>
             <button
               className={cn(
-                "px-2 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all",
                 quotaWindow === "weekly"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
               )}
               onClick={() => setQuotaWindow("weekly")}
@@ -844,12 +844,12 @@ function Accounts() {
           </div>
 
           {/* View mode switcher */}
-          <div className="flex gap-1 bg-gray-100 dark:bg-base-200 p-1 rounded-lg shrink-0">
+          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
             <button
               className={cn(
-                "p-1.5 rounded-md transition-all",
+                "h-7 w-7 inline-flex items-center justify-center rounded-md transition-all",
                 viewMode === "list"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
               )}
               onClick={() => setViewMode("list")}
@@ -859,9 +859,9 @@ function Accounts() {
             </button>
             <button
               className={cn(
-                "p-1.5 rounded-md transition-all",
+                "h-7 w-7 inline-flex items-center justify-center rounded-md transition-all",
                 viewMode === "grid"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
               )}
               onClick={() => setViewMode("grid")}
@@ -872,19 +872,19 @@ function Accounts() {
           </div>
 
           {/* Quota tier filter pills */}
-          <div className="flex gap-0.5 bg-gray-100/80 dark:bg-base-200 p-1 rounded-xl border border-gray-200/50 dark:border-white/5 shrink-0">
+          <div className="h-9 inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-base-200 border border-gray-200/50 dark:border-base-200/60 shrink-0">
             {/* All */}
             <button
               className={cn(
-                "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'all'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
               )}
               onClick={() => setFilter('all')}
               title={`${t('accounts.all')} (${filterCounts.all})`}
             >
-              <span className="hidden md:inline">{t('accounts.all')}</span>
+              <span>{t('accounts.all')}</span>
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'all'
@@ -898,15 +898,15 @@ function Accounts() {
             {/* PRO */}
             <button
               className={cn(
-                "px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 md:gap-1.5 whitespace-nowrap shrink-0",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'pro'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
               )}
               onClick={() => setFilter('pro')}
               title={`${t('accounts.pro')} (${filterCounts.pro})`}
             >
-              <span className="hidden md:inline">{t('accounts.pro')}</span>
+              <span>{t('accounts.pro')}</span>
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'pro'
@@ -920,15 +920,15 @@ function Accounts() {
             {/* ULTRA */}
             <button
               className={cn(
-                "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'ultra'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
               )}
               onClick={() => setFilter('ultra')}
               title={`${t('accounts.ultra')} (${filterCounts.ultra})`}
             >
-              <span className="hidden md:inline">{t('accounts.ultra')}</span>
+              <span>{t('accounts.ultra')}</span>
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'ultra'
@@ -942,15 +942,15 @@ function Accounts() {
             {/* FREE */}
             <button
               className={cn(
-                "flex px-2 lg:px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all items-center gap-1 lg:gap-1.5 whitespace-nowrap shrink-0",
+                "h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
                 filter === 'free'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5"
+                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
               )}
               onClick={() => setFilter('free')}
               title={`${t('accounts.free')} (${filterCounts.free})`}
             >
-              <span className="hidden md:inline">{t('accounts.free')}</span>
+              <span>{t('accounts.free')}</span>
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-colors",
                 filter === 'free'

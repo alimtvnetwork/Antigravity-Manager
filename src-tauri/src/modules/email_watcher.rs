@@ -11,7 +11,7 @@ use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::net::UdpSocket;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -28,6 +28,7 @@ pub struct WatcherStatus {
 }
 
 static WATCHER_RUNNING: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
+static AWAITING_REPLY_DEADLINE: Lazy<Arc<AtomicI64>> = Lazy::new(|| Arc::new(AtomicI64::new(0)));
 static LAST_STATUS: Lazy<Arc<Mutex<WatcherStatus>>> = Lazy::new(|| {
     Arc::new(Mutex::new(WatcherStatus {
         is_running: false,
@@ -38,6 +39,23 @@ static LAST_STATUS: Lazy<Arc<Mutex<WatcherStatus>>> = Lazy::new(|| {
         last_alert_sent: None,
     }))
 });
+
+/// Activate fast adaptive polling window (in seconds)
+pub fn activate_awaiting_reply(duration_seconds: i64) {
+    let deadline = Utc::now().timestamp() + duration_seconds;
+    AWAITING_REPLY_DEADLINE.store(deadline, Ordering::SeqCst);
+    crate::modules::logger::log_info(&format!(
+        "[EmailWatcher] Fast adaptive polling activated for {}s (deadline: {})",
+        duration_seconds, deadline
+    ));
+}
+
+/// Check if current timestamp is within awaiting reply deadline
+pub fn is_awaiting_reply() -> bool {
+    let deadline = AWAITING_REPLY_DEADLINE.load(Ordering::SeqCst);
+    let now = Utc::now().timestamp();
+    deadline > now
+}
 
 /// Detect local machine network IP address
 pub fn detect_local_ip() -> String {
@@ -78,6 +96,105 @@ pub async fn get_watcher_status() -> WatcherStatus {
     status
 }
 
+fn determine_inbox_interval(settings: &email_vault_db::EmailNotificationSettings) -> i64 {
+    let is_awaiting = is_awaiting_reply();
+    if is_awaiting {
+        return settings.active_awaiting_interval_seconds.clamp(5, 10) as i64;
+    }
+    let minutes = settings.baseline_polling_interval_minutes.clamp(2, 4);
+    (minutes * 60) as i64
+}
+
+async fn update_status_telemetry(m_name: String, m_ip: String, now: i64) {
+    let mut st = LAST_STATUS.lock().await;
+    st.machine_name = m_name;
+    st.machine_ip = m_ip;
+    st.last_telemetry_check = now;
+}
+
+async fn update_status_inbox(now: i64) {
+    let mut st = LAST_STATUS.lock().await;
+    st.last_inbox_check = now;
+}
+
+async fn check_telemetry_sensors(
+    settings: &email_vault_db::EmailNotificationSettings,
+    m_name: &str,
+    m_ip: &str,
+    last_quota: &mut i64,
+    last_idle: &mut i64,
+    now: i64,
+) {
+    if settings.notify_on_quota_drop {
+        let is_cooldown_ready = now - *last_quota > 600;
+        if is_cooldown_ready {
+            check_quota_drop_sensor(settings, m_name, m_ip, last_quota).await;
+        }
+    }
+    if settings.notify_on_idle_workspace {
+        let is_cooldown_ready = now - *last_idle > 600;
+        if is_cooldown_ready {
+            check_idle_projects_sensor(m_name, m_ip, last_idle).await;
+        }
+    }
+}
+
+async fn execute_heartbeat_tick(
+    settings: &email_vault_db::EmailNotificationSettings,
+    last_inbox: &mut i64,
+    last_telemetry: &mut i64,
+    last_quota: &mut i64,
+    last_idle: &mut i64,
+) {
+    let m_name = detect_machine_name();
+    let m_ip = detect_local_ip();
+    let now = Utc::now().timestamp();
+
+    let inbox_interval = determine_inbox_interval(settings);
+    let is_inbox_due = now - *last_inbox >= inbox_interval;
+    if is_inbox_due {
+        *last_inbox = now;
+        poll_inbox_cycle(&m_name, &m_ip).await;
+        update_status_inbox(now).await;
+    }
+
+    let telemetry_interval = (settings.polling_interval_minutes.max(1) * 60) as i64;
+    let is_telemetry_due = now - *last_telemetry >= telemetry_interval;
+    if is_telemetry_due {
+        *last_telemetry = now;
+        update_status_telemetry(m_name.clone(), m_ip.clone(), now).await;
+        check_telemetry_sensors(settings, &m_name, &m_ip, last_quota, last_idle, now).await;
+    }
+}
+
+async fn run_watcher_heartbeat_loop() {
+    let mut last_inbox: i64 = 0;
+    let mut last_telemetry: i64 = 0;
+    let mut last_quota: i64 = 0;
+    let mut last_idle: i64 = 0;
+
+    while WATCHER_RUNNING.load(Ordering::SeqCst) {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        let settings = match email_vault_db::get_notification_settings() {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        let is_enabled = settings.is_enabled;
+        if !is_enabled {
+            continue;
+        }
+        execute_heartbeat_tick(
+            &settings,
+            &mut last_inbox,
+            &mut last_telemetry,
+            &mut last_quota,
+            &mut last_idle,
+        )
+        .await;
+    }
+    crate::modules::logger::log_info("[EmailWatcher] Background watcher stopped");
+}
+
 /// Start the background watcher loop
 pub fn start_email_watcher() {
     let is_already_running = WATCHER_RUNNING.swap(true, Ordering::SeqCst);
@@ -90,67 +207,7 @@ pub fn start_email_watcher() {
     );
 
     tokio::spawn(async move {
-        let mut loop_tick: u32 = 0;
-        let mut last_idle_alert: i64 = 0;
-        let mut last_quota_alert: i64 = 0;
-
-        while WATCHER_RUNNING.load(Ordering::SeqCst) {
-            tokio::time::sleep(Duration::from_secs(60)).await;
-            loop_tick += 1;
-
-            let settings = match email_vault_db::get_notification_settings() {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            let is_enabled = settings.is_enabled;
-            if !is_enabled {
-                continue;
-            }
-
-            let m_name = detect_machine_name();
-            let m_ip = detect_local_ip();
-            let now = Utc::now().timestamp();
-
-            // Update status
-            {
-                let mut st = LAST_STATUS.lock().await;
-                st.machine_name = m_name.clone();
-                st.machine_ip = m_ip.clone();
-                st.last_telemetry_check = now;
-            }
-
-            // 1. Inbound Inbox Poller (every inbox_check_interval_minutes)
-            let in_interval = settings.inbox_check_interval_minutes.max(1);
-            if loop_tick % in_interval == 0 {
-                poll_inbox_cycle(&m_name, &m_ip).await;
-                let mut st = LAST_STATUS.lock().await;
-                st.last_inbox_check = now;
-            }
-
-            // 2. Telemetry Sensors (every polling_interval_minutes)
-            let poll_interval = settings.polling_interval_minutes.max(1);
-            if loop_tick % poll_interval == 0 {
-                // Sensor A: Quota Drop Check
-                if settings.notify_on_quota_drop {
-                    let is_quota_check_due = now - last_quota_alert > 600; // 10 min cooldown
-                    if is_quota_check_due {
-                        check_quota_drop_sensor(&settings, &m_name, &m_ip, &mut last_quota_alert)
-                            .await;
-                    }
-                }
-
-                // Sensor B: Idle Running Projects Check
-                if settings.notify_on_idle_workspace {
-                    let is_idle_check_due = now - last_idle_alert > 600; // 10 min cooldown
-                    if is_idle_check_due {
-                        check_idle_projects_sensor(&m_name, &m_ip, &mut last_idle_alert).await;
-                    }
-                }
-            }
-        }
-
-        crate::modules::logger::log_info("[EmailWatcher] Background watcher stopped");
+        run_watcher_heartbeat_loop().await;
     });
 }
 

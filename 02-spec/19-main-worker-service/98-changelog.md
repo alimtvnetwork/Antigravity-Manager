@@ -1,3 +1,9 @@
+## v4.48.0 — 2026-09-21 (Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening)
+
+**Scope:** Version bump. Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening.
+
+---
+
 ## v4.47.1 — 2026-09-21 (Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27))
 
 **Scope:** Version bump. Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27).

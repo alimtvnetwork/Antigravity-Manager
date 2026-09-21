@@ -471,11 +471,11 @@ download_file() {
         return 1
     fi
 
-    # Try aria2c with 80 parallel split connections and 500KB chunks
+    # Try aria2c with 80 parallel split connections and 1MB chunks
     if [[ -n "${ARIA2C_BIN:-}" && -x "$ARIA2C_BIN" ]]; then
-        info "Downloading with aria2c (80 parallel split connections, 500KB chunks)..."
+        info "Downloading with aria2c (80 parallel split connections, 1MB chunks)..."
         local aria_exit=0
-        run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 500K \
+        run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 1M \
             --allow-overwrite=true \
             --auto-file-renaming=false \
             --summary-interval=1 \
@@ -483,19 +483,6 @@ download_file() {
             --dir="$dest_dir" \
             -o "$dest_file" \
             "$url" || aria_exit=$?
-
-        if [[ "$aria_exit" -eq 28 ]]; then
-            info "Adapting aria2c segment size to 1MB minimum threshold (80 splits)..."
-            aria_exit=0
-            run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 1M \
-                --allow-overwrite=true \
-                --auto-file-renaming=false \
-                --summary-interval=1 \
-                --console-log-level=warn \
-                --dir="$dest_dir" \
-                -o "$dest_file" \
-                "$url" || aria_exit=$?
-        fi
 
         if [[ "$aria_exit" -eq 0 && -f "$full_path" && -s "$full_path" ]]; then
             return 0

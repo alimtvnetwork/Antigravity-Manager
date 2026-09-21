@@ -49,6 +49,8 @@ export interface EmailNotificationSettings {
     is_enabled: boolean;
     polling_interval_minutes: number;
     inbox_check_interval_minutes: number;
+    baseline_polling_interval_minutes: number;
+    active_awaiting_interval_seconds: number;
     notify_on_quota_drop: boolean;
     quota_drop_threshold_percent: number;
     notify_on_workspace_switch: boolean;
@@ -301,6 +303,20 @@ export async function triggerManualEmailCheck(): Promise<string> {
         useErrorStore.getState().captureError(e, {
             source: 'emailService.triggerManualEmailCheck',
             endpoint: 'trigger_manual_email_check',
+        });
+        throw e;
+    }
+}
+
+export async function dispatchEmailTestPing(projectName?: string): Promise<string> {
+    try {
+        return await invoke('dispatch_email_test_ping', {
+            projectName: projectName || 'Antigravity-Workspace',
+        });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.dispatchEmailTestPing',
+            endpoint: 'dispatch_email_test_ping',
         });
         throw e;
     }

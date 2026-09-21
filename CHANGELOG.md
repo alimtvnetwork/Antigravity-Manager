@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.48.0 (2026-09-21)**:
+        -   **[Release v4.48.0] Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening.
     *   **v4.47.1 (2026-09-21)**:
         -   **[Release v4.47.1] Fix Rust formatting in commands/mod.rs and register format check in CI runner (RCA-27)**:
             -   **Update System**: Automated release and version synchronization across all manifests.

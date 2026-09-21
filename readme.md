@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.47.1-3B82F6?style=flat-square" alt="Version 4.47.1">
+    <img src="https://img.shields.io/badge/Version-4.48.0-3B82F6?style=flat-square" alt="Version 4.48.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -130,14 +130,14 @@ To install an exact, pinned historical release directly from GitHub Releases:
 
 #### Windows (PowerShell 5.1+)
 ```powershell
-# Install pinned release (e.g. v4.47.1)
-irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.47.1/install.ps1 | iex
+# Install pinned release (e.g. v4.48.0)
+irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.48.0/install.ps1 | iex
 ```
 
 #### Linux & macOS (Bash)
 ```bash
-# Install pinned release (e.g. v4.47.1)
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.47.1/install.sh | bash
+# Install pinned release (e.g. v4.48.0)
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.48.0/install.sh | bash
 ```
 
 > [!NOTE]

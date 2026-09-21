@@ -640,6 +640,26 @@ pub fn render_self_test_email(
     (subject, html)
 }
 
+/// Render HTML email for test ping command verification
+pub fn render_test_ping_email(
+    project_name: &str,
+    machine_name: &str,
+    machine_ip: &str,
+    timestamp: i64,
+) -> (String, String) {
+    let subject = format!("[AGM Ping] Test Command Ping: {}", project_name);
+    let content = format!(
+        r#"<p><span class="badge badge-info">COMMAND TEST PING</span></p>
+<p>Test ping dispatched for <strong>{}</strong> (epoch: <code>{}</code>).</p>
+<p>Reply to verify remote command handling:</p>
+<div class="cmd">Subject: Project: {}<br><br>echo 'Ping verified!'</div>
+<p>Adaptive fast polling (5-10s) active.</p>"#,
+        project_name, timestamp, project_name
+    );
+    let html = wrap_email_card("Command Test Ping", &content, machine_name, machine_ip);
+    (subject, html)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
