@@ -12,6 +12,8 @@ use crate::modules::email_vault_db::{
     NotifyRecipientInput,
 };
 use crate::modules::email_watcher::{self, WatcherStatus};
+use crate::utils::command::CommandExtWrapper;
+use serde::{Deserialize, Serialize};
 
 #[tauri::command]
 pub async fn get_email_settings() -> AppResult<EmailNotificationSettings> {
@@ -286,13 +288,13 @@ pub struct CliExecResult {
 pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResult> {
     let cmd_str = command.trim();
     if cmd_str.is_empty() {
-        return Err(AppError::Validation("Command cannot be empty".to_string()));
+        return Err(AppError::Config("Command cannot be empty".to_string()));
     }
 
     #[cfg(target_os = "windows")]
     let output = {
         let mut cmd = std::process::Command::new("powershell.exe");
-        crate::utils::command::CommandExtWrapper::creation_flags_windows(&mut cmd).args([
+        cmd.creation_flags_windows().args([
             "-NoProfile",
             "-NonInteractive",
             "-WindowStyle",
@@ -303,7 +305,7 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
             cmd_str,
         ]);
         cmd.output().map_err(|e| {
-            AppError::Execution(format!("Failed to execute PowerShell on Windows: {}", e))
+            AppError::Process(format!("Failed to execute PowerShell on Windows: {}", e))
         })?
     };
 
@@ -311,7 +313,7 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
     let output = std::process::Command::new("sh")
         .args(["-c", cmd_str])
         .output()
-        .map_err(|e| AppError::Execution(format!("Failed to execute command on Unix: {}", e)))?;
+        .map_err(|e| AppError::Process(format!("Failed to execute command on Unix: {}", e)))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
