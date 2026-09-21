@@ -184,6 +184,9 @@ fn select_next_best_profile(
             if acc.validation_blocked {
                 continue;
             }
+            if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
+                continue;
+            }
 
             let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
             if quota > threshold {
@@ -219,6 +222,9 @@ fn select_next_best_profile(
             continue;
         }
         if acc.validation_blocked {
+            continue;
+        }
+        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
             continue;
         }
         let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
@@ -271,6 +277,18 @@ pub async fn execute_profile_rotation(
     );
 
     instance::switch_account_to_instance(&target.account_id, Some(&target.instance_id)).await?;
+
+    // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
+    let target_acc_id = target.account_id.clone();
+    let target_inst_id = target.instance_id.clone();
+    tokio::spawn(async move {
+        let _ = crate::modules::workspace_lease_manager::acquire_lease(
+            &target_acc_id,
+            &target_inst_id,
+            90,
+        )
+        .await;
+    });
 
     // Step 3: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
     let _ = crate::modules::repo_db::dispatch_running_prompts(&target.instance_id);

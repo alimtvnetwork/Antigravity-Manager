@@ -7,8 +7,14 @@ use crate::error::AppError;
 use crate::modules::supabase_client::SupabaseClient;
 use crate::modules::supabase_sync::{self, SupabaseConfig};
 use chrono::Utc;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+static ACTIVE_REMOTE_LEASES: Lazy<RwLock<HashMap<String, WorkspaceLease>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Distributed workspace lease model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,5 +203,25 @@ pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
     let resp = client.select("workspace_leases", &query).await?;
 
     let leases: Vec<WorkspaceLease> = serde_json::from_value(resp).unwrap_or_default();
+    if let Ok(mut cache) = ACTIVE_REMOTE_LEASES.write() {
+        cache.clear();
+        for l in &leases {
+            cache.insert(l.account_id.clone(), l.clone());
+        }
+    }
     Ok(leases)
+}
+
+/// Synchronously check if an account is currently leased by another active node
+pub fn is_account_leased_by_other(account_id: &str) -> bool {
+    let local_node = supabase_sync::get_local_node_id();
+    let now = Utc::now().timestamp();
+    if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
+        if let Some(lease) = cache.get(account_id) {
+            if lease.expires_at > now && lease.node_id != local_node {
+                return true;
+            }
+        }
+    }
+    false
 }
