@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.47.0 (2026-09-21)**:
+        -   **[Release v4.47.0] Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization.
     *   **v4.46.0 (2026-09-20)**:
         -   **[Release v4.46.0] Fix thinking store signature preservation and error manager enhancements**:
             -   **Update System**: Automated release and version synchronization across all manifests.

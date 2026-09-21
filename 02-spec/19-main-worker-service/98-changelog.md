@@ -1,3 +1,9 @@
+## v4.47.0 — 2026-09-21 (Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization)
+
+**Scope:** Version bump. Window restore healing, zero-displacement accounts UI, active account highlighting, shortcut name standardization.
+
+---
+
 ## v4.46.0 — 2026-09-20 (Fix thinking store signature preservation and error manager enhancements)
 
 **Scope:** Version bump. Fix thinking store signature preservation and error manager enhancements.
