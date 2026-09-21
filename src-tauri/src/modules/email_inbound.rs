@@ -498,7 +498,14 @@ pub fn execute_inbound_action(
     </tr>
   </tbody>
 </table>
-<p style="margin-top:12px; font-size:12px; color:#94a3b8;">To send commands: reply with <code>Exec: &lt;Node-Alias&gt;</code> or fast-forward workspace with <code>FF: &lt;Node-Alias&gt;</code>.</p>"#,
+<div style="margin-top:14px; padding:10px 14px; background:#0f172a; border-radius:6px; border:1px solid #334155;">
+  <p style="margin:0 0 6px 0; font-size:12px; font-weight:bold; color:#38bdf8;">Remote Command Formats:</p>
+  <ul style="font-size:12px; color:#94a3b8; line-height:1.6; margin:0 0 0 16px; padding:0;">
+    <li><code>CMD:&lt;Node-Alias&gt;:&lt;PowerShell-Command&gt;</code> (Execute PowerShell/Bash command on target node)</li>
+    <li><code>FF</code> or <code>FF:&lt;Node-Alias&gt;</code> (Fast-forward workspace profile switcher)</li>
+    <li><code>SNAPSHOT</code> or <code>How many machines are running?</code> (Refresh cluster status)</li>
+  </ul>
+</div>"#,
                 local_machine_name, local_machine_ip, uptime_min
             );
             let html = wrap_card(

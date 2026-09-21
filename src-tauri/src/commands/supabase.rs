@@ -5,9 +5,9 @@
 
 use crate::error::{AppError, AppResult};
 use crate::modules::iterative_codec;
-use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint};
+use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint, TableVerificationResult};
 use crate::modules::supabase_schema;
-use crate::modules::supabase_sync::{self, SupabaseConfig};
+use crate::modules::supabase_sync::{self, DataMigrationSummary, SupabaseConfig};
 use crate::modules::workspace_lease_manager::{self, LeaseResult, WorkspaceLease};
 use serde::{Deserialize, Serialize};
 
@@ -41,6 +41,24 @@ pub async fn save_supabase_config(config: SupabaseConfig) -> AppResult<()> {
 pub async fn test_supabase_endpoint(endpoint: SupabaseEndpoint) -> AppResult<bool> {
     let client = SupabaseClient::new(&endpoint)?;
     client.test_connection().await
+}
+
+#[tauri::command]
+pub async fn check_supabase_endpoint_tables(
+    endpoint: SupabaseEndpoint,
+) -> AppResult<TableVerificationResult> {
+    let client = SupabaseClient::new(&endpoint)?;
+    Ok(client
+        .verify_expected_tables(&endpoint.id, &endpoint.role)
+        .await)
+}
+
+#[tauri::command]
+pub async fn migrate_supabase_data(
+    source_id: String,
+    target_id: String,
+) -> AppResult<DataMigrationSummary> {
+    supabase_sync::migrate_database_data(&source_id, &target_id).await
 }
 
 #[tauri::command]

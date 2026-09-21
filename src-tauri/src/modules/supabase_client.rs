@@ -22,6 +22,16 @@ pub struct SupabaseEndpoint {
     pub priority: u32,
 }
 
+/// Table verification result for schema checking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableVerificationResult {
+    pub endpoint_id: String,
+    pub is_connected: bool,
+    pub verified_tables: Vec<String>,
+    pub missing_tables: Vec<String>,
+    pub error_message: Option<String>,
+}
+
 /// Lightweight PostgREST HTTP Client
 pub struct SupabaseClient {
     client: reqwest::Client,
@@ -87,6 +97,84 @@ impl SupabaseClient {
             ),
             Some(status_code),
         ))
+    }
+
+    /// Check if a specific table exists and is readable via PostgREST
+    pub async fn check_table_exists(&self, table: &str) -> Result<bool, AppError> {
+        let url = format!("{}/rest/v1/{}?limit=0", self.base_url, table);
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| AppError::Network(e.to_string(), None))?;
+
+        let status_code = resp.status().as_u16();
+        if status_code == 200 {
+            return Ok(true);
+        }
+        if status_code == 404 {
+            return Ok(false);
+        }
+        let text = resp.text().await.unwrap_or_default();
+        if text.contains("does not exist") || text.contains("PGRST204") || text.contains("PGRST205")
+        {
+            return Ok(false);
+        }
+        Err(AppError::Network(
+            format!(
+                "Table probe failed for '{}' with status {}: {}",
+                table, status_code, text
+            ),
+            Some(status_code),
+        ))
+    }
+
+    /// Check existence of all expected tables for this endpoint role
+    pub async fn verify_expected_tables(
+        &self,
+        endpoint_id: &str,
+        role: &str,
+    ) -> TableVerificationResult {
+        let expected: Vec<&str> = match role {
+            "root" => vec!["nodes", "instance_profiles", "workspace_leases"],
+            "secondary" => vec!["command_queue", "command_telemetry", "endpoint_health"],
+            _ => vec![
+                "nodes",
+                "instance_profiles",
+                "workspace_leases",
+                "command_queue",
+                "command_telemetry",
+                "endpoint_health",
+            ],
+        };
+
+        let mut verified = Vec::new();
+        let mut missing = Vec::new();
+        let mut err_msg = None;
+
+        for table in expected {
+            match self.check_table_exists(table).await {
+                Ok(true) => verified.push(table.to_string()),
+                Ok(false) => missing.push(table.to_string()),
+                Err(e) => {
+                    missing.push(table.to_string());
+                    if err_msg.is_none() {
+                        err_msg = Some(e.to_string());
+                    }
+                }
+            }
+        }
+
+        let is_connected = !verified.is_empty() || missing.len() > 0;
+
+        TableVerificationResult {
+            endpoint_id: endpoint_id.to_string(),
+            is_connected,
+            verified_tables: verified,
+            missing_tables: missing,
+            error_message: err_msg,
+        }
     }
 
     /// Query rows from a table with PostgREST query parameters

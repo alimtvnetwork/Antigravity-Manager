@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-21T22:37:13Z",
+  "updated_at": "2026-09-21T22:43:15Z",
   "files": [
     ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".github/workflows/ci.yml",
@@ -13,6 +13,7 @@
     "src-tauri/src/commands/email.rs",
     "src-tauri/src/commands/mod.rs",
     "src-tauri/src/commands/supabase.rs",
+    "src-tauri/src/commands/telegram.rs",
     "src-tauri/src/lib.rs",
     "src-tauri/src/modules/auto_switcher.rs",
     "src-tauri/src/modules/email_inbound.rs",
@@ -25,6 +26,7 @@
     "src-tauri/src/modules/supabase_pruner.rs",
     "src-tauri/src/modules/supabase_schema.rs",
     "src-tauri/src/modules/supabase_sync.rs",
+    "src-tauri/src/modules/telegram_inbound.rs",
     "src-tauri/src/modules/update_checker.rs",
     "src-tauri/src/modules/workspace_lease_manager.rs",
     "src-tauri/tauri.conf.json",
@@ -54,6 +56,7 @@
     "src/pages/Settings.tsx",
     "src/services/emailService.ts",
     "src/services/supabaseService.ts",
+    "src/services/telegramService.ts",
     "src/stores/useViewStore.ts",
     "src/utils/env.ts",
     "src/utils/request.ts",

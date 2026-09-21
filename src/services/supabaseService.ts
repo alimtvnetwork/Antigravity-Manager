@@ -38,6 +38,23 @@ export interface LeaseResult {
     expires_at?: number;
 }
 
+export interface TableVerificationResult {
+    endpoint_id: string;
+    is_connected: boolean;
+    verified_tables: string[];
+    missing_tables: string[];
+    error_message?: string;
+}
+
+export interface DataMigrationSummary {
+    is_success: boolean;
+    nodes_migrated: number;
+    profiles_migrated: number;
+    leases_migrated: number;
+    commands_migrated: number;
+    message: string;
+}
+
 export interface LocalNodeInfo {
     node_id: string;
     node_alias: string;
@@ -70,6 +87,40 @@ export const supabaseService = {
         } catch (error) {
             useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
             return false;
+        }
+    },
+
+    async checkEndpointTables(endpoint: SupabaseEndpoint): Promise<TableVerificationResult> {
+        try {
+            return await invoke<TableVerificationResult>('check_supabase_endpoint_tables', { endpoint });
+        } catch (error) {
+            useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
+            return {
+                endpoint_id: endpoint.id,
+                is_connected: false,
+                verified_tables: [],
+                missing_tables: [],
+                error_message: String(error),
+            };
+        }
+    },
+
+    async migrateData(sourceId: string, targetId: string): Promise<DataMigrationSummary> {
+        try {
+            return await invoke<DataMigrationSummary>('migrate_supabase_data', {
+                sourceId,
+                targetId,
+            });
+        } catch (error) {
+            useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
+            return {
+                is_success: false,
+                nodes_migrated: 0,
+                profiles_migrated: 0,
+                leases_migrated: 0,
+                commands_migrated: 0,
+                message: String(error),
+            };
         }
     },
 

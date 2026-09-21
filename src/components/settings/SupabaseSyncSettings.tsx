@@ -14,13 +14,23 @@ import {
     Sparkles,
     Lock,
     Cpu,
+    Send,
+    ArrowRightLeft,
+    ShieldCheck,
 } from 'lucide-react';
 import {
     supabaseService,
     SupabaseConfig,
     SupabaseEndpoint,
     LocalNodeInfo,
+    TableVerificationResult,
+    DataMigrationSummary,
 } from '../../services/supabaseService';
+import {
+    telegramService,
+    TelegramConfig,
+    TelegramWatcherStatus,
+} from '../../services/telegramService';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
 
@@ -31,6 +41,8 @@ export default function SupabaseSyncSettings() {
     const [isSaving, setIsSaving] = useState(false);
     const [testingEndpointId, setTestingEndpointId] = useState<string | null>(null);
     const [testResults, setTestResults] = useState<Record<string, { isSuccess: boolean; msg: string }>>({});
+    const [verifyingEndpointId, setVerifyingEndpointId] = useState<string | null>(null);
+    const [tableVerification, setTableVerification] = useState<Record<string, TableVerificationResult>>({});
 
     // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -44,6 +56,21 @@ export default function SupabaseSyncSettings() {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importText, setImportText] = useState('');
     const [isAiPromptModalOpen, setIsAiPromptModalOpen] = useState(false);
+
+    // Cross-DB Migration Modal
+    const [isMigrateModalOpen, setIsMigrateModalOpen] = useState(false);
+    const [sourceEpId, setSourceEpId] = useState('');
+    const [targetEpId, setTargetEpId] = useState('');
+    const [isMigrating, setIsMigrating] = useState(false);
+    const [migrationResult, setMigrationResult] = useState<DataMigrationSummary | null>(null);
+
+    // Telegram Bot Integration State
+    const [telegramConfig, setTelegramConfig] = useState<TelegramConfig | null>(null);
+    const [telegramStatus, setTelegramStatus] = useState<TelegramWatcherStatus | null>(null);
+    const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+    const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
+    const [isSavingTelegram, setIsSavingTelegram] = useState(false);
+    const [isSendingPing, setIsSendingPing] = useState(false);
 
     // Form state for adding/editing endpoint
     const [formEndpoint, setFormEndpoint] = useState<Partial<SupabaseEndpoint>>({
@@ -63,14 +90,18 @@ export default function SupabaseSyncSettings() {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [loadedConfig, loadedNode] = await Promise.all([
+            const [loadedConfig, loadedNode, loadedTgConfig, loadedTgStatus] = await Promise.all([
                 supabaseService.getConfig(),
                 supabaseService.getLocalNodeInfo(),
+                telegramService.getConfig().catch(() => null),
+                telegramService.getStatus().catch(() => null),
             ]);
             setConfig(loadedConfig);
             setNodeInfo(loadedNode);
+            if (loadedTgConfig) setTelegramConfig(loadedTgConfig);
+            if (loadedTgStatus) setTelegramStatus(loadedTgStatus);
         } catch (e) {
-            console.error('Failed to load Supabase settings:', e);
+            console.error('Failed to load Supabase / Telegram settings:', e);
         } finally {
             setIsLoading(false);
         }
@@ -100,6 +131,111 @@ export default function SupabaseSyncSettings() {
             },
         }));
         setTestingEndpointId(null);
+    };
+
+    const handleCheckTables = async (endpoint: SupabaseEndpoint) => {
+        setVerifyingEndpointId(endpoint.id);
+        try {
+            const res = await supabaseService.checkEndpointTables(endpoint);
+            setTableVerification((prev) => ({
+                ...prev,
+                [endpoint.id]: res,
+            }));
+            if (res.missing_tables.length === 0) {
+                showToast(`All ${res.verified_tables.length} tables verified on ${endpoint.name}`, 'success');
+            } else {
+                showToast(`Missing tables on ${endpoint.name}: ${res.missing_tables.join(', ')}`, 'warning');
+            }
+        } catch (e) {
+            showToast(`Table verification failed: ${String(e)}`, 'error');
+        } finally {
+            setVerifyingEndpointId(null);
+        }
+    };
+
+    const handleOpenMigrateModal = () => {
+        if (!config || config.endpoints.length < 2) {
+            showToast('You need at least 2 endpoints to perform cross-database migration', 'warning');
+            return;
+        }
+        setSourceEpId(config.endpoints[0].id);
+        setTargetEpId(config.endpoints[1].id);
+        setMigrationResult(null);
+        setIsMigrateModalOpen(true);
+    };
+
+    const handleMigrateSubmit = async () => {
+        if (!sourceEpId || !targetEpId) {
+            showToast('Please select source and target endpoints', 'warning');
+            return;
+        }
+        if (sourceEpId === targetEpId) {
+            showToast('Source and target endpoints cannot be the same', 'warning');
+            return;
+        }
+        setIsMigrating(true);
+        try {
+            const res = await supabaseService.migrateData(sourceEpId, targetEpId);
+            setMigrationResult(res);
+            if (res.is_success) {
+                showToast(res.message, 'success');
+            } else {
+                showToast(`Migration error: ${res.message}`, 'error');
+            }
+        } catch (e) {
+            showToast(`Data migration failed: ${String(e)}`, 'error');
+        } finally {
+            setIsMigrating(false);
+        }
+    };
+
+    const handleSaveTelegram = async () => {
+        if (!telegramConfig) return;
+        setIsSavingTelegram(true);
+        try {
+            await telegramService.saveConfig(telegramConfig);
+            showToast('Telegram bot settings saved', 'success');
+            const st = await telegramService.getStatus();
+            setTelegramStatus(st);
+        } catch (e) {
+            showToast(`Failed to save Telegram settings: ${String(e)}`, 'error');
+        } finally {
+            setIsSavingTelegram(false);
+        }
+    };
+
+    const handleTestTelegram = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim()) {
+            showToast('Please provide a Telegram Bot Token', 'warning');
+            return;
+        }
+        setIsTestingTelegram(true);
+        try {
+            const username = await telegramService.testBot(telegramConfig.bot_token);
+            setTelegramBotUsername(username);
+            showToast(`Connected to Telegram bot: @${username}`, 'success');
+        } catch (e) {
+            setTelegramBotUsername(null);
+            showToast(`Telegram connection failed: ${String(e)}`, 'error');
+        } finally {
+            setIsTestingTelegram(false);
+        }
+    };
+
+    const handleSendTelegramPing = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim() || !telegramConfig.allowed_chat_id) {
+            showToast('Please specify Bot Token and Allowed Chat ID first', 'warning');
+            return;
+        }
+        setIsSendingPing(true);
+        try {
+            await telegramService.sendTestMessage(telegramConfig.bot_token, telegramConfig.allowed_chat_id);
+            showToast('Test ping sent to your Telegram chat!', 'success');
+        } catch (e) {
+            showToast(`Failed to send test ping: ${String(e)}`, 'error');
+        } finally {
+            setIsSendingPing(false);
+        }
     };
 
     const handleOpenSchemaModal = async (role: 'root' | 'secondary') => {
@@ -265,6 +401,14 @@ Here are my Supabase details:
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleOpenMigrateModal}
+                        className="px-3 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition text-xs font-medium"
+                        title="Migrate recent state from damaged/old Supabase to another"
+                    >
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                        Migrate to New DB
+                    </button>
                     <button
                         onClick={() => setIsAiPromptModalOpen(true)}
                         className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 transition text-xs font-medium"
@@ -439,6 +583,26 @@ Here are my Supabase details:
                                         <div className="text-xs font-mono text-gray-400 truncate max-w-md">
                                             {ep.url}
                                         </div>
+                                        {tableVerification[ep.id] && (
+                                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                                                {tableVerification[ep.id].verified_tables.map((t) => (
+                                                    <span
+                                                        key={t}
+                                                        className="px-1.5 py-0.5 text-[10px] bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20 font-mono"
+                                                    >
+                                                        ✓ {t}
+                                                    </span>
+                                                ))}
+                                                {tableVerification[ep.id].missing_tables.map((t) => (
+                                                    <span
+                                                        key={t}
+                                                        className="px-1.5 py-0.5 text-[10px] bg-red-500/10 text-red-400 rounded border border-red-500/20 font-mono"
+                                                    >
+                                                        ✗ {t}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -456,6 +620,19 @@ Here are my Supabase details:
                                                 {result.msg}
                                             </span>
                                         )}
+                                        <button
+                                            onClick={() => handleCheckTables(ep)}
+                                            disabled={verifyingEndpointId === ep.id}
+                                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700 text-xs flex items-center gap-1 transition"
+                                            title="Verify if required tables exist on Supabase"
+                                        >
+                                            {verifyingEndpointId === ep.id ? (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                                <ShieldCheck className="w-3 h-3 text-cyan-400" />
+                                            )}
+                                            Check Tables
+                                        </button>
                                         <button
                                             onClick={() => handleTestEndpoint(ep)}
                                             disabled={isTesting}
@@ -481,6 +658,222 @@ Here are my Supabase details:
                     </div>
                 )}
             </div>
+
+            {/* Telegram Remote Watcher Integration */}
+            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="font-semibold text-white flex items-center gap-2">
+                            <Send className="w-4 h-4 text-sky-400" />
+                            Telegram Inbound Bot Integration
+                        </h4>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            Query cluster snapshots ("How many machines are running?"), fast-forward workspaces, and execute terminal commands from your phone via Telegram.
+                        </p>
+                    </div>
+                    {telegramConfig && (
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={telegramConfig.is_enabled}
+                                onChange={(e) => {
+                                    const updated = { ...telegramConfig, is_enabled: e.target.checked };
+                                    setTelegramConfig(updated);
+                                    telegramService.saveConfig(updated).catch(console.error);
+                                }}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                        </label>
+                    )}
+                </div>
+
+                {telegramConfig && (
+                    <div className="space-y-3 pt-2 border-t border-slate-800/80">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Telegram Bot Token
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                                    value={telegramConfig.bot_token}
+                                    onChange={(e) =>
+                                        setTelegramConfig({ ...telegramConfig, bot_token: e.target.value })
+                                    }
+                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Allowed Chat ID (Optional Security Filter)
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 987654321"
+                                    value={telegramConfig.allowed_chat_id ?? ''}
+                                    onChange={(e) =>
+                                        setTelegramConfig({
+                                            ...telegramConfig,
+                                            allowed_chat_id: e.target.value ? Number(e.target.value) : null,
+                                        })
+                                    }
+                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="flex items-center gap-2">
+                                {telegramBotUsername && (
+                                    <span className="text-xs text-sky-400 font-mono bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+                                        @{telegramBotUsername}
+                                    </span>
+                                )}
+                                {telegramStatus?.is_running && (
+                                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono">
+                                        Polling Active
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleTestTelegram}
+                                    disabled={isTestingTelegram}
+                                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700 text-xs flex items-center gap-1.5 transition"
+                                >
+                                    {isTestingTelegram ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
+                                    )}
+                                    Test Bot
+                                </button>
+                                <button
+                                    onClick={handleSendTelegramPing}
+                                    disabled={isSendingPing || !telegramConfig.allowed_chat_id}
+                                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700 text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                                >
+                                    {isSendingPing ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Send className="w-3.5 h-3.5 text-sky-400" />
+                                    )}
+                                    Send Ping
+                                </button>
+                                <button
+                                    onClick={handleSaveTelegram}
+                                    disabled={isSavingTelegram}
+                                    className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition"
+                                >
+                                    Save Telegram
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-gray-400 space-y-1">
+                            <span className="font-semibold text-gray-300">Supported Telegram Commands:</span>
+                            <div className="font-mono text-[11px] text-gray-400 space-y-0.5">
+                                <p>• <code>/snapshot</code> or <code>How many machines are running?</code> — Cluster snapshot</p>
+                                <p>• <code>FF</code> or <code>/ff</code> — Fast-forward workspace profile rotation</p>
+                                <p>• <code>CMD:&lt;node-alias&gt;:&lt;powershell-command&gt;</code> — Execute remote terminal command</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Cross-DB Migration Modal */}
+            <ModalDialog
+                isOpen={isMigrateModalOpen}
+                onClose={() => setIsMigrateModalOpen(false)}
+                title="Cross-Database Selective Data Migration"
+            >
+                <div className="space-y-4 text-sm">
+                    <p className="text-xs text-gray-400">
+                        Migrate recent, critical state (online nodes, active profiles, unexpired leases, and last 50 commands) from a source or damaged Supabase endpoint to a new target endpoint.
+                    </p>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Source Endpoint (Damaged / Current)
+                        </label>
+                        <select
+                            value={sourceEpId}
+                            onChange={(e) => setSourceEpId(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-amber-500 text-xs"
+                        >
+                            {config?.endpoints.map((ep) => (
+                                <option key={ep.id} value={ep.id}>
+                                    {ep.name} ({ep.role} - {ep.url})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Target Endpoint (New Supabase Project)
+                        </label>
+                        <select
+                            value={targetEpId}
+                            onChange={(e) => setTargetEpId(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-amber-500 text-xs"
+                        >
+                            {config?.endpoints.map((ep) => (
+                                <option key={ep.id} value={ep.id}>
+                                    {ep.name} ({ep.role} - {ep.url})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {migrationResult && (
+                        <div
+                            className={`p-3 rounded-lg border text-xs ${
+                                migrationResult.is_success
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                                    : 'bg-red-500/10 border-red-500/30 text-red-300'
+                            }`}
+                        >
+                            <p className="font-semibold">{migrationResult.message}</p>
+                            {migrationResult.is_success && (
+                                <div className="mt-1 font-mono text-[11px] text-gray-300 flex gap-3">
+                                    <span>Nodes: {migrationResult.nodes_migrated}</span>
+                                    <span>Profiles: {migrationResult.profiles_migrated}</span>
+                                    <span>Leases: {migrationResult.leases_migrated}</span>
+                                    <span>Commands: {migrationResult.commands_migrated}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                            onClick={() => setIsMigrateModalOpen(false)}
+                            className="px-4 py-2 rounded-lg bg-slate-800 text-gray-300 text-xs hover:bg-slate-700 transition"
+                        >
+                            Close
+                        </button>
+                        <button
+                            onClick={handleMigrateSubmit}
+                            disabled={isMigrating}
+                            className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition flex items-center gap-1.5"
+                        >
+                            {isMigrating ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                            )}
+                            Start Migration
+                        </button>
+                    </div>
+                </div>
+            </ModalDialog>
 
             {/* Add Endpoint Modal */}
             <ModalDialog

@@ -28,6 +28,9 @@ pub use email::*;
 // 导出 supabase 命令
 pub mod supabase;
 pub use supabase::*;
+// 导出 telegram 命令
+pub mod telegram;
+pub use telegram::*;
 
 /// 列出所有账号
 #[tauri::command]

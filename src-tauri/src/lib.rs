@@ -870,6 +870,8 @@ pub fn run() {
             commands::get_supabase_config,
             commands::save_supabase_config,
             commands::test_supabase_endpoint,
+            commands::check_supabase_endpoint_tables,
+            commands::migrate_supabase_data,
             commands::get_supabase_schema_sql,
             commands::export_supabase_config,
             commands::import_supabase_config,
@@ -877,6 +879,12 @@ pub fn run() {
             commands::release_account_lease,
             commands::list_active_account_leases,
             commands::get_local_node_info,
+            // Telegram Inbound Watcher commands
+            commands::get_telegram_config,
+            commands::save_telegram_config,
+            commands::test_telegram_bot,
+            commands::get_telegram_status,
+            commands::send_telegram_test_message,
         ])
 
 

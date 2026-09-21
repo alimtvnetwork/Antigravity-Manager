@@ -35,6 +35,7 @@ pub mod supabase_command_queue;
 pub mod supabase_pruner;
 pub mod supabase_schema;
 pub mod supabase_sync;
+pub mod telegram_inbound;
 pub mod token_stats;
 pub mod tray;
 pub mod update_checker;

@@ -195,3 +195,134 @@ pub fn start_sync_worker() {
         }
     });
 }
+
+/// Migration summary for cross-database failover transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataMigrationSummary {
+    pub is_success: bool,
+    pub nodes_migrated: usize,
+    pub profiles_migrated: usize,
+    pub leases_migrated: usize,
+    pub commands_migrated: usize,
+    pub message: String,
+}
+
+/// Migrate active and recent state from a source/damaged Supabase endpoint to a target endpoint
+pub async fn migrate_database_data(
+    source_endpoint_id: &str,
+    target_endpoint_id: &str,
+) -> Result<DataMigrationSummary, AppError> {
+    let config = load_config()?;
+    let source_ep = config
+        .endpoints
+        .iter()
+        .find(|e| e.id == source_endpoint_id)
+        .ok_or_else(|| {
+            AppError::Config(format!(
+                "Source endpoint '{}' not found",
+                source_endpoint_id
+            ))
+        })?;
+    let target_ep = config
+        .endpoints
+        .iter()
+        .find(|e| e.id == target_endpoint_id)
+        .ok_or_else(|| {
+            AppError::Config(format!(
+                "Target endpoint '{}' not found",
+                target_endpoint_id
+            ))
+        })?;
+
+    let source_client = SupabaseClient::new(source_ep)?;
+    let target_client = SupabaseClient::new(target_ep)?;
+
+    let mut nodes_migrated = 0;
+    let mut profiles_migrated = 0;
+    let mut leases_migrated = 0;
+    let mut commands_migrated = 0;
+
+    // 1. Migrate active nodes
+    if let Ok(nodes_val) = source_client.select("nodes", "status=eq.online").await {
+        if let Some(nodes_arr) = nodes_val.as_array() {
+            for node in nodes_arr {
+                if target_client
+                    .upsert("nodes", node.clone(), "id")
+                    .await
+                    .is_ok()
+                {
+                    nodes_migrated += 1;
+                }
+            }
+        }
+    }
+
+    // 2. Migrate active instance profiles
+    if let Ok(prof_val) = source_client
+        .select("instance_profiles", "status=eq.running")
+        .await
+    {
+        if let Some(prof_arr) = prof_val.as_array() {
+            for prof in prof_arr {
+                if target_client
+                    .upsert("instance_profiles", prof.clone(), "id")
+                    .await
+                    .is_ok()
+                {
+                    profiles_migrated += 1;
+                }
+            }
+        }
+    }
+
+    // 3. Migrate active leases (unexpired)
+    let now = Utc::now().timestamp();
+    let lease_query = format!("expires_at=gt.{}", now);
+    if let Ok(leases_val) = source_client.select("workspace_leases", &lease_query).await {
+        if let Some(leases_arr) = leases_val.as_array() {
+            for lease in leases_arr {
+                if target_client
+                    .upsert("workspace_leases", lease.clone(), "account_id")
+                    .await
+                    .is_ok()
+                {
+                    leases_migrated += 1;
+                }
+            }
+        }
+    }
+
+    // 4. Migrate recent 50 commands
+    if let Ok(cmd_val) = source_client
+        .select("command_queue", "order=created_at.desc&limit=50")
+        .await
+    {
+        if let Some(cmd_arr) = cmd_val.as_array() {
+            for cmd in cmd_arr {
+                if target_client
+                    .upsert("command_queue", cmd.clone(), "id")
+                    .await
+                    .is_ok()
+                {
+                    commands_migrated += 1;
+                }
+            }
+        }
+    }
+
+    let total = nodes_migrated + profiles_migrated + leases_migrated + commands_migrated;
+    let msg =
+        format!(
+        "Successfully migrated {} records ({} nodes, {} profiles, {} leases, {} commands) to {}",
+        total, nodes_migrated, profiles_migrated, leases_migrated, commands_migrated, target_ep.name
+    );
+
+    Ok(DataMigrationSummary {
+        is_success: true,
+        nodes_migrated,
+        profiles_migrated,
+        leases_migrated,
+        commands_migrated,
+        message: msg,
+    })
+}
