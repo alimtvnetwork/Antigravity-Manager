@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-22T07:25:00Z, Skills Suite & Memory write: created 6 specialized domain skills for Antigravity-Manager (agm-proxy-engine, agm-thinking-store, agm-multi-instance-sandboxing, agm-split-sqlite-architecture, agm-frontend-react-tauri, agm-email-remote-control) and recorded learned/17-agm-dedicated-domain-skills-suite.md.
 - 2026-09-19T02:00:00Z, Memory write: v4.18.0 email management, split security vault DB, bidirectional remote control, 20 CI/CD RCAs, and quality resilience recorded in learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md.
 - 2026-09-18T09:00:00Z, Memory write: v4.17.0 architecture, SQLite L2 tool signatures, test suite resilience, 17 CI/CD RCAs, and .ai-memory migration recorded in learned/15-v4-17-0-architecture-sqlite-tool-signatures-and-test-resilience.md.
 - 2026-09-17T14:00:00Z, Memory write: comprehensive project context, v4.14.0 release state, 10 recent git commits, and CODE RED rules recorded in learned/14-comprehensive-project-context-and-v4-14-0-state.md.
@@ -39,6 +40,9 @@
 - .ai-memory/memory/learned/14-comprehensive-project-context-and-v4-14-0-state.md, why: comprehensive project context, v4.14.0 release state, 10 recent git commits, and CODE RED rules
 - .ai-memory/memory/learned/15-v4-17-0-architecture-sqlite-tool-signatures-and-test-resilience.md, why: v4.17.0 architecture, SQLite L2 tool signatures, test suite resilience, 17 CI/CD RCAs, and .ai-memory migration
 - .ai-memory/memory/learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md, why: v4.18.0 email management, split security passwords DB, 20 CI/CD RCAs, and quality resilience
+- .ai-memory/memory/learned/17-gitmap-search-and-llm-commands-protocol.md, why: elimination of broad recursive OS filesystem scans in favor of GitMap indexed search
+- .ai-memory/memory/learned/18-ruby-homebrew-cask-architecture.md, why: Homebrew Cask package definition architecture and release distribution
+- .ai-memory/memory/learned/19-agm-dedicated-domain-skills-suite.md, why: dedicated AGM domain skills suite covering reverse proxy, thinking store, multi-instance sandboxing, split SQLite databases, React UI, and email remote control
 - `02-spec/21-app/01-index.md`, why: master index of application specifications, architecture guides, token capture sequences, and multi-instance blueprints
 - `.ai-memory/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.ai-memory/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony

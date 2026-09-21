@@ -2,7 +2,7 @@
 
 ## 1. Context & Ban on Broad OS-Level Scans
 
-AI agents must **NEVER** run broad, recursive filesystem scans via shell commands (e.g. `Get-ChildItem -Path "C:\Program Files*" -Recurse`, `find / -name ...`, or scanning entire system root directories).
+AI agents must **NEVER** run broad, recursive filesystem scans via shell commands (e.g. `Get-ChildItem -Path "%ProgramFiles%*" -Recurse`, `find / -name ...`, or scanning entire system root directories).
 These operations spawn long-running background tasks, lock execution threads, flood OS disk I/O, waste IDE resources, and cause noticeable UI stalls.
 
 ## 2. Mandatory Search Protocols
