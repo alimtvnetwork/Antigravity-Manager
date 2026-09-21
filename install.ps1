@@ -318,19 +318,16 @@ function Remove-PreviousInstallations {
         }
     }
 
-    # 4. Clean previous shortcuts from Start Menu, Desktop, and Taskbar
+    # 4. Clean legacy shortcuts from Start Menu, Desktop, and Taskbar (preserving active AGM by Alim.lnk)
     $prevShortcuts = @(
-        (Join-Path $StartMenuDir "AGM by Alim.lnk"),
         (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
         (Join-Path $StartMenuDir "antigravity-tools.lnk"),
         (Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"),
         (Join-Path $StartMenuDir "Anti-Gravity Tools.lnk"),
-        (Join-Path $DesktopDir "AGM by Alim.lnk"),
         (Join-Path $DesktopDir "Antigravity Tools.lnk"),
         (Join-Path $DesktopDir "antigravity-tools.lnk"),
         (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
         (Join-Path $DesktopDir "Anti-Gravity Tools.lnk"),
-        (Join-Path $TaskbarDir "AGM by Alim.lnk"),
         (Join-Path $TaskbarDir "Antigravity Tools.lnk"),
         (Join-Path $TaskbarDir "antigravity-tools.lnk"),
         (Join-Path $TaskbarDir "Anti-Gravity Tools by Alim.lnk"),
@@ -406,6 +403,67 @@ function Pin-TaskbarShortcut {
             }
         }
     }
+}
+
+function Pin-StartMenuOnce {
+    param(
+        [string]$ShortcutPath,
+        [string]$MarkerDir
+    )
+
+    $pinMarker = Join-Path $MarkerDir ".start_menu_pinned"
+    if (Test-Path $pinMarker) {
+        Write-Step "Start Menu pin already configured (marker exists). Skipping."
+        return
+    }
+
+    if (-not (Test-Path $ShortcutPath)) {
+        Write-Warn "Shortcut $ShortcutPath not found; cannot pin to Start Menu."
+        return
+    }
+
+    Write-Step "Configuring Start Menu pin if not exists (one-time setup)..."
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        $folderPath = Split-Path $ShortcutPath -Parent
+        $fileName = Split-Path $ShortcutPath -Leaf
+        $folder = $shell.Namespace($folderPath)
+        if ($folder) {
+            $item = $folder.ParseName($fileName)
+            if ($item) {
+                $verbs = $item.Verbs()
+                $isAlreadyPinned = $false
+                $pinVerb = $null
+                foreach ($v in $verbs) {
+                    $clean = $v.Name.Replace('&', '').Trim()
+                    if ($clean -match '^(Unpin from Start|Unpin from Start screen|从.*开始.*取消固定|Von .*Start.* lösen)') {
+                        $isAlreadyPinned = $true
+                        break
+                    }
+                    if ($clean -match '^(Pin to Start|Pin to Start screen|pintostartscreen|固定到.*开始.*|An .*Start.* anheften)') {
+                        $pinVerb = $v
+                    }
+                }
+
+                if ($isAlreadyPinned) {
+                    Write-Step "Application is already pinned to Start Menu."
+                } elseif ($pinVerb) {
+                    try {
+                        $pinVerb.DoIt()
+                        Write-Success "Pinned to Start Menu via shell verb: $($pinVerb.Name)"
+                    } catch {
+                        Write-Step "Native shell verb pin restricted by Windows security policy; shortcut active in Start Menu."
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Step "Start Menu pin check note: $_"
+    }
+
+    try {
+        Set-Content -Path $pinMarker -Value "pinned" -Force -ErrorAction SilentlyContinue
+    } catch {}
 }
 
 # --- UNINSTALL FLOW ---
@@ -1055,16 +1113,15 @@ if (-not $NoShortcut) {
                 if (-not (Test-Path $StartMenuDir)) {
                     New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
                 }
-                if (Test-Path $StartMenuShortcut) {
-                    Write-Step "Start Menu shortcut already exists: $StartMenuShortcut"
-                } else {
-                    $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
-                    $smShortcut.TargetPath = $ExePath
-                    $smShortcut.WorkingDirectory = $InstallDir
-                    $smShortcut.Description = $Tooltip
-                    $smShortcut.Save()
-                    Write-Success "Created Start Menu shortcut: $StartMenuShortcut"
-                }
+                $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
+                $smShortcut.TargetPath = $ExePath
+                $smShortcut.WorkingDirectory = $InstallDir
+                $smShortcut.Description = $Tooltip
+                $smShortcut.Save()
+                Write-Success "Configured Start Menu shortcut: $StartMenuShortcut"
+
+                # Step 6: Pin to Start Menu if not exists (one-time setup)
+                Pin-StartMenuOnce -ShortcutPath $StartMenuShortcut -MarkerDir $InstallDir
 
                 # Desktop
                 if (Test-Path $DesktopDir) {
