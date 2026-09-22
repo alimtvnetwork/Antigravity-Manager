@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCompactDuration, getLiveLimitForModel, getLiveLimitState } from '../../utils/liveLimit';
 import { getModelProtectionKey, findQuotaModel, findImageQuotaModel } from '../../config/modelConfig';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { formatDateTime } from '../../utils/date';
 
 
 interface AccountRowProps {
@@ -326,15 +327,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 最后使用 */}
-            <td className="px-4 py-1">
-                <div className="flex flex-col">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
-                        {new Date(account.last_used * 1000).toLocaleDateString()}
-                    </span>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono whitespace-nowrap leading-tight">
-                        {new Date(account.last_used * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                </div>
+            <td className="px-4 py-1 whitespace-nowrap">
+                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 font-mono">
+                    {formatDateTime(account.last_used)}
+                </span>
             </td>
 
             {/* 操作 */}

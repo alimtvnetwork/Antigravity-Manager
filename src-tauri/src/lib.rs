@@ -83,6 +83,58 @@ fn credential_state(value: &str) -> &'static str {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub fn force_restore_and_focus_win32(window: &tauri::WebviewWindow) {
+    use std::ffi::c_void;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn ShowWindow(hwnd: *mut c_void, n_cmd_show: i32) -> i32;
+        fn SetForegroundWindow(hwnd: *mut c_void) -> i32;
+        fn BringWindowToTop(hwnd: *mut c_void) -> i32;
+        fn SwitchToThisWindow(hwnd: *mut c_void, alt_tab: i32);
+        fn IsIconic(hwnd: *mut c_void) -> i32;
+        fn OpenIcon(hwnd: *mut c_void) -> i32;
+        fn GetCurrentThreadId() -> u32;
+        fn GetWindowThreadProcessId(hwnd: *mut c_void, lpdw_process_id: *mut u32) -> u32;
+        fn AttachThreadInput(id_attach: u32, id_attach_to: u32, f_attach: i32) -> i32;
+        fn GetForegroundWindow() -> *mut c_void;
+    }
+
+    if let Ok(hwnd) = window.hwnd() {
+        let hwnd_ptr = hwnd.0 as *mut c_void;
+        unsafe {
+            let is_min = IsIconic(hwnd_ptr) != 0;
+            if is_min {
+                OpenIcon(hwnd_ptr);
+                ShowWindow(hwnd_ptr, 9); // SW_RESTORE
+            } else {
+                ShowWindow(hwnd_ptr, 5); // SW_SHOW
+            }
+
+            let fg_hwnd = GetForegroundWindow();
+            let fg_thread = GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut());
+            let current_thread = GetCurrentThreadId();
+
+            let is_different_thread = fg_thread != current_thread;
+            let has_fg_thread = fg_thread != 0;
+            if is_different_thread {
+                if has_fg_thread {
+                    AttachThreadInput(current_thread, fg_thread, 1);
+                    BringWindowToTop(hwnd_ptr);
+                    SetForegroundWindow(hwnd_ptr);
+                    AttachThreadInput(current_thread, fg_thread, 0);
+                }
+            } else {
+                BringWindowToTop(hwnd_ptr);
+                SetForegroundWindow(hwnd_ptr);
+            }
+
+            SwitchToThisWindow(hwnd_ptr, 1);
+        }
+    }
+}
+
 pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
     let _ = window.show();
     let _ = window.unminimize();
@@ -109,6 +161,7 @@ pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
     let _ = window.set_focus();
     #[cfg(target_os = "windows")]
     {
+        force_restore_and_focus_win32(window);
         let _ = window.set_always_on_top(true);
         let _ = window.set_always_on_top(false);
         let _ = window.set_focus();
@@ -121,6 +174,7 @@ pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
             .set_activation_policy(tauri::ActivationPolicy::Regular)
             .unwrap_or(());
     }
+    let _ = window.emit("window-restored", ());
 }
 
 #[cfg(target_os = "linux")]

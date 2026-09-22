@@ -85,32 +85,32 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   return (
     <div
       className={`
-        fixed top-6 right-6 z-[100]
-        transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
-        ${isVisible && !isClosing ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-4 opacity-0 scale-95'}
+        fixed bottom-6 right-6 z-[100]
+        transition-all duration-400 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+        ${isVisible && !isClosing ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'}
       `}
     >
       <div className="
         relative overflow-hidden
-        w-72 p-3.5
+        w-64 p-2.5
         rounded-xl
-        border border-white/20 dark:border-white/10
-        shadow-[0_8px_24px_0_rgba(31,38,135,0.12)]
+        border border-white/30 dark:border-white/10
+        shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
         backdrop-blur-xl
-        bg-white/80 dark:bg-slate-900/75
+        bg-white/90 dark:bg-slate-900/90
         group
       ">
-        <div className="absolute -top-10 -right-10 w-28 h-28 bg-blue-500/15 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/25 transition-colors duration-500" />
-        <div className="absolute -bottom-10 -left-10 w-28 h-28 bg-purple-500/15 rounded-full blur-2xl pointer-events-none group-hover:bg-purple-500/25 transition-colors duration-500" />
+        <div className="absolute -top-8 -right-8 w-20 h-20 bg-blue-500/15 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/25 transition-colors duration-500" />
+        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-purple-500/15 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/25 transition-colors duration-500" />
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-1.5">
             <div className="flex items-center gap-1.5">
-              <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
+              <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 shadow-xs">
                 {updateState === 'ready' ? (
-                  <CheckCircle className="w-3.5 h-3.5 text-white" />
+                  <CheckCircle className="w-3 h-3 text-white" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                  <Sparkles className="w-3 h-3 text-white" />
                 )}
               </div>
               <div>
@@ -120,7 +120,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                     : t('update_notification.title')}
                 </h3>
                 {updateInfo && (
-                  <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
                     v{updateInfo.latest_version}
                   </p>
                 )}
@@ -138,14 +138,14 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 "
                 aria-label={t('common.cancel')}
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             )}
           </div>
 
           {/* Status message */}
-          <div className="mb-2.5">
-            <p className="text-xs text-gray-600 dark:text-gray-300 leading-snug">
+          <div className="mb-2">
+            <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-snug">
               {updateState === 'downloading' && t('update_notification.downloading')}
               {updateState === 'ready' && t('update_notification.restart_prompt')}
               {updateState === 'error' && `${t('update_notification.toast.failed')}`}
@@ -159,7 +159,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
           {/* Progress bar during download */}
           {updateState === 'downloading' && (
-            <div className="mb-2.5">
+            <div className="mb-2">
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                 <div
                   className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full transition-all duration-300"
@@ -183,21 +183,20 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   relative overflow-hidden
                   bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500
                   text-white font-medium text-xs
-                  py-1.5 px-3 rounded-lg
-                  shadow shadow-green-500/20
+                  py-1 px-2.5 rounded-lg
+                  shadow-xs shadow-green-500/20
                   transition-all duration-300
                   flex items-center justify-center gap-1.5
                   active:scale-[0.98] cursor-pointer
                 "
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3 h-3" />
                 <span>{t('update_notification.btn_restart')}</span>
-                <div className="absolute inset-0 -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent z-20 pointer-events-none" />
               </button>
               <button
                 onClick={handleClose}
                 className="
-                  px-2.5 py-1.5 rounded-lg
+                  px-2 py-1 rounded-lg
                   text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                   hover:bg-black/5 dark:hover:bg-white/10
                   transition-all duration-200
@@ -211,7 +210,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
           {/* Installer / Manual download button */}
           {updateState === 'manual' && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1">
               <div className="flex gap-1.5">
                 <button
                   onClick={handleRunInstaller}
@@ -222,8 +221,8 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                     bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
                     disabled:from-blue-400 disabled:to-purple-400 disabled:cursor-not-allowed
                     text-white font-medium
-                    py-1.5 px-3 rounded-lg
-                    shadow shadow-blue-500/20
+                    py-1 px-2.5 rounded-lg
+                    shadow-xs shadow-blue-500/20
                     transition-all duration-300
                     flex items-center justify-center gap-1.5
                     active:scale-[0.98] cursor-pointer text-xs
@@ -231,12 +230,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 >
                   {isInstalling ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-3 h-3 animate-spin" />
                       <span>{t('update_notification.installing', 'Installing...')}</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Sparkles className="w-3 h-3" />
                       <span>{t('update_notification.btn_install_now', 'Install Now')}</span>
                     </>
                   )}
@@ -245,7 +244,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   onClick={handleClose}
                   disabled={isInstalling}
                   className="
-                    px-2.5 py-1.5 rounded-lg
+                    px-2 py-1 rounded-lg
                     text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                     hover:bg-black/5 dark:hover:bg-white/10
                     transition-all duration-200
@@ -268,7 +267,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   }
                 }}
                 disabled={isInstalling}
-                className="text-[11px] text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
+                className="text-[10px] text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
               >
                 {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>
@@ -288,14 +287,14 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 w-full
                 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
                 text-white font-medium
-                py-2.5 px-4 rounded-xl
-                shadow-lg shadow-blue-500/25
+                py-1.5 px-3 rounded-lg
+                shadow-xs shadow-blue-500/25
                 transition-all duration-300
-                flex items-center justify-center gap-2
+                flex items-center justify-center gap-1.5 text-xs
                 active:scale-[0.98]
               "
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span>{t('common.retry')}</span>
             </button>
           )}
@@ -304,3 +303,4 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
     </div>
   );
 };
+

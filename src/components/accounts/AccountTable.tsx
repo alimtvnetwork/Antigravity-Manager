@@ -63,6 +63,7 @@ import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../ut
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
 import { supabaseService, WorkspaceLease } from '../../services/supabaseService';
+import { formatDateTime } from '../../utils/date';
 
 // ============================================================================
 // 类型定义
@@ -739,36 +740,32 @@ function AccountRowContent({
             </td>
 
             {/* 最后使用时间列 */}
-            <td className="px-2 py-0.5 align-middle">
-                <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
-                        {new Date(account.last_used * 1000).toLocaleDateString()}
-                    </span>
-                    <span className="text-[9px] text-gray-400 dark:text-gray-500 font-mono whitespace-nowrap">
-                        {new Date(account.last_used * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                </div>
+            <td className="px-2 py-0.5 align-middle whitespace-nowrap">
+                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 font-mono">
+                    {formatDateTime(account.last_used)}
+                </span>
             </td>
 
             {/* 操作列 */}
             <td className={cn(
-                "px-1 py-0.5 sticky right-0 z-10 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
+                "px-2 py-0.5 sticky right-0 z-10 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
                 // 动态高对比高亮处理
                 isCurrent
                     ? "bg-[#fffbeb] dark:bg-[#131b2e]"
                     : "bg-white dark:bg-base-100",
                 !isCurrent ? "group-hover:bg-amber-500/10 dark:group-hover:bg-[#162238]" : ""
             )}>
-                <div className="flex items-center justify-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. 刷新按钮 (首选首位) */}
                     <button
-                        className={`p-1 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
+                        className={`p-1.5 rounded-md transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
                         disabled={isRefreshing || isDisabled}
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
+
 
                     {/* 2. 切换/实例选择操作组 (排在第二位) */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
@@ -1142,7 +1139,7 @@ function AccountTable({
                                     </div>
                                 </div>
                             </th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[85px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[150px] whitespace-nowrap">
                                 <button
                                     type="button"
                                     onClick={() => handleSortToggle('last_used')}
@@ -1160,7 +1157,7 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[260px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[210px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
                         </tr>
                     </thead>
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>

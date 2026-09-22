@@ -5,6 +5,7 @@ import { Account, DeviceProfile, DeviceProfileVersion } from '../../types/accoun
 import * as accountService from '../../services/accountService';
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../../utils/env';
+import { formatDateTime } from '../../utils/date';
 
 interface DeviceFingerprintDialogProps {
     account: Account | null;
@@ -276,7 +277,7 @@ function HistoryRow({ id, label, createdAt, profile, onRestore, onDelete, isCurr
         <div className="flex items-start justify-between p-2 rounded-lg border border-gray-100 dark:border-base-200 hover:border-indigo-200 dark:hover:border-indigo-500/40 transition-colors">
             <div className="text-[11px] text-gray-600 dark:text-gray-300 flex-1">
                 <div className="font-semibold">{label}{isCurrent && <span className="ml-2 text-[10px] text-blue-500">{t('accounts.device_fingerprint_dialog.current')}</span>}</div>
-                {createdAt > 0 && <div className="text-[10px] text-gray-400">{new Date(createdAt * 1000).toLocaleString()}</div>}
+                {createdAt > 0 && <div className="text-[10px] text-gray-400">{formatDateTime(createdAt)}</div>}
                 <div className="mt-1 text-[10px] font-mono text-gray-500">
                     <div>machineId: {profile.machine_id}</div>
                     <div>macMachineId: {profile.mac_machine_id}</div>

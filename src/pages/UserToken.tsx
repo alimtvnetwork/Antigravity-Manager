@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { request as invoke } from '../utils/request';
 import { showToast } from '../components/common/ToastContainer';
 import { copyToClipboard } from '../utils/clipboard';
+import { formatDateTime } from '../utils/date';
 
 interface UserToken {
     id: string;
@@ -202,8 +203,7 @@ const UserToken: React.FC = () => {
     };
 
     const formatTime = (ts?: number) => {
-        if (!ts) return '-';
-        return new Date(ts * 1000).toLocaleString();
+        return formatDateTime(ts);
     };
 
     const getExpiresLabel = (type: string) => {

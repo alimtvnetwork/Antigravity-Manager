@@ -756,7 +756,7 @@ function Accounts() {
   };
 
   return (
-    <div className="h-full flex flex-col px-4 sm:px-6 pt-2 pb-4 gap-3 max-w-7xl mx-auto w-full min-w-0">
+    <div className="h-full flex flex-col px-2.5 sm:px-4 pt-1.5 pb-4 gap-2.5 max-w-7xl mx-auto w-full min-w-0">
       {/* File input for import */}
       <input
         ref={fileInputRef}
@@ -767,16 +767,16 @@ function Accounts() {
       />
 
       {/* Top action bar: search, filters, and action buttons */}
-      <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 min-w-0 w-full">
+      <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 min-w-0 w-full">
         {/* Left controls: search, window, view mode, quota filter */}
-        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
+        <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
           {/* Search box - responsive */}
           <div className="hidden lg:block flex-none w-40 relative transition-all focus-within:w-48">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
               placeholder={t('accounts.search_placeholder')}
-              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              className="w-full h-8 pl-8 pr-3 bg-gray-100/50 dark:bg-white/[0.04] text-xs text-gray-900 dark:text-base-content border border-transparent hover:border-gray-200/50 dark:hover:border-white/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -790,20 +790,20 @@ function Accounts() {
                   setIsSearchExpanded(true);
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }}
-                className="p-2 bg-gray-100/40 dark:bg-white/[0.04] hover:bg-gray-200/60 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+                className="h-8 w-8 inline-flex items-center justify-center bg-gray-100/40 dark:bg-white/[0.04] hover:bg-gray-200/60 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
                 title={t('accounts.search_placeholder')}
               >
-                <Search className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                <Search className="w-3.5 h-3.5 text-gray-600 dark:text-gray-300" />
               </button>
             ) : (
               <div className="absolute left-0 top-0 z-10 w-64 flex items-center gap-1">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     placeholder={t('accounts.search_placeholder')}
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-base-100 text-sm text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-lg"
+                    className="w-full h-8 pl-8 pr-3 bg-white dark:bg-slate-900 text-xs text-gray-900 dark:text-base-content border border-transparent rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-lg"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onBlur={() => setIsSearchExpanded(false)}

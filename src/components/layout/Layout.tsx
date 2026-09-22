@@ -8,6 +8,9 @@ import { useEffect } from 'react';
 import { isTauri } from '../../utils/env';
 import { ensureFullViewState } from '../../utils/windowManager';
 
+import { useAccountStore } from '../../stores/useAccountStore';
+import { useInstanceStore } from '../../stores/useInstanceStore';
+
 function Layout() {
     const { isMiniView } = useViewStore();
 
@@ -21,11 +24,27 @@ function Layout() {
         }
     }, [isMiniView]);
 
-    // Ensure WebView2 invalidates backbuffer and repaints after minimize/restore
+    // Ensure WebView2 invalidates backbuffer and repaints after minimize/restore,
+    // and re-syncs accounts and instances to eliminate stale cached UI states
     useEffect(() => {
+        let lastRestoreTime = 0;
         const handleRestore = () => {
-            if (document.hidden) return;
+            const now = Date.now();
+            if (now - lastRestoreTime < 1500) return;
+            lastRestoreTime = now;
+
             window.dispatchEvent(new Event('resize'));
+
+            try {
+                const accountStore = useAccountStore.getState();
+                accountStore.fetchAccounts();
+                accountStore.fetchCurrentAccount();
+
+                const instanceStore = useInstanceStore.getState();
+                instanceStore.fetchInstances();
+            } catch (err) {
+                console.error('[Layout] Failed to refresh stores on restore:', err);
+            }
         };
 
         window.addEventListener('focus', handleRestore);
@@ -48,6 +67,7 @@ function Layout() {
             if (unlisten) unlisten();
         };
     }, []);
+
 
     if (isMiniView) {
         return (

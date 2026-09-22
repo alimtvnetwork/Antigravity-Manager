@@ -9,6 +9,7 @@ import { MODEL_CONFIG, sortModels, getModelProtectionKey, resolveQuotaModels, en
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { formatDateTime } from '../../utils/date';
 
 interface AccountCardProps {
     account: Account;
@@ -318,7 +319,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                             )}
                         </div>
                         <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono shrink-0 whitespace-nowrap">
-                            {new Date(account.last_used * 1000).toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatDateTime(account.last_used)}
                         </span>
                     </div>
                 </div>
