@@ -33,11 +33,12 @@ pub fn encode_iterative(data: &str, rounds: u32) -> String {
     format!("{}${}", effective_rounds, current)
 }
 
-/// Decode iterative Base64 string prefixed with "<rounds>$"
+/// Decode iterative Base64 string prefixed with "<rounds>$" or "<rounds>:"
 pub fn decode_iterative(encoded: &str) -> Result<String, AppError> {
     let trimmed = encoded.trim();
 
-    if let Some((rounds_part, payload_part)) = trimmed.split_once('$') {
+    let parts = trimmed.split_once('$').or_else(|| trimmed.split_once(':'));
+    if let Some((rounds_part, payload_part)) = parts {
         let rounds: u32 = rounds_part
             .parse()
             .map_err(|_| AppError::Config(format!("Invalid iteration prefix: {}", rounds_part)))?;
@@ -65,6 +66,101 @@ pub fn decode_iterative(encoded: &str) -> Result<String, AppError> {
     Ok(trimmed.to_string())
 }
 
+fn format_yaml_endpoint(ep: &SupabaseEndpoint) -> String {
+    format!(
+        "  - id: \"{}\"\n    name: \"{}\"\n    url: \"{}\"\n    api_key: \"{}\"\n    role: \"{}\"\n    is_enabled: {}\n    prune_threshold_mb: {}\n    priority: {}\n",
+        ep.id, ep.name, ep.url, ep.api_key, ep.role, ep.is_enabled, ep.prune_threshold_mb, ep.priority
+    )
+}
+
+fn format_yaml_bundle(bundle: &SupabaseExportBundle) -> String {
+    let mut out = format!(
+        "version: \"{}\"\nnode_alias: \"{}\"\nis_sync_enabled: {}\nauto_prune_root_mb: {}\nauto_prune_secondary_mb: {}\nheartbeat_interval_secs: {}\nendpoints:\n",
+        bundle.version, bundle.node_alias, bundle.is_sync_enabled, bundle.auto_prune_root_mb, bundle.auto_prune_secondary_mb, bundle.heartbeat_interval_secs
+    );
+    for ep in &bundle.endpoints {
+        out.push_str(&format_yaml_endpoint(ep));
+    }
+    out
+}
+
+fn parse_yaml_bundle(content: &str) -> Result<SupabaseExportBundle, AppError> {
+    let mut version = "1.0.0".to_string();
+    let mut node_alias = "Node-Local".to_string();
+    let mut is_sync_enabled = false;
+    let mut auto_prune_root_mb = 400;
+    let mut auto_prune_secondary_mb = 200;
+    let mut heartbeat_interval_secs = 30;
+    let mut endpoints = Vec::new();
+    let mut cur_ep: Option<SupabaseEndpoint> = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if let Some((k, v)) = trimmed.split_once(':') {
+            let key = k.trim().trim_start_matches("- ").trim();
+            let val = v.trim().trim_matches('"').trim_matches('\'');
+
+            if trimmed.starts_with("- ") {
+                if let Some(ep) = cur_ep.take() {
+                    endpoints.push(ep);
+                }
+                cur_ep = Some(SupabaseEndpoint {
+                    id: String::new(),
+                    name: String::new(),
+                    url: String::new(),
+                    api_key: String::new(),
+                    role: "secondary".to_string(),
+                    is_enabled: true,
+                    prune_threshold_mb: 200,
+                    priority: 1,
+                });
+            }
+
+            if let Some(ep) = cur_ep.as_mut() {
+                match key {
+                    "id" => ep.id = val.to_string(),
+                    "name" => ep.name = val.to_string(),
+                    "url" => ep.url = val.to_string(),
+                    "api_key" => ep.api_key = val.to_string(),
+                    "role" => ep.role = val.to_string(),
+                    "is_enabled" => ep.is_enabled = val.parse().unwrap_or(true),
+                    "prune_threshold_mb" => ep.prune_threshold_mb = val.parse().unwrap_or(200),
+                    "priority" => ep.priority = val.parse().unwrap_or(1),
+                    _ => {}
+                }
+            } else {
+                match key {
+                    "version" => version = val.to_string(),
+                    "node_alias" => node_alias = val.to_string(),
+                    "is_sync_enabled" => is_sync_enabled = val.parse().unwrap_or(false),
+                    "auto_prune_root_mb" => auto_prune_root_mb = val.parse().unwrap_or(400),
+                    "auto_prune_secondary_mb" => auto_prune_secondary_mb = val.parse().unwrap_or(200),
+                    "heartbeat_interval_secs" => heartbeat_interval_secs = val.parse().unwrap_or(30),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if let Some(ep) = cur_ep {
+        endpoints.push(ep);
+    }
+
+    Ok(SupabaseExportBundle {
+        version,
+        node_alias,
+        is_sync_enabled,
+        auto_prune_root_mb,
+        auto_prune_secondary_mb,
+        heartbeat_interval_secs,
+        endpoints,
+    })
+}
+
 /// Export Supabase configuration with iterative Base64 encoded keys
 pub fn export_config_string(
     config: &SupabaseConfig,
@@ -90,9 +186,7 @@ pub fn export_config_string(
     };
 
     if format_type.eq_ignore_ascii_case("yaml") || format_type.eq_ignore_ascii_case("yml") {
-        // Fallback JSON-formatted YAML wrapper for reliability
-        serde_json::to_string_pretty(&bundle)
-            .map_err(|e| AppError::Config(format!("Export JSON serialization failed: {}", e)))
+        Ok(format_yaml_bundle(&bundle))
     } else {
         serde_json::to_string_pretty(&bundle)
             .map_err(|e| AppError::Config(format!("Export serialization failed: {}", e)))
@@ -101,8 +195,11 @@ pub fn export_config_string(
 
 /// Import Supabase configuration and decode iterative Base64 keys
 pub fn import_config_string(content: &str) -> Result<SupabaseConfig, AppError> {
-    let bundle: SupabaseExportBundle = serde_json::from_str(content.trim())
-        .map_err(|e| AppError::Config(format!("Failed to parse import content: {}", e)))?;
+    let trimmed = content.trim();
+    let bundle: SupabaseExportBundle = match serde_json::from_str(trimmed) {
+        Ok(b) => b,
+        Err(_) => parse_yaml_bundle(trimmed)?,
+    };
 
     let mut restored_endpoints = Vec::new();
 
