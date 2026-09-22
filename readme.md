@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.52.0-3B82F6?style=flat-square" alt="Version 4.52.0">
+    <img src="https://img.shields.io/badge/Version-4.57.0-3B82F6?style=flat-square" alt="Version 4.57.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -124,21 +124,38 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 ---
 
-### Pinned Version Installation (Historical Releases)
+### 📌 Version Pinning & Known Good Releases
 
-To install an exact, pinned historical release directly from GitHub Releases:
+This version pinning matrix allows developers, enterprise deployments, and users to target any verified release, move smoothly across known stable checkpoints, or roll back if regressions occur.
 
-#### Windows (PowerShell 5.1+)
-```powershell
-# Install pinned release (e.g. v4.57.0)
-irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.57.0/install.ps1 | iex
-```
+<!-- STAMP:VERSION_PIN_TABLE_START -->
+| Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| **v4.57.0** (Latest) | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.57.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.57.0/install.sh \| bash` | `git checkout v4.57.0` |
+| **v4.56.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.sh \| bash` | `git checkout v4.56.0` |
+| **v4.55.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.55.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.55.0/install.sh \| bash` | `git checkout v4.55.0` |
+| **v4.52.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.52.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.52.0/install.sh \| bash` | `git checkout v4.52.0` |
+| **v4.51.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.51.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.51.0/install.sh \| bash` | `git checkout v4.51.0` |
+<!-- STAMP:VERSION_PIN_TABLE_END -->
 
-#### Linux & macOS (Bash)
-```bash
-# Install pinned release (e.g. v4.57.0)
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.57.0/install.sh | bash
-```
+#### How to Pin or Rollback Releases
+
+1. **CLI Parameter Pinning:**
+   - **Windows:**
+     ```powershell
+     .\install.ps1 -Version "4.57.0"
+     ```
+   - **Linux & macOS:**
+     ```bash
+     curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.57.0
+     ```
+
+2. **Git Workspace Pinning:**
+   - Switch your local cloned codebase directly to any historical checkpoint:
+     ```bash
+     git fetch --tags
+     git checkout tags/v4.57.0
+     ```
 
 > [!NOTE]
 > The installer automatically detects pinned release URLs and honors the requested release version, falling back through up to 4 historical candidate releases if target assets cannot be retrieved.

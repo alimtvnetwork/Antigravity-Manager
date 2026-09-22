@@ -71,6 +71,7 @@ export interface CaptureErrorMeta {
   method?: string;
   status?: number;
   requestBody?: string;
+  context?: ErrorContext;
 }
 
 // In-memory ring buffer for the last 10 user clicks
@@ -237,6 +238,7 @@ export function buildCapturedError(
     details: norm.details,
     createdAt: new Date().toISOString(),
     context: {
+      ...meta?.context,
       ...context,
       source: meta?.source,
       triggerComponent: meta?.triggerComponent,

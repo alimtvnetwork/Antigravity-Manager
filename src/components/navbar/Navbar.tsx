@@ -2,6 +2,7 @@ import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, K
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { useErrorStore } from '../../stores/error-store';
 import { isLinux, isTauri } from '../../utils/env';
 import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
@@ -16,7 +17,7 @@ import type { NavItem } from './constants';
  * Responsibility: Layout and state management, responsive handling delegated to subcomponents
  */
 function Navbar() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { config, saveConfig } = useConfigStore();
 
     // Create navigation items with translated labels
@@ -49,6 +50,10 @@ function Navbar() {
             getCurrentWindow().startDragging();
         } catch (err) {
             console.error('Failed to start dragging window:', err);
+            useErrorStore.getState().captureError(err, {
+                source: 'Navbar.tsx',
+                triggerAction: 'handleMouseDown.startDragging',
+            });
         }
     };
 
@@ -65,6 +70,10 @@ function Navbar() {
             await getCurrentWindow().toggleMaximize();
         } catch (err) {
             console.error('Failed to toggle maximize window:', err);
+            useErrorStore.getState().captureError(err, {
+                source: 'Navbar.tsx',
+                triggerAction: 'handleDoubleClick.toggleMaximize',
+            });
         }
     };
 
@@ -74,64 +83,86 @@ function Navbar() {
 
         const newTheme = config.theme === 'light' ? 'dark' : 'light';
 
-        // Use View Transition API if supported, but skip on Linux (may cause crash)
-        if (!isLinux()) {
-            if ('startViewTransition' in document) {
-                const x = event.clientX;
-                const y = event.clientY;
-                const endRadius = Math.hypot(
-                    Math.max(x, window.innerWidth - x),
-                    Math.max(y, window.innerHeight - y)
-                );
-
-                // @ts-ignore
-                const transition = document.startViewTransition(async () => {
-                    saveConfig({
-                        ...config,
-                        theme: newTheme,
-                        language: config.language
-                    }, true);
-                });
-
-                transition.ready.then(() => {
-                    const isDarkMode = newTheme === 'dark';
-                    const clipPath = isDarkMode
-                        ? [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`]
-                        : [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
-
-                    document.documentElement.animate(
-                        {
-                            clipPath: clipPath
-                        },
-                        {
-                            duration: 500,
-                            easing: 'ease-in-out',
-                            fill: 'forwards',
-                            pseudoElement: isDarkMode ? '::view-transition-old(root)' : '::view-transition-new(root)'
-                        }
+        try {
+            // Use View Transition API if supported, but skip on Linux (may cause crash)
+            if (!isLinux()) {
+                if ('startViewTransition' in document) {
+                    const x = event.clientX;
+                    const y = event.clientY;
+                    const endRadius = Math.hypot(
+                        Math.max(x, window.innerWidth - x),
+                        Math.max(y, window.innerHeight - y)
                     );
-                });
-                return;
-            }
-        }
 
-        // Fallback: direct switch (Linux or browsers without View Transition)
-        await saveConfig({
-            ...config,
-            theme: newTheme,
-            language: config.language
-        }, true);
+                    // @ts-ignore
+                    const transition = document.startViewTransition(async () => {
+                        saveConfig({
+                            ...config,
+                            theme: newTheme,
+                            language: config.language
+                        }, true);
+                    });
+
+                    transition.ready.then(() => {
+                        const isDarkMode = newTheme === 'dark';
+                        const clipPath = isDarkMode
+                            ? [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`]
+                            : [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
+
+                        document.documentElement.animate(
+                            {
+                                clipPath: clipPath
+                            },
+                            {
+                                duration: 500,
+                                easing: 'ease-in-out',
+                                fill: 'forwards',
+                                pseudoElement: isDarkMode ? '::view-transition-old(root)' : '::view-transition-new(root)'
+                            }
+                        );
+                    });
+                    return;
+                }
+            }
+
+            // Fallback: direct switch (Linux or browsers without View Transition)
+            await saveConfig({
+                ...config,
+                theme: newTheme,
+                language: config.language
+            }, true);
+        } catch (err) {
+            console.error('Failed to toggle theme:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'Navbar.tsx',
+                triggerComponent: 'NavSettings.ThemeToggle',
+                triggerAction: 'toggleTheme',
+            });
+            useErrorStore.getState().openErrorModal(captured);
+        }
     };
 
-    // Language change logic
+    // Language change logic (runs cleanly in background / hide mode, reporting errors to store)
     const handleLanguageChange = async (langCode: string) => {
-        if (!config) return;
+        try {
+            await i18n.changeLanguage(langCode);
+            if (!config) return;
 
-        await saveConfig({
-            ...config,
-            language: langCode,
-            theme: config.theme
-        }, true);
+            await saveConfig({
+                ...config,
+                language: langCode,
+                theme: config.theme
+            }, true);
+        } catch (err) {
+            console.error('Failed to change language:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'Navbar.tsx',
+                triggerComponent: 'NavSettings.LanguageDropdown',
+                triggerAction: 'handleLanguageChange',
+                context: { targetLanguage: langCode }
+            });
+            useErrorStore.getState().openErrorModal(captured);
+        }
     };
 
     return (

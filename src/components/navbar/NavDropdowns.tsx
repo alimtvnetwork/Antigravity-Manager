@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { NavItem, Language } from './constants';
 import { isTauri } from '../../utils/env';
 import { useViewStore } from '../../stores/useViewStore';
+import { useErrorStore } from '../../stores/error-store';
 
 // useClickOutside Hook
 export function useClickOutside(
@@ -13,7 +14,10 @@ export function useClickOutside(
 ) {
     useEffect(() => {
         const listener = (event: MouseEvent) => {
-            if (!ref.current || ref.current.contains(event.target as Node)) {
+            if (!ref.current) {
+                return;
+            }
+            if (ref.current.contains(event.target as Node)) {
                 return;
             }
             handler();
@@ -45,8 +49,19 @@ export function LanguageDropdown({
     useClickOutside(menuRef, () => setIsOpen(false));
 
     const handleLanguageChange = (langCode: string) => {
-        onLanguageChange(langCode);
         setIsOpen(false);
+        try {
+            onLanguageChange(langCode);
+        } catch (err) {
+            console.error('Failed to change language in LanguageDropdown:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'NavDropdowns.tsx',
+                triggerComponent: 'LanguageDropdown',
+                triggerAction: 'handleLanguageChange',
+                context: { targetLanguage: langCode },
+            });
+            useErrorStore.getState().openErrorModal(captured);
+        }
     };
 
     return (
@@ -188,13 +203,34 @@ export function MoreDropdown({
     useClickOutside(menuRef, () => setIsOpen(false));
 
     const handleThemeToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
-        onThemeToggle(event);
         setIsOpen(false);
+        try {
+            onThemeToggle(event);
+        } catch (err) {
+            console.error('Failed to toggle theme in MoreDropdown:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'NavDropdowns.tsx',
+                triggerComponent: 'MoreDropdown',
+                triggerAction: 'handleThemeToggle',
+            });
+            useErrorStore.getState().openErrorModal(captured);
+        }
     };
 
     const handleLanguageChange = (langCode: string) => {
-        onLanguageChange(langCode);
         setIsOpen(false);
+        try {
+            onLanguageChange(langCode);
+        } catch (err) {
+            console.error('Failed to change language in MoreDropdown:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'NavDropdowns.tsx',
+                triggerComponent: 'MoreDropdown',
+                triggerAction: 'handleLanguageChange',
+                context: { targetLanguage: langCode },
+            });
+            useErrorStore.getState().openErrorModal(captured);
+        }
     };
 
     const handleLogout = () => {

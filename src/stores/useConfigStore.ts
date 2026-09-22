@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AppConfig } from '../types/config';
 import * as configService from '../services/configService';
+import { useErrorStore } from './error-store';
 
 interface ConfigState {
     config: AppConfig | null;
@@ -30,7 +31,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
             const config = await configService.loadConfig();
             set({ config, loading: false });
         } catch (error) {
+            console.error('[useConfigStore] Failed to load config:', error);
             set({ error: String(error), loading: false });
+            useErrorStore.getState().captureError(error, {
+                source: 'useConfigStore.ts',
+                triggerAction: 'loadConfig',
+            });
         }
     },
 
@@ -42,11 +48,24 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
             const { isTauri } = await import('../utils/env');
             if (isTauri()) {
                 const { invoke } = await import('@tauri-apps/api/core');
-                await invoke('set_window_theme', { theme: config.theme }).catch(() => {
-                });
+                try {
+                    await invoke('set_window_theme', { theme: config.theme });
+                } catch (themeErr) {
+                    console.warn('[useConfigStore] set_window_theme notice:', themeErr);
+                    useErrorStore.getState().captureError(themeErr, {
+                        source: 'useConfigStore.ts',
+                        triggerAction: 'set_window_theme',
+                        context: { theme: config.theme },
+                    });
+                }
             }
         } catch (error) {
+            console.error('[useConfigStore] Failed to save config:', error);
             set({ error: String(error), loading: false });
+            useErrorStore.getState().captureError(error, {
+                source: 'useConfigStore.ts',
+                triggerAction: 'saveConfig',
+            });
             throw error;
         }
     },
@@ -63,8 +82,18 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         const { config } = get();
         if (!config || config.language === language) return;
 
-        const newConfig = { ...config, language };
-        await get().saveConfig(newConfig, true);
+        try {
+            const newConfig = { ...config, language };
+            await get().saveConfig(newConfig, true);
+        } catch (error) {
+            console.error('[useConfigStore] Failed to update language:', error);
+            useErrorStore.getState().captureError(error, {
+                source: 'useConfigStore.ts',
+                triggerAction: 'updateLanguage',
+                context: { language },
+            });
+            throw error;
+        }
     },
 
     toggleShowAllQuotas: () => {

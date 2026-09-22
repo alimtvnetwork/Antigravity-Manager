@@ -259,10 +259,13 @@ def update_homebrew_cask(next_version, dry_run=False):
     print(f"[*] Updated Casks/antigravity-tools.rb -> {next_version}")
 
 
-def update_readme_pins(current_ver, next_version, dry_run=False):
-    """Pins new version in readme.md badges and text references."""
+def update_readme_pins(current_ver, next_version, today_str=None, dry_run=False):
+    """Pins new version in readme.md badges, table, and text references."""
     if not README_MD.is_file():
         return
+
+    if not today_str:
+        today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
     with open(README_MD, "r", encoding="utf-8") as f:
         content = f.read()
@@ -281,6 +284,42 @@ def update_readme_pins(current_ver, next_version, dry_run=False):
         new_content,
     )
 
+    # Maintain Version Pinning Table between anchors
+    start_anchor = "<!-- STAMP:VERSION_PIN_TABLE_START -->"
+    end_anchor = "<!-- STAMP:VERSION_PIN_TABLE_END -->"
+    if start_anchor in new_content and end_anchor in new_content:
+        start_idx = new_content.find(start_anchor) + len(start_anchor)
+        end_idx = new_content.find(end_anchor)
+        table_block = new_content[start_idx:end_idx]
+
+        if f"v{next_version}" not in table_block:
+            # Strip '(Latest)' from prior releases
+            table_block = table_block.replace(" (Latest)", "")
+            table_lines = [line for line in table_block.strip().splitlines() if line.strip()]
+            if len(table_lines) >= 2:
+                header = table_lines[0]
+                separator = table_lines[1]
+                existing_rows = table_lines[2:]
+
+                new_row = (
+                    f"| **v{next_version}** (Latest) | {today_str} | 🟢 Verified | "
+                    f"`irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.ps1 \\| iex` | "
+                    f"`curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.sh \\| bash` | "
+                    f"`git checkout v{next_version}` |"
+                )
+                updated_table = (
+                    "\n"
+                    + header
+                    + "\n"
+                    + separator
+                    + "\n"
+                    + new_row
+                    + "\n"
+                    + "\n".join(existing_rows)
+                    + "\n"
+                )
+                new_content = new_content[:start_idx] + updated_table + new_content[end_idx:]
+
     if new_content == content:
         new_content = re.sub(rf"\bv?{escaped_curr}\b", f"v{next_version}", content)
 
@@ -288,13 +327,14 @@ def update_readme_pins(current_ver, next_version, dry_run=False):
         return
 
     if dry_run:
-        print(f"[DRY RUN] Would update version references in readme.md: {current_ver} -> {next_version}")
+        print(f"[DRY RUN] Would update version references and pin matrix in readme.md: {current_ver} -> {next_version}")
         return
 
     with open(README_MD, "w", encoding="utf-8", newline="\n") as f:
         f.write(new_content)
 
     print(f"[*] Updated readme.md version pins -> v{next_version}")
+
 
 
 def update_changelogs(next_version, scope, today_str, dry_run=False):
@@ -400,7 +440,7 @@ def execute_bump(tier="minor", explicit_version=None, scope=None, dry_run=False)
     update_cargo_toml(next_ver, dry_run=dry_run)
     update_template_version(next_ver, dry_run=dry_run)
     update_homebrew_cask(next_ver, dry_run=dry_run)
-    update_readme_pins(current_ver, next_ver, dry_run=dry_run)
+    update_readme_pins(current_ver, next_ver, today_str=today_str, dry_run=dry_run)
     update_changelogs(next_ver, bump_scope, today_str, dry_run=dry_run)
     run_repo_sync_if_available(dry_run=dry_run)
 

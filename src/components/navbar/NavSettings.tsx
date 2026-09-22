@@ -6,6 +6,7 @@ import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
 import { useViewStore } from '../../stores/useViewStore';
+import { useErrorStore } from '../../stores/error-store';
 import { AgyCleanModal } from '../modals/agy-clean-modal';
 
 interface NavSettingsProps {
@@ -37,19 +38,23 @@ export function NavSettings({
     useEffect(() => {
         if (!isTauri()) return;
         const win = getCurrentWindow();
-        win.isMaximized().then(setIsMaximized).catch(() => {});
+        win.isMaximized().then(setIsMaximized).catch((e) => {
+            console.warn('Initial window maximize check notice:', e);
+        });
 
         let unlistenResize: (() => void) | undefined;
         win.onResized(async () => {
             try {
                 const max = await win.isMaximized();
                 setIsMaximized(max);
-            } catch {
-                // Ignore window polling error during destruction
+            } catch (err) {
+                console.warn('Window resize polling notice:', err);
             }
         }).then((fn) => {
             unlistenResize = fn;
-        }).catch(() => {});
+        }).catch((err) => {
+            console.warn('Window resize listener setup notice:', err);
+        });
 
         return () => {
             if (unlistenResize) {
@@ -63,6 +68,10 @@ export function NavSettings({
             await getCurrentWindow().minimize();
         } catch (e) {
             console.error('Failed to minimize window:', e);
+            useErrorStore.getState().captureError(e, {
+                source: 'NavSettings.tsx',
+                triggerAction: 'handleMinimize',
+            });
         }
     };
 
@@ -74,6 +83,10 @@ export function NavSettings({
             setIsMaximized(max);
         } catch (e) {
             console.error('Failed to toggle maximize window:', e);
+            useErrorStore.getState().captureError(e, {
+                source: 'NavSettings.tsx',
+                triggerAction: 'handleToggleMaximize',
+            });
         }
     };
 
@@ -82,6 +95,10 @@ export function NavSettings({
             await getCurrentWindow().close();
         } catch (e) {
             console.error('Failed to close window:', e);
+            useErrorStore.getState().captureError(e, {
+                source: 'NavSettings.tsx',
+                triggerAction: 'handleClose',
+            });
         }
     };
 
