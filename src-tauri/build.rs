@@ -1,14 +1,18 @@
 fn main() {
-    tauri_build::build();
-
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
     if target_os == "windows" && target_env == "msvc" {
-        if let Ok(out_dir) = std::env::var("OUT_DIR") {
-            let resource_lib = std::path::PathBuf::from(&out_dir).join("resource.lib");
-            if resource_lib.exists() {
-                println!("cargo:rustc-link-arg={}", resource_lib.display());
+        let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        let attrs = tauri_build::Attributes::new().windows_attributes(windows);
+        tauri_build::try_build(attrs).expect("failed to run tauri-build");
+
+        let manifest_path = std::path::Path::new("windows-test.manifest");
+        if manifest_path.exists() {
+            println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+            if let Ok(abs_path) = manifest_path.canonicalize() {
+                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
             }
         }
 
@@ -30,6 +34,8 @@ fn main() {
                 }
             }
         }
+    } else {
+        tauri_build::build();
     }
 }
 

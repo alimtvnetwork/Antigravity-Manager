@@ -2,6 +2,14 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.60.0 (2026-09-22)**:
+        -   **[MSVC 链接器与发布产物修复] 修复 MSVC 重复资源错误 (CVT1100 / LNK1123) 与安装脚本解耦**:
+            -   **MSVC 重复资源修复**: 移除 `src-tauri/build.rs` 中冗余的 `resource.lib` 手动链接参数，交由 `tauri-build` 原生管理 Windows 清单与版本资源，根除 `CVTRES CVT1100` duplicate resource 与 `LNK1123`。
+            -   **编译器警告完全清除**: 修复 Claude、Gemini、OpenAI 代理与映射器中的中间变量重新赋值与未使用变量警告，编译实现 0 错误 0 警告。
+            -   **发布资产与安装脚本解耦**: 从 Release 发布资产中移除 `install.ps1` 与 `install.sh`，保证安装脚本仅从 Git 根目录与标签动态拉取。
+            -   **发布前二进制产物校验**: 在发布工作流中增加二进制资产强校验，严禁在无二进制可执行文件时发布空 Release。
+            -   **发布说明一键复制独立代码块**: 将安装命令拆分为独立的单行代码块，支持在 GitHub 发布页直接点击一键复制。
+
     *   **v4.31.0 (2026-09-20)**:
         -   **[更新系统与安装器集成] 启动自动更新检查、Shell 脚本更新参数与应用内一键升级**:
             -   **启动自动更新检查**: 实现应用启动时在后台自动检测最新发布版本，并显示更新提示弹窗及一键升级操作。
@@ -3122,6 +3130,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.60.0 (2026-09-22)**:
+        -   **[Release v4.60.0] Fix MSVC duplicate resource link error and release asset decoupling**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix MSVC duplicate resource link error and release asset decoupling.
     *   **v4.59.0 (2026-09-22)**:
         -   **[Release v4.59.0] Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32)**:
             -   **Update System**: Automated release and version synchronization across all manifests.

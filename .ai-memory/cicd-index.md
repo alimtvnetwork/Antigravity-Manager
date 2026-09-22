@@ -24,6 +24,9 @@ Tracks every CI/CD validator finding (CODE-RED-*, STYLE-*) encountered during se
 | 07 | [Cross-spec missing-file checker false-positives in `26-spec-outsides`](resolved-issues/07-cross-spec-missing-file-link-checker.md) | ✅ Solved | missing-file | 2026-04-23 |
 | 29 | [TypeScript instanceService missing exports & rustfmt](cicd-issues/29-typescript-instance-exports-and-rustfmt-rca.md) | ✅ Solved | tsc, rustfmt | 2026-09-22 |
 | 30 | [GUI config empty file parse failure (E9001) & self-healing](cicd-issues/30-gui-config-empty-file-parse-failure-and-self-healing-rca.md) | ✅ Solved | E9001, config | 2026-09-22 |
+| 31 | [Fast-forward switch delegation & crash recovery](cicd-issues/31-fast-forward-switch-delegation-rca.md) | ✅ Solved | fast-forward, switch | 2026-09-22 |
+| 32 | [CI test data dir race & Windows entrypoint failure](cicd-issues/32-ci-test-data-dir-race-and-windows-entrypoint-rca.md) | ✅ Solved | concurrency, entrypoint | 2026-09-22 |
+| 33 | [MSVC duplicate resource link failure (CVT1100) & release asset decoupling](cicd-issues/33-msvc-duplicate-manifest-and-release-assets-rca.md) | ✅ Solved | msvc, cvtres, release-assets | 2026-09-23 |
 
 ---
 

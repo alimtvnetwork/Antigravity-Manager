@@ -19,6 +19,8 @@
 | 5 | Install script version-pinning placeholder unreplaced | script generation | 🟠 High | ✅ Fixed |
 | 6 | Missing `GITHUB_TOKEN` silently skips upload | asset upload | 🟡 Medium | ✅ Mitigated |
 | 7 | Asset name mismatch between checksum and upload | packaging | 🟠 High | ✅ Fixed |
+| 8 | Tauri duplicate `resource.lib` link in MSVC (`CVT1100`) | windows compile | 🔴 Blocker | ✅ Fixed v4.60.0 |
+| 9 | Release binary asset decoupling & presence assertion | asset publish | 🔴 Blocker | ✅ Fixed v4.60.0 |
 
 ---
 
@@ -313,6 +315,63 @@ The compress step produced `gitmap-v3.56.0-windows-amd64.zip`, but the checksum 
 
 - `.github/workflows/release.yml`
 - `02-spec/16-generic-release/05-checksums-verification.md`
+
+---
+
+## Issue #8 — Tauri Duplicate `resource.lib` Link in MSVC (`CVT1100` / `LNK1123`)
+
+### Symptom
+
+```text
+CVTRES : fatal error CVT1100: duplicate resource. type:VERSION, name:1, language:0x0409
+LINK : fatal error LNK1123: failure during conversion to COFF: file invalid or corrupt
+```
+
+Fails during Windows bundle compilation (`npm run tauri build`) when MSVC's `link.exe` runs `cvtres.exe`.
+
+### Root Cause
+
+In `src-tauri/build.rs`, the build script emitted `cargo:rustc-link-arg=...resource.lib`. However, `tauri-build` compiles `resource.rc` and automatically passes `cargo:rustc-link-lib=static=resource`. Providing both flags passed duplicate copies of `resource.lib` to MSVC linker, causing `CVT1100: duplicate resource`.
+
+### Fix (v4.60.0)
+
+Removed manual `cargo:rustc-link-arg` emission for `resource.lib` from `src-tauri/build.rs`. Tauri manages Windows resources and manifests natively.
+
+### Prevention Rules
+
+1. **Never pass `cargo:rustc-link-arg=...resource.lib` when using `tauri-build`.**
+2. In `build.rs`, only perform runtime dependency staging (e.g. `WebView2Loader.dll` copying for tests); leave resource linking entirely to Tauri.
+
+---
+
+## Issue #9 — Release Binary Asset Decoupling & Presence Assertion
+
+### Symptom
+
+GitHub Release was published with zero binary executable files (`.exe`, `.AppImage`, `.dmg`), containing only `install.ps1`, `install.sh`, and `checksums.txt`.
+
+### Root Cause
+
+1. The `publish-release` job ran with `if: always() && !cancelled() && needs.build-tauri.result != 'cancelled'`, which triggered even if all compilation jobs in `build-tauri` failed.
+2. Standalone installer scripts were copied into `release-files/`, polluting release binary assets.
+3. No pre-publish assertion verified that real binary artifacts existed before uploading.
+
+### Fix (v4.60.0)
+
+1. Removed `install.ps1` and `install.sh` copying into `release-files/`. Installers are maintained at repository root and fetched dynamically via git tags.
+2. Added mandatory binary asset presence assertion:
+   ```bash
+   if [ -z "$(find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \))" ]; then
+     echo "::error::CRITICAL: No executable binary or installer packages found in release-files! Refusing to publish empty release."
+     exit 1
+   fi
+   ```
+3. Formatted release notes into 4 individual code blocks for 1-click copying.
+
+### Prevention Rules
+
+1. **Installers belong at git root, not inside binary release assets.**
+2. **Never publish a release without executable binaries.** Assert binary existence before upload.
 
 ---
 

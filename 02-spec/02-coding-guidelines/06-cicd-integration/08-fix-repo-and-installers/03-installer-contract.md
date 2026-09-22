@@ -144,3 +144,13 @@ When the flag is set (or `INSTALL_RUN_FIX_REPO=1`):
 - Zero nested conditionals; guard-and-return.
 - Every error logged to stderr AND reflected in the exit code.
 - No magic numbers in branching — every exit code is a named constant.
+
+---
+
+## 10. Multi-Version Fallback Ladder & Asset Decoupling
+
+1. **Standalone Installer Decoupling:** Standalone installer scripts (`install.ps1`, `install.sh`) MUST NOT be uploaded as binary assets to GitHub Releases. They are distributed exclusively via the repository tree and raw GitHub tag endpoints.
+2. **Resilient 5–10 Version Fallback Ladder:** In implicit/latest mode, installers query GitHub releases/tags and maintain a list of 5 to 10 fallback candidate versions. If downloading or installing the latest version fails, the installer automatically retreats to the previous candidate and retries, up to 10 sequential attempts.
+3. **Dedicated Release Code Blocks:** Every release body MUST format installation commands into isolated Markdown code blocks (one block per variant) with 1-click copy support.
+4. **Mandatory Binary Asset Gate:** Release CI workflows must assert that at least one executable binary asset exists before publishing, preventing empty release pages.
+

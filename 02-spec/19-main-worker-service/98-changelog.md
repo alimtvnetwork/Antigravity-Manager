@@ -1,3 +1,9 @@
+## v4.60.0 — 2026-09-22 (Fix MSVC duplicate resource link error and release asset decoupling)
+
+**Scope:** Version bump. Fix MSVC duplicate resource link error and release asset decoupling.
+
+---
+
 ## v4.59.0 — 2026-09-22 (Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32))
 
 **Scope:** Version bump. Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32).

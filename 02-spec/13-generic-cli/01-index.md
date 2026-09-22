@@ -71,6 +71,8 @@ concrete examples. Adapt syntax to your target language.
 | 19 | [19-shell-completion.md](19-shell-completion.md) | Tab-completion for PowerShell, Bash, Zsh |
 | 20 | [20-terminal-output-design.md](20-terminal-output-design.md) | Rich terminal report formatting and color system |
 | 21 | [21-post-install-shell-activation.md](21-post-install-shell-activation.md) | Post-install shell wrapper activation, `doctor` check, profile injection |
+| 22 | [22-self-update-gold-standard.md](22-self-update-gold-standard.md) | Canonical self-update, two-phase handoff & cleanup |
+| 23 | [23-gitmap-cli-and-pipeline-ai.md](23-gitmap-cli-and-pipeline-ai.md) | GitMap autonomous engine, Pipeline-AI dynamic waiting & fallback ladder |
 
 ---
 

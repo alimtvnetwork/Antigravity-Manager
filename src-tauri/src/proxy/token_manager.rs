@@ -2402,7 +2402,7 @@ impl TokenManager {
             } else {
                 // [NEW]   fetch_project_id   SingleFlight
                 // 1.   inflight
-                let (mut rx, is_new) = {
+                let (rx, is_new) = {
                     if let Some(existing_rx) = self.load_code_assist_inflight.get(&token.account_id)
                     {
                         (existing_rx.value().clone(), false)
@@ -2435,15 +2435,6 @@ impl TokenManager {
                             }
                             Err(e) => Err(e),
                         };
-
-                    // inflight
-                    if let Some(mut entry) =
-                        self.load_code_assist_inflight.get_mut(&token.account_id)
-                    {
-                        // rx，  Rust   watch   tx  ？
-                        // ：  tx。 ：  Mutex   scope   tx。
-                        // DashMap   tx，  Mutex   if is_new
-                    }
 
                     // 【 】:   project_id  ，  refresh_mu  ，
                     // “ ” 。  Mutex  ，

@@ -383,6 +383,11 @@ jobs:
           if [ -n "$setup_file" ] && [ -f "$setup_file" ]; then
             cp "$setup_file" agm-alim-setup.exe
           fi
+          # Ensure at least one executable binary or installer package is present before proceeding with release publishing
+          if [ -z "$(find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \))" ]; then
+            echo "::error::CRITICAL: No executable binary or installer packages found in release-files! Refusing to publish empty release."
+            exit 1
+          fi
           # Generate SHA-256 checksums
           sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true
           cd ..

@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.60.0 (2026-09-22)**:
+        -   **[MSVC Linker & Release Assets] Fix Duplicate Resource Link Failure (CVT1100 / LNK1123) & Release Asset Decoupling**:
+            -   **MSVC Duplicate Resource Fix**: Removed redundant `cargo:rustc-link-arg` for `resource.lib` in `src-tauri/build.rs`, allowing `tauri-build` to manage native Windows resources and manifests cleanly without triggering `CVTRES CVT1100` duplicate VERSION resource collision.
+            -   **Compiler Warnings Eliminated**: Suppressed intermediate `unused_assignments` and prefixed unused stream tracking variables across Claude, Gemini, and OpenAI handlers and mappers for a 100% warning-free build.
+            -   **Release Asset Decoupling**: Excluded standalone bootstrap installer scripts (`install.ps1`, `install.sh`) from release assets to preserve clean binary distribution from raw git tags.
+            -   **Release Binary Gate**: Enforced mandatory pre-publish verification in `.github/workflows/release.yml` asserting that executable packages (`.exe`, `.AppImage`, `.dmg`, `.deb`, `.rpm`, `.zip`) are present before creating or updating releases.
+            -   **1-Click Installation Blocks**: Formatted release notes into individual, dedicated Markdown code blocks for Windows and POSIX commands for effortless one-click copying.
     *   **v4.59.0 (2026-09-22)**:
         -   **[Release v4.59.0] Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32)**:
             -   **Update System**: Automated release and version synchronization across all manifests.

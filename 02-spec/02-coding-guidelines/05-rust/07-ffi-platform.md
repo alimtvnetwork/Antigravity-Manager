@@ -194,6 +194,20 @@ impl Drop for HookHandle {
 
 ---
 
+## Tauri & Windows Native Resource Linking Standard (`new_without_app_manifest`)
+
+1. **Manifest Collision Rule:** Never pass `/MANIFEST:EMBED` in `build.rs` while allowing `tauri_build::build()` to generate its default manifest in `resource.rc`. Supplying two manifests results in MSVC fatal error `CVTRES : fatal error CVT1100: duplicate resource. type:MANIFEST, name:1, language:0x0409`.
+2. **Canonical Solution:** On Windows MSVC, invoke `tauri_build::WindowsAttributes::new_without_app_manifest()`:
+   ```rust
+   let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+   let attrs = tauri_build::Attributes::new().windows_attributes(windows);
+   tauri_build::try_build(attrs).expect("failed to run tauri-build");
+   ```
+   This keeps version and icon metadata in `resource.lib` while enabling MSVC linker to embed `windows-test.manifest` via `/MANIFEST:EMBED` across both the application binary and the `[lib]` test runner executable with zero duplicate resource conflicts.
+3. **TOTAL BAN on Manual `resource.lib` Link-Args:** Never pass `cargo:rustc-link-arg=...resource.lib` in `build.rs`. `tauri-build` already emits `cargo:rustc-link-lib=static=resource`. Manual arguments inject duplicate version tables, triggering `CVTRES CVT1100: duplicate resource. type:VERSION, name:1`.
+
+---
+
 ## Cross-References
 
 | Reference | Location |

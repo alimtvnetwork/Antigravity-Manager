@@ -56,4 +56,6 @@ GitMap is an ultra-fast developer companion and autonomous CLI engine designed f
 ## Operational Guardrails
 1. **Mandatory Pre-Flight Pull:** Always run `git pull` before modifying code.
 2. **File Size & Binary Guard:** Respect 500 KB limit (Rule R19); never commit test binaries or temp artifacts.
-3. **Coding Guidelines:** Max 8–15 lines per function, single return types with `*apperror.AppError`, affirmative booleans.
+3. **Coding Guidelines:** Max 8–15 lines per function, structured return types with `*appfault.AppError` (`pkg/appfault`), affirmative booleans without explicit `true` checks.
+4. **Adaptive Pipeline Waiting:** Use `gitmap pipeline-ai status -t <eta>` to sleep during workflow runs, strictly avoiding credit-exhausting tight loops.
+5. **Resilient Distribution:** Support 5-to-10 version fallback ladder in shell installers and exclude installer scripts from binary release assets.

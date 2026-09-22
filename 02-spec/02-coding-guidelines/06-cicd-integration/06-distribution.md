@@ -59,13 +59,21 @@ maintenance for consumers — just bump the version pin.
 
 ---
 
-## Release pipeline integration
+## 3. Release Binary Asset Decoupling & Presence Assertion
 
-`.github/workflows/release.yml` runs on every `v*` tag and:
+1. **Installer Script Decoupling:** Standalone installer scripts (`install.ps1`, `install.sh`) MUST NOT be packaged into release assets. They are hosted at the repository root and fetched dynamically via git tag URLs.
+2. **Mandatory Binary Asset Gate:** Every release workflow MUST assert that at least one executable binary or installer package (`*.exe`, `*.dmg`, `*.AppImage`, `*.deb`, `*.rpm`, `*.zip`) is present in `release-files/` before creating or updating a release. Publishing an empty release is strictly prohibited.
 
-1. Zips `linters-cicd/` → `coding-guidelines-linters-vX.Y.Z.zip`
-2. Computes SHA-256, appends to `checksums.txt`
-3. Uploads as a Release asset alongside slides-app and core artifacts
+---
+
+## 4. Release Notes Code Block Standard
+
+Every published release MUST format quick-install commands into separate, dedicated Markdown code blocks for Windows and POSIX, with 1-click copy support:
+
+- **Windows Latest:** `irm https://raw.githubusercontent.com/<owner>/<repo>/main/install.ps1 | iex`
+- **Windows Pinned:** `irm https://raw.githubusercontent.com/<owner>/<repo>/<tag>/install.ps1 | iex`
+- **Linux/macOS Latest:** `curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | bash`
+- **Linux/macOS Pinned:** `curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<tag>/install.sh | bash`
 
 ---
 
