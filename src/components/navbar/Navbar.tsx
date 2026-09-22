@@ -136,15 +136,14 @@ function Navbar() {
 
     return (
         <nav
-            data-tauri-drag-region
             onMouseDown={handleMouseDown}
             onDoubleClick={handleDoubleClick}
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
             className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80 select-none"
         >
-            <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }} data-tauri-drag-region>
+            <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}
-                <div className="flex items-center justify-between h-14 gap-2 md:gap-3" data-tauri-drag-region>
+                <div className="flex items-center justify-between h-14 gap-2 md:gap-3">
                     {/* Logo & Error Manager Badge */}
                     <div
                         className="no-drag shrink-0 flex items-center gap-1.5 min-w-0"

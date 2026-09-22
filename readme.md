@@ -53,7 +53,7 @@
 </p>
 
 <p align="center">
-  <em>Maintained and enhanced by <strong><a href="https://github.com/alim-ul-karim">Md. Alim Ul Karim</a></strong> &amp; <strong><a href="https://riseup-asia.com/">Riseup Asia LLC</a></strong> · Originally created by <strong>lbjlaq</strong> and upstream contributors</em>
+  <em>Maintained and enhanced by <strong><a href="https://github.com/alim-ul-karim">Md. Alim Ul Karim</a></strong> &amp; <strong><a href="https://riseup-asia.com/">Riseup Asia LLC</a></strong> · Special thanks and gratitude to <strong><a href="https://lbjlaq.github.io/Antigravity-Manager/">lbjlaq</a></strong> for creating this project in the first place</em>
 </p>
 
 ---
@@ -534,5 +534,5 @@ We extend our sincere thanks to all creators, developers, and open-source contri
 - **Security Statement**: All tokens, credentials, and session state are securely encrypted and stored locally in SQLite database files on your machine. No telemetry or authentication credentials leave your device.
 
 <p align="center">
-  <em>Antigravity Tools · Managed and enhanced by Md. Alim Ul Karim &amp; Riseup Asia LLC · Special thanks and full credit to the original upstream repository <a href="https://github.com/lbjlaq/Antigravity-Manager">lbjlaq/Antigravity-Manager</a> and all original contributors.</em>
+  <em>Antigravity Tools · Managed and enhanced by Md. Alim Ul Karim &amp; Riseup Asia LLC · Special thanks and heartfelt gratitude to <a href="https://lbjlaq.github.io/Antigravity-Manager/">lbjlaq</a> and the original upstream repository <a href="https://github.com/lbjlaq/Antigravity-Manager">lbjlaq/Antigravity-Manager</a> for creating this project in the first place.</em>
 </p>

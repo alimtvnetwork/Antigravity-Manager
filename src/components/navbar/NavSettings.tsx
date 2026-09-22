@@ -67,14 +67,9 @@ export function NavSettings({
     const handleToggleMaximize = async () => {
         try {
             const win = getCurrentWindow();
-            const isMax = await win.isMaximized();
-            if (isMax) {
-                await win.unminimize();
-                setIsMaximized(false);
-            } else {
-                await win.maximize();
-                setIsMaximized(true);
-            }
+            await win.toggleMaximize();
+            const max = await win.isMaximized();
+            setIsMaximized(max);
         } catch (e) {
             console.error('Failed to toggle maximize window:', e);
         }
@@ -100,18 +95,22 @@ export function NavSettings({
             <div className="hidden lg:flex items-center gap-1.5 md:gap-2 shrink-0">
                 {/* Mini view toggle button */}
                 <button
+                    type="button"
                     onClick={() => setMiniView(true)}
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                     title={t('nav.mini_view', 'Mini View')}
+                    aria-label="Mini View"
                 >
                     <Minimize2 className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
                 </button>
 
                 {/* Theme toggle button */}
                 <button
+                    type="button"
                     onClick={onThemeToggle}
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                     title={theme === 'light' ? t('nav.theme_to_dark') : t('nav.theme_to_light')}
+                    aria-label="Toggle Theme"
                 >
                     {theme === 'light' ? (
                         <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />

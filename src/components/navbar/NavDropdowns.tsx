@@ -52,9 +52,11 @@ export function LanguageDropdown({
     return (
         <div className={`relative ${className}`} ref={menuRef}>
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 title={t('settings.general.language')}
+                aria-label="Language selection"
             >
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
                     {languages.find(l => l.code === currentLanguage)?.short || 'EN'}
@@ -202,9 +204,11 @@ export function MoreDropdown({
     return (
         <div className="relative" ref={menuRef}>
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 title={t('nav.more', 'More')}
+                aria-label="More options"
             >
                 <MoreVertical className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
