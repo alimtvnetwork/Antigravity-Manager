@@ -132,6 +132,17 @@ export interface AutoProfileSwitcherConfig {
     auto_fast_forward_on_critical?: boolean;
 }
 
+export interface InstanceQuotaSummary {
+    instance_id: string;
+    instance_name: string;
+    bound_email?: string;
+    quota_percent?: number;
+    reset_time_iso?: string;
+    seconds_until_reset?: number;
+    is_running: boolean;
+    is_depleted_before_finish: boolean;
+}
+
 export interface AutoSwitcherStatus {
     is_running: boolean;
     active_instance_id: string;
@@ -140,6 +151,8 @@ export interface AutoSwitcherStatus {
     last_check_timestamp: number;
     last_switch_timestamp?: number;
     last_switch_reason?: string;
+    monitored_instance_count?: number;
+    monitored_instances?: InstanceQuotaSummary[];
 }
 
 export async function getAutoSwitcherStatus(): Promise<AutoSwitcherStatus> {

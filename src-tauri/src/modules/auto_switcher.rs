@@ -17,6 +17,32 @@ pub struct AutoSwitcherStatus {
     pub last_check_timestamp: i64,
     pub last_switch_timestamp: Option<i64>,
     pub last_switch_reason: Option<String>,
+    #[serde(default)]
+    pub monitored_instance_count: usize,
+    #[serde(default)]
+    pub monitored_instances: Vec<InstanceQuotaSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct InstanceQuotaSummary {
+    pub instance_id: String,
+    pub instance_name: String,
+    pub bound_email: Option<String>,
+    pub quota_percent: Option<f64>,
+    pub reset_time_iso: Option<String>,
+    pub seconds_until_reset: Option<i64>,
+    pub is_running: bool,
+    pub is_depleted_before_finish: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QuotaPeriodStatus {
+    pub quota_percent: f64,
+    pub reset_time_iso: Option<String>,
+    pub reset_timestamp: Option<i64>,
+    pub seconds_until_reset: Option<i64>,
+    pub is_period_finished: bool,
+    pub is_depleted_before_finish: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +110,7 @@ pub fn snapshot_task_state(
 }
 
 /// Calculate quota percentage for a specific target model in an account
-fn calculate_account_quota(account: &Account, target_model: &str) -> Option<f64> {
+pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<f64> {
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
 
@@ -105,8 +131,128 @@ fn calculate_account_quota(account: &Account, target_model: &str) -> Option<f64>
     None
 }
 
+/// Parse an ISO 8601 or RFC 3339 reset time string into UNIX timestamp (seconds)
+pub fn parse_reset_time_to_unix(reset_time_str: &str) -> Option<i64> {
+    let trimmed = reset_time_str.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
+        return Some(dt.timestamp());
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S%.fZ") {
+        return Some(dt.timestamp());
+    }
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S") {
+        return Some(dt.and_utc().timestamp());
+    }
+    None
+}
+
+/// Calculate quota percentage and period boundary status for an account
+pub fn evaluate_account_period_status(
+    account: &Account,
+    target_model: &str,
+    threshold_percent: f64,
+    now_sec: i64,
+) -> Option<QuotaPeriodStatus> {
+    let quota_data = account.quota.as_ref()?;
+    let target = target_model.to_lowercase();
+
+    let mut matched_model = None;
+    for m in &quota_data.models {
+        if m.name.to_lowercase().contains(&target) {
+            matched_model = Some(m);
+            break;
+        }
+    }
+
+    let (quota_percent, reset_time_str) = if let Some(m) = matched_model {
+        (m.percentage as f64, m.reset_time.as_str())
+    } else if !quota_data.models.is_empty() {
+        let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
+        let avg = total as f64 / quota_data.models.len() as f64;
+        let first_reset = quota_data
+            .models
+            .iter()
+            .find(|m| !m.reset_time.is_empty())
+            .map(|m| m.reset_time.as_str())
+            .unwrap_or("");
+        (avg, first_reset)
+    } else {
+        return None;
+    };
+
+    let reset_timestamp = parse_reset_time_to_unix(reset_time_str);
+    let (seconds_until_reset, is_period_finished) = match reset_timestamp {
+        Some(reset_ts) => {
+            let diff = reset_ts - now_sec;
+            let finished = diff <= 0;
+            (Some(diff), finished)
+        }
+        None => (None, false),
+    };
+
+    let is_low_quota = quota_percent <= threshold_percent;
+    let mut is_depleted_before_finish = false;
+    if is_low_quota {
+        if reset_timestamp.is_some() {
+            if !is_period_finished {
+                is_depleted_before_finish = true;
+            }
+        }
+    }
+
+    Some(QuotaPeriodStatus {
+        quota_percent,
+        reset_time_iso: if reset_time_str.is_empty() {
+            None
+        } else {
+            Some(reset_time_str.to_string())
+        },
+        reset_timestamp,
+        seconds_until_reset,
+        is_period_finished,
+        is_depleted_before_finish,
+    })
+}
+
+/// List instances that are either currently running or marked as active
+pub fn list_running_or_active_instances() -> Result<Vec<instance::InstanceConfig>, String> {
+    let registry = instance::load_registry()?;
+    let active_id = registry.active_instance_id.clone();
+    let mut result = Vec::new();
+
+    for inst in registry.instances {
+        let is_active = inst.id == active_id;
+        let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+
+        if is_active {
+            result.push(inst);
+        } else if is_running {
+            result.push(inst);
+        }
+    }
+
+    Ok(result)
+}
+
+/// Get account IDs currently bound to any running or active instance
+pub fn get_active_in_use_account_ids() -> Vec<String> {
+    let instances = list_running_or_active_instances().unwrap_or_default();
+    let mut in_use = Vec::new();
+    for inst in instances {
+        if let Some(acc_id) = inst.bound_account_id {
+            if !in_use.contains(&acc_id) {
+                in_use.push(acc_id);
+            }
+        }
+    }
+    in_use
+}
+
 /// Candidate profile target scored for auto-switch
-struct ProfileCandidate {
+pub struct ProfileCandidate {
     pub instance_id: String,
     pub account_id: String,
     pub email: String,
@@ -115,7 +261,7 @@ struct ProfileCandidate {
 }
 
 /// Multi-factor scoring for candidate accounts matching instanceService
-fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let mut score = 0.0;
 
     // 1. Idle time factor (Longest time not used, or never used)
@@ -155,19 +301,35 @@ fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f
         score += 10000.0;
     }
 
+    // 5. Reset Window Lookahead Factor
+    if let Some(period_stat) = evaluate_account_period_status(acc, target_model, 20.0, now_sec) {
+        if period_stat.is_period_finished {
+            // Quota has elapsed reset boundary, provider will refresh credits
+            score += 15000.0;
+        } else if let Some(secs_left) = period_stat.seconds_until_reset {
+            if secs_left > 0 {
+                // When quota is healthy (> threshold), having more runway before reset adds stability
+                let runway_bonus = ((secs_left as f64) / 3600.0 * 500.0).min(5000.0);
+                score += runway_bonus;
+            }
+        }
+    }
+
     score
 }
 
-/// Find next best candidate profile with healthy quota
-fn select_next_best_profile(
+/// Find next best candidate profile with healthy quota, excluding accounts in active use by other instances
+pub fn select_next_best_profile(
     current_instance_id: &str,
     target_model: &str,
     threshold: f64,
+    excluded_account_ids: &[String],
 ) -> Result<Option<ProfileCandidate>, String> {
     let registry = instance::load_registry()?;
     let now_sec = chrono::Utc::now().timestamp();
     let mut candidates = Vec::new();
 
+    // 1. Inspect instances not in active use
     for inst in &registry.instances {
         if inst.id == current_instance_id {
             continue;
@@ -176,6 +338,10 @@ fn select_next_best_profile(
         let Some(ref acc_id) = inst.bound_account_id else {
             continue;
         };
+
+        if excluded_account_ids.contains(acc_id) {
+            continue;
+        }
 
         if let Ok(acc) = account::load_account(acc_id) {
             if acc.disabled {
@@ -188,17 +354,106 @@ fn select_next_best_profile(
                 continue;
             }
 
-            let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
+            let period_status =
+                evaluate_account_period_status(&acc, target_model, threshold, now_sec);
+            let quota = period_status
+                .as_ref()
+                .map(|s| s.quota_percent)
+                .or_else(|| calculate_account_quota(&acc, target_model))
+                .unwrap_or(0.0);
+
+            let is_period_finished = period_status
+                .as_ref()
+                .map(|s| s.is_period_finished)
+                .unwrap_or(false);
+
+            let mut is_eligible = false;
             if quota > threshold {
+                is_eligible = true;
+            } else if is_period_finished {
+                is_eligible = true;
+            }
+
+            if is_eligible {
                 let score = score_candidate_account(&acc, target_model, now_sec);
+                let effective_quota = if is_period_finished {
+                    if quota <= threshold {
+                        100.0
+                    } else {
+                        quota
+                    }
+                } else {
+                    quota
+                };
+
                 candidates.push(ProfileCandidate {
-                    instance_id: inst.id.clone(),
+                    instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
-                    quota_percent: quota,
+                    quota_percent: effective_quota,
                     score,
                 });
             }
+        }
+    }
+
+    // 2. Check unbound accounts in pool
+    let all_accounts = account::list_accounts().unwrap_or_default();
+    for acc in all_accounts {
+        if excluded_account_ids.contains(&acc.id) {
+            continue;
+        }
+        if acc.disabled {
+            continue;
+        }
+        if acc.validation_blocked {
+            continue;
+        }
+        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
+            continue;
+        }
+        if candidates.iter().any(|c| c.account_id == acc.id) {
+            continue;
+        }
+
+        let period_status = evaluate_account_period_status(&acc, target_model, threshold, now_sec);
+        let quota = period_status
+            .as_ref()
+            .map(|s| s.quota_percent)
+            .or_else(|| calculate_account_quota(&acc, target_model))
+            .unwrap_or(0.0);
+
+        let is_period_finished = period_status
+            .as_ref()
+            .map(|s| s.is_period_finished)
+            .unwrap_or(false);
+
+        let mut is_eligible = false;
+        if quota > threshold {
+            is_eligible = true;
+        } else if is_period_finished {
+            is_eligible = true;
+        }
+
+        if is_eligible {
+            let score = score_candidate_account(&acc, target_model, now_sec);
+            let effective_quota = if is_period_finished {
+                if quota <= threshold {
+                    100.0
+                } else {
+                    quota
+                }
+            } else {
+                quota
+            };
+
+            candidates.push(ProfileCandidate {
+                instance_id: current_instance_id.to_string(),
+                account_id: acc.id,
+                email: acc.email,
+                quota_percent: effective_quota,
+                score,
+            });
         }
     }
 
@@ -213,39 +468,6 @@ fn select_next_best_profile(
         return Ok(Some(best));
     }
 
-    // If no candidate instance has healthy quota, check unbound accounts in pool
-    let all_accounts = account::list_accounts().unwrap_or_default();
-    let mut account_candidates = Vec::new();
-
-    for acc in all_accounts {
-        if acc.disabled {
-            continue;
-        }
-        if acc.validation_blocked {
-            continue;
-        }
-        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
-            continue;
-        }
-        let quota = calculate_account_quota(&acc, target_model).unwrap_or(0.0);
-        if quota > threshold {
-            let score = score_candidate_account(&acc, target_model, now_sec);
-            account_candidates.push((acc, quota, score));
-        }
-    }
-
-    account_candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
-
-    if let Some((best_acc, quota, score)) = account_candidates.into_iter().next() {
-        return Ok(Some(ProfileCandidate {
-            instance_id: current_instance_id.to_string(),
-            account_id: best_acc.id,
-            email: best_acc.email,
-            quota_percent: quota,
-            score,
-        }));
-    }
-
     Ok(None)
 }
 
@@ -255,28 +477,24 @@ pub async fn execute_profile_rotation(
     reason: String,
     has_auto_resume: bool,
 ) -> Result<(), String> {
-    let active_id = instance::get_active_instance_id().unwrap_or_default();
+    let inst_id = &target.instance_id;
 
-    // Step 1: Split Repo DB - Snapshot running prompts for all active projects before switching
-    let _ = crate::modules::repo_db::backup_running_prompts(&active_id);
+    // Step 1: Split Repo DB - Snapshot running prompts for this instance before switching
+    let _ = crate::modules::repo_db::backup_running_prompts(inst_id);
 
     if has_auto_resume {
-        let _ = snapshot_task_state(&target.instance_id, &target.account_id, &reason);
+        let _ = snapshot_task_state(inst_id, &target.account_id, &reason);
     }
 
     logger::log_info(&format!(
-        "[AutoSwitcher] Rotating to instance '{}' (email: {}, quota: {:.1}%). Reason: {}",
-        target.instance_id, target.email, target.quota_percent, reason
+        "[AutoSwitcher] Rotating instance '{}' to account '{}' (email: {}, quota: {:.1}%). Reason: {}",
+        inst_id, target.account_id, target.email, target.quota_percent, reason
     ));
 
     // Step 2: Trigger email notification just before the workspace switch
-    crate::modules::email_watcher::notify_workspace_switched(
-        &active_id,
-        &target.instance_id,
-        &reason,
-    );
+    crate::modules::email_watcher::notify_workspace_switched(inst_id, inst_id, &reason);
 
-    instance::switch_account_to_instance(&target.account_id, Some(&target.instance_id)).await?;
+    instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
 
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
     let target_acc_id = target.account_id.clone();
@@ -291,7 +509,7 @@ pub async fn execute_profile_rotation(
     });
 
     // Step 3: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
-    let _ = crate::modules::repo_db::dispatch_running_prompts(&target.instance_id);
+    let _ = crate::modules::repo_db::dispatch_running_prompts(inst_id);
 
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();
@@ -301,7 +519,7 @@ pub async fn execute_profile_rotation(
     Ok(())
 }
 
-/// Check active instance quota and auto-rotate if below threshold
+/// Check all monitored instance copies' quota and auto-rotate any instance below threshold
 pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
@@ -310,74 +528,150 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
         return Ok(None);
     }
 
-    let active_id = instance::get_active_instance_id()?;
-    let registry = instance::load_registry()?;
-    let active_inst = registry
-        .instances
-        .iter()
-        .find(|i| i.id == active_id)
-        .ok_or_else(|| format!("Active instance {} not found", active_id))?;
-
-    let Some(ref bound_acc_id) = active_inst.bound_account_id else {
+    let monitored_instances = list_running_or_active_instances()?;
+    if monitored_instances.is_empty() {
         return Ok(None);
-    };
+    }
 
-    let bound_acc = account::load_account(bound_acc_id)?;
-    let quota_percent =
-        calculate_account_quota(&bound_acc, &switcher_cfg.target_model).unwrap_or(100.0);
-
+    let in_use_account_ids = get_active_in_use_account_ids();
     let now = chrono::Utc::now().timestamp();
     {
         let mut state = RUNTIME_STATE.lock().unwrap();
         state.last_check_timestamp = now;
     }
 
-    // 1. Critical threshold check (<= 12.0% or configured critical_threshold_percent)
-    let is_critical = quota_percent <= switcher_cfg.critical_threshold_percent;
-    if is_critical {
-        if switcher_cfg.auto_fast_forward_on_critical {
-            let reason = format!(
-                "Critical quota alert: model '{}' dropped to {:.1}% (<= {:.1}%). Fast-forwarding to highest credit candidate...",
-                switcher_cfg.target_model, quota_percent, switcher_cfg.critical_threshold_percent
-            );
-            logger::log_warn(&format!("[AutoSwitcher] {}", reason));
+    let mut rotated_reasons = Vec::new();
+
+    for inst in monitored_instances {
+        let Some(ref bound_acc_id) = inst.bound_account_id else {
+            continue;
+        };
+
+        let bound_acc = match account::load_account(bound_acc_id) {
+            Ok(acc) => acc,
+            Err(_) => continue,
+        };
+
+        let period_status = evaluate_account_period_status(
+            &bound_acc,
+            &switcher_cfg.target_model,
+            switcher_cfg.low_quota_threshold_percent,
+            now,
+        );
+
+        let quota_percent = period_status
+            .as_ref()
+            .map(|s| s.quota_percent)
+            .or_else(|| calculate_account_quota(&bound_acc, &switcher_cfg.target_model))
+            .unwrap_or(100.0);
+
+        let is_depleted_before_finish = period_status
+            .as_ref()
+            .map(|s| s.is_depleted_before_finish)
+            .unwrap_or(false);
+
+        let is_period_finished = period_status
+            .as_ref()
+            .map(|s| s.is_period_finished)
+            .unwrap_or(false);
+
+        // Filter out accounts in use by OTHER instances
+        let excluded_accounts: Vec<String> = in_use_account_ids
+            .iter()
+            .filter(|id| *id != bound_acc_id)
+            .cloned()
+            .collect();
+
+        // 1. Critical threshold check (<= 12.0% or configured critical_threshold_percent)
+        let is_critical = quota_percent <= switcher_cfg.critical_threshold_percent;
+        if is_critical {
+            if switcher_cfg.auto_fast_forward_on_critical {
+                let reason = format!(
+                    "Critical quota alert on instance '{}': model '{}' dropped to {:.1}% (<= {:.1}%). Fast-forwarding to highest credit candidate...",
+                    inst.id, switcher_cfg.target_model, quota_percent, switcher_cfg.critical_threshold_percent
+                );
+                logger::log_warn(&format!("[AutoSwitcher] {}", reason));
+
+                if let Some(candidate) = select_next_best_profile(
+                    &inst.id,
+                    &switcher_cfg.target_model,
+                    switcher_cfg.critical_threshold_percent,
+                    &excluded_accounts,
+                )? {
+                    execute_profile_rotation(
+                        candidate,
+                        reason.clone(),
+                        switcher_cfg.has_auto_resume,
+                    )
+                    .await?;
+                    rotated_reasons.push(reason);
+                    continue;
+                }
+            }
+        }
+
+        // 2. Standard low-quota or depleted before finish check
+        if is_period_finished {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Instance '{}' quota period finished (reset time reached). Ready for quota reset.",
+                inst.id
+            ));
+            continue;
+        }
+
+        let is_low_quota = quota_percent <= switcher_cfg.low_quota_threshold_percent;
+        let mut should_rotate = false;
+        if is_depleted_before_finish {
+            should_rotate = true;
+        } else if is_low_quota {
+            should_rotate = true;
+        }
+
+        if should_rotate {
+            let reason = if is_depleted_before_finish {
+                let secs_left = period_status
+                    .as_ref()
+                    .and_then(|s| s.seconds_until_reset)
+                    .unwrap_or(0);
+                format!(
+                    "Quota depleted before period finish on instance '{}': model '{}' at {:.1}% with {}s until reset",
+                    inst.id, switcher_cfg.target_model, quota_percent, secs_left
+                )
+            } else {
+                format!(
+                    "Quota for model '{}' on instance '{}' dropped to {:.1}% (threshold: {:.1}%)",
+                    switcher_cfg.target_model,
+                    inst.id,
+                    quota_percent,
+                    switcher_cfg.low_quota_threshold_percent
+                )
+            };
+
+            logger::log_info(&format!("[AutoSwitcher] {}", reason));
 
             if let Some(candidate) = select_next_best_profile(
-                &active_id,
+                &inst.id,
                 &switcher_cfg.target_model,
-                switcher_cfg.critical_threshold_percent,
+                switcher_cfg.low_quota_threshold_percent,
+                &excluded_accounts,
             )? {
                 execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
                     .await?;
-                return Ok(Some(reason));
+                rotated_reasons.push(reason);
+            } else {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Instance '{}' quota low ({:.1}%) but no healthy alternative profile found in pool.",
+                    inst.id, quota_percent
+                ));
             }
         }
     }
 
-    // 2. Standard low-quota threshold check
-    if quota_percent <= switcher_cfg.low_quota_threshold_percent {
-        let reason = format!(
-            "Quota for model '{}' dropped to {:.1}% (threshold: {:.1}%)",
-            switcher_cfg.target_model, quota_percent, switcher_cfg.low_quota_threshold_percent
-        );
-
-        if let Some(candidate) = select_next_best_profile(
-            &active_id,
-            &switcher_cfg.target_model,
-            switcher_cfg.low_quota_threshold_percent,
-        )? {
-            execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
-                .await?;
-            return Ok(Some(reason));
-        } else {
-            logger::log_warn(&format!(
-                "[AutoSwitcher] Quota low ({:.1}%) but no healthy alternative profile found.",
-                quota_percent
-            ));
-        }
+    if rotated_reasons.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(rotated_reasons.join("; ")))
     }
-
-    Ok(None)
 }
 
 /// Calculate dynamic polling interval based on credit quota ladder
@@ -403,9 +697,23 @@ pub async fn trigger_manual_rotation() -> Result<String, String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
     let active_id = instance::get_active_instance_id()?;
+    let in_use_account_ids = get_active_in_use_account_ids();
 
-    let candidate = select_next_best_profile(&active_id, &switcher_cfg.target_model, 0.0)?
-        .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
+    let registry = instance::load_registry()?;
+    let current_bound = registry
+        .instances
+        .iter()
+        .find(|i| i.id == active_id)
+        .and_then(|i| i.bound_account_id.clone());
+
+    let excluded: Vec<String> = in_use_account_ids
+        .into_iter()
+        .filter(|id| Some(id) != current_bound.as_ref())
+        .collect();
+
+    let candidate =
+        select_next_best_profile(&active_id, &switcher_cfg.target_model, 0.0, &excluded)?
+            .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
 
     let reason = "Manual rotation triggered by user".to_string();
     let email = candidate.email.clone();
@@ -423,24 +731,70 @@ pub async fn trigger_manual_rotation() -> Result<String, String> {
 pub fn get_status() -> AutoSwitcherStatus {
     let registry = instance::load_registry().unwrap_or_default();
     let active_id = registry.active_instance_id.clone();
-    let active_inst = registry.instances.into_iter().find(|i| i.id == active_id);
+    let app_config = config::load_app_config().unwrap_or_default();
+    let switcher_cfg = app_config.auto_profile_switcher;
+    let now_sec = chrono::Utc::now().timestamp();
 
-    let email = active_inst.as_ref().and_then(|i| i.bound_email.clone());
-    let quota = active_inst
-        .as_ref()
-        .and_then(|i| i.bound_account_id.as_ref())
-        .and_then(|id| account::load_account(id).ok())
-        .and_then(|acc| calculate_account_quota(&acc, "gemini-pro"));
+    let running_or_active =
+        list_running_or_active_instances().unwrap_or_else(|_| registry.instances.clone());
+    let mut monitored_instances = Vec::new();
+
+    let mut active_email = None;
+    let mut active_quota = None;
+
+    for inst in &running_or_active {
+        let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        let mut quota_pct = None;
+        let mut reset_iso = None;
+        let mut secs_until = None;
+        let mut is_depleted_before_finish = false;
+
+        if let Some(ref acc_id) = inst.bound_account_id {
+            if let Ok(acc) = account::load_account(acc_id) {
+                if let Some(period_stat) = evaluate_account_period_status(
+                    &acc,
+                    &switcher_cfg.target_model,
+                    switcher_cfg.low_quota_threshold_percent,
+                    now_sec,
+                ) {
+                    quota_pct = Some(period_stat.quota_percent);
+                    reset_iso = period_stat.reset_time_iso;
+                    secs_until = period_stat.seconds_until_reset;
+                    is_depleted_before_finish = period_stat.is_depleted_before_finish;
+                } else {
+                    quota_pct = calculate_account_quota(&acc, &switcher_cfg.target_model);
+                }
+            }
+        }
+
+        if inst.id == active_id {
+            active_email = inst.bound_email.clone();
+            active_quota = quota_pct;
+        }
+
+        monitored_instances.push(InstanceQuotaSummary {
+            instance_id: inst.id.clone(),
+            instance_name: inst.name.clone(),
+            bound_email: inst.bound_email.clone(),
+            quota_percent: quota_pct,
+            reset_time_iso: reset_iso,
+            seconds_until_reset: secs_until,
+            is_running,
+            is_depleted_before_finish,
+        });
+    }
 
     let state = RUNTIME_STATE.lock().unwrap();
     AutoSwitcherStatus {
         is_running: state.is_running,
         active_instance_id: active_id,
-        active_account_email: email,
-        current_quota_percent: quota,
+        active_account_email: active_email,
+        current_quota_percent: active_quota,
         last_check_timestamp: state.last_check_timestamp,
         last_switch_timestamp: state.last_switch_timestamp,
         last_switch_reason: state.last_switch_reason.clone(),
+        monitored_instance_count: monitored_instances.len(),
+        monitored_instances,
     }
 }
 
@@ -457,8 +811,16 @@ pub fn start_auto_switcher() {
             let app_config = config::load_app_config().unwrap_or_default();
             let switcher_cfg = app_config.auto_profile_switcher;
             let cur_status = get_status();
+            let lowest_monitored_quota = cur_status
+                .monitored_instances
+                .iter()
+                .filter_map(|i| i.quota_percent)
+                .fold(cur_status.current_quota_percent, |acc, q| match acc {
+                    Some(a) => Some(a.min(q)),
+                    None => Some(q),
+                });
             let interval_secs =
-                calculate_next_interval_seconds(cur_status.current_quota_percent, &switcher_cfg);
+                calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg);
 
             tokio::time::sleep(Duration::from_secs(interval_secs as u64)).await;
 
@@ -473,6 +835,47 @@ pub fn start_auto_switcher() {
 mod tests {
     use super::*;
     use crate::models::config::AutoProfileSwitcherConfig;
+    use crate::models::token::TokenData;
+
+    fn make_test_account(
+        id: &str,
+        email: &str,
+        model: &str,
+        pct: i32,
+        reset_time: &str,
+    ) -> Account {
+        let token = TokenData::new(
+            "access_token".to_string(),
+            "refresh_token".to_string(),
+            3600,
+            Some(email.to_string()),
+            None,
+            None,
+            false,
+            None,
+        );
+        let mut acc = Account::new(id.to_string(), email.to_string(), token);
+        let model_quota = crate::models::quota::ModelQuota {
+            name: model.to_string(),
+            percentage: pct,
+            reset_time: reset_time.to_string(),
+            display_name: None,
+            supports_images: None,
+            supports_thinking: None,
+            thinking_budget: None,
+            recommended: None,
+            max_tokens: None,
+            max_output_tokens: None,
+            supported_mime_types: None,
+        };
+        acc.quota = Some(crate::models::quota::QuotaData {
+            models: vec![model_quota],
+            last_updated: chrono::Utc::now().timestamp(),
+            subscription_tier: Some("pro".to_string()),
+            is_forbidden: false,
+        });
+        acc
+    }
 
     #[test]
     fn test_calculate_next_interval_seconds_ladder() {
@@ -482,20 +885,80 @@ mod tests {
         cfg.critical_interval_seconds = 60;
         cfg.critical_threshold_percent = 12.0;
 
-        // None quota defaults to check_interval_seconds
         assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
-
-        // Healthy quota (>= 20%) uses standard check_interval_seconds
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(20.0), &cfg), 300);
-
-        // Caution quota (< 20% and > critical_threshold_percent) uses caution_interval_seconds
         assert_eq!(calculate_next_interval_seconds(Some(19.9), &cfg), 180);
         assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 180);
-
-        // Critical quota (<= critical_threshold_percent) uses critical_interval_seconds
         assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 60);
+    }
+
+    #[test]
+    fn test_parse_reset_time_to_unix() {
+        let valid_rfc3339 = "2026-09-22T14:30:00Z";
+        let parsed = parse_reset_time_to_unix(valid_rfc3339);
+        assert!(parsed.is_some());
+        assert_eq!(parsed.unwrap(), 1790087400);
+
+        let empty = "";
+        assert_eq!(parse_reset_time_to_unix(empty), None);
+
+        let invalid = "not-a-date";
+        assert_eq!(parse_reset_time_to_unix(invalid), None);
+    }
+
+    #[test]
+    fn test_evaluate_account_period_status_before_finish() {
+        let now_sec = 1790080000;
+        let future_time = "2026-09-22T14:30:00Z"; // 1790087400, +7400s
+        let acc = make_test_account("acc-1", "test@domain.com", "gemini-pro", 8, future_time);
+
+        let status = evaluate_account_period_status(&acc, "gemini-pro", 15.0, now_sec);
+        assert!(status.is_some());
+        let stat = status.unwrap();
+
+        assert_eq!(stat.quota_percent, 8.0);
+        assert!(stat.is_depleted_before_finish);
+        let period_finished = stat.is_period_finished;
+        assert!(!period_finished);
+        assert_eq!(stat.seconds_until_reset, Some(7400));
+    }
+
+    #[test]
+    fn test_evaluate_account_period_status_after_finish() {
+        let now_sec = 1790090000;
+        let past_time = "2026-09-22T14:30:00Z"; // 1790087400, -2600s
+        let acc = make_test_account("acc-2", "test2@domain.com", "gemini-pro", 5, past_time);
+
+        let status = evaluate_account_period_status(&acc, "gemini-pro", 15.0, now_sec);
+        assert!(status.is_some());
+        let stat = status.unwrap();
+
+        assert_eq!(stat.quota_percent, 5.0);
+        assert!(stat.is_period_finished);
+        let depleted_before_finish = stat.is_depleted_before_finish;
+        assert!(!depleted_before_finish);
+        assert_eq!(stat.seconds_until_reset, Some(-2600));
+    }
+
+    #[test]
+    fn test_score_candidate_account_reset_time_priority() {
+        let now_sec = 1790090000;
+        let past_time = "2026-09-22T14:30:00Z"; // Period finished (+15000 bonus)
+        let future_time = "2026-09-22T20:00:00Z"; // 1790107200, runway bonus
+
+        let mut acc_a = make_test_account("acc-a", "a@domain.com", "gemini-pro", 10, past_time);
+        acc_a.last_used = now_sec - 3600;
+
+        let mut acc_b = make_test_account("acc-b", "b@domain.com", "gemini-pro", 10, future_time);
+        acc_b.last_used = now_sec - 3600;
+
+        let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
+        let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
+
+        // Account A period finished gets +15000, scoring higher than distant runway bonus
+        assert!(score_a > score_b);
     }
 }
