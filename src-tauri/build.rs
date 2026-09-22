@@ -6,12 +6,9 @@ fn main() {
     if target_os == "windows" && target_env == "msvc" {
         let manifest_path = std::path::Path::new("windows-test.manifest");
         if manifest_path.exists() {
-            println!("cargo:rustc-link-arg-tests=/MANIFEST:EMBED");
+            println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
             if let Ok(abs_path) = manifest_path.canonicalize() {
-                println!(
-                    "cargo:rustc-link-arg-tests=/MANIFESTINPUT:{}",
-                    abs_path.display()
-                );
+                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
             }
         }
 
