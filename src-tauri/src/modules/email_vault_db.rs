@@ -470,29 +470,7 @@ pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, St
 
     // Store password in separate split database email_passwords.db
     if let Some(ref pwd) = input.password {
-        let has_content = !pwd.trim().is_empty();
-        if has_content {
-            let pass_conn = connect_passwords_db()?;
-            let mut salt_bytes = [0u8; 16];
-            rand::thread_rng().fill_bytes(&mut salt_bytes);
-            let salt = BASE64_STANDARD.encode(salt_bytes);
-
-            let (enc_secret, fingerprint, ssh_pub) = encrypt_secret(pwd, &salt)?;
-
-            pass_conn.execute(
-                "INSERT INTO email_credentials 
-                 (account_id, auth_type, encrypted_secret, rsa_public_fingerprint, ssh_rsa_public_key, salt, updated_at)
-                 VALUES (?, 'password', ?, ?, ?, ?, ?)
-                 ON CONFLICT(account_id) DO UPDATE SET
-                    encrypted_secret = excluded.encrypted_secret,
-                    rsa_public_fingerprint = excluded.rsa_public_fingerprint,
-                    ssh_rsa_public_key = excluded.ssh_rsa_public_key,
-                    salt = excluded.salt,
-                    updated_at = excluded.updated_at",
-                params![&account_id, enc_secret, fingerprint, ssh_pub, salt, now],
-            )
-            .map_err(|e| format!("Failed to save credential in split passwords database: {}", e))?;
-        }
+        save_account_secret(&account_id, pwd)?;
     }
 
     Ok(EmailAccount {
@@ -564,6 +542,36 @@ pub fn get_account_secret(account_id: &str) -> Result<String, String> {
     let cred =
         row.ok_or_else(|| format!("No credential record found for account '{}'", account_id))?;
     decrypt_secret(&cred.0, &cred.1)
+}
+
+/// Save or update raw secret in separate split passwords database for account_id
+pub fn save_account_secret(account_id: &str, plain_secret: &str) -> Result<(), String> {
+    let has_content = !plain_secret.trim().is_empty();
+    if has_content {
+        let pass_conn = connect_passwords_db()?;
+        let now = Utc::now().timestamp();
+        let mut salt_bytes = [0u8; 16];
+        rand::thread_rng().fill_bytes(&mut salt_bytes);
+        let salt = BASE64_STANDARD.encode(salt_bytes);
+
+        let (enc_secret, fingerprint, ssh_pub) = encrypt_secret(plain_secret, &salt)?;
+
+        pass_conn
+            .execute(
+                "INSERT INTO email_credentials 
+                 (account_id, auth_type, encrypted_secret, rsa_public_fingerprint, ssh_rsa_public_key, salt, updated_at)
+                 VALUES (?, 'password', ?, ?, ?, ?, ?)
+                 ON CONFLICT(account_id) DO UPDATE SET
+                    encrypted_secret = excluded.encrypted_secret,
+                    rsa_public_fingerprint = excluded.rsa_public_fingerprint,
+                    ssh_rsa_public_key = excluded.ssh_rsa_public_key,
+                    salt = excluded.salt,
+                    updated_at = excluded.updated_at",
+                params![account_id, enc_secret, fingerprint, ssh_pub, salt, now],
+            )
+            .map_err(|e| format!("Failed to save credential in split passwords database: {}", e))?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

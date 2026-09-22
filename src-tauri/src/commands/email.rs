@@ -294,19 +294,16 @@ pub async fn dispatch_custom_email_task(
 
     if target_recipients.is_empty() {
         return Err(AppError::Email(
-            "No recipients configured. Please add a recipient or specify an email address.".to_string(),
+            "No recipients configured. Please add a recipient or specify an email address."
+                .to_string(),
         ));
     }
 
     let m_name = email_watcher::detect_machine_name();
     let m_ip = email_watcher::detect_local_ip();
 
-    let full_subject = subject.unwrap_or_else(|| {
-        format!(
-            "[AGM-TASK] [Node: {}] [Type: {}]",
-            m_name, task_type
-        )
-    });
+    let full_subject =
+        subject.unwrap_or_else(|| format!("[AGM-TASK] [Node: {}] [Type: {}]", m_name, task_type));
 
     let full_body = format!(
         "<div style=\"font-family: monospace; padding: 16px; background: #0f172a; color: #f8fafc; border-radius: 8px;\">\
@@ -321,8 +318,9 @@ pub async fn dispatch_custom_email_task(
         m_name, m_ip, task_type, task_type, task_payload
     );
 
-    let res = email_sender::dispatch_email_with_failover(&full_subject, &full_body, &target_recipients)
-        .map_err(AppError::Email)?;
+    let res =
+        email_sender::dispatch_email_with_failover(&full_subject, &full_body, &target_recipients)
+            .map_err(AppError::Email)?;
 
     // Activate fast adaptive awaiting poll (5–10s quick-poll)
     email_watcher::activate_awaiting_reply(300);

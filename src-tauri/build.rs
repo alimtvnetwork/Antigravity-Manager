@@ -44,18 +44,59 @@ fn embed_windows_manifest() {
             format!("1 24 \"{}\"\n", manifest_str)
         };
         if std::fs::write(&rc_path, rc_content).is_ok() {
-            let status = std::process::Command::new("windres")
-                .args(&[
-                    rc_path.to_str().unwrap(),
-                    "-O",
-                    "coff",
-                    "-o",
-                    res_path.to_str().unwrap(),
-                ])
-                .status();
-            if let Ok(s) = status {
-                if s.success() {
-                    println!("cargo:rustc-link-arg={}", res_path.display());
+            let res_res_path = std::path::Path::new(&out_dir).join("comctl6.res");
+            let mut is_compiled = false;
+
+            // Check if rc.exe (Windows SDK Resource Compiler) is available
+            let rc_cmd = if std::process::Command::new("rc.exe")
+                .arg("/?")
+                .output()
+                .is_ok()
+            {
+                "rc.exe".to_string()
+            } else if std::path::Path::new(
+                "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe",
+            )
+            .exists()
+            {
+                "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe"
+                    .to_string()
+            } else {
+                String::new()
+            };
+
+            let has_rc = !rc_cmd.is_empty();
+            if has_rc {
+                let status = std::process::Command::new(&rc_cmd)
+                    .args(&[
+                        "/nologo",
+                        "/fo",
+                        res_res_path.to_str().unwrap(),
+                        rc_path.to_str().unwrap(),
+                    ])
+                    .status();
+                if let Ok(s) = status {
+                    if s.success() {
+                        println!("cargo:rustc-link-arg={}", res_res_path.display());
+                        is_compiled = true;
+                    }
+                }
+            }
+
+            if !is_compiled {
+                let status = std::process::Command::new("windres")
+                    .args(&[
+                        rc_path.to_str().unwrap(),
+                        "-O",
+                        "coff",
+                        "-o",
+                        res_path.to_str().unwrap(),
+                    ])
+                    .status();
+                if let Ok(s) = status {
+                    if s.success() {
+                        println!("cargo:rustc-link-arg={}", res_path.display());
+                    }
                 }
             }
         }

@@ -457,10 +457,8 @@ pub fn start_auto_switcher() {
             let app_config = config::load_app_config().unwrap_or_default();
             let switcher_cfg = app_config.auto_profile_switcher;
             let cur_status = get_status();
-            let interval_secs = calculate_next_interval_seconds(
-                cur_status.current_quota_percent,
-                &switcher_cfg,
-            );
+            let interval_secs =
+                calculate_next_interval_seconds(cur_status.current_quota_percent, &switcher_cfg);
 
             tokio::time::sleep(Duration::from_secs(interval_secs as u64)).await;
 

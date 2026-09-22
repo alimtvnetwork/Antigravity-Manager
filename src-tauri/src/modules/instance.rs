@@ -1161,11 +1161,13 @@ mod tests {
             rusqlite::params!["inst-test-1", 54321, "/tmp/inst1", now],
         ).unwrap();
 
-        let (saved_pid, status): (u32, String) = conn.query_row(
-            "SELECT pid, status FROM instance_processes WHERE instance_id = ?1",
-            ["inst-test-1"],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        ).unwrap();
+        let (saved_pid, status): (u32, String) = conn
+            .query_row(
+                "SELECT pid, status FROM instance_processes WHERE instance_id = ?1",
+                ["inst-test-1"],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
 
         assert_eq!(saved_pid, 54321);
         assert_eq!(status, "running");
@@ -1175,11 +1177,13 @@ mod tests {
             rusqlite::params![now + 10, "inst-test-1"],
         ).unwrap();
 
-        let updated_status: String = conn.query_row(
-            "SELECT status FROM instance_processes WHERE instance_id = ?1",
-            ["inst-test-1"],
-            |row| row.get(0),
-        ).unwrap();
+        let updated_status: String = conn
+            .query_row(
+                "SELECT status FROM instance_processes WHERE instance_id = ?1",
+                ["inst-test-1"],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(updated_status, "stopped");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
