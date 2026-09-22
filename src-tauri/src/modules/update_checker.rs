@@ -606,11 +606,11 @@ pub async fn run_installer_update() -> Result<String, String> {
         ]);
 
         if std::path::Path::new("install.ps1").exists() {
-            ps_cmd.args(["-File", ".\\install.ps1", "-Update"]);
+            ps_cmd.args(["-File", ".\\install.ps1", "-Update", "-NoLaunch"]);
         } else {
             ps_cmd.args([
                 "-Command",
-                "irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex",
+                "& { $script = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($script)) -Update -NoLaunch }",
             ]);
         }
 
@@ -630,11 +630,20 @@ pub async fn run_installer_update() -> Result<String, String> {
             logger::log_info(&format!("Installer update succeeded: {}", stdout));
             Ok(stdout)
         } else {
+            let error_detail = if !stderr.trim().is_empty() {
+                stderr.trim().to_string()
+            } else if !stdout.trim().is_empty() {
+                let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
+                lines.iter().rev().take(6).cloned().collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" | ")
+            } else {
+                format!("Process exited with status code {:?}", output.status.code())
+            };
+
             logger::log_error(&format!(
                 "Installer update failed - stdout: {} stderr: {}",
                 stdout, stderr
             ));
-            Err(format!("Installer update failed: {}", stderr))
+            Err(format!("Installer update failed: {}", error_detail))
         }
     }
 
@@ -643,7 +652,7 @@ pub async fn run_installer_update() -> Result<String, String> {
         let cmd = if std::path::Path::new("install.sh").exists() {
             "bash ./install.sh --update".to_string()
         } else {
-            "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash".to_string()
+            "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --update".to_string()
         };
 
         let result = tokio::time::timeout(
@@ -667,11 +676,20 @@ pub async fn run_installer_update() -> Result<String, String> {
             logger::log_info(&format!("Installer update succeeded: {}", stdout));
             Ok(stdout)
         } else {
+            let error_detail = if !stderr.trim().is_empty() {
+                stderr.trim().to_string()
+            } else if !stdout.trim().is_empty() {
+                let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
+                lines.iter().rev().take(6).cloned().collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" | ")
+            } else {
+                format!("Process exited with status code {:?}", output.status.code())
+            };
+
             logger::log_error(&format!(
                 "Installer update failed - stdout: {} stderr: {}",
                 stdout, stderr
             ));
-            Err(format!("Installer update failed: {}", stderr))
+            Err(format!("Installer update failed: {}", error_detail))
         }
     }
 }

@@ -82,6 +82,9 @@ function Write-Warn {
 function Write-Err {
     param([string]$Message)
     Write-Host "$LeftPadding[ERROR] $Message" -ForegroundColor Red
+    try {
+        [Console]::Error.WriteLine("$LeftPadding[ERROR] $Message")
+    } catch {}
 }
 
 function Invoke-IndentedCommand {
@@ -143,36 +146,6 @@ function Get-InvocationHistoryCandidates {
         }
     } catch {}
     try {
-        $hist = Get-History -Count 10 -ErrorAction SilentlyContinue
-        if ($hist) {
-            foreach ($h in $hist) {
-                if ($h.CommandLine) { $candidates.Add($h.CommandLine) }
-            }
-        }
-    } catch {}
-    try {
-        $rlPath = (Get-PSReadLineOption -ErrorAction SilentlyContinue).HistorySavePath
-        if ($rlPath) {
-            if (Test-Path $rlPath) {
-                $lastLines = Get-Content -Path $rlPath -Tail 20 -ErrorAction SilentlyContinue
-                if ($lastLines) {
-                    foreach ($line in $lastLines) {
-                        if ($line) { $candidates.Add($line) }
-                    }
-                }
-            }
-        }
-    } catch {}
-    try {
-        $rlItems = [Microsoft.PowerShell.PSConsoleReadLine]::GetHistoryItems()
-        if ($rlItems) {
-            $lastItems = $rlItems | Select-Object -Last 10
-            foreach ($item in $lastItems) {
-                if ($item) { $candidates.Add("$item") }
-            }
-        }
-    } catch {}
-    try {
         $envCmd = [System.Environment]::CommandLine
         if ($envCmd) { $candidates.Add($envCmd) }
     } catch {}
@@ -197,19 +170,34 @@ function Resolve-PinnedVersion {
         [string]$BakedVersion
     )
     if ($ExplicitVersion) {
-        return ($ExplicitVersion -replace "^v", "")
+        $clean = ($ExplicitVersion -replace "^v", "").Trim()
+        $parts = $clean.Split("-")[0].Split(".")
+        if ($parts.Length -eq 2) {
+            $clean = "$clean.0"
+        }
+        return $clean
     }
     if ($BakedVersion) {
         if ($BakedVersion -ne "__PINNED_VERSION__") {
             Write-Step "Respecting pinned installer version: v$BakedVersion"
-            return ($BakedVersion -replace "^v", "")
+            $clean = ($BakedVersion -replace "^v", "").Trim()
+            $parts = $clean.Split("-")[0].Split(".")
+            if ($parts.Length -eq 2) {
+                $clean = "$clean.0"
+            }
+            return $clean
         }
     }
     $entries = Get-InvocationHistoryCandidates
-    $regex = 'releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)(/|$|\s|"|' + "')"
+    # Strictly scope to Antigravity-Manager or agm-alim URLs so unrelated command lines never pollute version
+    $regex = '(?i)(Antigravity-Manager|agm-alim|antigravity).*releases/download/v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
     foreach ($entry in $entries) {
         if ($entry -match $regex) {
-            $detected = $Matches[1]
+            $detected = $Matches[2]
+            $parts = $detected.Split("-")[0].Split(".")
+            if ($parts.Length -eq 2) {
+                $detected = "$detected.0"
+            }
             Write-Step "Detected pinned version from download URL: v$detected"
             return $detected
         }
@@ -248,6 +236,17 @@ function Close-ToolProcesses {
     param([string]$Context = "installation")
     Write-Step "Closing all running tool processes, Electron instances, WebViews, and background tasks ($Context)..."
 
+    # Identify caller parent PID so in-app update never self-terminates
+    $parentPid = 0
+    try {
+        $myProc = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
+        if ($myProc) {
+            if ($myProc.ParentProcessId) {
+                $parentPid = [int]$myProc.ParentProcessId
+            }
+        }
+    } catch {}
+
     $processNames = @(
         "agm-alim",
         "antigravity-tools",
@@ -256,21 +255,21 @@ function Close-ToolProcesses {
         "AGM by Alim"
     )
 
-    # 1. Force tree-kill known executables using taskkill (terminates process and all child workers/WebViews)
+    # 1. Gracefully terminate other running tool instances (protecting invoking parent process during in-app update)
     foreach ($pName in $processNames) {
         try {
-            & taskkill.exe /F /T /IM "$pName.exe" 2>$null | Out-Null
+            $runningProcs = Get-Process -Name $pName -ErrorAction SilentlyContinue
+            if ($runningProcs) {
+                foreach ($p in $runningProcs) {
+                    if ($parentPid) {
+                        if ($p.Id -eq $parentPid) {
+                            continue
+                        }
+                    }
+                    Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+                }
+            }
         } catch {}
-    }
-
-    # 2. Kill remaining processes via PowerShell Get-Process
-    $procs = Get-Process -ErrorAction SilentlyContinue | Where-Object { $processNames -contains $_.ProcessName }
-    if ($procs) {
-        foreach ($p in $procs) {
-            try {
-                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            } catch {}
-        }
     }
 
     # 3. Terminate orphan WebView2 processes related to Antigravity/AGM
@@ -988,8 +987,21 @@ foreach ($endpoint in $apiEndpoints) {
     if ($candidateVersions.Count -ge 4) { break }
 }
 
+# If pinned release is not in GitHub releases, replenish queue with latest releases
+if ($isPinned) {
+    if (-not $releaseMetadataMap.ContainsKey($cleanPinned)) {
+        Write-Warn "Requested release v$cleanPinned does not exist on GitHub releases. Replenishing queue with available releases..."
+        foreach ($tagVer in $releaseMetadataMap.Keys) {
+            if (-not $candidateVersions.Contains($tagVer)) {
+                $candidateVersions.Add($tagVer)
+            }
+            if ($candidateVersions.Count -ge 4) { break }
+        }
+    }
+}
+
 # Fallback known historical releases
-$knownFallbacks = @("4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
+$knownFallbacks = @("4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
 foreach ($kb in $knownFallbacks) {
     if ($candidateVersions.Count -ge 4) { break }
     if (-not $isPinned) {
@@ -1126,6 +1138,27 @@ foreach ($candVersion in $versionQueue) {
 
         if (-not (Test-Path $InstallDir)) {
             New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+        } else {
+            # Gracefully handle file-locking for in-app updates:
+            # If the application binary is currently running, rename it to .old so NSIS can unpack the new executable freely
+            $lockCandidates = @(
+                (Join-Path $InstallDir $BinaryName),
+                (Join-Path $InstallDir "agm-alim.exe"),
+                (Join-Path $InstallDir "AGM by Alim.exe"),
+                (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
+                (Join-Path $InstallDir "antigravity-tools.exe")
+            )
+            foreach ($lc in $lockCandidates) {
+                if (Test-Path $lc) {
+                    $oldBak = "$lc.old"
+                    try {
+                        if (Test-Path $oldBak) {
+                            Remove-Item -Path $oldBak -Force -ErrorAction SilentlyContinue
+                        }
+                        Move-Item -Path $lc -Destination $oldBak -Force -ErrorAction SilentlyContinue
+                    } catch {}
+                }
+            }
         }
 
         Write-Step "Executing installer package ($DownloadedFile)..."

@@ -249,10 +249,13 @@ resolve_pinned_version() {
         candidates+=("$(tail -n 15 "${HOME}/.zsh_history" 2>/dev/null || true)")
     fi
 
-    local regex='releases/download/v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)(/|$|[[:space:]]|"|'"')"
+    local regex='(Antigravity-Manager|agm-alim|antigravity).*releases/download/v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
     for entry in "${candidates[@]}"; do
         if [[ "$entry" =~ $regex ]]; then
-            VERSION="${BASH_REMATCH[1]}"
+            VERSION="${BASH_REMATCH[2]}"
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+                VERSION="${VERSION}.0"
+            fi
             info "Detected pinned version from download URL: v$VERSION"
             return 0
         fi
@@ -270,6 +273,9 @@ get_version() {
 
     if [[ -n "${VERSION:-}" ]]; then
         local user_ver="${VERSION#v}"
+        if [[ "$user_ver" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            user_ver="${user_ver}.0"
+        fi
         if _is_valid_version "$user_ver"; then
             CANDIDATE_VERSIONS+=("$user_ver")
             is_pinned=1
@@ -315,7 +321,7 @@ get_version() {
     done
 
     # Fallback ladder
-    local fallbacks=("4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
+    local fallbacks=("4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
             break
