@@ -203,8 +203,29 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
 
     let content = fs::read_to_string(&registry_path)
         .map_err(|e| format!("Failed to read instances registry: {}", e))?;
-    let registry: InstanceRegistry = serde_json::from_str(&content)
+    let mut registry: InstanceRegistry = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse instances registry: {}", e))?;
+
+    let has_default = registry.instances.iter().any(|i| i.id == "default");
+    if !has_default {
+        let default_dir = get_default_antigravity_data_dir();
+        let now = chrono::Utc::now().timestamp();
+        let default_instance = InstanceConfig {
+            id: "default".to_string(),
+            name: "Default".to_string(),
+            data_dir: default_dir.to_string_lossy().to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: now,
+            last_used: now,
+            is_default: true,
+            pid: None,
+        };
+        registry.instances.insert(0, default_instance);
+        let _ = save_registry(&registry);
+    }
 
     Ok(registry)
 }

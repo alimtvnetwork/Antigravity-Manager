@@ -61,6 +61,7 @@ export function InstanceSelector() {
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<InstanceStatus | null>(null);
     const [launchingId, setLaunchingId] = useState<string | null>(null);
+    const [isRotating, setIsRotating] = useState(false);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,6 +269,8 @@ export function InstanceSelector() {
     };
 
     const handleSmartRotate = async (sourceId?: string) => {
+        if (isRotating) return;
+        setIsRotating(true);
         try {
             const result = await smartRotateProfileAccount(sourceId);
             const runwayText = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
@@ -275,13 +278,15 @@ export function InstanceSelector() {
                 ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
                 : '';
             showToast(
-                t('instances.smart_switched_toast', `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayText}${resumeText}`),
+                t('instances.smart_switched_toast', `Switched ${result.instanceName} to ${result.accountEmail}${runwayText}${resumeText}`),
                 'success'
             );
             setIsOpen(false);
         } catch (e: any) {
             console.error('Failed to smart rotate profile:', e);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
+        } finally {
+            setIsRotating(false);
         }
     };
 
@@ -365,11 +370,19 @@ export function InstanceSelector() {
                 return (
                     <button
                         type="button"
-                        onClick={() => handleSmartRotate(activeInstance?.config.id)}
-                        className="hidden md:flex p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer"
+                        disabled={isRotating}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSmartRotate(activeInstance?.config.id);
+                        }}
+                        className={`hidden md:flex p-1.5 rounded-lg text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer ${
+                            isRotating
+                                ? 'bg-blue-400 dark:bg-blue-800 cursor-not-allowed opacity-80'
+                                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+                        }`}
                         title={tooltipText}
                     >
-                        <FastForward className="w-3.5 h-3.5 fill-current" />
+                        <FastForward className={`w-3.5 h-3.5 fill-current ${isRotating ? 'animate-spin' : ''}`} />
                     </button>
                 );
             })()}
@@ -579,14 +592,15 @@ export function InstanceSelector() {
                                             <div className="w-6 h-6 flex items-center justify-center">
                                                 <button
                                                     type="button"
+                                                    disabled={isRotating}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleSmartRotate(inst.config.id);
                                                     }}
-                                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer flex items-center justify-center"
+                                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title={t('instances.smart_switch_tooltip', 'Smart Switch: Close process, pick account with longest refill runway, and switch')}
                                                 >
-                                                    <FastForward className="w-3 h-3 fill-current" />
+                                                    <FastForward className={`w-3 h-3 fill-current ${isRotating ? 'animate-spin' : ''}`} />
                                                 </button>
                                             </div>
 

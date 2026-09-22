@@ -240,7 +240,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     switchAccountToInstance: async (accountId: string, instanceId?: string) => {
         set({ isLoading: true, error: null });
         try {
-            await instanceService.switchAccountToInstance(accountId, instanceId);
+            let targetIde: string | undefined;
+            if (instanceId) {
+                if (instanceId !== 'default') {
+                    targetIde = `instance:${instanceId}`;
+                }
+            }
+            const { useAccountStore } = await import('./useAccountStore');
+            await useAccountStore.getState().switchAccount(accountId, targetIde);
             await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
@@ -316,7 +323,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('No available account found to play this instance');
             }
 
-            await instanceService.switchAccountToInstance(candidate.id, instId);
+            let targetIdeParam: string | undefined;
+            if (instId) {
+                if (instId !== 'default') {
+                    targetIdeParam = `instance:${instId}`;
+                }
+            }
+            await useAccountStore.getState().switchAccount(candidate.id, targetIdeParam);
 
             await Promise.all([
                 get().fetchInstances(true),
@@ -372,8 +385,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const instanceName = cur?.config.name || instId;
             const currentAccountId = cur?.config.bound_account_id;
 
-            // 1. Close running processes from target profile directory first
-            await instanceService.closeInstance(instId);
+            // 1. Close running processes from target profile directory first (for isolated sandboxes)
+            if (instId !== 'default') {
+                try {
+                    await instanceService.closeInstance(instId);
+                } catch (closeErr) {
+                    console.warn('[useInstanceStore] Non-fatal close instance notice:', closeErr);
+                }
+            }
 
             // 2. Discover active running instances
             const runningInstances = get().instances.filter(i => i.is_running && i.config.bound_account_id);
@@ -442,8 +461,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('All candidate accounts were either depleted (<10% quota) or currently in use');
             }
 
-            // 6. Inject verified account tokens into target profile state.vscdb and launch
-            await instanceService.switchAccountToInstance(verified.account.id, instId);
+            // 6. Delegate execution directly to proven switchAccount command (Button 2 delegation)
+            let targetIdeParam: string | undefined;
+            if (instId) {
+                if (instId !== 'default') {
+                    targetIdeParam = `instance:${instId}`;
+                }
+            }
+            await useAccountStore.getState().switchAccount(verified.account.id, targetIdeParam);
 
             // 6.5 Auto-resume recent active prompts (<1h) if enabled
             let resumeResult: instanceService.AutoResumeResult | null = null;
