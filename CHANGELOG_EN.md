@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.57.0 (2026-09-22)**:
+        -   **[Release v4.57.0] Delegate fast-forward rotation to proven switchAccount pipeline**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Delegate fast-forward rotation to proven switchAccount pipeline.
     *   **v4.56.0 (2026-09-22)**:
         -   **[Release v4.56.0] Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery**:
             -   **Update System**: Automated release and version synchronization across all manifests.

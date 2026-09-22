@@ -1,3 +1,9 @@
+## v4.57.0 — 2026-09-22 (Delegate fast-forward rotation to proven switchAccount pipeline)
+
+**Scope:** Version bump. Delegate fast-forward rotation to proven switchAccount pipeline.
+
+---
+
 ## v4.56.0 — 2026-09-22 (Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery)
 
 **Scope:** Version bump. Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery.
