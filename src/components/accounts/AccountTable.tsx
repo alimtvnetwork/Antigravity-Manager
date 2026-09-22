@@ -45,6 +45,8 @@ import {
     Check,
     Clock,
     Bot,
+    Repeat2,
+    Terminal,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
@@ -791,20 +793,20 @@ function AccountRowContent({
                                 </div>
                                 {instances.map((inst) => (
                                     <button
-                                        key={inst.id}
-                                        className={cn(
-                                            "w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors",
-                                            inst.id === activeInstanceId ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-700 dark:text-gray-300"
-                                        )}
+                                        key={inst.config.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setShowInstanceMenu(false);
-                                            onSwitch(inst.id);
+                                            onSwitch(`instance:${inst.config.id}`);
                                         }}
+                                        className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-base-100 text-gray-700 dark:text-gray-300"
                                     >
-                                        <span className="truncate">{inst.config.name}</span>
-                                        {inst.id === activeInstanceId && (
-                                            <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                        <div className="flex items-center gap-1.5 truncate">
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="truncate">{inst.config.name}</span>
+                                        </div>
+                                        {inst.config.id === activeInstanceId && (
+                                            <span className="text-[10px] text-blue-600 font-medium">Active</span>
                                         )}
                                     </button>
                                 ))}
@@ -812,20 +814,37 @@ function AccountRowContent({
                         )}
                     </div>
 
-                    {/* 3. 其它功能按钮 (直接横向展开展示，不折叠) */}
                     <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                        title={t('accounts.device_info')}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', '切换到 Antigravity IDE'))}
+                        disabled={isSwitching || isDisabled}
                     >
-                        <Smartphone className="w-3.5 h-3.5" />
+                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-                        title={t('accounts.view_details')}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', '切换到 Antigravity CLI (agy)'))}
+                        disabled={isSwitching || isDisabled}
                     >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    {/* 3. 详情与其它操作 */}
+                    <button
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition-all"
+                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+                        title={t('common.details')}
+                    >
+                        <Info className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
+                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
+                        title={t('accounts.device_fingerprint')}
+                    >
+                        <Fingerprint className="w-3.5 h-3.5" />
                     </button>
                     {onUpdateLabel && (
                         <button
