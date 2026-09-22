@@ -1,3 +1,9 @@
+## v4.58.0 — 2026-09-22 (Fix navbar transfer button delegation and error stack tracing)
+
+**Scope:** Version bump. Fix navbar transfer button delegation and error stack tracing.
+
+---
+
 ## v4.57.0 — 2026-09-22 (Delegate fast-forward rotation to proven switchAccount pipeline)
 
 **Scope:** Version bump. Delegate fast-forward rotation to proven switchAccount pipeline.

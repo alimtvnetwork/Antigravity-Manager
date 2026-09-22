@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.58.0 (2026-09-22)**:
+        -   **[Release v4.58.0] Fix navbar transfer button delegation and error stack tracing**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix navbar transfer button delegation and error stack tracing.
     *   **v4.57.0 (2026-09-22)**:
         -   **[Release v4.57.0] Delegate fast-forward rotation to proven switchAccount pipeline**:
             -   **Update System**: Automated release and version synchronization across all manifests.

@@ -391,9 +391,6 @@ export function getSubscriptionTierMultiplier(tierName?: string): number {
 export function extractWeeklyQuotaPercent(acc: Account): number {
     const models = acc.quota?.models || [];
     const validModels = models.filter(m => {
-        const name = (m.name || '').toLowerCase();
-        const isExcluded = name.includes('3.0') || name.includes('3.1');
-        if (isExcluded) return false;
         return typeof m.percentage === 'number';
     });
 

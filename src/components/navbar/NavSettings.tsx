@@ -68,10 +68,11 @@ export function NavSettings({
             await getCurrentWindow().minimize();
         } catch (e) {
             console.error('Failed to minimize window:', e);
-            useErrorStore.getState().captureError(e, {
+            const captured = useErrorStore.getState().captureError(e, {
                 source: 'NavSettings.tsx',
                 triggerAction: 'handleMinimize',
             });
+            useErrorStore.getState().openErrorModal(captured);
         }
     };
 
@@ -83,10 +84,11 @@ export function NavSettings({
             setIsMaximized(max);
         } catch (e) {
             console.error('Failed to toggle maximize window:', e);
-            useErrorStore.getState().captureError(e, {
+            const captured = useErrorStore.getState().captureError(e, {
                 source: 'NavSettings.tsx',
                 triggerAction: 'handleToggleMaximize',
             });
+            useErrorStore.getState().openErrorModal(captured);
         }
     };
 
@@ -95,10 +97,11 @@ export function NavSettings({
             await getCurrentWindow().close();
         } catch (e) {
             console.error('Failed to close window:', e);
-            useErrorStore.getState().captureError(e, {
+            const captured = useErrorStore.getState().captureError(e, {
                 source: 'NavSettings.tsx',
                 triggerAction: 'handleClose',
             });
+            useErrorStore.getState().openErrorModal(captured);
         }
     };
 
@@ -126,7 +129,19 @@ export function NavSettings({
                 {/* Mini view toggle button */}
                 <button
                     type="button"
-                    onClick={() => setMiniView(true)}
+                    onClick={() => {
+                        try {
+                            setMiniView(true);
+                        } catch (err) {
+                            console.error('Failed to switch to mini view:', err);
+                            const captured = useErrorStore.getState().captureError(err, {
+                                source: 'NavSettings.tsx',
+                                triggerComponent: 'NavSettings.MiniView',
+                                triggerAction: 'setMiniView',
+                            });
+                            useErrorStore.getState().openErrorModal(captured);
+                        }
+                    }}
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                     title={t('nav.mini_view', 'Mini View')}
                     aria-label="Mini View"

@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useAccountStore } from '../../stores/useAccountStore';
+import { useErrorStore } from '../../stores/error-store';
 import { cn } from '../../utils/cn';
 import { isTauri } from '../../utils/env';
 import { request as invoke } from '../../utils/request';
@@ -100,6 +101,13 @@ export function InstanceSelector() {
             showToast(t('instances.created_toast', 'New instance profile created'), 'success');
         } catch (e: any) {
             console.error('Failed to create instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleCreate',
+                context: { newInstanceName: trimmed },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -107,15 +115,23 @@ export function InstanceSelector() {
     const handleCopy = async () => {
         const trimmed = copyInstanceName.trim();
         if (!trimmed) return;
-        if (!activeInstance) return;
+        const target = activeInstance || instances[0];
+        if (!target) return;
         try {
-            const copied = await copyInstance(activeInstance.config.id, trimmed, cloneMode);
+            const copied = await copyInstance(target.config.id, trimmed, cloneMode);
             await setActiveInstance(copied.id);
             setCopyInstanceName('');
             setIsCopyOpen(false);
             showToast(t('instances.copied_toast', 'Instance profile duplicated'), 'success');
         } catch (e: any) {
             console.error('Failed to copy instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleCopy',
+                context: { sourceInstanceId: target.config.id, copyInstanceName: trimmed, cloneMode },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -132,6 +148,13 @@ export function InstanceSelector() {
             showToast(t('instances.renamed_toast', 'Profile renamed successfully'), 'success');
         } catch (e: any) {
             console.error('Failed to rename instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleEdit',
+                context: { editTargetId, editInstanceName: trimmed },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -156,6 +179,13 @@ export function InstanceSelector() {
             showToast(t('instances.deleted_toast', 'Profile deleted successfully'), 'success');
         } catch (e: any) {
             console.error('Failed to delete instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleDelete',
+                context: { targetId },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -171,6 +201,13 @@ export function InstanceSelector() {
             );
         } catch (e: any) {
             console.error('Smart play failed:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleSmartPlay',
+                context: { targetId: instId },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         } finally {
             setLaunchingId(null);
@@ -189,6 +226,13 @@ export function InstanceSelector() {
             }
         } catch (e: any) {
             console.error('Failed to toggle instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleToggleLaunch',
+                context: { instanceId, isRunning },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(t('instances.launch_error', 'Failed to launch instance: ') + (e?.message || e), 'error');
         } finally {
             setLaunchingId(null);
@@ -225,6 +269,12 @@ export function InstanceSelector() {
             }
         } catch (e: any) {
             console.error('Failed to export profiles:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleExportProfiles',
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -249,6 +299,12 @@ export function InstanceSelector() {
             }
         } catch (e: any) {
             console.error('Failed to import profiles:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleImportProfiles',
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         }
     };
@@ -262,6 +318,12 @@ export function InstanceSelector() {
             showToast(t('instances.import_success', `Successfully imported ${configs.length} profiles`), 'success');
         } catch (err: any) {
             console.error('Failed to import file:', err);
+            const captured = useErrorStore.getState().captureError(err, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleFileInput',
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${err?.message || err}`, 'error');
         } finally {
             e.target.value = '';
@@ -272,18 +334,29 @@ export function InstanceSelector() {
         if (isRotating) return;
         setIsRotating(true);
         try {
-            const result = await smartRotateProfileAccount(sourceId);
-            const runwayText = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
+            const targetId = sourceId || activeInstance?.config.id || 'default';
+            const result = await smartRotateProfileAccount(targetId);
             const resumeText = (result.resumedProjectsCount ?? 0) > 0
                 ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
                 : '';
             showToast(
-                t('instances.smart_switched_toast', `Switched ${result.instanceName} to ${result.accountEmail}${runwayText}${resumeText}`),
+                t('instances.smart_switched_toast', `Transferred ${result.instanceName} to ${result.accountEmail}${resumeText}`),
                 'success'
             );
             setIsOpen(false);
         } catch (e: any) {
-            console.error('Failed to smart rotate profile:', e);
+            console.error('Failed to smart transfer profile account:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector.TransferButton',
+                triggerAction: 'handleSmartRotate',
+                context: {
+                    sourceId,
+                    activeInstanceId: activeInstance?.config.id,
+                    instanceName: activeInstance?.config.name,
+                },
+            });
+            useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
         } finally {
             setIsRotating(false);

@@ -409,68 +409,64 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 accounts = useAccountStore.getState().accounts;
             }
 
-            // 4. Rank candidate accounts using multiplicative formula
-            const ranked = instanceService.rankSmartCandidates(
-                accounts,
-                activeInUseAccountIds,
-                currentAccountId
-            );
-            const hasRanked = ranked.length > 0;
-            if (!hasRanked) {
+            // 4. Filter eligible accounts (not disabled, not forbidden, not blocked)
+            const eligibleAccounts = accounts.filter(acc => {
+                const isDisabled = Boolean(acc.disabled);
+                if (isDisabled) return false;
+                const isForbidden = Boolean(acc.quota?.is_forbidden);
+                if (isForbidden) return false;
+                const isBlocked = Boolean(acc.validation_blocked);
+                if (isBlocked) return false;
+                return true;
+            });
+
+            if (eligibleAccounts.length === 0) {
                 set({ isLoading: false });
-                throw new Error('No candidate accounts found for rotation');
+                throw new Error('No eligible accounts available for transfer');
             }
 
-            // 5. Pre-activation verification and demotion loop
-            let verified: instanceService.MultiplicativeCandidateResult | null = null;
-            const queue = [...ranked];
+            // 5. Select candidate accounts (preferring accounts not currently bound to other running instances and not current account)
+            let pool = eligibleAccounts.filter(a => {
+                const inUseByOther = activeInUseAccountIds.includes(a.id);
+                if (inUseByOther) return false;
+                const isCurrent = Boolean(currentAccountId && a.id === currentAccountId);
+                if (isCurrent) return false;
+                return true;
+            });
 
-            while (queue.length > 0) {
-                const pick = queue.shift();
-                if (!pick) continue;
-                if (pick.score <= 0) continue;
-
-                try {
-                    await useAccountStore.getState().refreshQuota(pick.account.id);
-                } catch {
-                    continue;
-                }
-
-                const freshAccounts = useAccountStore.getState().accounts;
-                const freshAccount = freshAccounts.find(a => a.id === pick.account.id);
-                if (!freshAccount) continue;
-
-                const freshScore = instanceService.calculateMultiplicativeScore(
-                    freshAccount,
-                    activeInUseAccountIds,
-                    currentAccountId
-                );
-
-                const isUnused = freshScore.activeFactor === 1;
-                const hasQuota = freshScore.weeklyQuotaPercent >= 10;
-                if (isUnused) {
-                    if (hasQuota) {
-                        verified = { ...freshScore, isVerified: true };
-                        break;
-                    }
-                }
+            if (pool.length === 0) {
+                pool = eligibleAccounts.filter(a => !activeInUseAccountIds.includes(a.id));
             }
 
-            if (!verified) {
-                set({ isLoading: false });
-                throw new Error('All candidate accounts were either depleted (<10% quota) or currently in use');
+            if (pool.length === 0) {
+                pool = eligibleAccounts;
             }
 
-            // 6. Delegate execution directly to proven switchAccount command (Button 2 delegation)
+            // 6. Rank candidate accounts based on quota, tier, and idle time
+            const scoredPool = pool.map(acc => {
+                const weeklyQuota = instanceService.extractWeeklyQuotaPercent(acc);
+                const tierMultiplier = instanceService.getSubscriptionTierMultiplier(acc.quota?.subscription_tier);
+                const nowSec = Math.floor(Date.now() / 1000);
+                const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 999999;
+                const idleHours = Math.min(240, Math.floor(idleSec / 3600));
+
+                const score = (weeklyQuota * tierMultiplier) + (idleHours * 5);
+                return { account: acc, score, weeklyQuota };
+            });
+
+            scoredPool.sort((a, b) => b.score - a.score);
+            const targetCandidate = scoredPool[0]?.account || eligibleAccounts[0];
+
+            // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;
             if (instId) {
                 if (instId !== 'default') {
                     targetIdeParam = `instance:${instId}`;
                 }
             }
-            await useAccountStore.getState().switchAccount(verified.account.id, targetIdeParam);
+            await useAccountStore.getState().switchAccount(targetCandidate.id, targetIdeParam);
 
-            // 6.5 Auto-resume recent active prompts (<1h) if enabled
+            // 8. Auto-resume recent active prompts (<1h) if enabled
             let resumeResult: instanceService.AutoResumeResult | null = null;
             try {
                 resumeResult = await instanceService.resumeRecentProjectPrompts(instId);
@@ -478,7 +474,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 console.warn('[useInstanceStore] Auto-resume recent prompts notice:', resumeErr);
             }
 
-            // 7. Synchronize UI state
+            // 9. Synchronize UI state
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchCurrentAccount(),
@@ -488,9 +484,9 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             set({ activeInstanceId: instId, isLoading: false });
 
             return {
-                accountEmail: verified.account.email,
+                accountEmail: targetCandidate.email,
                 instanceName,
-                daysUntilRefill: verified.daysUntilRefill,
+                daysUntilRefill: 0,
                 resumedProjectsCount: resumeResult?.resumed_project_count ?? 0,
                 skippedProjectsCount: resumeResult?.skipped_project_count ?? 0,
             };
