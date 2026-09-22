@@ -43,9 +43,9 @@
 </p>
 
 <p align="center">
-  <strong>Lead Architect &amp; Maintainer: <a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
+  <strong>Lead Architect &amp; Maintainer: <a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/aukgit">@aukgit</a> / <a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
   Chief Software Engineer, <a href="https://riseup-asia.com/"><strong>Riseup Asia LLC</strong></a> (Official Corporate Sponsor)<br/>
-  <a href="https://github.com/alim-ul-karim">GitHub Profile</a> ·
+  <a href="https://github.com/aukgit">GitHub (@aukgit)</a> ·
   <a href="https://alimkarim.com/">Personal Website</a> ·
   <a href="https://www.linkedin.com/in/alimkarim">LinkedIn</a> ·
   <a href="https://stackoverflow.com/users/513511/md-alim-ul-karim">Stack Overflow</a> ·
@@ -53,7 +53,7 @@
 </p>
 
 <p align="center">
-  <em>Maintained and enhanced by <strong><a href="https://github.com/alim-ul-karim">Md. Alim Ul Karim</a></strong> &amp; <strong><a href="https://riseup-asia.com/">Riseup Asia LLC</a></strong> · Special thanks and gratitude to <strong><a href="https://lbjlaq.github.io/Antigravity-Manager/">lbjlaq</a></strong> for creating this project in the first place</em>
+  <em>Maintained and enhanced by <strong><a href="https://github.com/aukgit">Md. Alim Ul Karim</a></strong> &amp; <strong><a href="https://riseup-asia.com/">Riseup Asia LLC</a></strong> · Special thanks and heartfelt gratitude to <strong><a href="https://lbjlaq.github.io/Antigravity-Manager/">lbjlaq</a></strong> for creating this project in the first place</em>
 </p>
 
 ---
@@ -534,9 +534,9 @@ We extend our sincere thanks to all creators, developers, and open-source contri
 ## 👤 Lead Architect & Company
 
 <p align="center">
-  <strong><a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
+  <strong><a href="https://alimkarim.com/">Md. Alim Ul Karim</a></strong> (<a href="https://github.com/aukgit">@aukgit</a> / <a href="https://github.com/alim-ul-karim">@alim-ul-karim</a>)<br/>
   Chief Software Engineer, <a href="https://riseup-asia.com/"><strong>Riseup Asia LLC</strong></a><br/>
-  <a href="https://github.com/alim-ul-karim">GitHub Profile</a> ·
+  <a href="https://github.com/aukgit">GitHub Profile (@aukgit)</a> ·
   <a href="https://alimkarim.com/">Personal Website</a> ·
   <a href="https://www.linkedin.com/in/alimkarim">LinkedIn</a> ·
   <a href="https://stackoverflow.com/users/513511/md-alim-ul-karim">Stack Overflow</a> ·

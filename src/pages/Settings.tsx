@@ -1693,29 +1693,39 @@ function Settings() {
 
                                 {/* Cards Grid - Now 5 columns */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full max-w-6xl px-4">
-                                    {/* Author Card */}
-                                    <div className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group flex flex-col items-center text-center gap-3">
+                                    {/* Author & Sponsor Card */}
+                                    <a
+                                        href="https://alimkarim.com"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
+                                    >
                                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
                                             <User className="w-6 h-6 text-blue-500" />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author', 'Maintainer')}</div>
+                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author', 'Maintainer & Sponsor')}</div>
                                             <div className="font-bold text-gray-900 dark:text-base-content text-xs sm:text-sm">Md. Alim Ul Karim</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Managed & Enhanced</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Riseup Asia LLC</div>
                                         </div>
-                                    </div>
+                                    </a>
 
                                     {/* Upstream Genesis Card */}
-                                    <div className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group flex flex-col items-center text-center gap-3">
+                                    <a
+                                        href="https://lbjlaq.github.io/Antigravity-Manager/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
+                                    >
                                         <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
                                             <Sparkles className="w-6 h-6 text-emerald-500" />
                                         </div>
                                         <div>
                                             <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Upstream Genesis</div>
                                             <div className="font-bold text-gray-900 dark:text-base-content">lbjlaq</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Original Creator</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Original Creator · Special Thanks</div>
                                         </div>
-                                    </div>
+                                    </a>
 
                                     {/* Telegram Card */}
                                     <a
