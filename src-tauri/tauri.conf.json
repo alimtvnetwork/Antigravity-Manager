@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "agm-alim",
-  "version": "4.54.0",
+  "version": "4.55.0",
   "identifier": "com.lbjlaq.antigravity-tools",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -30,7 +30,7 @@
     "targets": "all",
     "createUpdaterArtifacts": false,
     "publisher": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
-    "copyright": "Copyright © 2026 MD Alim Ul Karim. Sponsored by RISE UP ASIA LLC. All rights reserved.",
+    "copyright": "Copyright \u00a9 2026 MD Alim Ul Karim. Sponsored by RISE UP ASIA LLC. All rights reserved.",
     "shortDescription": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
     "longDescription": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
     "icon": [

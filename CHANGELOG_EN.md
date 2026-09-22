@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.55.0 (2026-09-22)**:
+        -   **[Release v4.55.0] Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery.
     *   **v4.52.0 (2026-09-22)**:
         -   **[Release v4.52.0] Restore v4.47 quota progress bar and action buttons with clean typescript build**:
             -   **Update System**: Automated release and version synchronization across all manifests.

@@ -1,3 +1,9 @@
+## v4.55.0 — 2026-09-22 (Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery)
+
+**Scope:** Version bump. Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery.
+
+---
+
 ## v4.52.0 — 2026-09-22 (Restore v4.47 quota progress bar and action buttons with clean typescript build)
 
 **Scope:** Version bump. Restore v4.47 quota progress bar and action buttons with clean typescript build.
