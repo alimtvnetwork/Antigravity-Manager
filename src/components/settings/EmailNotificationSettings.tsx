@@ -813,12 +813,24 @@ export default function EmailNotificationSettings() {
                         </span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleAddRecipient();
+                        }}
+                        className="flex flex-col sm:flex-row gap-2 mb-3"
+                    >
                         <input
                             type="email"
                             placeholder="Recipient Email (e.g. user@domain.com)"
                             value={newRecipientEmail}
                             onChange={(e) => setNewRecipientEmail(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddRecipient();
+                                }
+                            }}
                             className="flex-1 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <input
@@ -826,15 +838,21 @@ export default function EmailNotificationSettings() {
                             placeholder="Group (e.g. dev, ops, default)"
                             value={newRecipientGroup}
                             onChange={(e) => setNewRecipientGroup(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddRecipient();
+                                }
+                            }}
                             className="w-36 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
-                            onClick={handleAddRecipient}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer"
+                            type="submit"
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer shrink-0"
                         >
                             Add Recipient
                         </button>
-                    </div>
+                    </form>
 
                     <div className="flex flex-wrap gap-2">
                         {recipients.map((rec) => (
@@ -922,20 +940,32 @@ export default function EmailNotificationSettings() {
                             placeholder="e.g. [Antigravity-Node-1][192.168.1.100][Instance-1] prompt: Review PR"
                             value={developerCustomSubject}
                             onChange={(e) => setDeveloperCustomSubject(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleDispatchDeveloperTask();
+                                }
+                            }}
                             className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                         />
                     </div>
 
                     <div className="mb-3">
                         <label className="text-[11px] font-semibold text-gray-600 dark:text-slate-400 mb-1 block">
-                            Command / Prompt Payload
+                            Command / Prompt Payload (Press Ctrl+Enter to dispatch)
                         </label>
                         <textarea
                             rows={3}
                             value={developerTaskPayload}
                             onChange={(e) => setDeveloperTaskPayload(e.target.value)}
+                            onKeyDown={(e) => {
+                                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleDispatchDeveloperTask();
+                                }
+                            }}
                             className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                            placeholder="Enter command or AI prompt payload..."
+                            placeholder="Enter command or AI prompt payload... (Ctrl+Enter to dispatch)"
                         />
                     </div>
 
@@ -1485,7 +1515,13 @@ export default function EmailNotificationSettings() {
                 onConfirm={handleSaveAccount}
                 onCancel={() => setIsAccountModalOpen(false)}
             >
-                <div className="space-y-3.5 text-xs">
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveAccount();
+                    }}
+                    className="space-y-3.5 text-xs"
+                >
                     {/* One-Click AI Instructions Copy */}
                     <div className="flex items-center justify-between p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
                         <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
@@ -1759,7 +1795,7 @@ export default function EmailNotificationSettings() {
                             </div>
                         )}
                     </div>
-                </div>
+                </form>
             </ModalDialog>
 
             {/* Import Modal */}
