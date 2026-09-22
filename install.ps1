@@ -58,7 +58,7 @@ $PinnedVersion = "__PINNED_VERSION__"
 $Repo = "alimtvnetwork/Antigravity-Manager"
 $UpstreamRepo = "lbjlaq/Antigravity-Manager"
 $AppName = "AGM by Alim"
-$FullName = "Antigravity Manager Tools By Alim"
+$FullName = "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC"
 $BinaryName = "agm-alim.exe"
 $ShortcutName = "AGM by Alim"
 $Tooltip = "AGM by Alim"
@@ -391,7 +391,7 @@ function Remove-PreviousInstallations {
 
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
-            $_.DisplayName -match '^(Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
+            $_.DisplayName -match '^(Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC|Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
         }
 
         if ($entries) {
@@ -694,7 +694,7 @@ function Get-InstalledVersion {
     )
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
-            $_.DisplayName -match '^(Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
+            $_.DisplayName -match '^(Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC|Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
         }
         foreach ($entry in $entries) {
             if ($entry.DisplayVersion) {
@@ -1281,6 +1281,30 @@ Write-Success "Installation of $FullName v$TargetVersion completed successfully!
 Write-Host "${LeftPadding}Target Directory: $InstallDir" -ForegroundColor Gray
 Write-Host "${LeftPadding}Executable:       $ExePath" -ForegroundColor Gray
 Write-Host ""
+
+# Ensure Windows Add/Remove Programs (Installed Apps) reflects full branding
+function Sync-InstalledAppsRegistryBranding {
+    $targetName = "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC"
+    $regRoots = @(
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    )
+    foreach ($root in $regRoots) {
+        if (Test-Path $root) {
+            $subkeys = @("agm-alim", "Antigravity Tools", "Antigravity-Tools", "AGM by Alim")
+            foreach ($sk in $subkeys) {
+                $fullPath = Join-Path $root $sk
+                if (Test-Path $fullPath) {
+                    try {
+                        Set-ItemProperty -Path $fullPath -Name "DisplayName" -Value $targetName -Force -ErrorAction SilentlyContinue
+                        Set-ItemProperty -Path $fullPath -Name "Publisher" -Value $targetName -Force -ErrorAction SilentlyContinue
+                    } catch {}
+                }
+            }
+        }
+    }
+}
+Sync-InstalledAppsRegistryBranding
 
 # Ensure Auto Sync Current Account is default true
 Ensure-DefaultConfig

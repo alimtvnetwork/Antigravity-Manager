@@ -1,8 +1,8 @@
 [package]
 name = "agm-alim"
-version = "4.53.0"
-description = "Antigravity Manager Tools By Alim"
-authors = ["you"]
+version = "4.54.0"
+description = "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC"
+authors = ["MD Alim Ul Karim <devorg.bd@gmail.com> (sponsored by RISE UP ASIA LLC)"]
 license = "CC-BY-NC-SA-4.0"
 edition = "2021"
 

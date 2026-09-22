@@ -1,7 +1,8 @@
 {
-  "version": "4.53.0",
+  "version": "4.54.0",
   "name": "agm-alim",
-  "description": "Antigravity Manager Tools By Alim",
+  "description": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
+  "author": "MD Alim Ul Karim (sponsored by RISE UP ASIA LLC)",
   "type": "module",
   "private": true,
   "scripts": {
