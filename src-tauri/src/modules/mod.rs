@@ -1,5 +1,6 @@
 pub mod account;
 pub mod account_service;
+pub mod agy_cleaner;
 pub mod auto_switcher;
 pub mod cache;
 pub mod cli;

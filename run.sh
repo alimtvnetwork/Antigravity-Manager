@@ -20,6 +20,19 @@ write_err() { echo -e "  ${RED}[ERROR] $1${NC}"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
+# Intercept CLI subcommands (agy, ccko, cckf, undo, cache-clear, help)
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        agy|agi|ccko|cckf|undo|cache-clear|help)
+            if [ -f "${HOME}/.cargo/env" ]; then
+                . "${HOME}/.cargo/env"
+            fi
+            cargo run --bin agm-alim --manifest-path "${SCRIPT_DIR}/src-tauri/Cargo.toml" -- "$@"
+            exit $?
+            ;;
+    esac
+fi
+
 MODE="dev"
 for arg in "$@"; do
     case "$arg" in

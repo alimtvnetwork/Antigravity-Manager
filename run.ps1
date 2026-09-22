@@ -62,6 +62,13 @@ function Write-Err {
 
 $ScriptDir = $PSScriptRoot
 
+# Intercept CLI subcommands (agy, ccko, cckf, undo, cache-clear, help)
+if ($args.Count -gt 0 -and ($args[0] -in @("agy", "agi", "ccko", "cckf", "undo", "cache-clear", "--help", "-h", "help"))) {
+    $cargoArgs = @("run", "--bin", "agm-alim", "--manifest-path", (Join-Path $ScriptDir "src-tauri\Cargo.toml"), "--") + $args
+    & cargo @cargoArgs
+    exit $LASTEXITCODE
+}
+
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host "                Antigravity-Manager Runner                 " -ForegroundColor Cyan

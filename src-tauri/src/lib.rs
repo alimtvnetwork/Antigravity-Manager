@@ -666,6 +666,10 @@ pub fn run() {
             modules::auto_switcher::start_auto_switcher();
             info!("Auto profile switcher daemon initialized.");
 
+            // Start periodic conversation cleanup daemon (1-hour ticker)
+            modules::agy_cleaner::start_cleanup_daemon();
+            info!("Conversation cleanup daemon initialized.");
+
             // [PHASE 1] Integrated into main Axum port (8045), port 19527 no longer started separately
             info!("Management API integrated into main proxy server (port 8045)");
 
@@ -747,6 +751,9 @@ pub fn run() {
             commands::clear_log_cache,
             commands::clear_antigravity_cache,
             commands::get_antigravity_cache_paths,
+            commands::preflight_antigravity_clean,
+            commands::prune_antigravity_conversations,
+            commands::undo_antigravity_prune,
             commands::open_data_folder,
             commands::get_data_dir_path,
             commands::set_data_dir,

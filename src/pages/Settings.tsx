@@ -109,6 +109,11 @@ function Settings() {
             has_auto_resume: true,
             cooldown_seconds: 180,
         },
+        conversation_cleanup: {
+            is_enabled: false,
+            interval_hours: 1,
+            keep_count: 40,
+        },
     });
 
     // Dialog state
@@ -191,6 +196,11 @@ function Settings() {
                 ...config,
                 auto_sync: config.auto_sync ?? true,
                 auto_sync_migrated: config.auto_sync_migrated ?? true,
+                conversation_cleanup: config.conversation_cleanup ?? {
+                    is_enabled: false,
+                    interval_hours: 1,
+                    keep_count: 40,
+                },
             });
         }
     }, [config]);
@@ -1324,6 +1334,87 @@ function Settings() {
                                             {t('settings.advanced.clear_antigravity_cache')}
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* Auto Conversation Pruning & Retention */}
+                                <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <h3 className="font-medium text-gray-900 dark:text-base-content">
+                                                {t('settings.advanced.auto_cleanup_title', 'Periodic Conversation Auto-Cleanup')}
+                                            </h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                {t('settings.advanced.auto_cleanup_desc', 'Automatically keep recent conversations and prune older conversations to temporary storage every 1 hour.')}
+                                            </p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={formData.conversation_cleanup?.is_enabled ?? false}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    conversation_cleanup: {
+                                                        is_enabled: e.target.checked,
+                                                        interval_hours: formData.conversation_cleanup?.interval_hours ?? 1,
+                                                        keep_count: formData.conversation_cleanup?.keep_count ?? 40,
+                                                    },
+                                                })}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                        </label>
+                                    </div>
+
+                                    {(formData.conversation_cleanup?.is_enabled ?? false) && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-base-200 p-4 rounded-lg border border-gray-200 dark:border-base-300 mb-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
+                                                    {t('settings.advanced.cleanup_keep_count', 'Keep Recent Conversations')}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="500"
+                                                    className="w-full px-4 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-white dark:bg-base-100 text-gray-900 dark:text-base-content"
+                                                    value={formData.conversation_cleanup?.keep_count ?? 40}
+                                                    onChange={(e) => setFormData({
+                                                        ...formData,
+                                                        conversation_cleanup: {
+                                                            is_enabled: formData.conversation_cleanup?.is_enabled ?? true,
+                                                            interval_hours: formData.conversation_cleanup?.interval_hours ?? 1,
+                                                            keep_count: parseInt(e.target.value) || 40,
+                                                        },
+                                                    })}
+                                                />
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                    {t('settings.advanced.cleanup_keep_desc', 'Default: 40 conversations. Older conversations are staged into temporary backup and can be undone.')}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
+                                                    {t('settings.advanced.cleanup_interval_hours', 'Execution Interval (Hours)')}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="168"
+                                                    className="w-full px-4 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-white dark:bg-base-100 text-gray-900 dark:text-base-content"
+                                                    value={formData.conversation_cleanup?.interval_hours ?? 1}
+                                                    onChange={(e) => setFormData({
+                                                        ...formData,
+                                                        conversation_cleanup: {
+                                                            is_enabled: formData.conversation_cleanup?.is_enabled ?? true,
+                                                            interval_hours: parseInt(e.target.value) || 1,
+                                                            keep_count: formData.conversation_cleanup?.keep_count ?? 40,
+                                                        },
+                                                    })}
+                                                />
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                    {t('settings.advanced.cleanup_interval_desc', 'Periodic interval in hours (default: 1 hour).')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
 

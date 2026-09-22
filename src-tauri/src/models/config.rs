@@ -40,6 +40,8 @@ pub struct AppConfig {
     pub auto_profile_switcher: AutoProfileSwitcherConfig, // [NEW] Auto profile switcher configuration
     #[serde(default = "default_instance_clone_mode")]
     pub instance_clone_mode: String,
+    #[serde(default)]
+    pub conversation_cleanup: ConversationCleanupConfig,
 }
 
 fn default_auto_sync() -> bool {
@@ -224,6 +226,7 @@ impl AppConfig {
             cloudflared: CloudflaredConfig::default(),
             auto_profile_switcher: AutoProfileSwitcherConfig::default(),
             instance_clone_mode: default_instance_clone_mode(),
+            conversation_cleanup: ConversationCleanupConfig::default(),
         }
     }
 }
@@ -296,6 +299,39 @@ impl Default for AutoProfileSwitcherConfig {
             auto_focus_window: true,
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
+        }
+    }
+}
+
+fn default_false() -> bool {
+    false
+}
+
+fn default_cleanup_interval_hours() -> u32 {
+    1
+}
+
+fn default_cleanup_keep_count() -> usize {
+    40
+}
+
+/// Conversation cleanup and retention configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationCleanupConfig {
+    #[serde(default = "default_false", alias = "enabled")]
+    pub is_enabled: bool,
+    #[serde(default = "default_cleanup_interval_hours")]
+    pub interval_hours: u32,
+    #[serde(default = "default_cleanup_keep_count")]
+    pub keep_count: usize,
+}
+
+impl Default for ConversationCleanupConfig {
+    fn default() -> Self {
+        Self {
+            is_enabled: false,
+            interval_hours: 1,
+            keep_count: 40,
         }
     }
 }

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2 } from 'lucide-react';
+import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { NavItem, Language } from './constants';
 import { isTauri } from '../../utils/env';
@@ -169,6 +169,7 @@ interface MoreDropdownProps {
     languages: Language[];
     onThemeToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
     onLanguageChange: (langCode: string) => void;
+    onOpenCleanModal?: () => void;
 }
 
 export function MoreDropdown({
@@ -176,7 +177,8 @@ export function MoreDropdown({
     currentLanguage,
     languages,
     onThemeToggle,
-    onLanguageChange
+    onLanguageChange,
+    onOpenCleanModal
 }: MoreDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -215,7 +217,21 @@ export function MoreDropdown({
 
             {/* Dropdown menu */}
             {isOpen && (
-                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-40 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                <div className="absolute ltr:right-0 rtl:left-0 mt-2 w-44 max-w-[calc(100vw-32px)] z-50 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ltr:origin-top-right rtl:origin-top-left">
+                    {/* Quick Clean */}
+                    {onOpenCleanModal && (
+                        <button
+                            onClick={() => {
+                                onOpenCleanModal();
+                                setIsOpen(false);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300"
+                        >
+                            <Sparkles className="w-4 h-4 text-blue-500" />
+                            <span>{t('nav.quick_clean', 'Quick Clean')}</span>
+                        </button>
+                    )}
+
                     {/* Mini view */}
                     <button
                         onClick={() => {

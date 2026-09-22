@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Sun, Moon, LogOut, Minimize2, Minus, X } from 'lucide-react';
+import { Sun, Moon, LogOut, Minimize2, Minus, X, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
 import { useViewStore } from '../../stores/useViewStore';
+import { AgyCleanModal } from '../modals/agy-clean-modal';
 
 interface NavSettingsProps {
     theme: 'light' | 'dark';
@@ -31,6 +32,7 @@ export function NavSettings({
     const { t } = useTranslation();
     const { setMiniView } = useViewStore();
     const [isMaximized, setIsMaximized] = useState(false);
+    const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
 
     useEffect(() => {
         if (!isTauri()) return;
@@ -93,6 +95,17 @@ export function NavSettings({
         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             {/* Collapsible Secondary Tools: Visible on >= 1024px */}
             <div className="hidden lg:flex items-center gap-1.5 md:gap-2 shrink-0">
+                {/* Antigravity Quick Clean button */}
+                <button
+                    type="button"
+                    onClick={() => setIsCleanModalOpen(true)}
+                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
+                    title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
+                    aria-label="Quick Clean"
+                >
+                    <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+
                 {/* Mini view toggle button */}
                 <button
                     type="button"
@@ -135,6 +148,7 @@ export function NavSettings({
                     languages={LANGUAGES}
                     onThemeToggle={onThemeToggle}
                     onLanguageChange={onLanguageChange}
+                    onOpenCleanModal={() => setIsCleanModalOpen(true)}
                 />
             </div>
 
@@ -192,6 +206,12 @@ export function NavSettings({
                     <LogOut className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400" />
                 </button>
             )}
+
+            {/* Quick Clean & Retention Modal */}
+            <AgyCleanModal
+                isOpen={isCleanModalOpen}
+                onClose={() => setIsCleanModalOpen(false)}
+            />
         </div>
     );
 }

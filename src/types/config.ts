@@ -193,6 +193,13 @@ export interface AppConfig {
     cloudflared: CloudflaredConfig; // [NEW] Cloudflared 配置
     auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] 自动配额轮换与任务恢复配置
     instance_clone_mode?: 'full' | 'profile'; // [NEW] 实例克隆模式：全量目录复制或仅配置
+    conversation_cleanup?: ConversationCleanupConfig; // [NEW] 对话历史与缓存定期自动清理配置
+}
+
+export interface ConversationCleanupConfig {
+    is_enabled: boolean;
+    interval_hours: number;
+    keep_count: number;
 }
 
 export interface AutoProfileSwitcherConfig {
