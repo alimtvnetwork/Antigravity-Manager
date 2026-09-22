@@ -98,6 +98,19 @@ export async function closeInstance(instanceId: string): Promise<void> {
     return await invoke('close_instance', { instanceId });
 }
 
+export async function cleanAndRestartWorkspace(): Promise<string> {
+    try {
+        return await invoke('clean_and_restart_workspace');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.cleanAndRestartWorkspace',
+            endpoint: 'clean_and_restart_workspace',
+            triggerAction: 'clean_and_restart_workspace',
+        });
+        throw e;
+    }
+}
+
 export async function getActiveInstance(): Promise<string> {
     return await invoke('get_active_instance');
 }
@@ -321,26 +334,107 @@ export function formatTimeAgo(timestampSec?: number): string {
     return `${days}d ago`;
 }
 
-export interface SmartCandidateResult {
+export interface MultiplicativeCandidateResult {
     account: Account;
     score: number;
-    idleHours: number;
+    activeFactor: number;
+    tierMultiplier: number;
+    weeklyQuotaPercent: number;
     daysUntilRefill: number;
     quotaPercentage: number;
+    idleHours: number;
+    isVerified?: boolean;
+}
+
+export type SmartCandidateResult = MultiplicativeCandidateResult;
+
+export function getSubscriptionTierMultiplier(tierName?: string): number {
+    const lower = (tierName || '').toLowerCase();
+    const isUltra = lower.includes('ultra');
+    if (isUltra) return 5;
+    const isPro = lower.includes('pro');
+    if (isPro) return 3;
+    return 1;
+}
+
+export function extractWeeklyQuotaPercent(acc: Account): number {
+    const models = acc.quota?.models || [];
+    const validModels = models.filter(m => {
+        const name = (m.name || '').toLowerCase();
+        const isExcluded = name.includes('3.0') || name.includes('3.1');
+        if (isExcluded) return false;
+        return typeof m.percentage === 'number';
+    });
+
+    const hasValid = validModels.length > 0;
+    if (!hasValid) return 100;
+
+    let total = 0;
+    for (const m of validModels) {
+        total += m.percentage;
+    }
+    return Math.round(total / validModels.length);
+}
+
+function calculateAccountRefillDays(acc: Account, nowMs: number): number {
+    let maxDays = 0;
+    const models = acc.quota?.models || [];
+    for (const m of models) {
+        if (!m.reset_time) continue;
+        const resetDate = parseFlexibleDate(m.reset_time);
+        if (!resetDate) continue;
+        const diffMs = resetDate.getTime() - nowMs;
+        if (diffMs > 0) {
+            const days = diffMs / 86400000;
+            if (days > maxDays) maxDays = days;
+        }
+    }
+    return Math.round(maxDays * 10) / 10;
 }
 
 /**
- * Smart Candidate Account Scoring & Selection
- * 1. Filter healthy accounts (not disabled, not forbidden, not validation blocked).
- * 2. Exclude current profile's account if alternative accounts exist.
- * 3. 4-Hour Inactivity Factor: Accounts not used in past 4h (or never used) receive highest priority.
- * 4. Refill Runway: Longest runway until quota reset (e.g. 6 days) receives top priority.
- * 5. Quota Headroom: Highest percentage remaining across models (100% full headroom).
+ * Multiplicative Candidate Scoring Algorithm:
+ * Score = S_active * M_tier * Q_weekly
+ * - S_active: 1 if unused, 0 if in use
+ * - M_tier: Ultra=5, Pro=3, Free=1
+ * - Q_weekly: 0 to 100
  */
-export function findSmartRotationAccount(
-    accounts: Account[],
+export function calculateMultiplicativeScore(
+    acc: Account,
+    activeInUseAccountIds: string[] = [],
     currentAccountId?: string
-): SmartCandidateResult | null {
+): MultiplicativeCandidateResult {
+    const isInUse = activeInUseAccountIds.includes(acc.id);
+    const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
+    const activeFactor = isInUse || isCurrent ? 0 : 1;
+
+    const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier);
+    const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
+    const score = activeFactor * tierMultiplier * weeklyQuotaPercent;
+
+    const nowMs = Date.now();
+    const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
+    const nowSec = Math.floor(nowMs / 1000);
+    const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
+    const idleHours = acc.last_used ? Math.round((idleSec / 3600) * 10) / 10 : 999;
+
+    return {
+        account: acc,
+        score,
+        activeFactor,
+        tierMultiplier,
+        weeklyQuotaPercent,
+        daysUntilRefill,
+        quotaPercentage: weeklyQuotaPercent,
+        idleHours,
+    };
+}
+
+export function rankSmartCandidates(
+    accounts: Account[],
+    activeInUseAccountIds: string[] = [],
+    currentAccountId?: string
+): MultiplicativeCandidateResult[] {
     const eligible = accounts.filter(acc => {
         const isDisabled = Boolean(acc.disabled);
         if (isDisabled) return false;
@@ -352,126 +446,44 @@ export function findSmartRotationAccount(
     });
 
     const hasEligible = eligible.length > 0;
-    if (!hasEligible) return null;
+    if (!hasEligible) return [];
 
-    let pool = eligible;
-    const hasMultiple = eligible.length > 1;
-    if (hasMultiple) {
-        if (currentAccountId) {
-            const others = eligible.filter(a => a.id !== currentAccountId);
-            const hasOthers = others.length > 0;
-            if (hasOthers) {
-                pool = others;
-            }
-        }
-    }
-
-    const nowMs = Date.now();
-    const nowSec = Math.floor(nowMs / 1000);
-
-    const scored: SmartCandidateResult[] = pool.map(acc => {
-        let score = 0;
-
-        // Factor A: 4-Hour Inactivity Recency (Top priority)
-        let idleHours = 999;
-        const hasNoLastUsed = !acc.last_used;
-        const isLastUsedZero = acc.last_used === 0;
-        if (hasNoLastUsed) {
-            idleHours = 999;
-            score += 100000;
-        } else if (isLastUsedZero) {
-            idleHours = 999;
-            score += 100000;
-        } else {
-            const idleSec = Math.max(0, nowSec - acc.last_used);
-            idleHours = idleSec / 3600;
-            const isFourHoursIdle = idleSec >= 4 * 3600;
-            if (isFourHoursIdle) {
-                score += 100000;
-                score += Math.min(20000, idleHours * 500);
-            } else {
-                score += Math.max(0, idleHours * 1000);
-            }
-        }
-
-        // Factor B: Refill Runway (Longest time until reset / weekly refill, e.g. 6 days)
-        let maxRefillDays = 0;
-        const models = acc.quota?.models || [];
-        for (const m of models) {
-            if (m.reset_time) {
-                const resetDate = parseFlexibleDate(m.reset_time);
-                if (resetDate) {
-                    const diffMs = resetDate.getTime() - nowMs;
-                    if (diffMs > 0) {
-                        const days = diffMs / (1000 * 60 * 60 * 24);
-                        if (days > maxRefillDays) {
-                            maxRefillDays = days;
-                        }
-                    }
-                }
-            }
-        }
-
-        const groups = acc.quota?.quota_groups || [];
-        for (const g of groups) {
-            for (const b of g.buckets || []) {
-                if (b.reset_time) {
-                    const resetDate = parseFlexibleDate(b.reset_time);
-                    if (resetDate) {
-                        const diffMs = resetDate.getTime() - nowMs;
-                        if (diffMs > 0) {
-                            const days = diffMs / (1000 * 60 * 60 * 24);
-                            if (days > maxRefillDays) {
-                                maxRefillDays = days;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        const hasSixDaysRunway = maxRefillDays >= 6;
-        if (hasSixDaysRunway) {
-            score += 50000;
-        }
-        score += Math.min(50000, Math.floor(maxRefillDays * 8000));
-
-        // Factor C: Quota Headroom (Remaining percentage across models)
-        let avgPercentage = 100;
-        const hasModels = models.length > 0;
-        if (hasModels) {
-            let totalPct = 0;
-            let count = 0;
-            for (const m of models) {
-                if (typeof m.percentage === 'number') {
-                    totalPct += m.percentage;
-                    count += 1;
-                }
-            }
-            const hasCount = count > 0;
-            if (hasCount) {
-                avgPercentage = Math.round(totalPct / count);
-            }
-        }
-        score += avgPercentage * 200;
-
-        // Factor D: Subscription Tier bonus
-        const tier = (acc.quota?.subscription_tier || '').toLowerCase();
-        if (tier.includes('ultra')) {
-            score += 3000;
-        } else if (tier.includes('pro')) {
-            score += 2000;
-        }
-
-        return {
-            account: acc,
-            score,
-            idleHours: Math.round(idleHours * 10) / 10,
-            daysUntilRefill: Math.round(maxRefillDays * 10) / 10,
-            quotaPercentage: avgPercentage,
-        };
+    const scored = eligible.map(acc => {
+        return calculateMultiplicativeScore(
+            acc,
+            activeInUseAccountIds,
+            currentAccountId
+        );
     });
 
-    scored.sort((a, b) => b.score - a.score);
-    return scored[0] || null;
+    const isAscending = Math.random() < 0.5;
+
+    scored.sort((a, b) => {
+        if (b.score !== a.score) {
+            return b.score - a.score;
+        }
+        const emailA = (a.account.email || '').toLowerCase();
+        const emailB = (b.account.email || '').toLowerCase();
+        if (isAscending) {
+            return emailA.localeCompare(emailB);
+        }
+        return emailB.localeCompare(emailA);
+    });
+
+    return scored;
+}
+
+export function findSmartRotationAccount(
+    accounts: Account[],
+    currentAccountId?: string,
+    activeInUseAccountIds: string[] = []
+): MultiplicativeCandidateResult | null {
+    const ranked = rankSmartCandidates(
+        accounts,
+        activeInUseAccountIds,
+        currentAccountId
+    );
+    const hasRanked = ranked.length > 0;
+    if (!hasRanked) return null;
+    return ranked[0];
 }

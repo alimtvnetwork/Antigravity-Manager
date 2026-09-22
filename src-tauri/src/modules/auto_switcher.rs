@@ -131,6 +131,56 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
     None
 }
 
+/// Hierarchical model quota evaluation:
+/// 1. Primary: Gemini 3.8 Flash (banning 3.0 / 3.1 Flash)
+/// 2. Fallback: Claude Sonnet 4.6 / Claude Sonnet
+pub fn evaluate_hierarchical_quota(account: &Account) -> Option<(String, f64, bool)> {
+    let quota_data = account.quota.as_ref()?;
+
+    // 1. Check Gemini 3.8 Flash (Primary)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        if is_banned {
+            continue;
+        }
+        let is_gemini_flash = (name_lower.contains("3.8") && name_lower.contains("flash"))
+            || (name_lower.contains("gemini") && name_lower.contains("flash"));
+        if is_gemini_flash {
+            let pct = m.percentage as f64;
+            let is_primary = true;
+            return Some((m.name.clone(), pct, is_primary));
+        }
+    }
+
+    // 2. Check Claude Sonnet 4.6 (Fallback)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_sonnet = name_lower.contains("sonnet") || name_lower.contains("claude");
+        if is_sonnet {
+            let pct = m.percentage as f64;
+            let is_primary = false;
+            return Some((m.name.clone(), pct, is_primary));
+        }
+    }
+
+    // 3. Any other non-banned Gemini model
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        if is_banned {
+            continue;
+        }
+        if name_lower.contains("gemini") {
+            let pct = m.percentage as f64;
+            let is_primary = false;
+            return Some((m.name.clone(), pct, is_primary));
+        }
+    }
+
+    None
+}
+
 /// Parse an ISO 8601 or RFC 3339 reset time string into UNIX timestamp (seconds)
 pub fn parse_reset_time_to_unix(reset_time_str: &str) -> Option<i64> {
     let trimmed = reset_time_str.trim();
@@ -260,62 +310,56 @@ pub struct ProfileCandidate {
     pub score: f64,
 }
 
-/// Multi-factor scoring for candidate accounts matching instanceService
+/// Multiplicative candidate scoring algorithm:
+/// Score = S_active * M_tier * Q_weekly
+/// - S_active: 1.0 if unused, 0.0 if in active use
+/// - M_tier: Ultra=5.0, Pro=3.0, Free=1.0
+/// - Q_weekly: 0.0 to 100.0 percentage
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    let mut score = 0.0;
-
-    // 1. Idle time factor (Longest time not used, or never used)
-    let has_never_used = acc.last_used == 0;
-    if has_never_used {
-        score += 100000.0;
-    } else {
-        let idle_hours = ((now_sec - acc.last_used) as f64 / 3600.0).max(0.0);
-        score += (idle_hours * 1000.0).min(50000.0);
-    }
-
-    // 2. Lowest remaining quota factor
-    let mut lowest_remaining = 100.0;
-    if let Some(quota) = acc.quota.as_ref() {
-        for m in &quota.models {
-            let pct = m.percentage as f64;
-            if pct < lowest_remaining {
-                lowest_remaining = pct;
-            }
-        }
-    }
-    score += lowest_remaining * 200.0;
-
-    // 3. Target model bonus
-    if let Some(quota) = calculate_account_quota(acc, target_model) {
-        score += quota * 100.0;
-    }
-
-    // 4. Subscription tier bonus
+    // 1. Subscription tier multiplier
     let tier = acc
         .quota
         .as_ref()
         .and_then(|q| q.subscription_tier.as_ref())
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
-    if tier.contains("pro") || tier.contains("ultra") {
-        score += 10000.0;
-    }
 
-    // 5. Reset Window Lookahead Factor
-    if let Some(period_stat) = evaluate_account_period_status(acc, target_model, 20.0, now_sec) {
-        if period_stat.is_period_finished {
-            // Quota has elapsed reset boundary, provider will refresh credits
-            score += 15000.0;
-        } else if let Some(secs_left) = period_stat.seconds_until_reset {
-            if secs_left > 0 {
-                // When quota is healthy (> threshold), having more runway before reset adds stability
-                let runway_bonus = ((secs_left as f64) / 3600.0 * 500.0).min(5000.0);
-                score += runway_bonus;
-            }
+    let tier_multiplier = if tier.contains("ultra") {
+        5.0
+    } else if tier.contains("pro") {
+        3.0
+    } else {
+        1.0
+    };
+
+    // 2. Weekly quota percentage (excluding banned models 3.0/3.1)
+    let mut weekly_quota_percent = 100.0;
+    if let Some(quota_data) = acc.quota.as_ref() {
+        let valid_models: Vec<_> = quota_data
+            .models
+            .iter()
+            .filter(|m| {
+                let name = m.name.to_lowercase();
+                let is_banned = name.contains("3.0") || name.contains("3.1");
+                !is_banned
+            })
+            .collect();
+
+        if !valid_models.is_empty() {
+            let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
+            weekly_quota_percent = (sum as f64 / valid_models.len() as f64).round();
         }
     }
 
-    score
+    // 3. Reset boundary check: if period has finished, provider will refresh credits to 100%
+    if let Some(period_stat) = evaluate_account_period_status(acc, target_model, 20.0, now_sec) {
+        if period_stat.is_period_finished {
+            weekly_quota_percent = 100.0;
+        }
+    }
+
+    let active_factor = 1.0;
+    active_factor * tier_multiplier * weekly_quota_percent
 }
 
 /// Find next best candidate profile with healthy quota, excluding accounts in active use by other instances
@@ -457,11 +501,17 @@ pub fn select_next_best_profile(
         }
     }
 
-    // Sort descending by multi-factor score
-    candidates.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
+    // Sort descending by multiplicative score with randomized directional tie-breaker
+    let is_ascending: bool = rand::random();
+    candidates.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
+        Some(std::cmp::Ordering::Equal) | None => {
+            if is_ascending {
+                a.email.to_lowercase().cmp(&b.email.to_lowercase())
+            } else {
+                b.email.to_lowercase().cmp(&a.email.to_lowercase())
+            }
+        }
+        Some(ord) => ord,
     });
 
     if let Some(best) = candidates.into_iter().next() {
@@ -966,7 +1016,7 @@ mod tests {
         let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
-        // Account A period finished gets +15000, scoring higher than distant runway bonus
+        // Account A period finished resets to 100% (score: 1.0 * 1.0 * 100.0 = 100.0), higher than un-refilled 10% (score: 10.0)
         assert!(score_a > score_b);
     }
 }

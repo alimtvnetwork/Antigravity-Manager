@@ -818,7 +818,7 @@ export default function EmailNotificationSettings() {
                             e.preventDefault();
                             handleAddRecipient();
                         }}
-                        className="flex flex-col sm:flex-row gap-2 mb-3"
+                        className="flex flex-wrap items-center gap-2 mb-3"
                     >
                         <input
                             type="email"
@@ -831,11 +831,11 @@ export default function EmailNotificationSettings() {
                                     handleAddRecipient();
                                 }
                             }}
-                            className="flex-1 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-64 max-w-xs px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <input
                             type="text"
-                            placeholder="Group (e.g. dev, ops, default)"
+                            placeholder="Group (e.g. default)"
                             value={newRecipientGroup}
                             onChange={(e) => setNewRecipientGroup(e.target.value)}
                             onKeyDown={(e) => {
@@ -844,11 +844,11 @@ export default function EmailNotificationSettings() {
                                     handleAddRecipient();
                                 }
                             }}
-                            className="w-36 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-28 px-2.5 py-1.5 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer shrink-0"
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer shrink-0"
                         >
                             Add Recipient
                         </button>

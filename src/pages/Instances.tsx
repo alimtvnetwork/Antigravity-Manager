@@ -19,6 +19,7 @@ import {
     Gem,
     Diamond,
     Circle,
+    Sparkles,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -103,6 +104,7 @@ export default function Instances() {
         closeInstance,
         setActiveInstance,
         smartRotateProfileAccount,
+        cleanAndRestartWorkspace,
     } = useInstanceStore();
 
     const {
@@ -262,6 +264,22 @@ export default function Instances() {
                     >
                         <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
                         <span className="hidden sm:inline">{t('common.refresh', 'Refresh')}</span>
+                    </button>
+                    <button
+                        onClick={async () => {
+                            try {
+                                const msg = await cleanAndRestartWorkspace();
+                                showToast(msg || 'Stuck Electron processes cleared & Antigravity restarted!', 'success');
+                            } catch (e: any) {
+                                setActionError(e?.toString() || 'Failed to clean and restart workspace');
+                            }
+                        }}
+                        disabled={isLoading}
+                        className="btn btn-warning btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer"
+                        title="Force-terminate lingering background Electron/Antigravity processes, purge lockfiles, and cleanly relaunch Antigravity"
+                    >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span className="hidden md:inline">Clean & Restart</span>
                     </button>
                     <button
                         onClick={() => {

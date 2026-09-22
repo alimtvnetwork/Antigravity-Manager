@@ -115,3 +115,8 @@ pub fn list_running_projects() -> Result<Vec<crate::modules::repo_db::RunningPro
 pub fn list_backed_up_prompts() -> Result<Vec<crate::modules::repo_db::ActivePrompt>, String> {
     crate::modules::repo_db::list_backed_up_prompts()
 }
+
+#[tauri::command]
+pub fn clean_and_restart_workspace() -> Result<String, String> {
+    crate::modules::process::clean_and_restart_workspace(None)
+}

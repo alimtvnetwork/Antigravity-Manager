@@ -35,6 +35,7 @@ interface InstanceState {
     smartPlayInstance: (instanceId?: string) => Promise<{ accountEmail: string; instanceName: string }>;
     rotateToNextBestProfile: (sourceInstanceId?: string) => Promise<InstanceStatus>;
     smartRotateProfileAccount: (targetInstanceId?: string) => Promise<{ accountEmail: string; instanceName: string; daysUntilRefill: number }>;
+    cleanAndRestartWorkspace: () => Promise<string>;
 }
 
 export const useInstanceStore = create<InstanceState>((set, get) => ({
@@ -324,7 +325,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 1. Close running processes from target profile directory first
             await instanceService.closeInstance(instId);
 
-            // 2. Discover accounts
+            // 2. Discover active running instances
+            const runningInstances = get().instances.filter(i => i.is_running && i.config.bound_account_id);
+            const activeInUseAccountIds = runningInstances
+                .map(i => i.config.bound_account_id as string)
+                .filter(id => id !== currentAccountId);
+
+            // 3. Discover accounts
             const { useAccountStore } = await import('./useAccountStore');
             let accounts = useAccountStore.getState().accounts;
             const hasAccounts = accounts.length > 0;
@@ -333,23 +340,62 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 accounts = useAccountStore.getState().accounts;
             }
 
-            // 3. Score candidate accounts (4h inactivity + refill runway + quota headroom)
-            const candidate = instanceService.findSmartRotationAccount(accounts, currentAccountId);
-            if (!candidate) {
+            // 4. Rank candidate accounts using multiplicative formula
+            const ranked = instanceService.rankSmartCandidates(
+                accounts,
+                activeInUseAccountIds,
+                currentAccountId
+            );
+            const hasRanked = ranked.length > 0;
+            if (!hasRanked) {
                 set({ isLoading: false });
-                throw new Error('No healthy candidate account found for rotation');
+                throw new Error('No candidate accounts found for rotation');
             }
 
-            // 4. Live quota refresh on candidate account to verify active status
-            await useAccountStore.getState().refreshQuota(candidate.account.id);
+            // 5. Pre-activation verification and demotion loop
+            let verified: instanceService.MultiplicativeCandidateResult | null = null;
+            const queue = [...ranked];
 
-            // 5. Inject verified account tokens into target profile state.vscdb and launch
-            await instanceService.switchAccountToInstance(candidate.account.id, instId);
+            while (queue.length > 0) {
+                const pick = queue.shift();
+                if (!pick) continue;
+                if (pick.score <= 0) continue;
 
-            // 5b. Synchronize current account in UI state without triggering destructive host-wide process kills
-            await useAccountStore.getState().fetchCurrentAccount();
+                try {
+                    await useAccountStore.getState().refreshQuota(pick.account.id);
+                } catch {
+                    continue;
+                }
 
-            // 6. Refresh instance and account states
+                const freshAccounts = useAccountStore.getState().accounts;
+                const freshAccount = freshAccounts.find(a => a.id === pick.account.id);
+                if (!freshAccount) continue;
+
+                const freshScore = instanceService.calculateMultiplicativeScore(
+                    freshAccount,
+                    activeInUseAccountIds,
+                    currentAccountId
+                );
+
+                const isUnused = freshScore.activeFactor === 1;
+                const hasQuota = freshScore.weeklyQuotaPercent >= 10;
+                if (isUnused) {
+                    if (hasQuota) {
+                        verified = { ...freshScore, isVerified: true };
+                        break;
+                    }
+                }
+            }
+
+            if (!verified) {
+                set({ isLoading: false });
+                throw new Error('All candidate accounts were either depleted (<10% quota) or currently in use');
+            }
+
+            // 6. Inject verified account tokens into target profile state.vscdb and launch
+            await instanceService.switchAccountToInstance(verified.account.id, instId);
+
+            // 7. Synchronize UI state
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchCurrentAccount(),
@@ -359,13 +405,27 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             set({ activeInstanceId: instId, isLoading: false });
 
             return {
-                accountEmail: candidate.account.email,
+                accountEmail: verified.account.email,
                 instanceName,
-                daysUntilRefill: candidate.daysUntilRefill,
+                daysUntilRefill: verified.daysUntilRefill,
             };
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to smart rotate profile' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.smartRotateProfileAccount' });
+            throw err;
+        }
+    },
+
+    cleanAndRestartWorkspace: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const msg = await instanceService.cleanAndRestartWorkspace();
+            await get().fetchInstances(true);
+            set({ isLoading: false });
+            return msg;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to clean and restart workspace' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.cleanAndRestartWorkspace' });
             throw err;
         }
     },

@@ -104,10 +104,10 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-base-300 space-y-4 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Polling Interval */}
-                        <div className="p-3.5 rounded-xl bg-gray-50/70 dark:bg-base-100/50 border border-gray-100 dark:border-base-300 space-y-2">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200">
                                 <span>{t('settings.auto_switcher.interval_label', 'Check Interval (seconds)')}</span>
-                                <span className="text-blue-600 dark:text-blue-400 font-mono">
+                                <span className="text-blue-600 dark:text-blue-400 font-mono font-bold">
                                     {currentConfig.check_interval_seconds}s
                                 </span>
                             </div>
@@ -118,9 +118,9 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 step="15"
                                 value={currentConfig.check_interval_seconds}
                                 onChange={(e) => handleIntervalChange(Number(e.target.value))}
-                                className="w-full accent-blue-600"
+                                className="w-full accent-blue-600 cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                            <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                 <span>15s</span>
                                 <span>60s (Default)</span>
                                 <span>120s</span>
@@ -129,10 +129,10 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
 
                         {/* Low Quota Threshold */}
-                        <div className="p-3.5 rounded-xl bg-gray-50/70 dark:bg-base-100/50 border border-gray-100 dark:border-base-300 space-y-2">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200">
                                 <span>{t('settings.auto_switcher.threshold_label', 'Low Quota Threshold (%)')}</span>
-                                <span className="text-rose-600 dark:text-rose-400 font-mono">
+                                <span className="text-rose-600 dark:text-rose-400 font-mono font-bold">
                                     &lt; {currentConfig.low_quota_threshold_percent.toFixed(0)}%
                                 </span>
                             </div>
@@ -143,9 +143,9 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 step="1"
                                 value={currentConfig.low_quota_threshold_percent}
                                 onChange={(e) => handleThresholdChange(Number(e.target.value))}
-                                className="w-full accent-rose-600"
+                                className="w-full accent-rose-600 cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                            <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                 <span>1%</span>
                                 <span>15% (Default)</span>
                                 <span>30%</span>
@@ -154,7 +154,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
 
                         {/* Caution Polling Interval (< 20% Credits) */}
-                        <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 space-y-2">
+                        <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 space-y-2">
                             <div className="flex justify-between items-center text-xs font-semibold text-amber-800 dark:text-amber-300">
                                 <span>Caution Polling Interval (&lt; 20% Credits)</span>
                                 <span className="font-mono font-bold">
@@ -168,7 +168,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 step="30"
                                 value={currentConfig.caution_interval_seconds || 180}
                                 onChange={(e) => onChange({ ...currentConfig, caution_interval_seconds: Number(e.target.value) })}
-                                className="w-full accent-amber-600"
+                                className="w-full accent-amber-600 cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-amber-600/70 dark:text-amber-400/60 font-mono">
                                 <span>1 min</span>
@@ -178,7 +178,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
 
                         {/* Critical Polling Interval (<= 12% Credits) */}
-                        <div className="p-3.5 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 space-y-2">
+                        <div className="p-3.5 rounded-xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 space-y-2">
                             <div className="flex justify-between items-center text-xs font-semibold text-rose-800 dark:text-rose-300">
                                 <span>Critical Polling Interval (&le; 12% Credits)</span>
                                 <span className="font-mono font-bold">
@@ -192,7 +192,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 step="15"
                                 value={currentConfig.critical_interval_seconds || 60}
                                 onChange={(e) => onChange({ ...currentConfig, critical_interval_seconds: Number(e.target.value) })}
-                                className="w-full accent-rose-600"
+                                className="w-full accent-rose-600 cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-rose-600/70 dark:text-rose-400/60 font-mono">
                                 <span>15s</span>
@@ -211,11 +211,11 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <select
                                 value={currentConfig.target_model}
                                 onChange={(e) => onChange({ ...currentConfig, target_model: e.target.value })}
-                                className="select select-sm w-full bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-lg text-xs"
+                                className="select select-sm w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200"
                             >
-                                <option value="gemini-pro">Gemini Pro (Code & General)</option>
-                                <option value="gemini-flash">Gemini Flash</option>
-                                <option value="claude">Claude Sonnet</option>
+                                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Primary, Recommended)</option>
+                                <option value="claude-sonnet-4.6">Claude Sonnet 4.6 (Failover / Fallback)</option>
+                                <option value="gemini-pro">Gemini Pro</option>
                             </select>
                         </div>
 

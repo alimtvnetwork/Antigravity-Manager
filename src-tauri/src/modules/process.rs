@@ -454,28 +454,153 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
     pids
 }
 
+/// Clean stale lockfiles (Electron lockfile, code.lock, Singleton*) from data directories
+pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
+    let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
+
+    // 1) From active process user-data-dir
+    if let Some(user_data_dir) = get_user_data_dir_from_process(target_ide) {
+        candidate_dirs.push(user_data_dir);
+    }
+
+    // 2) Standard platform folders
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let appdata_path = std::path::PathBuf::from(appdata);
+            candidate_dirs.push(appdata_path.join("Antigravity"));
+            candidate_dirs.push(appdata_path.join("Antigravity IDE"));
+            candidate_dirs.push(appdata_path.join("antigravity"));
+            candidate_dirs.push(appdata_path.join("antigravity-ide"));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            let app_sup = home.join("Library/Application Support");
+            candidate_dirs.push(app_sup.join("Antigravity"));
+            candidate_dirs.push(app_sup.join("Antigravity IDE"));
+            candidate_dirs.push(app_sup.join("antigravity"));
+            candidate_dirs.push(app_sup.join("antigravity-ide"));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            let config_dir = home.join(".config");
+            candidate_dirs.push(config_dir.join("Antigravity"));
+            candidate_dirs.push(config_dir.join("Antigravity IDE"));
+            candidate_dirs.push(config_dir.join("antigravity"));
+            candidate_dirs.push(config_dir.join("antigravity-ide"));
+        }
+    }
+
+    // Also include registered instance data directories
+    if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
+        if let Ok(entries) = std::fs::read_dir(&instances_dir) {
+            for entry in entries.flatten() {
+                if let Ok(ft) = entry.file_type() {
+                    if ft.is_dir() {
+                        candidate_dirs.push(entry.path().join("data"));
+                        candidate_dirs.push(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
+    for dir in candidate_dirs {
+        if !dir.exists() {
+            continue;
+        }
+
+        let lockfile = dir.join("lockfile");
+        if lockfile.exists() {
+            let _ = std::fs::remove_file(&lockfile);
+            crate::modules::logger::log_info(&format!(
+                "[Lockfile] Cleaned stale Electron lockfile: {:?}",
+                lockfile
+            ));
+        }
+
+        let code_lock = dir.join("code.lock");
+        if code_lock.exists() {
+            let _ = std::fs::remove_file(&code_lock);
+            crate::modules::logger::log_info(&format!(
+                "[Lockfile] Cleaned stale code.lock: {:?}",
+                code_lock
+            ));
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let fname = entry.file_name().to_string_lossy().to_lowercase();
+                let is_lock = fname == "lockfile"
+                    || fname.starts_with("singleton")
+                    || fname.ends_with(".lock")
+                    || fname == "code.lock";
+                if is_lock {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+    }
+}
+
 /// Close Antigravity processes
 pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<(), String> {
     crate::modules::logger::log_info(&format!("Closing Antigravity ({:?})...", target_ide));
 
     #[cfg(target_os = "windows")]
     {
-        // Windows: Precise kill by PID to support multiple versions or custom filenames
+        // Windows: Precise tree kill by PID to eliminate parent and all Electron helpers
         let pids = get_antigravity_pids(target_ide);
         if !pids.is_empty() {
             crate::modules::logger::log_info(&format!(
-                "Precisely closing {} identified processes on Windows...",
+                "Precisely closing {} identified process trees on Windows...",
                 pids.len()
             ));
-            for pid in pids {
+            for pid in &pids {
                 let _ = Command::new("taskkill")
-                    .args(["/F", "/PID", &pid.to_string()])
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }
-            // Give some time for system to clean up PIDs
-            thread::sleep(Duration::from_millis(200));
         }
+
+        // Safety fallback: sweep any lingering Antigravity image trees
+        let image_name = if target_ide == Some("ide") {
+            "Antigravity IDE.exe"
+        } else {
+            "Antigravity.exe"
+        };
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/IM", image_name])
+            .creation_flags(0x08000000)
+            .output();
+
+        // Drain verification loop: wait up to 2500ms for all processes to completely exit
+        let start_wait = std::time::Instant::now();
+        let max_wait = Duration::from_millis(2500);
+        let mut system = System::new();
+        loop {
+            system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+            let has_alive = pids
+                .iter()
+                .any(|&pid| system.process(sysinfo::Pid::from_u32(pid)).is_some());
+            if !has_alive {
+                break;
+            }
+            if start_wait.elapsed() > max_wait {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+
+        // Clean stale lockfiles after process termination
+        clean_antigravity_lockfiles(target_ide);
     }
 
     #[cfg(target_os = "macos")]
@@ -779,6 +904,9 @@ pub fn clean_appimage_env(cmd: &mut Command) {
 pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
     crate::modules::logger::log_info(&format!("Starting Antigravity ({:?})...", target_ide));
 
+    // Clean any stale lockfiles before starting new instance
+    clean_antigravity_lockfiles(target_ide);
+
     // Prefer manually specified path and args from configuration
     let config = crate::modules::config::load_app_config().ok();
     let manual_path = if target_ide == Some("ide") {
@@ -830,6 +958,7 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                             cmd.arg(arg);
                         }
                     }
+                    cmd.arg("--new-window");
 
                     cmd.spawn()
                         .map_err(|e| format!("Startup failed (open): {}", e))?;
@@ -842,6 +971,7 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                             cmd.arg(arg);
                         }
                     }
+                    cmd.arg("--new-window");
 
                     cmd.spawn()
                         .map_err(|e| format!("Startup failed (direct): {}", e))?;
@@ -853,10 +983,22 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                 let mut cmd = Command::new(&path_str);
 
                 // Add startup arguments
+                let mut has_new_window = false;
                 if let Some(ref args) = args {
                     for arg in args {
+                        if arg == "--new-window" {
+                            has_new_window = true;
+                        }
                         cmd.arg(arg);
                     }
+                }
+                if !has_new_window {
+                    cmd.arg("--new-window");
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
                 }
 
                 #[cfg(target_os = "linux")]
@@ -895,6 +1037,7 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                 cmd.arg(arg);
             }
         }
+        cmd.arg("--new-window");
 
         let output = cmd
             .output()
@@ -916,10 +1059,22 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
                 let mut cmd = Command::new(&detected_path);
 
                 // Add startup arguments
+                let mut has_new_window = false;
                 if let Some(ref args) = args {
                     for arg in args {
+                        if arg == "--new-window" {
+                            has_new_window = true;
+                        }
                         cmd.arg(arg);
                     }
+                }
+                if !has_new_window {
+                    cmd.arg("--new-window");
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
                 }
 
                 #[cfg(target_os = "linux")]
@@ -941,6 +1096,45 @@ pub fn start_antigravity(target_ide: Option<&str>) -> Result<(), String> {
             }
         }
     }
+}
+
+/// Emergency repair: Tree-kill all stuck Antigravity/Electron processes, purge all lockfiles, and cleanly relaunch Antigravity
+pub fn clean_and_restart_workspace(target_ide: Option<&str>) -> Result<String, String> {
+    crate::modules::logger::log_info(
+        "[Workspace] Executing emergency clean_and_restart_workspace...",
+    );
+
+    // 1. Force tree-kill all Antigravity processes
+    let _ = close_antigravity(5, target_ide);
+
+    // 2. Extra safety sweep: purge any remaining image processes on Windows
+    #[cfg(target_os = "windows")]
+    {
+        let image_name = if target_ide == Some("ide") {
+            "Antigravity IDE.exe"
+        } else {
+            "Antigravity.exe"
+        };
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/IM", image_name])
+            .creation_flags(0x08000000)
+            .output();
+    }
+
+    // 3. Purge all lockfiles
+    clean_antigravity_lockfiles(target_ide);
+
+    // 4. Brief pause to ensure file handles are unmapped
+    std::thread::sleep(Duration::from_millis(350));
+
+    // 5. Clean relaunch
+    start_antigravity(target_ide)?;
+
+    crate::modules::logger::log_info("[Workspace] Clean and restart completed successfully.");
+    Ok(
+        "Stuck processes terminated, lockfiles purged, and Antigravity cleanly relaunched."
+            .to_string(),
+    )
 }
 
 fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Option<Vec<String>>) {

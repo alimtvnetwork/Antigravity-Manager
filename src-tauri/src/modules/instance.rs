@@ -442,7 +442,9 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         let name_str = file_name.to_string_lossy().to_lowercase();
 
         // Skip volatile lock files, active socket handles, crashpad, and heavy caches
-        let is_lock = name_str.ends_with(".lock") || name_str.starts_with("singleton");
+        let is_lock = name_str == "lockfile"
+            || name_str.ends_with(".lock")
+            || name_str.starts_with("singleton");
         let is_cache = name_str.contains("cache")
             || name_str == "crashpad"
             || name_str.starts_with(".org.chromium");
@@ -592,6 +594,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     // Clean any orphaned lock files in the target instance data directory
     let has_target_dir = target_data_path.exists();
     if has_target_dir {
+        let lockfile = target_data_path.join("lockfile");
+        if lockfile.exists() {
+            let _ = fs::remove_file(&lockfile);
+        }
         let code_lock = target_data_path.join("code.lock");
         let has_code_lock = code_lock.exists();
         if has_code_lock {
@@ -600,7 +606,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if let Ok(entries) = fs::read_dir(&target_data_path) {
             for entry in entries.flatten() {
                 let fname = entry.file_name().to_string_lossy().to_lowercase();
-                let is_stale_lock = fname.starts_with("singleton") || fname.ends_with(".lock");
+                let is_stale_lock = fname == "lockfile"
+                    || fname.starts_with("singleton")
+                    || fname.ends_with(".lock")
+                    || fname == "code.lock";
                 if is_stale_lock {
                     let _ = fs::remove_file(entry.path());
                 }
@@ -677,6 +686,11 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             cmd.arg(format!("--extensions-dir={}", ext_dir));
         }
         cmd.arg("--new-window");
+
+        #[cfg(target_os = "windows")]
+        {
+            cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+        }
 
         #[cfg(target_os = "linux")]
         {
@@ -940,6 +954,10 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     // Clean any orphaned lock files in data_dir
     let target_data_path = PathBuf::from(&config.data_dir);
     if target_data_path.exists() {
+        let lockfile = target_data_path.join("lockfile");
+        if lockfile.exists() {
+            let _ = fs::remove_file(&lockfile);
+        }
         let code_lock = target_data_path.join("code.lock");
         if code_lock.exists() {
             let _ = fs::remove_file(&code_lock);
@@ -947,7 +965,10 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         if let Ok(entries) = fs::read_dir(&target_data_path) {
             for entry in entries.flatten() {
                 let fname = entry.file_name().to_string_lossy().to_lowercase();
-                let is_stale_lock = fname.starts_with("singleton") || fname.ends_with(".lock");
+                let is_stale_lock = fname == "lockfile"
+                    || fname.starts_with("singleton")
+                    || fname.ends_with(".lock")
+                    || fname == "code.lock";
                 if is_stale_lock {
                     let _ = fs::remove_file(entry.path());
                 }

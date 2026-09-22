@@ -898,6 +898,7 @@ pub fn run() {
             commands::trigger_manual_profile_rotation,
             commands::list_running_projects,
             commands::list_backed_up_prompts,
+            commands::clean_and_restart_workspace,
             // Email and Mailbox Management commands
             commands::get_email_settings,
             commands::save_email_settings,
