@@ -130,14 +130,14 @@ To install an exact, pinned historical release directly from GitHub Releases:
 
 #### Windows (PowerShell 5.1+)
 ```powershell
-# Install pinned release (e.g. v4.55.0)
-irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.55.0/install.ps1 | iex
+# Install pinned release (e.g. v4.56.0)
+irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.ps1 | iex
 ```
 
 #### Linux & macOS (Bash)
 ```bash
-# Install pinned release (e.g. v4.55.0)
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.55.0/install.sh | bash
+# Install pinned release (e.g. v4.56.0)
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.sh | bash
 ```
 
 > [!NOTE]

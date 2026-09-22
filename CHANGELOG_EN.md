@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.56.0 (2026-09-22)**:
+        -   **[Release v4.56.0] Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery.
     *   **v4.55.0 (2026-09-22)**:
         -   **[Release v4.55.0] Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery**:
             -   **Update System**: Automated release and version synchronization across all manifests.

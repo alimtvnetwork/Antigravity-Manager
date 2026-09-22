@@ -1,3 +1,9 @@
+## v4.56.0 — 2026-09-22 (Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery)
+
+**Scope:** Version bump. Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery.
+
+---
+
 ## v4.55.0 — 2026-09-22 (Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery)
 
 **Scope:** Version bump. Resolve TypeScript instance exports, rustfmt drift, and 2-min IDE crash focus recovery.
