@@ -11,6 +11,8 @@ pub struct AppConfig {
     pub refresh_interval: i32, // minutes
     #[serde(default = "default_auto_sync")]
     pub auto_sync: bool,
+    #[serde(default = "default_true")]
+    pub auto_sync_migrated: bool,
     #[serde(default = "default_sync_interval")]
     pub sync_interval: i32, // minutes
     pub default_export_path: Option<String>,
@@ -205,6 +207,7 @@ impl AppConfig {
             auto_refresh: true,
             refresh_interval: 15,
             auto_sync: true,
+            auto_sync_migrated: true,
             sync_interval: 5,
             default_export_path: None,
             proxy: ProxyConfig::default(),
@@ -302,6 +305,7 @@ mod tests {
     fn test_auto_sync_default_is_true() {
         let config = AppConfig::new();
         assert!(config.auto_sync);
+        assert!(config.auto_sync_migrated);
         assert_eq!(config.sync_interval, 5);
 
         // Deserializing JSON without auto_sync should default to true
@@ -309,6 +313,7 @@ mod tests {
             r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
         let restored: AppConfig = serde_json::from_str(json_str).unwrap();
         assert!(restored.auto_sync);
+        assert!(restored.auto_sync_migrated);
         assert_eq!(restored.sync_interval, 5);
     }
 }

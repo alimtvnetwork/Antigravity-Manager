@@ -51,6 +51,7 @@ function Settings() {
         auto_refresh: false,
         refresh_interval: 15,
         auto_sync: true,
+        auto_sync_migrated: true,
         sync_interval: 5,
         proxy: {
             enabled: false,
@@ -186,7 +187,11 @@ function Settings() {
 
     useEffect(() => {
         if (config) {
-            setFormData(config);
+            setFormData({
+                ...config,
+                auto_sync: config.auto_sync ?? true,
+                auto_sync_migrated: config.auto_sync_migrated ?? true,
+            });
         }
     }, [config]);
 

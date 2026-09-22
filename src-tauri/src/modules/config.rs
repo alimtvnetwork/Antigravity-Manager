@@ -25,7 +25,32 @@ pub fn load_app_config() -> Result<AppConfig, String> {
     let mut v: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| format!("failed_to_parse_config_file: {}", e))?;
 
+    let modified = migrate_config_value(&mut v);
+
+    let config: AppConfig = serde_json::from_value(v)
+        .map_err(|e| format!("failed_to_convert_config_after_migration: {}", e))?;
+
+    // If migration occurred, auto-save once to clean up the file
+    if modified {
+        let _ = save_app_config(&config);
+    }
+
+    Ok(config)
+}
+
+/// Migrate configuration JSON values across versions.
+/// Returns true if any value was modified and needs persistence.
+pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
     let mut modified = false;
+
+    // [MIGRATION] Default auto_sync to true for all existing users upgrading from legacy versions.
+    // Legacy configs created before v4.35.0 had auto_sync: false by default.
+    // When auto_sync_migrated is missing, we migrate auto_sync to true and stamp auto_sync_migrated: true.
+    if v.get("auto_sync_migrated").is_none() {
+        v["auto_sync"] = serde_json::Value::Bool(true);
+        v["auto_sync_migrated"] = serde_json::Value::Bool(true);
+        modified = true;
+    }
 
     // Migration logic
     if let Some(proxy) = v.get_mut("proxy") {
@@ -100,15 +125,7 @@ pub fn load_app_config() -> Result<AppConfig, String> {
         }
     }
 
-    let config: AppConfig = serde_json::from_value(v)
-        .map_err(|e| format!("failed_to_convert_config_after_migration: {}", e))?;
-
-    // If migration occurred, auto-save once to clean up the file
-    if modified {
-        let _ = save_app_config(&config);
-    }
-
-    Ok(config)
+    modified
 }
 
 /// Save application configuration (atomic write)
@@ -121,4 +138,49 @@ pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
 
     crate::utils::fs::write_atomic(&config_path, content.as_bytes())
         .map_err(|e| format!("failed_to_save_config: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_migrate_auto_sync_unmigrated_sets_true() {
+        let mut v = json!({
+            "language": "en",
+            "theme": "system",
+            "auto_sync": false
+        });
+        let modified = migrate_config_value(&mut v);
+        assert!(modified);
+        assert!(v["auto_sync"].as_bool().unwrap_or(false));
+        assert!(v["auto_sync_migrated"].as_bool().unwrap_or(false));
+    }
+
+    #[test]
+    fn test_migrate_auto_sync_already_migrated_preserves_false() {
+        let mut v = json!({
+            "language": "en",
+            "theme": "system",
+            "auto_sync": false,
+            "auto_sync_migrated": true
+        });
+        let modified = migrate_config_value(&mut v);
+        assert!(!modified);
+        assert!(!v["auto_sync"].as_bool().unwrap_or(true));
+        assert!(v["auto_sync_migrated"].as_bool().unwrap_or(false));
+    }
+
+    #[test]
+    fn test_migrate_auto_sync_missing_sets_true() {
+        let mut v = json!({
+            "language": "en",
+            "theme": "system"
+        });
+        let modified = migrate_config_value(&mut v);
+        assert!(modified);
+        assert!(v["auto_sync"].as_bool().unwrap_or(false));
+        assert!(v["auto_sync_migrated"].as_bool().unwrap_or(false));
+    }
 }

@@ -49,9 +49,11 @@ function BackgroundTaskRunner() {
         const { syncAccountFromDb } = useAccountStore.getState();
 
         // Check if we just turned it on
-        if (auto_sync && !prevAutoSyncRef.current) {
-            console.log('[BackgroundTask] Auto-sync enabled, executing immediately...');
-            syncAccountFromDb();
+        if (auto_sync) {
+            if (!prevAutoSyncRef.current) {
+                console.log('[BackgroundTask] Auto-sync enabled, executing immediately...');
+                syncAccountFromDb();
+            }
         }
         prevAutoSyncRef.current = auto_sync;
 

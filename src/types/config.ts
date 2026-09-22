@@ -173,6 +173,7 @@ export interface AppConfig {
     auto_refresh: boolean;
     refresh_interval: number;
     auto_sync: boolean;
+    auto_sync_migrated?: boolean;
     sync_interval: number;
     default_export_path?: string;
     antigravity_executable?: string; // [NEW] 手动指定的反重力程序路径

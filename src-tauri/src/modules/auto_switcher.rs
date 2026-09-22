@@ -218,7 +218,7 @@ pub fn evaluate_account_period_status(
 }
 
 /// List instances that are either currently running or marked as active
-pub fn list_running_or_active_instances() -> Result<Vec<instance::InstanceConfig>, String> {
+pub fn list_running_or_active_instances() -> Result<Vec<crate::models::InstanceConfig>, String> {
     let registry = instance::load_registry()?;
     let active_id = registry.active_instance_id.clone();
     let mut result = Vec::new();
@@ -873,6 +873,9 @@ mod tests {
             last_updated: chrono::Utc::now().timestamp(),
             subscription_tier: Some("pro".to_string()),
             is_forbidden: false,
+            forbidden_reason: None,
+            model_forwarding_rules: std::collections::HashMap::new(),
+            quota_groups: None,
         });
         acc
     }
