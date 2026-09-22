@@ -1,3 +1,9 @@
+## v4.52.0 — 2026-09-22 (Restore v4.47 quota progress bar and action buttons with clean typescript build)
+
+**Scope:** Version bump. Restore v4.47 quota progress bar and action buttons with clean typescript build.
+
+---
+
 ## v4.51.0 — 2026-09-22 (Restore v4.47 quota progress bar layout and fix Windows build manifest)
 
 **Scope:** Version bump. Restore v4.47 quota progress bar layout and fix Windows build manifest.
