@@ -22,6 +22,7 @@ pub mod iterative_codec;
 pub mod log_bridge;
 pub mod logger;
 pub mod migration;
+pub mod notification_hub;
 pub mod oauth;
 pub mod oauth_server;
 pub mod process;

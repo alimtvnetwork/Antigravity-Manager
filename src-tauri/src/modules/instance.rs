@@ -1080,6 +1080,14 @@ pub async fn switch_account_to_instance(
     // Launch instance
     launch_instance(&instance.id).map_err(|e| e.to_string())?;
 
+    // Dispatch unified Email and Telegram switch notifications
+    crate::modules::notification_hub::notify_account_switched(
+        &account.email,
+        &instance.name,
+        "User switched account to instance",
+        false,
+    );
+
     Ok(())
 }
 

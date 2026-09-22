@@ -491,8 +491,13 @@ pub async fn execute_profile_rotation(
         inst_id, target.account_id, target.email, target.quota_percent, reason
     ));
 
-    // Step 2: Trigger email notification just before the workspace switch
-    crate::modules::email_watcher::notify_workspace_switched(inst_id, inst_id, &reason);
+    // Step 2: Trigger unified Email and Telegram notifications before switch
+    crate::modules::notification_hub::notify_account_switched(
+        &target.email,
+        inst_id,
+        &reason,
+        true,
+    );
 
     instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
 

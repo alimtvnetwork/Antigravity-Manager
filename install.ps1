@@ -1306,7 +1306,7 @@ if (-not $NoLaunch) {
                     Write-Warn "Could not automatically start $ShortcutName."
                 }
             } catch {
-                Write-Warn "Could not launch $ShortcutName: $_"
+                Write-Warn "Could not launch ${ShortcutName}: $_"
             }
         }
     }

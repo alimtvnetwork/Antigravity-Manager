@@ -1530,6 +1530,13 @@ pub async fn switch_account(
         account.email
     ));
 
+    crate::modules::notification_hub::notify_account_switched(
+        &account.email,
+        target_ide.unwrap_or("default"),
+        "Account switch core logic completed",
+        false,
+    );
+
     Ok(())
 }
 
