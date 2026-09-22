@@ -378,10 +378,19 @@ curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/downloa
         print(f"[DRY RUN] Would run: gh release create v{next_version} --title v{next_version} --notes-file {notes_file} --generate-notes")
         return
 
+    repo_slug = "alimtvnetwork/Antigravity-Manager"
+    if VERSION_JSON.is_file():
+        try:
+            with open(VERSION_JSON, "r", encoding="utf-8") as f:
+                v_data = json.load(f)
+                repo_slug = v_data.get("RepoSlug") or repo_slug
+        except Exception:
+            pass
+
     try:
-        print(f"[*] Creating GitHub release v{next_version} via gh release create...")
+        print(f"[*] Creating GitHub release v{next_version} via gh release create on {repo_slug}...")
         run_cmd(
-            ["gh", "release", "create", f"v{next_version}", "--title", f"v{next_version}", "--notes-file", str(notes_file), "--generate-notes"],
+            ["gh", "release", "create", f"v{next_version}", "--repo", repo_slug, "--title", f"v{next_version}", "--notes-file", str(notes_file), "--generate-notes"],
             check=False,
         )
         print(f"[OK] Published GitHub release v{next_version} with Quick Install one-liners.")
