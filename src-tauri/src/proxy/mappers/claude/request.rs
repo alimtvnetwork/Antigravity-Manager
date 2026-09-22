@@ -2967,6 +2967,13 @@ mod tests {
     }
     #[test]
     fn test_default_max_tokens() {
+        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig::default(),
+        );
+
         let req = ClaudeRequest {
             model: "claude-3-opus".to_string(),
             messages: vec![Message {

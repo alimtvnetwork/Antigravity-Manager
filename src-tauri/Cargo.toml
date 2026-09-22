@@ -15,6 +15,11 @@ edition = "2021"
 name = "antigravity_tools_lib"
 crate-type = ["rlib"]
 
+[[bin]]
+name = "agm-alim"
+path = "src/main.rs"
+test = false
+
 [build-dependencies]
 tauri-build = { version = "^2.2.5", features = [] }
 

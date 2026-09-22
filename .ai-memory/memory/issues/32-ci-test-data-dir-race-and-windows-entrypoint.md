@@ -27,24 +27,27 @@ During GitHub Actions CI workflow run #35737415089 on commit `3131f07`, three jo
 
 ## Part 3: Root Cause Analysis
 1. **Unsynchronized Process Environment Mutation:** In Rust, `std::env::set_var` is process-global. While `account.rs` established `TEST_DATA_DIR_MUTEX`, `config.rs` unit tests omitted locking this mutex, resulting in data directory collisions between concurrent test threads.
-2. **Binary Test Target Execution on Headless CI:** Invoking `cargo test` without `--lib` compiles test harnesses for the binary crate `agm-alim` (`src/main.rs`). On Windows CI runners lacking GUI subsystem scaffolding, launching GUI test harnesses causes `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)`.
-3. **Missing Manifest Linking in Build Script:** `build.rs` did not link `windows-test.manifest` for MSVC targets, leaving test executables vulnerable to common control DLL entrypoint failures.
-4. **Unconditional Import of Target-Specific Trait:** `CommandExtWrapper` was imported unconditionally in `email_inbound.rs`, triggering unused import warnings on Unix platforms.
+2. **Missing Common-Controls 6.0 Manifest in Test Executable:** `tauri-plugin-dialog` references `TaskDialogIndirect` from `comctl32.dll`. Because `comctl32.dll` v5.82 does not export `TaskDialogIndirect` (it only exists in v6.0), Windows loader terminates unmanifested test executables before entry with `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)`. Tauri's build step embeds the manifest into `agm-alim.exe`, but `cargo test` runs `antigravity_tools_lib-*.exe` which lacked the manifest.
+3. **Architecture Collision in Build Script DLL Copy:** In `src-tauri/build.rs`, `copy_dll_recursive` copied all `WebView2Loader.dll` files in directory traversal order. `webview2-com-sys` generates `x86`, `x64`, and `arm64` DLLs. On Windows, `x86/WebView2Loader.dll` was copied after `x64/WebView2Loader.dll`, overwriting the 64-bit DLL with a 32-bit binary in `deps/`.
+4. **Duplicate Manifest Linking on Binary Test Targets:** Specifying `cargo:rustc-link-arg=/MANIFEST:EMBED` caused MSVC `link.exe` to fail with `CVT1100: duplicate resource` on `agm-alim` binary tests because Tauri already attached a manifest to the binary. Disabling `test = false` on `[[bin]]` avoids redundant compilation of `main.rs` as a test.
+5. **Platform-Conditional Import in Integration Module:** `std::process::Command` is unused on Windows but required on Linux and macOS for `secret-tool` and `kill`. Removing it caused compilation errors on Unix runners.
+6. **Concurrent State Mutation in Thinking Budget Tests:** `test_default_max_tokens` ran in parallel with tests mutating the global `ThinkingBudgetConfig` to `Adaptive`, which unexpectedly set `maxOutputTokens: 64000`.
 
 ## Part 4: Corrective Action & Verification
-1. **Thread-Safe Data Dir Test Synchronization:**
+1. **Thread-Safe Test State Synchronization:**
    - Updated `test_load_app_config_self_heals_empty_string` and `test_load_app_config_recovers_from_backup` in `src-tauri/src/modules/config.rs` to acquire `crate::modules::account::TEST_DATA_DIR_MUTEX`.
-   - Added `data_dir_override_slot()` clearing in `test_set_current_account_id_with_target` to guarantee complete state isolation.
-2. **Re-Embed Windows Test Manifest:**
-   - In `src-tauri/build.rs`, added MSVC manifest embedding for `windows-test.manifest` via `cargo:rustc-link-arg=/MANIFEST:EMBED` and `/MANIFESTINPUT`.
-3. **Harden CI Test Step and Platform Matrix:**
-   - Updated `.github/workflows/ci.yml` matrix from `windows-2025` to stable `windows-latest`.
-   - Appended `--lib` to the `cargo test` command so that all 752 library unit tests execute without attempting to invoke the GUI binary target.
-4. **Clean Compiler Warnings & Conditional Imports:**
-   - Added `#[cfg(target_os = "windows")]` to `CommandExtWrapper` in `email_inbound.rs`.
-   - Cleaned unused imports and variables in `models/mod.rs`, `modules/integration.rs`, `modules/repo_db.rs`, `modules/cloudflared.rs`, `commands/patch.rs`, `commands/supabase.rs`, and `proxy/server.rs`.
-5. **Local Verification:**
-   - Executed `cargo test --manifest-path src-tauri/Cargo.toml --lib -j 2`: **All 752 tests passed (0 failed)**.
+   - Added `TEST_THINKING_BUDGET_MUTEX` locking and reset in `test_default_max_tokens` in `src-tauri/src/proxy/mappers/claude/request.rs`.
+2. **Architecture-Aware DLL Copying in `build.rs`:**
+   - Modified `copy_dll_recursive` to verify the parent directory matches `expected_arch_dir` (`x64` for `x86_64`), preventing 32-bit overwrites.
+3. **Disable Redundant Binary Test Harness:**
+   - Explicitly configured `[[bin]]` with `name = "agm-alim"` and `test = false` in `src-tauri/Cargo.toml`.
+4. **Embed Windows Test Manifest:**
+   - Re-enabled `/MANIFEST:EMBED` and `/MANIFESTINPUT` for `windows-test.manifest` in `src-tauri/build.rs` for MSVC test executables.
+5. **Cross-Platform Trait & Command Imports:**
+   - Added `#[allow(unused_imports)] use std::process::Command;` in `src-tauri/src/modules/integration.rs`.
+   - Guarded Windows-only traits in `email_inbound.rs` with `#[cfg(target_os = "windows")]`.
+6. **Verification:**
+   - Executed `cargo test --manifest-path src-tauri/Cargo.toml`: **All 752 unit tests passed (0 failed)**.
    - Executed `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`: **Clean formatting (code 0)**.
-   - Executed `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -j 2`: **Zero errors (code 0)**.
-   - Executed `npx tsc --noEmit` and `npm run build`: **Built successfully (code 0)**.
+   - Executed `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features`: **Zero errors (code 0)**.
+   - Executed `npm run build`: **Built successfully (code 0)**.
