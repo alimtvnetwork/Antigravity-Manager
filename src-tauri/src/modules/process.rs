@@ -1735,13 +1735,40 @@ pub fn get_antigravity_cli_executable_path() -> Option<std::path::PathBuf> {
     None
 }
 
-/// Bring an instance window to the foreground by PID
+/// Bring any instance window in the process list to the foreground
 #[cfg(target_os = "windows")]
-pub fn focus_instance_process(pid: u32) -> bool {
+pub fn focus_instance_pids(pids: &[u32]) -> bool {
+    if pids.is_empty() {
+        return false;
+    }
     const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let pid_list = pids
+        .iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+
     let ps_cmd = format!(
-        "$ws = New-Object -ComObject WScript.Shell; $res = $ws.AppActivate({}); exit $(if ($res) {{ 0 }} else {{ 1 }})",
-        pid
+        r#"$pids = @({});
+$ws = New-Object -ComObject WScript.Shell;
+$act = $false;
+foreach ($p in $pids) {{
+    if ($ws.AppActivate($p)) {{ $act = $true; break }}
+}}
+if (-not $act) {{
+    foreach ($p in $pids) {{
+        $proc = Get-Process -Id $p -ErrorAction SilentlyContinue;
+        if ($proc -and $proc.MainWindowHandle -ne 0) {{
+            Add-Type '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);' -Name 'Win32Focus' -Namespace 'Antigravity';
+            [Antigravity.Win32Focus]::ShowWindow($proc.MainWindowHandle, 9);
+            [Antigravity.Win32Focus]::SetForegroundWindow($proc.MainWindowHandle);
+            $act = $true;
+            break;
+        }}
+    }}
+}}
+exit $(if ($act) {{ 0 }} else {{ 1 }})"#,
+        pid_list
     );
 
     let output = Command::new("powershell")
@@ -1752,6 +1779,21 @@ pub fn focus_instance_process(pid: u32) -> bool {
     match output {
         Ok(out) => out.status.success(),
         Err(_) => false,
+    }
+}
+
+/// Bring an instance window to the foreground by PID
+#[cfg(target_os = "windows")]
+pub fn focus_instance_process(pid: u32) -> bool {
+    focus_instance_pids(&[pid])
+}
+
+#[cfg(target_os = "macos")]
+pub fn focus_instance_pids(pids: &[u32]) -> bool {
+    if let Some(&pid) = pids.first() {
+        focus_instance_process(pid)
+    } else {
+        false
     }
 }
 
@@ -1771,6 +1813,15 @@ pub fn focus_instance_process(pid: u32) -> bool {
 }
 
 #[cfg(target_os = "linux")]
+pub fn focus_instance_pids(pids: &[u32]) -> bool {
+    if let Some(&pid) = pids.first() {
+        focus_instance_process(pid)
+    } else {
+        false
+    }
+}
+
+#[cfg(target_os = "linux")]
 pub fn focus_instance_process(pid: u32) -> bool {
     let output = Command::new("xdotool")
         .args(["search", "--pid", &pid.to_string(), "windowactivate"])
@@ -1779,6 +1830,11 @@ pub fn focus_instance_process(pid: u32) -> bool {
         Ok(out) => out.status.success(),
         Err(_) => false,
     }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn focus_instance_pids(_pids: &[u32]) -> bool {
+    false
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]

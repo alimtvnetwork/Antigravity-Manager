@@ -716,8 +716,11 @@ export default function Instances() {
                                                     try {
                                                         const result = await smartRotateProfileAccount(inst.config.id);
                                                         const runwayInfo = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
+                                                        const resumeInfo = (result.resumedProjectsCount ?? 0) > 0
+                                                            ? ` · Auto-resumed ${result.resumedProjectsCount} active project(s) (<1h)`
+                                                            : '';
                                                         showToast(
-                                                            `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayInfo}`,
+                                                            `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayInfo}${resumeInfo}`,
                                                             'success'
                                                         );
                                                     } catch (e: any) {

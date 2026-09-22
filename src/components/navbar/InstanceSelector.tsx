@@ -271,8 +271,11 @@ export function InstanceSelector() {
         try {
             const result = await smartRotateProfileAccount(sourceId);
             const runwayText = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
+            const resumeText = (result.resumedProjectsCount ?? 0) > 0
+                ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
+                : '';
             showToast(
-                t('instances.smart_switched_toast', `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayText}`),
+                t('instances.smart_switched_toast', `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayText}${resumeText}`),
                 'success'
             );
             setIsOpen(false);

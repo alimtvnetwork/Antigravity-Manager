@@ -261,6 +261,32 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                     Auto-Resume Recent Active Prompts on Fast-Forward (&lt; 1h with images)
                                 </label>
                             </div>
+                            {(currentConfig.auto_resume_recent_prompts ?? true) && (
+                                <div className="ml-7 p-2.5 bg-gray-50 dark:bg-base-200/50 rounded-lg border border-gray-100 dark:border-base-300 text-xs flex flex-col gap-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                                            Recency Cutoff Window:
+                                        </span>
+                                        <select
+                                            value={currentConfig.prompt_recency_threshold_seconds || 3600}
+                                            onChange={(e) => onChange({
+                                                ...currentConfig,
+                                                prompt_recency_threshold_seconds: Number(e.target.value),
+                                            })}
+                                            className="select select-xs select-bordered bg-white dark:bg-base-100 text-xs rounded"
+                                        >
+                                            <option value={1800}>30 Minutes</option>
+                                            <option value={3600}>1 Hour (Recommended)</option>
+                                            <option value={7200}>2 Hours</option>
+                                            <option value={18000}>5 Hours</option>
+                                            <option value={86400}>1 Day (24 Hours)</option>
+                                        </select>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                        Active projects run within this window are auto-resumed with their last prompt and attached images. Older inactive projects are safely skipped to spin up the clean boot process.
+                                    </p>
+                                </div>
+                            )}
                             <div className="flex items-center gap-3">
                                 <input
                                     type="checkbox"

@@ -864,7 +864,8 @@ pub fn get_status() -> AutoSwitcherStatus {
 pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
-    if !switcher_cfg.is_enabled {
+    let is_watchdog_active = switcher_cfg.is_enabled || switcher_cfg.auto_focus_window;
+    if !is_watchdog_active {
         return Ok(());
     }
 
@@ -881,14 +882,12 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     if is_running {
         // Antigravity IDE is running: bring window to foreground focus if requested
         if switcher_cfg.auto_focus_window {
-            if let Some(&pid) = pids.first() {
-                let focused = crate::modules::process::focus_instance_process(pid);
-                if focused {
-                    logger::log_info(&format!(
-                        "[CrashWatchdog] Focused running IDE window for instance '{}' (PID {})",
-                        active_inst.id, pid
-                    ));
-                }
+            let focused = crate::modules::process::focus_instance_pids(&pids);
+            if focused {
+                logger::log_info(&format!(
+                    "[CrashWatchdog] Focused running IDE window for instance '{}' (PIDs {:?})",
+                    active_inst.id, pids
+                ));
             }
         }
     } else {

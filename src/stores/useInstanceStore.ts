@@ -34,7 +34,13 @@ interface InstanceState {
     importInstancesJson: (jsonContent: string) => Promise<InstanceConfig[]>;
     smartPlayInstance: (instanceId?: string) => Promise<{ accountEmail: string; instanceName: string }>;
     rotateToNextBestProfile: (sourceInstanceId?: string) => Promise<InstanceStatus>;
-    smartRotateProfileAccount: (targetInstanceId?: string) => Promise<{ accountEmail: string; instanceName: string; daysUntilRefill: number }>;
+    smartRotateProfileAccount: (targetInstanceId?: string) => Promise<{
+        accountEmail: string;
+        instanceName: string;
+        daysUntilRefill: number;
+        resumedProjectsCount?: number;
+        skippedProjectsCount?: number;
+    }>;
     cleanAndRestartWorkspace: () => Promise<string>;
     resumeRecentProjectPrompts: (instanceId?: string) => Promise<instanceService.AutoResumeResult>;
 }
@@ -440,8 +446,9 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             await instanceService.switchAccountToInstance(verified.account.id, instId);
 
             // 6.5 Auto-resume recent active prompts (<1h) if enabled
+            let resumeResult: instanceService.AutoResumeResult | null = null;
             try {
-                await instanceService.resumeRecentProjectPrompts(instId);
+                resumeResult = await instanceService.resumeRecentProjectPrompts(instId);
             } catch (resumeErr) {
                 console.warn('[useInstanceStore] Auto-resume recent prompts notice:', resumeErr);
             }
@@ -459,6 +466,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 accountEmail: verified.account.email,
                 instanceName,
                 daysUntilRefill: verified.daysUntilRefill,
+                resumedProjectsCount: resumeResult?.resumed_project_count ?? 0,
+                skippedProjectsCount: resumeResult?.skipped_project_count ?? 0,
             };
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to smart rotate profile' });
