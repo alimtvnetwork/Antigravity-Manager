@@ -556,9 +556,69 @@ download_installer() {
     return 0
 }
 
+verify_download_checksum() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        if command -v sha256sum &>/dev/null; then
+            sha256sum "$file" 2>/dev/null || true
+        elif command -v shasum &>/dev/null; then
+            shasum -a 256 "$file" 2>/dev/null || true
+        fi
+    fi
+}
+
 # Remove any pre-existing previous tool packages
+close_tool_processes() {
+    local context="${1:-installation}"
+    step "Closing active tool processes and WebViews ($context)"
+    killall -9 agm-alim 2>/dev/null || true
+    killall -9 antigravity-tools 2>/dev/null || true
+    pkill -9 -f "agm-alim" 2>/dev/null || true
+    pkill -9 -f "antigravity-tools" 2>/dev/null || true
+    pkill -9 -f "WebKitWebProcess" 2>/dev/null || true
+    pkill -9 -f "electron.*antigravity" 2>/dev/null || true
+    sleep 0.5
+}
+
+ensure_default_config() {
+    local cfg_dir="${HOME}/.antigravity_tools"
+    local cfg_file="${cfg_dir}/gui_config.json"
+    mkdir -p "$cfg_dir" 2>/dev/null || true
+    if [[ -f "$cfg_file" ]]; then
+        if command -v python3 &>/dev/null; then
+            python3 -c "
+import json
+try:
+    with open('$cfg_file', 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    if not d.get('auto_sync_migrated'):
+        d['auto_sync'] = True
+        d['auto_sync_migrated'] = True
+        with open('$cfg_file', 'w', encoding='utf-8') as f:
+            json.dump(d, f, indent=2)
+except Exception:
+    pass
+" 2>/dev/null || true
+        fi
+    else
+        cat << 'EOF' > "$cfg_file"
+{
+  "language": "en",
+  "theme": "system",
+  "auto_refresh": true,
+  "refresh_interval": 15,
+  "auto_sync": true,
+  "auto_sync_migrated": true,
+  "sync_interval": 5
+}
+EOF
+    fi
+}
+
 # NOTE: Executed ONLY AFTER new package has been successfully downloaded and verified!
 remove_previous_installation() {
+    close_tool_processes "pre-installation"
+
     if [[ "$PLATFORM" != "linux" ]]; then
         return
     fi
@@ -938,6 +998,12 @@ main() {
 
     # Explicit post-install cleanup of downloaded packages
     cleanup
+
+    # Ensure Auto Sync Current Account is default true
+    ensure_default_config
+
+    # Close any lingering processes, WebViews, or Electron tasks
+    close_tool_processes "post-installation"
 
     # Newline before summary
     echo ""

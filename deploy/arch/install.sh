@@ -170,6 +170,7 @@ for PKGVER in "${CANDIDATES[@]}"; do
             PKGBUILD.template > PKGBUILD
 
         echo "🛠️ Starting installation via makepkg..."
+        # Safe non-destructive replacement: makepkg/pacman will install -m 755 or cp binaries
         run_indented makepkg -si --noconfirm || exit 1
     ) && SUCCESS_STEP=1
 

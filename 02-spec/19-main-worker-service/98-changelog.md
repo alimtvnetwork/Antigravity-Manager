@@ -1,3 +1,9 @@
+## v4.50.0 — 2026-09-22 (Default auto_sync to true, enhance installer process cleanup and auto-launch)
+
+**Scope:** Version bump. Default auto_sync to true, enhance installer process cleanup and auto-launch.
+
+---
+
 ## v4.49.0 — 2026-09-22 (Fix rustfmt formatting and rust compilation errors)
 
 **Scope:** Version bump. Fix rustfmt formatting and rust compilation errors.

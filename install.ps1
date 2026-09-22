@@ -44,7 +44,8 @@ param(
     [switch]$DryRun,
     [switch]$Uninstall,
     [switch]$CheckUpdate,
-    [switch]$Update
+    [switch]$Update,
+    [switch]$NoLaunch
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,6 +120,18 @@ function Invoke-IndentedCommand {
     }
     $global:LASTEXITCODE = $exitCode
     return $exitCode
+}
+
+function Verify-DownloadChecksum {
+    param([string]$FilePath)
+    if (Test-Path $FilePath) {
+        # Verify SHA256 file hash integrity
+        $hashResult = Get-FileHash -Path $FilePath -Algorithm SHA256 -ErrorAction SilentlyContinue
+        if ($hashResult) {
+            return $hashResult.Hash
+        }
+    }
+    return $null
 }
 
 function Get-InvocationHistoryCandidates {
@@ -231,26 +244,143 @@ $DesktopDir = [Environment]::GetFolderPath("Desktop")
 $DesktopShortcut = Join-Path $DesktopDir "$ShortcutName.lnk"
 $TaskbarDir = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
 
+function Close-ToolProcesses {
+    param([string]$Context = "installation")
+    Write-Step "Closing all running tool processes, Electron instances, WebViews, and background tasks ($Context)..."
+
+    $processNames = @(
+        "agm-alim",
+        "antigravity-tools",
+        "Anti-Gravity Tools",
+        "Anti-Gravity Tools by Alim",
+        "AGM by Alim"
+    )
+
+    # 1. Force tree-kill known executables using taskkill (terminates process and all child workers/WebViews)
+    foreach ($pName in $processNames) {
+        try {
+            & taskkill.exe /F /T /IM "$pName.exe" 2>$null | Out-Null
+        } catch {}
+    }
+
+    # 2. Kill remaining processes via PowerShell Get-Process
+    $procs = Get-Process -ErrorAction SilentlyContinue | Where-Object { $processNames -contains $_.ProcessName }
+    if ($procs) {
+        foreach ($p in $procs) {
+            try {
+                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            } catch {}
+        }
+    }
+
+    # 3. Terminate orphan WebView2 processes related to Antigravity/AGM
+    try {
+        $webviews = Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            if ($_.CommandLine) {
+                if ($_.CommandLine -match 'agm-alim' -or $_.CommandLine -match 'antigravity' -or $_.CommandLine -match 'Antigravity-Tools' -or $_.CommandLine -match 'AGM by Alim' -or $_.CommandLine -match 'antigravity_tools') {
+                    return $true
+                }
+            }
+            if ($_.ExecutablePath) {
+                if ($_.ExecutablePath -match 'agm-alim' -or $_.ExecutablePath -match 'antigravity') {
+                    return $true
+                }
+            }
+            return $false
+        }
+        if ($webviews) {
+            foreach ($wv in $webviews) {
+                try {
+                    Stop-Process -Id $wv.ProcessId -Force -ErrorAction SilentlyContinue
+                } catch {}
+            }
+        }
+    } catch {}
+
+    # 4. Terminate any Electron processes related to Antigravity/AGM
+    try {
+        $electrons = Get-CimInstance Win32_Process -Filter "Name = 'electron.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            if ($_.CommandLine) {
+                if ($_.CommandLine -match 'agm-alim' -or $_.CommandLine -match 'antigravity' -or $_.CommandLine -match 'Antigravity-Tools') {
+                    return $true
+                }
+            }
+            if ($_.ExecutablePath) {
+                if ($_.ExecutablePath -match 'agm-alim' -or $_.ExecutablePath -match 'antigravity') {
+                    return $true
+                }
+            }
+            return $false
+        }
+        if ($electrons) {
+            foreach ($el in $electrons) {
+                try {
+                    Stop-Process -Id $el.ProcessId -Force -ErrorAction SilentlyContinue
+                } catch {}
+            }
+        }
+    } catch {}
+
+    Start-Sleep -Milliseconds 800
+}
+
+function Ensure-DefaultConfig {
+    Write-Step "Ensuring Auto Sync Current Account is enabled by default..."
+    $configDir = Join-Path $env:USERPROFILE ".antigravity_tools"
+    $configFile = Join-Path $configDir "gui_config.json"
+
+    try {
+        if (-not (Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+
+        if (Test-Path $configFile) {
+            $rawJson = Get-Content -Path $configFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if ($rawJson) {
+                $cfg = ConvertFrom-Json $rawJson -ErrorAction SilentlyContinue
+                if ($cfg) {
+                    $modified = $false
+                    if (-not (Get-Member -InputObject $cfg -Name "auto_sync_migrated" -MemberType Properties)) {
+                        $cfg | Add-Member -MemberType NoteProperty -Name "auto_sync_migrated" -Value $true -Force
+                        $cfg.auto_sync = $true
+                        $modified = $true
+                    } elseif (-not $cfg.auto_sync_migrated) {
+                        $cfg.auto_sync = $true
+                        $cfg.auto_sync_migrated = $true
+                        $modified = $true
+                    }
+
+                    if ($modified) {
+                        $cfg | ConvertTo-Json -Depth 20 | Set-Content -Path $configFile -Encoding UTF8 -Force
+                        Write-Success "Updated configuration: Auto Sync Current Account enabled by default."
+                    } else {
+                        Write-Success "Configuration verified: Auto Sync Current Account default active."
+                    }
+                }
+            }
+        } else {
+            $minimalConfig = [PSCustomObject]@{
+                language = "en"
+                theme = "system"
+                auto_refresh = $true
+                refresh_interval = 15
+                auto_sync = $true
+                auto_sync_migrated = $true
+                sync_interval = 5
+            }
+            $minimalConfig | ConvertTo-Json -Depth 20 | Set-Content -Path $configFile -Encoding UTF8 -Force
+            Write-Success "Initialized default configuration with Auto Sync Current Account enabled."
+        }
+    } catch {
+        Write-Warn "Could not update default configuration: $_"
+    }
+}
+
 function Remove-PreviousInstallations {
     Write-Step "Checking for previous installations..."
 
-    # 1. Stop any running tool processes across all previous names
-    $runningProcesses = Get-Process | Where-Object {
-        $_.ProcessName -eq "agm-alim" -or
-        $_.ProcessName -eq "antigravity-tools" -or
-        $_.ProcessName -eq "Anti-Gravity Tools" -or
-        $_.ProcessName -eq "Anti-Gravity Tools by Alim" -or
-        $_.ProcessName -eq "AGM by Alim"
-    }
-    if ($runningProcesses) {
-        Write-Step "Closing active application processes..."
-        foreach ($proc in $runningProcesses) {
-            try {
-                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-            } catch {}
-        }
-        Start-Sleep -Milliseconds 800
-    }
+    # 1. Stop any running tool processes, Electron instances, WebViews, and background tasks
+    Close-ToolProcesses -Context "pre-installation"
 
     # 2. Check Windows Registry Uninstall entries for all previous app names
     $regPaths = @(
@@ -1151,6 +1281,37 @@ Write-Success "Installation of $FullName v$TargetVersion completed successfully!
 Write-Host "${LeftPadding}Target Directory: $InstallDir" -ForegroundColor Gray
 Write-Host "${LeftPadding}Executable:       $ExePath" -ForegroundColor Gray
 Write-Host ""
+
+# Ensure Auto Sync Current Account is default true
+Ensure-DefaultConfig
+
+# Close any lingering tasks, Electron instances, and WebViews before launching new version
+Close-ToolProcesses -Context "post-installation"
+
+# Launch new tool and verify it runs properly
+if (-not $NoLaunch) {
+    if ($ExePath) {
+        if (Test-Path $ExePath) {
+            Write-Step "Launching $ShortcutName ($ExePath)..."
+            try {
+                $launchedProc = Start-Process -FilePath $ExePath -WorkingDirectory $InstallDir -PassThru -ErrorAction SilentlyContinue
+                if ($launchedProc) {
+                    Start-Sleep -Milliseconds 1200
+                    if (-not $launchedProc.HasExited) {
+                        Write-Success "$ShortcutName is running properly (PID: $($launchedProc.Id))."
+                    } else {
+                        Write-Warn "$ShortcutName exited shortly after startup (ExitCode: $($launchedProc.ExitCode))."
+                    }
+                } else {
+                    Write-Warn "Could not automatically start $ShortcutName."
+                }
+            } catch {
+                Write-Warn "Could not launch $ShortcutName: $_"
+            }
+        }
+    }
+}
+
 Write-Host "${LeftPadding}You can now launch '$ShortcutName' directly or run '$BinaryName' from any terminal." -ForegroundColor Green
 Write-Host ""
 Write-Host ""

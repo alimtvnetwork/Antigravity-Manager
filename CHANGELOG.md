@@ -3122,6 +3122,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.50.0 (2026-09-22)**:
+        -   **[Release v4.50.0] Default auto_sync to true, enhance installer process cleanup and auto-launch**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Default auto_sync to true, enhance installer process cleanup and auto-launch.
     *   **v4.49.0 (2026-09-22)**:
         -   **[Release v4.49.0] Fix rustfmt formatting and rust compilation errors**:
             -   **Update System**: Automated release and version synchronization across all manifests.
