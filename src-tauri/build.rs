@@ -5,11 +5,10 @@ fn main() {
     let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
     if target_os == "windows" && target_env == "msvc" {
-        let manifest_path = std::path::Path::new("windows-test.manifest");
-        if manifest_path.exists() {
-            println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
-            if let Ok(abs_path) = manifest_path.canonicalize() {
-                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
+        if let Ok(out_dir) = std::env::var("OUT_DIR") {
+            let resource_lib = std::path::PathBuf::from(&out_dir).join("resource.lib");
+            if resource_lib.exists() {
+                println!("cargo:rustc-link-arg={}", resource_lib.display());
             }
         }
 

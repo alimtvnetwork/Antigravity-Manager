@@ -349,17 +349,29 @@ def create_github_release_if_available(next_version, scope, dry_run=False):
     notes_content = f"""## Quick Install v{next_version}
 
 ### Windows (PowerShell 5.1+)
+
+#### Direct Latest Install (Auto-Updating)
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
-# Or pinned version:
-irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.ps1 | iex
 ```
 
+#### Pinned Version Install (v{next_version})
+```powershell
+irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v{next_version}/install.ps1 | iex
+```
+
+---
+
 ### Linux / macOS (Bash)
+
+#### Direct Latest Install (Auto-Updating)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
-# Or pinned version:
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{next_version}/install.sh | bash
+```
+
+#### Pinned Version Install (v{next_version})
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v{next_version}/install.sh | bash
 ```
 
 ---

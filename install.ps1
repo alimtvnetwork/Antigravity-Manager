@@ -169,6 +169,19 @@ function Resolve-PinnedVersion {
         [string]$ExplicitVersion,
         [string]$BakedVersion
     )
+    if (-not $ExplicitVersion) {
+        if ($env:AGM_VERSION) {
+            $ExplicitVersion = $env:AGM_VERSION
+        } elseif ($env:VERSION) {
+            $ExplicitVersion = $env:VERSION
+        } elseif ($env:INSTALLER_VERSION) {
+            $ExplicitVersion = $env:INSTALLER_VERSION
+        } elseif ($args -and $args.Count -gt 0) {
+            if ($args[0] -match '^[vV]?[0-9]+\.[0-9]+') {
+                $ExplicitVersion = $args[0]
+            }
+        }
+    }
     if ($ExplicitVersion) {
         $clean = ($ExplicitVersion -replace "^v", "").Trim()
         $parts = $clean.Split("-")[0].Split(".")
@@ -190,7 +203,7 @@ function Resolve-PinnedVersion {
     }
     $entries = Get-InvocationHistoryCandidates
     # Strictly scope to Antigravity-Manager or agm-alim URLs so unrelated command lines never pollute version
-    $regex = '(?i)(Antigravity-Manager|agm-alim|antigravity).*releases/download/v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
+    $regex = '(?i)(Antigravity-Manager|agm-alim|antigravity).*(?:releases/download/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/'
     foreach ($entry in $entries) {
         if ($entry -match $regex) {
             $detected = $Matches[2]
@@ -827,7 +840,8 @@ function Invoke-FastDownload {
     # 1. Try aria2c with 80 parallel split connections and 1MB chunks
     $aria2Bin = Get-Aria2cPath
     if ($aria2Bin) {
-        Write-Step "Accelerating download with aria2c (80 splits, 1MB chunks)..."
+        Write-Step "Delegating download request to aria2c accelerator..."
+        Write-Step "Accelerating download with aria2c (16 connections, 80 splits, 1MB chunks)..."
         try {
             $ariaArgs = @(
                 "--disable-ipv6=true",
@@ -838,8 +852,9 @@ function Invoke-FastDownload {
                 "--file-allocation=none",
                 "--allow-overwrite=true",
                 "--auto-file-renaming=false",
-                "--summary-interval=1",
-                "--console-log-level=warn",
+                "--summary-interval=0",
+                "--console-log-level=error",
+                "--show-console-readout=false",
                 "--dir=$destDir",
                 "-o", "$destFile",
                 "$Url"
@@ -847,15 +862,17 @@ function Invoke-FastDownload {
             $ariaExit = Invoke-IndentedCommand -FilePath $aria2Bin -ArgumentList $ariaArgs
             if ($ariaExit -eq 0) {
                 if (Test-Path $DestinationPath) {
-                    if ((Get-Item $DestinationPath).Length -gt 0) {
-                        Write-Success "Download completed via aria2c."
+                    $itemLen = (Get-Item $DestinationPath).Length
+                    if ($itemLen -gt 0) {
+                        $sizeMb = [math]::Round($itemLen / 1MB, 2)
+                        Write-Success "Download completed successfully via aria2c ($sizeMb MB)."
                         return $true
                     }
                 }
             }
-            Write-Warn "aria2c finished with code $ariaExit; falling back to secondary downloader..."
+            Write-Warn "aria2c finished with code $ariaExit; delegating download request to secondary downloader (curl / Invoke-WebRequest)..."
         } catch {
-            Write-Warn "aria2c encountered an error: $_. Falling back..."
+            Write-Warn "aria2c encountered an error: $_. Delegating download request to secondary downloader..."
         }
     } else {
         Write-Step "aria2c not found; proceeding with standard download stream..."
@@ -984,7 +1001,7 @@ foreach ($endpoint in $apiEndpoints) {
             }
         }
     } catch {}
-    if ($candidateVersions.Count -ge 4) { break }
+    if ($candidateVersions.Count -ge 10) { break }
 }
 
 # If pinned release is not in GitHub releases, replenish queue with latest releases
@@ -995,15 +1012,15 @@ if ($isPinned) {
             if (-not $candidateVersions.Contains($tagVer)) {
                 $candidateVersions.Add($tagVer)
             }
-            if ($candidateVersions.Count -ge 4) { break }
+            if ($candidateVersions.Count -ge 10) { break }
         }
     }
 }
 
 # Fallback known historical releases
-$knownFallbacks = @("4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
+$knownFallbacks = @("4.59.0", "4.58.0", "4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
 foreach ($kb in $knownFallbacks) {
-    if ($candidateVersions.Count -ge 4) { break }
+    if ($candidateVersions.Count -ge 10) { break }
     if (-not $isPinned) {
         if (-not $candidateVersions.Contains($kb)) {
             $candidateVersions.Add($kb)
@@ -1021,10 +1038,10 @@ foreach ($kb in $knownFallbacks) {
     }
 }
 
-# Build strict 4-version queue
+# Build multi-version fallback queue (up to 10 releases)
 $versionQueue = @()
 foreach ($v in $candidateVersions) {
-    if ($versionQueue.Count -lt 4) {
+    if ($versionQueue.Count -lt 10) {
         $versionQueue += $v
     }
 }
@@ -1055,8 +1072,8 @@ if ($CurrentVersion) {
     Write-Step "Installation mode        : Fresh installation (v$TargetVersion)"
 }
 
-# Step 2: Intelligent Multi-Version Try-Catch Installation Ladder (Up to 4 attempts)
-$maxAttempts = 4
+# Step 2: Intelligent Multi-Version Try-Catch Installation Ladder (Up to 10 attempts)
+$maxAttempts = 10
 $attempt = 0
 $installedOk = $false
 $installedVersion = $null

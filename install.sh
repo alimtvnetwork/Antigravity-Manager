@@ -229,6 +229,14 @@ resolve_pinned_version() {
         candidates+=("$(tr '\0' ' ' < "/proc/$$/cmdline" 2>/dev/null || true)")
     fi
 
+    if [[ -z "${VERSION:-}" ]]; then
+        if [[ -n "${AGM_VERSION:-}" ]]; then
+            VERSION="$AGM_VERSION"
+        elif [[ -n "${INSTALLER_VERSION:-}" ]]; then
+            VERSION="$INSTALLER_VERSION"
+        fi
+    fi
+
     # 3. Process inspection via ps (Linux, macOS, BSD)
     if command -v ps >/dev/null 2>&1; then
         if [[ -n "${PPID:-}" ]]; then
@@ -249,10 +257,10 @@ resolve_pinned_version() {
         candidates+=("$(tail -n 15 "${HOME}/.zsh_history" 2>/dev/null || true)")
     fi
 
-    local regex='(Antigravity-Manager|agm-alim|antigravity).*releases/download/v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
+    local regex='(Antigravity-Manager|agm-alim|antigravity|gitmap).*(releases/download/|raw\.githubusercontent\.com/[^/]+/[^/]+/)v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
     for entry in "${candidates[@]}"; do
         if [[ "$entry" =~ $regex ]]; then
-            VERSION="${BASH_REMATCH[2]}"
+            VERSION="${BASH_REMATCH[3]}"
             if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
                 VERSION="${VERSION}.0"
             fi
@@ -313,7 +321,7 @@ get_version() {
                         CANDIDATE_VERSIONS+=("$tag")
                     fi
                 fi
-                if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
+                if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
                     break 2
                 fi
             done <<< "$tags"
@@ -321,9 +329,9 @@ get_version() {
     done
 
     # Fallback ladder
-    local fallbacks=("4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
+    local fallbacks=("4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
-        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 4 ]]; then
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
             break
         fi
         local already_in=0
@@ -338,7 +346,7 @@ get_version() {
         fi
     done
 
-    CANDIDATE_VERSIONS=("${CANDIDATE_VERSIONS[@]:0:4}")
+    CANDIDATE_VERSIONS=("${CANDIDATE_VERSIONS[@]:0:10}")
     RELEASE_VERSION="${CANDIDATE_VERSIONS[0]}"
 }
 
@@ -479,21 +487,24 @@ download_file() {
 
     # Try aria2c with 80 parallel split connections and 1MB chunks
     if [[ -n "${ARIA2C_BIN:-}" && -x "$ARIA2C_BIN" ]]; then
-        info "Downloading with aria2c (80 parallel split connections, 1MB chunks)..."
+        info "Delegating download request to aria2c accelerator..."
+        info "Accelerating download with aria2c (16 connections, 80 splits, 1MB chunks)..."
         local aria_exit=0
         run_indented "$ARIA2C_BIN" --disable-ipv6=true -x 16 -s 80 -j 16 -k 1M \
             --allow-overwrite=true \
             --auto-file-renaming=false \
-            --summary-interval=1 \
-            --console-log-level=warn \
+            --summary-interval=0 \
+            --console-log-level=error \
+            --show-console-readout=false \
             --dir="$dest_dir" \
             -o "$dest_file" \
             "$url" || aria_exit=$?
 
         if [[ "$aria_exit" -eq 0 && -f "$full_path" && -s "$full_path" ]]; then
+            success "Download completed successfully via aria2c."
             return 0
         fi
-        warn "aria2c download failed or interrupted, falling back to curl..."
+        warn "aria2c download failed or interrupted; delegating download request to secondary downloader (curl)..."
     fi
 
     # Fallback to curl
@@ -920,12 +931,42 @@ EOF
 # Main entry point
 main() {
     local is_update_only=0
-    for arg in "$@"; do
-        case "$arg" in
-            --help|-h)              show_help ;;
-            --version|-v)           echo "install.sh v2.0.0"; exit 0 ;;
-            --check-update|--check) check_for_updates_cli ;;
-            --update)               is_update_only=1 ;;
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help
+                ;;
+            --version|-v)
+                if [[ $# -gt 1 && ! "$2" =~ ^-- ]]; then
+                    VERSION="$2"
+                    shift 2
+                else
+                    echo "install.sh v2.5.0"
+                    exit 0
+                fi
+                ;;
+            --version=*)
+                VERSION="${1#*=}"
+                shift
+                ;;
+            -v=*)
+                VERSION="${1#*=}"
+                shift
+                ;;
+            --check-update|--check)
+                check_for_updates_cli
+                ;;
+            --update)
+                is_update_only=1
+                shift
+                ;;
+            v[0-9]*|[0-9]*)
+                VERSION="$1"
+                shift
+                ;;
+            *)
+                shift
+                ;;
         esac
     done
 
@@ -959,7 +1000,7 @@ main() {
 
     display_migration
 
-    local max_attempts=4
+    local max_attempts=10
     local attempt=0
     local installed_ok=0
 

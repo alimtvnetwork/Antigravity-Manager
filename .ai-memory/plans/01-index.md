@@ -81,4 +81,6 @@ Master directory of architectural and execution plans.
 - [03-ide-crash-recovery-and-prompt-resume.md](completed/03-ide-crash-recovery-and-prompt-resume.md): Enhanced 2-minute IDE crash & focus watchdog, multi-PID process tree foreground focus with Win32 ShowWindow(SW_RESTORE) fallback, Fast-Forward UI prompt resume counter feedback, and configurable recency cutoff window (30m, 1h, 2h, 5h, 1d).
 - [04-cicd-typescript-instance-exports-and-rustfmt.md](completed/04-cicd-typescript-instance-exports-and-rustfmt.md): Resolve missing TypeScript exports in instanceService and rustfmt formatting across src-tauri.
 - [05-gui-config-empty-file-parse-failure-and-self-healing.md](completed/05-gui-config-empty-file-parse-failure-and-self-healing.md): GUI config empty file parse failure (E9001) resolution, RwLock concurrency synchronization, and automatic self-healing architecture.
+- [63-installer-resilience-and-release-spec.md](completed/63-installer-resilience-and-release-spec.md): Installer script decoupling from release assets, multi-version fallback ladder (5 to 10 releases), pinned version installation, isolated release page code blocks, aria2c delegation logging cleanliness, coding guidelines Rule R22, and GitMap repository synchronization.
+
 
