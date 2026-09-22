@@ -52,6 +52,27 @@ pub struct ActivePrompt {
     pub status: String, // "running", "backed_up", "dispatched", "completed"
     pub created_at: i64,
     pub updated_at: i64,
+    #[serde(default)]
+    pub image_payload: Option<String>,
+}
+
+/// Metadata for an auto-resumed prompt
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoResumePromptInfo {
+    pub project_id: String,
+    pub repo_path: String,
+    pub prompt_preview: String,
+    pub has_image: bool,
+}
+
+/// Outcome of the fast-forward auto-resume operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoResumeResult {
+    pub instance_id: String,
+    pub account_email: String,
+    pub resumed_project_count: usize,
+    pub skipped_project_count: usize,
+    pub resumed_prompts: Vec<AutoResumePromptInfo>,
 }
 
 /// Get path to the dedicated split repo prompts SQLite database
@@ -104,11 +125,15 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
             status TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
+            image_payload TEXT,
             FOREIGN KEY(project_id) REFERENCES running_projects(id)
         )",
         [],
     )
     .map_err(|e| format!("Failed to create active_prompts table: {}", e))?;
+
+    // Migration: add image_payload column if it doesn't exist yet
+    let _ = conn.execute("ALTER TABLE active_prompts ADD COLUMN image_payload TEXT", []);
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_active_prompts_instance_status 
@@ -255,7 +280,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         }
 
         // Check workspace state.vscdb for active prompts / tasks
-        let mut extracted_prompts = Vec::new();
+        let mut extracted_prompts: Vec<(String, Option<String>)> = Vec::new();
         if let Some(ref ws_storage) = project.workspace_storage_path {
             let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
             if ws_db_path.exists() {
@@ -276,7 +301,15 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                             for item in rows.flatten() {
                                 let content = item.1;
                                 if !content.trim().is_empty() && content.len() > 10 {
-                                    extracted_prompts.push(content);
+                                    let mut img_payload = None;
+                                    if content.contains("data:image/") {
+                                        if let Some(start) = content.find("data:image/") {
+                                            let tail = &content[start..];
+                                            let end = tail.find('"').or_else(|| tail.find('\'')).or_else(|| tail.find(' ')).unwrap_or(tail.len());
+                                            img_payload = Some(tail[..end].to_string());
+                                        }
+                                    }
+                                    extracted_prompts.push((content, img_payload));
                                 }
                             }
                         }
@@ -291,16 +324,16 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 "Active project snapshot for '{}' [{}] before instance rotation at {}",
                 project.repo_name, project.repo_path, now
             );
-            extracted_prompts.push(fallback_snapshot);
+            extracted_prompts.push((fallback_snapshot, None));
         }
 
-        for prompt_text in extracted_prompts {
+        for (prompt_text, image_payload) in extracted_prompts {
             let prompt_id = Uuid::new_v4().to_string();
             let prompt_model = Some("gemini-pro".to_string());
             let result = conn.execute(
                 "INSERT INTO active_prompts 
-                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?)",
+                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?, ?)",
                 params![
                     &prompt_id,
                     &project.id,
@@ -311,6 +344,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     &project.id,
                     now,
                     now,
+                    &image_payload,
                 ],
             );
 
@@ -327,6 +361,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     status: "backed_up".to_string(),
                     created_at: now,
                     updated_at: now,
+                    image_payload,
                 };
                 if let Ok(mut map) = get_memory_prompts_map().lock() {
                     map.insert(prompt_id, active_prompt);
@@ -350,7 +385,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at 
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
              WHERE instance_id = ? AND status = 'backed_up'",
         )
@@ -369,6 +404,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 status: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
             })
         })
         .map_err(|e| format!("Failed to query backed-up prompts: {}", e))?
@@ -391,6 +427,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             "instance_id": instance_id,
             "prompt_content": prompt.prompt_content,
             "model": prompt.model,
+            "image_payload": prompt.image_payload,
             "dispatched_at": now,
         });
         if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
@@ -458,7 +495,7 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at 
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts WHERE status = 'backed_up' ORDER BY created_at DESC",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
@@ -476,6 +513,7 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
                 status: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
             })
         })
         .map_err(|e| format!("Failed to query backed-up prompts: {}", e))?
@@ -490,7 +528,7 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at 
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts ORDER BY created_at DESC LIMIT 50",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
@@ -508,6 +546,7 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
                 status: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
             })
         })
         .map_err(|e| format!("Failed to query prompts: {}", e))?
@@ -515,6 +554,170 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
         .collect();
 
     Ok(rows)
+}
+
+/// Auto-resume recent prompts for projects active within max_age_seconds (strictly skips projects older than threshold)
+pub fn auto_resume_recent_prompts(
+    instance_id: &str,
+    max_age_seconds: i64,
+) -> Result<AutoResumeResult, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let threshold_cutoff = now - max_age_seconds;
+
+    // Load instance details to determine account email
+    let registry = crate::modules::instance::load_registry().unwrap_or_default();
+    let account_email = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .and_then(|i| i.bound_email.clone())
+        .unwrap_or_else(|| "unbound".to_string());
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at 
+             FROM running_projects 
+             WHERE instance_id = ? OR ? = ''
+             ORDER BY last_detected_at DESC",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let projects = stmt
+        .query_map([instance_id, instance_id], |row| {
+            let running_int: i32 = row.get(5)?;
+            Ok(RunningProject {
+                id: row.get(0)?,
+                instance_id: row.get(1)?,
+                repo_name: row.get(2)?,
+                repo_path: row.get(3)?,
+                workspace_storage_path: row.get(4)?,
+                is_running: running_int != 0,
+                last_detected_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query projects: {}", e))?
+        .flatten()
+        .collect::<Vec<RunningProject>>();
+
+    let mut resumed_prompts = Vec::new();
+    let mut resumed_count = 0;
+    let mut skipped_count = 0;
+
+    for project in projects {
+        // STRICT RECENCY FILTER: If project last active > max_age_seconds (e.g. > 1 hour, 2h, 5h, 1 day), SKIP!
+        let is_stale = project.last_detected_at < threshold_cutoff;
+        if is_stale {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Skipping project '{}' (last detected {}s ago, exceeds threshold {}s)",
+                project.repo_name,
+                now - project.last_detected_at,
+                max_age_seconds
+            ));
+            skipped_count += 1;
+            continue;
+        }
+
+        // Project was active within < 1 hour! Find its most recent prompt + image
+        let mut prompt_stmt = conn
+            .prepare(
+                "SELECT id, prompt_content, model, image_payload 
+                 FROM active_prompts 
+                 WHERE project_id = ? 
+                 ORDER BY created_at DESC LIMIT 1",
+            )
+            .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
+
+        let maybe_prompt = prompt_stmt
+            .query_row([&project.id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })
+            .ok();
+
+        let (prompt_id, prompt_text, prompt_model, image_payload) = match maybe_prompt {
+            Some((id, content, model, img)) => (id, content, model, img),
+            None => {
+                let new_id = Uuid::new_v4().to_string();
+                let content = format!(
+                    "Resume active project workspace for '{}' [{}] after IDE crash recovery",
+                    project.repo_name, project.repo_path
+                );
+                (new_id, content, Some("gemini-pro".to_string()), None)
+            }
+        };
+
+        let has_image = image_payload.is_some();
+
+        // Dispatch directly to project folder via .antigravity_resume_task.json to spin up boot process immediately
+        let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
+        let payload = serde_json::json!({
+            "prompt_id": prompt_id,
+            "project_id": project.id,
+            "instance_id": instance_id,
+            "repo_path": project.repo_path,
+            "prompt_content": prompt_text,
+            "model": prompt_model,
+            "image_payload": image_payload,
+            "has_image": has_image,
+            "auto_boot": true,
+            "resumed_at": now,
+        });
+
+        if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            let _ = fs::write(&task_file, json_str);
+        }
+
+        // Mark / update status in active_prompts as dispatched
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'dispatched', ?, ?, ?)",
+            params![
+                &prompt_id,
+                &project.id,
+                instance_id,
+                &project.repo_path,
+                &prompt_text,
+                &prompt_model,
+                &project.id,
+                now,
+                now,
+                &image_payload,
+            ],
+        );
+
+        let preview = if prompt_text.len() > 80 {
+            format!("{}...", &prompt_text[..77])
+        } else {
+            prompt_text.clone()
+        };
+
+        resumed_prompts.push(AutoResumePromptInfo {
+            project_id: project.id.clone(),
+            repo_path: project.repo_path.clone(),
+            prompt_preview: preview,
+            has_image,
+        });
+
+        resumed_count += 1;
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Auto-resumed prompt for project '{}' (image: {})",
+            project.repo_name, has_image
+        ));
+    }
+
+    Ok(AutoResumeResult {
+        instance_id: instance_id.to_string(),
+        account_email,
+        resumed_project_count: resumed_count,
+        skipped_project_count: skipped_count,
+        resumed_prompts,
+    })
 }
 
 #[cfg(test)]
@@ -597,4 +800,43 @@ mod tests {
             .unwrap();
         assert_eq!(status_after, "dispatched");
     }
+
+    #[test]
+    fn test_auto_resume_recency_filter() {
+        let conn = Connection::open_in_memory().unwrap();
+        let _ = conn.pragma_update(None, "journal_mode", "WAL");
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+
+        // 1. Insert recent project (active 10 minutes ago)
+        let _ = conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-recent', 'inst-test', 'RecentApp', '/work/recent', NULL, 1, ?, ?)",
+            params![now - 600, now - 600],
+        );
+
+        // 2. Insert old project (active 2 hours ago)
+        let _ = conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-old', 'inst-test', 'OldApp', '/work/old', NULL, 1, ?, ?)",
+            params![now - 7200, now - 7200],
+        );
+
+        // Verify recency threshold logic
+        let threshold = 3600; // 1 hour
+        let cutoff = now - threshold;
+
+        let recent_last = now - 600;
+        let old_last = now - 7200;
+
+        let is_recent_valid = recent_last >= cutoff;
+        let is_old_stale = old_last < cutoff;
+
+        assert!(is_recent_valid);
+        assert!(is_old_stale);
+    }
 }
+

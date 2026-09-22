@@ -1734,3 +1734,55 @@ pub fn get_antigravity_cli_executable_path() -> Option<std::path::PathBuf> {
 
     None
 }
+
+/// Bring an instance window to the foreground by PID
+#[cfg(target_os = "windows")]
+pub fn focus_instance_process(pid: u32) -> bool {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let ps_cmd = format!(
+        "$ws = New-Object -ComObject WScript.Shell; $res = $ws.AppActivate({}); exit $(if ($res) {{ 0 }} else {{ 1 }})",
+        pid
+    );
+
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
+    match output {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn focus_instance_process(pid: u32) -> bool {
+    let script = format!(
+        "tell application \"System Events\" to set frontmost of (first process whose unix id is {}) to true",
+        pid
+    );
+    let output = Command::new("osascript")
+        .args(["-e", &script])
+        .output();
+    match output {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn focus_instance_process(pid: u32) -> bool {
+    let output = Command::new("xdotool")
+        .args(["search", "--pid", &pid.to_string(), "windowactivate"])
+        .output();
+    match output {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub fn focus_instance_process(_pid: u32) -> bool {
+    false
+}
+

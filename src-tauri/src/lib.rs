@@ -899,6 +899,7 @@ pub fn run() {
             commands::list_running_projects,
             commands::list_backed_up_prompts,
             commands::clean_and_restart_workspace,
+            commands::resume_recent_project_prompts,
             // Email and Mailbox Management commands
             commands::get_email_settings,
             commands::save_email_settings,

@@ -27,6 +27,10 @@ const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     target_model: 'gemini-pro',
     has_auto_resume: true,
     cooldown_seconds: 180,
+    auto_resume_recent_prompts: true,
+    auto_focus_window: true,
+    watchdog_interval_seconds: 120,
+    prompt_recency_threshold_seconds: 3600,
 };
 
 export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ config, onChange }) => {
@@ -243,6 +247,30 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 />
                                 <label htmlFor="auto_ff_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                                     Auto-trigger Fast-Forward when credits drop &le; 12% (Highest credit candidate)
+                                </label>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="auto_resume_recent_cb"
+                                    checked={currentConfig.auto_resume_recent_prompts ?? true}
+                                    onChange={(e) => onChange({ ...currentConfig, auto_resume_recent_prompts: e.target.checked })}
+                                    className="checkbox checkbox-sm checkbox-accent rounded"
+                                />
+                                <label htmlFor="auto_resume_recent_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    Auto-Resume Recent Active Prompts on Fast-Forward (&lt; 1h with images)
+                                </label>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="auto_focus_cb"
+                                    checked={currentConfig.auto_focus_window ?? true}
+                                    onChange={(e) => onChange({ ...currentConfig, auto_focus_window: e.target.checked })}
+                                    className="checkbox checkbox-sm checkbox-info rounded"
+                                />
+                                <label htmlFor="auto_focus_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    2-Minute IDE Crash &amp; Focus Watchdog (Auto-focus PID &amp; Auto-recover)
                                 </label>
                             </div>
                         </div>

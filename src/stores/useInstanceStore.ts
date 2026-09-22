@@ -36,6 +36,7 @@ interface InstanceState {
     rotateToNextBestProfile: (sourceInstanceId?: string) => Promise<InstanceStatus>;
     smartRotateProfileAccount: (targetInstanceId?: string) => Promise<{ accountEmail: string; instanceName: string; daysUntilRefill: number }>;
     cleanAndRestartWorkspace: () => Promise<string>;
+    resumeRecentProjectPrompts: (instanceId?: string) => Promise<instanceService.AutoResumeResult>;
 }
 
 export const useInstanceStore = create<InstanceState>((set, get) => ({
@@ -54,9 +55,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 instanceService.listInstances(),
                 instanceService.getActiveInstance(),
             ]);
-            set({ instances, activeInstanceId: activeId, isLoading: false, error: null });
+            set({ instances, activeInstanceId: activeId, isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to fetch instances' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.fetchInstances' });
         }
     },
 
@@ -65,18 +67,16 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const status = await instanceService.getAutoSwitcherStatus();
             set({ switcherStatus: status });
         } catch (err: any) {
-            console.error('Failed to fetch switcher status:', err);
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.fetchSwitcherStatus' });
         }
     },
 
     updateSwitcherConfig: async (config: AutoProfileSwitcherConfig) => {
-        set({ isLoading: true, error: null });
         try {
             await instanceService.updateAutoSwitcherConfig(config);
             await get().fetchSwitcherStatus();
-            set({ isLoading: false });
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to update switcher config' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.updateSwitcherConfig' });
             throw err;
         }
     },
@@ -84,12 +84,16 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     triggerManualRotation: async () => {
         set({ isLoading: true, error: null });
         try {
-            const msg = await instanceService.triggerManualProfileRotation();
-            await Promise.all([get().fetchInstances(), get().fetchSwitcherStatus()]);
+            const result = await instanceService.triggerManualProfileRotation();
+            await Promise.all([
+                get().fetchInstances(true),
+                get().fetchSwitcherStatus(),
+            ]);
             set({ isLoading: false });
-            return msg;
+            return result;
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to trigger manual rotation' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to trigger profile rotation' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.triggerManualRotation' });
             throw err;
         }
     },
@@ -98,11 +102,12 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const config = await instanceService.createInstance(name);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
             return config;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to create instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.createInstance' });
             throw err;
         }
     },
@@ -111,11 +116,12 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const config = await instanceService.copyInstance(sourceId, targetName, cloneMode);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
             return config;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to copy instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.copyInstance' });
             throw err;
         }
     },
@@ -124,11 +130,12 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const config = await instanceService.renameInstance(instanceId, newName);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
             return config;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to rename instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.renameInstance' });
             throw err;
         }
     },
@@ -137,31 +144,37 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await instanceService.deleteInstance(instanceId);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to delete instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.deleteInstance' });
             throw err;
         }
     },
 
     wipeSession: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
         try {
-            await instanceService.wipeInstanceSession(instanceId);
-            await get().fetchInstances();
+            await instanceService.wipeSession(instanceId);
+            await get().fetchInstances(true);
+            set({ isLoading: false });
         } catch (err: any) {
-            set({ error: err?.toString() || 'Failed to wipe session' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to wipe session' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.wipeSession' });
             throw err;
         }
     },
 
     launchInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
         try {
             await instanceService.launchInstance(instanceId);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
+            set({ isLoading: false });
         } catch (err: any) {
-            set({ error: err?.toString() || 'Failed to launch instance' });
-            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'launchInstance' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to launch instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.launchInstance' });
             throw err;
         }
     },
@@ -169,13 +182,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     cloneInstanceExecutable: async (instanceId: string) => {
         set({ isLoading: true, error: null });
         try {
-            const clonedPath = await instanceService.cloneInstanceExecutable(instanceId);
-            await get().fetchInstances();
+            const path = await instanceService.cloneInstanceExecutable(instanceId);
+            await get().fetchInstances(true);
             set({ isLoading: false });
-            return clonedPath;
+            return path;
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to clone executable' });
-            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'cloneInstanceExecutable' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to clone instance executable' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.cloneInstanceExecutable' });
             throw err;
         }
     },
@@ -184,30 +197,36 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await instanceService.setInstanceExecutable(instanceId, executablePath);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to set executable path' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to set instance executable' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.setInstanceExecutable' });
             throw err;
         }
     },
 
     closeInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
         try {
             await instanceService.closeInstance(instanceId);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
+            set({ isLoading: false });
         } catch (err: any) {
-            set({ error: err?.toString() || 'Failed to close instance' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to close instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.closeInstance' });
             throw err;
         }
     },
 
     setActiveInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
         try {
             await instanceService.setActiveInstance(instanceId);
-            set({ activeInstanceId: instanceId });
+            set({ activeInstanceId: instanceId, isLoading: false });
         } catch (err: any) {
-            set({ error: err?.toString() || 'Failed to set active instance' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to set active instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.setActiveInstance' });
             throw err;
         }
     },
@@ -216,36 +235,58 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await instanceService.switchAccountToInstance(accountId, instanceId);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to switch account' });
-            useErrorStore.getState().captureError(err, { source: 'instance', triggerAction: 'switchAccountToInstance' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to switch account to instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.switchAccountToInstance' });
             throw err;
         }
     },
 
     exportInstancesJson: async () => {
-        return await instanceService.exportInstancesJson();
+        try {
+            return await instanceService.exportInstancesJson();
+        } catch (err: any) {
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.exportInstancesJson' });
+            throw err;
+        }
     },
 
     importInstancesJson: async (jsonContent: string) => {
         set({ isLoading: true, error: null });
         try {
             const configs = await instanceService.importInstancesJson(jsonContent);
-            await get().fetchInstances();
+            await get().fetchInstances(true);
             set({ isLoading: false });
             return configs;
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to import instances JSON' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to import instances' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.importInstancesJson' });
             throw err;
         }
     },
 
-    smartPlayInstance: async (targetInstanceId?: string) => {
+    smartPlayInstance: async (instanceId?: string) => {
         set({ isLoading: true, error: null });
         try {
-            const instId = targetInstanceId || get().activeInstanceId || 'default';
+            const instId = instanceId || get().activeInstanceId || 'default';
+            const cur = get().instances.find(i => i.config.id === instId);
+            const instanceName = cur?.config.name || instId;
+
+            const isAlreadyRunning = cur?.is_running;
+            if (isAlreadyRunning) {
+                set({ isLoading: false });
+                return {
+                    accountEmail: cur?.config.bound_email || 'Already Running',
+                    instanceName,
+                };
+            }
+
+            const activeInUseAccountIds = get()
+                .instances.filter(i => i.is_running && i.config.bound_account_id)
+                .map(i => i.config.bound_account_id as string);
+
             const { useAccountStore } = await import('./useAccountStore');
             let accounts = useAccountStore.getState().accounts;
             const hasAccounts = accounts.length > 0;
@@ -253,34 +294,39 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 await useAccountStore.getState().fetchAccounts();
                 accounts = useAccountStore.getState().accounts;
             }
-            const bestAccount = instanceService.findBestSmartPlayAccount(accounts);
 
-            const hasBest = Boolean(bestAccount);
-            if (!hasBest) {
-                await instanceService.launchInstance(instId);
-                await get().fetchInstances(true);
-                set({ isLoading: false });
-                const cur = get().instances.find(i => i.config.id === instId);
-                return {
-                    accountEmail: 'None',
-                    instanceName: cur?.config.name || 'Instance',
-                };
+            let candidate = instanceService.pickBestCandidateAccount(
+                accounts,
+                activeInUseAccountIds,
+                cur?.config.bound_account_id
+            );
+
+            if (!candidate) {
+                candidate = accounts.find(a => !activeInUseAccountIds.includes(a.id)) || accounts[0];
             }
 
-            await instanceService.switchAccountToInstance(bestAccount!.id, instId);
+            if (!candidate) {
+                set({ isLoading: false });
+                throw new Error('No available account found to play this instance');
+            }
+
+            await instanceService.switchAccountToInstance(candidate.id, instId);
+
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchCurrentAccount(),
+                useAccountStore.getState().fetchAccounts(),
             ]);
 
-            set({ isLoading: false });
-            const cur = get().instances.find(i => i.config.id === instId);
+            set({ activeInstanceId: instId, isLoading: false });
+
             return {
-                accountEmail: bestAccount!.email,
-                instanceName: cur?.config.name || 'Instance',
+                accountEmail: candidate.email,
+                instanceName,
             };
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to smart play instance' });
+            set({ isLoading: false, error: err?.toString() || 'Failed to play instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.smartPlayInstance' });
             throw err;
         }
     },
@@ -288,25 +334,23 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     rotateToNextBestProfile: async (sourceInstanceId?: string) => {
         set({ isLoading: true, error: null });
         try {
-            await get().fetchInstances(true);
-            const list = get().instances;
-            const currentId = sourceInstanceId || get().activeInstanceId;
-            const best = instanceService.findBestRotationProfile(list, currentId);
-            if (!best) {
-                throw new Error('No candidate profile available for rotation');
+            const currentActiveId = sourceInstanceId || get().activeInstanceId || 'default';
+            const instances = get().instances;
+
+            const nextBest = instanceService.selectNextBestProfile(instances, currentActiveId);
+            if (!nextBest) {
+                set({ isLoading: false });
+                throw new Error('No available idle profile found for rotation');
             }
 
-            // Close previous instance profile if different
-            if (currentId && currentId !== best.config.id) {
-                await instanceService.closeInstance(currentId);
-            }
+            await instanceService.closeInstance(currentActiveId);
+            await instanceService.setActiveInstance(nextBest.config.id);
+            await instanceService.launchInstance(nextBest.config.id);
 
-            // Set active and launch candidate profile
-            await instanceService.setActiveInstance(best.config.id);
-            await instanceService.launchInstance(best.config.id);
             await get().fetchInstances(true);
-            set({ activeInstanceId: best.config.id, isLoading: false });
-            return best;
+            set({ activeInstanceId: nextBest.config.id, isLoading: false });
+
+            return nextBest;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to rotate profile' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.rotateToNextBestProfile' });
@@ -395,6 +439,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 6. Inject verified account tokens into target profile state.vscdb and launch
             await instanceService.switchAccountToInstance(verified.account.id, instId);
 
+            // 6.5 Auto-resume recent active prompts (<1h) if enabled
+            try {
+                await instanceService.resumeRecentProjectPrompts(instId);
+            } catch (resumeErr) {
+                console.warn('[useInstanceStore] Auto-resume recent prompts notice:', resumeErr);
+            }
+
             // 7. Synchronize UI state
             await Promise.all([
                 get().fetchInstances(true),
@@ -426,6 +477,16 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to clean and restart workspace' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.cleanAndRestartWorkspace' });
+            throw err;
+        }
+    },
+
+    resumeRecentProjectPrompts: async (instanceId?: string) => {
+        try {
+            const instId = instanceId || get().activeInstanceId || 'default';
+            return await instanceService.resumeRecentProjectPrompts(instId);
+        } catch (err: any) {
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.resumeRecentProjectPrompts' });
             throw err;
         }
     },

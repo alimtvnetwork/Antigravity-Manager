@@ -244,6 +244,14 @@ fn default_true() -> bool {
     true
 }
 
+fn default_watchdog_interval() -> u32 {
+    120
+}
+
+fn default_recency_threshold() -> u32 {
+    3600
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -261,6 +269,14 @@ pub struct AutoProfileSwitcherConfig {
     pub critical_threshold_percent: f64,
     #[serde(default = "default_true")]
     pub auto_fast_forward_on_critical: bool,
+    #[serde(default = "default_true")]
+    pub auto_resume_recent_prompts: bool,
+    #[serde(default = "default_true")]
+    pub auto_focus_window: bool,
+    #[serde(default = "default_watchdog_interval")]
+    pub watchdog_interval_seconds: u32,
+    #[serde(default = "default_recency_threshold")]
+    pub prompt_recency_threshold_seconds: u32,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -276,6 +292,10 @@ impl Default for AutoProfileSwitcherConfig {
             critical_interval_seconds: 60,
             critical_threshold_percent: 12.0,
             auto_fast_forward_on_critical: true,
+            auto_resume_recent_prompts: true,
+            auto_focus_window: true,
+            watchdog_interval_seconds: 120,
+            prompt_recency_threshold_seconds: 3600,
         }
     }
 }

@@ -143,6 +143,35 @@ export interface AutoProfileSwitcherConfig {
     critical_interval_seconds?: number;
     critical_threshold_percent?: number;
     auto_fast_forward_on_critical?: boolean;
+    auto_resume_recent_prompts?: boolean;
+    auto_focus_window?: boolean;
+    watchdog_interval_seconds?: number;
+    prompt_recency_threshold_seconds?: number;
+}
+
+export interface AutoResumePromptInfo {
+    project_id: string;
+    repo_path: string;
+    prompt_preview: string;
+    has_image: boolean;
+}
+
+export interface AutoResumeResult {
+    instance_id: string;
+    account_email: string;
+    resumed_project_count: number;
+    skipped_project_count: number;
+    resumed_prompts: AutoResumePromptInfo[];
+}
+
+export async function resumeRecentProjectPrompts(
+    instanceId?: string,
+    maxAgeSeconds?: number
+): Promise<AutoResumeResult> {
+    return await invoke('resume_recent_project_prompts', {
+        instanceId: instanceId || null,
+        maxAgeSeconds: maxAgeSeconds || null,
+    });
 }
 
 export interface InstanceQuotaSummary {

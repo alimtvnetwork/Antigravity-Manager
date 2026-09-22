@@ -566,6 +566,13 @@ pub async fn execute_profile_rotation(
     // Step 3: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
     let _ = crate::modules::repo_db::dispatch_running_prompts(inst_id);
 
+    // Auto-resume recent active prompts (<1h) if configured
+    let app_config = config::load_app_config().unwrap_or_default();
+    if app_config.auto_profile_switcher.auto_resume_recent_prompts {
+        let threshold = app_config.auto_profile_switcher.prompt_recency_threshold_seconds as i64;
+        let _ = crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold);
+    }
+
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();
     state.last_switch_timestamp = Some(now);
@@ -853,6 +860,77 @@ pub fn get_status() -> AutoSwitcherStatus {
     }
 }
 
+/// Check active instance health, focus window if running, and auto-recover on crash
+pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
+    let app_config = config::load_app_config()?;
+    let switcher_cfg = app_config.auto_profile_switcher;
+    if !switcher_cfg.is_enabled {
+        return Ok(());
+    }
+
+    let registry = instance::load_registry()?;
+    let active_id = registry.active_instance_id.clone();
+    let active_inst = match registry.instances.iter().find(|i| i.id == active_id) {
+        Some(inst) => inst,
+        None => return Ok(()),
+    };
+
+    let pids = instance::find_pids_for_data_dir(&active_inst.data_dir, active_inst.is_default);
+    let is_running = !pids.is_empty();
+
+    if is_running {
+        // Antigravity IDE is running: bring window to foreground focus if requested
+        if switcher_cfg.auto_focus_window {
+            if let Some(&pid) = pids.first() {
+                let focused = crate::modules::process::focus_instance_process(pid);
+                if focused {
+                    logger::log_info(&format!(
+                        "[CrashWatchdog] Focused running IDE window for instance '{}' (PID {})",
+                        active_inst.id, pid
+                    ));
+                }
+            }
+        }
+    } else {
+        // Antigravity IDE is NOT running or crashed!
+        logger::log_warn(&format!(
+            "[CrashWatchdog] Active IDE instance '{}' is not running or crashed. Initiating fast-forward recovery...",
+            active_inst.id
+        ));
+
+        // 1. Clean stale lockfiles in target IDE profile
+        crate::modules::process::clean_antigravity_lockfiles(Some("ide"));
+
+        // 2. Trigger fast-forward profile rotation and restart
+        match trigger_manual_rotation().await {
+            Ok(msg) => {
+                logger::log_info(&format!("[CrashWatchdog] Fast-forward recovery completed: {}", msg));
+
+                // 3. If auto_resume_recent_prompts is enabled:
+                if switcher_cfg.auto_resume_recent_prompts {
+                    let threshold = switcher_cfg.prompt_recency_threshold_seconds as i64;
+                    match crate::modules::repo_db::auto_resume_recent_prompts(&active_inst.id, threshold) {
+                        Ok(res) => {
+                            logger::log_info(&format!(
+                                "[CrashWatchdog] Auto-resumed {} recent projects (< 1h) with prompts (skipped {})",
+                                res.resumed_project_count, res.skipped_project_count
+                            ));
+                        }
+                        Err(e) => {
+                            logger::log_warn(&format!("[CrashWatchdog] Prompt auto-resume warning: {}", e));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                logger::log_error(&format!("[CrashWatchdog] Fast-forward recovery failed: {}", e));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Start background auto-switcher daemon
 pub fn start_auto_switcher() {
     tauri::async_runtime::spawn(async move {
@@ -881,6 +959,20 @@ pub fn start_auto_switcher() {
 
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));
+            }
+        }
+    });
+
+    // Spawn dedicated 2-minute IDE Crash Recovery & Focus Watchdog
+    tauri::async_runtime::spawn(async move {
+        logger::log_info("[CrashWatchdog] 2-Minute IDE crash recovery & focus watchdog started.");
+        loop {
+            let app_config = config::load_app_config().unwrap_or_default();
+            let interval = app_config.auto_profile_switcher.watchdog_interval_seconds.max(30);
+            tokio::time::sleep(Duration::from_secs(interval as u64)).await;
+
+            if let Err(e) = check_and_recover_crashed_instance().await {
+                logger::log_warn(&format!("[CrashWatchdog] Error during crash watchdog cycle: {}", e));
             }
         }
     });

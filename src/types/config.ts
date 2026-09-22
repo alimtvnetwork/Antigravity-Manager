@@ -206,6 +206,10 @@ export interface AutoProfileSwitcherConfig {
     critical_interval_seconds?: number;
     critical_threshold_percent?: number;
     auto_fast_forward_on_critical?: boolean;
+    auto_resume_recent_prompts?: boolean;
+    auto_focus_window?: boolean;
+    watchdog_interval_seconds?: number;
+    prompt_recency_threshold_seconds?: number;
 }
 
 // ============================================================================

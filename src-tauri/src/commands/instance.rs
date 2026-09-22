@@ -120,3 +120,16 @@ pub fn list_backed_up_prompts() -> Result<Vec<crate::modules::repo_db::ActivePro
 pub fn clean_and_restart_workspace() -> Result<String, String> {
     crate::modules::process::clean_and_restart_workspace(None)
 }
+
+#[tauri::command]
+pub fn resume_recent_project_prompts(
+    instance_id: Option<String>,
+    max_age_seconds: Option<i64>,
+) -> Result<crate::modules::repo_db::AutoResumeResult, String> {
+    let inst_id = instance_id.unwrap_or_else(|| {
+        crate::modules::instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
+    });
+    let max_age = max_age_seconds.unwrap_or(3600);
+    crate::modules::repo_db::auto_resume_recent_prompts(&inst_id, max_age)
+}
+
