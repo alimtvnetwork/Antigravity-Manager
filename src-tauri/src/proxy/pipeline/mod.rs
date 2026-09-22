@@ -12,8 +12,10 @@ pub mod outbound;
 pub mod policy;
 pub mod usage;
 
+#[allow(unused_imports)]
 pub use events::CanonicalStreamEvent;
 pub use inbound::InboundThinkingPipeline;
+#[allow(unused_imports)]
 pub use outbound::{CanonicalEgressPayload, OutboundThinkingPipeline};
 pub use policy::ProxyProtocol;
 pub use usage::CanonicalUsage;

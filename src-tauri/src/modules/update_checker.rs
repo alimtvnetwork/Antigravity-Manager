@@ -634,7 +634,16 @@ pub async fn run_installer_update() -> Result<String, String> {
                 stderr.trim().to_string()
             } else if !stdout.trim().is_empty() {
                 let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
-                lines.iter().rev().take(6).cloned().collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" | ")
+                lines
+                    .iter()
+                    .rev()
+                    .take(6)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect::<Vec<_>>()
+                    .join(" | ")
             } else {
                 format!("Process exited with status code {:?}", output.status.code())
             };
@@ -680,7 +689,16 @@ pub async fn run_installer_update() -> Result<String, String> {
                 stderr.trim().to_string()
             } else if !stdout.trim().is_empty() {
                 let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
-                lines.iter().rev().take(6).cloned().collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" | ")
+                lines
+                    .iter()
+                    .rev()
+                    .take(6)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect::<Vec<_>>()
+                    .join(" | ")
             } else {
                 format!("Process exited with status code {:?}", output.status.code())
             };

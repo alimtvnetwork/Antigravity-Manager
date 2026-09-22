@@ -3,7 +3,7 @@
 
 #![allow(dead_code)]
 
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::modules::iterative_codec;
 use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint, TableVerificationResult};
 use crate::modules::supabase_schema;

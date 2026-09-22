@@ -13,7 +13,7 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex, OnceLock};
-use tokio::sync::{oneshot, watch, RwLock};
+use tokio::sync::{watch, RwLock};
 use tracing::{debug, error};
 
 // [FIX] Global accounts queue pending reload

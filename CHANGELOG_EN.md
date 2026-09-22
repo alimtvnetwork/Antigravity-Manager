@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.59.0 (2026-09-22)**:
+        -   **[Release v4.59.0] Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32)**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Synchronize test data dir mutex, embed windows manifest, and fix CI test runner (RCA-32).
     *   **v4.58.0 (2026-09-22)**:
         -   **[Release v4.58.0] Fix navbar transfer button delegation and error stack tracing**:
             -   **Update System**: Automated release and version synchronization across all manifests.

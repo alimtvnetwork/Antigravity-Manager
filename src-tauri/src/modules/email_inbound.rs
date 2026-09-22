@@ -6,6 +6,7 @@
 
 use crate::modules::email_sender::{self, EmailStream};
 use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
+#[cfg(target_os = "windows")]
 use crate::utils::command::CommandExtWrapper;
 use chrono::Utc;
 use std::io::{Read, Write};

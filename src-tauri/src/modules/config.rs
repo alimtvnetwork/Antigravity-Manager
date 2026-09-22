@@ -277,6 +277,9 @@ mod tests {
 
     #[test]
     fn test_load_app_config_self_heals_empty_string() {
+        let _env_guard = crate::modules::account::TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir =
             std::env::temp_dir().join(format!("test_config_empty_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
@@ -301,6 +304,9 @@ mod tests {
 
     #[test]
     fn test_load_app_config_recovers_from_backup() {
+        let _env_guard = crate::modules::account::TEST_DATA_DIR_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir =
             std::env::temp_dir().join(format!("test_config_bak_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);

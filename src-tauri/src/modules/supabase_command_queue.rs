@@ -5,7 +5,7 @@
 
 use crate::error::AppError;
 use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint};
-use crate::modules::supabase_sync::{self, SupabaseConfig};
+use crate::modules::supabase_sync::SupabaseConfig;
 use crate::utils::command::CommandExtWrapper;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

@@ -416,6 +416,9 @@ mod tests {
         let dir = TestDataDir::new();
         let previous = std::env::var_os("ABV_DATA_DIR");
         std::env::set_var("ABV_DATA_DIR", dir.path());
+        if let Ok(mut guard) = data_dir_override_slot().write() {
+            *guard = None;
+        }
 
         // Create a dummy account index with some accounts
         let now = chrono::Utc::now().timestamp();
