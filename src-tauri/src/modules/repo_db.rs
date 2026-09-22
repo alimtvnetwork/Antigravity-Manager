@@ -133,7 +133,10 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
     .map_err(|e| format!("Failed to create active_prompts table: {}", e))?;
 
     // Migration: add image_payload column if it doesn't exist yet
-    let _ = conn.execute("ALTER TABLE active_prompts ADD COLUMN image_payload TEXT", []);
+    let _ = conn.execute(
+        "ALTER TABLE active_prompts ADD COLUMN image_payload TEXT",
+        [],
+    );
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_active_prompts_instance_status 
@@ -305,7 +308,11 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                     if content.contains("data:image/") {
                                         if let Some(start) = content.find("data:image/") {
                                             let tail = &content[start..];
-                                            let end = tail.find('"').or_else(|| tail.find('\'')).or_else(|| tail.find(' ')).unwrap_or(tail.len());
+                                            let end = tail
+                                                .find('"')
+                                                .or_else(|| tail.find('\''))
+                                                .or_else(|| tail.find(' '))
+                                                .unwrap_or(tail.len());
                                             img_payload = Some(tail[..end].to_string());
                                         }
                                     }
@@ -839,4 +846,3 @@ mod tests {
         assert!(is_old_stale);
     }
 }
-

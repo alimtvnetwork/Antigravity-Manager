@@ -79,5 +79,5 @@ Master directory of architectural and execution plans.
 - [01-ide-crash-recovery-and-prompt-resume.md](completed/01-ide-crash-recovery-and-prompt-resume.md): 2-minute IDE crash & focus watchdog, PID-tracked foreground window focus, auto-failover to fast-forward profile rotation, recent prompt & project auto-resume (< 1h) with image payload recovery, and Windows CI test entrypoint fix via Common-Controls 6.0 manifest embedding.
 - [02-add-remove-programs-branding-and-v4-54-0.md](completed/02-add-remove-programs-branding-and-v4-54-0.md): Windows Add/Remove Programs (Installed Apps) branding update to 'Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC', NSIS installerHooks integration, live registry synchronization, and v4.54.0 minor version bump.
 - [03-ide-crash-recovery-and-prompt-resume.md](completed/03-ide-crash-recovery-and-prompt-resume.md): Enhanced 2-minute IDE crash & focus watchdog, multi-PID process tree foreground focus with Win32 ShowWindow(SW_RESTORE) fallback, Fast-Forward UI prompt resume counter feedback, and configurable recency cutoff window (30m, 1h, 2h, 5h, 1d).
-
+- [04-cicd-typescript-instance-exports-and-rustfmt.md](completed/04-cicd-typescript-instance-exports-and-rustfmt.md): Resolve missing TypeScript exports in instanceService and rustfmt formatting across src-tauri.
 

@@ -1803,9 +1803,7 @@ pub fn focus_instance_process(pid: u32) -> bool {
         "tell application \"System Events\" to set frontmost of (first process whose unix id is {}) to true",
         pid
     );
-    let output = Command::new("osascript")
-        .args(["-e", &script])
-        .output();
+    let output = Command::new("osascript").args(["-e", &script]).output();
     match output {
         Ok(out) => out.status.success(),
         Err(_) => false,
@@ -1841,4 +1839,3 @@ pub fn focus_instance_pids(_pids: &[u32]) -> bool {
 pub fn focus_instance_process(_pid: u32) -> bool {
     false
 }
-

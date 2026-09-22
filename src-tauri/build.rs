@@ -39,7 +39,10 @@ fn copy_dll_recursive(src: &std::path::Path, dst_deps: &std::path::Path) -> std:
             } else if path.is_file() {
                 let is_webview2 = path
                     .file_name()
-                    .map(|n| n.to_string_lossy().eq_ignore_ascii_case("WebView2Loader.dll"))
+                    .map(|n| {
+                        n.to_string_lossy()
+                            .eq_ignore_ascii_case("WebView2Loader.dll")
+                    })
                     .unwrap_or(false);
                 if is_webview2 {
                     let _ = std::fs::copy(&path, dst_deps.join("WebView2Loader.dll"));
@@ -49,5 +52,3 @@ fn copy_dll_recursive(src: &std::path::Path, dst_deps: &std::path::Path) -> std:
     }
     Ok(())
 }
-
-

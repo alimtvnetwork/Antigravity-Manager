@@ -132,4 +132,3 @@ pub fn resume_recent_project_prompts(
     let max_age = max_age_seconds.unwrap_or(3600);
     crate::modules::repo_db::auto_resume_recent_prompts(&inst_id, max_age)
 }
-

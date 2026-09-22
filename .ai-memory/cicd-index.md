@@ -22,6 +22,7 @@ Tracks every CI/CD validator finding (CODE-RED-*, STYLE-*) encountered during se
 | 05 | [Bulk STYLE-001 / STYLE-004 newline violations across markdown highlighter](resolved-issues/05-markdown-highlighter-newline-violations.md) | ✅ Solved | STYLE-001, STYLE-003, STYLE-004 | 2026-04-23 |
 | 06 | [Version drift after `package.json` bump (forgot `npm run sync`)](resolved-issues/06-version-drift-after-package-bump.md) | ✅ Solved | version-drift | 2026-04-23 |
 | 07 | [Cross-spec missing-file checker false-positives in `26-spec-outsides`](resolved-issues/07-cross-spec-missing-file-link-checker.md) | ✅ Solved | missing-file | 2026-04-23 |
+| 29 | [TypeScript instanceService missing exports & rustfmt](cicd-issues/29-typescript-instance-exports-and-rustfmt-rca.md) | ✅ Solved | tsc, rustfmt | 2026-09-22 |
 
 ---
 

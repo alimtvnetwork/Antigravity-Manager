@@ -569,7 +569,9 @@ pub async fn execute_profile_rotation(
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();
     if app_config.auto_profile_switcher.auto_resume_recent_prompts {
-        let threshold = app_config.auto_profile_switcher.prompt_recency_threshold_seconds as i64;
+        let threshold = app_config
+            .auto_profile_switcher
+            .prompt_recency_threshold_seconds as i64;
         let _ = crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold);
     }
 
@@ -903,12 +905,18 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
         // 2. Trigger fast-forward profile rotation and restart
         match trigger_manual_rotation().await {
             Ok(msg) => {
-                logger::log_info(&format!("[CrashWatchdog] Fast-forward recovery completed: {}", msg));
+                logger::log_info(&format!(
+                    "[CrashWatchdog] Fast-forward recovery completed: {}",
+                    msg
+                ));
 
                 // 3. If auto_resume_recent_prompts is enabled:
                 if switcher_cfg.auto_resume_recent_prompts {
                     let threshold = switcher_cfg.prompt_recency_threshold_seconds as i64;
-                    match crate::modules::repo_db::auto_resume_recent_prompts(&active_inst.id, threshold) {
+                    match crate::modules::repo_db::auto_resume_recent_prompts(
+                        &active_inst.id,
+                        threshold,
+                    ) {
                         Ok(res) => {
                             logger::log_info(&format!(
                                 "[CrashWatchdog] Auto-resumed {} recent projects (< 1h) with prompts (skipped {})",
@@ -916,13 +924,19 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
                             ));
                         }
                         Err(e) => {
-                            logger::log_warn(&format!("[CrashWatchdog] Prompt auto-resume warning: {}", e));
+                            logger::log_warn(&format!(
+                                "[CrashWatchdog] Prompt auto-resume warning: {}",
+                                e
+                            ));
                         }
                     }
                 }
             }
             Err(e) => {
-                logger::log_error(&format!("[CrashWatchdog] Fast-forward recovery failed: {}", e));
+                logger::log_error(&format!(
+                    "[CrashWatchdog] Fast-forward recovery failed: {}",
+                    e
+                ));
             }
         }
     }
@@ -967,11 +981,17 @@ pub fn start_auto_switcher() {
         logger::log_info("[CrashWatchdog] 2-Minute IDE crash recovery & focus watchdog started.");
         loop {
             let app_config = config::load_app_config().unwrap_or_default();
-            let interval = app_config.auto_profile_switcher.watchdog_interval_seconds.max(30);
+            let interval = app_config
+                .auto_profile_switcher
+                .watchdog_interval_seconds
+                .max(30);
             tokio::time::sleep(Duration::from_secs(interval as u64)).await;
 
             if let Err(e) = check_and_recover_crashed_instance().await {
-                logger::log_warn(&format!("[CrashWatchdog] Error during crash watchdog cycle: {}", e));
+                logger::log_warn(&format!(
+                    "[CrashWatchdog] Error during crash watchdog cycle: {}",
+                    e
+                ));
             }
         }
     });

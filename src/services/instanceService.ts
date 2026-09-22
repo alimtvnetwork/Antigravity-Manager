@@ -55,6 +55,8 @@ export async function wipeInstanceSession(instanceId: string): Promise<void> {
     return await invoke('wipe_instance_session', { instanceId });
 }
 
+export const wipeSession = wipeInstanceSession;
+
 export async function launchInstance(instanceId: string): Promise<void> {
     try {
         return await invoke('launch_instance', { instanceId });
@@ -516,3 +518,17 @@ export function findSmartRotationAccount(
     if (!hasRanked) return null;
     return ranked[0];
 }
+
+export function pickBestCandidateAccount(
+    accounts: Account[],
+    activeInUseAccountIds: string[] = [],
+    currentAccountId?: string
+): Account | null {
+    const smart = findSmartRotationAccount(accounts, currentAccountId, activeInUseAccountIds);
+    if (smart?.account) {
+        return smart.account;
+    }
+    return findBestSmartPlayAccount(accounts);
+}
+
+export const selectNextBestProfile = findBestRotationProfile;
