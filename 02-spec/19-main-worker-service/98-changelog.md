@@ -1,3 +1,9 @@
+## v4.49.0 — 2026-09-22 (Fix rustfmt formatting and rust compilation errors)
+
+**Scope:** Version bump. Fix rustfmt formatting and rust compilation errors.
+
+---
+
 ## v4.48.0 — 2026-09-21 (Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening)
 
 **Scope:** Version bump. Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening.

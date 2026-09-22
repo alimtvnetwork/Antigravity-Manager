@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.49.0 (2026-09-22)**:
+        -   **[Release v4.49.0] Fix rustfmt formatting and rust compilation errors**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Fix rustfmt formatting and rust compilation errors.
     *   **v4.48.0 (2026-09-21)**:
         -   **[Release v4.48.0] Responsive UI, pinned window controls, error history actions, email ping & dual-interval polling, auto-rotation glassmorphism, and installer hardening**:
             -   **Update System**: Automated release and version synchronization across all manifests.
