@@ -138,8 +138,12 @@ fn parse_yaml_bundle(content: &str) -> Result<SupabaseExportBundle, AppError> {
                     "node_alias" => node_alias = val.to_string(),
                     "is_sync_enabled" => is_sync_enabled = val.parse().unwrap_or(false),
                     "auto_prune_root_mb" => auto_prune_root_mb = val.parse().unwrap_or(400),
-                    "auto_prune_secondary_mb" => auto_prune_secondary_mb = val.parse().unwrap_or(200),
-                    "heartbeat_interval_secs" => heartbeat_interval_secs = val.parse().unwrap_or(30),
+                    "auto_prune_secondary_mb" => {
+                        auto_prune_secondary_mb = val.parse().unwrap_or(200)
+                    }
+                    "heartbeat_interval_secs" => {
+                        heartbeat_interval_secs = val.parse().unwrap_or(30)
+                    }
                     _ => {}
                 }
             }

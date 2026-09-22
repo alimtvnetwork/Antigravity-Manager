@@ -29,3 +29,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [25-rust-compilation-and-release-asset-stamping-rca.md](.ai-memory/cicd-issues/25-rust-compilation-and-release-asset-stamping-rca.md)
 - [26-thinking-store-signature-truncation-sentinel-override-rca.md](.ai-memory/cicd-issues/26-thinking-store-signature-truncation-sentinel-override-rca.md)
 - [27-rustfmt-mod-command-formatting-drift-rca.md](.ai-memory/cicd-issues/27-rustfmt-mod-command-formatting-drift-rca.md)
+- [28-rustfmt-iterative-codec-and-compile-errors-rca.md](.ai-memory/cicd-issues/28-rustfmt-iterative-codec-and-compile-errors-rca.md)

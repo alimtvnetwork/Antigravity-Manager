@@ -72,7 +72,7 @@ pub fn detect_local_ip() -> String {
 
 /// Detect local machine hostname or saved custom node name
 pub fn detect_machine_name() -> String {
-    if let Ok(settings) = email_vault_db::get_email_settings() {
+    if let Ok(settings) = email_vault_db::get_notification_settings() {
         if !settings.local_machine_name.trim().is_empty() {
             return settings.local_machine_name.trim().to_string();
         }

@@ -86,19 +86,21 @@ pub async fn execute_and_report_command(
 
     // 2. Execute command
     #[cfg(target_os = "windows")]
-    let output_res = Command::new("powershell")
-        .args([
+    let output_res = {
+        let mut cmd_proc = Command::new("powershell");
+        cmd_proc.creation_flags_windows().args([
             "-NoProfile",
             "-NonInteractive",
             "-Command",
             &cmd.command_text,
-        ])
-        .output_hidden();
+        ]);
+        cmd_proc.output()
+    };
 
     #[cfg(not(target_os = "windows"))]
     let output_res = Command::new("sh")
         .args(["-c", &cmd.command_text])
-        .output_hidden();
+        .output();
 
     let (stdout, stderr, exit_code) = match output_res {
         Ok(out) => (

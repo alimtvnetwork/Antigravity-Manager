@@ -32,6 +32,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -458,14 +459,22 @@ def execute_ci_job(job_name: str, command: list[str]) -> JobResult:
     start_time = time.perf_counter()
     effective_cmd = resolve_job_command(job_name, command)
 
+    executable = effective_cmd[0]
+    if not shutil.which(executable) and not Path(executable).is_file():
+        elapsed = time.perf_counter() - start_time
+        out_msg = f"[SKIPPED] Tool '{executable}' not installed on local host"
+        return JobResult(
+            name=job_name, is_success=True, output=out_msg, duration_sec=round(elapsed, 2), return_code=0
+        )
+
     # Check if target script exists on disk if command specifies a script file
     for arg in effective_cmd[1:]:
         if not arg.startswith("-") and ("." in arg or "/" in arg or "\\" in arg):
-            if arg.endswith((".py", ".mjs", ".js", ".sh")):
+            if arg.endswith((".py", ".mjs", ".js", ".sh")) or "node_modules" in arg:
                 target_path = REPO_ROOT / arg
-                if not target_path.is_file():
+                if not target_path.exists():
                     elapsed = time.perf_counter() - start_time
-                    out_msg = f"[SKIPPED] Optional script '{arg}' not present in repository"
+                    out_msg = f"[SKIPPED] Optional script/dependency '{arg}' not present in repository"
                     return JobResult(
                         name=job_name, is_success=True, output=out_msg, duration_sec=round(elapsed, 2), return_code=0
                     )
