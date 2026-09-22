@@ -55,6 +55,7 @@
 ## Before writing code
 
 - `02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md`, why: authoritative specification for email dispatch, split security passwords vault, and remote execution bridge
+- `02-spec/21-app/17-email-intelligence-acknowledgment-and-universal-import-export.md`, why: authoritative specification for inbound email command intelligence, fuzzy typo matching, immediate acknowledgment receipts, and universal settings import/export with reversible multi-pass Base64 obfuscation
 - `02-spec/21-app/`, why: complete reverse-engineered and remediated application architecture, proxy protocols, SQLite schemas, and frontend UI specs
 - `spec/`, why: understand feature specifications
 

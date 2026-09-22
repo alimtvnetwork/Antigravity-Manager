@@ -127,6 +127,7 @@ The complete reverse-engineered architecture is documented across the following 
 | [14-automated-quota-polling-profile-switching-and-task-resumption.md](14-automated-quota-polling-profile-switching-and-task-resumption.md) | Auto Quota Polling & Task Recovery | Tokio polling daemon (15s–600s), low-quota threshold (<10%), best profile selection, task snapshot recovery |
 | [15-account-rotation-api-endpoint.md](15-account-rotation-api-endpoint.md) | Account Rotation API & Split Repo DB | HTTP endpoints (/api/accounts/rotate), split repo database, running prompts backup & direct dispatch |
 | [16-email-dispatch-mailbox-remote-management-and-split-security-db.md](16-email-dispatch-mailbox-remote-management-and-split-security-db.md) | Email Dispatch & Remote Control | Split database passwords vault, OpenSSH RSA identity, mailbox pool failover, and bidirectional remote control |
+| [17-email-intelligence-acknowledgment-and-universal-import-export.md](17-email-intelligence-acknowledgment-and-universal-import-export.md) | Email Intelligence & Universal Import/Export | Inbound fuzzy typo resolution, immediate acknowledgment receipts, and universal settings import/export with reversible multi-pass Base64 obfuscation |
 
 ---
 
