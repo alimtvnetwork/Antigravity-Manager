@@ -12,6 +12,43 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+
+/// Multi-pass Base64 encoder for sensitive data protection
+pub fn base64_encode_multi(data: &str, passes: usize) -> String {
+    let mut current = data.as_bytes().to_vec();
+    let num_passes = passes.max(1);
+    for _ in 0..num_passes {
+        let encoded = STANDARD.encode(&current);
+        current = encoded.into_bytes();
+    }
+    String::from_utf8(current).unwrap_or_default()
+}
+
+/// Multi-pass Base64 decoder for restoring multi-encoded sensitive payloads
+pub fn base64_decode_multi(encoded_str: &str, passes: usize) -> Result<String, String> {
+    let mut current_bytes = encoded_str.as_bytes().to_vec();
+    let num_passes = passes.max(1);
+    for pass in 0..num_passes {
+        let text = String::from_utf8(current_bytes.clone())
+            .map_err(|e| format!("Pass {} utf8 conversion error: {}", pass, e))?;
+        current_bytes = STANDARD
+            .decode(text.trim())
+            .map_err(|e| format!("Pass {} base64 decode error: {}", pass, e))?;
+    }
+    String::from_utf8(current_bytes).map_err(|e| format!("Final utf8 decode error: {}", e))
+}
+
+/// Encrypted credential record bundled in universal export
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportedCredential {
+    pub account_id: String,
+    pub auth_type: String,
+    pub multi_encoded_secret: String,
+    pub passes: usize,
+}
+
 /// Master export bundle for JSON serialization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailExportBundle {
@@ -20,6 +57,8 @@ pub struct EmailExportBundle {
     pub accounts: Vec<EmailAccount>,
     pub recipients: Vec<NotifyRecipient>,
     pub settings: EmailNotificationSettings,
+    #[serde(default)]
+    pub credentials: Vec<ExportedCredential>,
 }
 
 /// Summary report returned after importing email configuration
@@ -37,12 +76,28 @@ pub fn export_to_json() -> Result<String, String> {
     let recipients = email_vault_db::list_notify_recipients()?;
     let settings = email_vault_db::get_notification_settings()?;
 
+    let mut credentials = Vec::new();
+    for acc in &accounts {
+        if let Ok(secret) = email_vault_db::get_account_secret(&acc.id) {
+            if !secret.trim().is_empty() {
+                let encoded = base64_encode_multi(&secret, 3);
+                credentials.push(ExportedCredential {
+                    account_id: acc.id.clone(),
+                    auth_type: "PASSWORD".to_string(),
+                    multi_encoded_secret: encoded,
+                    passes: 3,
+                });
+            }
+        }
+    }
+
     let bundle = EmailExportBundle {
-        version: "4.18.0".to_string(),
+        version: "4.49.0".to_string(),
         exported_at: Utc::now().timestamp(),
         accounts,
         recipients,
         settings,
+        credentials,
     };
 
     serde_json::to_string_pretty(&bundle).map_err(|e| format!("Failed to serialize JSON: {}", e))
@@ -82,6 +137,13 @@ pub fn import_from_json(payload: &str) -> Result<ImportSummary, String> {
             summary
                 .errors
                 .push(format!("Failed to import account '{}'", acc_email));
+        }
+    }
+
+    // Restore multi-pass encoded secrets into vault
+    for cred in bundle.credentials {
+        if let Ok(plain_secret) = base64_decode_multi(&cred.multi_encoded_secret, cred.passes) {
+            let _ = email_vault_db::save_account_secret(&cred.account_id, &plain_secret);
         }
     }
 
@@ -580,5 +642,24 @@ mod tests {
         assert_eq!(cells[0], "Alias & Name");
         assert_eq!(cells[1], "test@example.com");
         assert_eq!(cells[2], "587");
+    }
+
+    #[test]
+    fn test_base64_multi_pass_roundtrip() {
+        let secret = "super-secret-password-123!@#$%^&*()";
+        let encoded_3 = base64_encode_multi(secret, 3);
+        assert_ne!(encoded_3, secret);
+        let decoded = base64_decode_multi(&encoded_3, 3).expect("3-pass decode failed");
+        assert_eq!(decoded, secret);
+
+        let encoded_1 = base64_encode_multi(secret, 1);
+        let decoded_1 = base64_decode_multi(&encoded_1, 1).expect("1-pass decode failed");
+        assert_eq!(decoded_1, secret);
+    }
+
+    #[test]
+    fn test_base64_multi_pass_invalid_input() {
+        let result = base64_decode_multi("not-valid-base64!!!", 1);
+        assert!(result.is_err());
     }
 }

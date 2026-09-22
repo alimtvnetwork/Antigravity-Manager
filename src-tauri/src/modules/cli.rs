@@ -140,6 +140,28 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
+        "--fast-forward" | "-ff" | "fast-forward" => {
+            println!("[CLI] Initiating fast-forward profile rotation...");
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("Error creating async runtime: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            match rt.block_on(crate::modules::auto_switcher::trigger_manual_rotation()) {
+                Ok(msg) => {
+                    println!("[CLI] Fast-forward success: {}", msg);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[CLI] Fast-forward failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+
         "--profile-help" | "--help-profile" => {
             println!("Antigravity Multi-Profile CLI Commands:");
             println!("  --create-profile <name>           Create a new isolated profile");
@@ -151,6 +173,7 @@ pub fn handle_cli_arguments() -> bool {
                 "  --delete-profile <id>             Delete a profile directory and registry entry"
             );
             println!("  --run-profile <id>                Launch Antigravity using the specified profile");
+            println!("  --fast-forward, -ff               Rotate immediately to next best profile with healthy credits");
             std::process::exit(0);
         }
 

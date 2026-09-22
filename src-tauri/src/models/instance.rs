@@ -14,6 +14,8 @@ pub struct InstanceConfig {
     pub created_at: i64,
     pub last_used: i64,
     pub is_default: bool,
+    #[serde(default)]
+    pub pid: Option<u32>,
 }
 
 /// Runtime instance status exposed to frontend and CLI

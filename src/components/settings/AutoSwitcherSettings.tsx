@@ -152,6 +152,54 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 <span>50%</span>
                             </div>
                         </div>
+
+                        {/* Caution Polling Interval (< 20% Credits) */}
+                        <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                <span>Caution Polling Interval (&lt; 20% Credits)</span>
+                                <span className="font-mono font-bold">
+                                    {Math.round((currentConfig.caution_interval_seconds || 180) / 60)} min ({currentConfig.caution_interval_seconds || 180}s)
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="60"
+                                max="300"
+                                step="30"
+                                value={currentConfig.caution_interval_seconds || 180}
+                                onChange={(e) => onChange({ ...currentConfig, caution_interval_seconds: Number(e.target.value) })}
+                                className="w-full accent-amber-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-amber-600/70 dark:text-amber-400/60 font-mono">
+                                <span>1 min</span>
+                                <span>3 min (Default)</span>
+                                <span>5 min</span>
+                            </div>
+                        </div>
+
+                        {/* Critical Polling Interval (<= 12% Credits) */}
+                        <div className="p-3.5 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-semibold text-rose-800 dark:text-rose-300">
+                                <span>Critical Polling Interval (&le; 12% Credits)</span>
+                                <span className="font-mono font-bold">
+                                    {currentConfig.critical_interval_seconds || 60}s
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="15"
+                                max="120"
+                                step="15"
+                                value={currentConfig.critical_interval_seconds || 60}
+                                onChange={(e) => onChange({ ...currentConfig, critical_interval_seconds: Number(e.target.value) })}
+                                className="w-full accent-rose-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-rose-600/70 dark:text-rose-400/60 font-mono">
+                                <span>15s</span>
+                                <span>60s (Default)</span>
+                                <span>120s</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -172,17 +220,31 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
 
                         {/* Task Resume Checkbox */}
-                        <div className="flex items-center gap-3 pt-4">
-                            <input
-                                type="checkbox"
-                                id="auto_resume_cb"
-                                checked={currentConfig.has_auto_resume}
-                                onChange={(e) => onChange({ ...currentConfig, has_auto_resume: e.target.checked })}
-                                className="checkbox checkbox-sm checkbox-primary rounded"
-                            />
-                            <label htmlFor="auto_resume_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                {t('settings.auto_switcher.auto_resume_label', 'Snapshot and auto-resume pending tasks on restart')}
-                            </label>
+                        <div className="flex flex-col gap-2 pt-2">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="auto_resume_cb"
+                                    checked={currentConfig.has_auto_resume}
+                                    onChange={(e) => onChange({ ...currentConfig, has_auto_resume: e.target.checked })}
+                                    className="checkbox checkbox-sm checkbox-primary rounded"
+                                />
+                                <label htmlFor="auto_resume_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    {t('settings.auto_switcher.auto_resume_label', 'Snapshot and auto-resume pending tasks on restart')}
+                                </label>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="auto_ff_cb"
+                                    checked={currentConfig.auto_fast_forward_on_critical ?? true}
+                                    onChange={(e) => onChange({ ...currentConfig, auto_fast_forward_on_critical: e.target.checked })}
+                                    className="checkbox checkbox-sm checkbox-secondary rounded"
+                                />
+                                <label htmlFor="auto_ff_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    Auto-trigger Fast-Forward when credits drop &le; 12% (Highest credit candidate)
+                                </label>
+                            </div>
                         </div>
                     </div>
 

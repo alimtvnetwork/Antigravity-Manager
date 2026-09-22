@@ -274,6 +274,67 @@ pub async fn dispatch_email_test_ping(project_name: Option<String>) -> AppResult
     ))
 }
 
+#[tauri::command]
+pub async fn dispatch_custom_email_task(
+    recipient_email: Option<String>,
+    task_type: String,
+    task_payload: String,
+    subject: Option<String>,
+) -> AppResult<String> {
+    let target_recipients = if let Some(ref email) = recipient_email {
+        let trimmed = email.trim();
+        if !trimmed.is_empty() {
+            vec![trimmed.to_string()]
+        } else {
+            get_active_recipient_emails()?
+        }
+    } else {
+        get_active_recipient_emails()?
+    };
+
+    if target_recipients.is_empty() {
+        return Err(AppError::Email(
+            "No recipients configured. Please add a recipient or specify an email address.".to_string(),
+        ));
+    }
+
+    let m_name = email_watcher::detect_machine_name();
+    let m_ip = email_watcher::detect_local_ip();
+
+    let full_subject = subject.unwrap_or_else(|| {
+        format!(
+            "[AGM-TASK] [Node: {}] [Type: {}]",
+            m_name, task_type
+        )
+    });
+
+    let full_body = format!(
+        "<div style=\"font-family: monospace; padding: 16px; background: #0f172a; color: #f8fafc; border-radius: 8px;\">\
+         <h2 style=\"color: #38bdf8; margin-top: 0;\">AGM Remote Task Instruction</h2>\
+         <p><b>Node:</b> {} ({})</p>\
+         <p><b>Task Type:</b> {}</p>\
+         <div style=\"background: #1e293b; padding: 12px; border-radius: 6px; border: 1px solid #334155; margin-top: 12px;\">\
+         <pre style=\"margin: 0; white-space: pre-wrap; color: #4ade80;\">{}: {}</pre>\
+         </div>\
+         <p style=\"color: #94a3b8; font-size: 11px; margin-top: 16px;\">Sent via Antigravity-Manager Developer Quick Dispatch</p>\
+         </div>",
+        m_name, m_ip, task_type, task_type, task_payload
+    );
+
+    let res = email_sender::dispatch_email_with_failover(&full_subject, &full_body, &target_recipients)
+        .map_err(AppError::Email)?;
+
+    // Activate fast adaptive awaiting poll (5–10s quick-poll)
+    email_watcher::activate_awaiting_reply(300);
+
+    Ok(format!(
+        "Task '{}' dispatched to {} recipient(s) via account '{}'. Quick-poll activated (5m).",
+        task_type,
+        target_recipients.len(),
+        res.used_account_email
+    ))
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliExecResult {
     pub exit_code: i32,

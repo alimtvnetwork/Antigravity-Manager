@@ -201,6 +201,10 @@ export interface AutoProfileSwitcherConfig {
     target_model: string;
     has_auto_resume: boolean;
     cooldown_seconds: number;
+    caution_interval_seconds?: number;
+    critical_interval_seconds?: number;
+    critical_threshold_percent?: number;
+    auto_fast_forward_on_critical?: boolean;
 }
 
 // ============================================================================

@@ -25,6 +25,107 @@ pub fn get_registry_path() -> Result<PathBuf, String> {
     Ok(dir.join("instances.json"))
 }
 
+/// Path to instances.db SQLite database
+pub fn get_instance_db_path() -> Result<PathBuf, String> {
+    let dir = get_instances_dir()?;
+    Ok(dir.join("instances.db"))
+}
+
+/// Open and initialize the instance SQLite database with WAL mode
+pub fn open_instance_db() -> Result<rusqlite::Connection, String> {
+    let db_path = get_instance_db_path()?;
+    let conn = rusqlite::Connection::open(db_path).map_err(|e| e.to_string())?;
+
+    let _ = conn.pragma_update(None, "journal_mode", "WAL");
+    let _ = conn.pragma_update(None, "busy_timeout", 5000);
+    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS instance_processes (
+            instance_id TEXT PRIMARY KEY,
+            pid INTEGER NOT NULL,
+            data_dir TEXT NOT NULL,
+            launched_at INTEGER NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create instance_processes table: {}", e))?;
+
+    Ok(conn)
+}
+
+/// Record an instance PID launch in the SQLite database and in registry
+pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(conn) = open_instance_db() {
+        let _ = conn.execute(
+            "INSERT INTO instance_processes (instance_id, pid, data_dir, launched_at, is_active)
+             VALUES (?1, ?2, ?3, ?4, 1)
+             ON CONFLICT(instance_id) DO UPDATE SET
+                pid = excluded.pid,
+                data_dir = excluded.data_dir,
+                launched_at = excluded.launched_at,
+                is_active = 1",
+            rusqlite::params![instance_id, pid as i64, data_dir, now],
+        );
+    }
+
+    if let Ok(mut registry) = load_registry() {
+        if let Some(inst) = registry.instances.iter_mut().find(|i| i.id == instance_id) {
+            inst.pid = Some(pid);
+            inst.last_used = now;
+            let _ = save_registry(&registry);
+        }
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Saved instance '{}' launch PID {} to SQLite DB and registry",
+        instance_id, pid
+    ));
+    Ok(())
+}
+
+/// Query active PID for an instance from SQLite DB
+pub fn get_instance_saved_pid(instance_id: &str) -> Option<u32> {
+    if let Ok(conn) = open_instance_db() {
+        if let Ok(pid) = conn.query_row(
+            "SELECT pid FROM instance_processes WHERE instance_id = ?1 AND is_active = 1",
+            rusqlite::params![instance_id],
+            |row| row.get::<_, i64>(0),
+        ) {
+            if pid > 0 {
+                return Some(pid as u32);
+            }
+        }
+    }
+
+    if let Ok(registry) = load_registry() {
+        if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+            return inst.pid;
+        }
+    }
+    None
+}
+
+/// Mark instance PID as stopped in SQLite DB and registry
+pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
+    if let Ok(conn) = open_instance_db() {
+        let _ = conn.execute(
+            "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1",
+            rusqlite::params![instance_id],
+        );
+    }
+
+    if let Ok(mut registry) = load_registry() {
+        if let Some(inst) = registry.instances.iter_mut().find(|i| i.id == instance_id) {
+            inst.pid = None;
+            let _ = save_registry(&registry);
+        }
+    }
+    Ok(())
+}
+
 /// Fallback default user data directory
 pub fn get_default_antigravity_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
@@ -89,6 +190,7 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             created_at: now,
             last_used: now,
             is_default: true,
+            pid: None,
         };
 
         let registry = InstanceRegistry {
@@ -180,7 +282,16 @@ pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
     system.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     for config in registry.instances {
-        let pids = find_pids_for_data_dir(&config.data_dir, config.is_default);
+        let mut pids = find_pids_for_data_dir(&config.data_dir, false);
+        if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(&config.id)) {
+            let pid_alive = system.process(sysinfo::Pid::from_u32(saved_pid)).is_some();
+            let not_in_list = !pids.contains(&saved_pid);
+            if pid_alive {
+                if not_in_list {
+                    pids.push(saved_pid);
+                }
+            }
+        }
         let is_running = !pids.is_empty();
         let first_pid = pids.first().copied();
 
@@ -236,6 +347,7 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
         created_at: now,
         last_used: now,
         is_default: false,
+        pid: None,
     };
 
     registry.instances.push(config.clone());
@@ -349,6 +461,22 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Check if an instance is currently running using selective data dir and saved PID
+pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option<u32>) -> bool {
+    let pids = find_pids_for_data_dir(data_dir, false);
+    if !pids.is_empty() {
+        return true;
+    }
+    if let Some(saved_pid) = config_pid.or_else(|| get_instance_saved_pid(instance_id)) {
+        let mut sys = System::new();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
+        if sys.process(sysinfo::Pid::from_u32(saved_pid)).is_some() {
+            return true;
+        }
+    }
+    false
+}
+
 /// Delete an instance profile
 pub fn delete_instance(instance_id: &str) -> Result<(), String> {
     let mut registry = load_registry()?;
@@ -363,8 +491,7 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
 
     let config = &registry.instances[pos];
-    let pids = find_pids_for_data_dir(&config.data_dir, config.is_default);
-    if !pids.is_empty() {
+    if is_instance_running(instance_id, &config.data_dir, config.pid) {
         return Err("Cannot delete instance while it is running. Close it first.".to_string());
     }
 
@@ -393,8 +520,7 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
         .find(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
 
-    let pids = find_pids_for_data_dir(&config.data_dir, config.is_default);
-    if !pids.is_empty() {
+    if is_instance_running(instance_id, &config.data_dir, config.pid) {
         return Err("Cannot wipe session while instance is running. Close it first.".to_string());
     }
 
@@ -505,12 +631,8 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     };
 
     // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-    let existing_pids = find_pids_for_data_dir(&data_dir, is_default);
-    let has_existing = !existing_pids.is_empty();
-    if has_existing {
-        let _ = close_instance(instance_id);
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
+    let _ = close_instance(instance_id);
+    std::thread::sleep(std::time::Duration::from_millis(300));
 
     let exe_str = exe_path.to_string_lossy().to_string();
 
@@ -532,13 +654,13 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         }
         cmd.arg("--new-window");
 
-        cmd.spawn().map_err(|e| {
+        let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!(
                 "Failed to spawn macOS instance process: {}",
                 e
             ))
         })?;
-
+        let _ = record_instance_pid(instance_id, child.id(), &data_dir);
         return Ok(());
     }
 
@@ -561,10 +683,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             crate::modules::process::clean_appimage_env(&mut cmd);
         }
 
-        cmd.spawn().map_err(|e| {
+        let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
         })?;
-
+        let _ = record_instance_pid(instance_id, child.id(), &data_dir);
         Ok(())
     }
 }
@@ -733,8 +855,23 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         .find(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
 
-    let pids = find_pids_for_data_dir(&config.data_dir, config.is_default);
+    let mut system = System::new();
+    system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+
+    // 1. Gather all candidate PIDs for THIS specific instance only
+    let mut pids = find_pids_for_data_dir(&config.data_dir, false);
+    if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
+        let is_alive = system.process(sysinfo::Pid::from_u32(saved_pid)).is_some();
+        let not_contains = !pids.contains(&saved_pid);
+        if is_alive {
+            if not_contains {
+                pids.push(saved_pid);
+            }
+        }
+    }
+
     if pids.is_empty() {
+        let _ = mark_instance_stopped(instance_id);
         return Ok(());
     }
 
@@ -763,7 +900,6 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     // Synchronously wait for processes to exit to prevent SQLite locks and state overwrite
-    let mut system = System::new();
     let start_wait = std::time::Instant::now();
     let max_graceful = std::time::Duration::from_millis(3000);
 
@@ -801,6 +937,26 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
+    // Clean any orphaned lock files in data_dir
+    let target_data_path = PathBuf::from(&config.data_dir);
+    if target_data_path.exists() {
+        let code_lock = target_data_path.join("code.lock");
+        if code_lock.exists() {
+            let _ = fs::remove_file(&code_lock);
+        }
+        if let Ok(entries) = fs::read_dir(&target_data_path) {
+            for entry in entries.flatten() {
+                let fname = entry.file_name().to_string_lossy().to_lowercase();
+                let is_stale_lock = fname.starts_with("singleton") || fname.ends_with(".lock");
+                if is_stale_lock {
+                    let _ = fs::remove_file(entry.path());
+                }
+            }
+        }
+    }
+
+    let _ = mark_instance_stopped(instance_id);
+
     // Small settle delay to ensure OS flushes file handles and SQLite locks
     std::thread::sleep(std::time::Duration::from_millis(150));
 
@@ -819,8 +975,7 @@ pub fn get_active_instance_id() -> Result<String, String> {
     }
     // Fallback: check if any instance is currently running
     for inst in &registry.instances {
-        let pids = find_pids_for_data_dir(&inst.data_dir, inst.is_default);
-        let is_running = !pids.is_empty();
+        let is_running = is_instance_running(&inst.id, &inst.data_dir, inst.pid);
         if is_running {
             return Ok(inst.id.clone());
         }
@@ -966,15 +1121,68 @@ mod tests {
             created_at: 1000,
             last_used: 2000,
             is_default: false,
+            pid: Some(12345),
         };
 
         let json = serde_json::to_string(&instance).unwrap();
         let restored: InstanceConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "ubuntu-test");
+        assert_eq!(restored.pid, Some(12345));
         assert_eq!(
             restored.executable_path,
             Some("/opt/antigravity/antigravity".to_string())
         );
+    }
+
+    #[test]
+    fn test_instance_pid_sqlite_persistence() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "agm_pid_test_{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let test_db_path = temp_dir.join("test_instances.db");
+        let conn = rusqlite::Connection::open(&test_db_path).unwrap();
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS instance_processes (
+                instance_id TEXT PRIMARY KEY,
+                pid INTEGER NOT NULL,
+                data_dir TEXT,
+                status TEXT NOT NULL,
+                started_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );",
+        );
+
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT OR REPLACE INTO instance_processes (instance_id, pid, data_dir, status, started_at, updated_at)
+             VALUES (?1, ?2, ?3, 'running', ?4, ?4)",
+            rusqlite::params!["inst-test-1", 54321, "/tmp/inst1", now],
+        ).unwrap();
+
+        let (saved_pid, status): (u32, String) = conn.query_row(
+            "SELECT pid, status FROM instance_processes WHERE instance_id = ?1",
+            ["inst-test-1"],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+
+        assert_eq!(saved_pid, 54321);
+        assert_eq!(status, "running");
+
+        conn.execute(
+            "UPDATE instance_processes SET status = 'stopped', updated_at = ?1 WHERE instance_id = ?2",
+            rusqlite::params![now + 10, "inst-test-1"],
+        ).unwrap();
+
+        let updated_status: String = conn.query_row(
+            "SELECT status FROM instance_processes WHERE instance_id = ?1",
+            ["inst-test-1"],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(updated_status, "stopped");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

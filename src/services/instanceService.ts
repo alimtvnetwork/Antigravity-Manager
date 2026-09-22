@@ -126,6 +126,10 @@ export interface AutoProfileSwitcherConfig {
     target_model: string;
     has_auto_resume: boolean;
     cooldown_seconds: number;
+    caution_interval_seconds?: number;
+    critical_interval_seconds?: number;
+    critical_threshold_percent?: number;
+    auto_fast_forward_on_critical?: boolean;
 }
 
 export interface AutoSwitcherStatus {
@@ -458,4 +462,3 @@ export function findSmartRotationAccount(
     scored.sort((a, b) => b.score - a.score);
     return scored[0] || null;
 }
-

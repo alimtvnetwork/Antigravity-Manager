@@ -295,6 +295,11 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('No candidate profile available for rotation');
             }
 
+            // Close previous instance profile if different
+            if (currentId && currentId !== best.config.id) {
+                await instanceService.closeInstance(currentId);
+            }
+
             // Set active and launch candidate profile
             await instanceService.setActiveInstance(best.config.id);
             await instanceService.launchInstance(best.config.id);
@@ -341,12 +346,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 5. Inject verified account tokens into target profile state.vscdb and launch
             await instanceService.switchAccountToInstance(candidate.account.id, instId);
 
-            // 5b. If target instance is default or active IDE instance, also switch active editor account directly
-            const isDefaultTarget = instId === 'default';
-            const isActiveTarget = instId === get().activeInstanceId;
-            if (isDefaultTarget || isActiveTarget) {
-                await useAccountStore.getState().switchAccount(candidate.account.id);
-            }
+            // 5b. Synchronize current account in UI state without triggering destructive host-wide process kills
+            await useAccountStore.getState().fetchCurrentAccount();
 
             // 6. Refresh instance and account states
             await Promise.all([
@@ -369,4 +370,3 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         }
     },
 }));
-

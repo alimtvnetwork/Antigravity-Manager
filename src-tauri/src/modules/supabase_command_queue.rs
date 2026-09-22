@@ -98,9 +98,7 @@ pub async fn execute_and_report_command(
     };
 
     #[cfg(not(target_os = "windows"))]
-    let output_res = Command::new("sh")
-        .args(["-c", &cmd.command_text])
-        .output();
+    let output_res = Command::new("sh").args(["-c", &cmd.command_text]).output();
 
     let (stdout, stderr, exit_code) = match output_res {
         Ok(out) => (

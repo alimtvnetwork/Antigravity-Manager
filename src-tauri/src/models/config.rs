@@ -225,6 +225,22 @@ impl AppConfig {
     }
 }
 
+fn default_caution_interval() -> u32 {
+    180
+}
+
+fn default_critical_interval() -> u32 {
+    60
+}
+
+fn default_critical_threshold() -> f64 {
+    12.0
+}
+
+fn default_true() -> bool {
+    true
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -234,6 +250,14 @@ pub struct AutoProfileSwitcherConfig {
     pub target_model: String,
     pub has_auto_resume: bool,
     pub cooldown_seconds: u32,
+    #[serde(default = "default_caution_interval")]
+    pub caution_interval_seconds: u32,
+    #[serde(default = "default_critical_interval")]
+    pub critical_interval_seconds: u32,
+    #[serde(default = "default_critical_threshold")]
+    pub critical_threshold_percent: f64,
+    #[serde(default = "default_true")]
+    pub auto_fast_forward_on_critical: bool,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -245,6 +269,10 @@ impl Default for AutoProfileSwitcherConfig {
             target_model: "gemini-pro".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
+            caution_interval_seconds: 180,
+            critical_interval_seconds: 60,
+            critical_threshold_percent: 12.0,
+            auto_fast_forward_on_critical: true,
         }
     }
 }

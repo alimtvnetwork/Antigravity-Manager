@@ -332,6 +332,29 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
         state.last_check_timestamp = now;
     }
 
+    // 1. Critical threshold check (<= 12.0% or configured critical_threshold_percent)
+    let is_critical = quota_percent <= switcher_cfg.critical_threshold_percent;
+    if is_critical {
+        if switcher_cfg.auto_fast_forward_on_critical {
+            let reason = format!(
+                "Critical quota alert: model '{}' dropped to {:.1}% (<= {:.1}%). Fast-forwarding to highest credit candidate...",
+                switcher_cfg.target_model, quota_percent, switcher_cfg.critical_threshold_percent
+            );
+            logger::log_warn(&format!("[AutoSwitcher] {}", reason));
+
+            if let Some(candidate) = select_next_best_profile(
+                &active_id,
+                &switcher_cfg.target_model,
+                switcher_cfg.critical_threshold_percent,
+            )? {
+                execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
+                    .await?;
+                return Ok(Some(reason));
+            }
+        }
+    }
+
+    // 2. Standard low-quota threshold check
     if quota_percent <= switcher_cfg.low_quota_threshold_percent {
         let reason = format!(
             "Quota for model '{}' dropped to {:.1}% (threshold: {:.1}%)",
@@ -355,6 +378,24 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
     }
 
     Ok(None)
+}
+
+/// Calculate dynamic polling interval based on credit quota ladder
+pub fn calculate_next_interval_seconds(
+    quota_percent: Option<f64>,
+    cfg: &AutoProfileSwitcherConfig,
+) -> u32 {
+    let Some(quota) = quota_percent else {
+        return cfg.check_interval_seconds.max(15);
+    };
+
+    if quota <= cfg.critical_threshold_percent {
+        cfg.critical_interval_seconds.max(10)
+    } else if quota < 20.0 {
+        cfg.caution_interval_seconds.max(15)
+    } else {
+        cfg.check_interval_seconds.max(15)
+    }
 }
 
 /// Trigger manual rotation to the next best profile
@@ -413,10 +454,13 @@ pub fn start_auto_switcher() {
         }
 
         loop {
-            let interval_secs = config::load_app_config()
-                .map(|c| c.auto_profile_switcher.check_interval_seconds)
-                .unwrap_or(60)
-                .max(15);
+            let app_config = config::load_app_config().unwrap_or_default();
+            let switcher_cfg = app_config.auto_profile_switcher;
+            let cur_status = get_status();
+            let interval_secs = calculate_next_interval_seconds(
+                cur_status.current_quota_percent,
+                &switcher_cfg,
+            );
 
             tokio::time::sleep(Duration::from_secs(interval_secs as u64)).await;
 
@@ -425,4 +469,35 @@ pub fn start_auto_switcher() {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::config::AutoProfileSwitcherConfig;
+
+    #[test]
+    fn test_calculate_next_interval_seconds_ladder() {
+        let mut cfg = AutoProfileSwitcherConfig::default();
+        cfg.check_interval_seconds = 300;
+        cfg.caution_interval_seconds = 180;
+        cfg.critical_interval_seconds = 60;
+        cfg.critical_threshold_percent = 12.0;
+
+        // None quota defaults to check_interval_seconds
+        assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
+
+        // Healthy quota (>= 20%) uses standard check_interval_seconds
+        assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
+        assert_eq!(calculate_next_interval_seconds(Some(20.0), &cfg), 300);
+
+        // Caution quota (< 20% and > critical_threshold_percent) uses caution_interval_seconds
+        assert_eq!(calculate_next_interval_seconds(Some(19.9), &cfg), 180);
+        assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 180);
+
+        // Critical quota (<= critical_threshold_percent) uses critical_interval_seconds
+        assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 60);
+    }
 }

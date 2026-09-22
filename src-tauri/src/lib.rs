@@ -865,6 +865,7 @@ pub fn run() {
             commands::get_email_watcher_status,
             commands::trigger_manual_email_check,
             commands::dispatch_email_test_ping,
+            commands::dispatch_custom_email_task,
             commands::test_execute_cli_command,
             // Supabase Cross-Node Synchronization commands
             commands::get_supabase_config,

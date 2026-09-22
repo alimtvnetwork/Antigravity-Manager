@@ -342,3 +342,25 @@ export async function testExecuteCliCommand(command: string): Promise<CliExecRes
         throw e;
     }
 }
+
+export async function dispatchCustomEmailTask(
+    taskType: string,
+    taskPayload: string,
+    recipientEmail?: string,
+    subject?: string
+): Promise<string> {
+    try {
+        return await invoke('dispatch_custom_email_task', {
+            taskType,
+            taskPayload,
+            recipientEmail: recipientEmail || null,
+            subject: subject || null,
+        });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'emailService.dispatchCustomEmailTask',
+            endpoint: 'dispatch_custom_email_task',
+        });
+        throw e;
+    }
+}
