@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.0 (2026-09-23)**:
+        -   **[Release v4.65.0 & Installed Apps Branding Alignment] Display Title & Publisher Finalization with Full macOS Universal Bundle Support**:
+            -   **Windows Installed Apps Branding Alignment**: Formatted the Windows "Installed apps" entry to display Title: **Antigravity Manager Tools** with subtitle / Publisher line: **Maintained by Alim, Sponsored by RISEUP ASIA LLC**, stamped directly through NSIS post-install hooks (`src-tauri/hooks.nsh`), `tauri.conf.json`, and `install.ps1` registry sync logic.
+            -   **macOS Universal Packaging Hook**: Added `scripts/before-bundle.js` and wired `"beforeBundleCommand"` in `src-tauri/tauri.conf.json`. Automatically detects `universal-apple-darwin` targets, verifies architecture compilation, and uses `lipo -create` to merge the standalone `agm` CLI binary before Tauri macOS bundler packaging, resolving packaging failures on auxiliary binaries.
+            -   **Explicit Default Primary Binary**: Added `default-run = "agm-alim"` in `src-tauri/Cargo.toml` to strictly identify the GUI application binary.
+            -   **Rust Trait Warning Suppression**: Added `#[allow(async_fn_in_trait)]` to `SystemIntegration` trait in `src-tauri/src/modules/integration.rs`, removing compiler suggestions on public trait async methods.
+            -   **CI/CD RCA 35 Grounded**: Authored `.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md` and registered in index.
     *   **v4.64.0 (2026-09-23)**:
         -   **[macOS Universal App Bundle Packaging Fix, beforeBundleCommand Hook, Installed Apps Branding & RCA 35 Resolution] Resolved Multi-Binary Universal Darwin Packaging and Windows Installed Apps Branding Alignment**:
             -   **Windows Installed Apps Branding Alignment**: Formatted the Windows "Installed apps" entry to display Title: **Antigravity Manager Tools** with subtitle / Publisher line: **Maintained by Alim, Sponsored by RISEUP ASIA LLC**, stamped directly through NSIS post-install hooks (`src-tauri/hooks.nsh`), `tauri.conf.json`, and `install.ps1` registry sync logic.

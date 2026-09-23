@@ -2,6 +2,14 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.65.0 (2026-09-23)**:
+        -   **[Release v4.65.0 与已安装应用品牌最终确立] 统一 Windows 安装列表主标题与发行者信息，全面集成 macOS Universal 二进制构建**:
+            -   **Windows 已安装应用主标题与发行者品牌规范**: 将 Windows「已安装应用/添加或删除程序」列表中的主标题（DisplayName）统一精简为 **Antigravity Manager Tools**，副标题/发行者（Publisher）统一规范为 **Maintained by Alim, Sponsored by RISEUP ASIA LLC**，并在 NSIS 钩子（`src-tauri/hooks.nsh`）、`tauri.conf.json` 及 `install.ps1` 注册表同步逻辑中全链路生效。
+            -   **macOS Universal 打包钩子强化**: 新增 `scripts/before-bundle.js` 自动化打包钩子，并在 `src-tauri/tauri.conf.json` 中配置 `"beforeBundleCommand"`。针对 `universal-apple-darwin` 目标自动检测并编译缺失架构，调用 `lipo -create` 汇编生成 `agm` 通用 Mach-O 独立二进制，解决 Tauri macOS bundler 复制缺失辅助二进制导致的打包中断。
+            -   **Cargo 明确主运行二进制**: 在 `src-tauri/Cargo.toml` 中显式配置 `default-run = "agm-alim"`，严格隔离 GUI 主应用与终端 CLI 二进制。
+            -   **Rust Trait 警告抑制**: 在 `src-tauri/src/modules/integration.rs` 的 `SystemIntegration` 特征上标注 `#[allow(async_fn_in_trait)]`，彻底消除编译器公共特征异步方法建议警告。
+            -   **CI/CD RCA 35 根因分析登记**: 编制归档 `.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md`，完成全链路质量闭环。
+
     *   **v4.64.0 (2026-09-23)**:
         -   **[macOS 通用二进制打包修复、beforeBundleCommand 钩子、已安装应用品牌规范与 RCA 35 闭环] 解决 macOS universal-apple-darwin 多二进制打包缺失与 Windows 安装列表品牌格式化**:
             -   **Windows 已安装应用主标题与发行者品牌规范**: 将 Windows「已安装应用/添加或删除程序」列表中的主标题（DisplayName）统一精简为 **Antigravity Manager Tools**，副标题/发行者（Publisher）统一规范为 **Maintained by Alim, Sponsored by RISEUP ASIA LLC**，并在 NSIS 钩子（`src-tauri/hooks.nsh`）、`tauri.conf.json` 及 `install.ps1` 注册表同步逻辑中全链路生效。
@@ -3164,6 +3172,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.0 (2026-09-23)**:
+        -   **[Release v4.65.0] Update installed app branding to Antigravity Manager Tools and bump to v4.65.0**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Update installed app branding to Antigravity Manager Tools and bump to v4.65.0.
     *   **v4.63.0 (2026-09-23)**:
         -   **[Release v4.63.0] expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync**:
             -   **Update System**: Automated release and version synchronization across all manifests.

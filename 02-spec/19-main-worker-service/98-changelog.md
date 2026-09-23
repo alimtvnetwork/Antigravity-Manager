@@ -1,3 +1,9 @@
+## v4.65.0 — 2026-09-23 (Update installed app branding to Antigravity Manager Tools and bump to v4.65.0)
+
+**Scope:** Version bump. Update installed app branding to Antigravity Manager Tools and bump to v4.65.0.
+
+---
+
 ## v4.64.0 — 2026-09-23 (resolve universal darwin agm bundle packaging and bump to v4.64.0)
 
 **Scope:** Fix. macOS universal bundle packaging beforeBundleCommand hook, default-run cargo setting, and trait warning suppression.
