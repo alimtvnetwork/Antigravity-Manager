@@ -1,3 +1,9 @@
+## v4.64.0 — 2026-09-23 (resolve universal darwin agm bundle packaging and bump to v4.64.0)
+
+**Scope:** Fix. macOS universal bundle packaging beforeBundleCommand hook, default-run cargo setting, and trait warning suppression.
+
+---
+
 ## v4.63.0 — 2026-09-23 (expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync)
 
 **Scope:** Version bump. expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync.

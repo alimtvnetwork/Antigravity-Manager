@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.64.0 (2026-09-23)**:
+        -   **[macOS Universal App Bundle Packaging Fix, beforeBundleCommand Hook & RCA 35 Resolution] Resolved Multi-Binary Universal Darwin Packaging and Trait Warning Suppression**:
+            -   **macOS Universal Packaging Hook**: Added `scripts/before-bundle.js` and wired `"beforeBundleCommand"` in `src-tauri/tauri.conf.json`. Automatically detects `universal-apple-darwin` targets, verifies architecture compilation, and uses `lipo -create` to merge the standalone `agm` CLI binary before Tauri macOS bundler packaging, resolving packaging failures on auxiliary binaries.
+            -   **Explicit Default Primary Binary**: Added `default-run = "agm-alim"` in `src-tauri/Cargo.toml` to strictly identify the GUI application binary.
+            -   **Rust Trait Warning Suppression**: Added `#[allow(async_fn_in_trait)]` to `SystemIntegration` trait in `src-tauri/src/modules/integration.rs`, removing compiler suggestions on public trait async methods.
+            -   **CI/CD RCA 35 Grounded**: Authored `.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md` and registered in index.
     *   **v4.63.0 (2026-09-23)**:
         -   **[Native AGM Terminal CLI Expansion & Inbound Email Command Suite] GitMap Parity with doctor, accounts, switch, prompts, proxy, sync, pull, clean, & logs**:
             -   **GitMap Parity Native CLI Suite**: Expanded standalone `agm` terminal CLI binary with `doctor`/`check` (database vault integrity, IDE process status, proxy gateway port 8045, PATH, and network diagnostic), `accounts`/`acc` (registered accounts list, tiers, and quotas with `--active` and `--json`), `switch <email>` (direct active account switching without GUI), `prompts` (active tasks from `repo_prompts.db` and template categories), `proxy [status|test]` (loopback latency probe), `sync` (vault and instance synchronization), `pull` (`git pull origin main` integration), `clean`/`purge` (safe cache cleanup protecting DB vaults), and `logs` (real-time tailing and keyword filtering).

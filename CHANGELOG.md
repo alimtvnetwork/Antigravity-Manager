@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.64.0 (2026-09-23)**:
+        -   **[macOS 通用二进制打包修复、beforeBundleCommand 钩子与 RCA 35 闭环] 解决 macOS universal-apple-darwin 多二进制打包缺失与特征警告抑制**:
+            -   **macOS Universal 打包钩子强化**: 新增 `scripts/before-bundle.js` 自动化打包钩子，并在 `src-tauri/tauri.conf.json` 中配置 `"beforeBundleCommand"`。针对 `universal-apple-darwin` 目标自动检测并编译缺失架构，调用 `lipo -create` 汇编生成 `agm` 通用 Mach-O 独立二进制，解决 Tauri macOS bundler 复制缺失辅助二进制导致的打包中断。
+            -   **Cargo 明确主运行二进制**: 在 `src-tauri/Cargo.toml` 中显式配置 `default-run = "agm-alim"`，严格隔离 GUI 主应用与终端 CLI 二进制。
+            -   **Rust Trait 警告抑制**: 在 `src-tauri/src/modules/integration.rs` 的 `SystemIntegration` 特征上标注 `#[allow(async_fn_in_trait)]`，彻底消除编译器公共特征异步方法建议警告。
+            -   **CI/CD RCA 35 根因分析登记**: 编制归档 `.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md`，完成全链路质量闭环。
+
     *   **v4.63.0 (2026-09-23)**:
         -   **[原生 AGM 终端 CLI 扩充与入站邮件全指令映射] 对标 GitMap 扩充 doctor、accounts、switch、prompts、proxy、sync、pull、clean、logs 命令**:
             -   **对标 GitMap 原生 CLI 指令全集**: 为独立的 `agm` 命令行工具扩充 `doctor`/`check`（金库完整性、IDE 进程、代理端口、PATH 与网络全方位诊断）、`accounts`/`acc`（注册账户列表、等级与配额，支持 `--active` 与 `--json`）、`switch <email>`（终端直接切换活跃账户并同步指纹）、`prompts`（活跃任务与模板库）、`proxy [status|test]`（回环延迟探测）、`sync`（本地与金库同步）、`pull`（`git pull origin main` 联动）、`clean`/`purge`（安全清理临时构建缓存并绝对保护金库）、`logs`（支持 `--tail` 与 `--filter`）。
