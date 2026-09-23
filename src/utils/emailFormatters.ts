@@ -314,7 +314,12 @@ export async function downloadOrSaveFile(
                 filters: [
                     {
                         name: extension.toUpperCase(),
-                        extensions: [extension === 'yaml' ? 'yaml' : extension],
+                        extensions:
+                            extension === 'yaml' || extension === 'yml'
+                                ? ['yaml', 'yml']
+                                : extension === 'xlsx'
+                                  ? ['xlsx', 'xls']
+                                  : [extension],
                     },
                     {
                         name: 'All Files',
