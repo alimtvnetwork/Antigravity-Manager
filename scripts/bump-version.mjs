@@ -346,6 +346,14 @@ const TARGET_FILES = [
             return content.replace(anchor, newBlock);
         },
     },
+    {
+        name: 'src-tauri/hooks.nsh (NSIS installer postinstall hook)',
+        relPath: 'src-tauri/hooks.nsh',
+        replace: (content) => content.replace(
+            `StrCpy $0 "${currentVersion}"`,
+            `StrCpy $0 "${newVersion}"`
+        ),
+    },
 ];
 
 // 6. Execute atomic replacements
