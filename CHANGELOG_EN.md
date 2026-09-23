@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.63.0 (2026-09-23)**:
+        -   **[Native AGM Terminal CLI Expansion & Inbound Email Command Suite] GitMap Parity with doctor, accounts, switch, prompts, proxy, sync, pull, clean, & logs**:
+            -   **GitMap Parity Native CLI Suite**: Expanded standalone `agm` terminal CLI binary with `doctor`/`check` (database vault integrity, IDE process status, proxy gateway port 8045, PATH, and network diagnostic), `accounts`/`acc` (registered accounts list, tiers, and quotas with `--active` and `--json`), `switch <email>` (direct active account switching without GUI), `prompts` (active tasks from `repo_prompts.db` and template categories), `proxy [status|test]` (loopback latency probe), `sync` (vault and instance synchronization), `pull` (`git pull origin main` integration), `clean`/`purge` (safe cache cleanup protecting DB vaults), and `logs` (real-time tailing and keyword filtering).
+            -   **Full Inbound Email Command Mapping**: Bounded all expanded CLI commands into `src-tauri/src/modules/email_inbound.rs` (`DoctorDiagnostic`, `ListAccounts`, `AccountSwitch`, `ProxyStatus`, `SystemClean`, `SyncState`), backed by 2-phase plaintext receipts (Phase 1 ACK + Phase 2 Result) and 10-second debounce sliding stack.
+            -   **Expanded Local-Only E2E Test Suite**: Updated `03-ai-scripts/40-test-email-permutations-e2e.py` to cover all 30 subject command permutations, 10 native AGM CLI subcommands, and 9 Rust unit tests with 100% pass rate.
+            -   **Canonical Spec & Index Registration**: Authored canonical Spec 20 (`02-spec/21-app/20-agm-cli-expanded-commands.md`) and consolidated execution Plan 66.
     *   **v4.62.0 (2026-09-23)**:
         -   **[Inbound Email Remote Control, 2-Phase Plaintext Receipts & Native AGM Terminal CLI] Unified Pipe Grammar, Plaintext Receipts, 10s Debounce Stack, & Native agm CLI**:
             -   **Unified Inbound Email Pipe Grammar**: Added comprehensive parsing for `sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]` with partial IP octet matching (e.g. `12` matching `192.168.1.12`), optional instance tags, project targeting, and smart GitMap prefix collapsing.

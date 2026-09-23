@@ -102,7 +102,8 @@ def run_rust_unit_tests() -> bool:
         "--nocapture",
     ]
     try:
-        res = subprocess.run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, timeout=120)
+        env = dict(os.environ, CARGO_INCREMENTAL="0")
+        res = subprocess.run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, timeout=120, env=env)
         if res.returncode == 0:
             print_pass("RUST-UNIT-TESTS", "All 9 Rust unit tests in email_inbound passed successfully.")
             return True
@@ -132,6 +133,12 @@ def run_agm_cli_verification() -> bool:
         ("help", "Displays command cheat sheet"),
         ("status", "Displays node status, active account, and local IP"),
         ("instances", "Lists sandbox profiles and instances"),
+        ("doctor", "Performs pre-flight system health checks"),
+        ("accounts", "Lists registered accounts and quotas"),
+        ("prompts", "Lists active prompts and prompt templates"),
+        ("proxy", "Displays proxy gateway status and routes"),
+        ("sync", "Synchronizes local state and split vaults"),
+        ("clean", "Safely prunes temp test directories"),
     ]
 
     for subcmd, desc in subcommands:
@@ -251,15 +258,42 @@ def parse_subject_grammar(subject: str, body: str):
     if lower_cmd in ["agm ff", "agm smart-switch", "agm ff/smart-switch", "ff"]:
         return {"action": "fast_forward", "target": target}
 
-    if lower_cmd == "agy prompts ls":
+    if lower_cmd == "agy prompts ls" or lower_cmd in ["agm prompts", "agm prompts ls", "prompts"]:
         return {"action": "prompts_ls", "target": target, "is_gitmap": False}
+
+    if lower_cmd in ["doctor", "agm doctor", "check", "agm check"]:
+        return {"action": "doctor", "target": target}
+
+    if lower_cmd in ["accounts", "agm accounts", "agm acc", "acc"]:
+        return {"action": "accounts", "target": target}
+
+    if lower_cmd.startswith("agm switch") or lower_cmd.startswith("switch"):
+        email_query = (
+            cmd_str[10:].strip()
+            if lower_cmd.startswith("agm switch")
+            else (cmd_str[6:].strip() if lower_cmd.startswith("switch") else "")
+        )
+        query = email_query if email_query else (parts[2].strip() if len(parts) >= 3 else body.strip())
+        return {"action": "switch", "target": target, "email": query}
+
+    if lower_cmd in ["proxy", "agm proxy", "agm proxy status"]:
+        return {"action": "proxy", "target": target, "is_test": False}
+
+    if lower_cmd in ["agm proxy test", "proxy test"]:
+        return {"action": "proxy", "target": target, "is_test": True}
+
+    if lower_cmd in ["clean", "agm clean", "purge", "agm purge"]:
+        return {"action": "clean", "target": target}
+
+    if lower_cmd in ["sync", "agm sync"]:
+        return {"action": "sync", "target": target}
 
     return {"action": "custom", "target": target, "command": cmd_str}
 
 
 def test_all_subject_permutations() -> bool:
     """Test every subject email permutation requested by the user."""
-    print("\n[*] Testing All 19 Subject Command Permutations...")
+    print("\n[*] Testing All 30 Subject Command Permutations...")
 
     permutations = [
         # 1. Prompt with project
@@ -394,6 +428,83 @@ def test_all_subject_permutations() -> bool:
             "VM3 | gitmap prompts ls",
             "",
             {"action": "prompts_ls", "target": "VM3", "is_gitmap": True},
+        ),
+        # 20. AGM Doctor
+        (
+            "P20",
+            "VM3 | agm doctor",
+            "",
+            {"action": "doctor", "target": "VM3"},
+        ),
+        # 21. AGM Check
+        (
+            "P21",
+            "VM3 | agm check",
+            "",
+            {"action": "doctor", "target": "VM3"},
+        ),
+        # 22. AGM Accounts
+        (
+            "P22",
+            "VM3 | agm accounts",
+            "",
+            {"action": "accounts", "target": "VM3"},
+        ),
+        # 23. AGM Acc
+        (
+            "P23",
+            "VM3 | agm acc",
+            "",
+            {"action": "accounts", "target": "VM3"},
+        ),
+        # 24. AGM Switch
+        (
+            "P24",
+            "VM3 | agm switch | abidul@example.com",
+            "",
+            {"action": "switch", "target": "VM3", "email": "abidul@example.com"},
+        ),
+        # 25. AGM Proxy
+        (
+            "P25",
+            "VM3 | agm proxy",
+            "",
+            {"action": "proxy", "target": "VM3", "is_test": False},
+        ),
+        # 26. AGM Proxy Test
+        (
+            "P26",
+            "VM3 | agm proxy test",
+            "",
+            {"action": "proxy", "target": "VM3", "is_test": True},
+        ),
+        # 27. AGM Clean
+        (
+            "P27",
+            "VM3 | agm clean",
+            "",
+            {"action": "clean", "target": "VM3"},
+        ),
+        # 28. AGM Purge
+        (
+            "P28",
+            "VM3 | agm purge",
+            "",
+            {"action": "clean", "target": "VM3"},
+        ),
+        # 29. AGM Sync
+        (
+            "P29",
+            "VM3 | agm sync",
+            "",
+            {"action": "sync", "target": "VM3"},
+        ),
+        # 30. AGM Prompts
+        (
+            "P30",
+            "VM3 | agm prompts",
+            "",
+            {"action": "prompts_ls", "target": "VM3", "is_gitmap": False},
         ),
     ]
 
@@ -545,7 +656,7 @@ def main():
     all_success = rust_ok and perms_ok and receipts_ok and security_ok and cli_ok
     print_header("E2E Test Execution Summary")
     print(f"  Rust Unit Tests:              {'[PASS]' if rust_ok else '[FAIL]'}")
-    print(f"  19 Subject Permutations:      {'[PASS]' if perms_ok else '[FAIL]'}")
+    print(f"  30 Subject Permutations:      {'[PASS]' if perms_ok else '[FAIL]'}")
     print(f"  2-Phase Plaintext Receipts:   {'[PASS]' if receipts_ok else '[FAIL]'}")
     print(f"  10s Debounce & ACL Stack:     {'[PASS]' if security_ok else '[FAIL]'}")
     print(f"  Native AGM CLI Verification:  {'[PASS]' if cli_ok else '[FAIL]'}")

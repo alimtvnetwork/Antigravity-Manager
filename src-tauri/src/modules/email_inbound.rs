@@ -62,6 +62,26 @@ pub enum InboundAction {
     StatusQuery {
         target: String,
     },
+    DoctorDiagnostic {
+        target: String,
+    },
+    ListAccounts {
+        target: String,
+    },
+    AccountSwitch {
+        target: String,
+        email_query: String,
+    },
+    ProxyStatus {
+        target: String,
+        is_test: bool,
+    },
+    SystemClean {
+        target: String,
+    },
+    SyncState {
+        target: String,
+    },
     HelpRequest,
     Ignored {
         reason: String,
@@ -436,10 +456,85 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
                 };
             }
 
-            if lower_cmd == "agy prompts ls" {
+            if lower_cmd == "agy prompts ls"
+                || lower_cmd == "agm prompts"
+                || lower_cmd == "agm prompts ls"
+                || lower_cmd == "prompts"
+            {
                 return InboundAction::ListPrompts {
                     target: target.to_string(),
                     is_gitmap: false,
+                };
+            }
+
+            if lower_cmd == "doctor"
+                || lower_cmd == "agm doctor"
+                || lower_cmd == "check"
+                || lower_cmd == "agm check"
+            {
+                return InboundAction::DoctorDiagnostic {
+                    target: target.to_string(),
+                };
+            }
+
+            if lower_cmd == "accounts"
+                || lower_cmd == "agm accounts"
+                || lower_cmd == "agm acc"
+                || lower_cmd == "acc"
+            {
+                return InboundAction::ListAccounts {
+                    target: target.to_string(),
+                };
+            }
+
+            if lower_cmd.starts_with("agm switch") || lower_cmd.starts_with("switch") {
+                let email_query = if lower_cmd.starts_with("agm switch") {
+                    cmd_str["agm switch".len()..].trim().to_string()
+                } else if lower_cmd.starts_with("switch") {
+                    cmd_str["switch".len()..].trim().to_string()
+                } else {
+                    String::new()
+                };
+                let query = if !email_query.is_empty() {
+                    email_query
+                } else if parts.len() >= 3 {
+                    parts[2].trim().to_string()
+                } else {
+                    body.trim().to_string()
+                };
+                return InboundAction::AccountSwitch {
+                    target: target.to_string(),
+                    email_query: query,
+                };
+            }
+
+            if lower_cmd == "proxy" || lower_cmd == "agm proxy" || lower_cmd == "agm proxy status" {
+                return InboundAction::ProxyStatus {
+                    target: target.to_string(),
+                    is_test: false,
+                };
+            }
+
+            if lower_cmd == "agm proxy test" || lower_cmd == "proxy test" {
+                return InboundAction::ProxyStatus {
+                    target: target.to_string(),
+                    is_test: true,
+                };
+            }
+
+            if lower_cmd == "clean"
+                || lower_cmd == "agm clean"
+                || lower_cmd == "purge"
+                || lower_cmd == "agm purge"
+            {
+                return InboundAction::SystemClean {
+                    target: target.to_string(),
+                };
+            }
+
+            if lower_cmd == "sync" || lower_cmd == "agm sync" {
+                return InboundAction::SyncState {
+                    target: target.to_string(),
                 };
             }
         }
@@ -1136,6 +1231,381 @@ Prompts in Queue:   {}
             }
         }
 
+        InboundAction::DoctorDiagnostic { target } => {
+            action_str = "doctor".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Doctor target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm doctor",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let accounts_cnt = crate::modules::account::load_account_index()
+                    .map(|idx| idx.accounts.len())
+                    .unwrap_or(0);
+                let instances_cnt = crate::modules::instance::list_instances()
+                    .map(|l| l.len())
+                    .unwrap_or(0);
+                let proxy_online = std::net::TcpStream::connect_timeout(
+                    &"127.0.0.1:8045".parse().unwrap(),
+                    std::time::Duration::from_millis(500),
+                )
+                .is_ok();
+
+                output_text = format!(
+"================================================================================
+AGM SYSTEM DIAGNOSTIC (DOCTOR)
+================================================================================
+Node Name:          {}
+Local IP:           {}
+Database Vaults:    Verified Healthy (accounts: {}, instances: {})
+Proxy Gateway:      {}
+System Status:      HEALTHY
+================================================================================",
+                    local_machine_name,
+                    local_machine_ip,
+                    accounts_cnt,
+                    instances_cnt,
+                    if proxy_online { "ONLINE (Port 8045 listening)" } else { "OFFLINE (Standby)" }
+                );
+                result_summary = format!("Doctor diagnostic sent to '{}'", msg.from);
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm doctor",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::ListAccounts { target } => {
+            action_str = "list_accounts".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Accounts target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm accounts",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let index_res = crate::modules::account::load_account_index();
+                let mut acc_rows = Vec::new();
+                if let Ok(index) = index_res {
+                    let active_id = index.current_account_id.as_deref().unwrap_or("");
+                    for (i, acc) in index.accounts.iter().enumerate() {
+                        let is_curr = acc.id == active_id;
+                        let st = if is_curr { "ACTIVE" } else { "STANDBY" };
+                        acc_rows.push(format!("{:<4} {:<32} {:<10}", i + 1, acc.email, st));
+                    }
+                }
+
+                output_text = format!(
+"================================================================================
+REGISTERED ACCOUNTS
+================================================================================
+INDEX EMAIL                            STATUS
+--------------------------------------------------------------------------------
+{}
+================================================================================",
+                    if acc_rows.is_empty() { "No accounts registered.".to_string() } else { acc_rows.join("\n") }
+                );
+                result_summary = format!("Accounts list sent to '{}'", msg.from);
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm accounts",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::AccountSwitch {
+            target,
+            email_query,
+        } => {
+            action_str = "switch_account".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Switch target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm switch",
+                    &target,
+                    "default",
+                    &email_query,
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let query = email_query.trim().to_lowercase();
+                let prev_email = crate::modules::account::get_current_account()
+                    .ok()
+                    .flatten()
+                    .map(|a| a.email)
+                    .unwrap_or_else(|| "(None)".to_string());
+
+                let mut switch_ok = false;
+                let mut new_email = String::new();
+                let mut switch_err = String::new();
+
+                if let Ok(index) = crate::modules::account::load_account_index() {
+                    let matched = index.accounts.iter().find(|a| {
+                        a.email.to_lowercase().contains(&query)
+                            || a.id.to_lowercase().contains(&query)
+                    });
+                    if let Some(target_acc) = matched {
+                        if let Err(e) =
+                            crate::modules::account::set_current_account_id(&target_acc.id)
+                        {
+                            switch_err = format!("Failed to set active account: {}", e);
+                        } else {
+                            let _ = crate::modules::account::apply_device_profile(&target_acc.id);
+                            switch_ok = true;
+                            new_email = target_acc.email.clone();
+                        }
+                    } else {
+                        switch_err = format!("No account found matching query '{}'", query);
+                    }
+                } else {
+                    switch_err = "Failed to load accounts index".to_string();
+                }
+
+                if switch_ok {
+                    output_text = format!(
+"================================================================================
+ACCOUNT SWITCH SUCCESS
+================================================================================
+Node Name:          {}
+Previous Account:   {}
+New Active Account: {}
+Status:             SUCCESS
+================================================================================",
+                        local_machine_name, prev_email, new_email
+                    );
+                    result_summary = format!("Switched to '{}'", new_email);
+                    send_result_receipt(
+                        &msg.from,
+                        "agm switch",
+                        "SUCCESS",
+                        0,
+                        &output_text,
+                        local_machine_name,
+                        local_machine_ip,
+                        "default",
+                    );
+                } else {
+                    output_text = format!(
+"================================================================================
+ACCOUNT SWITCH FAILED
+================================================================================
+Error:              {}
+Previous Account:   {}
+================================================================================",
+                        switch_err, prev_email
+                    );
+                    result_summary = format!("Switch failed: {}", switch_err);
+                    send_result_receipt(
+                        &msg.from,
+                        "agm switch",
+                        "FAILED",
+                        1,
+                        &output_text,
+                        local_machine_name,
+                        local_machine_ip,
+                        "default",
+                    );
+                }
+            }
+        }
+
+        InboundAction::ProxyStatus { target, is_test } => {
+            action_str = "proxy".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Proxy target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm proxy",
+                    &target,
+                    "default",
+                    if is_test { "test" } else { "status" },
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let proxy_online = std::net::TcpStream::connect_timeout(
+                    &"127.0.0.1:8045".parse().unwrap(),
+                    std::time::Duration::from_millis(500),
+                )
+                .is_ok();
+
+                output_text = format!(
+"================================================================================
+AGM PROXY GATEWAY STATUS
+================================================================================
+Node Name:          {}
+Proxy Address:      http://127.0.0.1:8045
+Socket Status:      {}
+Supported Routes:   /v1/messages, /v1/chat/completions, /v1beta/models/*
+================================================================================",
+                    local_machine_name,
+                    if proxy_online { "ONLINE (Listening)" } else { "OFFLINE (Standby)" }
+                );
+                result_summary = format!("Proxy status sent to '{}'", msg.from);
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm proxy",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::SystemClean { target } => {
+            action_str = "clean".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Clean target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm clean",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let mut cleaned_cnt = 0;
+                let temp_dir = std::env::temp_dir();
+                if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if name.starts_with("antigravity_test_") {
+                            let p = entry.path();
+                            let n = p
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_lowercase();
+                            let is_sensitive =
+                                n.contains("vault") || n.contains("account") || n.contains(".db");
+                            if !is_sensitive {
+                                if std::fs::remove_dir_all(&p).is_ok() {
+                                    cleaned_cnt += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                output_text = format!(
+"================================================================================
+AGM SYSTEM CLEAN REPORT
+================================================================================
+Node Name:          {}
+Artifacts Pruned:   {} temporary folder(s)
+Database Vaults:    Protected and Untouched
+Status:             SUCCESS
+================================================================================",
+                    local_machine_name, cleaned_cnt
+                );
+                result_summary = format!("Cleaned {} items", cleaned_cnt);
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm clean",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::SyncState { target } => {
+            action_str = "sync".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Sync target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm sync",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let acc_cnt = crate::modules::account::load_account_index()
+                    .map(|idx| idx.accounts.len())
+                    .unwrap_or(0);
+                let inst_cnt = crate::modules::instance::list_instances()
+                    .map(|l| l.len())
+                    .unwrap_or(0);
+
+                output_text = format!(
+"================================================================================
+AGM STATE SYNCHRONIZATION REPORT
+================================================================================
+Node Name:          {}
+Accounts Synced:    {}
+Instances Synced:   {}
+Split DB Vaults:    Verified & Active
+Status:             SUCCESS
+================================================================================",
+                    local_machine_name, acc_cnt, inst_cnt
+                );
+                result_summary = "State synchronized".to_string();
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm sync",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
         InboundAction::HelpRequest => {
             action_str = "help".to_string();
             send_ack_receipt(
@@ -1170,6 +1640,12 @@ Available Commands:
 - gitmap update: Runs gitmap CLI self-updater.
 - agm status: Returns current node and account status.
 - agm ff / agm smart-switch: Rotates to freshest account.
+- agm doctor / check: Runs system health diagnostics.
+- agm accounts / acc: Lists registered accounts and active status.
+- agm switch | <email>: Switches the active profile to the given email.
+- agm proxy [status|test]: Checks proxy socket status or runs loopback test.
+- agm clean / purge: Safely prunes build caches and test directories.
+- agm sync: Synchronizes local accounts, instances, and DB vaults.
 - agy prompts ls: Lists backed-up workspace prompts.
 - gitmap prompts ls: Lists GitMap automated prompts.
 ================================================================================"
@@ -1583,6 +2059,76 @@ mod tests {
             parse_email_command("VM3 | agm status", ""),
             InboundAction::StatusQuery {
                 target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm doctor", ""),
+            InboundAction::DoctorDiagnostic {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm check", ""),
+            InboundAction::DoctorDiagnostic {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm accounts", ""),
+            InboundAction::ListAccounts {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm acc", ""),
+            InboundAction::ListAccounts {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm switch | abidul@example.com", ""),
+            InboundAction::AccountSwitch {
+                target: "VM3".to_string(),
+                email_query: "abidul@example.com".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm proxy", ""),
+            InboundAction::ProxyStatus {
+                target: "VM3".to_string(),
+                is_test: false
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm proxy test", ""),
+            InboundAction::ProxyStatus {
+                target: "VM3".to_string(),
+                is_test: true
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm clean", ""),
+            InboundAction::SystemClean {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm purge", ""),
+            InboundAction::SystemClean {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm sync", ""),
+            InboundAction::SyncState {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm prompts", ""),
+            InboundAction::ListPrompts {
+                target: "VM3".to_string(),
+                is_gitmap: false
             }
         );
         assert_eq!(

@@ -1,3 +1,9 @@
+## v4.63.0 — 2026-09-23 (expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync)
+
+**Scope:** Version bump. expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync.
+
+---
+
 ## v4.62.0 — 2026-09-23 (Routine release v4.62.0)
 
 **Scope:** Version bump. Routine release v4.62.0.

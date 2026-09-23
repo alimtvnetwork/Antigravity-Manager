@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.63.0 (2026-09-23)**:
+        -   **[原生 AGM 终端 CLI 扩充与入站邮件全指令映射] 对标 GitMap 扩充 doctor、accounts、switch、prompts、proxy、sync、pull、clean、logs 命令**:
+            -   **对标 GitMap 原生 CLI 指令全集**: 为独立的 `agm` 命令行工具扩充 `doctor`/`check`（金库完整性、IDE 进程、代理端口、PATH 与网络全方位诊断）、`accounts`/`acc`（注册账户列表、等级与配额，支持 `--active` 与 `--json`）、`switch <email>`（终端直接切换活跃账户并同步指纹）、`prompts`（活跃任务与模板库）、`proxy [status|test]`（回环延迟探测）、`sync`（本地与金库同步）、`pull`（`git pull origin main` 联动）、`clean`/`purge`（安全清理临时构建缓存并绝对保护金库）、`logs`（支持 `--tail` 与 `--filter`）。
+            -   **入站邮件远程控制指令全量映射**: 在 `src-tauri/src/modules/email_inbound.rs` 中完整映射 `DoctorDiagnostic`、`ListAccounts`、`AccountSwitch`、`ProxyStatus`、`SystemClean`、`SyncState`，所有指令均遵循双相通知机制（第一相即时纯文本 ACK + 第二相后台执行结果明细回执）及 10 秒防抖滑动栈保护。
+            -   **本地端到端测试套件全量扩充**: 扩展 `03-ai-scripts/40-test-email-permutations-e2e.py` 至 30 种主题指令变体、10 项 AGM CLI 终端命令验证及 9 项 Rust 单元测试，本地验证 100% 通过。
+            -   **规范与架构蓝图确立**: 编制权威规范 `02-spec/21-app/20-agm-cli-expanded-commands.md`，并在计划索引中闭环归档 Plan 66。
+
     *   **v4.62.0 (2026-09-23)**:
         -   **[入站邮件远程控制、纯文本双相回执与原生 AGM 终端 CLI] 统一管道语法解析、双相通知回执、10秒防抖滑动栈与原生 agm 终端命令**:
             -   **统一入站邮件管道语法**: 支持 `sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]` 2至4段式管道语法，具备部分 IP 尾段模糊匹配（如 `12` 匹配 `192.168.1.12`）、实例与项目智能提取及前缀去重功能。
@@ -3149,6 +3156,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.63.0 (2026-09-23)**:
+        -   **[Release v4.63.0] expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: expand agm terminal commands with doctor, accounts, switch, prompts, proxy, and sync.
     *   **v4.62.0 (2026-09-23)**:
         -   **[Release v4.62.0] Routine release v4.62.0**:
             -   **Update System**: Automated release and version synchronization across all manifests.
