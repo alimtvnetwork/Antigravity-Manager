@@ -22,8 +22,16 @@ import {
     Zap,
     Terminal,
     Play,
+    Eye,
+    EyeOff,
+    MessageSquare,
 } from 'lucide-react';
 import AiSampleTemplatesModal from './ai-sample-templates-modal';
+import {
+    telegramService,
+    TelegramConfig,
+    TelegramWatcherStatus,
+} from '../../services/telegramService';
 import {
     EmailAccount,
     EmailAccountInput,
@@ -88,6 +96,15 @@ export default function EmailNotificationSettings() {
     const [developerCustomSubject, setDeveloperCustomSubject] = useState<string>('');
     const [isDispatchingTask, setIsDispatchingTask] = useState<boolean>(false);
 
+    // Telegram Bot Integration State
+    const [telegramConfig, setTelegramConfig] = useState<TelegramConfig | null>(null);
+    const [telegramStatus, setTelegramStatus] = useState<TelegramWatcherStatus | null>(null);
+    const [isTestingTelegram, setIsTestingTelegram] = useState<boolean>(false);
+    const [isSavingTelegram, setIsSavingTelegram] = useState<boolean>(false);
+    const [isSendingTelegramPing, setIsSendingTelegramPing] = useState<boolean>(false);
+    const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
+    const [showBotToken, setShowBotToken] = useState<boolean>(false);
+
     // Account modal state
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState<EmailAccountInput>({
@@ -129,14 +146,18 @@ export default function EmailNotificationSettings() {
 
     const loadAll = async () => {
         try {
-            const [accs, recs, sets] = await Promise.all([
+            const [accs, recs, sets, tgConf, tgStat] = await Promise.all([
                 listEmailAccounts(),
                 listNotifyRecipients(),
                 getEmailSettings(),
+                telegramService.getConfig().catch(() => null),
+                telegramService.getStatus().catch(() => null),
             ]);
             setAccounts(accs);
             setRecipients(recs);
             setSettings(sets);
+            if (tgConf) setTelegramConfig(tgConf);
+            if (tgStat) setTelegramStatus(tgStat);
         } catch (e: any) {
             console.error('Failed to load email settings:', e);
             showToast('Failed to load email configurations', 'error');
@@ -146,6 +167,55 @@ export default function EmailNotificationSettings() {
     useEffect(() => {
         loadAll();
     }, []);
+
+    const handleSaveTelegram = async () => {
+        if (!telegramConfig) return;
+        setIsSavingTelegram(true);
+        try {
+            await telegramService.saveConfig(telegramConfig);
+            showToast('Telegram bot settings saved successfully', 'success');
+            const st = await telegramService.getStatus();
+            setTelegramStatus(st);
+        } catch (e: any) {
+            showToast(`Failed to save Telegram settings: ${e?.message || e}`, 'error');
+        } finally {
+            setIsSavingTelegram(false);
+        }
+    };
+
+    const handleTestTelegram = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim()) {
+            showToast('Please enter a Telegram Bot Token', 'warning');
+            return;
+        }
+        setIsTestingTelegram(true);
+        try {
+            const username = await telegramService.testBot(telegramConfig.bot_token);
+            setTelegramBotUsername(username);
+            showToast(`Connected to Telegram bot: @${username}`, 'success');
+        } catch (e: any) {
+            setTelegramBotUsername(null);
+            showToast(`Telegram connection failed: ${e?.message || e}`, 'error');
+        } finally {
+            setIsTestingTelegram(false);
+        }
+    };
+
+    const handleSendTelegramPing = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim() || !telegramConfig.allowed_chat_id) {
+            showToast('Please specify Bot Token and Allowed Chat ID first', 'warning');
+            return;
+        }
+        setIsSendingTelegramPing(true);
+        try {
+            await telegramService.sendTestMessage(telegramConfig.bot_token, telegramConfig.allowed_chat_id);
+            showToast('Test alert sent to your Telegram chat!', 'success');
+        } catch (e: any) {
+            showToast(`Failed to send test alert: ${e?.message || e}`, 'error');
+        } finally {
+            setIsSendingTelegramPing(false);
+        }
+    };
 
     const handleSaveSettings = async () => {
         setIsSaving(true);
@@ -1502,6 +1572,203 @@ export default function EmailNotificationSettings() {
                         ) : null}
                     </div>
                 ) : null}
+            </div>
+
+            {/* Telegram Bot & Alerts Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-sky-500" />
+                            Telegram Bot & Alert Notifications
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
+                            Receive real-time push alerts, account switch logs, and remote command executions directly on Telegram.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {telegramStatus?.is_running ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Active & Polling
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700">
+                                Inactive
+                            </span>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const cmd = `.\\03-ai-scripts\\setup-telegram-bot.ps1 -BotToken "${telegramConfig?.bot_token || 'TOKEN'}" -ChatId "${telegramConfig?.allowed_chat_id || 'CHAT_ID'}"`;
+                                navigator.clipboard.writeText(cmd);
+                                showToast('PowerShell verification command copied', 'info');
+                            }}
+                            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            title="Copy PowerShell script command"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy PS Script</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Bot Token & Allowed Chat ID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300 flex items-center justify-between">
+                                <span>Telegram Bot Token</span>
+                                {telegramBotUsername && (
+                                    <span className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold">
+                                        @{telegramBotUsername} Verified
+                                    </span>
+                                )}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showBotToken ? 'text' : 'password'}
+                                    value={telegramConfig?.bot_token || ''}
+                                    onChange={(e) =>
+                                        setTelegramConfig((prev) =>
+                                            prev
+                                                ? { ...prev, bot_token: e.target.value }
+                                                : {
+                                                      bot_token: e.target.value,
+                                                      allowed_chat_id: null,
+                                                      is_enabled: false,
+                                                      poll_interval_secs: 5,
+                                                  }
+                                        )
+                                    }
+                                    placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                                    className="w-full px-3 py-2 pr-10 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBotToken(!showBotToken)}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-0.5"
+                                >
+                                    {showBotToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                                Allowed Chat ID (Numeric)
+                            </label>
+                            <input
+                                type="number"
+                                value={telegramConfig?.allowed_chat_id ?? ''}
+                                onChange={(e) => {
+                                    const val = e.target.value.trim();
+                                    const parsed = val ? parseInt(val, 10) : null;
+                                    setTelegramConfig((prev) =>
+                                        prev
+                                            ? { ...prev, allowed_chat_id: isNaN(parsed as any) ? null : parsed }
+                                            : {
+                                                  bot_token: '',
+                                                  allowed_chat_id: isNaN(parsed as any) ? null : parsed,
+                                                  is_enabled: false,
+                                                  poll_interval_secs: 5,
+                                              }
+                                    );
+                                }}
+                                placeholder="987654321"
+                                className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Enable Toggle & Polling Interval */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-750">
+                        <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={telegramConfig?.is_enabled || false}
+                                onChange={(e) =>
+                                    setTelegramConfig((prev) =>
+                                        prev
+                                            ? { ...prev, is_enabled: e.target.checked }
+                                            : {
+                                                  bot_token: '',
+                                                  allowed_chat_id: null,
+                                                  is_enabled: e.target.checked,
+                                                  poll_interval_secs: 5,
+                                              }
+                                    )
+                                }
+                                className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-gray-300 dark:border-slate-600"
+                            />
+                            <div>
+                                <span className="text-xs font-semibold text-gray-900 dark:text-slate-100">
+                                    Enable Telegram Bot Notifications & Inbound Daemon
+                                </span>
+                                <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                                    Polls for commands and sends instant alerts when accounts switch or quota drops.
+                                </p>
+                            </div>
+                        </label>
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600 dark:text-slate-400">Poll Interval:</span>
+                            <input
+                                type="number"
+                                min={2}
+                                max={60}
+                                value={telegramConfig?.poll_interval_secs || 5}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10) || 5;
+                                    setTelegramConfig((prev) =>
+                                        prev ? { ...prev, poll_interval_secs: val } : null
+                                    );
+                                }}
+                                className="w-16 px-2 py-1 text-xs border border-gray-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 text-center font-mono"
+                            />
+                            <span className="text-xs text-gray-500">sec</span>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-slate-800">
+                        <div className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Create bot with <span className="font-semibold text-sky-600 dark:text-sky-400">@BotFather</span> and get ID from <span className="font-semibold text-sky-600 dark:text-sky-400">@userinfobot</span>.
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleTestTelegram}
+                                disabled={isTestingTelegram}
+                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                            >
+                                {isTestingTelegram ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                Test Bot Token
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSendTelegramPing}
+                                disabled={isSendingTelegramPing}
+                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                            >
+                                {isSendingTelegramPing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                Send Test Alert
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveTelegram}
+                                disabled={isSavingTelegram}
+                                className="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                            >
+                                {isSavingTelegram ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                Save Telegram Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Account Add/Edit Modal */}

@@ -9,10 +9,10 @@ pub mod constants;
 pub mod error;
 #[cfg(target_os = "linux")]
 mod linux_graphics;
-mod models;
-mod modules;
+pub mod models;
+pub mod modules;
 mod proxy; // Proxy service module
-mod utils;
+pub mod utils;
 
 use modules::logger;
 use std::sync::Arc;

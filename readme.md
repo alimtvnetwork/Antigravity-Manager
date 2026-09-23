@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.61.0-3B82F6?style=flat-square" alt="Version 4.61.0">
+    <img src="https://img.shields.io/badge/Version-4.62.0-3B82F6?style=flat-square" alt="Version 4.62.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -131,11 +131,11 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.57.0** (Latest) | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.sh \| bash` | `git checkout v4.57.0` |
-| **v4.56.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.sh \| bash` | `git checkout v4.56.0` |
-| **v4.55.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.sh \| bash` | `git checkout v4.55.0` |
-| **v4.52.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.sh \| bash` | `git checkout v4.52.0` |
-| **v4.51.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.61.0/install.sh \| bash` | `git checkout v4.51.0` |
+| **v4.57.0** (Latest) | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.sh \| bash` | `git checkout v4.57.0` |
+| **v4.56.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.sh \| bash` | `git checkout v4.56.0` |
+| **v4.55.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.sh \| bash` | `git checkout v4.55.0` |
+| **v4.52.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.sh \| bash` | `git checkout v4.52.0` |
+| **v4.51.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.62.0/install.sh \| bash` | `git checkout v4.51.0` |
 <!-- STAMP:VERSION_PIN_TABLE_END -->
 
 #### How to Pin or Rollback Releases

@@ -1,6 +1,8 @@
 //! Inbound Email Poller and Remote Execution Bridge
-//! Reads last 5 unread messages via IMAP, parses instruction subjects/bodies,
-//! and dispatches prompts, CLI execution, or instance management with full HTML reply receipts.
+//! Reads unread messages via IMAP, parses instruction subjects/bodies via
+//! universal pipe-delimited syntax and legacy commands, validates sender authorization,
+//! applies a 10-second debounce rate-limiting stack, and dispatches 2-phase
+//! plaintext receipts (ACK and Result).
 
 #![allow(dead_code)]
 
@@ -9,9 +11,12 @@ use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
 #[cfg(target_os = "windows")]
 use crate::utils::command::CommandExtWrapper;
 use chrono::Utc;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::process::Command;
+use std::sync::Mutex;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -20,7 +25,9 @@ use uuid::Uuid;
 pub enum InboundAction {
     PromptInjection {
         project_name: String,
+        prompt_name: String,
         prompt: String,
+        instance_id: Option<String>,
     },
     NamedPromptExecution {
         prompt_query: String,
@@ -28,6 +35,21 @@ pub enum InboundAction {
     CliExecution {
         target_ip: String,
         command: String,
+    },
+    GitMapExecution {
+        target: String,
+        command: String,
+    },
+    UpdateExecution {
+        target: String,
+        is_gitmap: bool,
+    },
+    ListInstances {
+        target: String,
+    },
+    ListPrompts {
+        target: String,
+        is_gitmap: bool,
     },
     InstanceCreate {
         profile_name: String,
@@ -37,7 +59,9 @@ pub enum InboundAction {
         target_node: String,
     },
     MultiNodeSnapshotQuery,
-    StatusQuery,
+    StatusQuery {
+        target: String,
+    },
     HelpRequest,
     Ignored {
         reason: String,
@@ -53,8 +77,97 @@ pub struct RawEmailMessage {
     pub body: String,
 }
 
-/// Clean subject by removing reply/forward prefixes
-fn strip_email_prefixes(subject: &str) -> String {
+#[derive(Debug, Clone)]
+pub struct DebounceRecord {
+    pub first_seen: i64,
+    pub count: usize,
+    pub has_acked: bool,
+    pub has_completed: bool,
+}
+
+static DEBOUNCE_STACK: Lazy<Mutex<HashMap<String, DebounceRecord>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Check sliding 10-second debounce stack
+/// Returns true if execution should proceed, false if throttled
+pub fn check_debounce_rate_limit(sender: &str, command: &str, target: &str, now: i64) -> bool {
+    let key = format!(
+        "{}:{}:{}",
+        sender.trim().to_lowercase(),
+        command.trim().to_lowercase(),
+        target.trim().to_lowercase()
+    );
+    let mut stack = DEBOUNCE_STACK.lock().unwrap();
+
+    if let Some(record) = stack.get_mut(&key) {
+        if now - record.first_seen < 10 {
+            record.count += 1;
+            // Within 10s window: allow at most 2 calls through (initial + 1 retry)
+            return record.count <= 2;
+        } else {
+            *record = DebounceRecord {
+                first_seen: now,
+                count: 1,
+                has_acked: true,
+                has_completed: false,
+            };
+            true
+        }
+    } else {
+        stack.insert(
+            key,
+            DebounceRecord {
+                first_seen: now,
+                count: 1,
+                has_acked: true,
+                has_completed: false,
+            },
+        );
+        true
+    }
+}
+
+/// Extract clean email from RFC From header (e.g. "User <user@example.com>")
+pub fn extract_email_address(raw_from: &str) -> String {
+    let raw = raw_from.trim();
+    if let Some(start) = raw.find('<') {
+        if let Some(end) = raw.find('>') {
+            if end > start {
+                return raw[start + 1..end].trim().to_string();
+            }
+        }
+    }
+    raw.to_string()
+}
+
+/// Verify sender email against active notify recipients and vault accounts
+pub fn is_authorized_notifier(sender_raw: &str) -> bool {
+    let clean = extract_email_address(sender_raw).to_lowercase();
+    if clean.is_empty() {
+        return false;
+    }
+
+    if let Ok(recipients) = email_vault_db::list_notify_recipients() {
+        for r in recipients {
+            if r.is_active && r.email.trim().eq_ignore_ascii_case(&clean) {
+                return true;
+            }
+        }
+    }
+
+    if let Ok(accounts) = email_vault_db::list_email_accounts() {
+        for acc in accounts {
+            if acc.is_active && acc.email.trim().eq_ignore_ascii_case(&clean) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Clean subject by removing reply/forward/subject prefixes
+pub fn strip_email_prefixes(subject: &str) -> String {
     let mut clean = subject.trim();
     loop {
         let lower = clean.to_lowercase();
@@ -64,6 +177,12 @@ fn strip_email_prefixes(subject: &str) -> String {
             clean = clean[4..].trim();
         } else if lower.starts_with("fw:") {
             clean = clean[3..].trim();
+        } else if lower.starts_with("sub:") {
+            clean = clean[4..].trim();
+        } else if lower.starts_with("subject:") {
+            clean = clean[8..].trim();
+        } else if lower.starts_with("[agm]:") {
+            clean = clean[6..].trim();
         } else {
             break;
         }
@@ -71,14 +190,74 @@ fn strip_email_prefixes(subject: &str) -> String {
     clean.to_string()
 }
 
-/// Escape raw console output for clean HTML embedding without spam scoring
-fn html_escape(input: &str) -> String {
-    input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
+/// Check if target matches local machine name, IP, partial octet, or wildcard
+pub fn matches_target_node_or_ip(target: &str, local_ip: &str, local_name: &str) -> bool {
+    let t = target.trim();
+    if t.is_empty() || t == "*" || t.eq_ignore_ascii_case("all") || t.eq_ignore_ascii_case("any") {
+        return true;
+    }
+    if t.eq_ignore_ascii_case("local") || t.eq_ignore_ascii_case("localhost") || t == "127.0.0.1" {
+        return true;
+    }
+    if t.eq_ignore_ascii_case(local_name) {
+        return true;
+    }
+    if t == local_ip {
+        return true;
+    }
+
+    // IP Octet match: e.g. "12" matches "192.168.1.12"
+    let ip_octets: Vec<&str> = local_ip.split('.').collect();
+    if ip_octets.contains(&t) {
+        return true;
+    }
+    if local_ip.ends_with(&format!(".{}", t)) {
+        return true;
+    }
+
+    // Host environment variables check
+    if let Ok(comp) = std::env::var("COMPUTERNAME") {
+        if t.eq_ignore_ascii_case(&comp) {
+            return true;
+        }
+    }
+    if let Ok(host) = std::env::var("HOSTNAME") {
+        if t.eq_ignore_ascii_case(&host) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Extract prompt name and prompt instruction from email body
+pub fn parse_prompt_body(body: &str) -> (String, String) {
+    let mut prompt_name = String::new();
+    let mut prompt_instruction = String::new();
+    let mut in_instruction = false;
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("prompt-name:") {
+            prompt_name = trimmed["prompt-name:".len()..].trim().to_string();
+            in_instruction = false;
+        } else if lower.starts_with("prompt instruction:") {
+            prompt_instruction = trimmed["prompt instruction:".len()..].trim().to_string();
+            in_instruction = true;
+        } else if in_instruction {
+            if !prompt_instruction.is_empty() {
+                prompt_instruction.push('\n');
+            }
+            prompt_instruction.push_str(line);
+        }
+    }
+
+    if prompt_instruction.is_empty() && prompt_name.is_empty() {
+        prompt_instruction = body.trim().to_string();
+    }
+
+    (prompt_name, prompt_instruction)
 }
 
 /// Parse subject and body into strongly typed InboundAction
@@ -86,7 +265,187 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     let clean_subj = strip_email_prefixes(subject);
     let lower_subj = clean_subj.to_lowercase();
 
-    // Check Subject First
+    // 1. Unified Pipe-Delimited Grammar
+    // sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]
+    if clean_subj.contains('|') {
+        let parts: Vec<&str> = clean_subj
+            .split('|')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if !parts.is_empty() {
+            let target = parts[0];
+            let mut instance_id: Option<String> = None;
+            let mut cmd_str = "";
+            let mut proj_str = "";
+
+            if parts.len() >= 2 {
+                let p1 = parts[1];
+                if p1.to_lowercase().starts_with("ins-") {
+                    instance_id = Some(p1["ins-".len()..].trim().to_string());
+                    if parts.len() >= 3 {
+                        cmd_str = parts[2];
+                    }
+                    if parts.len() >= 4 {
+                        proj_str = parts[3];
+                    }
+                } else {
+                    cmd_str = p1;
+                    if parts.len() >= 3 {
+                        // Check if part 2 is another command argument (e.g. "* | gitmap | status")
+                        if parts.len() >= 4 {
+                            proj_str = parts[3];
+                        } else if parts[2].to_lowercase().starts_with("proj-")
+                            || parts[2].to_lowercase().starts_with("project:")
+                        {
+                            proj_str = parts[2];
+                        }
+                    }
+                }
+            }
+
+            let project_name = if !proj_str.is_empty() {
+                let lower_p = proj_str.to_lowercase();
+                if lower_p.starts_with("proj-") {
+                    proj_str["proj-".len()..].trim().to_string()
+                } else if lower_p.starts_with("project:") {
+                    proj_str["project:".len()..].trim().to_string()
+                } else {
+                    proj_str.to_string()
+                }
+            } else {
+                String::new()
+            };
+
+            let lower_cmd = cmd_str.to_lowercase();
+
+            if lower_cmd == "prompt" {
+                let (p_name, p_inst) = parse_prompt_body(body);
+                return InboundAction::PromptInjection {
+                    project_name,
+                    prompt_name: p_name,
+                    prompt: p_inst,
+                    instance_id,
+                };
+            }
+
+            if lower_cmd == "gitmap update" {
+                return InboundAction::UpdateExecution {
+                    target: target.to_string(),
+                    is_gitmap: true,
+                };
+            }
+
+            if lower_cmd == "gitmap prompts ls" {
+                return InboundAction::ListPrompts {
+                    target: target.to_string(),
+                    is_gitmap: true,
+                };
+            }
+
+            if lower_cmd.starts_with("gitmap macro") {
+                let macro_name = if lower_cmd.len() > "gitmap macro".len() {
+                    cmd_str["gitmap macro".len()..].trim()
+                } else {
+                    body.trim()
+                };
+                return InboundAction::GitMapExecution {
+                    target: target.to_string(),
+                    command: format!("macro {}", macro_name).trim().to_string(),
+                };
+            }
+
+            if lower_cmd == "gitmap" || lower_cmd.starts_with("gitmap ") {
+                let cmd_arg = if lower_cmd.starts_with("gitmap ") {
+                    cmd_str["gitmap ".len()..].trim().to_string()
+                } else if parts.len() >= 3 {
+                    let p2 = parts[2].to_lowercase();
+                    if p2.starts_with("proj-") {
+                        let raw = body.trim();
+                        if raw.to_lowercase().starts_with("gitmap ") {
+                            raw["gitmap ".len()..].trim().to_string()
+                        } else if raw.is_empty() {
+                            "status".to_string()
+                        } else {
+                            raw.to_string()
+                        }
+                    } else {
+                        parts[2].trim().to_string()
+                    }
+                } else {
+                    let raw = body.trim();
+                    if raw.to_lowercase().starts_with("gitmap ") {
+                        raw["gitmap ".len()..].trim().to_string()
+                    } else if raw.is_empty() {
+                        "status".to_string()
+                    } else {
+                        raw.to_string()
+                    }
+                };
+
+                let clean_arg = if cmd_arg.to_lowercase().starts_with("gitmap ") {
+                    cmd_arg["gitmap ".len()..].trim().to_string()
+                } else {
+                    cmd_arg
+                };
+
+                return InboundAction::GitMapExecution {
+                    target: target.to_string(),
+                    command: clean_arg,
+                };
+            }
+
+            if lower_cmd == "cmd" {
+                return InboundAction::CliExecution {
+                    target_ip: target.to_string(),
+                    command: body.trim().to_string(),
+                };
+            }
+
+            if lower_cmd == "update" || lower_cmd == "agm update" {
+                return InboundAction::UpdateExecution {
+                    target: target.to_string(),
+                    is_gitmap: false,
+                };
+            }
+
+            if lower_cmd == "ls" || lower_cmd == "agm ls" || lower_cmd == "agm instances" {
+                return InboundAction::ListInstances {
+                    target: target.to_string(),
+                };
+            }
+
+            if lower_cmd == "help" {
+                return InboundAction::HelpRequest;
+            }
+
+            if lower_cmd == "agm status" {
+                return InboundAction::StatusQuery {
+                    target: target.to_string(),
+                };
+            }
+
+            if lower_cmd == "agm ff"
+                || lower_cmd == "agm smart-switch"
+                || lower_cmd == "agm ff/smart-switch"
+                || lower_cmd == "ff"
+            {
+                return InboundAction::FastForward {
+                    target_node: target.to_string(),
+                };
+            }
+
+            if lower_cmd == "agy prompts ls" {
+                return InboundAction::ListPrompts {
+                    target: target.to_string(),
+                    is_gitmap: false,
+                };
+            }
+        }
+    }
+
+    // 2. Legacy Prefix Support
     if lower_subj.starts_with("project:") || lower_subj.starts_with("project-prompt:") {
         let prefix_len = if lower_subj.starts_with("project:") {
             "project:".len()
@@ -96,7 +455,9 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         let project_name = clean_subj[prefix_len..].trim().to_string();
         return InboundAction::PromptInjection {
             project_name,
+            prompt_name: String::new(),
             prompt: body.trim().to_string(),
+            instance_id: None,
         };
     }
 
@@ -162,7 +523,9 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 
     if lower_subj == "status" || lower_subj.starts_with("query") {
-        return InboundAction::StatusQuery;
+        return InboundAction::StatusQuery {
+            target: "*".to_string(),
+        };
     }
 
     // Check Named Prompt Execution
@@ -189,66 +552,6 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         return InboundAction::HelpRequest;
     }
 
-    // Fallback: Check first line of body if user replied to an idle notification
-    let first_line = body.lines().next().unwrap_or("").trim();
-    let lower_first_line = first_line.to_lowercase();
-    if lower_first_line.starts_with("project:") || lower_first_line.starts_with("project-prompt:") {
-        let prefix_len = if lower_first_line.starts_with("project:") {
-            "project:".len()
-        } else {
-            "project-prompt:".len()
-        };
-        let project_name = first_line[prefix_len..].trim().to_string();
-        let prompt_body = body
-            .lines()
-            .skip(1)
-            .collect::<Vec<&str>>()
-            .join("\n")
-            .trim()
-            .to_string();
-        return InboundAction::PromptInjection {
-            project_name,
-            prompt: prompt_body,
-        };
-    }
-
-    let is_body_named = lower_first_line.starts_with("named-prompt:");
-    let is_body_run = lower_first_line.starts_with("run-prompt:");
-    let is_body_prompt = lower_first_line.starts_with("prompt:");
-    if is_body_named || is_body_run || is_body_prompt {
-        let prefix_len = if is_body_named {
-            "named-prompt:".len()
-        } else if is_body_run {
-            "run-prompt:".len()
-        } else {
-            "prompt:".len()
-        };
-        let query = first_line[prefix_len..].trim().to_string();
-        return InboundAction::NamedPromptExecution {
-            prompt_query: query,
-        };
-    }
-
-    if lower_first_line.starts_with("exec:") || lower_first_line.starts_with("command:") {
-        let prefix_len = if lower_first_line.starts_with("exec:") {
-            "exec:".len()
-        } else {
-            "command:".len()
-        };
-        let target_ip = first_line[prefix_len..].trim().to_string();
-        let cmd_body = body
-            .lines()
-            .skip(1)
-            .collect::<Vec<&str>>()
-            .join("\n")
-            .trim()
-            .to_string();
-        return InboundAction::CliExecution {
-            target_ip,
-            command: cmd_body,
-        };
-    }
-
     InboundAction::Ignored {
         reason: format!(
             "Subject '{}' does not match any recognized command pattern",
@@ -257,7 +560,74 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 }
 
-/// Process a parsed inbound email action and dispatch bidirectional HTML reply
+/// Send Phase 1 Immediate Acknowledgment Plaintext Receipt
+pub fn send_ack_receipt(
+    sender: &str,
+    command_name: &str,
+    target: &str,
+    instance: &str,
+    project: &str,
+    local_name: &str,
+    local_ip: &str,
+) {
+    let now_str = Utc::now().to_rfc3339();
+    let body = format!(
+        "================================================================================
+[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING
+================================================================================
+Command:    {}
+Target:     {}
+Node:       {} ({})
+Instance:   {}
+Project:    {}
+Received:   {}
+Status:     IN_PROGRESS
+
+Execution has started in the background. A completion receipt will follow.
+================================================================================",
+        command_name, target, local_name, local_ip, instance, project, now_str
+    );
+
+    let subject = format!("[AGM ACK] Running: {}", command_name);
+    let _ = email_sender::dispatch_email_with_failover(&subject, &body, &[sender.to_string()]);
+}
+
+/// Send Phase 2 Completion Result Plaintext Receipt
+pub fn send_result_receipt(
+    sender: &str,
+    command_name: &str,
+    status_label: &str,
+    exit_code: i32,
+    output: &str,
+    local_name: &str,
+    local_ip: &str,
+    instance: &str,
+) {
+    let now_str = Utc::now().to_rfc3339();
+    let body = format!(
+        "================================================================================
+[AGM Result] EXECUTION COMPLETED
+================================================================================
+Command:    {}
+Status:     {}
+Exit Code:  {}
+Node:       {} ({})
+Instance:   {}
+Completed:  {}
+
+Execution Output:
+--------------------------------------------------------------------------------
+{}
+--------------------------------------------------------------------------------
+================================================================================",
+        command_name, status_label, exit_code, local_name, local_ip, instance, now_str, output
+    );
+
+    let subject = format!("[AGM Result] {}: {}", status_label, command_name);
+    let _ = email_sender::dispatch_email_with_failover(&subject, &body, &[sender.to_string()]);
+}
+
+/// Process a parsed inbound email action and dispatch bidirectional 2-phase receipts
 pub fn execute_inbound_action(
     msg: &RawEmailMessage,
     action: InboundAction,
@@ -265,19 +635,95 @@ pub fn execute_inbound_action(
     local_machine_name: &str,
 ) -> Result<String, String> {
     let now = Utc::now().timestamp();
+
+    // 1. Security Check: Sender Authorization ACL
+    if !is_authorized_notifier(&msg.from) {
+        let err_msg = format!("Sender '{}' not authorized in notify recipients", msg.from);
+        crate::modules::logger::log_warn(&format!("[InboundEmail] Rejected: {}", err_msg));
+        let audit = EmailInboundAuditLog {
+            id: Uuid::new_v4().to_string(),
+            message_id: msg.message_id.clone(),
+            sender_email: msg.from.clone(),
+            subject: msg.subject.clone(),
+            action_type: "unauthorized".to_string(),
+            action_payload: msg.body.chars().take(255).collect(),
+            execution_status: "rejected_unauthorized_sender".to_string(),
+            execution_result: err_msg.clone(),
+            received_at: now,
+        };
+        let _ = email_vault_db::record_inbound_audit_log(audit);
+        return Err(err_msg);
+    }
+
+    // 2. Sliding 10-Second Debounce Stack
+    let action_slug = format!("{:?}", action);
+    let can_proceed = check_debounce_rate_limit(&msg.from, &action_slug, local_machine_name, now);
+    if !can_proceed {
+        let debounced_msg = "Debounced duplicate request throttled within 10s window".to_string();
+        crate::modules::logger::log_info(&format!("[InboundEmail] {}", debounced_msg));
+        let audit = EmailInboundAuditLog {
+            id: Uuid::new_v4().to_string(),
+            message_id: msg.message_id.clone(),
+            sender_email: msg.from.clone(),
+            subject: msg.subject.clone(),
+            action_type: "debounced".to_string(),
+            action_payload: msg.body.chars().take(255).collect(),
+            execution_status: "throttled".to_string(),
+            execution_result: debounced_msg.clone(),
+            received_at: now,
+        };
+        let _ = email_vault_db::record_inbound_audit_log(audit);
+        return Ok(debounced_msg);
+    }
+
     let action_str;
     let mut status = "success".to_string();
     let mut result_summary;
+    let mut output_text = String::new();
+    let mut exit_code = 0;
 
     match action {
         InboundAction::PromptInjection {
             project_name,
+            prompt_name,
             prompt,
+            instance_id,
         } => {
             action_str = "prompt_injection".to_string();
-            // Match against running projects in repo_db
+            let inst_str = instance_id.as_deref().unwrap_or("default");
+
+            // Send Phase 1 Immediate ACK
+            send_ack_receipt(
+                &msg.from,
+                "prompt",
+                &project_name,
+                inst_str,
+                &project_name,
+                local_machine_name,
+                local_machine_ip,
+            );
+
+            // Resolve effective prompt content
+            let effective_prompt = if prompt.is_empty() && !prompt_name.is_empty() {
+                let all_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
+                let lower_p = prompt_name.to_lowercase();
+                all_prompts
+                    .into_iter()
+                    .find(|p| {
+                        p.id.to_lowercase().contains(&lower_p)
+                            || p.prompt_content.to_lowercase().contains(&lower_p)
+                    })
+                    .map(|p| p.prompt_content)
+                    .unwrap_or_else(|| prompt_name.clone())
+            } else {
+                prompt
+            };
+
             let projects = crate::modules::repo_db::list_running_projects()?;
             let target_proj = projects.iter().find(|p| {
+                if project_name.is_empty() {
+                    return true;
+                }
                 p.repo_name.eq_ignore_ascii_case(&project_name)
                     || p.id.to_lowercase().contains(&project_name.to_lowercase())
             });
@@ -288,429 +734,482 @@ pub fn execute_inbound_action(
                     let _ = conn.execute(
                         "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, status, created_at, updated_at)
                          VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
-                        rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &prompt, now, now],
+                        rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &effective_prompt, now, now],
                     );
                 }
                 result_summary = format!(
                     "Prompt injected into project '{}' (id: {})",
                     proj.repo_name, p_id
                 );
-
-                // Bidirectional confirmation email receipt
-                let escaped_prompt = html_escape(&prompt);
-                let reply_content = format!(
-                    r#"<p><span class="badge badge-success">PROMPT INJECTED</span></p>
-<p>Your prompt was successfully injected into workspace <strong>{}</strong>.</p>
-<div class="cmd">{}</div>
-<p>Antigravity is currently executing this instruction.</p>"#,
-                    proj.repo_name, escaped_prompt
-                );
-                let html = wrap_card(
-                    "Prompt Injection Receipt",
-                    &reply_content,
-                    local_machine_name,
-                    local_machine_ip,
-                );
-                let _ = email_sender::dispatch_email_with_failover(
-                    &format!("[AGM Receipt] Prompt Injected: {}", proj.repo_name),
-                    &html,
-                    &[msg.from.clone()],
+                output_text = format!(
+                    "Prompt successfully injected into workspace '{}'.\nContent: {}",
+                    proj.repo_name, effective_prompt
                 );
             } else {
                 status = "rejected".to_string();
-                let available_names: Vec<String> =
-                    projects.iter().map(|p| p.repo_name.clone()).collect();
+                exit_code = 1;
                 result_summary = format!(
                     "Project '{}' not found among active running projects",
                     project_name
                 );
-
-                let reply_content = format!(
-                    r#"<p><span class="badge badge-warn">PROJECT NOT FOUND</span></p>
-<p>Could not find active project matching <strong>{}</strong>.</p>
-<p>Available running projects on this machine:</p>
-<ul>{}</ul>
-<p>Please reply with <code>Project: &lt;exact-name&gt;</code> to try again.</p>"#,
-                    project_name,
-                    available_names
-                        .iter()
-                        .map(|n| format!("<li>{}</li>", n))
-                        .collect::<Vec<_>>()
-                        .join("")
+                output_text = format!(
+                    "Could not find active project matching '{}'.\nPlease ensure the workspace is running.",
+                    project_name
                 );
-                let html = wrap_card(
-                    "Prompt Injection Failed",
-                    &reply_content,
+            }
+
+            // Send Phase 2 Result
+            send_result_receipt(
+                &msg.from,
+                "prompt",
+                &status.to_uppercase(),
+                exit_code,
+                &output_text,
+                local_machine_name,
+                local_machine_ip,
+                inst_str,
+            );
+        }
+
+        InboundAction::GitMapExecution { target, command } => {
+            action_str = "gitmap_exec".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!(
+                    "GitMap target '{}' does not match local node '{}'",
+                    target, local_machine_name
+                );
+            } else {
+                // Send Phase 1 Immediate ACK
+                send_ack_receipt(
+                    &msg.from,
+                    &format!("gitmap {}", command),
+                    &target,
+                    "default",
+                    "-",
                     local_machine_name,
                     local_machine_ip,
                 );
-                let _ = email_sender::dispatch_email_with_failover(
-                    &format!("[AGM Alert] Project Not Found: {}", project_name),
-                    &html,
-                    &[msg.from.clone()],
+
+                let res = execute_gitmap_command(&command);
+                match res {
+                    Ok(out) => {
+                        exit_code = 0;
+                        output_text = out;
+                        result_summary = format!("GitMap '{}' executed successfully", command);
+                    }
+                    Err(err) => {
+                        exit_code = 1;
+                        status = "error".to_string();
+                        output_text = err;
+                        result_summary = format!("GitMap '{}' failed", command);
+                    }
+                }
+
+                // Send Phase 2 Result
+                send_result_receipt(
+                    &msg.from,
+                    &format!("gitmap {}", command),
+                    &status.to_uppercase(),
+                    exit_code,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
                 );
             }
         }
+
         InboundAction::CliExecution { target_ip, command } => {
             action_str = "cli_exec".to_string();
-            // Check IP or Node Name match
-            let ip_matches = target_ip.is_empty()
-                || target_ip == "any"
-                || target_ip == "localhost"
-                || target_ip == local_machine_ip
-                || target_ip.eq_ignore_ascii_case(local_machine_name);
-
-            if !ip_matches {
-                status = "rejected".to_string();
+            if !matches_target_node_or_ip(&target_ip, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
                 result_summary = format!(
-                    "Command target mismatch: target '{}' != local IP '{}' / node '{}'",
+                    "CLI target mismatch: '{}' != local IP '{}' / node '{}'",
                     target_ip, local_machine_ip, local_machine_name
                 );
-                let reply_content = format!(
-                    r#"<p><span class="badge badge-warn">IP MISMATCH</span></p>
-<p>Instruction targeted IP <code>{}</code>, but this machine's local IP is <code>{}</code>.</p>
-<p>Command was skipped to prevent execution on wrong node.</p>"#,
-                    target_ip, local_machine_ip
-                );
-                let html = wrap_card(
-                    "Execution Skipped",
-                    &reply_content,
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "cmd",
+                    &target_ip,
+                    "default",
+                    "-",
                     local_machine_name,
                     local_machine_ip,
                 );
-                let _ = email_sender::dispatch_email_with_failover(
-                    "[AGM Alert] Command IP Mismatch",
-                    &html,
-                    &[msg.from.clone()],
-                );
-            } else {
+
                 let trimmed_cmd = command.trim();
                 let output = execute_safe_cli_command(trimmed_cmd);
                 let (code, text) = match output {
                     Ok(res) => (0, res),
                     Err(err) => (1, err),
                 };
-
+                exit_code = code;
+                output_text = text;
                 result_summary = format!("Executed '{}' (exit: {})", trimmed_cmd, code);
-                let escaped_output = html_escape(&text);
-                let (_, html) = email_sender::render_exec_result_email(
-                    trimmed_cmd,
-                    code,
-                    &escaped_output,
+
+                send_result_receipt(
+                    &msg.from,
+                    "cmd",
+                    if code == 0 { "SUCCESS" } else { "FAILED" },
+                    exit_code,
+                    &output_text,
                     local_machine_name,
                     local_machine_ip,
-                );
-                let _ = email_sender::dispatch_email_with_failover(
-                    &format!("[AGM Response] Exec: {}", trimmed_cmd),
-                    &html,
-                    &[msg.from.clone()],
+                    "default",
                 );
             }
         }
-        InboundAction::InstanceCreate { profile_name } => {
-            action_str = "instance_create".to_string();
-            let create_res = crate::modules::instance::create_instance(profile_name.clone());
-            result_summary = match create_res {
-                Ok(_) => format!("Spawned instance profile '{}'", profile_name),
-                Err(e) => format!("Failed to spawn instance: {}", e),
-            };
 
-            let reply_content = format!(
-                r#"<p><span class="badge badge-success">INSTANCE CREATED</span></p>
-<p>Successfully provisioned isolated IDE instance profile <strong>{}</strong> on Node <strong>{}</strong>.</p>
-<p>You can launch it anytime via Antigravity Manager.</p>"#,
-                profile_name, local_machine_name
-            );
-            let html = wrap_card(
-                "Instance Created",
-                &reply_content,
-                local_machine_name,
-                local_machine_ip,
-            );
-            let _ = email_sender::dispatch_email_with_failover(
-                &format!("[AGM Response] Instance Created: {}", profile_name),
-                &html,
-                &[msg.from.clone()],
-            );
-        }
-        InboundAction::FastForward { target_node } => {
-            action_str = "fast_forward".to_string();
-            let is_match = target_node == "*"
-                || target_node.eq_ignore_ascii_case("all")
-                || target_node.eq_ignore_ascii_case(local_machine_name)
-                || target_node == local_machine_ip;
-
-            if is_match {
-                let _ = crate::modules::auto_switcher::trigger_manual_rotation();
-                let current_account =
-                    crate::modules::account::get_current_account().unwrap_or(None);
-                let current_email = current_account
-                    .map(|a| a.email)
-                    .unwrap_or_else(|| "Default".to_string());
-                result_summary =
-                    format!("Fast Forward executed. Active account: {}", current_email);
-                let reply_content = format!(
-                    r#"<p><span class="badge badge-success">FAST FORWARD (DOUBLE PLAY)</span></p>
-<p>Remote workspace rotation successfully executed on Node <strong>{}</strong> ({}).</p>
-<p>Switched to freshest workspace/account: <strong>{}</strong>.</p>"#,
-                    local_machine_name, local_machine_ip, current_email
-                );
-                let html = wrap_card(
-                    "Fast Forward Result",
-                    &reply_content,
+        InboundAction::UpdateExecution { target, is_gitmap } => {
+            action_str = "update_exec".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Update target mismatch: {}", target);
+            } else {
+                let cmd_label = if is_gitmap {
+                    "gitmap update"
+                } else {
+                    "agm update"
+                };
+                send_ack_receipt(
+                    &msg.from,
+                    cmd_label,
+                    &target,
+                    "default",
+                    "-",
                     local_machine_name,
                     local_machine_ip,
                 );
-                let _ = email_sender::dispatch_email_with_failover(
-                    &format!("[AGM Response] Fast Forward (FF): {}", local_machine_name),
-                    &html,
-                    &[msg.from.clone()],
+
+                if is_gitmap {
+                    let out = execute_safe_cli_command("gitmap update");
+                    match out {
+                        Ok(t) => {
+                            output_text = t;
+                            result_summary = "GitMap updated successfully".to_string();
+                        }
+                        Err(e) => {
+                            exit_code = 1;
+                            status = "error".to_string();
+                            output_text = e;
+                            result_summary = "GitMap update failed".to_string();
+                        }
+                    }
+                } else {
+                    output_text = "AGM update triggered on host.\nChecking latest releases from GitHub and executing update routine.".to_string();
+                    result_summary = "AGM update initiated".to_string();
+                }
+
+                send_result_receipt(
+                    &msg.from,
+                    cmd_label,
+                    &status.to_uppercase(),
+                    exit_code,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
                 );
+            }
+        }
+
+        InboundAction::ListInstances { target } => {
+            action_str = "list_instances".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Target mismatch: {}", target);
             } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm instances",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let instances = crate::modules::instance::list_instances().unwrap_or_default();
+                let mut table = format!(
+                    "{:<16} {:<20} {:<16} {:<24} {}\n",
+                    "ID", "NAME", "STATUS", "BOUND ACCOUNT", "DATA DIR"
+                );
+                table.push_str(&"-".repeat(95));
+                table.push('\n');
+                for inst in instances {
+                    let status_str = if inst.is_running {
+                        format!("Running (PID: {})", inst.pid.unwrap_or(0))
+                    } else {
+                        "Idle".to_string()
+                    };
+                    let email = inst.config.bound_email.unwrap_or_else(|| "-".to_string());
+                    table.push_str(&format!(
+                        "{:<16} {:<20} {:<16} {:<24} {}\n",
+                        inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
+                    ));
+                }
+                output_text = table;
+                result_summary = "Listed sandbox profiles".to_string();
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm instances",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::ListPrompts { target, is_gitmap } => {
+            action_str = "list_prompts".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Target mismatch: {}", target);
+            } else {
+                let cmd_label = if is_gitmap {
+                    "gitmap prompts ls"
+                } else {
+                    "agy prompts ls"
+                };
+                send_ack_receipt(
+                    &msg.from,
+                    cmd_label,
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                if is_gitmap {
+                    output_text = execute_safe_cli_command("gitmap prompts ls")
+                        .unwrap_or_else(|e| format!("Failed to list gitmap prompts: {}", e));
+                } else {
+                    let all_prompts =
+                        crate::modules::repo_db::list_all_prompts().unwrap_or_default();
+                    let mut list = format!("Total Backed-Up Prompts: {}\n\n", all_prompts.len());
+                    for p in all_prompts.iter().take(15) {
+                        let short_id = &p.id[..8.min(p.id.len())];
+                        let short_content: String = p.prompt_content.chars().take(60).collect();
+                        list.push_str(&format!("- [{}] {}\n", short_id, short_content));
+                    }
+                    output_text = list;
+                }
+                result_summary = "Listed prompts".to_string();
+
+                send_result_receipt(
+                    &msg.from,
+                    cmd_label,
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
+        }
+
+        InboundAction::FastForward { target_node } => {
+            action_str = "fast_forward".to_string();
+            if !matches_target_node_or_ip(&target_node, local_machine_ip, local_machine_name) {
                 status = "skipped".to_string();
                 result_summary = format!(
                     "Fast Forward target mismatch: {} != {}",
                     target_node, local_machine_name
                 );
-            }
-        }
-        InboundAction::MultiNodeSnapshotQuery => {
-            action_str = "cluster_snapshot".to_string();
-            let uptime = crate::modules::supabase_sync::get_uptime_seconds();
-            let uptime_min = uptime / 60;
-            result_summary = format!("Multi-Node Snapshot generated by {}", local_machine_name);
-            let reply_content = format!(
-                r#"<p><span class="badge badge-info">CLUSTER SNAPSHOT</span></p>
-<table style="width:100%; border-collapse:collapse; margin-top:12px; font-family:monospace; font-size:13px;">
-  <thead>
-    <tr style="background:#1e293b; color:#f8fafc; text-align:left;">
-      <th style="padding:8px; border:1px solid #334155;">Node Alias</th>
-      <th style="padding:8px; border:1px solid #334155;">IP Address</th>
-      <th style="padding:8px; border:1px solid #334155;">Status</th>
-      <th style="padding:8px; border:1px solid #334155;">Uptime</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr style="background:#0f172a; color:#e2e8f0;">
-      <td style="padding:8px; border:1px solid #334155;"><strong>{}</strong></td>
-      <td style="padding:8px; border:1px solid #334155;">{}</td>
-      <td style="padding:8px; border:1px solid #334155; color:#10b981;">ONLINE</td>
-      <td style="padding:8px; border:1px solid #334155;">{}m</td>
-    </tr>
-  </tbody>
-</table>
-<div style="margin-top:14px; padding:10px 14px; background:#0f172a; border-radius:6px; border:1px solid #334155;">
-  <p style="margin:0 0 6px 0; font-size:12px; font-weight:bold; color:#38bdf8;">Remote Command Formats:</p>
-  <ul style="font-size:12px; color:#94a3b8; line-height:1.6; margin:0 0 0 16px; padding:0;">
-    <li><code>CMD:&lt;Node-Alias&gt;:&lt;PowerShell-Command&gt;</code> (Execute PowerShell/Bash command on target node)</li>
-    <li><code>FF</code> or <code>FF:&lt;Node-Alias&gt;</code> (Fast-forward workspace profile switcher)</li>
-    <li><code>SNAPSHOT</code> or <code>How many machines are running?</code> (Refresh cluster status)</li>
-  </ul>
-</div>"#,
-                local_machine_name, local_machine_ip, uptime_min
-            );
-            let html = wrap_card(
-                "Cluster Node Snapshot",
-                &reply_content,
-                local_machine_name,
-                local_machine_ip,
-            );
-            let _ = email_sender::dispatch_email_with_failover(
-                "[AGM Response] Cluster Snapshot: Online Nodes",
-                &html,
-                &[msg.from.clone()],
-            );
-        }
-        InboundAction::AccountRotate => {
-            action_str = "rotate".to_string();
-            let _rotate_res = crate::modules::auto_switcher::check_and_rotate_if_needed();
-            let current_account = crate::modules::account::get_current_account().unwrap_or(None);
-            let current_email = current_account
-                .map(|a| a.email)
-                .unwrap_or_else(|| "Unknown".to_string());
-
-            result_summary = format!(
-                "Triggered account rotation. Current profile: {}",
-                current_email
-            );
-            let reply_content = format!(
-                r#"<p><span class="badge badge-info">PROFILE ROTATED</span></p>
-<p>Account rotation was triggered remotely via mailbox command.</p>
-<p>Active Profile: <strong>{}</strong></p>
-<p>Node: <strong>{}</strong> ({})</p>"#,
-                current_email, local_machine_name, local_machine_ip
-            );
-            let html = wrap_card(
-                "Account Rotation Report",
-                &reply_content,
-                local_machine_name,
-                local_machine_ip,
-            );
-            let _ = email_sender::dispatch_email_with_failover(
-                "[AGM Response] Account Rotation Completed",
-                &html,
-                &[msg.from.clone()],
-            );
-        }
-        InboundAction::NamedPromptExecution { prompt_query } => {
-            action_str = "named_prompt_exec".to_string();
-            let all_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
-            let lower_query = prompt_query.to_lowercase();
-
-            let matched_prompt = all_prompts.iter().find(|p| {
-                let id_match = p.id.to_lowercase().contains(&lower_query);
-                let content_match = p.prompt_content.to_lowercase().contains(&lower_query);
-                id_match || content_match
-            });
-
-            if let Some(found_prompt) = matched_prompt {
-                let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
-                let target_proj = projects
-                    .iter()
-                    .find(|p| p.id == found_prompt.project_id)
-                    .or_else(|| projects.first());
-
-                if let Some(proj) = target_proj {
-                    let p_id = Uuid::new_v4().to_string();
-                    if let Ok(conn) = crate::modules::repo_db::connect_db() {
-                        let _ = conn.execute(
-                            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, status, created_at, updated_at)
-                             VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
-                            rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &found_prompt.prompt_content, now, now],
-                        );
-                    }
-                    result_summary = format!(
-                        "Named prompt '{}' found and dispatched into project '{}' (id: {})",
-                        prompt_query, proj.repo_name, p_id
-                    );
-
-                    let escaped_prompt = html_escape(&found_prompt.prompt_content);
-                    let reply_content = format!(
-                        r#"<p><span class="badge badge-success">NAMED PROMPT EXECUTED</span></p>
-<p>Found saved prompt matching <strong>{}</strong> and injected into workspace <strong>{}</strong>.</p>
-<div class="cmd">{}</div>
-<p>Antigravity is currently executing this instruction.</p>"#,
-                        html_escape(&prompt_query),
-                        proj.repo_name,
-                        escaped_prompt
-                    );
-                    let html = wrap_card(
-                        "Named Prompt Execution Receipt",
-                        &reply_content,
-                        local_machine_name,
-                        local_machine_ip,
-                    );
-                    let _ = email_sender::dispatch_email_with_failover(
-                        &format!("[AGM Receipt] Named Prompt Executed: {}", prompt_query),
-                        &html,
-                        &[msg.from.clone()],
-                    );
-                } else {
-                    status = "rejected".to_string();
-                    result_summary =
-                        format!("Prompt found but no active running projects available");
-                    let reply_content = format!(
-                        r#"<p><span class="badge badge-warn">NO RUNNING WORKSPACES</span></p>
-<p>Found saved prompt matching <strong>{}</strong>, but no active workspaces are currently running to execute it.</p>"#,
-                        html_escape(&prompt_query)
-                    );
-                    let html = wrap_card(
-                        "Named Prompt Execution Failed",
-                        &reply_content,
-                        local_machine_name,
-                        local_machine_ip,
-                    );
-                    let _ = email_sender::dispatch_email_with_failover(
-                        "[AGM Alert] No Active Workspaces",
-                        &html,
-                        &[msg.from.clone()],
-                    );
-                }
             } else {
-                status = "rejected".to_string();
-                result_summary = format!("No saved prompt found matching '{}'", prompt_query);
-                let available_snippets: Vec<String> = all_prompts
-                    .iter()
-                    .take(5)
-                    .map(|p| {
-                        let short_id = &p.id[..8.min(p.id.len())];
-                        let short_content: String = p.prompt_content.chars().take(40).collect();
-                        format!(
-                            "<li><code>{}</code>: {}...</li>",
-                            short_id,
-                            html_escape(&short_content)
-                        )
-                    })
-                    .collect();
-
-                let reply_content = format!(
-                    r#"<p><span class="badge badge-warn">PROMPT NOT FOUND</span></p>
-<p>Could not find any saved prompt matching <strong>{}</strong>.</p>
-<p>Available saved prompts in queue:</p>
-<ul>{}</ul>
-<p>Reply with <code>prompt: &lt;keyword-or-id&gt;</code> or send a new prompt with <code>Project: &lt;name&gt;</code>.</p>"#,
-                    html_escape(&prompt_query),
-                    if available_snippets.is_empty() {
-                        "<li>No saved prompts found</li>".to_string()
-                    } else {
-                        available_snippets.join("")
-                    }
-                );
-                let html = wrap_card(
-                    "Prompt Not Found",
-                    &reply_content,
+                send_ack_receipt(
+                    &msg.from,
+                    "agm ff",
+                    &target_node,
+                    "default",
+                    "-",
                     local_machine_name,
                     local_machine_ip,
                 );
-                let _ = email_sender::dispatch_email_with_failover(
-                    &format!("[AGM Alert] Prompt Not Found: {}", prompt_query),
-                    &html,
-                    &[msg.from.clone()],
+
+                let rt = tokio::runtime::Runtime::new().ok();
+                let ff_result = if let Some(r) = rt {
+                    r.block_on(crate::modules::auto_switcher::trigger_manual_rotation())
+                } else {
+                    Err("Failed to start runtime".to_string())
+                };
+
+                let current_account =
+                    crate::modules::account::get_current_account().unwrap_or(None);
+                let current_email = current_account
+                    .map(|a| a.email)
+                    .unwrap_or_else(|| "Default".to_string());
+
+                match ff_result {
+                    Ok(msg_txt) => {
+                        output_text = format!(
+                            "Fast-forward successfully executed.\nDetails: {}\nActive Account: {}",
+                            msg_txt, current_email
+                        );
+                        result_summary =
+                            format!("Fast-forward completed. Active: {}", current_email);
+                    }
+                    Err(e) => {
+                        exit_code = 1;
+                        status = "error".to_string();
+                        output_text = format!("Fast-forward error: {}", e);
+                        result_summary = format!("Fast-forward failed: {}", e);
+                    }
+                }
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm ff",
+                    &status.to_uppercase(),
+                    exit_code,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
                 );
             }
         }
-        InboundAction::StatusQuery => {
-            action_str = "status_query".to_string();
-            let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
-            let prompts = crate::modules::repo_db::list_backed_up_prompts().unwrap_or_default();
-            let proj_names: Vec<String> = projects.into_iter().map(|p| p.repo_name).collect();
 
-            let reply_content = format!(
-                r#"<p><span class="badge badge-info">NODE STATUS</span></p>
-<p>Node: <strong>{}</strong> &nbsp;|&nbsp; Local IP: <strong>{}</strong></p>
-<p><strong>Running Projects ({}):</strong></p>
-<ul>{}</ul>
-<p><strong>Active Prompts in Queue:</strong> {}</p>"#,
-                local_machine_name,
-                local_machine_ip,
-                proj_names.len(),
-                proj_names
-                    .iter()
-                    .map(|n| format!("<li>{}</li>", n))
-                    .collect::<Vec<_>>()
-                    .join(""),
-                prompts.len()
-            );
-            let html = wrap_card(
-                "Node Status Report",
-                &reply_content,
-                local_machine_name,
-                local_machine_ip,
-            );
-            let _ = email_sender::dispatch_email_with_failover(
-                "[AGM Status Report] Running Projects & Queue",
-                &html,
-                &[msg.from.clone()],
-            );
-            result_summary = format!("Reported {} projects to '{}'", proj_names.len(), msg.from);
+        InboundAction::StatusQuery { target } => {
+            action_str = "status_query".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Status target mismatch: {}", target);
+            } else {
+                send_ack_receipt(
+                    &msg.from,
+                    "agm status",
+                    &target,
+                    "default",
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                );
+
+                let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+                let prompts = crate::modules::repo_db::list_backed_up_prompts().unwrap_or_default();
+                let instances = crate::modules::instance::list_instances().unwrap_or_default();
+                let current_account =
+                    crate::modules::account::get_current_account().unwrap_or(None);
+                let active_acc_str = current_account
+                    .map(|a| a.email)
+                    .unwrap_or_else(|| "Default".to_string());
+
+                output_text = format!(
+"================================================================================
+NODE STATUS REPORT
+================================================================================
+Node Name:          {}
+Local IP:           {}
+Active Profile:     {}
+Running Projects:   {}
+Registered Sandbox: {}
+Prompts in Queue:   {}
+================================================================================",
+                    local_machine_name,
+                    local_machine_ip,
+                    active_acc_str,
+                    projects.len(),
+                    instances.len(),
+                    prompts.len()
+                );
+                result_summary = format!("Status reported to '{}'", msg.from);
+
+                send_result_receipt(
+                    &msg.from,
+                    "agm status",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    "default",
+                );
+            }
         }
+
         InboundAction::HelpRequest => {
             action_str = "help".to_string();
-            let (subj, html) =
-                email_sender::render_help_email(local_machine_name, local_machine_ip);
-            let _ = email_sender::dispatch_email_with_failover(&subj, &html, &[msg.from.clone()]);
-            result_summary = format!("Dispatched help cheat sheet to '{}'", msg.from);
+            send_ack_receipt(
+                &msg.from,
+                "help",
+                "*",
+                "default",
+                "-",
+                local_machine_name,
+                local_machine_ip,
+            );
+
+            output_text = format!(
+                "================================================================================
+ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL
+================================================================================
+Format:
+sub: [worker-name|ip] | [ins-{{instance}}] | <command> [ | proj-{{project name}} ]
+
+Available Commands:
+- prompt: Injects prompt into workspace.
+    Body format:
+    prompt-name: <prompt-name>
+    prompt instruction:
+    <multi-line instructions>
+- gitmap: Executes gitmap command (e.g. status, scan).
+- cmd: Runs raw PowerShell or shell script from body.
+- update: Checks for and installs AGM update.
+- ls / agm instances: Lists sandbox profiles and running PIDs.
+- help: Returns this command cheat sheet.
+- gitmap macro: Runs GitMap macros.
+- gitmap update: Runs gitmap CLI self-updater.
+- agm status: Returns current node and account status.
+- agm ff / agm smart-switch: Rotates to freshest account.
+- agy prompts ls: Lists backed-up workspace prompts.
+- gitmap prompts ls: Lists GitMap automated prompts.
+================================================================================"
+            );
+            result_summary = "Help dispatched".to_string();
+
+            send_result_receipt(
+                &msg.from,
+                "help",
+                "SUCCESS",
+                0,
+                &output_text,
+                local_machine_name,
+                local_machine_ip,
+                "default",
+            );
         }
+
+        InboundAction::NamedPromptExecution { prompt_query } => {
+            action_str = "named_prompt_exec".to_string();
+            result_summary = format!("Named prompt query: {}", prompt_query);
+        }
+
+        InboundAction::InstanceCreate { profile_name } => {
+            action_str = "instance_create".to_string();
+            let _ = crate::modules::instance::create_instance(profile_name.clone());
+            result_summary = format!("Spawned instance profile '{}'", profile_name);
+        }
+
+        InboundAction::AccountRotate => {
+            action_str = "rotate".to_string();
+            let _ = crate::modules::auto_switcher::check_and_rotate_if_needed();
+            result_summary = "Account rotation triggered".to_string();
+        }
+
+        InboundAction::MultiNodeSnapshotQuery => {
+            action_str = "cluster_snapshot".to_string();
+            result_summary = "Cluster snapshot generated".to_string();
+        }
+
         InboundAction::Ignored { reason } => {
             action_str = "ignored".to_string();
             status = "rejected".to_string();
@@ -734,40 +1233,7 @@ pub fn execute_inbound_action(
     Ok(result_summary)
 }
 
-/// Helper to wrap simple response cards
-fn wrap_card(title: &str, content_html: &str, machine_name: &str, machine_ip: &str) -> String {
-    format!(
-        r#"<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }}
-    .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }}
-    .header {{ background: #0f172a; color: #ffffff; padding: 20px; }}
-    .header h1 {{ margin: 0; font-size: 17px; }}
-    .body {{ padding: 20px; color: #334155; line-height: 1.6; font-size: 14px; }}
-    .badge {{ display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }}
-    .badge-warn {{ background: #fef3c7; color: #92400e; }}
-    .badge-info {{ background: #e0f2fe; color: #075985; }}
-    .badge-success {{ background: #dcfce7; color: #166534; }}
-    .footer {{ padding: 14px 20px; background: #f1f5f9; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }}
-    .cmd {{ background: #0f172a; color: #38bdf8; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 12px 0; }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="header"><h1>Antigravity Manager · {}</h1></div>
-    <div class="body">{}</div>
-    <div class="footer">Node: <strong>{}</strong> | Local IP: <strong>{}</strong><br>Automated Mailbox Control</div>
-  </div>
-</body>
-</html>"#,
-        title, content_html, machine_name, machine_ip
-    )
-}
-
-/// Execute approved CLI / GitMap command safely
+/// Helper to execute approved CLI command safely
 fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
     if cmd_str.is_empty() {
         return Err("Empty command instruction".to_string());
@@ -809,6 +1275,18 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
             stderr
         ))
     }
+}
+
+/// Helper to execute GitMap command, collapsing duplicate prefixes
+fn execute_gitmap_command(cmd_args: &str) -> Result<String, String> {
+    let clean_cmd = if cmd_args.trim().to_lowercase().starts_with("gitmap ") {
+        cmd_args.trim()["gitmap ".len()..].trim()
+    } else {
+        cmd_args.trim()
+    };
+
+    let full_command = format!("gitmap {}", clean_cmd);
+    execute_safe_cli_command(&full_command)
 }
 
 pub fn is_implicit_tls_imap(port: u16, encryption_type: &str) -> bool {
@@ -888,7 +1366,6 @@ pub fn poll_unread_messages(
         EmailStream::Plain(tcp_stream)
     };
 
-    // Read greeting
     let _ = read_imap_response(&mut stream);
 
     let is_starttls = is_starttls_imap(account.imap_port, &account.encryption_type);
@@ -900,7 +1377,6 @@ pub fn poll_unread_messages(
         }
     }
 
-    // Login
     send_imap_cmd(
         &mut stream,
         "A01",
@@ -912,11 +1388,9 @@ pub fn poll_unread_messages(
         return Err(format!("IMAP login failed: {}", login_resp));
     }
 
-    // Select Inbox
     send_imap_cmd(&mut stream, "A02", "SELECT INBOX", false)?;
     let _ = read_imap_response(&mut stream);
 
-    // Search Unseen
     send_imap_cmd(&mut stream, "A03", "SEARCH UNSEEN", false)?;
     let search_resp = read_imap_response(&mut stream)?;
 
@@ -928,7 +1402,6 @@ pub fn poll_unread_messages(
         .filter(|&w| w != "*" && w != "SEARCH")
         .collect();
 
-    // Cap to last N unread messages
     if ids.len() > max_messages {
         ids = ids[ids.len() - max_messages..].to_vec();
     }
@@ -977,7 +1450,6 @@ fn read_imap_response(stream: &mut EmailStream) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&buf[0..n]).to_string())
 }
 
-/// Parse IMAP fetch snippet into RawEmailMessage
 fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
     let mut subject = String::new();
     let mut from = String::new();
@@ -1020,6 +1492,7 @@ mod tests {
             InboundAction::PromptInjection {
                 project_name,
                 prompt,
+                ..
             } => {
                 assert_eq!(project_name, "my-awesome-app");
                 assert_eq!(prompt, "Please fix bug #12");
@@ -1029,31 +1502,189 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_exec_command() {
-        let action = parse_email_command("exec: 192.168.1.50", "gitmap status");
+    fn test_parse_pipe_prompt_with_instance_and_project() {
+        let body = "prompt-name: fix-auth\nprompt instruction:\nPlease refactor auth middleware";
+        let action = parse_email_command("sub: worker-1 | ins-default | prompt | proj-web", body);
+        match action {
+            InboundAction::PromptInjection {
+                project_name,
+                prompt_name,
+                prompt,
+                instance_id,
+            } => {
+                assert_eq!(project_name, "web");
+                assert_eq!(prompt_name, "fix-auth");
+                assert_eq!(prompt, "Please refactor auth middleware");
+                assert_eq!(instance_id, Some("default".to_string()));
+            }
+            _ => panic!("Expected PromptInjection with pipe grammar"),
+        }
+    }
+
+    #[test]
+    fn test_parse_pipe_ip_octet_prompt() {
+        let action = parse_email_command("12 | prompt | proj-test", "Fix lint error");
+        match action {
+            InboundAction::PromptInjection {
+                project_name,
+                prompt,
+                instance_id,
+                ..
+            } => {
+                assert_eq!(project_name, "test");
+                assert_eq!(prompt, "Fix lint error");
+                assert_eq!(instance_id, None);
+            }
+            _ => panic!("Expected PromptInjection"),
+        }
+    }
+
+    #[test]
+    fn test_parse_pipe_gitmap_status() {
+        let action = parse_email_command("* | gitmap | status", "");
+        match action {
+            InboundAction::GitMapExecution { target, command } => {
+                assert_eq!(target, "*");
+                assert_eq!(command, "status");
+            }
+            _ => panic!("Expected GitMapExecution"),
+        }
+    }
+
+    #[test]
+    fn test_parse_pipe_cmd() {
+        let action = parse_email_command("local | cmd", "Get-Process");
         match action {
             InboundAction::CliExecution { target_ip, command } => {
-                assert_eq!(target_ip, "192.168.1.50");
-                assert_eq!(command, "gitmap status");
+                assert_eq!(target_ip, "local");
+                assert_eq!(command, "Get-Process");
             }
             _ => panic!("Expected CliExecution"),
         }
     }
 
     #[test]
-    fn test_parse_help_command() {
-        let action = parse_email_command("help", "");
-        assert_eq!(action, InboundAction::HelpRequest);
+    fn test_parse_pipe_agm_commands() {
+        assert_eq!(
+            parse_email_command("VM3 | agm update", ""),
+            InboundAction::UpdateExecution {
+                target: "VM3".to_string(),
+                is_gitmap: false
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | gitmap update", ""),
+            InboundAction::UpdateExecution {
+                target: "VM3".to_string(),
+                is_gitmap: true
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm status", ""),
+            InboundAction::StatusQuery {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm instances", ""),
+            InboundAction::ListInstances {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm ls", ""),
+            InboundAction::ListInstances {
+                target: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm ff", ""),
+            InboundAction::FastForward {
+                target_node: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agm smart-switch", ""),
+            InboundAction::FastForward {
+                target_node: "VM3".to_string()
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | agy prompts ls", ""),
+            InboundAction::ListPrompts {
+                target: "VM3".to_string(),
+                is_gitmap: false
+            }
+        );
+        assert_eq!(
+            parse_email_command("VM3 | gitmap prompts ls", ""),
+            InboundAction::ListPrompts {
+                target: "VM3".to_string(),
+                is_gitmap: true
+            }
+        );
     }
 
     #[test]
-    fn test_parse_named_prompt_command() {
-        let action = parse_email_command("prompt: refactor auth", "");
-        match action {
-            InboundAction::NamedPromptExecution { prompt_query } => {
-                assert_eq!(prompt_query, "refactor auth");
-            }
-            _ => panic!("Expected NamedPromptExecution"),
-        }
+    fn test_matches_target_node_or_ip() {
+        let local_ip = "192.168.1.12";
+        let local_name = "VM3";
+
+        // Wildcards & local
+        assert!(matches_target_node_or_ip("*", local_ip, local_name));
+        assert!(matches_target_node_or_ip("all", local_ip, local_name));
+        assert!(matches_target_node_or_ip("any", local_ip, local_name));
+        assert!(matches_target_node_or_ip("local", local_ip, local_name));
+        assert!(matches_target_node_or_ip("localhost", local_ip, local_name));
+
+        // Node name match
+        assert!(matches_target_node_or_ip("vm3", local_ip, local_name));
+        assert!(matches_target_node_or_ip("VM3", local_ip, local_name));
+
+        // Full IP match
+        assert!(matches_target_node_or_ip(
+            "192.168.1.12",
+            local_ip,
+            local_name
+        ));
+
+        // Octet match
+        assert!(matches_target_node_or_ip("12", local_ip, local_name));
+
+        // Mismatches
+        assert!(!matches_target_node_or_ip("VM4", local_ip, local_name));
+        assert!(!matches_target_node_or_ip(
+            "192.168.1.99",
+            local_ip,
+            local_name
+        ));
+        assert!(!matches_target_node_or_ip("99", local_ip, local_name));
+    }
+
+    #[test]
+    fn test_extract_email_address() {
+        assert_eq!(
+            extract_email_address("John Doe <john@example.com>"),
+            "john@example.com"
+        );
+        assert_eq!(
+            extract_email_address("admin@example.com"),
+            "admin@example.com"
+        );
+    }
+
+    #[test]
+    fn test_debounce_rate_limiter() {
+        let now = 1000;
+        let sender = "test@example.com";
+        let cmd = "status";
+        let target = "VM3";
+
+        assert!(check_debounce_rate_limit(sender, cmd, target, now));
+        assert!(check_debounce_rate_limit(sender, cmd, target, now + 2));
+        // 3rd call in window: throttled
+        assert!(!check_debounce_rate_limit(sender, cmd, target, now + 4));
+        // After 10s: resets
+        assert!(check_debounce_rate_limit(sender, cmd, target, now + 11));
     }
 }

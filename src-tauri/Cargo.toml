@@ -1,6 +1,6 @@
 [package]
 name = "agm-alim"
-version = "4.61.0"
+version = "4.62.0"
 description = "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC"
 authors = ["MD Alim Ul Karim <devorg.bd@gmail.com> (sponsored by RISE UP ASIA LLC)"]
 license = "CC-BY-NC-SA-4.0"
@@ -18,6 +18,11 @@ crate-type = ["rlib"]
 [[bin]]
 name = "agm-alim"
 path = "src/main.rs"
+test = false
+
+[[bin]]
+name = "agm"
+path = "src/bin/agm.rs"
 test = false
 
 [build-dependencies]

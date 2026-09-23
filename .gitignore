@@ -68,7 +68,8 @@ test-reports/
 *.out
 *.class
 build/
-bin/
+/bin/
+!src-tauri/src/bin/
 obj/
 tmp/
 *.tmp

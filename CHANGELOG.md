@@ -2,6 +2,15 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.62.0 (2026-09-23)**:
+        -   **[入站邮件远程控制、纯文本双相回执与原生 AGM 终端 CLI] 统一管道语法解析、双相通知回执、10秒防抖滑动栈与原生 agm 终端命令**:
+            -   **统一入站邮件管道语法**: 支持 `sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]` 2至4段式管道语法，具备部分 IP 尾段模糊匹配（如 `12` 匹配 `192.168.1.12`）、实例与项目智能提取及前缀去重功能。
+            -   **双相纯文本通知回执**: 彻底废除臃肿易进垃圾箱的 HTML 邮件模板，代之以轻量级格式化纯文本；接收指令即刻发出第一相 ACK 确认（`[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING`），并在后台执行完毕后触发第二相执行结果回执（`[AGM Result] EXECUTION COMPLETED`）。
+            -   **10秒防抖滑动栈与安全 ACL**: 引入 10 秒时间窗口防抖机制，短时间内连续相同指令最多触发 2 封邮件并在窗口结束时合并汇总；强制白名单校验（`notify_recipients`），非授权发件人静默拒绝并记录安全审计日志。
+            -   **原生 AGM 终端 CLI (`agm`)**: Rust 原生编译独立的 `agm` 命令行工具，提供 `agm status`、`agm instances` / `agm ls`、`agm ff` / `agm smart-switch`、`agm update`、`agm install`（一键注册至用户 PATH 与 PowerShell `$PROFILE`）以及带交互密码安全回退与远端自动更新的 `agm ssh`。
+            -   **邮件与通知界面整合 Telegram**: 在「邮件与通知设置」页面统一整合 Telegram Bot Token（密码显隐）、Chat ID、轮询间隔与连通性测试，提供详尽 Telegram Bot 创建指南与自动化 PowerShell 脚本。
+            -   **本地专属端到端自动化测试套件**: 编写 `03-ai-scripts/40-test-email-permutations-e2e.py`，从本地 SQLite 金库动态加载凭据（零敏感信息入库），全量验证 19 种主题指令变体、9 项 Rust 单元测试、双相回执格式与 CLI 二进制。
+
     *   **v4.61.0 (2026-09-23)**:
         -   **[智能切换评分、预激活校验、窗口控制与错误遥测] 智能多因子评分算法、周配额桶提取、预激活校验循环与窗口控制 ACL 强化**:
             -   **智能多因子乘法评分**: 实现 $\text{Score} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$ 公式，彻底废除 100,000 点旧版闲置加分，仅在账户闲置时赋予激活因子 1，在用账户乘数为 0。Ultra 乘数 5、Pro 乘数 3、Free 乘数 1。
@@ -3140,6 +3149,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.62.0 (2026-09-23)**:
+        -   **[Release v4.62.0] Routine release v4.62.0**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Routine release v4.62.0.
     *   **v4.61.0 (2026-09-23)**:
         -   **[Release v4.61.0] Smart switch multi-factor scoring, pre-activation verification loop, window ACL controls, and XPath error telemetry**:
             -   **Update System**: Automated release and version synchronization across all manifests.

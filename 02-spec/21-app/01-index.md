@@ -129,6 +129,8 @@ The complete reverse-engineered architecture is documented across the following 
 | [16-email-dispatch-mailbox-remote-management-and-split-security-db.md](16-email-dispatch-mailbox-remote-management-and-split-security-db.md) | Email Dispatch & Remote Control | Split database passwords vault, OpenSSH RSA identity, mailbox pool failover, and bidirectional remote control |
 | [17-email-intelligence-acknowledgment-and-universal-import-export.md](17-email-intelligence-acknowledgment-and-universal-import-export.md) | Email Intelligence & Universal Import/Export | Inbound fuzzy typo resolution, immediate acknowledgment receipts, and universal settings import/export with reversible multi-pass Base64 obfuscation |
 | [18-smart-multi-factor-scoring-pre-activation-refresh-and-ui-telemetry.md](18-smart-multi-factor-scoring-pre-activation-refresh-and-ui-telemetry.md) | Smart Multi-Factor Scoring & UI Telemetry | Multi-factor account scoring ($S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$), randomized tie-breaking, pre-activation refresh verification loop, window controls ACL bridge, and XPath event tracking |
+| [19-inbound-email-remote-control-and-agm-cli.md](19-inbound-email-remote-control-and-agm-cli.md) | Inbound Email Remote Control & AGM Native Terminal CLI | Universal pipe-delimited email command grammar, 2-phase plaintext ACK/Result receipts, 10s sliding debounce stack, sender ACL, and native `agm` terminal CLI |
+| [telegram-bot-setup-guide.md](telegram-bot-setup-guide.md) | Telegram Bot Setup & Automated PowerShell Guide | Guide and automated script for Telegram Bot creation, chat ID extraction, credential validation, and alert testing |
 
 ---
 

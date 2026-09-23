@@ -388,14 +388,21 @@ fn build_mime_message(
     let date = Utc::now().to_rfc2822();
     let encoded_subject = format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()));
 
+    let content_type = if html_body.trim_start().starts_with('<') {
+        "text/html; charset=UTF-8"
+    } else {
+        "text/plain; charset=UTF-8"
+    };
+
     format!(
-        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.18.0\r\n\r\n{}",
+        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.62.0\r\n\r\n{}",
         account.alias,
         account.email,
         recipients.join(", "),
         encoded_subject,
         date,
         msg_id,
+        content_type,
         html_body
     )
 }

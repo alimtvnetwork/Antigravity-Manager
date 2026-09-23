@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.62.0 (2026-09-23)**:
+        -   **[Inbound Email Remote Control, 2-Phase Plaintext Receipts & Native AGM Terminal CLI] Unified Pipe Grammar, Plaintext Receipts, 10s Debounce Stack, & Native agm CLI**:
+            -   **Unified Inbound Email Pipe Grammar**: Added comprehensive parsing for `sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]` with partial IP octet matching (e.g. `12` matching `192.168.1.12`), optional instance tags, project targeting, and smart GitMap prefix collapsing.
+            -   **2-Phase Plaintext Notification Receipts**: Eliminated heavy HTML email templates in favor of clean, spam-resistant plaintext receipts; sends immediate Phase 1 ACK (`[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING`) on ingestion followed by Phase 2 Result receipt (`[AGM Result] EXECUTION COMPLETED`) upon command termination.
+            -   **10-Second Debounce Sliding Stack & Security ACL**: Enforces 10s sliding window debouncing allowing at most 2 emails per spam burst with boundary consolidation; checks sender authorization against `notify_recipients` ACL to prevent spoofing.
+            -   **Native AGM Terminal CLI (`agm`)**: Compiled standalone native binary providing `agm status`, `agm instances` / `agm ls`, `agm ff` / `agm smart-switch`, `agm update`, `agm install` (PATH & PowerShell `$PROFILE` installer), and `agm ssh` with secure hidden password fallback and remote VM auto-update.
+            -   **Telegram Settings Consolidation**: Consolidated Telegram Bot Token, Chat ID, and test ping directly into the Email & Alerts view with a comprehensive step-by-step setup guide and automated PowerShell script.
+            -   **Local-Only E2E Test Suite**: Authored `03-ai-scripts/40-test-email-permutations-e2e.py` testing all 19 command permutations, 9 Rust unit tests, receipt formatting, and CLI binaries dynamically grounded in local DB vault credentials.
     *   **v4.61.0 (2026-09-23)**:
         -   **[Smart Switch Scoring, Pre-Activation Verification, Window Controls & Error Telemetry] Multi-Factor Multiplicative Scoring, Weekly Quota Group Extraction, Pre-Activation Refresh Verification Loop, & Window Control ACL Hardening**:
             -   **Multi-Factor Multiplicative Scoring**: Implemented $\text{Score} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$ across TypeScript and Rust backends. Completely eliminated legacy +100,000 idle bonuses; active in-use accounts receive multiplier 0, while inactive candidates receive 1. Ultra multiplier is 5, Pro multiplier is 3, and Free/other is 1.
