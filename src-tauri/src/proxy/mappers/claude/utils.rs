@@ -39,7 +39,7 @@ pub fn to_claude_usage(
     }
 }
 
-/// 提取 thoughtSignature
+// 提取 thoughtSignature
 // 已移除未使用的 extract_thought_signature 函数
 
 #[cfg(test)]

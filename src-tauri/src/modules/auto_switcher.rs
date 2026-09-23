@@ -1156,7 +1156,13 @@ mod tests {
         let future_time = "2026-09-30T14:30:00Z";
 
         // Candidate A: Pro tier, 100% weekly Gemini, 100% weekly Claude
-        let mut acc_a = make_test_account("synth_acc_a", "synth_a@test.local", "gemini-pro", 100, future_time);
+        let mut acc_a = make_test_account(
+            "synth_acc_a",
+            "synth_a@test.local",
+            "gemini-pro",
+            100,
+            future_time,
+        );
         if let Some(ref mut q) = acc_a.quota {
             q.quota_groups = Some(vec![
                 crate::models::quota::QuotaGroup {
@@ -1187,7 +1193,13 @@ mod tests {
         }
 
         // Candidate B: Pro tier, 21% weekly Gemini, 100% weekly Claude
-        let mut acc_b = make_test_account("synth_acc_b", "synth_b@test.local", "gemini-pro", 100, future_time);
+        let mut acc_b = make_test_account(
+            "synth_acc_b",
+            "synth_b@test.local",
+            "gemini-pro",
+            100,
+            future_time,
+        );
         if let Some(ref mut q) = acc_b.quota {
             q.quota_groups = Some(vec![
                 crate::models::quota::QuotaGroup {

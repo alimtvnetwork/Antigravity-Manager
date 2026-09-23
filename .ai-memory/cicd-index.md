@@ -27,6 +27,7 @@ Tracks every CI/CD validator finding (CODE-RED-*, STYLE-*) encountered during se
 | 31 | [Fast-forward switch delegation & crash recovery](cicd-issues/31-fast-forward-switch-delegation-rca.md) | ✅ Solved | fast-forward, switch | 2026-09-22 |
 | 32 | [CI test data dir race & Windows entrypoint failure](cicd-issues/32-ci-test-data-dir-race-and-windows-entrypoint-rca.md) | ✅ Solved | concurrency, entrypoint | 2026-09-22 |
 | 33 | [MSVC duplicate resource link failure (CVT1100) & release asset decoupling](cicd-issues/33-msvc-duplicate-manifest-and-release-assets-rca.md) | ✅ Solved | msvc, cvtres, release-assets | 2026-09-23 |
+| 34 | [Rustfmt auto-switcher unit test argument list failure](cicd-issues/34-rustfmt-auto-switcher-unit-test-rca.md) | ✅ Solved | rustfmt, clippy, multi-os | 2026-09-23 |
 
 ---
 
