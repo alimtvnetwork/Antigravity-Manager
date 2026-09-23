@@ -2,6 +2,15 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.65.3 (2026-09-24)**:
+        -   **[Release v4.65.3: 邮箱全格式原生导出、单账号导入导出与 AI 嵌入式 JSON 语法] 邮箱交互式多格式预览弹窗、Tauri 原生文件对话框保存、单账号独立导入导出与嵌入式 JSON AI 指令段**:
+            -   **交互式导出预览弹窗与 WebView2 导出失灵根治**: 新增 `MailboxExportModal.tsx` 组件，彻底解决 Windows WebView2 下点击导出仅弹出提示却无文件下载与无界面反馈的缺陷。点击导出即刻在屏幕中央呼出代码高亮预览弹窗，支持 **JSON**、**YAML**、**CSV** 三大主流格式实时热切换，支持一键复制代码与调用系统级原生保存文件对话框。
+            -   **Tauri 后端安全保存放行多扩展名**: 优化 `src-tauri/src/commands/mod.rs` 中的 `validate_user_json_path` 路径安全网关，全面放行 `.json`、`.csv`、`.yaml`、`.yml`、`.txt`、`.xlsx` 与 `.xls`，打通全格式文件的本地持久化保存通道。
+            -   **单账号独立导出与表格操作列扩充**: 在「邮箱账户与邮箱池」表格操作列新增单账号专属「Export」按钮，支持对单个邮箱配置一键导出与预览；在添加/编辑邮箱弹窗中内嵌「Account IO」工具条，支持对当前表单数据一键导出 JSON / YAML / CSV。
+            -   **单账号极速导入抽屉**: 在邮箱弹窗中提供「Import (JSON / YAML / CSV)」抽屉面板，支持粘贴任意格式配置文本或通过文件选择器加载本地配置文件，自动解析并精准回填至表单字段。
+            -   **AI 配置指令嵌入 JSON 语法段**: 重构邮箱弹窗中的「AI 自动邮箱配置」指令，将严格的 JSON 语法规范直接嵌入提示词正文中，并增加「View JSON Format」实时预览切换块，方便直观查看与一键复制结构化语法。
+            -   **全局 AI 模板库与 YAML 批量导入支持**: 在 `ai-sample-templates-modal.tsx` 中嵌入标准 JSON 语法 schema 并新增独立「YAML Schema」代码标签页；在全局批量导入弹窗中新增 YAML 格式选项并增强容错解析器。
+
     *   **v4.65.2 (2026-09-24)**:
         -   **[Release v4.65.2: 大屏 UI 深度优化、横向滚动条根治与已安装应用版本号规范] 大屏幕宽屏自适应、WebView2 滚动条彻底消除与 Windows 应用列表版本号显示**:
             -   **全站大屏自适应与最大宽度扩展**: 将全局 10 大核心页面（`Accounts`、`Dashboard`、`Instances`、`ApiProxy`、`Settings`、`TokenStats`、`UserToken`、`Security`、`Monitor`、`Email`）的容器宽度限制从 `max-w-7xl`（1280px）提升至 `max-w-[1920px]`，彻底消除 1080p、1440p、4K 及带鱼屏上的严重留白与挤压问题。
@@ -3192,6 +3201,16 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.3 (2026-09-24)**:
+        -   **[Release v4.65.3: Mailbox Multi-Format Visual Export, Single-Account Import/Export & Embedded JSON AI Syntax] Interactive Export Preview Modal, Native OS File Saving, Single Account Form Drawer & Embedded JSON AI Instructions**:
+            -   **Interactive Visual Export Modal & WebView2 Download Fix**: Introduced `MailboxExportModal.tsx` to eliminate WebView2 silent download failures where blob URL clicks were dropped without file or UI response. Clicking any export action immediately launches a syntax-highlighted dark modal with live switching between **JSON**, **YAML**, and **CSV**, instant clipboard copying, and native OS file saving.
+            -   **Tauri Backend File Save Gate Expansion**: Updated `validate_user_json_path` in `src-tauri/src/commands/mod.rs` to permit saving `.json`, `.csv`, `.yaml`, `.yml`, `.txt`, `.xlsx`, and `.xls` files via Tauri's native `@tauri-apps/plugin-dialog` save handler.
+            -   **Single-Account Individual Export**: Added dedicated `Export` buttons to each account row in the Email Accounts table and added an `Account IO` header toolbar in the Add/Edit Mailbox modal for one-click JSON, YAML, or CSV export of single configurations.
+            -   **Single-Account Quick Import Drawer**: Added an expandable quick import drawer to the Add/Edit Mailbox dialog to paste or browse (`.json`, `.yaml`, `.csv`, `.txt`) configurations and automatically populate all form fields.
+            -   **Embedded JSON Syntax in AI Configuration Segment**: Refactored the AI Mailbox Configuration banner to embed the exact JSON schema syntax directly inside the prompt text, accompanied by a `View JSON Format` toggle to preview the active JSON structure.
+            -   **Global AI Templates & YAML Bulk Ingestion**: Embedded JSON schemas and added a dedicated YAML Schema tab in `ai-sample-templates-modal.tsx`, while introducing YAML radio selection and fallback parsing to the general Import dialog.
+
+
     *   **v4.65.2 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

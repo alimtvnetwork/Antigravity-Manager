@@ -3,6 +3,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.3 (2026-09-24)**:
+        -   **[Release v4.65.3: Mailbox Multi-Format Visual Export, Single-Account Import/Export & Embedded JSON AI Syntax] Interactive Export Preview Modal, Native OS File Saving, Single Account Form Drawer & Embedded JSON AI Instructions**:
+            -   **Interactive Visual Export Modal & WebView2 Download Fix**: Introduced `MailboxExportModal.tsx` to eliminate WebView2 silent download failures where blob URL clicks were dropped without file or UI response. Clicking any export action immediately launches a syntax-highlighted dark modal with live switching between **JSON**, **YAML**, and **CSV**, instant clipboard copying, and native OS file saving.
+            -   **Tauri Backend File Save Gate Expansion**: Updated `validate_user_json_path` in `src-tauri/src/commands/mod.rs` to permit saving `.json`, `.csv`, `.yaml`, `.yml`, `.txt`, `.xlsx`, and `.xls` files via Tauri's native `@tauri-apps/plugin-dialog` save handler.
+            -   **Single-Account Individual Export**: Added dedicated `Export` buttons to each account row in the Email Accounts table and added an `Account IO` header toolbar in the Add/Edit Mailbox modal for one-click JSON, YAML, or CSV export of single configurations.
+            -   **Single-Account Quick Import Drawer**: Added an expandable quick import drawer to the Add/Edit Mailbox dialog to paste or browse (`.json`, `.yaml`, `.csv`, `.txt`) configurations and automatically populate all form fields.
+            -   **Embedded JSON Syntax in AI Configuration Segment**: Refactored the AI Mailbox Configuration banner to embed the exact JSON schema syntax directly inside the prompt text, accompanied by a `View JSON Format` toggle to preview the active JSON structure.
+            -   **Global AI Templates & YAML Bulk Ingestion**: Embedded JSON schemas and added a dedicated YAML Schema tab in `ai-sample-templates-modal.tsx`, while introducing YAML radio selection and fallback parsing to the general Import dialog.
+
     *   **v4.65.2 (2026-09-24)**:
         -   **[Release v4.65.2: Big Screen UI Responsiveness, Scrollbar Elimination & Windows App List Version Stamping] Full High-Resolution Optimization, Native Scrollbar Elimination & Windows Installed Apps Versioning**:
             -   **Big Screen UI Responsiveness & Wide Display Optimization**: Expanded container width constraints from `max-w-7xl` (1280px) to `max-w-[1920px]` across all 10 core application pages (`Accounts`, `Dashboard`, `Instances`, `ApiProxy`, `Settings`, `TokenStats`, `UserToken`, `Security`, `Monitor`, `Email`), eliminating artificial layout pinching and dead space on 1080p, 1440p, 4K, and ultrawide monitors.
