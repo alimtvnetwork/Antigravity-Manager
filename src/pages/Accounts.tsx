@@ -642,13 +642,13 @@ function Accounts() {
   };
 
   return (
-    <div className="h-full flex flex-col px-2.5 sm:px-4 pt-1.5 pb-4 gap-2.5 max-w-7xl mx-auto w-full min-w-0">
+    <div className="h-full flex flex-col px-2.5 sm:px-4 pt-1.5 pb-4 gap-2.5 max-w-[1920px] mx-auto w-full min-w-0">
       {/* Top action bar: search, filters, and action buttons */}
-      <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 min-w-0 w-full">
+      <div className="flex-none flex flex-wrap 2xl:flex-nowrap items-center justify-between gap-1.5 min-w-0 w-full">
         {/* Left controls: search, window, view mode, quota filter */}
-        <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none max-w-full py-0.5 min-w-0">
+        <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap overflow-x-auto lg:overflow-x-visible scrollbar-none max-w-full py-0.5 min-w-0 shrink-0">
           {/* Search box - responsive */}
-          <div className="hidden lg:block flex-none w-40 relative transition-all focus-within:w-48">
+          <div className="hidden lg:block flex-none w-36 relative transition-all focus-within:w-44">
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"

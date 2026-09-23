@@ -81,7 +81,20 @@ a {
 /* 滚动条优化 - 彻底隐藏但保留功能 */
 ::-webkit-scrollbar {
   width: 0px;
+  height: 0px;
   background: transparent;
+}
+
+/* Global scrollbar-none utility to prevent horizontal/vertical scrollbars */
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 ::-webkit-scrollbar-track {

@@ -55,7 +55,7 @@ export default function Email() {
 
     return (
         <div className="h-full w-full overflow-y-auto">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3 animate-in fade-in duration-300">
+            <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-3 space-y-3 animate-in fade-in duration-300">
                 {/* Page Header with Integrated Telemetry in same line */}
                 <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-200 dark:border-base-200 flex-wrap">
                     <div className="flex items-center gap-2.5 flex-wrap min-w-0">

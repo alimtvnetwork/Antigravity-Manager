@@ -330,7 +330,7 @@ const TokenStats: React.FC = () => {
 
     return (
         <div className="h-full w-full overflow-y-auto">
-            <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-7xl mx-auto">
+            <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-[1920px] mx-auto">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                         <Zap className="w-6 h-6 text-blue-500" />

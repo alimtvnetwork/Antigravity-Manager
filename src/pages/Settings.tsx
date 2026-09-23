@@ -510,7 +510,7 @@ function Settings() {
 
     return (
         <div className="h-full w-full overflow-y-auto">
-            <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-7xl mx-auto">
+            <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-[1920px] mx-auto">
                 {/* Top toolbar: Tab navigation and save button */}
                 <div className="flex justify-between items-center">
                     {/* Tab navigation */}

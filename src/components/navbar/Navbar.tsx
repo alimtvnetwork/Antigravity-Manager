@@ -175,7 +175,7 @@ function Navbar() {
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
             className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80 select-none"
         >
-            <div className="max-w-7xl mx-auto px-2 sm:px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
+            <div className="w-full px-3 sm:px-4 md:px-6 relative" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}
                 <div className="flex items-center justify-between h-14 gap-1 sm:gap-2 md:gap-3 min-w-0">
                     {/* Logo & Error Manager Badge */}
