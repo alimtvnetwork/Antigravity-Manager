@@ -25,8 +25,14 @@ import {
     Eye,
     EyeOff,
     MessageSquare,
+    FileCode,
 } from 'lucide-react';
 import AiSampleTemplatesModal from './ai-sample-templates-modal';
+import MailboxExportModal from './MailboxExportModal';
+import {
+    downloadOrSaveFile,
+    parseAccountsFromText,
+} from '../../utils/emailFormatters';
 import {
     telegramService,
     TelegramConfig,
@@ -126,13 +132,27 @@ export default function EmailNotificationSettings() {
 
     // Import/Export state
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [importFormat, setImportFormat] = useState<'json' | 'csv' | 'xlsx'>('json');
+    const [importFormat, setImportFormat] = useState<'json' | 'yaml' | 'csv' | 'xlsx'>('json');
     const [importPayload, setImportPayload] = useState('');
     const [testingAccountId, setTestingAccountId] = useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [isActionsOpen, setIsActionsOpen] = useState(false);
     const [isSampleTemplatesOpen, setIsSampleTemplatesOpen] = useState(false);
     const actionsDropdownRef = React.useRef<HTMLDivElement>(null);
+
+    // Export preview modal state (all accounts or single account)
+    const [exportModalState, setExportModalState] = useState<{
+        isOpen: boolean;
+        singleAccount?: Partial<EmailAccount> | null;
+        allAccounts?: EmailAccount[];
+        initialFormat?: 'json' | 'yaml' | 'csv';
+    }>({ isOpen: false });
+
+    // Single account modal quick import/export state
+    const [isModalQuickImportOpen, setIsModalQuickImportOpen] = useState(false);
+    const [modalQuickImportText, setModalQuickImportText] = useState('');
+    const [showAiJsonSyntax, setShowAiJsonSyntax] = useState(false);
+    const singleAccountFileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -247,6 +267,9 @@ export default function EmailNotificationSettings() {
         });
         setTestResult(null);
         setIsTestingDirect(false);
+        setIsModalQuickImportOpen(false);
+        setModalQuickImportText('');
+        setShowAiJsonSyntax(false);
         setIsAccountModalOpen(true);
     };
 
@@ -266,6 +289,9 @@ export default function EmailNotificationSettings() {
         });
         setTestResult(null);
         setIsTestingDirect(false);
+        setIsModalQuickImportOpen(false);
+        setModalQuickImportText('');
+        setShowAiJsonSyntax(false);
         setIsAccountModalOpen(true);
     };
 
@@ -450,22 +476,74 @@ export default function EmailNotificationSettings() {
         }
     };
 
-    const handleExport = async (format: 'json' | 'csv' | 'xlsx') => {
-        try {
-            const content = await exportEmailData(format);
-            const blob = new Blob([content], {
-                type: format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'application/vnd.ms-excel',
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `antigravity-mailboxes-${Date.now()}.${format === 'xlsx' ? 'xls' : format}`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast(`Exported ${format.toUpperCase()} successfully`, 'success');
-        } catch (e: any) {
-            showToast('Export failed: ' + (e?.message || e), 'error');
+    const handleExport = (format: 'json' | 'yaml' | 'csv' | 'xlsx') => {
+        if (format === 'xlsx') {
+            exportEmailData('xlsx')
+                .then((content) =>
+                    downloadOrSaveFile(`antigravity-mailboxes-${Date.now()}.xls`, content, 'xlsx')
+                )
+                .catch((e) => showToast('Export failed: ' + (e?.message || e), 'error'));
+            return;
         }
+        setExportModalState({
+            isOpen: true,
+            allAccounts: accounts,
+            initialFormat: format,
+        });
+    };
+
+    const handleExportSingleAccount = (
+        account: Partial<EmailAccount>,
+        initialFormat: 'json' | 'yaml' | 'csv' = 'json'
+    ) => {
+        setExportModalState({
+            isOpen: true,
+            singleAccount: account,
+            initialFormat,
+        });
+    };
+
+    const handleQuickImportSingle = (text: string) => {
+        if (!text.trim()) {
+            showToast('Please paste JSON, YAML, or CSV content first', 'warning');
+            return;
+        }
+        const parsed = parseAccountsFromText(text);
+        if (parsed.error || parsed.accounts.length === 0) {
+            showToast(parsed.error || 'Failed to parse mailbox data', 'error');
+            return;
+        }
+        const target = parsed.accounts[0];
+        setEditingAccount((prev) => ({
+            ...prev,
+            alias: target.alias || prev.alias,
+            email: target.email || prev.email,
+            password: target.password || prev.password,
+            smtp_host: target.smtp_host || prev.smtp_host,
+            smtp_port: target.smtp_port || prev.smtp_port,
+            imap_host: target.imap_host || prev.imap_host,
+            imap_port: target.imap_port || prev.imap_port,
+            encryption_type: target.encryption_type || prev.encryption_type,
+            is_default: target.is_default !== undefined ? target.is_default : prev.is_default,
+            is_active: target.is_active !== undefined ? target.is_active : prev.is_active,
+        }));
+        showToast(`Loaded mailbox details from ${parsed.format.toUpperCase()}`, 'success');
+        setIsModalQuickImportOpen(false);
+        setModalQuickImportText('');
+    };
+
+    const handleSingleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target?.result as string;
+            if (text) {
+                handleQuickImportSingle(text);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
     };
 
     const handleImportSubmit = async () => {
@@ -474,14 +552,50 @@ export default function EmailNotificationSettings() {
             return;
         }
         try {
-            const summary = await importEmailData(importFormat, importPayload);
-            showToast(
-                `Imported ${summary.accounts_imported} mailboxes, ${summary.recipients_imported} recipients`,
-                'success'
-            );
-            setIsImportModalOpen(false);
-            setImportPayload('');
-            await loadAll();
+            if (importFormat === 'yaml') {
+                const parsed = parseAccountsFromText(importPayload);
+                if (parsed.error || parsed.accounts.length === 0) {
+                    showToast(parsed.error || 'No valid YAML accounts found', 'error');
+                    return;
+                }
+                let count = 0;
+                for (const acc of parsed.accounts) {
+                    await addEmailAccount(acc);
+                    count++;
+                }
+                showToast(`Imported ${count} mailboxes from YAML`, 'success');
+                setIsImportModalOpen(false);
+                setImportPayload('');
+                await loadAll();
+                return;
+            }
+
+            try {
+                const summary = await importEmailData(importFormat, importPayload);
+                showToast(
+                    `Imported ${summary.accounts_imported} mailboxes, ${summary.recipients_imported} recipients`,
+                    'success'
+                );
+                setIsImportModalOpen(false);
+                setImportPayload('');
+                await loadAll();
+            } catch (err: any) {
+                // Fallback to parseAccountsFromText for array/single JSON or CSV
+                const parsed = parseAccountsFromText(importPayload);
+                if (parsed.accounts.length > 0) {
+                    let count = 0;
+                    for (const acc of parsed.accounts) {
+                        await addEmailAccount(acc);
+                        count++;
+                    }
+                    showToast(`Imported ${count} mailboxes successfully`, 'success');
+                    setIsImportModalOpen(false);
+                    setImportPayload('');
+                    await loadAll();
+                } else {
+                    throw err;
+                }
+            }
         } catch (e: any) {
             showToast('Import failed: ' + (e?.message || e), 'error');
         }
@@ -494,6 +608,8 @@ export default function EmailNotificationSettings() {
         const lowerName = file.name.toLowerCase();
         if (lowerName.endsWith('.json')) {
             setImportFormat('json');
+        } else if (lowerName.endsWith('.yaml') || lowerName.endsWith('.yml')) {
+            setImportFormat('yaml');
         } else if (lowerName.endsWith('.csv')) {
             setImportFormat('csv');
         } else if (lowerName.endsWith('.xml') || lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
@@ -703,6 +819,17 @@ export default function EmailNotificationSettings() {
                                             type="button"
                                             onClick={() => {
                                                 setIsActionsOpen(false);
+                                                handleExport('yaml');
+                                            }}
+                                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                        >
+                                            <FileCode className="w-3.5 h-3.5 text-emerald-500" />
+                                            <span>Export YAML</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsActionsOpen(false);
                                                 handleExport('csv');
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
@@ -797,7 +924,7 @@ export default function EmailNotificationSettings() {
                                     <th className="py-2 px-2.5 font-semibold">IMAP Host</th>
                                     <th className="py-2 px-2.5 font-semibold">Enc</th>
                                     <th className="py-2 px-2.5 font-semibold">Role</th>
-                                    <th className="py-2 px-2.5 font-semibold text-right whitespace-nowrap min-w-[230px]">Actions</th>
+                                    <th className="py-2 px-2.5 font-semibold text-right whitespace-nowrap min-w-[290px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -832,7 +959,7 @@ export default function EmailNotificationSettings() {
                                                 </button>
                                             )}
                                         </td>
-                                        <td className="py-2 px-2.5 text-right space-x-1 whitespace-nowrap min-w-[230px]">
+                                        <td className="py-2 px-2.5 text-right space-x-1 whitespace-nowrap min-w-[290px]">
                                             <button
                                                 onClick={() => handleTestSmtp(acc.id)}
                                                 disabled={testingAccountId === acc.id}
@@ -854,6 +981,14 @@ export default function EmailNotificationSettings() {
                                                 className="px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 text-[10px] cursor-pointer transition-colors"
                                             >
                                                 Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleExportSingleAccount(acc)}
+                                                className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200/60 dark:border-amber-800/50 text-[10px] font-medium cursor-pointer transition-colors"
+                                                title="Export this account (JSON / YAML / CSV)"
+                                            >
+                                                Export
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteAccount(acc.id)}
@@ -1776,7 +1911,7 @@ export default function EmailNotificationSettings() {
                 isOpen={isAccountModalOpen}
                 title={editingAccount.id ? 'Edit Mailbox Configuration' : 'Add Mailbox to Secure Split Vault'}
                 type="confirm"
-                maxWidth="max-w-lg"
+                maxWidth="max-w-xl"
                 confirmText={editingAccount.id ? 'Save Mailbox' : 'Add Mailbox to Vault'}
                 cancelText="Cancel"
                 onConfirm={handleSaveAccount}
@@ -1789,30 +1924,187 @@ export default function EmailNotificationSettings() {
                     }}
                     className="space-y-3.5 text-xs"
                 >
-                    {/* One-Click AI Instructions Copy */}
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
-                        <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
-                            <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                            <span className="font-medium text-[11px]">AI Automated Mailbox Configuration</span>
+                    {/* Single Account Import / Export Action Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">Account IO:</span>
+                            <button
+                                type="button"
+                                onClick={() => setIsModalQuickImportOpen(!isModalQuickImportOpen)}
+                                className={`px-2 py-1 text-[11px] font-medium rounded-md border flex items-center gap-1 transition-colors cursor-pointer ${
+                                    isModalQuickImportOpen
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700'
+                                }`}
+                                title="Import single account from JSON, YAML, or CSV"
+                            >
+                                <Upload className="w-3 h-3 text-indigo-500" />
+                                <span>Import (JSON / YAML / CSV)</span>
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const instructions = `Configure Mailbox in Antigravity Manager:
-- Alias: Primary Mailbox
-- Email: your-email@gmail.com
-- App Password: <generated-app-password>
-- SMTP: smtp.gmail.com (Port: 587, TLS)
-- IMAP: imap.gmail.com (Port: 993, TLS)`;
-                                navigator.clipboard.writeText(instructions);
-                                showToast('AI instructions copied to clipboard', 'success');
-                            }}
-                            className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                            title="Copy AI Instructions to Clipboard"
-                        >
-                            <Copy className="w-3 h-3" />
-                            <span>Copy AI Instructions</span>
-                        </button>
+
+                        <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-gray-400 dark:text-slate-500 mr-0.5">Export:</span>
+                            <button
+                                type="button"
+                                onClick={() => handleExportSingleAccount(editingAccount, 'json')}
+                                className="px-1.5 py-0.5 text-[10px] font-medium rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Export single account as JSON"
+                            >
+                                <FileJson className="w-3 h-3 text-amber-500" />
+                                <span>JSON</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleExportSingleAccount(editingAccount, 'yaml')}
+                                className="px-1.5 py-0.5 text-[10px] font-medium rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Export single account as YAML"
+                            >
+                                <FileCode className="w-3 h-3 text-emerald-500" />
+                                <span>YAML</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleExportSingleAccount(editingAccount, 'csv')}
+                                className="px-1.5 py-0.5 text-[10px] font-medium rounded border border-blue-200 dark:border-blue-800/60 bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Export single account as CSV"
+                            >
+                                <FileText className="w-3 h-3 text-blue-500" />
+                                <span>CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Expandable Quick Import Panel */}
+                    {isModalQuickImportOpen && (
+                        <div className="p-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-2 animate-in fade-in slide-in-from-top-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                    Import Account Config (Paste or Browse File)
+                                </span>
+                                <div>
+                                    <input
+                                        type="file"
+                                        ref={singleAccountFileInputRef}
+                                        className="hidden"
+                                        accept=".json,.yaml,.yml,.csv,.txt"
+                                        onChange={handleSingleFileUpload}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => singleAccountFileInputRef.current?.click()}
+                                        className="px-2 py-0.5 text-[10px] font-medium bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Upload className="w-3 h-3" />
+                                        Browse File
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea
+                                rows={3}
+                                value={modalQuickImportText}
+                                onChange={(e) => setModalQuickImportText(e.target.value)}
+                                placeholder="Paste single account JSON, YAML, or CSV snippet here to auto-fill form..."
+                                className="w-full px-2.5 py-1.5 font-mono text-[11px] border border-indigo-200 dark:border-indigo-800 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsModalQuickImportOpen(false);
+                                        setModalQuickImportText('');
+                                    }}
+                                    className="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-700 dark:text-slate-400 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleQuickImportSingle(modalQuickImportText)}
+                                    className="px-3 py-1 text-[11px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors cursor-pointer shadow-xs"
+                                >
+                                    Apply to Form
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* One-Click AI Instructions with Embedded JSON Syntax Segment */}
+                    <div className="rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 p-2.5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+                                <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                                <span className="font-semibold text-[11px]">AI Automated Mailbox Configuration</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAiJsonSyntax(!showAiJsonSyntax)}
+                                    className="px-2 py-0.5 text-[10px] font-medium bg-blue-100/70 dark:bg-blue-900/50 hover:bg-blue-200/70 dark:hover:bg-blue-900/80 text-blue-800 dark:text-blue-200 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                    <FileJson className="w-3 h-3" />
+                                    <span>{showAiJsonSyntax ? 'Hide JSON Format' : 'View JSON Format'}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const instructions = `Generate or configure a mailbox for Antigravity-Manager matching this exact JSON specification segment:
+
+\`\`\`json
+{
+  "alias": "${editingAccount.alias || 'Primary Mailbox'}",
+  "email": "${editingAccount.email || 'your-email@gmail.com'}",
+  "password": "<generated-app-password>",
+  "smtp_host": "${editingAccount.smtp_host || 'smtp.gmail.com'}",
+  "smtp_port": ${editingAccount.smtp_port || 587},
+  "imap_host": "${editingAccount.imap_host || 'imap.gmail.com'}",
+  "imap_port": ${editingAccount.imap_port || 993},
+  "encryption_type": "${editingAccount.encryption_type || 'TLS'}",
+  "is_default": ${editingAccount.is_default},
+  "is_active": ${editingAccount.is_active}
+}
+\`\`\`
+
+Instructions: Provide the app-password and verified SMTP/IMAP settings inside the JSON segment so it can be pasted directly into Antigravity-Manager's mailbox import.`;
+                                        navigator.clipboard.writeText(instructions);
+                                        showToast('AI instructions with embedded JSON syntax copied to clipboard', 'success');
+                                    }}
+                                    className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                    title="Copy AI Instructions with Embedded JSON Syntax to Clipboard"
+                                >
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy AI Instructions</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Embedded JSON Syntax Segment Preview */}
+                        {showAiJsonSyntax && (
+                            <div className="pt-1.5 border-t border-blue-200/50 dark:border-blue-900/40">
+                                <div className="text-[10px] text-blue-700 dark:text-blue-300 font-medium mb-1">
+                                    Embedded JSON Syntax Segment:
+                                </div>
+                                <pre className="p-2 bg-slate-950 text-amber-300 font-mono text-[10px] rounded-md overflow-x-auto leading-tight select-all">
+{JSON.stringify(
+    {
+        alias: editingAccount.alias || 'Primary Mailbox',
+        email: editingAccount.email || 'your-email@gmail.com',
+        password: editingAccount.password || '<app-password>',
+        smtp_host: editingAccount.smtp_host || 'smtp.gmail.com',
+        smtp_port: editingAccount.smtp_port || 587,
+        imap_host: editingAccount.imap_host || 'imap.gmail.com',
+        imap_port: editingAccount.imap_port || 993,
+        encryption_type: editingAccount.encryption_type || 'TLS',
+        is_default: editingAccount.is_default,
+        is_active: editingAccount.is_active,
+    },
+    null,
+    2
+)}
+                                </pre>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -2093,6 +2385,16 @@ export default function EmailNotificationSettings() {
                                 <input
                                     type="radio"
                                     name="import_fmt"
+                                    value="yaml"
+                                    checked={importFormat === 'yaml'}
+                                    onChange={() => setImportFormat('yaml')}
+                                />
+                                <span>YAML</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="import_fmt"
                                     value="csv"
                                     checked={importFormat === 'csv'}
                                     onChange={() => setImportFormat('csv')}
@@ -2116,7 +2418,7 @@ export default function EmailNotificationSettings() {
                                 type="file"
                                 ref={fileInputRef}
                                 className="hidden"
-                                accept=".json,.csv,.xml,.xlsx,.xls"
+                                accept=".json,.yaml,.yml,.csv,.xml,.xlsx,.xls"
                                 onChange={handleFileUpload}
                             />
                             <button
@@ -2149,6 +2451,15 @@ export default function EmailNotificationSettings() {
             <AiSampleTemplatesModal
                 isOpen={isSampleTemplatesOpen}
                 onClose={() => setIsSampleTemplatesOpen(false)}
+            />
+
+            {/* Mailbox Export Preview & Save Modal */}
+            <MailboxExportModal
+                isOpen={exportModalState.isOpen}
+                onClose={() => setExportModalState({ isOpen: false })}
+                singleAccount={exportModalState.singleAccount}
+                allAccounts={exportModalState.allAccounts}
+                initialFormat={exportModalState.initialFormat}
             />
         </div>
     );

@@ -840,13 +840,19 @@ fn validate_user_json_path(path: &str, must_exist: bool) -> Result<PathBuf, Stri
         return Err("security_denied: sensitive system path is not allowed".to_string());
     }
 
-    let is_json = resolved
+    let is_allowed_ext = resolved
         .extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("json"))
+        .map(|ext| {
+            let lower = ext.to_ascii_lowercase();
+            matches!(
+                lower.as_str(),
+                "json" | "csv" | "yaml" | "yml" | "txt" | "xlsx" | "xls"
+            )
+        })
         .unwrap_or(false);
-    if !is_json {
-        return Err("invalid_path: only .json files are allowed".to_string());
+    if !is_allowed_ext {
+        return Err("invalid_path: only text configuration files (.json, .csv, .yaml, .yml, .txt, .xlsx) are allowed".to_string());
     }
 
     if must_exist {

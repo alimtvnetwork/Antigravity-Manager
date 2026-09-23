@@ -6,12 +6,14 @@ import {
     Check,
     FileJson,
     FileText,
+    FileCode,
     Bot,
     HelpCircle,
     Terminal,
 } from 'lucide-react';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
+import { downloadOrSaveFile } from '../../utils/emailFormatters';
 
 interface Props {
     isOpen: boolean;
@@ -45,23 +47,64 @@ const SAMPLE_JSON_DATA = [
     }
 ];
 
+const SAMPLE_YAML_DATA = `- alias: Primary Google Workspace
+  email: alerts@yourcompany.com
+  password: app-password-without-spaces
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  imap_host: imap.gmail.com
+  imap_port: 993
+  encryption_type: TLS
+  is_default: true
+  is_active: true
+
+- alias: Backup Microsoft 365
+  email: backup-agent@outlook.com
+  password: app-specific-token
+  smtp_host: smtp.office365.com
+  smtp_port: 587
+  imap_host: outlook.office365.com
+  imap_port: 993
+  encryption_type: STARTTLS
+  is_default: false
+  is_active: true`;
+
 const SAMPLE_CSV_DATA = `alias,email,password,smtp_host,smtp_port,imap_host,imap_port,encryption_type,is_default,is_active
 Primary Gmail,agent@gmail.com,app-password-here,smtp.gmail.com,587,imap.gmail.com,993,TLS,true,true
 Corporate Outlook,alerts@corp.com,app-token-here,smtp.office365.com,587,outlook.office365.com,993,STARTTLS,false,true`;
 
-const SAMPLE_AI_PROMPT = `Generate a JSON array of email mailboxes for AGM (Antigravity Manager) with the following schema for each object:
-- alias (string, human-readable name)
-- email (string, email address)
-- password (string, application password or token)
-- smtp_host (string, e.g. "smtp.gmail.com")
-- smtp_port (number, e.g. 587 or 465)
-- imap_host (string, e.g. "imap.gmail.com")
-- imap_port (number, e.g. 993)
-- encryption_type (string: "TLS", "STARTTLS", or "SSL")
-- is_default (boolean: true for first, false for others)
-- is_active (boolean: true)
+const SAMPLE_AI_PROMPT = `Generate a JSON array of email mailboxes for Antigravity Manager (AGM) following this exact JSON syntax schema:
 
-Output only valid JSON array.`;
+\`\`\`json
+[
+  {
+    "alias": "Primary Google Workspace",
+    "email": "alerts@yourcompany.com",
+    "password": "app-password-without-spaces",
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "encryption_type": "TLS",
+    "is_default": true,
+    "is_active": true
+  }
+]
+\`\`\`
+
+Schema Requirements:
+- alias: human-readable mailbox name (string)
+- email: valid email address (string)
+- password: application-specific password or token without spaces (string)
+- smtp_host: SMTP server hostname (string, e.g. "smtp.gmail.com", "mail.domain.com")
+- smtp_port: SMTP port (number: 587 for TLS, 465 for SSL)
+- imap_host: IMAP server hostname (string, e.g. "imap.gmail.com", "mail.domain.com")
+- imap_port: IMAP port (number: 993 for SSL/TLS)
+- encryption_type: "TLS", "STARTTLS", or "SSL" (string)
+- is_default: boolean (true for default sender, false for others)
+- is_active: boolean (true)
+
+Output only valid JSON matching the schema above.`;
 
 const SAMPLE_INBOUND_COMMANDS = [
     {
@@ -109,7 +152,7 @@ const SAMPLE_INBOUND_COMMANDS = [
 ];
 
 export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
-    const [activeTab, setActiveTab] = useState<'json' | 'csv' | 'prompt' | 'commands'>('json');
+    const [activeTab, setActiveTab] = useState<'json' | 'yaml' | 'csv' | 'prompt' | 'commands'>('json');
     const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
     const handleCopy = (text: string, tabName: string) => {
@@ -119,17 +162,8 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
         setTimeout(() => setCopiedTab(null), 2000);
     };
 
-    const handleDownload = (filename: string, content: string, mimeType: string) => {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast(`Downloaded ${filename}`, 'success');
+    const handleDownload = async (filename: string, content: string, extension: 'json' | 'yaml' | 'csv') => {
+        await downloadOrSaveFile(filename, content, extension);
     };
 
     const jsonString = JSON.stringify(SAMPLE_JSON_DATA, null, 2);
@@ -157,7 +191,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                 <div className="flex items-center gap-1.5 border-b border-gray-200 dark:border-base-300 pb-2">
                     <button
                         onClick={() => setActiveTab('json')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                             activeTab === 'json'
                                 ? 'bg-amber-500 text-white shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
@@ -167,8 +201,19 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                         <span>JSON Schema</span>
                     </button>
                     <button
+                        onClick={() => setActiveTab('yaml')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                            activeTab === 'yaml'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
+                        }`}
+                    >
+                        <FileCode className="w-3.5 h-3.5" />
+                        <span>YAML Schema</span>
+                    </button>
+                    <button
                         onClick={() => setActiveTab('csv')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                             activeTab === 'csv'
                                 ? 'bg-blue-600 text-white shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
@@ -179,7 +224,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                     </button>
                     <button
                         onClick={() => setActiveTab('prompt')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                             activeTab === 'prompt'
                                 ? 'bg-purple-600 text-white shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
@@ -190,9 +235,9 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                     </button>
                     <button
                         onClick={() => setActiveTab('commands')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                             activeTab === 'commands'
-                                ? 'bg-emerald-600 text-white shadow-xs'
+                                ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-200'
                         }`}
                     >
@@ -218,7 +263,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                                         <span>Copy</span>
                                     </button>
                                     <button
-                                        onClick={() => handleDownload('mailboxes_sample.json', jsonString, 'application/json')}
+                                        onClick={() => handleDownload('mailboxes_sample.json', jsonString, 'json')}
                                         className="btn btn-xs btn-primary gap-1"
                                     >
                                         <Download className="w-3 h-3" />
@@ -228,6 +273,35 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                             </div>
                             <pre className="p-3 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed">
                                 {jsonString}
+                            </pre>
+                        </div>
+                    )}
+
+                    {activeTab === 'yaml' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Sample Mailboxes YAML (`mailboxes_sample.yaml`)
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => handleCopy(SAMPLE_YAML_DATA, 'yaml')}
+                                        className="btn btn-xs btn-ghost gap-1 hover:bg-gray-200 dark:hover:bg-base-300"
+                                    >
+                                        {copiedTab === 'yaml' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                        <span>Copy</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDownload('mailboxes_sample.yaml', SAMPLE_YAML_DATA, 'yaml')}
+                                        className="btn btn-xs btn-primary gap-1"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        <span>Download YAML</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <pre className="p-3 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed">
+                                {SAMPLE_YAML_DATA}
                             </pre>
                         </div>
                     )}
@@ -247,7 +321,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
                                         <span>Copy</span>
                                     </button>
                                     <button
-                                        onClick={() => handleDownload('mailboxes_sample.csv', SAMPLE_CSV_DATA, 'text/csv')}
+                                        onClick={() => handleDownload('mailboxes_sample.csv', SAMPLE_CSV_DATA, 'csv')}
                                         className="btn btn-xs btn-primary gap-1"
                                     >
                                         <Download className="w-3 h-3" />
