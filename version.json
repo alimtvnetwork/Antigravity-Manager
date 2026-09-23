@@ -8,8 +8,9 @@
     "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
   },
   "Version": "4.64.0",
-  "Title": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
-  "FullName": "Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC",
+  "Title": "Antigravity Manager Tools",
+  "FullName": "Antigravity Manager Tools",
+  "Publisher": "Maintained by Alim, Sponsored by RISEUP ASIA LLC",
   "RepoSlug": "alimtvnetwork/Antigravity-Manager",
   "RepoUrl": "https://github.com/alimtvnetwork/Antigravity-Manager",
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",

@@ -446,7 +446,7 @@ fn wrap_email_card(
     </div>
     <div class="footer">
       Machine: <strong>{}</strong> &nbsp;|&nbsp; Local IP: <strong>{}</strong><br>
-      Automated Mailbox Dispatcher · Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC
+      Automated Mailbox Dispatcher · Antigravity Manager Tools · Maintained by Alim, Sponsored by RISEUP ASIA LLC
     </div>
   </div>
 </body>
