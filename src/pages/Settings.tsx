@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send } from 'lucide-react';
+import { useState, useEffect, startTransition } from 'react';
+import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
 import { AppConfig } from '../types/config';
 import ModalDialog from '../components/common/ModalDialog';
+import { UnifiedBackupModal } from '../components/modals/UnifiedBackupModal';
 import { showToast } from '../components/common/ToastContainer';
 import QuotaProtection from '../components/settings/QuotaProtection';
 import SmartWarmup from '../components/settings/SmartWarmup';
@@ -44,7 +45,8 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.29.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.65.0');
+    const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
         theme: 'system',
@@ -518,7 +520,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('general')}
+                            onClick={() => startTransition(() => setActiveTab('general'))}
                         >
                             {t('settings.tabs.general')}
                         </button>
@@ -527,7 +529,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('account')}
+                            onClick={() => startTransition(() => setActiveTab('account'))}
                         >
                             {t('settings.tabs.account')}
                         </button>
@@ -536,7 +538,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('proxy')}
+                            onClick={() => startTransition(() => setActiveTab('proxy'))}
                         >
                             {t('settings.tabs.proxy')}
                         </button>
@@ -563,7 +565,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('advanced')}
+                            onClick={() => startTransition(() => setActiveTab('advanced'))}
                         >
                             {t('settings.tabs.advanced')}
                         </button>
@@ -572,7 +574,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('debug')}
+                            onClick={() => startTransition(() => setActiveTab('debug'))}
                         >
                             {t('settings.tabs.debug')}
                         </button>
@@ -581,7 +583,7 @@ function Settings() {
                                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => setActiveTab('about')}
+                            onClick={() => startTransition(() => setActiveTab('about'))}
                         >
                             {t('settings.tabs.about')}
                         </button>
@@ -612,7 +614,10 @@ function Settings() {
                                     onChange={(e) => {
                                         const newLang = e.target.value;
                                         setFormData({ ...formData, language: newLang });
-                                        i18n.changeLanguage(newLang);
+                                        document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+                                        startTransition(() => {
+                                            i18n.changeLanguage(newLang);
+                                        });
                                         updateLanguage(newLang);
                                     }}
                                 >
@@ -740,6 +745,29 @@ function Settings() {
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.general.update_check_interval_desc')}</p>
                                     </div>
                                 )}
+                            </>
+
+                            {/* Lightweight Mode (Release Memory) */}
+                            {isTauri() && (
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                    <div>
+                                        <div className="font-medium text-gray-900 dark:text-base-content">{t('settings.general.lightweight_mode')}</div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('settings.general.lightweight_mode_desc')}</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={formData.lightweight_mode ?? false}
+                                            onChange={(e) => {
+                                                const enabled = e.target.checked;
+                                                setFormData({ ...formData, lightweight_mode: enabled });
+                                            }}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+                            )}
 
                                 {/* Menu display settings */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
@@ -835,7 +863,6 @@ function Settings() {
                                         {t('settings.menu.selected_items_note')}
                                     </p>
                                 </div>
-
                                 {/* Instance clone mode settings */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-1">
@@ -860,7 +887,6 @@ function Settings() {
                                         </option>
                                     </select>
                                 </div>
-                            </>
                         </div>
                     )}
 
@@ -1071,6 +1097,26 @@ function Settings() {
                                         )}
                                     </div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.advanced.default_export_path_desc')}</p>
+                                </div>
+
+                                {/* Unified Backup & Vault Card */}
+                                <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-between gap-4">
+                                    <div className="space-y-0.5">
+                                        <div className="text-sm font-semibold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
+                                            <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                            <span>Unified Backup & Encrypted Vault</span>
+                                        </div>
+                                        <p className="text-xs text-purple-700 dark:text-purple-300/80">
+                                            Export entire environment, accounts, and configurations with AES-256-GCM encryption.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsBackupModalOpen(true)}
+                                        className="px-3.5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer"
+                                    >
+                                        Manage Backups
+                                    </button>
                                 </div>
 
                                 {/* Data directory */}
@@ -1691,8 +1737,8 @@ function Settings() {
                                     </div>
                                 </div>
 
-                                {/* Cards Grid - Now 5 columns */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full max-w-6xl px-4">
+                                {/* Cards Grid - 4 columns */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-5xl px-4">
                                     {/* Author & Sponsor Card */}
                                     <a
                                         href="https://alimkarim.com"
@@ -1707,23 +1753,6 @@ function Settings() {
                                             <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author', 'Maintainer & Sponsor')}</div>
                                             <div className="font-bold text-gray-900 dark:text-base-content text-xs sm:text-sm">Md. Alim Ul Karim</div>
                                             <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Riseup Asia LLC</div>
-                                        </div>
-                                    </a>
-
-                                    {/* Upstream Genesis Card */}
-                                    <a
-                                        href="https://lbjlaq.github.io/Antigravity-Manager/"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
-                                    >
-                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <Sparkles className="w-6 h-6 text-emerald-500" />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Upstream Genesis</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content">lbjlaq</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Original Creator · Special Thanks</div>
                                         </div>
                                     </a>
 
@@ -2059,6 +2088,12 @@ function Settings() {
                     </div>
                     <div className="modal-backdrop bg-black/60 backdrop-blur-md fixed inset-0 z-[-1]" onClick={() => setIsSupportModalOpen(false)}></div>
                 </div>
+
+                {/* Unified Backup Modal */}
+                <UnifiedBackupModal
+                    isOpen={isBackupModalOpen}
+                    onClose={() => setIsBackupModalOpen(false)}
+                />
             </div >
         </div >
     );

@@ -6,7 +6,8 @@
 //! PATH self-installation, GitHub auto-updates, and SSH remote machine management.
 
 use antigravity_tools_lib::modules::{
-    account, auto_switcher, email_vault_db, email_watcher, instance, proxy_db, repo_db, security_db,
+    account, auto_switcher, email_vault_db, email_watcher, instance, proxy_db, repo_db,
+    security_db, supabase_sync,
 };
 use std::env;
 use std::fs;
@@ -918,23 +919,48 @@ fn cmd_instances() {
                 return;
             }
 
-            println!("\nRegistered Sandbox Profiles ({} total):", instances.len());
-            println!(
-                "{:<16} {:<20} {:<18} {:<24} {}",
-                "ID", "NAME", "STATUS", "BOUND ACCOUNT", "DATA DIR"
-            );
-            println!("{}", "-".repeat(100));
+            let node_alias = supabase_sync::load_config()
+                .map(|c| c.node_alias)
+                .unwrap_or_else(|_| "Local".to_string());
+            let local_ip = supabase_sync::get_local_ip();
 
-            for inst in instances {
+            println!(
+                "\nRegistered Sandbox Profiles ({} total) [Node: {} | IP: {}]:",
+                instances.len(),
+                node_alias,
+                local_ip
+            );
+            println!(
+                "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} {}",
+                "#", "ID", "NAME", "STATUS", "BOUND ACCOUNT", "NODE / IP", "DATA DIR"
+            );
+            println!("{}", "-".repeat(115));
+
+            for (idx, inst) in instances.iter().enumerate() {
+                let seq_str = match inst.config.seq_num {
+                    Some(s) => format!("#{}", s),
+                    None => format!("#{}", idx + 1),
+                };
                 let status_str = if inst.is_running {
                     format!("Running (PID: {})", inst.pid.unwrap_or(0))
                 } else {
                     "Idle".to_string()
                 };
-                let email = inst.config.bound_email.unwrap_or_else(|| "-".to_string());
+                let email = inst
+                    .config
+                    .bound_email
+                    .clone()
+                    .unwrap_or_else(|| "-".to_string());
+                let node_info = format!("{}/{}", node_alias, local_ip);
                 println!(
-                    "{:<16} {:<20} {:<18} {:<24} {}",
-                    inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
+                    "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} {}",
+                    seq_str,
+                    inst.config.id,
+                    inst.config.name,
+                    status_str,
+                    email,
+                    node_info,
+                    inst.config.data_dir
                 );
             }
             println!();

@@ -16,7 +16,7 @@ import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
 import { UpdateNotification } from './components/UpdateNotification';
 import DebugConsole from './components/debug/DebugConsole';
-import { useEffect } from 'react';
+import { useEffect, startTransition } from 'react';
 import { useConfigStore } from './stores/useConfigStore';
 import { useAccountStore } from './stores/useAccountStore';
 import { useUpdateStore } from './stores/use-update-store';
@@ -95,16 +95,13 @@ function App() {
     loadConfig();
   }, [loadConfig]);
 
-  // Sync language from config
+  // Sync language from config (仅在不同步时通过 startTransition 非阻塞调度)
   useEffect(() => {
-    if (config?.language) {
-      i18n.changeLanguage(config.language);
-      // Support RTL
-      if (config.language === 'ar') {
-        document.documentElement.dir = 'rtl';
-      } else {
-        document.documentElement.dir = 'ltr';
-      }
+    if (config?.language && i18n.language !== config.language) {
+      startTransition(() => {
+        i18n.changeLanguage(config.language);
+      });
+      document.documentElement.dir = config.language === 'ar' ? 'rtl' : 'ltr';
     }
   }, [config?.language, i18n]);
 
@@ -137,6 +134,15 @@ function App() {
         console.log('[App] Backend triggered quota refresh, syncing UI...');
         fetchCurrentAccount();
         fetchAccounts();
+      })
+    );
+
+    // Listen for manual trigger update event
+    unlistenPromises.push(
+      listen('app://trigger-update', () => {
+        console.log('[App] Received app://trigger-update event, showing updater...');
+        setShowNotification(true);
+        checkForUpdates();
       })
     );
 

@@ -1,21 +1,17 @@
 //! Full-duplex unified model thinking and response streaming pipeline architecture
 //!
 //! 1. Canonical Intermediate Representation (Canonical IR): Google Gemini standard format (`contents` + `generationConfig`)
-//! 2. Protocol Inbound Strategy Adapters (`InboundThinkingPipeline`, `ProxyProtocol`)
+//! 2. Protocol Inbound Strategy Adapters (`InboundThinkingPipeline`, `ProxyProtocol`, `UpstreamClassification`)
 //! 3. Unified Usage and Cache Computation & Protocol Diffusion (`CanonicalUsage`)
-//! 4. Unified Outbound Extraction, Reverse Ingestion & Protocol Diffusion for Streaming/Non-Streaming (`OutboundThinkingPipeline`, `CanonicalStreamEvent`)
+//!
+//! Architectural Design: Outbound diffusion is independently implemented by each protocol mapper adapter
+//! (Gemini -> each protocol wire format). No unified outbound pipeline is maintained to preserve protocol
+//! flexibility and streaming stability.
 
-pub mod canonical;
-pub mod events;
 pub mod inbound;
-pub mod outbound;
 pub mod policy;
 pub mod usage;
 
-#[allow(unused_imports)]
-pub use events::CanonicalStreamEvent;
 pub use inbound::InboundThinkingPipeline;
-#[allow(unused_imports)]
-pub use outbound::{CanonicalEgressPayload, OutboundThinkingPipeline};
-pub use policy::ProxyProtocol;
+pub use policy::{ProxyProtocol, UpstreamClassification};
 pub use usage::CanonicalUsage;

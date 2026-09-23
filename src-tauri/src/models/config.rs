@@ -36,12 +36,13 @@ pub struct AppConfig {
     pub hidden_menu_items: Vec<String>, // Hidden menu item path list
     #[serde(default)]
     pub cloudflared: CloudflaredConfig, // [NEW] Cloudflared configuration
-    #[serde(default)]
     pub auto_profile_switcher: AutoProfileSwitcherConfig, // [NEW] Auto profile switcher configuration
     #[serde(default = "default_instance_clone_mode")]
     pub instance_clone_mode: String,
     #[serde(default)]
     pub conversation_cleanup: ConversationCleanupConfig,
+    #[serde(default)]
+    pub lightweight_mode: bool, // [NEW] Lightweight mode: destroy webview on minimize/close to tray
 }
 
 fn default_auto_sync() -> bool {
@@ -172,7 +173,7 @@ pub struct CircuitBreakerConfig {
     #[serde(default = "default_backoff_steps")]
     pub backoff_steps: Vec<u64>,
 
-    /// Lock account until quota reset time when 5-hour rolling or weekly quota reaches 0
+    /// Optional 5h zero-quota lock; exhausted weekly quota always blocks scheduling.
     #[serde(default = "default_lock_on_zero_quota")]
     pub lock_on_zero_quota: bool,
 }
@@ -227,12 +228,13 @@ impl AppConfig {
             auto_profile_switcher: AutoProfileSwitcherConfig::default(),
             instance_clone_mode: default_instance_clone_mode(),
             conversation_cleanup: ConversationCleanupConfig::default(),
+            lightweight_mode: false,
         }
     }
 }
 
 fn default_caution_interval() -> u32 {
-    180
+    60
 }
 
 fn default_critical_interval() -> u32 {
@@ -240,7 +242,7 @@ fn default_critical_interval() -> u32 {
 }
 
 fn default_critical_threshold() -> f64 {
-    12.0
+    10.0
 }
 
 fn default_true() -> bool {
@@ -274,7 +276,7 @@ pub struct AutoProfileSwitcherConfig {
     pub auto_fast_forward_on_critical: bool,
     #[serde(default = "default_true")]
     pub auto_resume_recent_prompts: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_false")]
     pub auto_focus_window: bool,
     #[serde(default = "default_watchdog_interval")]
     pub watchdog_interval_seconds: u32,
@@ -286,17 +288,17 @@ impl Default for AutoProfileSwitcherConfig {
     fn default() -> Self {
         Self {
             is_enabled: true,
-            check_interval_seconds: 60,
+            check_interval_seconds: 480,
             low_quota_threshold_percent: 10.0,
             target_model: "gemini-pro".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
-            caution_interval_seconds: 180,
+            caution_interval_seconds: 60,
             critical_interval_seconds: 60,
-            critical_threshold_percent: 12.0,
+            critical_threshold_percent: 10.0,
             auto_fast_forward_on_critical: true,
             auto_resume_recent_prompts: true,
-            auto_focus_window: true,
+            auto_focus_window: false,
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
         }

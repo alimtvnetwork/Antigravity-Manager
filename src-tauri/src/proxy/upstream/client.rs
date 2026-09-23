@@ -53,9 +53,12 @@ pub fn sanitize_error_for_log(error_text: &str) -> String {
     let re_bearer = regex::Regex::new(r#"(?i)(bearer\s+)[^"'\\\s,}\]]+"#).unwrap();
     let redacted = re_bearer.replace_all(&redacted, "$1<redacted>");
 
-    // Limit length to avoid log bombs
+    // Limit length to avoid log bombs (UTF-8 character boundary safe protection)
     if redacted.len() > 1000 {
-        format!("{}... (truncated)", &redacted[..1000])
+        format!(
+            "{}... (truncated)",
+            crate::proxy::mappers::common_utils::safe_truncate_str(&redacted, 1000)
+        )
     } else {
         redacted.into_owned()
     }
@@ -601,7 +604,7 @@ impl UpstreamClient {
     }
 }
 
-/// 派生确定性 UUID 格式的客户端窗口 Session ID (RFC 4122 v4 格式)
+/// Derives deterministic UUID formatted client window Session ID (RFC 4122 v4 format)
 fn derive_session_uuid(seed: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();

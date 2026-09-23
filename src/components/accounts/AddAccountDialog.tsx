@@ -300,7 +300,10 @@ function AddAccountDialog({ onAdd, showText = true }: AddAccountDialogProps) {
 
             // 3. Listen for incoming message
             const handleMessage = async (event: MessageEvent) => {
-                // Security check
+                // Security check: strictly validate message origin matches current window origin
+                if (event.origin && event.origin !== window.location.origin) {
+                    return;
+                }
                 if (event.data?.type === 'oauth-success') {
                     popup.close();
                     window.removeEventListener('message', handleMessage);

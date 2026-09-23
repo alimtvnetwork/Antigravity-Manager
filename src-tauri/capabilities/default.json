@@ -15,6 +15,16 @@
     "core:window:allow-unminimize",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-destroy",
+    "opener:default",
+    "opener:allow-open-url",
+    "dialog:default",
+    "fs:default",
+    "process:default",
+    "autostart:default"
   ]
 }

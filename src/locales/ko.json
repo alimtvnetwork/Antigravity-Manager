@@ -136,7 +136,32 @@
       "export_no_accounts": "내보낼 계정이 없습니다",
       "export_success": "내보내기 성공! 저장 위치: {{path}}",
       "export_error": "내보내기 실패"
-    }
+    },
+    "accounts_health": "계정 생태계 상태",
+    "total_accounts_desc": "구성된 전체 계정",
+    "available_accounts": "사용 가능한 계정 수",
+    "available_accounts_desc": "✓ 활성 및 정상 · 프록시 서비스 중",
+    "disabled_accounts": "비활성화된 계정 수",
+    "disabled_accounts_desc": "수동 중지 / 프록시 비활성화",
+    "abnormal_accounts": "이상 계정 수",
+    "abnormal_accounts_has_risk": "⚠ 리스크 인증 / 차단 확인 필요",
+    "abnormal_accounts_no_risk": "✓ 이상 및 차단 계정 없음",
+    "quota_matrix_active": "사용 가능 계정 할당량 생산성 매트릭스",
+    "quota_matrix_all_normal": "모든 정상 계정 할당량 매트릭스 (비활성 포함)",
+    "base_pool_count": "기준: {{count}}개 계정",
+    "btn_only_available": "사용 가능 계정만 ({{count}})",
+    "btn_include_disabled": "비활성 계정 포함 ({{count}})",
+    "btn_title_only_available": "현재: 사용 가능한 계정만 (클릭 시 비활성 포함)",
+    "btn_title_include_disabled": "현재: 비활성 포함 모든 정상 계정 (클릭 시 사용 가능만)",
+    "gemini_available_quota": "Gemini 사용 가능 할당량",
+    "gemini_image_quota": "Gemini 이미지 할당량",
+    "claude_available_quota": "Claude 사용 가능 할당량",
+    "weighted_available": "종합 가중치 할당량",
+    "quota_sufficient_short": "충분",
+    "quota_tight_short": "부족",
+    "rolling_5h": "5시간 롤링:",
+    "weekly_7d": "7일 주간:",
+    "zero_weekly_warning": "{{count}}개 계정이 주간 할당량 소진으로 차단됨 (0% 판정)"
   },
   "accounts": {
     "account": "계정",
@@ -394,7 +419,11 @@
       "auto_check_update_disabled": "자동 확인 비활성화됨",
       "update_check_interval": "확인 간격 (시간)",
       "update_check_interval_desc": "자동 확인 간격 설정 (1-168 시간)",
-      "update_check_interval_saved": "확인 간격 설정 저장됨"
+      "update_check_interval_saved": "확인 간격 설정 저장됨",
+      "lightweight_mode": "경량 모드 (메모리 해제)",
+      "lightweight_mode_desc": "트레이로 닫거나 최소화할 때 WebView 렌더링 프로세스를 종료하여 상주 메모리를 약 35MB로 줄입니다. 창을 다시 열 때 약간의 재구성 시간이 필요합니다.",
+      "lightweight_mode_enabled": "경량 모드 활성화됨",
+      "lightweight_mode_disabled": "경량 모드 비활성화됨"
     },
     "account": {
       "title": "계정 설정",
@@ -685,7 +714,8 @@
     "quit": "애플리케이션 종료",
     "no_account": "계정 없음",
     "unknown_quota": "알 수 없음 (클릭하여 새로고침)",
-    "forbidden": "계정 금지됨"
+    "forbidden": "계정 금지됨",
+    "lightweight_mode": "경량 모드 (트레이 시 메모리 해제)"
   },
   "proxy": {
     "title": "API 프록시 서비스",
@@ -716,10 +746,10 @@
       "auto_start": "앱과 함께 자동 시작",
       "auto_start_tooltip": "앱 실행 시 로컬 API 프록시 서비스를 자동으로 시작합니다.",
       "allow_lan_access": "LAN 액세스 허용",
-      "allow_lan_access_tooltip": "활성화하면 서비스가 0.0.0.0에 바인딩되어 LAN의 다른 장치가 액세스할 수 있습니다. 인증을 활성화 상태로 유지하고 API 키를 보호하세요. 적용하려면 다시 시작해야 합니다.",
-      "allow_lan_access_hint_enabled": "🌐 0.0.0.0에서 수신 대기 중, LAN 장치 액세스 가능",
+      "allow_lan_access_tooltip": "활성화하면 서비스가 IPv6/IPv4 듀얼 스택 와일드카드([::] / 0.0.0.0)에 바인딩되어 LAN 및 외부 장치가 액세스할 수 있습니다. 인증을 활성화 상태로 유지하고 API 키를 보호하세요. 적용하려면 서비스를 다시 시작해야 합니다.",
+      "allow_lan_access_hint_enabled": "🌐 [::] / 0.0.0.0에서 수신 대기 중 (IPv6/IPv4 듀얼 스택), LAN 및 외부 장치 액세스 가능",
       "allow_lan_access_hint_disabled": "🔒 127.0.0.1에서만 수신 대기, localhost 액세스 (개인정보 보호 우선)",
-      "allow_lan_access_warning": "⚠️ 활성화 시 LAN 장치에서 액세스할 수 있습니다. API 키를 안전하게 보관하세요",
+      "allow_lan_access_warning": "⚠️ 활성화 시 LAN 및 외부 장치에서 액세스할 수 있습니다. API 키를 안전하게 보관하세요",
       "allow_lan_access_restart_hint": "ℹ️ 변경 사항을 적용하려면 서비스 다시 시작 필요",
       "api_key": "API 키",
       "api_key_tooltip": "프록시 인증이 활성화된 경우 클라이언트가 사용하는 공유 비밀 키입니다. 키를 재생성하면 이전 키는 즉시 무효화됩니다.",

@@ -489,6 +489,12 @@ pub async fn save_config(
         Some(config.proxy.experimental.thinking_max_memory_turns),
     );
 
+    // 同步健康检查日志捕获开关
+    let monitor_lock = proxy_state.monitor.read().await;
+    if let Some(monitor) = monitor_lock.as_ref() {
+        monitor.set_capture_health_logs(config.proxy.capture_health_logs);
+    }
+
     // 热更新正在运行的服务
     let instance_lock = proxy_state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
@@ -906,6 +912,15 @@ pub async fn prune_antigravity_conversations(
 ) -> Result<modules::agy_cleaner::PruneResult, String> {
     let keep = keep_count.unwrap_or(10);
     modules::agy_cleaner::prune_and_clean(keep)
+}
+
+/// Prune older Antigravity conversations only (preserving caches) with temp staging
+#[tauri::command]
+pub async fn prune_antigravity_conversations_only(
+    keep_count: Option<usize>,
+) -> Result<modules::agy_cleaner::PruneResult, String> {
+    let keep = keep_count.unwrap_or(10);
+    modules::agy_cleaner::prune_conversations_only(keep)
 }
 
 /// Undo the last or specific Antigravity conversation pruning transaction

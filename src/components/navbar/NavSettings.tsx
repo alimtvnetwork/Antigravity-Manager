@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Sun, Moon, LogOut, Minimize2, Minus, X, Sparkles } from 'lucide-react';
+import { Sun, Moon, LogOut, Minus, X, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
-import { useViewStore } from '../../stores/useViewStore';
 import { useErrorStore } from '../../stores/error-store';
 import { AgyCleanModal } from '../modals/agy-clean-modal';
 
@@ -21,7 +20,7 @@ interface NavSettingsProps {
  * Settings button component - handles responsiveness independently
  *
  * Responsive strategy:
- * - ≥ 1024px: standalone secondary buttons (mini view, theme, language)
+ * - ≥ 1024px: standalone secondary buttons (quick clean, theme, language)
  * - < 1024px: secondary tools collapse into responsive kebab/overflow menu
  * - Window controls (Minimize, Maximize/Restore, Close): always permanently visible and pinned
  */
@@ -32,7 +31,6 @@ export function NavSettings({
     onLanguageChange
 }: NavSettingsProps) {
     const { t } = useTranslation();
-    const { setMiniView } = useViewStore();
     const [isMaximized, setIsMaximized] = useState(false);
     const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
 
@@ -143,30 +141,7 @@ export function NavSettings({
                     title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
                     aria-label="Quick Clean"
                 >
-                    <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-
-                {/* Mini view toggle button */}
-                <button
-                    type="button"
-                    onClick={() => {
-                        try {
-                            setMiniView(true);
-                        } catch (err) {
-                            console.error('Failed to switch to mini view:', err);
-                            const captured = useErrorStore.getState().captureError(err, {
-                                source: 'NavSettings.tsx',
-                                triggerComponent: 'NavSettings.MiniView',
-                                triggerAction: 'setMiniView',
-                            });
-                            useErrorStore.getState().openErrorModal(captured);
-                        }
-                    }}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
-                    title={t('nav.mini_view', 'Mini View')}
-                    aria-label="Mini View"
-                >
-                    <Minimize2 className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
+                    <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 {/* Theme toggle button */}

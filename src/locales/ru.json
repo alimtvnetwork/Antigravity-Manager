@@ -136,7 +136,32 @@
       "export_no_accounts": "Нет аккаунтов для экспорта",
       "export_success": "Экспорт успешен! Файл сохранен в: {{path}}",
       "export_error": "Не удалось выполнить экспорт"
-    }
+    },
+    "accounts_health": "Состояние экосистемы аккаунтов",
+    "total_accounts_desc": "Все настроенные аккаунты",
+    "available_accounts": "Доступные аккаунты",
+    "available_accounts_desc": "✓ Активны и исправны · В работе прокси",
+    "disabled_accounts": "Отключенные аккаунты",
+    "disabled_accounts_desc": "Остановлены вручную / Прокси выключен",
+    "abnormal_accounts": "Аномальные аккаунты",
+    "abnormal_accounts_has_risk": "⚠ Требуется проверка / блокировка",
+    "abnormal_accounts_no_risk": "✓ Нет аномальных или заблокированных",
+    "quota_matrix_active": "Матрица квот доступных аккаунтов",
+    "quota_matrix_all_normal": "Матрица всех нормальных аккаунтов (вкл. отключенные)",
+    "base_pool_count": "База: {{count}} акк.",
+    "btn_only_available": "Только доступные ({{count}})",
+    "btn_include_disabled": "Включая отключенные ({{count}})",
+    "btn_title_only_available": "Сейчас: только активные (нажмите, чтобы включить отключенные)",
+    "btn_title_include_disabled": "Сейчас: все нормальные аккаунты (нажмите для только активных)",
+    "gemini_available_quota": "Доступная квота Gemini",
+    "gemini_image_quota": "Квота изображений Gemini",
+    "claude_available_quota": "Доступная квота Claude",
+    "weighted_available": "Взвешенная квота",
+    "quota_sufficient_short": "Достаточно",
+    "quota_tight_short": "Мало",
+    "rolling_5h": "5ч скользящая:",
+    "weekly_7d": "7д недельная:",
+    "zero_weekly_warning": "{{count}} акк. заблокирован(о) из-за исчерпания недельной квоты (0%)"
   },
   "accounts": {
     "account": "Аккаунт",
@@ -394,7 +419,11 @@
       "auto_check_update_disabled": "Автопроверка отключена",
       "update_check_interval": "Интервал проверки (часы)",
       "update_check_interval_desc": "Установите интервал автопроверки (1-168 часов)",
-      "update_check_interval_saved": "Настройки интервала проверки сохранены"
+      "update_check_interval_saved": "Настройки интервала проверки сохранены",
+      "lightweight_mode": "Легковесный режим (освобождение памяти)",
+      "lightweight_mode_desc": "Выгружает процесс WebView при сворачивании или закрытии в трей, снижая память до ~35 МБ. При повторном открытии окна потребуется пара миллисекунд для пересоздания.",
+      "lightweight_mode_enabled": "Легковесный режим включен",
+      "lightweight_mode_disabled": "Легковесный режим отключен"
     },
     "account": {
       "title": "Настройки аккаунта",
@@ -685,7 +714,8 @@
     "quit": "Выйти из приложения",
     "no_account": "Нет аккаунта",
     "unknown_quota": "Неизвестно (Нажмите для обновления)",
-    "forbidden": "Аккаунт запрещен"
+    "forbidden": "Аккаунт запрещен",
+    "lightweight_mode": "Легковесный режим (выгрузка памяти)"
   },
   "proxy": {
     "title": "Сервис API Прокси",
@@ -716,10 +746,10 @@
       "auto_start": "Автозапуск с приложением",
       "auto_start_tooltip": "Автоматически запускает локальный сервис API Прокси при запуске приложения.",
       "allow_lan_access": "Разрешить доступ из локальной сети",
-      "allow_lan_access_tooltip": "Когда включено, сервис привязывается к 0.0.0.0, чтобы другие устройства в вашей локальной сети могли получить к нему доступ. Оставьте авторизацию включенной и защищайте свой API ключ; требуется перезапуск для применения.",
-      "allow_lan_access_hint_enabled": "🌐 Прослушивание на 0.0.0.0, устройства LAN могут получить доступ",
+      "allow_lan_access_tooltip": "Когда включено, сервис привязывается к маске двойного стека IPv6/IPv4 ([::] / 0.0.0.0), чтобы устройства в локальной сети и внешние клиенты могли получить к нему доступ. Оставьте авторизацию включенной и защищайте свой API ключ; требуется перезапуск сервиса для применения.",
+      "allow_lan_access_hint_enabled": "🌐 Прослушивание на [::] / 0.0.0.0 (IPv6/IPv4 Dual-Stack), устройства LAN и внешние клиенты могут получить доступ",
       "allow_lan_access_hint_disabled": "🔒 Прослушивание только на 127.0.0.1, доступ по localhost (Приоритет конфиденциальности)",
-      "allow_lan_access_warning": "⚠️ Устройства LAN могут получить доступ при включении. Защитите свой API ключ",
+      "allow_lan_access_warning": "⚠️ Устройства LAN и внешние клиенты могут получить доступ при включении. Защитите свой API ключ",
       "allow_lan_access_restart_hint": "ℹ️ Требуется перезапуск сервиса для применения изменений",
       "api_key": "API ключ",
       "api_key_tooltip": "Общий секрет, используемый клиентами, когда авторизация прокси включена. Перегенерация ключа немедленно аннулирует старый.",
@@ -1636,46 +1666,62 @@
     "hint_custom_expires": "Set precise expiration timestamp for this token"
   },
   "apiKeyFun": {
-    "title": "APIKEY.FUN Hub",
-    "eyebrow": "Hub",
-    "description": "The official Antigravity Tools API Hub, providing stable, open, and cost-effective large model API services. Supports mainstream models like Claude, OpenAI, and Gemini. Ideal for unified configuration in Codex, Gemini CLI, Claude Code, and other development tools.",
-    "viewNow": "View Now",
+    "title": "Хаб APIKEY.FUN",
+    "eyebrow": "Хаб",
+    "description": "Официальный партнерский хаб Antigravity Tools для стабильного и выгодного доступа к API больших моделей (Claude, OpenAI, Gemini). Подходит для конфигурации в Codex, Claude Code и других CLI.",
+    "viewNow": "Перейти",
     "usage": {
-      "remainingAmount": "Remaining",
-      "usedAmount": "Used",
-      "todayRequests": "Today's Requests",
-      "todayTokens": "Today's Tokens",
-      "totalRequests": "Total Requests",
-      "totalTokens": "Total Tokens"
+      "remainingAmount": "Остаток",
+      "usedAmount": "Использовано",
+      "todayRequests": "Запросов сегодня",
+      "todayTokens": "Токенов сегодня",
+      "totalRequests": "Всего запросов",
+      "totalTokens": "Всего токенов"
     },
     "keyManager": {
-      "title": "Key Management",
-      "desc": "Save frequently used API Keys. Click to switch and query balance automatically.",
-      "lastRemainingLabel": "Last Balance",
+      "title": "Управление ключами",
+      "desc": "Сохраняйте ключи для быстрого переключения и проверки баланса.",
+      "lastRemainingLabel": "Прошлый баланс",
       "lastRemaining": "${{value}}",
-      "notQueried": "Not queried",
-      "addedAt": "Added at",
-      "empty": "No saved keys."
+      "notQueried": "Не проверялся",
+      "addedAt": "Добавлен",
+      "empty": "Нет сохраненных ключей."
     },
-    "queryTitle": "Key Quota Query",
+    "queryTitle": "Проверка баланса ключа",
     "apiKeyLabel": "API Key",
-    "apiKeyPlaceholder": "Paste your API Key...",
-    "queryButton": "Refresh",
+    "apiKeyPlaceholder": "Вставьте API-ключ...",
+    "queryButton": "Обновить",
     "cli": {
-      "quickConfig": "One-Click Local Dev Setup",
-      "syncDesc": "Sync to official standard configuration",
-      "codexTooltip": "Sync API Key & BaseURL to Antigravity Codex",
-      "claudeTooltip": "Sync API Key & BaseURL to Claude Code",
+      "quickConfig": "Быстрая настройка окружения",
+      "syncDesc": "Синхронизация со стандартной конфигурацией",
+      "codexTooltip": "Синхронизировать API Key и BaseURL с Codex / ChatGPT CLI",
+      "claudeTooltip": "Синхронизировать API Key и BaseURL с Claude Code",
       "opencodeTooltip": "Синхронизировать API Key, BaseURL и модели в OpenCode"
     },
     "models": {
-      "title": "Available Models",
-      "empty": "No models returned for current API Key."
+      "title": "Доступные модели",
+      "empty": "Введите ключ и нажмите «Обновить», чтобы загрузить список моделей.",
+      "emptyFromKey": "Модели еще не получены. Нажмите «Обновить» для загрузки списка моделей."
     },
     "errors": {
-      "parseFormat": "Parse format error: {{err}}",
-      "fetchFailed": "Fetch failed: {{err}}",
-      "queryFailed": "Failed to get valid quota or models. Please check if the API Key and Base URL are correct."
-    }
+      "parseFormat": "Ошибка формата ответа: {{err}}",
+      "fetchFailed": "Ошибка запроса: {{err}}",
+      "queryFailed": "Не удалось получить данные о балансе или моделях. Проверьте правильность ключа и адреса."
+    },
+    "opencode": {
+      "modelsRequired": "Обновите данные ключа, чтобы загрузить модели перед активацией профиля OpenCode.",
+      "active": "Активен",
+      "modified": "Изменен",
+      "inactive": "Нет профиля",
+      "syncedToast": "Синхронизировано с OpenCode: {{name}}",
+      "removedToast": "Удалено из OpenCode: {{name}}",
+      "clickToRemove": "OpenCode профиль активен и синхронизирован. Кликните для отключения",
+      "clickToUpdate": "Есть отличия в настройках. Кликните для обновления",
+      "clickToActivate": "Кликните для создания отдельного профиля в OpenCode",
+      "syncedActiveTooltip": "OpenCode: профиль активен и полностью синхронизирован. Кликните, чтобы отключить",
+      "partialTooltip": "OpenCode: настройки или модели отличаются. Кликните для синхронизации"
+    },
+    "syncSuccess": "Успешно синхронизировано с {{app}}",
+    "syncError": "Ошибка синхронизации: {{error}}"
   }
 }

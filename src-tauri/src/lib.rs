@@ -541,6 +541,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = modules::lightweight::exit_lightweight_mode(app);
             let _ = app.get_webview_window("main").map(|window| {
                 restore_and_focus_window(&window);
             });
@@ -691,16 +692,25 @@ pub fn run() {
                         .unwrap_or(true);
 
                     if tray_enabled {
-                        let _ = window.hide();
-                        #[cfg(target_os = "macos")]
-                        {
-                            use tauri::Manager;
-                            window
-                                .app_handle()
-                                .set_activation_policy(tauri::ActivationPolicy::Accessory)
-                                .unwrap_or(());
-                        }
                         api.prevent_close();
+
+                        let is_lightweight = modules::load_app_config()
+                            .map(|c| c.lightweight_mode)
+                            .unwrap_or(false);
+
+                        if is_lightweight {
+                            let _ = modules::lightweight::enter_lightweight_mode(window.app_handle());
+                        } else {
+                            let _ = window.hide();
+                            #[cfg(target_os = "macos")]
+                            {
+                                use tauri::Manager;
+                                window
+                                    .app_handle()
+                                    .set_activation_policy(tauri::ActivationPolicy::Accessory)
+                                    .unwrap_or(());
+                            }
+                        }
                     }
                 }
                 tauri::WindowEvent::Focused(focused) => {
@@ -759,6 +769,7 @@ pub fn run() {
             commands::get_antigravity_cache_paths,
             commands::preflight_antigravity_clean,
             commands::prune_antigravity_conversations,
+            commands::prune_antigravity_conversations_only,
             commands::undo_antigravity_prune,
             commands::open_data_folder,
             commands::get_data_dir_path,
@@ -795,6 +806,7 @@ pub fn run() {
             commands::proxy::get_proxy_logs_count_filtered,
             commands::proxy::get_proxy_logs_filtered,
             commands::proxy::set_proxy_monitor_enabled,
+            commands::proxy::set_proxy_capture_health_logs,
             commands::proxy::clear_proxy_logs,
             commands::proxy::clear_thinking_store,
             commands::proxy::generate_api_key,
@@ -841,9 +853,11 @@ pub fn run() {
             proxy::cli_sync::execute_cli_restore,
             proxy::cli_sync::get_cli_config_content,
             proxy::opencode_sync::get_opencode_sync_status,
+            proxy::opencode_sync::get_opencode_providers,
             proxy::opencode_sync::get_canonical_families,
             proxy::opencode_sync::execute_opencode_sync,
             proxy::opencode_sync::execute_opencode_openai_sync,
+            proxy::opencode_sync::execute_opencode_remove_provider,
             proxy::opencode_sync::execute_opencode_restore,
             proxy::opencode_sync::get_opencode_config_content,
             proxy::opencode_sync::execute_opencode_clear,
@@ -969,6 +983,17 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             match event {
+                // Prevent app from exiting when window is destroyed in lightweight mode
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    let tray_enabled = app_handle
+                        .try_state::<AppRuntimeFlags>()
+                        .map(|flags| flags.tray_enabled)
+                        .unwrap_or(true);
+
+                    if tray_enabled {
+                        api.prevent_exit();
+                    }
+                }
                 // Handle app exit - cleanup background tasks and release ports
                 tauri::RunEvent::Exit => {
                     tracing::info!("Application exiting, cleaning up background tasks and releasing ports...");
@@ -1006,6 +1031,7 @@ pub fn run() {
                 // Handle macOS dock icon click to reopen window
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
+                    let _ = modules::lightweight::exit_lightweight_mode(app_handle);
                     if let Some(window) = app_handle.get_webview_window("main") {
                         let _ = window.unminimize();
                         let _ = window.show();

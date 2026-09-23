@@ -55,6 +55,8 @@ pub fn get_all_candidate_db_paths(target_ide: Option<&str>) -> Vec<PathBuf> {
             "Antigravity IDE",
             "antigravity-ide",
         ]
+    } else if target_ide == Some("classic") {
+        &["Antigravity", "antigravity"]
     } else {
         &[
             "Antigravity IDE",
@@ -202,6 +204,11 @@ fn inject_new_format(
     )
     .map_err(|e| format!("Failed to initialize ItemTable: {}", e))?;
 
+    // Busy timeout: In hot-switching scenarios Antigravity is still running and concurrent writers may exist in DB;
+    // Explicitly set busy_timeout so SQLite waits and retries on transient lock contention rather than failing with SQLITE_BUSY.
+    conn.busy_timeout(std::time::Duration::from_millis(2000))
+        .map_err(|e| format!("Failed to set busy_timeout: {}", e))?;
+
     // Create OAuthTokenInfo (binary)
     let oauth_info = protobuf::create_oauth_info(
         access_token,
@@ -311,6 +318,10 @@ pub fn write_service_machine_id(
     service_machine_id: &str,
 ) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // 同 `inject_new_format`：热切号时应用仍在运行，忙等待避免瞬时锁竞争导致写入失败
+    conn.busy_timeout(std::time::Duration::from_millis(2000))
+        .map_err(|e| format!("Failed to set busy_timeout: {}", e))?;
 
     conn.execute(
         "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",

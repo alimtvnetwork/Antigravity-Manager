@@ -901,16 +901,7 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     let is_running = !pids.is_empty();
 
     if is_running {
-        // Antigravity IDE is running: bring window to foreground focus if requested
-        if switcher_cfg.auto_focus_window {
-            let focused = crate::modules::process::focus_instance_pids(&pids);
-            if focused {
-                logger::log_info(&format!(
-                    "[CrashWatchdog] Focused running IDE window for instance '{}' (PIDs {:?})",
-                    active_inst.id, pids
-                ));
-            }
-        }
+        // Antigravity IDE is running normally: background watchdog must NOT steal focus
     } else {
         // Antigravity IDE is NOT running or crashed!
         logger::log_warn(&format!(
@@ -1173,6 +1164,9 @@ mod tests {
                         window: "weekly".to_string(),
                         remaining_fraction: 1.0,
                         reset_time: future_time.to_string(),
+                        observed_at: None,
+                        cycle_start: None,
+                        cycle_tokens: None,
                         display_name: None,
                         description: None,
                     }],
@@ -1185,6 +1179,9 @@ mod tests {
                         window: "weekly".to_string(),
                         remaining_fraction: 1.0,
                         reset_time: future_time.to_string(),
+                        observed_at: None,
+                        cycle_start: None,
+                        cycle_tokens: None,
                         display_name: None,
                         description: None,
                     }],
@@ -1210,6 +1207,9 @@ mod tests {
                         window: "weekly".to_string(),
                         remaining_fraction: 0.21,
                         reset_time: future_time.to_string(),
+                        observed_at: None,
+                        cycle_start: None,
+                        cycle_tokens: None,
                         display_name: None,
                         description: None,
                     }],
@@ -1222,6 +1222,9 @@ mod tests {
                         window: "weekly".to_string(),
                         remaining_fraction: 1.0,
                         reset_time: future_time.to_string(),
+                        observed_at: None,
+                        cycle_start: None,
+                        cycle_tokens: None,
                         display_name: None,
                         description: None,
                     }],

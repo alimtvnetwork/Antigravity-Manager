@@ -2,237 +2,25 @@
 use super::models::*;
 use serde_json::Value;
 
-pub fn is_shell_or_terminal_tool(tool_name: &str) -> bool {
-    matches!(
-        tool_name.to_ascii_lowercase().as_str(),
-        "shell"
-            | "bash"
-            | "local_shell"
-            | "local_shell_call"
-            | "powershell"
-            | "pwsh"
-            | "terminal"
-            | "cmd"
-            | "run_command"
-            | "execute_command"
-    )
-}
-
-pub fn is_workflow_tool(tool_name: &str) -> bool {
-    matches!(
-        tool_name.to_ascii_lowercase().as_str(),
-        "workflow" | "run_workflow" | "execute_workflow"
-    )
-}
-
-/// Standardize and sanitize tool parameters for shell, PowerShell, DSH (DeepSeek Harness), etc.
-/// 1. Rename aliases cmd / code / script / shell_command / input etc. to command
-/// 2. [DSH tool-pwsh / tool-bash & WorkBuddy]：
-///    - DSH strictly validates that both `command` (string) and `description` (string) exist and are non-empty.
-///    - If model placed command in description/text/prompt while command is missing, extract command.
-///    - If command exists without description, synthesize description from command.
-///    - If both are missing, populate safe placeholder command and description to prevent client crashes (Issues #3430 & #3440).
-/// 3. [DSH tool-workflow]：
-///    - DSH strictly validates `script` (string) and `meta` (object with `name` and `description`).
-///    - If model returns flat `name`/`description`, bundle them into `meta` object to satisfy validation.
+/// Pure passthrough of tool arguments without truncating, synthesizing, or rewriting fields
 pub fn normalize_and_sanitize_tool_args(tool_name: &str, args: &mut Value) {
-    if is_workflow_tool(tool_name) {
-        if let Some(obj) = args.as_object_mut() {
-            // 1. Normalize script field
-            if !obj.contains_key("script") {
-                for alt in &["code", "content", "command", "workflow", "body"] {
-                    if let Some(val) = obj.remove(*alt) {
-                        obj.insert("script".to_string(), val);
-                        break;
-                    }
-                }
-            }
-            // Provide fallback placeholder script if script is empty or missing
-            let script_empty = match obj.get("script") {
-                None => true,
-                Some(v) => v.as_str().map(|s| s.trim().is_empty()).unwrap_or(false),
-            };
-            if script_empty {
-                obj.insert(
-                    "script".to_string(),
-                    Value::String("// Workflow action logged\nreturn true;".to_string()),
-                );
-            }
-
-            // 2. Normalize meta field: { name: string, description: string }
-            let mut meta_obj = match obj.remove("meta") {
-                Some(Value::Object(m)) => m,
-                _ => serde_json::Map::new(),
-            };
-
-            // Recover flattened name and description from top level
-            if !meta_obj.contains_key("name") {
-                if let Some(top_name) = obj.remove("name") {
-                    meta_obj.insert("name".to_string(), top_name);
-                } else {
-                    meta_obj.insert(
-                        "name".to_string(),
-                        Value::String("dsh_workflow_task".to_string()),
-                    );
-                }
-            }
-            if !meta_obj.contains_key("description") {
-                if let Some(top_desc) = obj.remove("description") {
-                    meta_obj.insert("description".to_string(), top_desc);
-                } else {
-                    let desc = obj
-                        .get("script")
-                        .and_then(|v| v.as_str())
-                        .map(|s| {
-                            let first_line = s.lines().next().unwrap_or("Execute workflow");
-                            let clean = first_line.trim().trim_start_matches("//").trim();
-                            if clean.is_empty() {
-                                "Execute workflow script"
-                            } else {
-                                clean
-                            }
-                        })
-                        .unwrap_or("Execute workflow script");
-                    meta_obj.insert("description".to_string(), Value::String(desc.to_string()));
-                }
-            }
-
-            obj.insert("meta".to_string(), Value::Object(meta_obj));
-        }
-        return;
-    }
-
-    if !is_shell_or_terminal_tool(tool_name) {
-        return;
-    }
-
-    if let Some(obj) = args.as_object_mut() {
-        // 1. Normalize aliases to command
-        if !obj.contains_key("command") {
-            for alt_key in &["cmd", "code", "script", "shell_command", "input"] {
-                if let Some(val) = obj.remove(*alt_key) {
-                    obj.insert("command".to_string(), val);
-                    tracing::debug!(
-                        "[OpenAI] Normalized tool '{}' arg '{}' -> 'command'",
-                        tool_name,
-                        alt_key
-                    );
-                    break;
-                }
-            }
-        }
-
-        // 2. Verify whether command is missing or empty
-        let command_missing = match obj.get("command") {
-            None => true,
-            Some(v) => v.as_str().map(|s| s.trim().is_empty()).unwrap_or(false),
-        };
-
-        if command_missing {
-            // Check if model wrote command inside description
-            let raw_desc = obj
-                .get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-
-            // If description looks like executable command, do not overwrite with echo
-            let is_likely_command = !raw_desc.is_empty()
-                && (raw_desc.starts_with("git ")
-                    || raw_desc.starts_with("ls ")
-                    || raw_desc.starts_with("dir ")
-                    || raw_desc.starts_with("cd ")
-                    || raw_desc.starts_with("cat ")
-                    || raw_desc.starts_with("cargo ")
-                    || raw_desc.starts_with("npm ")
-                    || raw_desc.starts_with("pnpm ")
-                    || raw_desc.starts_with("yarn ")
-                    || raw_desc.starts_with("node ")
-                    || raw_desc.starts_with("python ")
-                    || raw_desc.starts_with("Get-")
-                    || raw_desc.starts_with("Set-")
-                    || raw_desc.contains(" | ")
-                    || raw_desc.contains(";"));
-
-            if is_likely_command {
-                obj.insert("command".to_string(), Value::String(raw_desc));
-            } else {
-                let desc_for_log = if raw_desc.is_empty() {
-                    "Action logged"
-                } else {
-                    raw_desc.as_str()
-                };
-
-                let safe_desc: String = desc_for_log
-                    .chars()
-                    .filter(|c| c.is_alphanumeric() || " _-:.,/".contains(*c))
-                    .collect();
-                let trimmed = safe_desc.trim();
-                let safe_title = if trimmed.is_empty() {
-                    "Action logged"
-                } else {
-                    trimmed
-                };
-
-                let fallback_cmd = format!("echo \"[OK: Action logged - {}]\"", safe_title);
-                obj.insert("command".to_string(), Value::String(fallback_cmd));
-                tracing::warn!(
-                    tool = %tool_name,
-                    description = %raw_desc,
-                    "Injected safe fallback 'command' into tool call arguments to prevent downstream client crash (Issue #3430)"
-                );
-            }
-        }
-
-        // 3. [Issue #3440] DSH strictly depends on required `description` string field
-        //    If description is missing, generate brief summary from command to prevent crash.
-        let desc_missing = match obj.get("description") {
-            None => true,
-            Some(v) => v.as_str().map(|s| s.trim().is_empty()).unwrap_or(false),
-        };
-
-        if desc_missing {
-            let cmd_str = obj
-                .get("command")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Execute shell command")
-                .trim();
-            // Use first 60 characters of command as brief description
-            let auto_desc = if cmd_str.len() > 60 {
-                format!("Run: {}...", &cmd_str[..57])
-            } else if !cmd_str.is_empty() {
-                format!("Run: {}", cmd_str)
-            } else {
-                "Execute command".to_string()
-            };
-            obj.insert("description".to_string(), Value::String(auto_desc));
-        }
+    if let Some(obj) = args.as_object() {
+        tracing::debug!(
+            "[OpenAI] Tool Call (Passthrough): '{}' Args: {:?}",
+            tool_name,
+            obj
+        );
     }
 }
 
 pub fn resolve_shell_tool_name(
     model_tool_name: &str,
-    client_tool_names: &std::collections::HashSet<String>,
+    _client_tool_names: &std::collections::HashSet<String>,
 ) -> String {
-    if model_tool_name == "shell"
-        || model_tool_name == "bash"
-        || model_tool_name == "local_shell"
-        || model_tool_name == "local_shell_call"
-    {
-        if client_tool_names.contains(model_tool_name) {
-            return model_tool_name.to_string();
-        }
-        for name in &["local_shell_call", "bash", "shell", "local_shell"] {
-            if client_tool_names.contains(*name) {
-                return name.to_string();
-            }
-        }
-        "local_shell_call".to_string()
-    } else {
-        model_tool_name.to_string()
-    }
+    // Pure passthrough of tool name without rewriting
+    model_tool_name.to_string()
 }
+
 fn extract_apply_patch_input(args: &Value) -> String {
     if let Some(obj) = args.as_object() {
         if let Some(input) = obj.get("input").and_then(|v| v.as_str()) {
@@ -246,7 +34,10 @@ fn extract_apply_patch_input(args: &Value) -> String {
             }
         }
         if let Some(cmd_str) = obj.get("command").and_then(|v| v.as_str()) {
-            if let Some(patch) = cmd_str.strip_prefix("apply_patch\n") {
+            if let Some(patch) = cmd_str.strip_prefix(
+                "apply_patch
+",
+            ) {
                 return patch.to_string();
             }
             if let Some(patch) = cmd_str.strip_prefix("apply_patch ") {
@@ -356,7 +147,6 @@ pub fn transform_openai_response(
                                 continue;
                             }
                         }
-
                         let final_name = resolve_shell_tool_name(name, client_tool_names);
 
                         let id = fc
@@ -726,133 +516,17 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_and_sanitize_tool_args_shell_alias() {
+    fn test_normalize_and_sanitize_tool_args_passthrough() {
         let mut args = json!({
-            "cmd": "ls -la /tmp"
+            "cmd": "ls -la /tmp",
+            "description": "Custom description",
+            "arbitrary_field": 123
         });
         normalize_and_sanitize_tool_args("shell", &mut args);
-        assert_eq!(args["command"], "ls -la /tmp");
-        assert!(!args.as_object().unwrap().contains_key("cmd"));
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_powershell_missing_command_with_description() {
-        // [Issue #3430] WorkBuddy PowerShell tool call with only description
-        let mut args = json!({
-            "description": "List directory contents"
-        });
-        normalize_and_sanitize_tool_args("PowerShell", &mut args);
-        assert_eq!(
-            args["command"],
-            "echo \"[OK: Action logged - List directory contents]\""
-        );
-        assert_eq!(args["description"], "List directory contents");
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_bash_empty_command_fallback() {
-        let mut args = json!({
-            "command": "   ",
-            "description": "Fetch status"
-        });
-        normalize_and_sanitize_tool_args("Bash", &mut args);
-        assert_eq!(
-            args["command"],
-            "echo \"[OK: Action logged - Fetch status]\""
-        );
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_unrelated_tool_untouched() {
-        let mut args = json!({
-            "query": "select * from users"
-        });
-        normalize_and_sanitize_tool_args("sql_query", &mut args);
+        // Verify pure passthrough: arguments remain intact, no fields renamed, deleted, or injected
+        assert_eq!(args["cmd"], "ls -la /tmp");
+        assert_eq!(args["description"], "Custom description");
+        assert_eq!(args["arbitrary_field"], 123);
         assert!(!args.as_object().unwrap().contains_key("command"));
-        assert_eq!(args["query"], "select * from users");
-    }
-
-    #[test]
-    fn test_transform_openai_response_sanitizes_powershell_tool_call() {
-        let gemini_resp = json!({
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "functionCall": {
-                            "name": "PowerShell",
-                            "args": {
-                                "description": "View current system information"
-                            }
-                        }
-                    }]
-                },
-                "finishReason": "STOP"
-            }]
-        });
-
-        let result = transform_openai_response(&gemini_resp, None, 1, None);
-        let tool_calls = result.choices[0].message.tool_calls.as_ref().unwrap();
-        assert_eq!(tool_calls.len(), 1);
-        assert_eq!(tool_calls[0].function.as_ref().unwrap().name, "PowerShell");
-
-        let parsed_args: Value =
-            serde_json::from_str(&tool_calls[0].function.as_ref().unwrap().arguments).unwrap();
-        assert_eq!(
-            parsed_args["command"],
-            "echo \"[OK: Action logged - View current system information]\""
-        );
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_dsh_pwsh_missing_description() {
-        // [Issue #3440] DSH tool-pwsh requires both command AND description
-        let mut args = json!({
-            "command": "Get-ChildItem -Path ./src -Recurse | Select-Object -First 10"
-        });
-        normalize_and_sanitize_tool_args("pwsh", &mut args);
-        assert_eq!(
-            args["command"],
-            "Get-ChildItem -Path ./src -Recurse | Select-Object -First 10"
-        );
-        assert!(args.get("description").is_some());
-        assert!(args["description"].as_str().unwrap().starts_with("Run: "));
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_dsh_pwsh_command_in_description() {
-        // [Issue #3440] Gemini puts actual command inside description
-        let mut args = json!({
-            "description": "git status -s"
-        });
-        normalize_and_sanitize_tool_args("pwsh", &mut args);
-        assert_eq!(args["command"], "git status -s");
-        assert_eq!(args["description"], "git status -s");
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_dsh_workflow_flattened() {
-        // [Issue #3440] DSH tool-workflow requires script and meta: { name, description }
-        let mut args = json!({
-            "script": "console.log('running test');",
-            "name": "run_test",
-            "description": "Run unit test suite"
-        });
-        normalize_and_sanitize_tool_args("workflow", &mut args);
-        assert_eq!(args["script"], "console.log('running test');");
-        assert!(args.get("meta").is_some());
-        assert_eq!(args["meta"]["name"], "run_test");
-        assert_eq!(args["meta"]["description"], "Run unit test suite");
-        assert!(!args.as_object().unwrap().contains_key("name"));
-    }
-
-    #[test]
-    fn test_normalize_and_sanitize_tool_args_dsh_workflow_missing_meta() {
-        let mut args = json!({
-            "code": "// Auto workflow\nreturn 42;"
-        });
-        normalize_and_sanitize_tool_args("workflow", &mut args);
-        assert_eq!(args["script"], "// Auto workflow\nreturn 42;");
-        assert_eq!(args["meta"]["name"], "dsh_workflow_task");
-        assert_eq!(args["meta"]["description"], "Auto workflow");
     }
 }

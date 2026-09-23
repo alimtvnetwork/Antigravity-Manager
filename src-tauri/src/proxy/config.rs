@@ -47,18 +47,40 @@ pub fn update_thinking_budget_config(config: ThinkingBudgetConfig) {
         if let Ok(mut cfg) = lock.write() {
             *cfg = config.clone();
             tracing::info!(
-                "[Thinking-Budget] Global config updated: mode={:?}, custom_value={}",
-                config.mode,
-                config.custom_value
+                "[Thinking-Budget] Global config updated: source={:?}, flash_mode={:?} (L:{}, M:{}, H:{}, T:{}), pro_mode={:?} (L:{}, H:{}), claude_mode={:?} (L:{}, M:{}, H:{})",
+                config.control_source,
+                config.flash_mode,
+                config.flash_low,
+                config.flash_medium,
+                config.flash_high,
+                config.flash_tiered,
+                config.pro_mode,
+                config.pro_low,
+                config.pro_high,
+                config.claude_mode,
+                config.claude_low,
+                config.claude_medium,
+                config.claude_high
             );
         }
     } else {
-        // 首次初始化
+        // Initial setup
         let _ = GLOBAL_THINKING_BUDGET_CONFIG.set(RwLock::new(config.clone()));
         tracing::info!(
-            "[Thinking-Budget] Global config initialized: mode={:?}, custom_value={}",
-            config.mode,
-            config.custom_value
+            "[Thinking-Budget] Global config initialized: source={:?}, flash_mode={:?} (L:{}, M:{}, H:{}, T:{}), pro_mode={:?} (L:{}, H:{}), claude_mode={:?} (L:{}, M:{}, H:{})",
+            config.control_source,
+            config.flash_mode,
+            config.flash_low,
+            config.flash_medium,
+            config.flash_high,
+            config.flash_tiered,
+            config.pro_mode,
+            config.pro_low,
+            config.pro_high,
+            config.claude_mode,
+            config.claude_low,
+            config.claude_medium,
+            config.claude_high
         );
     }
 }
@@ -561,47 +583,174 @@ fn default_thinking_retention_days() -> u32 {
     15
 }
 
-/// Thinking Budget 模式
-/// 控制如何处理调用方传入的 thinking_budget 参数
+/// Thinking budget authority control source
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingControlSource {
+    /// Gateway authority control (preferred / recommended): gateway manages parsing and injection
+    Gateway,
+    /// Client direct control: passthrough client-supplied thinking budget directly to upstream
+    Client,
+}
+
+impl Default for ThinkingControlSource {
+    fn default() -> Self {
+        Self::Gateway
+    }
+}
+
+/// Thinking Budget Mode
+/// Controls how thinking budget is handled during model invocations
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ThinkingBudgetMode {
-    /// 自动限制：对特定模型（Flash/Thinking）应用 24576 上限
-    Auto,
-    /// 透传：完全使用调用方传入的值，不做任何修改
-    Passthrough,
-    /// 自定义：使用用户设定的固定值覆盖所有请求
+    /// Default mode (official adaptive): passthrough official model ID without injecting thinkingBudget
+    #[serde(rename = "default")]
+    Default,
+    /// Custom mode: inject configured budget per tier
+    #[serde(rename = "custom")]
     Custom,
-    /// 自适应：使用 effort 参数控制思考强度 (Claude 4.6+)
+    /// Legacy compatibility mode: auto clamp
+    #[serde(rename = "auto")]
+    Auto,
+    /// Legacy compatibility mode: passthrough
+    #[serde(rename = "passthrough")]
+    Passthrough,
+    /// Legacy compatibility mode: adaptive
+    #[serde(rename = "adaptive")]
     Adaptive,
 }
 
 impl Default for ThinkingBudgetMode {
     fn default() -> Self {
-        Self::Auto
+        Self::Custom
     }
 }
 
-/// Thinking Budget 配置
+/// Thinking Budget Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThinkingBudgetConfig {
-    /// 模式选择
-    #[serde(default)]
+    /// Authority control: Gateway control vs Client control
+    #[serde(default = "default_control_source")]
+    pub control_source: ThinkingControlSource,
+
+    // --- Gemini Flash Tier Configurations ---
+    #[serde(default = "default_thinking_budget_mode")]
+    pub flash_mode: ThinkingBudgetMode,
+    #[serde(default = "default_flash_low")]
+    pub flash_low: i32, // Default 1000
+    #[serde(default = "default_flash_medium")]
+    pub flash_medium: i32, // Default 4000
+    #[serde(default = "default_flash_high")]
+    pub flash_high: i32, // Default 10000
+    #[serde(default = "default_flash_tiered")]
+    pub flash_tiered: i32, // Default -1
+
+    // --- Gemini Pro Tier Configurations ---
+    #[serde(default = "default_thinking_budget_mode")]
+    pub pro_mode: ThinkingBudgetMode,
+    #[serde(default = "default_pro_low")]
+    pub pro_low: i32, // Default 1001
+    #[serde(default = "default_pro_high")]
+    pub pro_high: i32, // Default 10001
+
+    // --- Claude Series Configurations ---
+    #[serde(default = "default_thinking_budget_mode")]
+    pub claude_mode: ThinkingBudgetMode,
+    #[serde(default = "default_claude_budget")]
+    pub claude_budget: i32, // Unified thinking budget (default 16000, -1 for adaptive)
+    #[serde(default = "default_claude_low")]
+    pub claude_low: i32, // Default 1024
+    #[serde(default = "default_claude_medium")]
+    pub claude_medium: i32, // Default 4096
+    #[serde(default = "default_claude_high")]
+    pub claude_high: i32, // Default 16000
+
+    // --- Backward Compatibility Fields ---
+    #[serde(default = "default_thinking_budget_mode")]
     pub mode: ThinkingBudgetMode,
-    /// 自定义固定值（仅在 mode=Custom 时生效）
     #[serde(default = "default_thinking_budget_custom_value")]
     pub custom_value: u32,
-    /// 思考强度 (仅在 mode=Adaptive 时生效) : low, medium, high
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    #[serde(default = "default_flash_low")]
+    pub custom_low: i32,
+    #[serde(default = "default_flash_medium")]
+    pub custom_medium: i32,
+    #[serde(default = "default_flash_high")]
+    pub custom_high: i32,
+    #[serde(default = "default_flash_tiered")]
+    pub custom_tiered: i32,
+}
+
+fn default_control_source() -> ThinkingControlSource {
+    ThinkingControlSource::Gateway
+}
+
+fn default_thinking_budget_mode() -> ThinkingBudgetMode {
+    ThinkingBudgetMode::Custom
+}
+
+fn default_flash_low() -> i32 {
+    1024
+}
+fn default_flash_medium() -> i32 {
+    4096
+}
+fn default_flash_high() -> i32 {
+    16384
+}
+fn default_flash_tiered() -> i32 {
+    -1
+}
+
+fn default_pro_low() -> i32 {
+    1001
+}
+fn default_pro_high() -> i32 {
+    10001
+}
+
+fn default_claude_budget() -> i32 {
+    16384
+}
+fn default_claude_low() -> i32 {
+    1024
+}
+fn default_claude_medium() -> i32 {
+    4096
+}
+fn default_claude_high() -> i32 {
+    16384
 }
 
 impl Default for ThinkingBudgetConfig {
     fn default() -> Self {
         Self {
-            mode: ThinkingBudgetMode::Auto,
+            control_source: default_control_source(),
+            flash_mode: default_thinking_budget_mode(),
+            flash_low: default_flash_low(),
+            flash_medium: default_flash_medium(),
+            flash_high: default_flash_high(),
+            flash_tiered: default_flash_tiered(),
+
+            pro_mode: default_thinking_budget_mode(),
+            pro_low: default_pro_low(),
+            pro_high: default_pro_high(),
+
+            claude_mode: default_thinking_budget_mode(),
+            claude_budget: default_claude_budget(),
+            claude_low: default_claude_low(),
+            claude_medium: default_claude_medium(),
+            claude_high: default_claude_high(),
+
+            mode: default_thinking_budget_mode(),
             custom_value: default_thinking_budget_custom_value(),
             effort: None,
+            custom_low: default_flash_low(),
+            custom_medium: default_flash_medium(),
+            custom_high: default_flash_high(),
+            custom_tiered: default_flash_tiered(),
         }
     }
 }
@@ -765,6 +914,10 @@ pub struct ProxyConfig {
     #[serde(default)]
     pub enable_logging: bool,
 
+    /// 是否捕获健康检查日志 (默认 false: 对 GET /health /healthz 请求全部过滤且不入库)
+    #[serde(default)]
+    pub capture_health_logs: bool,
+
     #[serde(default)]
     pub log_retention: LogRetentionConfig,
 
@@ -859,7 +1012,7 @@ fn default_max_rows() -> u64 {
     100_000
 }
 fn default_max_disk_mb() -> u64 {
-    1024
+    450
 }
 
 impl Default for LogRetentionConfig {
@@ -882,6 +1035,27 @@ pub struct UpstreamProxyConfig {
     pub url: String,
 }
 
+pub fn default_custom_mapping() -> std::collections::HashMap<String, String> {
+    let mut m = std::collections::HashMap::new();
+    m.insert(
+        "gemini-3.6-flash".to_string(),
+        "gemini-3.6-flash-tiered".to_string(),
+    );
+    m.insert(
+        "gemini-3.7-flash".to_string(),
+        "gemini-3.7-flash-tiered".to_string(),
+    );
+    m.insert(
+        "gemini-3.8-flash".to_string(),
+        "gemini-3.8-flash-tiered".to_string(),
+    );
+    m.insert(
+        "gemini-3.x-flash".to_string(),
+        "3.x-flash-tiered".to_string(),
+    );
+    m
+}
+
 impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
@@ -892,9 +1066,10 @@ impl Default for ProxyConfig {
             api_key: format!("sk-{}", uuid::Uuid::new_v4().simple()),
             admin_password: None,
             auto_start: false,
-            custom_mapping: std::collections::HashMap::new(),
+            custom_mapping: default_custom_mapping(),
             request_timeout: default_request_timeout(),
-            enable_logging: true, // 默认开启，支持 token 统计功能
+            enable_logging: true,       // 默认开启，支持 token 统计功能
+            capture_health_logs: false, // 默认关闭，过滤 GET /health 探活且不入库
             log_retention: LogRetentionConfig::default(),
             debug_logging: DebugLoggingConfig::default(),
             upstream_proxy: UpstreamProxyConfig::default(),
@@ -938,7 +1113,7 @@ fn default_zai_haiku_model() -> String {
 impl ProxyConfig {
     /// 获取实际的监听地址
     /// - allow_lan_access = false: 返回 "127.0.0.1"（默认，隐私优先）
-    /// - allow_lan_access = true: 返回 "0.0.0.0"（允许局域网访问）
+    /// - allow_lan_access = true: 返回 "0.0.0.0"（通配监听：底层自动启用 IPv6/IPv4 双栈监听，允许局域网与外部公网 IPv4/IPv6 访问）
     pub fn get_bind_address(&self) -> &str {
         if self.allow_lan_access {
             "0.0.0.0"

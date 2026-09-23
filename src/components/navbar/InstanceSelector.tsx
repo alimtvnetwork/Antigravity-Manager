@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import {
     ChevronDown,
     Copy,
-    Plus,
     Laptop,
     Pencil,
     Play,
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
-import { useConfigStore } from '../../stores/useConfigStore';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useErrorStore } from '../../stores/error-store';
 import { cn } from '../../utils/cn';
@@ -44,7 +42,6 @@ export function InstanceSelector() {
         smartRotateProfileAccount,
     } = useInstanceStore();
 
-    const config = useConfigStore(state => state.config);
     const currentAccount = useAccountStore(state => state.currentAccount);
     const accounts = useAccountStore(state => state.accounts);
 
@@ -377,7 +374,6 @@ export function InstanceSelector() {
     if (!isAvailable) return null;
 
     const isActiveRunning = Boolean(activeInstance?.is_running);
-    const isDefaultActive = activeInstance?.config.id === 'default';
 
     return (
         <div className="relative flex items-center gap-1 shrink-0" ref={dropdownRef}>
@@ -460,72 +456,7 @@ export function InstanceSelector() {
                 );
             })()}
 
-            {/* 3. Top Action Bar: Edit / Rename */}
-            <button
-                type="button"
-                onClick={() => {
-                    if (activeInstance) {
-                        setEditTargetId(activeInstance.config.id);
-                        setEditInstanceName(activeInstance.config.name);
-                        setIsEditOpen(true);
-                    }
-                }}
-                className="hidden lg:flex p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
-                title={t('instances.edit_current', 'Rename current instance profile')}
-            >
-                <Pencil className="w-3.5 h-3.5" />
-            </button>
 
-            {/* 4. Top Action Bar: Duplicate */}
-            <button
-                type="button"
-                onClick={() => {
-                    setCopyInstanceName(`${activeInstance?.config.name || 'Instance'} Copy`);
-                    setCloneMode(config?.instance_clone_mode || 'full');
-                    setIsCopyOpen(true);
-                }}
-                className="hidden lg:flex p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
-                title={t('instances.copy_current', 'Duplicate current instance profile')}
-            >
-                <Copy className="w-3.5 h-3.5" />
-            </button>
-
-            {/* 5. Top Action Bar: Remove / Delete */}
-            <button
-                type="button"
-                disabled={isDefaultActive}
-                onClick={() => {
-                    if (activeInstance) {
-                        setDeleteTarget(activeInstance);
-                        setIsDeleteOpen(true);
-                    }
-                }}
-                className={`hidden xl:flex p-1.5 rounded-lg transition-colors shrink-0 ${
-                    isDefaultActive
-                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-40'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer'
-                }`}
-                title={
-                    isDefaultActive
-                        ? t('instances.cannot_delete_default', 'Cannot delete default profile')
-                        : t('instances.delete_current', 'Delete current instance profile')
-                }
-            >
-                <Trash2 className="w-3.5 h-3.5" />
-            </button>
-
-            {/* 6. Top Action Bar: Plus / Create New */}
-            <button
-                type="button"
-                onClick={() => {
-                    setNewInstanceName('');
-                    setIsCreateOpen(true);
-                }}
-                className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
-                title={t('instances.create_new', 'Create new isolated instance profile')}
-            >
-                <Plus className="w-3.5 h-3.5" />
-            </button>
 
             {/* Dropdown Menu Popup (Strictly Above Page Content) */}
             {isOpen && (

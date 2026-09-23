@@ -17,13 +17,15 @@ import { showToast } from '../common/ToastContainer';
 
 export interface PreflightReport {
     total_conversations: number;
-    preserved_conversations: number;
-    pruned_conversations: number;
-    pruned_bytes: number;
-    cache_directories: string[];
-    cache_bytes_estimate: number;
-    total_bytes_to_free: number;
-    staging_directory: string;
+    keep_count: number;
+    preserved_count: number;
+    pruned_count: number;
+    total_conversation_bytes: number;
+    projected_reclaimed_bytes: number;
+    cache_paths_count: number;
+    cache_bytes: number;
+    cache_targets: string[];
+    staging_dir: string;
 }
 
 export interface PruneResult {
@@ -50,12 +52,13 @@ interface AgyCleanModalProps {
     onClose: () => void;
 }
 
-function formatBytes(bytes: number): string {
-    if (bytes <= 0) return '0 B';
+function formatBytes(bytes?: number | null): string {
+    if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    const converted = bytes / Math.pow(1024, i);
-    return `${converted.toFixed(converted >= 10 || i === 0 ? 1 : 2)} ${units[i]}`;
+    const safeI = Math.min(Math.max(0, i), units.length - 1);
+    const converted = bytes / Math.pow(1024, safeI);
+    return `${converted.toFixed(converted >= 10 || safeI === 0 ? 1 : 2)} ${units[safeI]}`;
 }
 
 export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
@@ -113,6 +116,26 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
         }
     };
 
+    const handleCleanConversationsOnly = async () => {
+        setIsPruning(true);
+        try {
+            const result = await invoke<PruneResult>('prune_antigravity_conversations_only', { keepCount });
+            setLastPruned(result);
+            showToast(
+                t(
+                    'agy_clean.clean_convs_success',
+                    `Pruned ${result.pruned_count} conversations. Freed ${formatBytes(result.total_freed_bytes)}.`
+                ),
+                'success'
+            );
+            await loadPreflight(keepCount);
+        } catch (err) {
+            showToast(`${t('common.error', 'Error')}: ${err}`, 'error');
+        } finally {
+            setIsPruning(false);
+        }
+    };
+
     const handleUndoLast = async () => {
         setIsUndoing(true);
         try {
@@ -133,6 +156,8 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
         }
     };
 
+    const estFreedBytes = (preflight?.projected_reclaimed_bytes || 0) + (preflight?.cache_bytes || 0);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
             <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
@@ -140,7 +165,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                            <Sparkles className="w-5 h-5" />
+                            <RotateCcw className="w-5 h-5" />
                         </div>
                         <div>
                             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -251,7 +276,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                                         <span>{t('agy_clean.preserved', 'Preserved')}</span>
                                     </div>
                                     <div className="mt-1 text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                                        {preflight.preserved_conversations}
+                                        {preflight.preserved_count}
                                     </div>
                                 </div>
                                 <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-100 dark:border-amber-900/30">
@@ -260,7 +285,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                                         <span>{t('agy_clean.staged', 'To Stage')}</span>
                                     </div>
                                     <div className="mt-1 text-lg font-bold text-amber-700 dark:text-amber-300">
-                                        {preflight.pruned_conversations}
+                                        {preflight.pruned_count}
                                     </div>
                                 </div>
                                 <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/30">
@@ -269,7 +294,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                                         <span>{t('agy_clean.freed', 'Est. Freed')}</span>
                                     </div>
                                     <div className="mt-1 text-lg font-bold text-blue-700 dark:text-blue-300">
-                                        {formatBytes(preflight.total_bytes_to_free)}
+                                        {formatBytes(estFreedBytes)}
                                     </div>
                                 </div>
                             </div>
@@ -287,7 +312,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                                     )}
                                 </p>
                                 <div className="pt-1 text-[11px] font-mono text-gray-500 dark:text-gray-400 break-all">
-                                    {preflight.staging_directory}
+                                    {preflight.staging_dir}
                                 </div>
                             </div>
 
@@ -339,14 +364,28 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-xl transition-colors cursor-pointer"
+                            className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-xl transition-colors cursor-pointer"
                         >
                             {t('common.cancel', 'Cancel')}
                         </button>
                         <button
                             type="button"
+                            onClick={handleCleanConversationsOnly}
+                            disabled={isPruning || isUndoing || isLoadingPreflight || (preflight?.pruned_count === 0)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl shadow-xs disabled:opacity-50 transition-all cursor-pointer"
+                            title="Prune old conversations without wiping application caches"
+                        >
+                            {isPruning ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Database className="w-3.5 h-3.5" />
+                            )}
+                            <span>{t('agy_clean.conversations_only_btn', 'Clean Conversations Only')}</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={handleCleanNow}
-                            disabled={isPruning || isUndoing || isLoadingPreflight || (preflight?.pruned_conversations === 0 && preflight?.total_bytes_to_free === 0)}
+                            disabled={isPruning || isUndoing || isLoadingPreflight || (preflight?.pruned_count === 0 && estFreedBytes === 0)}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-xs disabled:opacity-50 transition-all cursor-pointer"
                         >
                             {isPruning ? (
@@ -354,7 +393,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                             ) : (
                                 <Trash2 className="w-3.5 h-3.5" />
                             )}
-                            <span>{t('agy_clean.execute_btn', 'Clean & Prune Now')}</span>
+                            <span>{t('agy_clean.execute_btn', 'Clean & Prune All')}</span>
                         </button>
                     </div>
                 </div>

@@ -1646,32 +1646,6 @@ mod variant_tests {
     }
 }
 
-fn compact_apply_patch_failure_output(
-    output: String,
-    seen: &mut std::collections::HashSet<String>,
-    distinct_count: &mut usize,
-) -> String {
-    if !output.contains("apply_patch verification failed")
-        && !output.contains("Failed to find expected lines")
-        && !output.contains("Failed to find context")
-        && !output.contains("Expected update hunk")
-    {
-        return output;
-    }
-
-    let fingerprint = output.lines().take(8).collect::<Vec<_>>().join("\n");
-    if !seen.insert(fingerprint) {
-        return "[Repeated apply_patch failure omitted: the same error was already provided earlier in this request.]".to_string();
-    }
-
-    *distinct_count += 1;
-    if *distinct_count > 6 {
-        return "[Additional apply_patch failure omitted to avoid a retry loop. Produce a fresh V4A patch from current file contents instead of repeating previous failed patches.]".to_string();
-    }
-
-    output
-}
-
 fn codex_ledger_from_body(
     body: &Value,
 ) -> (
@@ -1774,8 +1748,9 @@ pub async fn handle_chat_completions(
     }
 
     let debug_cfg = state.debug_logging.read().await.clone();
-    let original_body =
-        debug_logger::is_enabled(&debug_cfg).then(|| debug_value_without_inline_data(&body));
+    let original_body = debug_logger::is_enabled(&debug_cfg).then(|| {
+        crate::proxy::payload_audit::reorder_payload_fields(&debug_value_without_inline_data(&body))
+    });
 
     // [NEW] Automatically detect and convert Responses format
     // If request contains instructions or input but no messages, consider it Responses format
@@ -2008,7 +1983,8 @@ pub async fn handle_chat_completions(
     let request_timeout = state.request_timeout;
     let token_manager = state.token_manager;
     let pool_size = token_manager.len();
-    let max_attempts = MAX_RETRY_ATTEMPTS.min(pool_size).max(1);
+    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
 
     let mut last_error = String::new();
     let mut last_email: Option<String> = None;
@@ -2017,6 +1993,7 @@ pub async fn handle_chat_completions(
     let mut image_permit = None;
     let mut failure_statuses = FailureStatusTracker::default();
     let mut used_attempts = 0;
+    let mut retried_without_thinking = false;
 
     // 2. Model route resolution (moved outside loop to support returning X-Mapped-Model on all paths)
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
@@ -2101,11 +2078,13 @@ pub async fn handle_chat_completions(
                             None,
                             &e,
                         );
-                        return Ok((
-                            StatusCode::SERVICE_UNAVAILABLE,
-                            headers,
-                            format!("Token error: {}", e),
-                        )
+                        let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+                            "openai",
+                            StatusCode::SERVICE_UNAVAILABLE.as_u16(),
+                            mapped_model.as_str(),
+                            &e,
+                        );
+                        return Ok((StatusCode::SERVICE_UNAVAILABLE, headers, Json(dual_err))
                             .into_response());
                     }
                 }
@@ -2674,16 +2653,90 @@ pub async fn handle_chat_completions(
             .await;
         }
 
-        // Determine retry strategy
-        let strategy = retry_state.determine_strategy(
+        // Determine retry strategy: passing attempt and pool_size for adaptive determination
+        let strategy = retry_state.determine_strategy_adaptive(
             &account_id,
             status_code,
             &error_text,
             retry_after.as_deref(),
-            false,
+            retried_without_thinking,
+            attempt,
+            pool_size,
         );
-        let should_mark_limited =
-            status_code == 429 || status_code == 529 || status_code == 503 || status_code == 500;
+        // Unified pipeline classification: protocol-agnostic rate limit and error classification
+        let classification = crate::proxy::pipeline::UpstreamClassification::classify(
+            status_code,
+            &error_text,
+            retry_after.as_deref(),
+        );
+
+        if classification.is_model_not_found() {
+            tracing::warn!(
+                "[{}] Pipeline: Target model [{}] not found on upstream (HTTP {}). Terminating retry loop without account lockout.",
+                trace_id, mapped_model, status_code
+            );
+            let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+                "openai",
+                status_code,
+                &mapped_model,
+                &error_text,
+            );
+            return Ok((
+                StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND),
+                [
+                    ("X-Account-Email", email.as_str()),
+                    ("X-Mapped-Model", mapped_model.as_str()),
+                ],
+                Json(dual_err),
+            )
+                .into_response());
+        }
+
+        if classification.is_thought_signature_error() {
+            if !retried_without_thinking {
+                retried_without_thinking = true;
+                tracing::warn!(
+                    "[{}] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
+                    trace_id, status_code
+                );
+                // 1. 精准定向净化 ThinkingStore 中的异构污染签名（保留思考文本与健康签名）
+                crate::proxy::thinking_store::ThinkingStore::global()
+                    .purge_corrupted_signatures(&session_id, &mapped_model);
+                // 2. 清理当前 session 的 SignatureCache
+                crate::proxy::SignatureCache::global().delete_session_signature(&client_session_id);
+                // 3. 追加修复提示词到最后一条用户消息
+                if let Some(last_msg) = openai_req.messages.last_mut() {
+                    if last_msg.role == "user" {
+                        let repair_prompt = "\n\n[System Recovery] Your previous output contained an invalid signature. Please regenerate the response without the corrupted signature block.";
+                        if let Some(content) = &mut last_msg.content {
+                            use crate::proxy::mappers::openai::{
+                                OpenAIContent, OpenAIContentBlock,
+                            };
+                            match content {
+                                OpenAIContent::String(s) => {
+                                    s.push_str(repair_prompt);
+                                }
+                                OpenAIContent::Array(arr) => {
+                                    arr.push(OpenAIContentBlock::Text {
+                                        text: repair_prompt.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                // 4. 保持同一账号原地重试
+                force_rotate = false;
+                continue;
+            } else {
+                tracing::warn!(
+                    "[{}] Pipeline: Thinking signature error persisted after retry without thinking. Terminating retry loop.",
+                    trace_id
+                );
+            }
+        }
+
+        let should_mark_limited = classification.should_lock_account();
         let needs_quota_refresh = if config.request_type == "image_gen" && should_mark_limited {
             token_manager
                 .mark_rate_limited_fast(
@@ -2862,20 +2915,19 @@ pub async fn handle_chat_completions(
             "OpenAI Upstream non-retryable error {} on account {}: {}",
             status_code, email, error_text
         );
+        let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+            "openai",
+            status_code,
+            &mapped_model,
+            &error_text,
+        );
         return Ok((
             status,
             [
                 ("X-Account-Email", email.as_str()),
                 ("X-Mapped-Model", mapped_model.as_str()),
             ],
-            // [FIX] Return JSON error for better client compatibility
-            Json(json!({
-                "error": {
-                    "message": error_text,
-                    "type": "upstream_error",
-                    "code": status_code
-                }
-            })),
+            Json(dual_err),
         )
             .into_response());
     }
@@ -2888,12 +2940,14 @@ pub async fn handle_chat_completions(
         &last_error,
     );
 
-    Ok((
-        final_status,
-        headers,
-        format!("All accounts exhausted. Last error: {}", last_error),
-    )
-        .into_response())
+    let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+        "openai",
+        final_status.as_u16(),
+        &mapped_model,
+        &last_error,
+    );
+
+    Ok((final_status, headers, Json(dual_err)).into_response())
 }
 
 // --- Codex GUIDANCE PROMPTS ---
@@ -2992,8 +3046,9 @@ pub async fn handle_completions(
         serialized_json_len(&body)
     );
     let debug_cfg = state.debug_logging.read().await.clone();
-    let original_body =
-        debug_logger::is_enabled(&debug_cfg).then(|| debug_value_without_inline_data(&body));
+    let original_body = debug_logger::is_enabled(&debug_cfg).then(|| {
+        crate::proxy::payload_audit::reorder_payload_fields(&debug_value_without_inline_data(&body))
+    });
     let is_responses_api = uri.path() == "/v1/responses";
     let is_codex_style = body.get("input").is_some() || body.get("instructions").is_some();
     let store_response = responses_store_enabled(&body);
@@ -3163,9 +3218,6 @@ pub async fn handle_completions(
                 }
             }
         }
-
-        let mut seen_apply_patch_failures = std::collections::HashSet::new();
-        let mut apply_patch_failure_distinct_count = 0usize;
 
         // Pass 2: Map durable conversation items to Gemini messages. Visible
         // assistant commentary stays in Codex's local transcript and must not
@@ -3399,13 +3451,6 @@ pub async fn handle_completions(
                             "shell".to_string()
                         };
 
-                        if name == "apply_patch" {
-                            output_str = compact_apply_patch_failure_output(
-                                output_str,
-                                &mut seen_apply_patch_failures,
-                                &mut apply_patch_failure_distinct_count,
-                            );
-                        }
                         output_str = prefix_with_step_marker(step_marker, output_str);
                         let output_content =
                             build_responses_tool_output_content(output_str, output_media);
@@ -3919,7 +3964,8 @@ pub async fn handle_completions(
 
     let upstream = state.upstream.clone();
     let pool_size = token_manager.len();
-    let max_attempts = MAX_RETRY_ATTEMPTS.min(pool_size).max(1);
+    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
 
     let mut last_error = String::new();
     let mut last_email: Option<String> = None;
@@ -4724,8 +4770,36 @@ pub async fn handle_completions(
             error_text
         );
 
-        // 3. Mark rate limit status (for UI display)
-        if status_code == 429 || status_code == 529 || status_code == 503 || status_code == 500 {
+        // 3. Unified pipeline classification and rate limit status (for UI display)
+        let classification = crate::proxy::pipeline::UpstreamClassification::classify(
+            status_code,
+            &error_text,
+            retry_after.as_deref(),
+        );
+
+        if classification.is_model_not_found() {
+            tracing::warn!(
+                "[{}] Pipeline: Target model [{}] not found on upstream (HTTP {}). Terminating completions retry loop without account lockout.",
+                trace_id, mapped_model, status_code
+            );
+            let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+                "openai",
+                status_code,
+                &mapped_model,
+                &error_text,
+            );
+            return Response::builder()
+                .status(StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND))
+                .header("X-Account-Email", email.as_str())
+                .header("X-Mapped-Model", mapped_model.as_str())
+                .body(Body::from(
+                    serde_json::to_string(&dual_err).unwrap_or_default(),
+                ))
+                .unwrap()
+                .into_response();
+        }
+
+        if classification.should_lock_account() {
             token_manager
                 .mark_rate_limited_async(
                     &email,
@@ -4737,12 +4811,20 @@ pub async fn handle_completions(
                 .await;
         }
 
-        let strategy = retry_state.determine_strategy(
+        if status_code == 429 || status_code == 529 {
+            token_manager
+                .unbind_session_and_clear_last_used(Some(&session_id_str))
+                .await;
+        }
+
+        let strategy = retry_state.determine_strategy_adaptive(
             &account_id,
             status_code,
             &error_text,
             retry_after.as_deref(),
             false,
+            attempt,
+            pool_size,
         );
 
         // Execute backoff
@@ -5062,7 +5144,8 @@ pub async fn handle_images_generations_internal(
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let max_pool_size = token_manager.len();
-    let max_attempts = MAX_RETRY_ATTEMPTS.min(max_pool_size).max(1);
+    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(max_pool_size);
 
     let mut tasks = JoinSet::new();
 
@@ -5203,9 +5286,13 @@ pub async fn handle_images_generations_internal(
                                     false,
                                 )
                             });
-                            // 429/500/503: mark limited before retry/rotation
-                            let should_mark_limited =
-                                status_code == 429 || status_code == 503 || status_code == 500;
+                            // 统一流水线限流裁决：500/503等服务异常绝不打入限流
+                            let classification = crate::proxy::pipeline::UpstreamClassification::classify(
+                                status_code,
+                                &err_text,
+                                retry_after.as_deref(),
+                            );
+                            let should_mark_limited = classification.should_lock_account();
                             let needs_quota_refresh = if should_mark_limited {
                                 tracing::warn!(
                                     "[Images] Account {} rate limited/error ({}), rotating...",
@@ -5583,7 +5670,8 @@ pub async fn handle_images_edits(
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let max_pool_size = token_manager.len();
-    let max_attempts = MAX_RETRY_ATTEMPTS.min(max_pool_size).max(1);
+    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(max_pool_size);
 
     let mut tasks = JoinSet::new();
     for _ in 0..n {
@@ -5688,9 +5776,14 @@ pub async fn handle_images_edits(
                                     false,
                                 )
                             });
-                            // Mark and retry 429/500/503 errors
-                            let should_mark_limited =
-                                status_code == 429 || status_code == 503 || status_code == 500;
+                            // Unified pipeline classification: service errors like 500/503 are never marked as rate limited
+                            let classification =
+                                crate::proxy::pipeline::UpstreamClassification::classify(
+                                    status_code,
+                                    &err_text,
+                                    retry_after.as_deref(),
+                                );
+                            let should_mark_limited = classification.should_lock_account();
                             let needs_quota_refresh = if should_mark_limited {
                                 tracing::warn!(
                                     "[Images] Account {} rate limited/error ({}), rotating...",
@@ -6609,10 +6702,10 @@ fn convert_codex_to_openai_request(mut body: Value) -> Value {
                         .and_then(|v| v.as_str())
                         .unwrap_or("unknown")
                         .to_string();
-                    if item_type == "local_shell_call" || name == "local_shell_call" {
-                        name = "shell".to_string();
-                    } else if item_type == "web_search_call" || name == "web_search_call" {
-                        name = "google_search".to_string();
+                    if item_type == "local_shell_call" && name == "unknown" {
+                        name = "local_shell_call".to_string();
+                    } else if item_type == "web_search_call" && name == "unknown" {
+                        name = "web_search_call".to_string();
                     }
                     call_id_to_name.insert(call_id.to_string(), name);
                 }
@@ -6622,8 +6715,6 @@ fn convert_codex_to_openai_request(mut body: Value) -> Value {
     }
 
     {
-        let mut seen_apply_patch_failures = std::collections::HashSet::new();
-        let mut apply_patch_failure_distinct_count = 0usize;
         for mut item in input_items {
             let item_type = responses_input_item_type(&item).to_string();
             let step_marker = step_markers.pop_front();
@@ -6766,13 +6857,6 @@ fn convert_codex_to_openai_request(mut body: Value) -> Value {
                         None => "shell".to_string(),
                     };
 
-                    if name == "apply_patch" {
-                        output_str = compact_apply_patch_failure_output(
-                            output_str,
-                            &mut seen_apply_patch_failures,
-                            &mut apply_patch_failure_distinct_count,
-                        );
-                    }
                     output_str = prefix_with_step_marker(step_marker, output_str);
                     let output_content =
                         build_responses_tool_output_content(output_str, output_media);

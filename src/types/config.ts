@@ -14,6 +14,7 @@ export interface ProxyConfig {
     custom_mapping?: Record<string, string>;
     request_timeout: number;
     enable_logging: boolean;
+    capture_health_logs?: boolean;
     log_retention?: LogRetentionConfig;
     debug_logging?: DebugLoggingConfig;
     upstream_proxy: UpstreamProxyConfig;
@@ -191,9 +192,10 @@ export interface AppConfig {
     circuit_breaker: CircuitBreakerConfig; // [NEW] 熔断器配置
     proxy: ProxyConfig;
     cloudflared: CloudflaredConfig; // [NEW] Cloudflared 配置
-    auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] 自动配额轮换与任务恢复配置
-    instance_clone_mode?: 'full' | 'profile'; // [NEW] 实例克隆模式：全量目录复制或仅配置
-    conversation_cleanup?: ConversationCleanupConfig; // [NEW] 对话历史与缓存定期自动清理配置
+    lightweight_mode?: boolean; // [NEW] Lightweight mode: release WebView when minimized to tray
+    auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] Auto profile switching and task recovery config
+    instance_clone_mode?: 'full' | 'profile'; // [NEW] Instance clone mode: full directory copy or profile only
+    conversation_cleanup?: ConversationCleanupConfig; // [NEW] Conversation history and cache auto-cleanup config
 }
 
 export interface ConversationCleanupConfig {

@@ -71,6 +71,7 @@ export interface QuotaBucket {
     window: string;  // "weekly" | "5h"
     remaining_fraction: number;
     reset_time: string;
+    cycle_tokens?: number; // 本实例在该周配额周期记录的 input + output Token
     display_name?: string;
     description?: string;
 }
@@ -79,7 +80,7 @@ export interface QuotaBucket {
 export interface QuotaGroup {
     display_name: string;
     description?: string;
-    buckets: QuotaBucket[];
+    buckets?: QuotaBucket[];
 }
 
 export interface DeviceProfile {

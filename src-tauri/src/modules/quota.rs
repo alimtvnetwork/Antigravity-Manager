@@ -480,9 +480,10 @@ pub async fn fetch_quota_with_cache(
                                             // If weekly quota is exhausted (<= 0.001), model is limited by weekly quota to 0%, use weekly reset
                                             if w.remaining_fraction <= 0.001 {
                                                 Some(w)
-                                            } else {
-                                                // When weekly quota is not exhausted, always use 5h bucket to accurately reflect 5h rolling quota and reset
+                                            } else if h.remaining_fraction <= w.remaining_fraction {
                                                 Some(h)
+                                            } else {
+                                                Some(w)
                                             }
                                         }
                                         (Some(h), None) => Some(h),
@@ -587,13 +588,18 @@ async fn fetch_quota_summary(
                         buckets: g
                             .buckets
                             .into_iter()
-                            .map(|b| crate::models::quota::QuotaBucket {
-                                bucket_id: b.bucket_id.unwrap_or_default(),
-                                window: b.window.unwrap_or_default(),
-                                remaining_fraction: b.remaining_fraction.unwrap_or(0.0),
-                                reset_time: b.reset_time.unwrap_or_default(),
-                                display_name: b.display_name,
-                                description: b.description,
+                            .filter_map(|b| {
+                                Some(crate::models::quota::QuotaBucket {
+                                    bucket_id: b.bucket_id.unwrap_or_default(),
+                                    window: b.window.unwrap_or_default(),
+                                    remaining_fraction: b.remaining_fraction?,
+                                    reset_time: b.reset_time.unwrap_or_default(),
+                                    observed_at: Some(chrono::Utc::now().timestamp_millis()),
+                                    cycle_start: None,
+                                    cycle_tokens: None,
+                                    display_name: b.display_name,
+                                    description: b.description,
+                                })
                             })
                             .collect(),
                     })

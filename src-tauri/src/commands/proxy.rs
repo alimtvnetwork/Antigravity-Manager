@@ -129,6 +129,7 @@ pub async fn internal_start_proxy_service(
         // Sync enabled state from config
         if let Some(monitor) = monitor_lock.as_ref() {
             monitor.set_enabled(config.enable_logging);
+            monitor.set_capture_health_logs(config.capture_health_logs);
         }
     }
 
@@ -420,6 +421,19 @@ pub async fn set_proxy_monitor_enabled(
     Ok(())
 }
 
+/// 设置捕获健康检查日志状态
+#[tauri::command]
+pub async fn set_proxy_capture_health_logs(
+    state: State<'_, ProxyServiceState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let monitor_lock = state.monitor.read().await;
+    if let Some(monitor) = monitor_lock.as_ref() {
+        monitor.set_capture_health_logs(enabled);
+    }
+    Ok(())
+}
+
 /// 清除反代请求日志
 #[tauri::command]
 pub async fn clear_proxy_logs(state: State<'_, ProxyServiceState>) -> Result<(), String> {
@@ -454,8 +468,14 @@ pub async fn get_proxy_logs_paginated(
 
 /// 获取单条日志的完整详情
 #[tauri::command]
-pub async fn get_proxy_log_detail(log_id: String) -> Result<ProxyRequestLog, String> {
-    crate::modules::proxy_db::get_log_detail(&log_id)
+pub async fn get_proxy_log_detail(
+    log_id: Option<String>,
+    #[allow(non_snake_case)] logId: Option<String>,
+) -> Result<ProxyRequestLog, String> {
+    let id = log_id
+        .or(logId)
+        .ok_or_else(|| "Missing log_id parameter".to_string())?;
+    crate::modules::proxy_db::get_log_detail(&id)
 }
 
 /// 获取日志总数
@@ -669,18 +689,7 @@ pub async fn fetch_zai_models(
         .map_err(|e| format!("Failed to read response: {}", e))?;
 
     if !status.is_success() {
-        let preview = if text.len() > 4000 {
-            let mut end = 4000;
-            while end > 0 {
-                if text.is_char_boundary(end) {
-                    break;
-                }
-                end -= 1;
-            }
-            &text[..end]
-        } else {
-            &text
-        };
+        let preview = crate::proxy::mappers::common_utils::safe_truncate_str(&text, 4000);
         return Err(format!("Upstream returned {}: {}", status, preview));
     }
 

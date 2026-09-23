@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2, Sparkles } from 'lucide-react';
+import { ChevronDown, MoreVertical, Sun, Moon, LogOut, Minimize2, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { NavItem, Language } from './constants';
 import { isTauri } from '../../utils/env';
@@ -263,7 +263,7 @@ export function MoreDropdown({
                             }}
                             className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300"
                         >
-                            <Sparkles className="w-4 h-4 text-blue-500" />
+                            <RotateCcw className="w-4 h-4 text-blue-500" />
                             <span>{t('nav.quick_clean', 'Quick Clean')}</span>
                         </button>
                     )}

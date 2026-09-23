@@ -1,10 +1,10 @@
-# 手动关闭已集成 PR 指南
+# Manual Guide for Closing Integrated Pull Requests
 
-如果你不想使用 GitHub CLI，可以按照以下步骤手动关闭 PR。
+If you prefer not to use the GitHub CLI, follow these steps to manually close integrated pull requests.
 
-## 需要关闭的 PR 列表
+## Integrated PR List
 
-以下 PR 已被手动集成到 v3.3.43：
+The following pull requests have been manually integrated into the project:
 
 1. **PR #825** - [Internationalization] Device Fingerprint Dialog localization (@IamAshrafee)
 2. **PR #822** - [Japanese] Add missing translations and refine terminology (@Koshikai)
@@ -12,63 +12,48 @@
 
 ---
 
-## 操作步骤
+## Instructions
 
-对于每个 PR，执行以下步骤：
+For each pull request, follow these steps:
 
-### 1. 访问 PR 页面
+### 1. Open the PR Page
 
-点击以下链接访问对应的 PR：
+Navigate to the corresponding pull request:
 
-- https://github.com/lbjlaq/Antigravity-Manager/pull/825
-- https://github.com/lbjlaq/Antigravity-Manager/pull/822
-- https://github.com/lbjlaq/Antigravity-Manager/pull/798
+- https://github.com/alimtvnetwork/Antigravity-Manager/pull/825
+- https://github.com/alimtvnetwork/Antigravity-Manager/pull/822
+- https://github.com/alimtvnetwork/Antigravity-Manager/pull/798
 
-### 2. 添加感谢评论
+### 2. Post Appreciation Comment
 
-在 PR 页面底部的评论框中，粘贴以下感谢消息：
+In the comment box at the bottom of the pull request page, paste the following note:
 
 ```markdown
-感谢您的贡献！🎉
-
-此 PR 的更改已被手动集成到 v3.3.43 版本中。
-
-相关更新已包含在以下文件中：
-- README.md 的版本更新日志
-- 贡献者列表
-
-再次感谢您对 Antigravity Tools 项目的支持！
-
----
-
 Thank you for your contribution! 🎉
 
-The changes from this PR have been manually integrated into v3.3.43.
+The changes from this PR have been integrated into the project codebase.
 
 The updates are documented in:
 - README.md changelog
 - Contributors list
 
-Thank you again for your support of the Antigravity Tools project!
+Thank you again for your support of the Antigravity Manager Tools project!
 ```
 
-### 3. 关闭 PR
+### 3. Close the Pull Request
 
-1. 点击评论框下方的 **"Close pull request"** 按钮
-2. 或者点击 **"Close with comment"** 按钮（如果你想同时添加评论）
-
----
-
-## 快速操作清单
-
-- [ ] PR #825 - 添加评论 + 关闭
-- [ ] PR #822 - 添加评论 + 关闭
-- [ ] PR #798 - 添加评论 + 关闭
+1. Click the **"Close pull request"** button beneath the comment field.
+2. Alternatively, click **"Close with comment"** to submit the thank-you note and close the PR simultaneously.
 
 ---
 
-## 验证
+## GitHub CLI One-Liner
 
-完成后，访问以下链接确认所有 PR 已关闭：
+If you have GitHub CLI installed (`gh`), close all three PRs with comments in a single command:
 
-https://github.com/lbjlaq/Antigravity-Manager/pulls?q=is%3Apr+is%3Aclosed
+```bash
+for pr in 825 822 798; do
+  gh pr comment $pr --body "Thank you for your contribution! 🎉 This PR has been manually integrated."
+  gh pr close $pr
+done
+```

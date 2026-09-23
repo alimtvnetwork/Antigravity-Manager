@@ -328,6 +328,15 @@ pub fn preflight_check(keep_count: usize) -> PreflightReport {
 
 /// Execute conversation pruning with safe temporary staging for undo
 pub fn prune_and_clean(keep_count: usize) -> Result<PruneResult, String> {
+    prune_internal(keep_count, true)
+}
+
+/// Execute conversation-only pruning without scrubbing application caches
+pub fn prune_conversations_only(keep_count: usize) -> Result<PruneResult, String> {
+    prune_internal(keep_count, false)
+}
+
+fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, String> {
     let base_dir = get_gemini_base_dir()
         .ok_or_else(|| "Failed to determine Antigravity base directory".to_string())?;
 
@@ -394,38 +403,43 @@ pub fn prune_and_clean(keep_count: usize) -> Result<PruneResult, String> {
         }
     }
 
-    // Clear application caches
-    let cache_result = crate::modules::cache::clear_antigravity_cache(None);
-    let cache_cleared_bytes = match cache_result {
-        Ok(res) => res.total_size_freed,
-        Err(e) => {
-            errors.push(format!("Cache clear warning: {}", e));
-            0
-        }
-    };
+    let cache_cleared_bytes = if clear_caches {
+        // Clear application caches
+        let cache_result = crate::modules::cache::clear_antigravity_cache(None);
+        let bytes = match cache_result {
+            Ok(res) => res.total_size_freed,
+            Err(e) => {
+                errors.push(format!("Cache clear warning: {}", e));
+                0
+            }
+        };
 
-    // Clean ephemeral brain subfolders (crashes, logs, tempmediaStorage)
-    let static_ephemeral = [
-        base_dir.join("crashes"),
-        base_dir.join("log"),
-        base_dir.join("brain").join("tempmediaStorage"),
-        base_dir.join("brain").join("cache"),
-    ];
+        // Clean ephemeral brain subfolders (crashes, logs, tempmediaStorage)
+        let static_ephemeral = [
+            base_dir.join("crashes"),
+            base_dir.join("log"),
+            base_dir.join("brain").join("tempmediaStorage"),
+            base_dir.join("brain").join("cache"),
+        ];
 
-    for eph in &static_ephemeral {
-        if eph.is_dir() {
-            if let Ok(entries) = fs::read_dir(eph) {
-                for item in entries.flatten() {
-                    let path = item.path();
-                    let _ = if path.is_dir() {
-                        fs::remove_dir_all(&path)
-                    } else {
-                        fs::remove_file(&path)
-                    };
+        for eph in &static_ephemeral {
+            if eph.is_dir() {
+                if let Ok(entries) = fs::read_dir(eph) {
+                    for item in entries.flatten() {
+                        let path = item.path();
+                        let _ = if path.is_dir() {
+                            fs::remove_dir_all(&path)
+                        } else {
+                            fs::remove_file(&path)
+                        };
+                    }
                 }
             }
         }
-    }
+        bytes
+    } else {
+        0
+    };
 
     // Write manifest for reversible undo
     let manifest = TransactionManifest {

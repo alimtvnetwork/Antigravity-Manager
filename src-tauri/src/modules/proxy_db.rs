@@ -893,6 +893,86 @@ pub fn delete_thinking_records_for_session(session_key: &str) -> Result<usize, S
     .map_err(|e| e.to_string())
 }
 
+/// Purge invalid heterogeneous signatures for a session by target model (preserving thoughts and valid signatures)
+pub fn purge_foreign_signatures_for_session_with_model(
+    session_key: &str,
+    target_model: &str,
+) -> Result<usize, String> {
+    let is_gemini = target_model.to_lowercase().contains("gemini");
+    let is_claude = target_model.to_lowercase().contains("claude");
+    if (!is_gemini && !is_claude) || session_key.is_empty() {
+        return Ok(0);
+    }
+
+    let conn = thinking_db()?;
+    let mut stmt = conn
+        .prepare_cached("SELECT id, signature FROM thinking_records WHERE session_key = ?1 AND signature IS NOT NULL")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![session_key], |row| {
+            let id: i64 = row.get(0)?;
+            let sig: String = row.get(1)?;
+            Ok((id, sig))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut ids_to_null = Vec::new();
+    for row in rows.flatten() {
+        let (id, sig) = row;
+        let is_foreign = if is_gemini {
+            !crate::proxy::thinking_store::is_likely_gemini_signature(&sig)
+        } else if is_claude {
+            !crate::proxy::thinking_store::is_claude_signature(&sig)
+        } else {
+            false
+        };
+        if is_foreign {
+            ids_to_null.push(id);
+        }
+    }
+
+    let mut total_updated = 0;
+    if !ids_to_null.is_empty() {
+        let mut update_stmt = conn
+            .prepare_cached("UPDATE thinking_records SET signature = NULL WHERE id = ?1")
+            .map_err(|e| e.to_string())?;
+        for id in ids_to_null {
+            if let Ok(n) = update_stmt.execute(params![id]) {
+                total_updated += n;
+            }
+        }
+    }
+
+    Ok(total_updated)
+}
+
+/// Backwards-compatible interface: defaults to cleaning for Gemini
+pub fn purge_foreign_signatures_for_session(session_key: &str) -> Result<usize, String> {
+    purge_foreign_signatures_for_session_with_model(session_key, "gemini")
+}
+
+/// Completely clear thinking block database (only thinking_records / thinking_sessions / tool_signatures, never touching request_logs)
+pub fn clear_all_thinking_data() -> Result<usize, String> {
+    let mut total_deleted = 0;
+    // 1. Clear records and sessions in thinking_store.db
+    let conn = thinking_db()?;
+    let deleted = conn
+        .execute("DELETE FROM thinking_records", [])
+        .map_err(|e| e.to_string())?;
+    total_deleted += deleted;
+    let _ = conn.execute("DELETE FROM thinking_sessions", []);
+    let _ = conn.execute("VACUUM", []);
+
+    // 2. Clear lingering tool signatures and stale thinking tables in proxy_logs.db (never touching request_logs)
+    if let Ok(log_conn) = connect_db() {
+        let _ = log_conn.execute("DELETE FROM tool_signatures", []);
+        let _ = log_conn.execute("DELETE FROM thinking_records", []);
+        let _ = log_conn.execute("DELETE FROM thinking_sessions", []);
+    }
+
+    Ok(total_deleted)
+}
 pub fn cleanup_old_thinking_records(days: i64) -> Result<usize, String> {
     let cutoff = chrono::Utc::now().timestamp_millis() - (days * 24 * 3600 * 1000);
     let deleted_tools = connect_db()
@@ -1587,28 +1667,6 @@ pub fn clear_logs() -> Result<(), String> {
     let _ = conn.execute("VACUUM", []);
     let _ = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE");
     Ok(())
-}
-
-/// 全量清空思考块数据库 (仅清空 thinking_records / thinking_sessions / tool_signatures，绝不触碰 request_logs 日志)
-pub fn clear_all_thinking_data() -> Result<usize, String> {
-    let mut total_deleted = 0;
-    // 1. 清空 thinking_store.db 中的记录与会话
-    let conn = thinking_db()?;
-    let deleted = conn
-        .execute("DELETE FROM thinking_records", [])
-        .map_err(|e| e.to_string())?;
-    total_deleted += deleted;
-    let _ = conn.execute("DELETE FROM thinking_sessions", []);
-    let _ = conn.execute("VACUUM", []);
-
-    // 2. 清空 proxy_logs.db 中残留的历史工具签名表与陈旧思考表 (绝不触碰 request_logs)
-    if let Ok(log_conn) = connect_db() {
-        let _ = log_conn.execute("DELETE FROM tool_signatures", []);
-        let _ = log_conn.execute("DELETE FROM thinking_records", []);
-        let _ = log_conn.execute("DELETE FROM thinking_sessions", []);
-    }
-
-    Ok(total_deleted)
 }
 
 /// Get total count of logs in database

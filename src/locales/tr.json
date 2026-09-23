@@ -135,7 +135,32 @@
       "export_no_accounts": "Dışa aktarılacak hesap yok",
       "export_success": "Dışa aktarma başarılı! Dosya kaydedildi: {{path}}",
       "export_error": "Dışa aktarma başarısız"
-    }
+    },
+    "accounts_health": "Hesap Ekosistemi Sağlığı",
+    "total_accounts_desc": "Yapılandırılmış tüm hesaplar",
+    "available_accounts": "Kullanılabilir Hesaplar",
+    "available_accounts_desc": "✓ Aktif ve normal · Proxy hizmetinde",
+    "disabled_accounts": "Devre Dışı Hesaplar",
+    "disabled_accounts_desc": "Manuel durduruldu / Proxy kapalı",
+    "abnormal_accounts": "Anormal Hesaplar",
+    "abnormal_accounts_has_risk": "⚠ Doğrulama / Engelleme riski",
+    "abnormal_accounts_no_risk": "✓ Anormal veya engellenmiş hesap yok",
+    "quota_matrix_active": "Aktif Hesaplar Kota Verimlilik Matrisi",
+    "quota_matrix_all_normal": "Tüm Normal Hesaplar Kota Matrisi (devre dışılar dahil)",
+    "base_pool_count": "Taban: {{count}} hesap",
+    "btn_only_available": "Yalnızca Aktif ({{count}})",
+    "btn_include_disabled": "Devre Dışıları Dahil Et ({{count}})",
+    "btn_title_only_available": "Geçerli: Yalnızca aktif (devre dışıları eklemek için tıklayın)",
+    "btn_title_include_disabled": "Geçerli: Tüm normal hesaplar (yalnızca aktif için tıklayın)",
+    "gemini_available_quota": "Gemini Kullanılabilir Kota",
+    "gemini_image_quota": "Gemini Görsel Kotası",
+    "claude_available_quota": "Claude Kullanılabilir Kota",
+    "weighted_available": "Ağırlıklı Kullanılabilir",
+    "quota_sufficient_short": "Yeterli",
+    "quota_tight_short": "Kritik",
+    "rolling_5h": "5s Dönen:",
+    "weekly_7d": "7g Haftalık:",
+    "zero_weekly_warning": "{{count}} aktif hesap haftalık kota bittiği için kesildi (%0 değerlendirildi)"
   },
   "accounts": {
     "account": "Hesap",
@@ -394,7 +419,11 @@
       "auto_check_update_disabled": "Auto check disabled",
       "update_check_interval": "Check Interval (hours)",
       "update_check_interval_desc": "Set auto-check interval (1-168 hours)",
-      "update_check_interval_saved": "Check interval settings saved"
+      "update_check_interval_saved": "Check interval settings saved",
+      "lightweight_mode": "Hafif Mod (Bellek Boşaltma)",
+      "lightweight_mode_desc": "Tepsiye küçültüldüğünde veya kapatıldığında WebView işleme sürecini sonlandırarak bellek kullanımını ~35MB'a düşürür. Pencereyi yeniden açarken birkaç milisaniyelik yeniden oluşturma süresi gerekir.",
+      "lightweight_mode_enabled": "Hafif mod etkinleştirildi",
+      "lightweight_mode_disabled": "Hafif mod devre dışı bırakıldı"
     },
     "account": {
       "title": "Hesap Ayarları",
@@ -681,7 +710,8 @@
     "quit": "Uygulamadan Çık",
     "no_account": "Hesap Yok",
     "unknown_quota": "Bilinmiyor (Yenilemek için tıklayın)",
-    "forbidden": "Hesap Yasaklı"
+    "forbidden": "Hesap Yasaklı",
+    "lightweight_mode": "Hafif Mod (Tepsideyken belleği boşalt)"
   },
   "proxy": {
     "title": "API Proxy Hizmeti",
@@ -709,10 +739,10 @@
       "auto_start": "Uygulama ile Otomatik Başlat",
       "auto_start_tooltip": "Uygulama başladığında yerel API Proxy hizmetini otomatik olarak başlatır.",
       "allow_lan_access": "LAN Erişimine İzin Ver",
-      "allow_lan_access_tooltip": "Etkinleştirildiğinde, hizmet 0.0.0.0'a bağlanır böylece LAN'ınızdaki diğer cihazlar erişebilir. Yetkilendirmeyi etkin tutun ve API anahtarınızı koruyun; uygulamak için yeniden başlatma gerekir.",
-      "allow_lan_access_hint_enabled": "🌐 0.0.0.0 dinleniyor, LAN cihazları erişebilir",
+      "allow_lan_access_tooltip": "Etkinleştirildiğinde, hizmet IPv6/IPv4 çift yığın genel adresine ([::] / 0.0.0.0) bağlanır böylece LAN ve harici cihazlar erişebilir. Yetkilendirmeyi etkin tutun ve API anahtarınızı koruyun; uygulamak için yeniden başlatma gerekir.",
+      "allow_lan_access_hint_enabled": "🌐 [::] / 0.0.0.0 dinleniyor (IPv6/IPv4 Çift Yığın), LAN ve harici cihazlar erişebilir",
       "allow_lan_access_hint_disabled": "🔒 Sadece 127.0.0.1 dinleniyor, localhost erişimi (Gizlilik Öncelikli)",
-      "allow_lan_access_warning": "⚠️ Etkinleştirildiğinde LAN cihazları erişebilir. API anahtarınızı güvende tutun",
+      "allow_lan_access_warning": "⚠️ Etkinleştirildiğinde LAN ve harici cihazlar erişebilir. API anahtarınızı güvende tutun",
       "allow_lan_access_restart_hint": "ℹ️ Değişiklikleri uygulamak için hizmet yeniden başlatması gerekir",
       "api_key": "API Anahtarı",
       "api_key_tooltip": "Proxy yetkilendirmesi etkinleştirildiğinde istemciler tarafından kullanılan paylaşılan gizli anahtar. Anahtarı yeniden oluşturmak eskisini hemen geçersiz kılar.",

@@ -183,7 +183,32 @@
       "export_no_accounts": "No accounts to export",
       "export_success": "Export successful! File saved to: {{path}}",
       "export_error": "Export failed"
-    }
+    },
+    "accounts_health": "Account Ecosystem Health",
+    "total_accounts_desc": "All configured accounts",
+    "available_accounts": "Available Accounts",
+    "available_accounts_desc": "✓ Active & healthy · In proxy service",
+    "disabled_accounts": "Disabled Accounts",
+    "disabled_accounts_desc": "Manually stopped / Proxy disabled",
+    "abnormal_accounts": "Abnormal Accounts",
+    "abnormal_accounts_has_risk": "⚠ Verification / Blocked risk",
+    "abnormal_accounts_no_risk": "✓ No risk or blocked accounts",
+    "quota_matrix_active": "Active Accounts Quota Productivity Matrix",
+    "quota_matrix_all_normal": "All Normal Accounts Quota Matrix (incl. disabled)",
+    "base_pool_count": "Base: {{count}} accounts",
+    "btn_only_available": "Active Only ({{count}})",
+    "btn_include_disabled": "Include Disabled ({{count}})",
+    "btn_title_only_available": "Current: Active accounts only (click to include disabled)",
+    "btn_title_include_disabled": "Current: All normal accounts including disabled (click for active only)",
+    "gemini_available_quota": "Gemini Available Quota",
+    "gemini_image_quota": "Gemini Image Quota",
+    "claude_available_quota": "Claude Available Quota",
+    "weighted_available": "Weighted Available",
+    "quota_sufficient_short": "Sufficient",
+    "quota_tight_short": "Tight",
+    "rolling_5h": "5h Rolling:",
+    "weekly_7d": "7d Weekly:",
+    "zero_weekly_warning": "{{count}} active account(s) circuit-broken due to zero weekly quota (rated 0%)"
   },
   "accounts": {
     "account": "Account",
@@ -309,6 +334,9 @@
     "quota_window_5h": "5-Hour Rolling Quota",
     "quota_window_weekly": "7-Day Weekly Quota",
     "quota_window_weekly_short": "Weekly",
+    "weekly_exhausted_tooltip": "Weekly quota exhausted (0%); waiting for weekly reset",
+    "weekly_tokens": "Cycle tokens",
+    "weekly_tokens_tooltip": "Tokens recorded by this instance in this quota cycle (input + output)",
     "quota_protected": "Protected",
     "details": {
       "title": "Quota Details",
@@ -442,7 +470,11 @@
       "auto_check_update_disabled": "Auto check disabled",
       "update_check_interval": "Check Interval (hours)",
       "update_check_interval_desc": "Set auto-check interval (1-168 hours)",
-      "update_check_interval_saved": "Check interval settings saved"
+      "update_check_interval_saved": "Check interval settings saved",
+      "lightweight_mode": "Lightweight Mode (Release RAM)",
+      "lightweight_mode_desc": "Destroy the webview renderer process when minimized or closed to tray. Reduces memory to ~35MB, with a slight delay when reopening the window.",
+      "lightweight_mode_enabled": "Lightweight mode enabled",
+      "lightweight_mode_disabled": "Lightweight mode disabled"
     },
     "account": {
       "title": "Account Settings",
@@ -742,7 +774,8 @@
     "quit": "Quit Application",
     "no_account": "No Account",
     "unknown_quota": "Unknown (Click to Refresh)",
-    "forbidden": "Account Forbidden"
+    "forbidden": "Account Forbidden",
+    "lightweight_mode": "Lightweight Mode (Release RAM)"
   },
   "proxy": {
     "title": "API Proxy Service",
@@ -773,10 +806,10 @@
       "auto_start": "Auto Start with App",
       "auto_start_tooltip": "Automatically starts the local API Proxy service when the app launches.",
       "allow_lan_access": "Allow LAN Access",
-      "allow_lan_access_tooltip": "When enabled, the service binds to 0.0.0.0 so other devices on your LAN can access it. Keep authorization enabled and protect your API key; restart required to apply.",
-      "allow_lan_access_hint_enabled": "🌐 Listening on 0.0.0.0, LAN devices can access",
+      "allow_lan_access_tooltip": "When enabled, the service binds to IPv6/IPv4 dual-stack wildcard ([::] / 0.0.0.0) so LAN and external devices can access it. Keep authorization enabled and protect your API key; service restart required to apply.",
+      "allow_lan_access_hint_enabled": "🌐 Listening on [::] / 0.0.0.0 (IPv6/IPv4 Dual-Stack), LAN and external devices can access",
       "allow_lan_access_hint_disabled": "🔒 Listening on 127.0.0.1 only, localhost access (Privacy First)",
-      "allow_lan_access_warning": "⚠️ LAN devices can access when enabled. Keep your API key secure",
+      "allow_lan_access_warning": "⚠️ LAN and external devices can access when enabled. Keep your API key secure",
       "allow_lan_access_restart_hint": "ℹ️ Service restart required to apply changes",
       "api_key": "API Key",
       "api_key_tooltip": "Shared secret used by clients when proxy authorization is enabled. Regenerating the key immediately invalidates the old one.",
@@ -921,8 +954,8 @@
       "circuit_breaker": {
         "title": "Adaptive Circuit Breaker",
         "tooltip": "Automatically increases lockout duration for accounts that repeatedly fail with quota exhaustion. This prevents wasting API calls on dead accounts while allowing transient errors to recover quickly.",
-        "lock_on_zero_quota": "Lock on Zero Quota (5h / Weekly)",
-        "lock_on_zero_quota_desc": "Automatically locks the account until its exact quota reset time whenever 5-hour rolling or weekly quota hits 0%, skipping short backoffs. Note: Quota state discovery and automatic recovery depend on 'Auto Refresh Quotas' in General Settings.",
+        "lock_on_zero_quota": "Lock on Zero 5h Quota",
+        "lock_on_zero_quota_desc": "With the circuit breaker enabled, locks exhausted 5h quota until its official reset. Exhausted weekly quota always blocks the affected model group, independently of these switches, until the official reset or a fresh quota refresh confirms recovery. Enable Auto Refresh Quotas to discover changes automatically.",
         "backoff_levels": "Backoff Levels (Seconds)",
         "input_placeholder": "Enter backoff durations in seconds, separated by commas",
         "level": "Lv {{level}}",
@@ -1307,7 +1340,9 @@
       "original_id": "Original ID",
       "route_to": "Route To",
       "select_target_model": "Select Target Model",
-      "original_placeholder": "Original (e.g. gpt-4 or gpt-4*)"
+      "original_placeholder": "Original model (e.g. gemini-3.x-flash, x must be > 8)",
+      "wildcard_rule_notice": "Wildcard rule (x must be > 8, e.g. 3.9, 3.10 routed to 3.x-flash-tiered)",
+      "wildcard_only_gemini_3x": "Only wildcard gemini-3.x-flash (x > 8) is supported, please specify exact model ID for others"
     },
     "multi_protocol": {
       "title": "Multi-Protocol Support",
@@ -1385,6 +1420,8 @@
       "gemini": "Gemini",
       "claude": "Claude",
       "images": "Images",
+      "capture_health": "Capture Health",
+      "capture_health_tip": "Disabled by default: skips all successful GET requests (incl. /v1/models polling and /health probes) and does not persist them; failed requests are always recorded; enable to record & save everything",
       "reset": "Reset",
       "by_account": "Filter by account",
       "all_accounts": "All Accounts"
@@ -1730,12 +1767,28 @@
     },
     "models": {
       "title": "Available Models",
-      "empty": "No models returned for current API Key."
+      "empty": "Enter key and query to load available models.",
+      "emptyFromKey": "No models returned yet. Query to fetch models."
     },
     "errors": {
       "parseFormat": "Parse format error: {{err}}",
       "fetchFailed": "Fetch failed: {{err}}",
       "queryFailed": "Failed to get valid quota or models. Please check if the API Key and Base URL are correct."
-    }
+    },
+    "opencode": {
+      "modelsRequired": "Refresh this key to load available models before activating its OpenCode profile.",
+      "active": "Active",
+      "modified": "Modified",
+      "inactive": "Inactive",
+      "syncedToast": "Synced to OpenCode: {{name}}",
+      "removedToast": "Removed from OpenCode: {{name}}",
+      "clickToRemove": "OpenCode profile is active and synced. Click to deactivate/remove",
+      "clickToUpdate": "Settings or models differ. Click to update",
+      "clickToActivate": "Click to activate separate profile in OpenCode",
+      "syncedActiveTooltip": "OpenCode: profile is active and fully synced. Click to deactivate",
+      "partialTooltip": "OpenCode: settings or models differ. Click to sync"
+    },
+    "syncSuccess": "Successfully synced to {{app}}",
+    "syncError": "Failed to sync: {{error}}"
   }
 }

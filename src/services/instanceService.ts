@@ -14,6 +14,7 @@ export interface InstanceConfig {
     created_at: number;
     last_used: number;
     is_default: boolean;
+    seq_num?: number;
 }
 
 export interface InstanceStatus {

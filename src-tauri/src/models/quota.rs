@@ -11,10 +11,51 @@ pub struct QuotaBucket {
     pub remaining_fraction: f64,
     /// Reset time (RFC3339)
     pub reset_time: String,
+    /// Successful bucket observation time in milliseconds; absent in older snapshots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_at: Option<i64>,
+    /// First observed early reset, in seconds; normal cycles start seven days before reset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_start: Option<i64>,
+    /// Usage recorded by this instance, populated only when returning the account list.
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub cycle_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+impl QuotaBucket {
+    /// Valid current weekly interval, with an inclusive start and exclusive reset.
+    pub(crate) fn weekly_cycle_bounds(&self, now: i64) -> Option<(i64, i64)> {
+        let window = format!("{} {}", self.window, self.bucket_id).to_lowercase();
+        if !(window.contains("week") || window.contains("7d"))
+            || !(0.0..=1.0).contains(&self.remaining_fraction)
+        {
+            return None;
+        }
+        let end = chrono::DateTime::parse_from_rfc3339(&self.reset_time)
+            .ok()?
+            .timestamp();
+        let normal_start = end.checked_sub(7 * 24 * 60 * 60)?;
+        let start = self.cycle_start.unwrap_or(normal_start);
+        (normal_start <= start && start <= now && now < end).then_some((start, end))
+    }
+
+    /// Called only for a newer observation of the same bucket by the existing merge.
+    pub(crate) fn retain_cycle_boundary(&mut self, previous: &Self, observed_at: i64) {
+        if self.reset_time == previous.reset_time {
+            self.cycle_start = previous.cycle_start;
+        }
+        let observed_secs = observed_at.div_euclid(1000);
+        if self.weekly_cycle_bounds(observed_secs).is_some()
+            && previous.weekly_cycle_bounds(observed_secs).is_some()
+            && self.remaining_fraction > previous.remaining_fraction + 1e-9
+        {
+            self.cycle_start = Some(observed_secs);
+        }
+    }
 }
 
 /// A model group (e.g. Gemini Models / Claude and GPT models)
@@ -23,6 +64,7 @@ pub struct QuotaGroup {
     pub display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default)]
     pub buckets: Vec<QuotaBucket>,
 }
 
@@ -155,5 +197,130 @@ pub fn tier_priority(tier: Option<&str>) -> u8 {
 impl Default for QuotaData {
     fn default() -> Self {
         Self::new()
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_subscription_tier() {
+        // Upstream real ID (authoritative field returned by loadCodeAssist)
+        assert_eq!(normalize_subscription_tier("free-tier"), "FREE");
+        assert_eq!(normalize_subscription_tier("g1-pro-tier"), "PRO");
+        assert_eq!(
+            normalize_subscription_tier("standard-tier"),
+            "standard-tier"
+        );
+        assert_eq!(normalize_subscription_tier("g1-ultra-tier"), "ULTRA");
+        assert_eq!(normalize_subscription_tier("GOOGLE_ONE_HELIUM"), "ULTRA");
+        assert_eq!(normalize_subscription_tier("GDP_HELIUM"), "ULTRA");
+
+        // Upstream real name (free text)
+        assert_eq!(
+            normalize_subscription_tier("Antigravity Starter Quota"),
+            "FREE"
+        );
+        assert_eq!(normalize_subscription_tier("Google AI Pro"), "PRO");
+        assert_eq!(normalize_subscription_tier("Google AI Ultra"), "ULTRA");
+
+        // Legacy / compatibility naming
+        assert_eq!(normalize_subscription_tier("Google One AI Premium"), "PRO");
+        assert_eq!(normalize_subscription_tier("gemini-advanced"), "PRO");
+        assert_eq!(normalize_subscription_tier("Gemini Pro"), "PRO");
+        assert_eq!(normalize_subscription_tier("pro"), "PRO");
+        assert_eq!(normalize_subscription_tier("gemini-ultra"), "ULTRA");
+        assert_eq!(normalize_subscription_tier("ULTRA"), "ULTRA");
+        assert_eq!(normalize_subscription_tier("Free"), "FREE");
+
+        // Empty / unrecognized returns as-is
+        assert_eq!(normalize_subscription_tier(""), "");
+        assert_eq!(normalize_subscription_tier("   "), "");
+        assert_eq!(
+            normalize_subscription_tier("totally-unknown"),
+            "totally-unknown"
+        );
+    }
+
+    #[test]
+    fn test_is_known_tier() {
+        assert!(is_known_tier("FREE"));
+        assert!(is_known_tier("PRO"));
+        assert!(is_known_tier("ULTRA"));
+        assert!(!is_known_tier(""));
+        assert!(!is_known_tier("totally-unknown"));
+        assert!(!is_known_tier("pro")); // Unnormalized lowercase is not a valid tier constant
+    }
+
+    #[test]
+    fn test_resolve_subscription_tier_no_model_fallback() {
+        // Critical regression: model list no longer participates in inference.
+        // Free accounts also receive the full claude/gpt catalog, so None must resolve to FREE,
+        // otherwise free accounts would be erroneously tagged as Pro.
+        assert_eq!(resolve_subscription_tier(None), "FREE");
+
+        // Upstream authoritative ID
+        assert_eq!(resolve_subscription_tier(Some("free-tier")), "FREE");
+        assert_eq!(resolve_subscription_tier(Some("g1-pro-tier")), "PRO");
+        assert_eq!(resolve_subscription_tier(Some("g1-ultra-tier")), "ULTRA");
+
+        // Upstream name
+        assert_eq!(
+            resolve_subscription_tier(Some("Antigravity Starter Quota")),
+            "FREE"
+        );
+        assert_eq!(resolve_subscription_tier(Some("Google AI Pro")), "PRO");
+
+        // Unrecognized -> FREE (never guess PRO)
+        assert_eq!(resolve_subscription_tier(Some("totally-unknown")), "FREE");
+        assert_eq!(resolve_subscription_tier(Some("")), "FREE");
+    }
+
+    #[test]
+    fn test_tier_priority() {
+        assert_eq!(tier_priority(Some("ULTRA")), 0);
+        assert_eq!(tier_priority(Some("g1-ultra-tier")), 0);
+        assert_eq!(tier_priority(Some("PRO")), 1);
+        assert_eq!(tier_priority(Some("g1-pro-tier")), 1);
+        assert_eq!(tier_priority(Some("FREE")), 2);
+        assert_eq!(tier_priority(Some("free-tier")), 2);
+
+        // Unknown / missing tier treated as FREE
+        assert_eq!(tier_priority(None), 2);
+        assert_eq!(tier_priority(Some("")), 2);
+        assert_eq!(tier_priority(Some("garbage")), 2);
+    }
+
+    #[test]
+    fn test_ensure_subscription_tier_normalizes_and_drops_unknown() {
+        let mut quota = QuotaData::new();
+
+        // Upstream name normalized
+        quota.subscription_tier = Some("Antigravity Starter Quota".to_string());
+        quota.ensure_subscription_tier();
+        assert_eq!(quota.subscription_tier.as_deref(), Some("FREE"));
+
+        quota.subscription_tier = Some("g1-pro-tier".to_string());
+        quota.ensure_subscription_tier();
+        assert_eq!(quota.subscription_tier.as_deref(), Some("PRO"));
+
+        // Unrecognized -> emptied, waiting for upstream backfill (never falls back to PRO)
+        quota.subscription_tier = Some("totally-unknown".to_string());
+        quota.ensure_subscription_tier();
+        assert_eq!(quota.subscription_tier, None);
+
+        // None stays None
+        quota.subscription_tier = None;
+        quota.ensure_subscription_tier();
+        assert_eq!(quota.subscription_tier, None);
+    }
+
+    #[test]
+    fn test_quota_group_deserialization_with_missing_buckets() {
+        let json = r#"{"display_name":"Gemini Models"}"#;
+        let group: QuotaGroup =
+            serde_json::from_str(json).expect("Should deserialize with missing buckets");
+        assert_eq!(group.display_name, "Gemini Models");
+        assert!(group.buckets.is_empty());
     }
 }

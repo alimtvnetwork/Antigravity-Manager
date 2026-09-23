@@ -1,3 +1,4 @@
+import { startTransition } from 'react';
 import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -49,11 +50,7 @@ function Navbar() {
         try {
             getCurrentWindow().startDragging();
         } catch (err) {
-            console.error('Failed to start dragging window:', err);
-            useErrorStore.getState().captureError(err, {
-                source: 'Navbar.tsx',
-                triggerAction: 'handleMouseDown.startDragging',
-            });
+            console.warn('Failed to start dragging window:', err);
         }
     };
 
@@ -142,19 +139,25 @@ function Navbar() {
         }
     };
 
-    // Language change logic (runs cleanly in background / hide mode, reporting errors to store)
-    const handleLanguageChange = async (langCode: string) => {
-        try {
-            await i18n.changeLanguage(langCode);
-            if (!config) return;
+    // Language change logic (instant response + non-blocking smooth transition + error reporting)
+    const handleLanguageChange = (langCode: string) => {
+        if (!config) return;
 
-            await saveConfig({
-                ...config,
-                language: langCode,
-                theme: config.theme
-            }, true);
-        } catch (err) {
-            console.error('Failed to change language:', err);
+        // 1. Immediately set RTL / LTR layout direction
+        document.documentElement.dir = langCode === 'ar' ? 'rtl' : 'ltr';
+
+        // 2. Use startTransition to trigger non-blocking progressive re-render
+        startTransition(() => {
+            i18n.changeLanguage(langCode);
+        });
+
+        // 3. Asynchronously persist config without blocking UI
+        saveConfig({
+            ...config,
+            language: langCode,
+            theme: config.theme
+        }, true).catch(err => {
+            console.error('Failed to persist language config:', err);
             const captured = useErrorStore.getState().captureError(err, {
                 source: 'Navbar.tsx',
                 triggerComponent: 'NavSettings.LanguageDropdown',
@@ -162,7 +165,7 @@ function Navbar() {
                 context: { targetLanguage: langCode }
             });
             useErrorStore.getState().openErrorModal(captured);
-        }
+        });
     };
 
     return (
@@ -172,12 +175,12 @@ function Navbar() {
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
             className="py-1.5 transition-colors duration-200 bg-[#FAFBFC] dark:bg-slate-900 border-b border-gray-200/50 dark:border-slate-800/80 select-none"
         >
-            <div className="max-w-7xl mx-auto px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
+            <div className="max-w-7xl mx-auto px-2 sm:px-3 md:px-5 relative w-full" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}
-                <div className="flex items-center justify-between h-14 gap-2 md:gap-3">
+                <div className="flex items-center justify-between h-14 gap-1 sm:gap-2 md:gap-3 min-w-0">
                     {/* Logo & Error Manager Badge */}
                     <div
-                        className="no-drag shrink-0 flex items-center gap-1.5 min-w-0"
+                        className="no-drag shrink-0 flex items-center gap-1 sm:gap-1.5 min-w-0"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
@@ -186,11 +189,11 @@ function Navbar() {
                     </div>
 
                     {/* Center draggable spacer */}
-                    <div className="flex-1 h-full min-w-2" data-tauri-drag-region />
+                    <div className="flex-1 h-full min-w-1" data-tauri-drag-region />
 
                     {/* Compact nav menu */}
                     <div
-                        className="no-drag shrink-0 flex justify-center min-w-0 px-1"
+                        className="no-drag shrink-0 flex justify-center min-w-0 px-0.5 sm:px-1"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
@@ -198,11 +201,11 @@ function Navbar() {
                     </div>
 
                     {/* Center draggable spacer */}
-                    <div className="flex-1 h-full min-w-2" data-tauri-drag-region />
+                    <div className="flex-1 h-full min-w-1" data-tauri-drag-region />
 
                     {/* Instance selector and settings (docked to far right) */}
                     <div
-                        className="no-drag flex items-center gap-1.5 md:gap-2 shrink-0 z-50 ml-auto"
+                        className="no-drag flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0 z-50 ml-auto min-w-0"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >

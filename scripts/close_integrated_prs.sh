@@ -1,115 +1,110 @@
 #!/bin/bash
 
-# 关闭已集成到 v4.0.3 的 PR 脚本
-# 使用前请确保已安装并登录 GitHub CLI: brew install gh && gh auth login
+# Script to close integrated PRs
+# Before running, ensure GitHub CLI is installed and authenticated: brew install gh && gh auth login
 
-REPO="lbjlaq/Antigravity-Manager"
-VERSION="v4.0.3"
+REPO="alimtvnetwork/Antigravity-Manager"
+VERSION="v4.65.0"
 
-# 感谢消息模板
-THANK_YOU_MESSAGE="感谢您的贡献！🎉
+# Thank you comment template
+THANK_YOU_MESSAGE="Thank you for your contribution! 🎉
 
-此 PR 的更改已被手动集成到 ${VERSION} 版本中。
-
-相关更新已包含在以下文件中：
-- README.md 的版本更新日志
-- 贡献者列表
-
-再次感谢您对 Antigravity Tools 项目的支持！
-
----
-
-Thank you for your contribution! 🎉
-
-The changes from this PR have been manually integrated into ${VERSION}.
+The changes from this PR have been integrated into the project codebase.
 
 The updates are documented in:
 - README.md changelog
 - Contributors list
 
-Thank you again for your support of the Antigravity Tools project!"
+Thank you again for your support of the Antigravity Manager Tools project!"
 
 echo "================================================"
-echo "关闭已集成到 ${VERSION} 的 PR"
+echo "Closing PRs integrated into ${VERSION}"
 echo "================================================"
 echo ""
 
-# PR 列表：格式为 "PR号|作者|标题"
+# PR List format: "PR_NUMBER|AUTHOR|TITLE"
 PRS_LIST=(
     "825|IamAshrafee|[Internationalization] Device Fingerprint Dialog localization"
-    "822|Koshikai|[Japanese] Add missing translations and refine terminology",
-    "798|vietnhatthai|[Translation Fix] Correct spelling error in Vietnamese settings",
-    "846|lengjingxu|[核心功能] 客户端热更新与 Token 统计系统",
-    "949|lbjlaq|Streaming chunks order fix",
-    "950|lbjlaq|[Fix] Remove redundant code and update README",
-    "973|Mag1cFall|fix: 修复 Windows 平台启动参数不生效的问题"
+    "822|Koshikai|[Japanese] Add missing translations and refine terminology"
+    "798|vietnhatthai|[Translation Fix] Correct spelling error in Vietnamese settings"
+    "846|lengjingxu|[Core Feature] Client Hot Update & Token Stats System"
+    "949|lbjlaq|Streaming chunks order fix"
+    "950|lbjlaq|[Fix] Remove redundant code and update README"
+    "973|Mag1cFall|fix: Fix Windows platform startup parameters not taking effect"
 )
 
-# 检查 GitHub CLI 是否已安装
+# Check if GitHub CLI is installed
 if ! command -v gh &> /dev/null; then
-    echo "❌ GitHub CLI 未安装"
+    echo "❌ GitHub CLI is not installed"
     echo ""
-    echo "请先安装 GitHub CLI:"
+    echo "Please install GitHub CLI first:"
     echo "  brew install gh"
     echo ""
-    echo "然后登录:"
+    echo "Then authenticate:"
     echo "  gh auth login"
     echo ""
     exit 1
 fi
 
-# 检查是否已登录
+# Verify authentication
+echo "Checking GitHub CLI authentication status..."
 if ! gh auth status &> /dev/null; then
-    echo "❌ 未登录 GitHub CLI"
-    echo ""
-    echo "请先登录:"
-    echo "  gh auth login"
-    echo ""
+    echo "❌ GitHub CLI is not authenticated"
+    echo "Please run 'gh auth login' to authenticate"
     exit 1
 fi
 
-echo "✅ GitHub CLI 已就绪"
+echo "✅ GitHub CLI is authenticated"
 echo ""
 
-# 遍历并处理每个 PR
-for item in "${PRS_LIST[@]}"; do
-    PR_NUM=$(echo "$item" | cut -d'|' -f1)
-    AUTHOR=$(echo "$item" | cut -d'|' -f2)
-    TITLE=$(echo "$item" | cut -d'|' -f3)
+# Process each PR
+SUCCESS_COUNT=0
+SKIP_COUNT=0
+FAIL_COUNT=0
 
+for pr_info in "${PRS_LIST[@]}"; do
+    IFS="|" read -r pr_number pr_author pr_title <<< "$pr_info"
+    
     echo "----------------------------------------"
-    echo "处理 PR #${PR_NUM}: ${TITLE}"
-    echo "作者: @${AUTHOR}"
-    echo "----------------------------------------"
-
-    # 添加感谢评论
-    echo "📝 添加感谢评论..."
-    gh pr comment ${PR_NUM} --repo ${REPO} --body "${THANK_YOU_MESSAGE}"
-
-    if [ $? -eq 0 ]; then
-        echo "✅ 评论已添加"
-    else
-        echo "❌ 评论添加失败"
+    echo "Processing PR #${pr_number}: ${pr_title}"
+    echo "Author: @${pr_author}"
+    
+    # Check PR status
+    pr_state=$(gh pr view "$pr_number" --repo "$REPO" --json state --jq .state 2>/dev/null)
+    
+    if [ $? -ne 0 ]; then
+        echo "⚠️  Unable to fetch PR #${pr_number} status (may not exist or lacks permission)"
+        ((FAIL_COUNT++))
         continue
     fi
-
-    # 关闭 PR
-    echo "🔒 关闭 PR..."
-    gh pr close ${PR_NUM} --repo ${REPO} --comment "已集成到 ${VERSION}，关闭此 PR。"
-
-    if [ $? -eq 0 ]; then
-        echo "✅ PR #${PR_NUM} 已关闭"
-    else
-        echo "❌ PR #${PR_NUM} 关闭失败"
+    
+    if [ "$pr_state" == "CLOSED" ] || [ "$pr_state" == "MERGED" ]; then
+        echo "ℹ️  PR #${pr_number} is already closed or merged (${pr_state}), skipping"
+        ((SKIP_COUNT++))
+        continue
     fi
-
-    echo ""
-    sleep 2  # 避免 API 限流
+    
+    # Add comment and close PR
+    echo "Adding thank-you comment and closing PR #${pr_number}..."
+    if gh pr comment "$pr_number" --repo "$REPO" --body "$THANK_YOU_MESSAGE" && \
+       gh pr close "$pr_number" --repo "$REPO"; then
+        echo "✅ PR #${pr_number} closed successfully!"
+        ((SUCCESS_COUNT++))
+    else
+        echo "❌ Failed to close PR #${pr_number}"
+        ((FAIL_COUNT++))
+    fi
+    
+    # Polite delay to prevent API rate limiting
+    sleep 2
 done
 
-echo "================================================"
-echo "✅ 所有 PR 处理完成！"
-echo "================================================"
 echo ""
-echo "请访问以下链接查看结果："
-echo "https://github.com/${REPO}/pulls?q=is%3Apr+is%3Aclosed"
+echo "================================================"
+echo "Summary"
+echo "================================================"
+echo "Successfully closed: ${SUCCESS_COUNT}"
+echo "Skipped: ${SKIP_COUNT}"
+echo "Failed: ${FAIL_COUNT}"
+echo "Total processed: ${#PRS_LIST[@]}"
+echo "================================================"

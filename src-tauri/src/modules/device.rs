@@ -56,13 +56,15 @@ pub fn get_storage_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
             "Antigravity IDE",
             "antigravity-ide",
         ]
+    } else if target_ide == Some("classic") {
+        &["Antigravity", "antigravity"]
     } else {
-        // target_ide = None: try IDE folder first, fall back to classic name
+        // target_ide = None: try classic and IDE folder variations
         &[
-            "Antigravity IDE",
             "Antigravity",
-            "antigravity-ide",
+            "Antigravity IDE",
             "antigravity",
+            "antigravity-ide",
         ]
     };
 

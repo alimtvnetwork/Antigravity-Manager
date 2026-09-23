@@ -159,7 +159,32 @@
       "export_no_accounts": "沒有可匯出的帳號",
       "export_success": "匯出成功! 檔案已儲存至: {{path}}",
       "export_error": "匯出失敗"
-    }
+    },
+    "accounts_health": "帳號生態健康",
+    "total_accounts_desc": "已錄入配置的全部帳號",
+    "available_accounts": "可用帳號數",
+    "available_accounts_desc": "✓ 開啟且狀態正常 · 反代服務中",
+    "disabled_accounts": "禁用帳號數",
+    "disabled_accounts_desc": "手動停用 / 反代已禁用",
+    "abnormal_accounts": "異常帳號數",
+    "abnormal_accounts_has_risk": "⚠ 需處理風控驗證 / 封禁",
+    "abnormal_accounts_no_risk": "✓ 零風控異常帳號",
+    "quota_matrix_active": "可用帳號配額生產力矩陣",
+    "quota_matrix_all_normal": "全量正常帳號配額矩陣 (包含已禁用)",
+    "base_pool_count": "底座: {{count}} 個帳號",
+    "btn_only_available": "僅看可用帳號 ({{count}})",
+    "btn_include_disabled": "包含禁用帳號 ({{count}})",
+    "btn_title_only_available": "當前：僅看開啟且正常的可用帳號 (點擊包含已禁用帳號)",
+    "btn_title_include_disabled": "當前：查看全部正常狀態帳號包含禁用 (點擊僅看可用帳號)",
+    "gemini_available_quota": "Gemini 可用配額",
+    "gemini_image_quota": "Gemini 繪圖配額",
+    "claude_available_quota": "Claude 可用配額",
+    "weighted_available": "綜合加權可用",
+    "quota_sufficient_short": "充足",
+    "quota_tight_short": "偏緊",
+    "rolling_5h": "5小時滾動:",
+    "weekly_7d": "7天週配額:",
+    "zero_weekly_warning": "{{count}} 個可用帳號因週配額已耗盡觸發熔斷 (判定 0%)"
   },
   "accounts": {
     "account": "帳號",
@@ -418,7 +443,11 @@
       "auto_check_update_disabled": "已停用自動檢查更新",
       "update_check_interval": "檢查間隔(小時)",
       "update_check_interval_desc": "設定自動檢查更新的時間間隔(1-168 小時)",
-      "update_check_interval_saved": "已儲存檢查間隔設定"
+      "update_check_interval_saved": "已儲存檢查間隔設定",
+      "lightweight_mode": "輕量模式 (釋放記憶體)",
+      "lightweight_mode_desc": "退出或最小化到系統匣時銷毀前端渲染行程，常駐記憶體可降至約 35MB。重新開啟主視窗時需要數毫秒重建。",
+      "lightweight_mode_enabled": "已啟用輕量模式",
+      "lightweight_mode_disabled": "已停用輕量模式"
     },
     "account": {
       "title": "帳號設定",
@@ -705,7 +734,8 @@
     "quit": "退出應用 (Exit)",
     "no_account": "無帳號",
     "unknown_quota": "未知 (點選重新整理)",
-    "forbidden": "帳號被封禁"
+    "forbidden": "帳號被封禁",
+    "lightweight_mode": "輕量模式 (退出時釋放記憶體)"
   },
   "proxy": {
     "title": "API 反向代理服務",
@@ -733,10 +763,10 @@
       "auto_start": "跟隨應用自動啟動",
       "auto_start_tooltip": "應用啟動時自動啟動本地 API 代理服務。",
       "allow_lan_access": "允許區域網路存取",
-      "allow_lan_access_tooltip": "開啟後繫結到 0.0.0.0，區域網路其他裝置也能存取。建議同時開啟鑑權並妥善保管 API 金鑰；修改後需重啟生效。",
-      "allow_lan_access_hint_enabled": "🌐 監聽 0.0.0.0，區域網路裝置可存取",
+      "allow_lan_access_tooltip": "開啟後繫結到 IPv6/IPv4 雙棧萬用位址（[::] / 0.0.0.0），區域網路及公網其他裝置均可存取。建議同時開啟鑑權並妥善保管 API 金鑰；修改後需重啟服務生效。",
+      "allow_lan_access_hint_enabled": "🌐 監聽 [::] / 0.0.0.0 (IPv6/IPv4 雙棧)，區域網路與外部裝置可存取",
       "allow_lan_access_hint_disabled": "🔒 僅監聽 127.0.0.1，僅本機可存取（隱私優先）",
-      "allow_lan_access_warning": "⚠️ 開啟後區域網路內其他裝置可存取，請確保 API 金鑰安全",
+      "allow_lan_access_warning": "⚠️ 開啟後區域網路與外部裝置均可存取，請確保 API 金鑰安全",
       "allow_lan_access_restart_hint": "ℹ️ 需要重啟服務後生效",
       "api_key": "API 金鑰",
       "api_key_tooltip": "啟用鑑權後，客戶端存取代理所需的共享金鑰。重新生成會立即使舊金鑰失效。",
@@ -1249,7 +1279,9 @@
       "gemini3_only_warning": "⚠️ 僅支援 Gemini 3 系列",
       "default_suffix": "（預設）",
       "select_target_model": "選擇目標模型",
-      "original_placeholder": "原始名 (如 gpt-4 或 gpt-4*)",
+      "original_placeholder": "原始名 (如 gemini-3.x-flash，x 必須大於 8)",
+      "wildcard_rule_notice": "通配符規則（x 必須大於 8，如 3.9、3.10 自動轉為 3.x-flash-tiered）",
+      "wildcard_only_gemini_3x": "僅允許內建通配符 gemini-3.x-flash（x 必須大於 8），其他請填寫具體模型 ID",
       "only_raw_quota_models": "Only Expose Quota Models",
       "only_raw_quota_models_tooltip": "When enabled, /v1/models only lists active quota models fetched from connected accounts, hiding built-in alias models (like gpt-4o) and image ratio variants.",
       "gemini3_group_label": "Gemini 3 (Recommended)",
@@ -1701,12 +1733,37 @@
     },
     "models": {
       "title": "可用模型",
-      "empty": "當前 API Key 未返回模型列表。"
+      "empty": "輸入 API Key 並查詢以取得可用模型清單。",
+      "emptyFromKey": "尚未取得模型。請點擊重新整理以取得模型清單。"
     },
     "errors": {
       "parseFormat": "解析格式異常: {{err}}",
       "fetchFailed": "取得失敗: {{err}}",
       "queryFailed": "無法取得有效的額度資料，請確認 API Key 是否有效。"
+    },
+    "opencode": {
+      "modelsRequired": "請先重新整理此金鑰以載入可用模型，再啟用其 OpenCode 設定。",
+      "active": "已同步",
+      "modified": "有差異",
+      "inactive": "未啟用",
+      "syncedToast": "已同步至 OpenCode: {{name}}",
+      "removedToast": "已從 OpenCode 移除設定檔 {{name}}",
+      "clickToRemove": "OpenCode 設定檔已啟用且一致。點擊停用（移除設定檔）",
+      "clickToUpdate": "設定或模型存在差異。點擊更新",
+      "clickToActivate": "點擊以在 OpenCode 中啟用獨立設定檔",
+      "syncedActiveTooltip": "OpenCode: 設定完全相符（已啟用）。點擊停用／移除",
+      "partialTooltip": "OpenCode: 設定或模型存在差異。點擊同步"
+    },
+    "syncSuccess": "成功同步至 {{app}}",
+    "syncError": "同步失敗: {{error}}"
+  },
+  "errors": {
+    "stream": {
+      "timeout_error": "Request timeout, please check your network connection",
+      "connection_error": "Connection failed, please check your network or proxy settings",
+      "decode_error": "Network unstable, data transmission interrupted. Try: 1) Check network 2) Switch proxy 3) Retry",
+      "stream_error": "Stream transmission error, please retry later",
+      "unknown_error": "Unknown error occurred, please retry later"
     }
   }
 }

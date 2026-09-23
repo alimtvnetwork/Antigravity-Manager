@@ -136,7 +136,32 @@
       "export_no_accounts": "Nenhuma conta para exportar",
       "export_success": "Exportação bem-sucedida! Arquivo salvo em: {{path}}",
       "export_error": "Falha na exportação"
-    }
+    },
+    "accounts_health": "Saúde do ecossistema de contas",
+    "total_accounts_desc": "Todas as contas configuradas",
+    "available_accounts": "Contas disponíveis",
+    "available_accounts_desc": "✓ Ativas e normais · Em serviço proxy",
+    "disabled_accounts": "Contas desativadas",
+    "disabled_accounts_desc": "Pausadas manualmente / Proxy desativado",
+    "abnormal_accounts": "Contas anormais",
+    "abnormal_accounts_has_risk": "⚠ Risco de verificação / bloqueio",
+    "abnormal_accounts_no_risk": "✓ Sem contas anormais ou bloqueadas",
+    "quota_matrix_active": "Matriz de cotas de contas ativas",
+    "quota_matrix_all_normal": "Matriz de todas as contas normais (incl. desativadas)",
+    "base_pool_count": "Base: {{count}} contas",
+    "btn_only_available": "Apenas ativas ({{count}})",
+    "btn_include_disabled": "Incluir desativadas ({{count}})",
+    "btn_title_only_available": "Atual: Apenas ativas (clique para incluir desativadas)",
+    "btn_title_include_disabled": "Atual: Todas as contas normais (clique para apenas ativas)",
+    "gemini_available_quota": "Cota disponível Gemini",
+    "gemini_image_quota": "Cota de imagem Gemini",
+    "claude_available_quota": "Cota disponível Claude",
+    "weighted_available": "Disponível ponderada",
+    "quota_sufficient_short": "Suficiente",
+    "quota_tight_short": "Apertada",
+    "rolling_5h": "5h contínua:",
+    "weekly_7d": "7d semanal:",
+    "zero_weekly_warning": "{{count}} conta(s) com corte por esgotamento de cota semanal (0%)"
   },
   "accounts": {
     "account": "Conta",
@@ -398,7 +423,11 @@
       "auto_check_update_disabled": "Verificação automática desabilitada",
       "update_check_interval": "Intervalo de Verificação (horas)",
       "update_check_interval_desc": "Definir intervalo de verificação automática (1-168 horas)",
-      "update_check_interval_saved": "Configurações de intervalo de verificação salvas"
+      "update_check_interval_saved": "Configurações de intervalo de verificação salvas",
+      "lightweight_mode": "Modo Leve (Liberar Memória)",
+      "lightweight_mode_desc": "Destrói o processo de renderização WebView ao fechar ou minimizar para a bandeja, reduzindo a memória para ~35MB. Leva alguns milissegundos para reconstruir a janela ao reabrir.",
+      "lightweight_mode_enabled": "Modo leve habilitado",
+      "lightweight_mode_disabled": "Modo leve desabilitado"
     },
     "account": {
       "title": "Configurações de Conta",
@@ -698,7 +727,8 @@
     "quit": "Sair do Aplicativo",
     "no_account": "Sem Conta",
     "unknown_quota": "Desconhecido (Clique para Atualizar)",
-    "forbidden": "Conta Proibida"
+    "forbidden": "Conta Proibida",
+    "lightweight_mode": "Modo Leve (Liberar memória ao fechar)"
   },
   "proxy": {
     "title": "Serviço de Proxy da API",
@@ -729,10 +759,10 @@
       "auto_start": "Iniciar Automaticamente",
       "auto_start_tooltip": "Inicia automaticamente o serviço de Proxy da API local quando o aplicativo é iniciado.",
       "allow_lan_access": "Permitir Acesso LAN",
-      "allow_lan_access_tooltip": "Quando habilitado, o serviço se vincula a 0.0.0.0 para que outros dispositivos na sua LAN possam acessá-lo. Mantenha a autorização habilitada e proteja sua chave de API; reinício necessário para aplicar.",
-      "allow_lan_access_hint_enabled": "🌐 Escutando em 0.0.0.0, dispositivos LAN podem acessar",
+      "allow_lan_access_tooltip": "Quando habilitado, o serviço se vincula ao endereço curinga dual-stack IPv6/IPv4 ([::] / 0.0.0.0) para que dispositivos na LAN e externos possam acessá-lo. Mantenha a autorização habilitada e proteja sua chave de API; reinício necessário para aplicar.",
+      "allow_lan_access_hint_enabled": "🌐 Escutando em [::] / 0.0.0.0 (Dual-Stack IPv6/IPv4), dispositivos LAN e externos podem acessar",
       "allow_lan_access_hint_disabled": "🔒 Escutando apenas em 127.0.0.1, acesso localhost (Privacidade Primeiro)",
-      "allow_lan_access_warning": "⚠️ Dispositivos LAN podem acessar quando habilitado. Mantenha sua chave de API segura",
+      "allow_lan_access_warning": "⚠️ Dispositivos LAN e externos podem acessar quando habilitado. Mantenha sua chave de API segura",
       "allow_lan_access_restart_hint": "ℹ️ Reinício do serviço necessário para aplicar alterações",
       "api_key": "Chave de Acesso (API Key)",
       "api_key_tooltip": "Segredo compartilhado usado pelos clientes quando a autorização do proxy está habilitada. Regenerar a chave invalida imediatamente a antiga.",

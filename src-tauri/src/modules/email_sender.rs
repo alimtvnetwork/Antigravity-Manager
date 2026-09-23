@@ -377,85 +377,55 @@ fn read_smtp_response(stream: &mut EmailStream) -> Result<String, String> {
     Ok(total_resp)
 }
 
-/// Build full MIME email message with anti-spam formatting
+/// Build full MIME email message with strictly plaintext formatting (zero HTML)
 fn build_mime_message(
     account: &EmailAccount,
     subject: &str,
-    html_body: &str,
+    body: &str,
     recipients: &[String],
 ) -> String {
     let msg_id = format!("<{}@{}>", Uuid::new_v4(), account.smtp_host);
     let date = Utc::now().to_rfc2822();
     let encoded_subject = format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()));
 
-    let content_type = if html_body.trim_start().starts_with('<') {
-        "text/html; charset=UTF-8"
-    } else {
-        "text/plain; charset=UTF-8"
-    };
-
     format!(
-        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.62.0\r\n\r\n{}",
+        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.65.0\r\n\r\n{}",
         account.alias,
         account.email,
         recipients.join(", "),
         encoded_subject,
         date,
         msg_id,
-        content_type,
-        html_body
+        body
     )
 }
 
 // ---------------------------------------------------------------------------
-// HTML Email Templates
+// Plaintext Email Templates (Strictly Plaintext, Zero HTML)
 // ---------------------------------------------------------------------------
 
-fn wrap_email_card(
+fn wrap_plaintext_email(
     title: &str,
-    content_html: &str,
+    content: &str,
     machine_name: &str,
     machine_ip: &str,
 ) -> String {
     format!(
-        r#"<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }}
-    .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
-    .header {{ background: #0f172a; color: #ffffff; padding: 24px; text-align: left; }}
-    .header h1 {{ margin: 0; font-size: 18px; font-weight: 600; }}
-    .body {{ padding: 24px; color: #334155; line-height: 1.6; font-size: 14px; }}
-    .badge {{ display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }}
-    .badge-warn {{ background: #fef3c7; color: #92400e; }}
-    .badge-info {{ background: #e0f2fe; color: #075985; }}
-    .badge-success {{ background: #dcfce7; color: #166534; }}
-    .footer {{ padding: 16px 24px; background: #f1f5f9; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }}
-    .cmd {{ background: #0f172a; color: #38bdf8; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 12px 0; }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h1>Antigravity Manager · {}</h1>
-    </div>
-    <div class="body">
-      {}
-    </div>
-    <div class="footer">
-      Machine: <strong>{}</strong> &nbsp;|&nbsp; Local IP: <strong>{}</strong><br>
-      Automated Mailbox Dispatcher · Antigravity Manager Tools · Maintained by Alim, Sponsored by RISEUP ASIA LLC
-    </div>
-  </div>
-</body>
-</html>"#,
-        title, content_html, machine_name, machine_ip
+        "================================================================================\r\n\
+         ANTIGRAVITY MANAGER · {}\r\n\
+         ================================================================================\r\n\r\n\
+         {}\r\n\r\n\
+         --------------------------------------------------------------------------------\r\n\
+         Node: {} | IP: {}\r\n\
+         Automated Dispatcher · Antigravity Manager Tools · Maintained by Alim, Sponsored by RISEUP ASIA LLC\r\n",
+        title.to_uppercase(),
+        content.trim(),
+        machine_name,
+        machine_ip
     )
 }
 
-/// Render HTML email for low quota alerts
+/// Render plaintext email for low quota alerts
 pub fn render_quota_drop_email(
     email: &str,
     current_quota: f64,
@@ -468,16 +438,18 @@ pub fn render_quota_drop_email(
         current_quota, email
     );
     let content = format!(
-        r#"<p><span class="badge badge-warn">CREDIT THRESHOLD TRIGGER</span></p>
-<p>The active profile <strong>{}</strong> has dropped to <strong>{:.1}%</strong> remaining credit, falling below the configured safety threshold of <strong>{}%</strong>.</p>
-<p>If auto-profile switcher is enabled, Antigravity Manager will attempt to migrate active workspaces to the next highest credit account.</p>"#,
+        "[!] CREDIT THRESHOLD TRIGGER\r\n\r\n\
+         The active profile '{}' has dropped to {:.1}% remaining credit,\r\n\
+         falling below the configured safety threshold of {}%.\r\n\r\n\
+         If auto-profile switcher is enabled, Antigravity Manager will attempt\r\n\
+         to migrate active workspaces to the next highest credit account.",
         email, current_quota, threshold
     );
-    let html = wrap_email_card("Low Credit Alert", &content, machine_name, machine_ip);
-    (subject, html)
+    let body = wrap_plaintext_email("Low Credit Alert", &content, machine_name, machine_ip);
+    (subject, body)
 }
 
-/// Render HTML email for automated workspace switch
+/// Render plaintext email for automated workspace switch
 pub fn render_workspace_switch_email(
     from_instance: &str,
     to_instance: &str,
@@ -487,22 +459,22 @@ pub fn render_workspace_switch_email(
 ) -> (String, String) {
     let subject = format!("[AGM Notice] Workspace Auto-Switched: {}", to_instance);
     let content = format!(
-        r#"<p><span class="badge badge-info">WORKSPACE SWITCHED</span></p>
-<p>Antigravity Manager transitioned active tasks from <strong>{}</strong> to <strong>{}</strong>.</p>
-<p><strong>Reason:</strong> {}</p>
-<p>Running prompts and repository states were safely snapshotted to <code>repo_prompts.db</code>.</p>"#,
+        "[*] WORKSPACE SWITCHED\r\n\r\n\
+         Antigravity Manager transitioned active tasks from '{}' to '{}'.\r\n\r\n\
+         Reason: {}\r\n\r\n\
+         Running prompts and repository states were safely snapshotted to repo_prompts.db.",
         from_instance, to_instance, reason
     );
-    let html = wrap_email_card(
+    let body = wrap_plaintext_email(
         "Profile Migration Notice",
         &content,
         machine_name,
         machine_ip,
     );
-    (subject, html)
+    (subject, body)
 }
 
-/// Render HTML email for idle running projects alert
+/// Render plaintext email for idle running projects alert
 pub fn render_idle_projects_email(
     projects: &[String],
     machine_name: &str,
@@ -511,28 +483,30 @@ pub fn render_idle_projects_email(
     let subject = "[AGM Prompt Request] Running Projects Idle - Ready for Instructions".to_string();
     let mut proj_list = String::new();
     for p in projects {
-        proj_list.push_str(&format!("<li><strong>{}</strong></li>", p));
+        proj_list.push_str(&format!("  - {}\r\n", p));
     }
 
     let content = format!(
-        r#"<p><span class="badge badge-success">IDLE WORKSPACE SENSOR</span></p>
-<p>There are no active prompts currently running in the following active projects:</p>
-<ul>{}</ul>
-<p>Would you like to send something to these projects? Reply to this email with the format:</p>
-<div class="cmd">Subject: Project: &lt;project-name&gt;<br><br>&lt;Your prompt instruction here...&gt;</div>
-<p>Antigravity Manager will read your reply and inject the prompt automatically.</p>"#,
-        proj_list
+        "[*] IDLE WORKSPACE SENSOR\r\n\r\n\
+         There are no active prompts currently running in the following active projects:\r\n\r\n\
+         {}\r\n\
+         Would you like to send something to these projects? Reply to this email with:\r\n\r\n\
+         Subject: sub: {} | proj-<project-name>\r\n\r\n\
+         <Your prompt instruction here...>\r\n\r\n\
+         Antigravity Manager will read your reply and inject the prompt automatically.",
+        proj_list.trim_end(),
+        machine_name
     );
-    let html = wrap_email_card(
+    let body = wrap_plaintext_email(
         "Idle Projects Notification",
         &content,
         machine_name,
         machine_ip,
     );
-    (subject, html)
+    (subject, body)
 }
 
-/// Render HTML email for remote CLI execution results
+/// Render plaintext email for remote CLI execution results
 pub fn render_exec_result_email(
     cmd: &str,
     exit_code: i32,
@@ -541,90 +515,60 @@ pub fn render_exec_result_email(
     machine_ip: &str,
 ) -> (String, String) {
     let subject = format!("[AGM Execution Report] exit: {} - {}", exit_code, cmd);
-    let status_badge = if exit_code == 0 {
-        r#"<span class="badge badge-success">SUCCESS</span>"#
-    } else {
-        r#"<span class="badge badge-warn">FAILED</span>"#
-    };
+    let status = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
 
     let content = format!(
-        r#"<p>{} <strong>Command:</strong> <code>{}</code></p>
-<p><strong>Exit Code:</strong> {}</p>
-<pre style="background: #0f172a; color: #f8fafc; padding: 14px; border-radius: 8px; overflow-x: auto; font-size: 12px;">{}</pre>"#,
-        status_badge, cmd, exit_code, output
+        "[{}] Command: {}\r\n\
+         Exit Code: {}\r\n\r\n\
+         -------------------------------- OUTPUT --------------------------------\r\n\
+         {}\r\n\
+         ------------------------------------------------------------------------",
+        status, cmd, exit_code, output
     );
-    let html = wrap_email_card(
+    let body = wrap_plaintext_email(
         "Command Execution Report",
         &content,
         machine_name,
         machine_ip,
     );
-    (subject, html)
+    (subject, body)
 }
 
-/// Render HTML email for help cheat sheet
+/// Render plaintext email for help cheat sheet
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
     let subject = "[AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet".to_string();
     let content = format!(
-        r#"<p>You can remotely command this Antigravity Manager instance by sending emails matching these subjects:</p>
-<table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0;">
-  <thead>
-    <tr style="background: #f1f5f9; text-align: left;">
-      <th style="padding: 8px; border: 1px solid #cbd5e1;">Command Subject</th>
-      <th style="padding: 8px; border: 1px solid #cbd5e1;">Body Content</th>
-      <th style="padding: 8px; border: 1px solid #cbd5e1;">Action Triggered</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>Project: &lt;name&gt;</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Prompt instructions</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Injects prompt into running project workspace</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>exec: {}</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">gitmap status</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Runs command on target IP machine & emails back result</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>instance: new</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Profile name or empty</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Launches isolated Antigravity IDE instance</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>rotate: accounts</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty)</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Rotates to next highest quota account profile</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>prompt: &lt;name&gt;</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty or keyword)</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Finds saved prompt by name/keyword and executes it on active workspace</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>status</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty)</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Reports running projects, active prompt queue, and node telemetry</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;"><code>help</code></td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">(Empty)</td>
-      <td style="padding: 8px; border: 1px solid #cbd5e1;">Returns this command cheat sheet</td>
-    </tr>
-  </tbody>
-</table>"#,
-        machine_ip
+        "You can remotely command this Antigravity Manager instance by sending emails\r\n\
+         matching the following pipe-delimited syntax in the subject:\r\n\r\n\
+         Format: sub: [node|ip|ins-X] | proj-{{name}} | <command>\r\n\r\n\
+         Supported Commands & Subject Examples:\r\n\r\n\
+         1. Inject Prompt to Workspace:\r\n\
+            Subject: sub: {} | proj-my-project | prompt\r\n\
+            Body:    <Your prompt instruction here...>\r\n\r\n\
+         2. Execute Command on Target Machine:\r\n\
+            Subject: sub: {} | exec: gitmap status\r\n\
+            Body:    (Optional command arguments)\r\n\r\n\
+         3. Launch New Sandbox Instance:\r\n\
+            Subject: sub: {} | instance: new\r\n\
+            Body:    <profile-name>\r\n\r\n\
+         4. Rotate to Next Highest Quota Account:\r\n\
+            Subject: sub: {} | rotate: accounts\r\n\r\n\
+         5. Query Status Telemetry & Health:\r\n\
+            Subject: sub: {} | status\r\n\r\n\
+         6. Help & Cheat Sheet:\r\n\
+            Subject: sub: {} | help",
+        machine_name, machine_ip, machine_name, machine_name, machine_name, machine_name
     );
-    let html = wrap_email_card(
+    let body = wrap_plaintext_email(
         "Remote Instructions Cheat Sheet",
         &content,
         machine_name,
         machine_ip,
     );
-    (subject, html)
+    (subject, body)
 }
 
-/// Render HTML email for self-test mailbox verification
+/// Render plaintext email for self-test mailbox verification
 pub fn render_self_test_email(
     email: &str,
     machine_name: &str,
@@ -632,22 +576,23 @@ pub fn render_self_test_email(
 ) -> (String, String) {
     let subject = format!("[AGM Test] Mailbox Connection Verified - {}", email);
     let content = format!(
-        r#"<p><span class="badge badge-success">CONNECTION VERIFIED ✓</span></p>
-<p>This is an automated self-test verification email from <strong>Antigravity Manager</strong>.</p>
-<p>Your mailbox account <code>{}</code> successfully authenticated via SMTP, passed credentials check, and delivered this verification message to itself.</p>
-<p>Remote commands, quota notifications, and failover routing are active for this account.</p>"#,
+        "[PASS] CONNECTION VERIFIED\r\n\r\n\
+         This is an automated self-test verification email from Antigravity Manager.\r\n\r\n\
+         Your mailbox account '{}' successfully authenticated via SMTP, passed credentials\r\n\
+         verification, and delivered this plaintext verification message.\r\n\r\n\
+         Remote commands, quota notifications, and failover routing are active for this account.",
         email
     );
-    let html = wrap_email_card(
+    let body = wrap_plaintext_email(
         "Mailbox Self-Test Verification",
         &content,
         machine_name,
         machine_ip,
     );
-    (subject, html)
+    (subject, body)
 }
 
-/// Render HTML email for test ping command verification
+/// Render plaintext email for test ping command verification
 pub fn render_test_ping_email(
     project_name: &str,
     machine_name: &str,
@@ -656,15 +601,15 @@ pub fn render_test_ping_email(
 ) -> (String, String) {
     let subject = format!("[AGM Ping] Test Command Ping: {}", project_name);
     let content = format!(
-        r#"<p><span class="badge badge-info">COMMAND TEST PING</span></p>
-<p>Test ping dispatched for <strong>{}</strong> (epoch: <code>{}</code>).</p>
-<p>Reply to verify remote command handling:</p>
-<div class="cmd">Subject: Project: {}<br><br>echo 'Ping verified!'</div>
-<p>Adaptive fast polling (5-10s) active.</p>"#,
-        project_name, timestamp, project_name
+        "[*] COMMAND TEST PING\r\n\r\n\
+         Test ping dispatched for '{}' (epoch: {}).\r\n\r\n\
+         Reply to this message with a prompt to verify remote execution:\r\n\
+         Subject: sub: {} | proj-{}\r\n\r\n\
+         echo 'Ping verified!'",
+        project_name, timestamp, machine_name, project_name
     );
-    let html = wrap_email_card("Command Test Ping", &content, machine_name, machine_ip);
-    (subject, html)
+    let body = wrap_plaintext_email("Command Test Ping", &content, machine_name, machine_ip);
+    (subject, body)
 }
 
 #[cfg(test)]
@@ -673,9 +618,11 @@ mod tests {
 
     #[test]
     fn test_template_rendering() {
-        let (subj, html) =
+        let (subj, text) =
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
-        assert!(html.contains("192.168.1.50"));
+        assert!(text.contains("192.168.1.50"));
+        assert!(!text.contains("<html"));
+        assert!(!text.contains("<div"));
     }
 }

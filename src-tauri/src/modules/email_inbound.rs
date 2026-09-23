@@ -771,6 +771,36 @@ pub fn execute_inbound_action(
         return Ok(debounced_msg);
     }
 
+    // 2b. SQLite 10-Minute Rate Limit for Heavy Actions
+    let is_heavy_action = matches!(
+        action,
+        InboundAction::AccountRotate
+            | InboundAction::SystemClean { .. }
+            | InboundAction::UpdateExecution { .. }
+    );
+    if is_heavy_action {
+        if let Ok(true) = email_vault_db::is_rate_limited_in_sqlite(&msg.from, &action_slug, 600) {
+            let rate_limited_msg = format!(
+                "Action '{:?}' rate-limited by SQLite audit guard (10-minute cooldown).",
+                action
+            );
+            crate::modules::logger::log_info(&format!("[InboundEmail] {}", rate_limited_msg));
+            let audit = EmailInboundAuditLog {
+                id: Uuid::new_v4().to_string(),
+                message_id: msg.message_id.clone(),
+                sender_email: msg.from.clone(),
+                subject: msg.subject.clone(),
+                action_type: action_slug,
+                action_payload: msg.body.chars().take(255).collect(),
+                execution_status: "rate_limited_10m".to_string(),
+                execution_result: rate_limited_msg.clone(),
+                received_at: now,
+            };
+            let _ = email_vault_db::record_inbound_audit_log(audit);
+            return Ok(rate_limited_msg);
+        }
+    }
+
     let action_str;
     let mut status = "success".to_string();
     let mut result_summary;

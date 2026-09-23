@@ -191,6 +191,7 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             last_used: now,
             is_default: true,
             pid: None,
+            seq_num: Some(1),
         };
 
         let registry = InstanceRegistry {
@@ -222,8 +223,29 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             last_used: now,
             is_default: true,
             pid: None,
+            seq_num: Some(1),
         };
         registry.instances.insert(0, default_instance);
+        let _ = save_registry(&registry);
+    }
+
+    let mut modified = false;
+    let mut current_max = registry
+        .instances
+        .iter()
+        .filter_map(|i| i.seq_num)
+        .max()
+        .unwrap_or(0);
+
+    for inst in registry.instances.iter_mut() {
+        if inst.seq_num.is_none() {
+            current_max += 1;
+            inst.seq_num = Some(current_max);
+            modified = true;
+        }
+    }
+
+    if modified {
         let _ = save_registry(&registry);
     }
 
@@ -357,6 +379,14 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
     fs::create_dir_all(&instance_data_dir)
         .map_err(|e| format!("Failed to create instance directory: {}", e))?;
 
+    let next_seq = registry
+        .instances
+        .iter()
+        .filter_map(|i| i.seq_num)
+        .max()
+        .unwrap_or(0)
+        + 1;
+
     let config = InstanceConfig {
         id: instance_id,
         name: trimmed_name.to_string(),
@@ -369,6 +399,7 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
         last_used: now,
         is_default: false,
         pid: None,
+        seq_num: Some(next_seq),
     };
 
     registry.instances.push(config.clone());
@@ -1172,12 +1203,14 @@ mod tests {
             last_used: 2000,
             is_default: false,
             pid: Some(12345),
+            seq_num: Some(2),
         };
 
         let json = serde_json::to_string(&instance).unwrap();
         let restored: InstanceConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "ubuntu-test");
         assert_eq!(restored.pid, Some(12345));
+        assert_eq!(restored.seq_num, Some(2));
         assert_eq!(
             restored.executable_path,
             Some("/opt/antigravity/antigravity".to_string())

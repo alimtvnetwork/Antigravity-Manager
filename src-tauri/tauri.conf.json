@@ -14,6 +14,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
+        "label": "main",
         "title": "Antigravity Manager Tools",
         "width": 1024,
         "height": 700,

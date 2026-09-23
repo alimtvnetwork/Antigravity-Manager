@@ -331,6 +331,8 @@ struct QuotaBucketDto {
     remaining_fraction: f64,
     reset_time: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    cycle_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
@@ -349,6 +351,7 @@ fn quota_group_to_dto(g: &crate::models::quota::QuotaGroup) -> QuotaGroupDto {
                 window: b.window.clone(),
                 remaining_fraction: b.remaining_fraction,
                 reset_time: b.reset_time.clone(),
+                cycle_tokens: b.cycle_tokens,
                 display_name: b.display_name.clone(),
                 description: b.description.clone(),
             })
@@ -770,10 +773,18 @@ impl AxumServer {
                 "/proxy/opencode/status",
                 post(admin_get_opencode_sync_status),
             )
+            .route(
+                "/proxy/opencode/providers",
+                get(admin_get_opencode_providers),
+            )
             .route("/proxy/opencode/sync", post(admin_execute_opencode_sync))
             .route(
                 "/proxy/opencode/openai-sync",
                 post(admin_execute_opencode_openai_sync),
+            )
+            .route(
+                "/proxy/opencode/remove-provider",
+                post(admin_execute_opencode_remove_provider),
             )
             .route(
                 "/proxy/opencode/restore",
@@ -833,6 +844,10 @@ impl AxumServer {
             .route(
                 "/proxy/monitor/toggle",
                 post(admin_set_proxy_monitor_enabled),
+            )
+            .route(
+                "/proxy/monitor/health-logs/toggle",
+                post(admin_set_proxy_capture_health_logs),
             )
             .route(
                 "/proxy/cloudflared/status",
@@ -1011,9 +1026,20 @@ impl AxumServer {
             app
         };
 
-        // Bind address (uses socket2 with SO_REUSEADDR to prevent port collision and TIME_WAIT retention)
+        // Bind address (uses socket2 with SO_REUSEADDR and dual-stack IPv4/IPv6 support)
         let listener = bind_tcp_listener(&host, port)?;
-        tracing::info!("API proxy server started on http://{}:{}", host, port);
+        let display_host = if host == "0.0.0.0" || host == "::" || host == "[::]" {
+            "0.0.0.0 / [::] (IPv4/IPv6 Dual-Stack)".to_string()
+        } else if host.contains(':') && !host.starts_with('[') {
+            format!("[{}]", host)
+        } else {
+            host.to_string()
+        };
+        tracing::info!(
+            "API proxy server started on http://{}:{}",
+            display_host,
+            port
+        );
 
         // Create unified cancellation token
         let cancel_token = tokio_util::sync::CancellationToken::new();
@@ -1053,11 +1079,23 @@ impl AxumServer {
                             Ok((stream, remote_addr)) => {
                                 let io = TokioIo::new(stream);
 
-                                // Inject ConnectInfo (for resolving client IP)
+                                // If IPv4-mapped IPv6 address (e.g. ::ffff:192.168.1.1), normalize to native IPv4
+                                let normalized_remote_addr = match remote_addr {
+                                    std::net::SocketAddr::V6(v6_addr) => {
+                                        if let Some(v4) = v6_addr.ip().to_ipv4_mapped() {
+                                            std::net::SocketAddr::V4(std::net::SocketAddrV4::new(v4, v6_addr.port()))
+                                        } else {
+                                            std::net::SocketAddr::V6(v6_addr)
+                                        }
+                                    }
+                                    v4_addr => v4_addr,
+                                };
+
+                                // Inject ConnectInfo (for resolving real IP)
                                 use tower::ServiceExt;
                                 use hyper::body::Incoming;
                                 let app_with_info = app.clone().map_request(move |mut req: axum::http::Request<Incoming>| {
-                                    req.extensions_mut().insert(axum::extract::ConnectInfo(remote_addr));
+                                    req.extensions_mut().insert(axum::extract::ConnectInfo(normalized_remote_addr));
                                     req
                                 });
 
@@ -1112,16 +1150,10 @@ impl AxumServer {
     }
 }
 
-/// Bind TCP listener with SO_REUSEADDR to prevent TIME_WAIT socket errors on restart
-fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, String> {
-    use std::net::ToSocketAddrs;
-    let addr_str = format!("{}:{}", host, port);
-    let socket_addr = addr_str
-        .to_socket_addrs()
-        .map_err(|e| format!("Failed to resolve address {}: {}", addr_str, e))?
-        .next()
-        .ok_or_else(|| format!("Failed to resolve address: {}", addr_str))?;
-
+/// Binds a single socket address (IPv4 or specific IPv6)
+fn bind_single_socket(
+    socket_addr: std::net::SocketAddr,
+) -> Result<tokio::net::TcpListener, String> {
     let domain = if socket_addr.is_ipv6() {
         socket2::Domain::IPV6
     } else {
@@ -1129,7 +1161,7 @@ fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, S
     };
 
     let socket = socket2::Socket::new(domain, socket2::Type::STREAM, Some(socket2::Protocol::TCP))
-        .map_err(|e| format!("Failed to create socket ({}): {}", addr_str, e))?;
+        .map_err(|e| format!("Failed to create socket ({}): {}", socket_addr, e))?;
 
     // Enable SO_REUSEADDR on Windows/Unix to prevent WSAEADDRINUSE (10048) on restarts
     let _ = socket.set_reuse_address(true);
@@ -1139,23 +1171,117 @@ fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, S
 
     socket
         .set_nonblocking(true)
-        .map_err(|e| format!("Failed to set non-blocking mode ({}): {}", addr_str, e))?;
+        .map_err(|e| format!("Failed to set non-blocking mode ({}): {}", socket_addr, e))?;
 
     socket
         .bind(&socket_addr.into())
-        .map_err(|e| format!("Failed to bind address {}: {}", addr_str, e))?;
+        .map_err(|e| format!("Failed to bind address {}: {}", socket_addr, e))?;
 
     socket
         .listen(1024)
-        .map_err(|e| format!("Failed to listen on address {}: {}", addr_str, e))?;
+        .map_err(|e| format!("Failed to listen on address {}: {}", socket_addr, e))?;
 
     let std_listener: std::net::TcpListener = socket.into();
     tokio::net::TcpListener::from_std(std_listener).map_err(|e| {
         format!(
             "Failed to convert to Tokio TcpListener ({}): {}",
-            addr_str, e
+            socket_addr, e
         )
     })
+}
+
+/// Binds IPv6/IPv4 dual-stack wildcard listener ([::]:port), accepting both IPv6 and IPv4 on a single socket
+fn bind_dual_stack_socket(port: u16) -> Result<tokio::net::TcpListener, String> {
+    use std::net::{Ipv6Addr, SocketAddr, SocketAddrV6};
+
+    let socket = socket2::Socket::new(
+        socket2::Domain::IPV6,
+        socket2::Type::STREAM,
+        Some(socket2::Protocol::TCP),
+    )
+    .map_err(|e| format!("Failed to create IPv6 dual-stack socket: {}", e))?;
+
+    // Critical: Windows defaults only_v6 to true, must explicitly set false for dual-stack IPv4 acceptance
+    if let Err(e) = socket.set_only_v6(false) {
+        return Err(format!(
+            "Failed to enable dual-stack support (set_only_v6(false)): {}",
+            e
+        ));
+    }
+
+    let _ = socket.set_reuse_address(true);
+
+    #[cfg(unix)]
+    let _ = socket.set_reuse_port(true);
+
+    socket
+        .set_nonblocking(true)
+        .map_err(|e| format!("Failed to set non-blocking mode: {}", e))?;
+
+    let addr = SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, port, 0, 0));
+    socket
+        .bind(&addr.into())
+        .map_err(|e| format!("Failed to bind dual-stack address [::]:{}: {}", port, e))?;
+
+    socket.listen(1024).map_err(|e| {
+        format!(
+            "Failed to listen on dual-stack address [::]:{}: {}",
+            port, e
+        )
+    })?;
+
+    let std_listener: std::net::TcpListener = socket.into();
+    tokio::net::TcpListener::from_std(std_listener).map_err(|e| {
+        format!(
+            "Failed to convert to Tokio TcpListener ([::]:{}): {}",
+            port, e
+        )
+    })
+}
+
+/// Binds TCP listener with SO_REUSEADDR and dual-stack IPv6/IPv4 wildcard support
+fn bind_tcp_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, String> {
+    let clean_host = host.trim_matches('[').trim_matches(']');
+    let is_wildcard = clean_host == "0.0.0.0" || clean_host == "::";
+
+    if is_wildcard {
+        // Try binding in IPv6 / IPv4 dual-stack mode on [::]:port
+        match bind_dual_stack_socket(port) {
+            Ok(listener) => {
+                tracing::info!(
+                    "TCP listener ready on [::]:{} (IPv6/IPv4 dual-stack mode)",
+                    port
+                );
+                return Ok(listener);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "IPv6 dual-stack bind failed ({}), gracefully falling back to IPv4 listener (0.0.0.0:{})",
+                    e,
+                    port
+                );
+            }
+        }
+        // Graceful fallback to IPv4 0.0.0.0
+        let v4_addr =
+            std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), port);
+        return bind_single_socket(v4_addr);
+    }
+
+    // Exact address binding (e.g. 127.0.0.1, ::1, or specific interface IP)
+    use std::net::ToSocketAddrs;
+    let addr_str = if clean_host.contains(':') {
+        format!("[{}]:{}", clean_host, port)
+    } else {
+        format!("{}:{}", clean_host, port)
+    };
+    let socket_addr = addr_str
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve address {}: {}", addr_str, e))?
+        .next()
+        .ok_or_else(|| format!("Failed to resolve address: {}", addr_str))?;
+
+    bind_single_socket(socket_addr)
 }
 
 // ===== API Handlers (delegated to src/proxy/handlers/*) =====
@@ -1953,6 +2079,26 @@ async fn admin_start_proxy_service(State(state): State<AppState>) -> impl IntoRe
     let mut running = state.is_running.write().await;
     *running = true;
     logger::log_info("[API] Proxy service enabled (persisted)");
+    StatusCode::OK
+}
+
+async fn admin_set_proxy_capture_health_logs(
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let enabled = payload
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    if state.monitor.is_capture_health_logs() != enabled {
+        state.monitor.set_capture_health_logs(enabled);
+        logger::log_info(&format!(
+            "[API] Health check capture logging state set to: {}",
+            enabled
+        ));
+    }
+
     StatusCode::OK
 }
 
@@ -4182,11 +4328,48 @@ async fn admin_execute_opencode_openai_sync(
     .await
     .map(|_| StatusCode::OK)
     .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse { error: e }),
-        )
+        let status = if crate::proxy::opencode_sync::is_provider_validation_error(&e) {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        (status, Json(ErrorResponse { error: e }))
     })
+}
+
+async fn admin_get_opencode_providers(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::opencode_sync::get_opencode_providers()
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpencodeRemoveProviderRequest {
+    provider_id: String,
+}
+
+async fn admin_execute_opencode_remove_provider(
+    Json(payload): Json<OpencodeRemoveProviderRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::opencode_sync::execute_opencode_remove_provider(payload.provider_id)
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            let status = if crate::proxy::opencode_sync::is_provider_validation_error(&e) {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ErrorResponse { error: e }))
+        })
 }
 
 async fn admin_execute_opencode_restore(
@@ -4466,5 +4649,16 @@ mod image_scheduler_tests {
         let listener2 = super::bind_tcp_listener("127.0.0.1", port)
             .expect("immediate re-bind must succeed with SO_REUSEADDR");
         drop(listener2);
+    }
+
+    #[tokio::test]
+    async fn test_bind_tcp_listener_wildcard_dual_stack() {
+        let port = 18100;
+        let listener = super::bind_tcp_listener("0.0.0.0", port)
+            .expect("wildcard dual-stack bind should succeed");
+        drop(listener);
+        let listener_v6 = super::bind_tcp_listener("::", port)
+            .expect("wildcard v6 dual-stack bind should succeed");
+        drop(listener_v6);
     }
 }

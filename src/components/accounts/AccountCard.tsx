@@ -10,6 +10,7 @@ import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { formatDateTime } from '../../utils/date';
+import { getModelQuotaDisplay } from '../../utils/quotaDisplay';
 
 interface AccountCardProps {
     account: Account;
@@ -142,10 +143,10 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
     const weeklyItems = useMemo(() => {
         if (quotaWindow !== 'weekly') return [];
         return (account.quota?.quota_groups || []).flatMap(group => {
-            return group.buckets
+            return (group.buckets || [])
                 .filter(b => b.window.toLowerCase().includes('week') || b.bucket_id.toLowerCase().includes('week'))
                 .map(b => {
-                    const shortGroupName = group.display_name
+                    const shortGroupName = (group.display_name || '')
                         .replace(/ models?$/i, '')
                         .replace(/Claude and GPT/i, 'Claude/GPT');
                     const weeklySuffix = t('accounts.quota_window_weekly_short', 'Semanal');
@@ -154,6 +155,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         label: b.display_name ? `${shortGroupName} (${b.display_name})` : `${shortGroupName} (${weeklySuffix})`,
                         percentage: Math.round((b.remaining_fraction || 0) * 100),
                         resetTime: b.reset_time,
+                        cycleTokens: b.cycle_tokens,
                         Icon: shortGroupName.toLowerCase().includes('claude') ? Sparkles : Bot,
                     };
                 });
@@ -165,52 +167,6 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         if (!key) return false;
         return account.protected_models?.includes(key);
     };
-
-    // Calculate model effective quota (considering weekly quota constraints)
-    const getModelEffectiveQuota = (modelId: string, modelData?: { percentage: number; reset_time?: string }) => {
-        if (!account.quota?.quota_groups || account.quota.quota_groups.length === 0) {
-            return {
-                percentage: modelData?.percentage || 0,
-                resetTime: modelData?.reset_time,
-                isWeeklyConstrained: false,
-            };
-        }
-        const nameLower = modelId.toLowerCase();
-        const isClaudeOrGpt = nameLower.startsWith('claude') || nameLower.startsWith('gpt');
-        const isGemini = nameLower.startsWith('gemini');
-
-        for (const group of account.quota.quota_groups) {
-            const gname = group.display_name.toLowerCase();
-            const isOtherProvider = gname.includes('claude') || gname.includes('gpt') || gname.includes('3p');
-            const matches = isClaudeOrGpt
-                ? isOtherProvider
-                : isGemini
-                ? gname.includes('gemini') || !isOtherProvider
-                : false;
-
-            if (matches) {
-                const weeklyBucket = group.buckets.find(b =>
-                    b.window?.toLowerCase().includes('week') || b.bucket_id?.toLowerCase().includes('week') || b.window?.toLowerCase().includes('7d')
-                );
-                if (weeklyBucket) {
-                    if ((weeklyBucket.remaining_fraction ?? 1) <= 0.001) {
-                        return {
-                            percentage: 0,
-                            resetTime: weeklyBucket.reset_time,
-                            isWeeklyConstrained: true,
-                        };
-                    }
-                }
-            }
-        }
-
-        return {
-            percentage: modelData?.percentage || 0,
-            resetTime: modelData?.reset_time,
-            isWeeklyConstrained: false,
-        };
-    };
-
     return (
         <div className={cn(
             "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-150 hover:shadow-md",
@@ -359,25 +315,21 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                     label={item.label}
                                     percentage={item.percentage}
                                     resetTime={item.resetTime}
+                                    weeklyTokens={item.cycleTokens ?? null}
                                     Icon={item.Icon}
                                 />
                             ))
                         ) : (
-                            displayModels.map((model) => {
-                                const effective = getModelEffectiveQuota(model.id, model.data);
-                                return (
-                                    <QuotaItem
-                                        key={model.id}
-                                        label={model.label}
-                                        percentage={effective.percentage}
-                                        resetTime={effective.resetTime}
-                                        isProtected={isModelProtected(model.protectedKey)}
-                                        liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
-                                        isWeeklyConstrained={effective.isWeeklyConstrained}
-                                        Icon={model.Icon}
-                                    />
-                                );
-                            })
+                            displayModels.map((model) => (
+                                <QuotaItem
+                                    key={model.id}
+                                    label={model.label}
+                                    {...getModelQuotaDisplay(model.id, model.data, account.quota?.quota_groups)}
+                                    isProtected={isModelProtected(model.protectedKey)}
+                                    liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
+                                    Icon={model.Icon}
+                                />
+                            ))
                         )}
                     </div>
                 )}
@@ -485,6 +437,30 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                             <Tag className="w-3.5 h-3.5" />
                         </button>
                     )}
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('classic'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
+                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
+                        disabled={isSwitching || isDisabled}
+                    >
+                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                    </button>
                     {onWarmup && (
                         <button
                             className={`p-1.5 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}

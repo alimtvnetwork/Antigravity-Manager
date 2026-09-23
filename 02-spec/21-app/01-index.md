@@ -131,6 +131,7 @@ The complete reverse-engineered architecture is documented across the following 
 | [18-smart-multi-factor-scoring-pre-activation-refresh-and-ui-telemetry.md](18-smart-multi-factor-scoring-pre-activation-refresh-and-ui-telemetry.md) | Smart Multi-Factor Scoring & UI Telemetry | Multi-factor account scoring ($S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$), randomized tie-breaking, pre-activation refresh verification loop, window controls ACL bridge, and XPath event tracking |
 | [19-inbound-email-remote-control-and-agm-cli.md](19-inbound-email-remote-control-and-agm-cli.md) | Inbound Email Remote Control & AGM Native Terminal CLI | Universal pipe-delimited email command grammar, 2-phase plaintext ACK/Result receipts, 10s sliding debounce stack, sender ACL, and native `agm` terminal CLI |
 | [20-agm-cli-expanded-commands.md](20-agm-cli-expanded-commands.md) | AGM CLI Expanded Commands Suite | Extended CLI command suite (doctor, accounts, switch, prompts, proxy, sync, pull, clean, logs) mirroring GitMap |
+| [21-pr4-upstream-sync-merge-and-architecture-protection.md](21-pr4-upstream-sync-merge-and-architecture-protection.md) | PR #4 Upstream Sync & Architecture Protection | Assimilating upstream features, preserving superior build/versioning/branding, and English translation |
 | [telegram-bot-setup-guide.md](telegram-bot-setup-guide.md) | Telegram Bot Setup & Automated PowerShell Guide | Guide and automated script for Telegram Bot creation, chat ID extraction, credential validation, and alert testing |
 
 ---
@@ -178,3 +179,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-002 (Proxy Conformance):** Endpoints `/v1/chat/completions`, `/v1/messages`, and `/v1beta/models/*` return valid OpenAI/Anthropic/Gemini compliant responses or structured error envelopes.
 - **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`.
 - **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
+- **AC-APP-022 (UI Fluidity & Fleet Invariants):** Implemented in [`22-ui-fluidity-email-remote-instance-fleet-fixes.md`](./22-ui-fluidity-email-remote-instance-fleet-fixes.md).

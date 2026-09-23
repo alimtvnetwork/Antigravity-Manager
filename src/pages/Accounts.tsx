@@ -23,6 +23,7 @@ import DeviceFingerprintDialog from "../components/accounts/DeviceFingerprintDia
 import ModalDialog from "../components/common/ModalDialog";
 import Pagination from "../components/common/Pagination";
 import AccountErrorDialog from "../components/accounts/AccountErrorDialog";
+import { UnifiedBackupModal } from "../components/modals/UnifiedBackupModal";
 import { showToast } from "../components/common/ToastContainer";
 import { exportAccounts } from "../services/accountService";
 import { useAccountStore } from "../stores/useAccountStore";
@@ -171,7 +172,8 @@ function Accounts() {
     }
   };
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [backupModalTab, setBackupModalTab] = useState<"export" | "import">("export");
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -619,128 +621,10 @@ function Accounts() {
     }
   };
 
-  const handleExport = () => {
-    const idsToExport =
-      selectedIds.size > 0
-        ? Array.from(selectedIds)
-        : accounts.map((a) => a.id);
-
-    const accountsToExport = accounts.filter((a) => idsToExport.includes(a.id));
-    exportAccountsToJson(accountsToExport);
-  };
-
   const handleExportOne = (accountId: string) => {
     const account = accounts.find((a) => a.id === accountId);
     if (account) {
       exportAccountsToJson([account]);
-    }
-  };
-
-  const processImportData = async (content: string) => {
-    let importData: Array<{ email?: string; refresh_token?: string }>;
-    try {
-      importData = JSON.parse(content);
-    } catch {
-      showToast(t("accounts.import_invalid_format"), "error");
-      return;
-    }
-
-    if (!Array.isArray(importData) || importData.length === 0) {
-      showToast(t("accounts.import_invalid_format"), "error");
-      return;
-    }
-
-    const validEntries = importData.filter(
-      (item) =>
-        item.refresh_token &&
-        typeof item.refresh_token === "string" &&
-        item.refresh_token.startsWith("1//"),
-    );
-
-    if (validEntries.length === 0) {
-      showToast(t("accounts.import_invalid_format"), "error");
-      return;
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const entry of validEntries) {
-      try {
-        await addAccount(entry.email || "", entry.refresh_token!);
-        successCount++;
-      } catch (error) {
-        console.error("Import account failed:", error);
-        failCount++;
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    if (failCount === 0) {
-      showToast(
-        t("accounts.import_success", { count: successCount }),
-        "success",
-      );
-    } else if (successCount > 0) {
-      showToast(
-        t("accounts.import_partial", {
-          success: successCount,
-          fail: failCount,
-        }),
-        "warning",
-      );
-    } else {
-      showToast(
-        t("accounts.import_fail", { error: "All accounts failed to import" }),
-        "error",
-      );
-    }
-  };
-
-  const handleImportJson = async () => {
-    if (isTauri()) {
-      try {
-        const { open } = await import("@tauri-apps/plugin-dialog");
-        const selected = await open({
-          multiple: false,
-          filters: [
-            {
-              name: "JSON",
-              extensions: ["json"],
-            },
-          ],
-        });
-        if (!selected || typeof selected !== "string") return;
-
-        const content: string = await invoke("read_text_file", {
-          path: selected,
-        });
-        await processImportData(content);
-      } catch (error) {
-        console.error("Import failed:", error);
-        showToast(t("accounts.import_fail", { error: String(error) }), "error");
-      }
-    } else {
-      // Web mode: trigger hidden file input
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const content = await file.text();
-      await processImportData(content);
-    } catch (error) {
-      console.error("Import failed:", error);
-      showToast(t("accounts.import_fail", { error: String(error) }), "error");
-    } finally {
-      // Reset input to allow selecting same file again
-      event.target.value = "";
     }
   };
 
@@ -759,15 +643,6 @@ function Accounts() {
 
   return (
     <div className="h-full flex flex-col px-2.5 sm:px-4 pt-1.5 pb-4 gap-2.5 max-w-7xl mx-auto w-full min-w-0">
-      {/* File input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
-
       {/* Top action bar: search, filters, and action buttons */}
       <div className="flex-none flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 min-w-0 w-full">
         {/* Left controls: search, window, view mode, quota filter */}
@@ -1072,8 +947,11 @@ function Accounts() {
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 self-center mx-1 shrink-0"></div>
 
           <button
-            className="px-2.5 py-2 border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-base-200 transition-colors flex items-center gap-1.5"
-            onClick={handleImportJson}
+            className="px-2.5 py-2 border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-base-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            onClick={() => {
+              setBackupModalTab("import");
+              setIsBackupModalOpen(true);
+            }}
             title={t("accounts.import_json")}
           >
             <Upload className="w-3.5 h-3.5" />
@@ -1083,19 +961,16 @@ function Accounts() {
           </button>
 
           <button
-            className="px-2.5 py-2 border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-base-200 transition-colors flex items-center gap-1.5"
-            onClick={handleExport}
-            title={
-              selectedIds.size > 0
-                ? t("accounts.export_selected", { count: selectedIds.size })
-                : t("common.export")
-            }
+            className="px-2.5 py-2 border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-base-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            onClick={() => {
+              setBackupModalTab("export");
+              setIsBackupModalOpen(true);
+            }}
+            title={t("common.export")}
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">
-              {selectedIds.size > 0
-                ? t("accounts.export_selected", { count: selectedIds.size })
-                : t("common.export")}
+              {t("common.export")}
             </span>
           </button>
         </div>
@@ -1306,6 +1181,13 @@ function Accounts() {
       <AccountErrorDialog
         account={accounts.find(a => a.id === errorAccountId) || null}
         onClose={() => setErrorAccountId(null)}
+      />
+
+      {/* Unified Encrypted Backup Modal */}
+      <UnifiedBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        initialTab={backupModalTab}
       />
     </div>
   );

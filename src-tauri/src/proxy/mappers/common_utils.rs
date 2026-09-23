@@ -1156,57 +1156,6 @@ mod tests {
     }
 }
 
-pub fn sanitize_system_prompt_for_tokens(text: &str) -> String {
-    use regex::Regex;
-    let mut cleaned = text.to_string();
-
-    // [CACHE] Step 1: 剥离动态内容（时间戳、UUID），确保跨请求的前缀一致性
-    // 这对 Gemini 隐式前缀缓存命中至关重要
-    let time_patterns = [
-        r"(?im)^Current (date|time)(\s+is)?\s*:.*$",
-        r"(?im)^Today is\s*:.*$",
-        r"(?im)^Date:\s+\d{4}-\d{2}-\d{2}.*$",
-    ];
-    for pat in &time_patterns {
-        if let Ok(re) = Regex::new(pat) {
-            cleaned = re.replace_all(&cleaned, "").into_owned();
-        }
-    }
-
-    // 剥离 UUID
-    if let Ok(re) = Regex::new(r"\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\b")
-    {
-        cleaned = re.replace_all(&cleaned, "{uuid}").into_owned();
-    }
-
-    // 剥离随机 request/session/trace ID
-    if let Ok(re) = Regex::new(r"\b(req|sid|trace)_[a-f0-9]{6,32}\b") {
-        cleaned = re.replace_all(&cleaned, "{id}").into_owned();
-    }
-
-    // Step 2: Compress massive XML tags injected by thick clients to save tokens
-
-    let tags_to_compress = [
-        "skills_instructions",
-        "skills",
-        "plugins",
-        "subagents",
-        "customizations",
-        "conversation_transcript",
-        "guidelines",
-    ];
-
-    for tag in tags_to_compress.iter() {
-        let pattern = format!(r"(?s)<{}>.*?</{}>", tag, tag);
-        if let Ok(re) = Regex::new(&pattern) {
-            let replacement = format!("<{}>\n[Omitted by Antigravity Proxy to save tokens. Tool definitions remain available.]\n</{}>", tag, tag);
-            cleaned = re.replace_all(&cleaned, replacement).into_owned();
-        }
-    }
-
-    cleaned
-}
-
 /// [FIX] Parse markdown base64 images from text and split into Gemini parts
 /// This prevents base64 reflection bloat where generated images are sent back as huge text strings
 pub fn parse_markdown_images_to_parts(text: &str) -> Vec<Value> {
@@ -1621,4 +1570,180 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
     }
 
     modified
+}
+
+/// Safely truncates a string slice to at most max_bytes, strictly aligning to UTF-8 character boundaries.
+/// If max_bytes falls within a multibyte character, it retreats to the nearest valid character boundary.
+pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+/// Safely truncates a string slice to at most max_chars (Unicode scalar values).
+/// If total char count exceeds max_chars, returns valid slice of the first max_chars.
+pub fn safe_truncate_chars(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        Some((byte_idx, _)) => &s[..byte_idx],
+        None => s,
+    }
+}
+
+/// [JEIKCODE SYNTHETIC USER REMINDER]
+/// Wraps mid-conversation system messages in `<system-reminder>` blocks.
+/// Informs the model that this content is a system background reminder, not user query,
+/// ensuring KV Cache stability by keeping top-level systemInstruction frozen.
+pub fn wrap_in_system_reminder(content: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    if trimmed.starts_with("<system-reminder>") && trimmed.ends_with("</system-reminder>") {
+        return trimmed.to_string();
+    }
+    format!(
+        "<system-reminder>\nBefore the user's request for this turn, the system provides the following reminder for your awareness. Please note that this is from prior system messages, not spoken by the user:\n{}\n</system-reminder>",
+        trimmed
+    )
+}
+
+#[cfg(test)]
+mod defense_tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_gemini_payload_ends_with_user_empty() {
+        let mut payload = json!({
+            "contents": []
+        });
+        assert!(ensure_gemini_payload_ends_with_user(&mut payload));
+        let contents = payload["contents"].as_array().unwrap();
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0]["role"], "user");
+        assert_eq!(
+            contents[0]["parts"][0]["text"],
+            TRANSIT_DEFENSE_FALLBACK_TEXT
+        );
+    }
+
+    #[test]
+    fn test_ensure_gemini_payload_ends_with_user_model_ending() {
+        let mut payload = json!({
+            "request": {
+                "contents": [
+                    { "role": "user", "parts": [{ "text": "hello" }] },
+                    { "role": "model", "parts": [{ "text": "hi there" }] }
+                ]
+            }
+        });
+        assert!(ensure_gemini_payload_ends_with_user(&mut payload));
+        let contents = payload["request"]["contents"].as_array().unwrap();
+        assert_eq!(contents.len(), 3);
+        assert_eq!(contents[2]["role"], "user");
+        assert_eq!(
+            contents[2]["parts"][0]["text"],
+            TRANSIT_DEFENSE_FALLBACK_TEXT
+        );
+    }
+
+    #[test]
+    fn test_ensure_gemini_payload_ends_with_user_no_content() {
+        let mut payload = json!({
+            "contents": [
+                { "role": "user", "parts": [{ "text": "(no content)" }] }
+            ]
+        });
+        assert!(ensure_gemini_payload_ends_with_user(&mut payload));
+        let contents = payload["contents"].as_array().unwrap();
+        assert_eq!(contents.len(), 1);
+        assert_eq!(
+            contents[0]["parts"][0]["text"],
+            TRANSIT_DEFENSE_FALLBACK_TEXT
+        );
+    }
+
+    #[test]
+    fn test_ensure_gemini_payload_ends_with_user_valid_untouched() {
+        let mut payload = json!({
+            "contents": [
+                { "role": "user", "parts": [{ "text": "valid message" }] }
+            ]
+        });
+        assert!(!ensure_gemini_payload_ends_with_user(&mut payload));
+        let contents = payload["contents"].as_array().unwrap();
+        assert_eq!(contents[0]["parts"][0]["text"], "valid message");
+    }
+
+    #[test]
+    fn test_wrap_in_system_reminder() {
+        use super::wrap_in_system_reminder;
+
+        // Empty content returns empty string
+        assert_eq!(wrap_in_system_reminder("   "), "");
+
+        // Raw text gets wrapped with English reminder header
+        let wrapped = wrap_in_system_reminder("Current date: 2026-09-19");
+        assert!(wrapped.starts_with("<system-reminder>\nBefore the user's request for this turn"));
+        assert!(wrapped.contains("Current date: 2026-09-19"));
+        assert!(wrapped.ends_with("</system-reminder>"));
+
+        // Already wrapped content is untouched (no double wrapping)
+        let already = "<system-reminder>\nsome text\n</system-reminder>";
+        assert_eq!(wrap_in_system_reminder(already), already);
+    }
+
+    #[test]
+    fn test_safe_truncate_str_utf8_boundaries() {
+        // "你好世界": each Chinese character is 3 bytes (12 bytes total):
+        // '你': 0..3, '好': 3..6, '世': 6..9, '界': 9..12
+        let text = "你好世界";
+        assert_eq!(safe_truncate_str(text, 0), "");
+        assert_eq!(safe_truncate_str(text, 1), ""); // falls inside '你', retreats to 0
+        assert_eq!(safe_truncate_str(text, 2), ""); // falls inside '你', retreats to 0
+        assert_eq!(safe_truncate_str(text, 3), "你");
+        assert_eq!(safe_truncate_str(text, 4), "你"); // falls inside '好', retreats to 3
+        assert_eq!(safe_truncate_str(text, 5), "你");
+        assert_eq!(safe_truncate_str(text, 6), "你好");
+        assert_eq!(safe_truncate_str(text, 12), "你好世界");
+        assert_eq!(safe_truncate_str(text, 100), "你好世界");
+
+        // Verify Issue #3493 scenario: 57th byte falls inside a 3-byte character
+        // Construct 55 bytes ASCII + "中文测试" (3 bytes each)
+        // "中文测试" starts at index 55: '中' (55..58)
+        // Index 57 falls directly in middle of '中' (55..58)
+        let mut s3493 = "a".repeat(55);
+        s3493.push_str("中文测试");
+        assert!(!s3493.is_char_boundary(57));
+        let truncated = safe_truncate_str(&s3493, 57);
+        assert_eq!(truncated.len(), 55);
+        assert_eq!(truncated, "a".repeat(55));
+
+        // Emoji test (4 bytes: 🦀 0..4)
+        let emoji = "🦀🦀";
+        assert_eq!(safe_truncate_str(emoji, 2), "");
+        assert_eq!(safe_truncate_str(emoji, 4), "🦀");
+        assert_eq!(safe_truncate_str(emoji, 6), "🦀");
+        assert_eq!(safe_truncate_str(emoji, 8), "🦀🦀");
+    }
+
+    #[test]
+    fn test_safe_truncate_chars_utf8() {
+        let text = "你好世界，Rust编程！";
+        assert_eq!(safe_truncate_chars(text, 0), "");
+        assert_eq!(safe_truncate_chars(text, 2), "你好");
+        assert_eq!(safe_truncate_chars(text, 4), "你好世界");
+        assert_eq!(safe_truncate_chars(text, 5), "你好世界，");
+        assert_eq!(safe_truncate_chars(text, 100), text);
+
+        let emoji_text = "🎉Hello世界🦀";
+        assert_eq!(safe_truncate_chars(emoji_text, 1), "🎉");
+        assert_eq!(safe_truncate_chars(emoji_text, 6), "🎉Hello");
+        assert_eq!(safe_truncate_chars(emoji_text, 8), "🎉Hello世界");
+        assert_eq!(safe_truncate_chars(emoji_text, 9), "🎉Hello世界🦀");
+    }
 }

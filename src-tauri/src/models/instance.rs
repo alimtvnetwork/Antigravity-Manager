@@ -16,6 +16,8 @@ pub struct InstanceConfig {
     pub is_default: bool,
     #[serde(default)]
     pub pid: Option<u32>,
+    #[serde(default)]
+    pub seq_num: Option<u32>,
 }
 
 /// Runtime instance status exposed to frontend and CLI
