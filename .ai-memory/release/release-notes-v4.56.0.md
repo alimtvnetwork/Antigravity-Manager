@@ -1,22 +1,33 @@
 ## Quick Install v4.56.0
 
 ### Windows (PowerShell 5.1+)
+
+#### Direct Latest Install (Auto-Updating)
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
-# Or pinned version:
-irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.ps1 | iex
 ```
 
-### Linux / macOS (Bash)
-```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
-# Or pinned version:
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.56.0/install.sh | bash
+#### Pinned Version Install (v4.56.0)
+```powershell
+irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.56.0/install.ps1 | iex
 ```
 
 ---
 
-## What's Changed in v4.56.0
+### Linux / macOS (Bash)
 
-- **Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery**: Automated release and version synchronization across all manifests.
-- **CI/CD Quality Gates**: 100% green verified across all 36 automated quality gates.
+#### Direct Latest Install (Auto-Updating)
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
+```
+
+#### Pinned Version Install (v4.56.0)
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.56.0/install.sh | bash
+```
+
+---
+
+- **[Release v4.56.0] Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery**:
+    - **Update System**: Automated release and version synchronization across all manifests.
+    - **Enhancements**: Fix E9001 gui_config parse error with self-healing, RwLock synchronization, and backup recovery.

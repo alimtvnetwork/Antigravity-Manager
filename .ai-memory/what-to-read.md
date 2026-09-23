@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-23T13:00:00Z, Memory write: installer multi-version fallback ladder (10 releases), release asset decoupling, quiet aria2c delegation, and bottom-bar reactive update trigger recorded in learned/20-installer-multi-version-fallback-ladder-and-release-blocks.md.
 - 2026-09-22T07:25:00Z, Skills Suite & Memory write: created 6 specialized domain skills for Antigravity-Manager (agm-proxy-engine, agm-thinking-store, agm-multi-instance-sandboxing, agm-split-sqlite-architecture, agm-frontend-react-tauri, agm-email-remote-control) and recorded learned/17-agm-dedicated-domain-skills-suite.md.
 - 2026-09-19T02:00:00Z, Memory write: v4.18.0 email management, split security vault DB, bidirectional remote control, 20 CI/CD RCAs, and quality resilience recorded in learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md.
 - 2026-09-18T09:00:00Z, Memory write: v4.17.0 architecture, SQLite L2 tool signatures, test suite resilience, 17 CI/CD RCAs, and .ai-memory migration recorded in learned/15-v4-17-0-architecture-sqlite-tool-signatures-and-test-resilience.md.
@@ -43,6 +44,7 @@
 - .ai-memory/memory/learned/17-gitmap-search-and-llm-commands-protocol.md, why: elimination of broad recursive OS filesystem scans in favor of GitMap indexed search
 - .ai-memory/memory/learned/18-ruby-homebrew-cask-architecture.md, why: Homebrew Cask package definition architecture and release distribution
 - .ai-memory/memory/learned/19-agm-dedicated-domain-skills-suite.md, why: dedicated AGM domain skills suite covering reverse proxy, thinking store, multi-instance sandboxing, split SQLite databases, React UI, and email remote control
+- .ai-memory/memory/learned/20-installer-multi-version-fallback-ladder-and-release-blocks.md, why: installer multi-version fallback ladder, quiet aria2c delegation, release asset decoupling, and bottom-bar update trigger
 - `02-spec/21-app/01-index.md`, why: master index of application specifications, architecture guides, token capture sequences, and multi-instance blueprints
 - `.ai-memory/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.ai-memory/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony

@@ -9,6 +9,7 @@ interface PaginationProps {
     itemsPerPage: number;
     onPageSizeChange?: (pageSize: number) => void;  // 新增:分页大小变更回调
     pageSizeOptions?: number[];  // 新增:可选的分页大小选项
+    centerContent?: React.ReactNode;
 }
 
 function Pagination({
@@ -18,7 +19,8 @@ function Pagination({
     totalItems,
     itemsPerPage,
     onPageSizeChange,
-    pageSizeOptions = [10, 20, 50, 100]
+    pageSizeOptions = [10, 20, 50, 100],
+    centerContent
 }: PaginationProps) {
     const { t } = useTranslation();
 
@@ -89,6 +91,13 @@ function Pagination({
                         </div>
                     )}
                 </div>
+
+                {centerContent && (
+                    <div className="flex items-center justify-center">
+                        {centerContent}
+                    </div>
+                )}
+
                 <div>
                     <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                         <button

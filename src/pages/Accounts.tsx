@@ -27,6 +27,7 @@ import { showToast } from "../components/common/ToastContainer";
 import { exportAccounts } from "../services/accountService";
 import { useAccountStore } from "../stores/useAccountStore";
 import { useConfigStore } from "../stores/useConfigStore";
+import { useUpdateStore } from "../stores/use-update-store";
 import { Account } from "../types/account";
 import { cn } from "../utils/cn";
 import { isTauri } from "../utils/env";
@@ -58,6 +59,7 @@ function Accounts() {
     updateAccountLabel,
   } = useAccountStore();
   const { config, showAllQuotas, toggleShowAllQuotas } = useConfigStore();
+  const { updateInfo, setShowNotification } = useUpdateStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -1178,6 +1180,22 @@ function Accounts() {
               setCurrentPage(1); // Reset to first page
             }}
             pageSizeOptions={[10, 20, 50, 100]}
+            centerContent={
+              updateInfo?.has_update ? (
+                <button
+                  type="button"
+                  onClick={() => setShowNotification(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 group"
+                  title="A newer version is available. Click to view and install."
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500 group-hover:rotate-12 transition-transform" />
+                  <span>Update Available: v{updateInfo.latest_version}</span>
+                  <span className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded font-semibold ml-0.5">
+                    Install Now
+                  </span>
+                </button>
+              ) : null
+            }
           />
         </div>
       )}

@@ -258,7 +258,7 @@ resolve_pinned_version() {
         candidates+=("$(tail -n 15 "${HOME}/.zsh_history" 2>/dev/null || true)")
     fi
 
-    local regex='(Antigravity-Manager|agm-alim|antigravity|gitmap).*(releases/download/|raw\.githubusercontent\.com/[^/]+/[^/]+/)v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
+    local regex='(releases/download/|raw\.githubusercontent\.com/[^/]+/(Antigravity-Manager|agm-alim|antigravity|gitmap)/|raw\.githubusercontent\.com/[^/]+/[^/]+/)v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)/'
     for entry in "${candidates[@]}"; do
         if [[ "$entry" =~ $regex ]]; then
             VERSION="${BASH_REMATCH[3]}"
@@ -495,7 +495,17 @@ fetch_api_release_tags() {
 }
 
 discover_api_candidates() {
-    if [[ ${MANIFEST_LOADED:-0} -eq 1 ]]; then
+    local is_manifest_stale=0
+    if [[ ${MANIFEST_LOADED:-0} -eq 1 && -n "${CURRENT_VERSION:-}" && ${#CANDIDATE_VERSIONS[@]} -gt 0 ]]; then
+        local top_ver="${CANDIDATE_VERSIONS[0]}"
+        local lowest
+        lowest=$(printf "%s\n%s\n" "$top_ver" "$CURRENT_VERSION" | sort -V | head -n1)
+        if [[ "$lowest" == "$top_ver" ]]; then
+            is_manifest_stale=1
+            info "Cached CDN manifest version (v$top_ver) is not newer than current installed version (v$CURRENT_VERSION); querying live GitHub releases..."
+        fi
+    fi
+    if [[ ${MANIFEST_LOADED:-0} -eq 1 && $is_manifest_stale -eq 0 ]]; then
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 5 ]]; then
             return 0
         fi
@@ -515,7 +525,7 @@ discover_api_candidates() {
 }
 
 populate_fallback_candidates() {
-    local fallbacks=("4.60.0" "4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
+    local fallbacks=("4.65.0" "4.64.0" "4.63.0" "4.62.0" "4.61.0" "4.60.0" "4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
             break

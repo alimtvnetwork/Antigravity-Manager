@@ -107,19 +107,35 @@
 
 Our universal installation script detects your operating system, CPU architecture (`x86_64` or `aarch64`), and available package manager to install the latest stable binary.
 
-#### Linux & macOS (Bash)
-```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
-```
+#### Windows (PowerShell 5.1+)
 
-#### Windows (PowerShell)
+##### Direct Latest Install (Auto-Updating)
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
+##### Pinned Version Install (v4.65.0)
+```powershell
+irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 | iex
+```
+
+---
+
+#### Linux & macOS (Bash)
+
+##### Direct Latest Install (Auto-Updating)
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
+```
+
+##### Pinned Version Install (v4.65.0)
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh | bash
+```
+
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.34.0`
+> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.65.0`
 > - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
 
 ---
@@ -131,11 +147,11 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.65.0** (Latest) | 2026-09-23 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.sh \| bash` | `git checkout v4.65.0` |
-| **v4.64.0** | 2026-09-23 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.sh \| bash` | `git checkout v4.64.0` |
-| **v4.63.0** | 2026-09-23 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.sh \| bash` | `git checkout v4.63.0` |
-| **v4.57.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.sh \| bash` | `git checkout v4.57.0` |
-| **v4.56.0** | 2026-09-22 | 🟢 Verified | `irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.65.0/install.sh \| bash` | `git checkout v4.56.0` |
+| **v4.65.0** (Latest) | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh \| bash` | `git checkout v4.65.0` |
+| **v4.64.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.sh \| bash` | `git checkout v4.64.0` |
+| **v4.63.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.sh \| bash` | `git checkout v4.63.0` |
+| **v4.57.0** | 2026-09-22 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.57.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.57.0/install.sh \| bash` | `git checkout v4.57.0` |
+| **v4.56.0** | 2026-09-22 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.56.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.56.0/install.sh \| bash` | `git checkout v4.56.0` |
 <!-- STAMP:VERSION_PIN_TABLE_END -->
 
 #### How to Pin or Rollback Releases
@@ -143,22 +159,22 @@ This version pinning matrix allows developers, enterprise deployments, and users
 1. **CLI Parameter Pinning:**
    - **Windows:**
      ```powershell
-     .\install.ps1 -Version "4.57.0"
+     .\install.ps1 -Version "4.65.0"
      ```
    - **Linux & macOS:**
      ```bash
-     curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.57.0
+     curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.65.0
      ```
 
 2. **Git Workspace Pinning:**
    - Switch your local cloned codebase directly to any historical checkpoint:
      ```bash
      git fetch --tags
-     git checkout tags/v4.57.0
+     git checkout tags/v4.65.0
      ```
 
 > [!NOTE]
-> The installer automatically detects pinned release URLs and honors the requested release version, falling back through up to 4 historical candidate releases if target assets cannot be retrieved.
+> The installer automatically detects pinned release URLs and honors the requested release version, falling back through up to 10 historical candidate releases if target assets cannot be retrieved.
 
 ---
 

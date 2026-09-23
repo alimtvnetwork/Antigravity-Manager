@@ -204,10 +204,10 @@ function Resolve-PinnedVersion {
     }
     $entries = Get-InvocationHistoryCandidates
     # Strictly scope to Antigravity-Manager or agm-alim URLs so unrelated command lines never pollute version
-    $regex = '(?i)(Antigravity-Manager|agm-alim|antigravity).*(?:releases/download/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/'
+    $regex = '(?i)(?:releases/download/|raw\.githubusercontent\.com/[^/]+/(?:Antigravity-Manager|agm-alim|antigravity)/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/'
     foreach ($entry in $entries) {
         if ($entry -match $regex) {
-            $detected = $Matches[2]
+            $detected = $Matches[1]
             $parts = $detected.Split("-")[0].Split(".")
             if ($parts.Length -eq 2) {
                 $detected = "$detected.0"
@@ -719,35 +719,77 @@ function Get-InstalledVersion {
     return ""
 }
 
+function Convert-ToSemVer {
+    param([string]$v)
+    $clean = $v -replace "^v", ""
+    $parts = $clean.Split("-")[0].Split(".")
+    $major = if ($parts.Length -ge 1) { [int]$parts[0] } else { 0 }
+    $minor = if ($parts.Length -ge 2) { [int]$parts[1] } else { 0 }
+    $patch = if ($parts.Length -ge 3) { [int]$parts[2] } else { 0 }
+    return [version]::new($major, $minor, $patch)
+}
+
 # --- CHECK-UPDATE FLOW ---
 if ($CheckUpdate) {
-    # Step 1: Resolve Release Version quietly
+    $curr = Get-InstalledVersion
+
+    # Step 1: Resolve Release Version quietly (probe rate-limit-free CDN manifest first)
     $TargetVersion = $Version
     if ($TargetVersion) {
         $TargetVersion = $TargetVersion -replace "^v", ""
     } else {
-        $apiEndpoints = @(
-            "https://api.github.com/repos/$Repo/releases",
-            "https://api.github.com/repos/$Repo/releases/latest",
-            "https://api.github.com/repos/$UpstreamRepo/releases",
-            "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+        $manifestEndpoints = @(
+            "https://raw.githubusercontent.com/$Repo/main/releases-manifest.json",
+            "https://github.com/$Repo/releases/latest/download/releases-manifest.json"
         )
-        foreach ($endpoint in $apiEndpoints) {
+        foreach ($mUrl in $manifestEndpoints) {
             try {
-                $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                if ($resp -is [System.Array] -and $resp.Count -gt 0) {
-                    $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
-                    if (-not $candidate) { $candidate = $resp[0] }
-                    if ($candidate -and $candidate.tag_name) {
-                        $TargetVersion = $candidate.tag_name -replace "^v", ""
+                $mResp = Invoke-RestMethod -Uri $mUrl -TimeoutSec 4
+                if ($mResp -and $mResp.releases -and $mResp.releases.Count -gt 0) {
+                    $mTop = $mResp.releases[0].version -replace "^v", ""
+                    if ($curr) {
+                        try {
+                            $tVer = Convert-ToSemVer $mTop
+                            $cVer = Convert-ToSemVer $curr
+                            if ($tVer -gt $cVer) {
+                                $TargetVersion = $mTop
+                                break
+                            }
+                        } catch {}
+                    } else {
+                        $TargetVersion = $mTop
                         break
                     }
-                } elseif ($resp -and $resp.tag_name) {
-                    $TargetVersion = $resp.tag_name -replace "^v", ""
-                    break
                 }
             } catch {}
         }
+
+        # If CDN manifest is not newer than current, check live GitHub API and updater.json
+        if (-not $TargetVersion) {
+            $apiEndpoints = @(
+                "https://api.github.com/repos/$Repo/releases",
+                "https://api.github.com/repos/$Repo/releases/latest",
+                "https://api.github.com/repos/$UpstreamRepo/releases",
+                "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+            )
+            foreach ($endpoint in $apiEndpoints) {
+                try {
+                    $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                    if ($resp -is [System.Array] -and $resp.Count -gt 0) {
+                        $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
+                        if (-not $candidate) { $candidate = $resp[0] }
+                        if ($candidate -and $candidate.tag_name) {
+                            $TargetVersion = $candidate.tag_name -replace "^v", ""
+                            break
+                        }
+                    } elseif ($resp -and $resp.tag_name) {
+                        $TargetVersion = $resp.tag_name -replace "^v", ""
+                        break
+                    }
+                } catch {}
+            }
+        }
+
         if (-not $TargetVersion) {
             try {
                 $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
@@ -757,17 +799,24 @@ if ($CheckUpdate) {
             } catch {}
         }
         if (-not $TargetVersion) {
-            $TargetVersion = "4.30.0"
+            $TargetVersion = "4.65.0"
         }
     }
 
-    $curr = Get-InstalledVersion
     $hasUpdate = $false
     if (-not $curr) {
         if ($TargetVersion) { $hasUpdate = $true }
     } elseif ($TargetVersion) {
-        if ($curr -ne $TargetVersion) {
-            $hasUpdate = $true
+        try {
+            $cVer = Convert-ToSemVer $curr
+            $tVer = Convert-ToSemVer $TargetVersion
+            if ($tVer -gt $cVer) {
+                $hasUpdate = $true
+            }
+        } catch {
+            if ($curr -ne $TargetVersion) {
+                $hasUpdate = $true
+            }
         }
     }
 
@@ -779,16 +828,6 @@ if ($CheckUpdate) {
     }
     $jsonObj | ConvertTo-Json -Compress
     return
-}
-
-function Convert-ToSemVer {
-    param([string]$v)
-    $clean = $v -replace "^v", ""
-    $parts = $clean.Split("-")[0].Split(".")
-    $major = if ($parts.Length -ge 1) { [int]$parts[0] } else { 0 }
-    $minor = if ($parts.Length -ge 2) { [int]$parts[1] } else { 0 }
-    $patch = if ($parts.Length -ge 3) { [int]$parts[2] } else { 0 }
-    return [version]::new($major, $minor, $patch)
 }
 
 function Get-Aria2cPath {
@@ -927,7 +966,8 @@ Write-Host "$LeftPadding    $FullName Installer" -ForegroundColor Cyan
 Write-Host "$LeftPadding========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 1: Discover Available Release Versions & Build 4-Candidate Queue
+# Step 1: Discover Available Release Versions & Build Candidate Queue
+$CurrentVersion = Get-InstalledVersion
 $candidateVersions = [System.Collections.Generic.List[string]]::new()
 $releaseMetadataMap = @{}
 
@@ -1007,8 +1047,20 @@ foreach ($mUrl in $manifestEndpoints) {
     } catch {}
 }
 
-# Tier 2: GitHub REST API (executed if manifest was not reached or yielded insufficient candidates)
-if (-not $manifestLoaded -or $candidateVersions.Count -lt 5) {
+# Tier 2: GitHub REST API (executed if manifest was not reached, yielded insufficient candidates, or manifest is stale)
+$isManifestStale = $false
+if ($manifestLoaded -and $CurrentVersion -and $candidateVersions.Count -gt 0) {
+    try {
+        $topSemVer = Convert-ToSemVer $candidateVersions[0]
+        $curSemVer = Convert-ToSemVer $CurrentVersion
+        if ($topSemVer -le $curSemVer) {
+            $isManifestStale = $true
+            Write-Step "Cached CDN manifest version (v$($candidateVersions[0])) is not newer than current installed version (v$CurrentVersion); querying live GitHub releases..."
+        }
+    } catch {}
+}
+
+if (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale) {
     $apiEndpoints = @()
     if ($isPinned) {
         $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
@@ -1080,7 +1132,7 @@ if ($isPinned) {
 }
 
 # Fallback known historical releases
-$knownFallbacks = @("4.59.0", "4.58.0", "4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
+$knownFallbacks = @("4.65.0", "4.64.0", "4.63.0", "4.62.0", "4.61.0", "4.60.0", "4.59.0", "4.58.0", "4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
 foreach ($kb in $knownFallbacks) {
     if ($candidateVersions.Count -ge 10) { break }
     if (-not $isPinned) {
@@ -1100,10 +1152,17 @@ foreach ($kb in $knownFallbacks) {
     }
 }
 
-# Build multi-version fallback queue (up to 10 releases)
+# Build multi-version fallback queue (up to 10 releases sorted descending by version)
+if ($isPinned -and $cleanPinned) {
+    $remaining = @($candidateVersions | Where-Object { $_ -ne $cleanPinned } | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+    $sortedCandidates = @($cleanPinned) + $remaining
+} else {
+    $sortedCandidates = @($candidateVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+}
+
 $versionQueue = @()
-foreach ($v in $candidateVersions) {
-    if ($versionQueue.Count -lt 10) {
+foreach ($v in $sortedCandidates) {
+    if (-not $versionQueue.Contains($v) -and $versionQueue.Count -lt 10) {
         $versionQueue += $v
     }
 }

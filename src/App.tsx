@@ -16,9 +16,10 @@ import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
 import { UpdateNotification } from './components/UpdateNotification';
 import DebugConsole from './components/debug/DebugConsole';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useConfigStore } from './stores/useConfigStore';
 import { useAccountStore } from './stores/useAccountStore';
+import { useUpdateStore } from './stores/use-update-store';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from './utils/env';
@@ -147,21 +148,17 @@ function App() {
     };
   }, [fetchCurrentAccount, fetchAccounts]);
 
-  // Update notification state
-  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+  // Update notification state from central store
+  const { showNotification, setShowNotification, checkForUpdates } = useUpdateStore();
 
   // Check for updates on startup
   useEffect(() => {
     const checkUpdates = async () => {
       try {
-        console.log('[App] Checking if we should check for updates on startup...');
-        const shouldCheck = await invoke<boolean>('should_check_updates_on_startup');
-        console.log('[App] Should check updates on startup:', shouldCheck);
-
+        const shouldCheck = await invoke<boolean>('should_check_updates_on_startup').catch(() => true);
         if (shouldCheck) {
-          setShowUpdateNotification(true);
-          await invoke('update_last_check_time');
-          console.log('[App] Startup update check initiated and last check time updated.');
+          await checkForUpdates();
+          await invoke('update_last_check_time').catch(() => {});
         }
       } catch (error) {
         console.error('Failed to check update settings:', error);
@@ -171,7 +168,7 @@ function App() {
     // Delay check to avoid blocking initial render
     const timer = setTimeout(checkUpdates, 2000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [checkForUpdates]);
 
   // Initialize global error, unhandled rejection, and click-trail listeners
   useEffect(() => {
@@ -184,8 +181,8 @@ function App() {
       <ThemeManager />
       <DebugConsole />
       <ErrorModal />
-      {showUpdateNotification && (
-        <UpdateNotification onClose={() => setShowUpdateNotification(false)} />
+      {showNotification && (
+        <UpdateNotification onClose={() => setShowNotification(false)} />
       )}
       <RouterProvider router={router} />
     </AdminAuthGuard>

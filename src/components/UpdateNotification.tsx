@@ -3,6 +3,7 @@ import { X, Sparkles, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { useTranslation } from 'react-i18next';
 import { relaunch as tauriRelaunch } from '@tauri-apps/plugin-process';
+import { useUpdateStore } from '../stores/use-update-store';
 
 interface UpdateInfo {
   has_update: boolean;
@@ -20,23 +21,30 @@ interface UpdateNotificationProps {
 
 export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose }) => {
   const { t } = useTranslation();
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const storeInfo = useUpdateStore((state) => state.updateInfo);
+  const checkForUpdates = useUpdateStore((state) => state.checkForUpdates);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(storeInfo);
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [updateState, setUpdateState] = useState<UpdateState>('checking');
+  const [updateState, setUpdateState] = useState<UpdateState>(storeInfo?.has_update ? 'manual' : 'checking');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isInstalling, setIsInstalling] = useState(false);
   const downloadStarted = useRef(false);
 
   useEffect(() => {
-    checkAndDownload();
-  }, []);
+    if (storeInfo?.has_update) {
+      setUpdateInfo(storeInfo);
+      setUpdateState('manual');
+      setTimeout(() => setIsVisible(true), 50);
+    } else {
+      checkAndDownload();
+    }
+  }, [storeInfo]);
 
   const checkAndDownload = async () => {
     try {
-      // 1. Check for updates via backend script or API
-      const info = await invoke<UpdateInfo>('check_update_via_script').catch(() => invoke<UpdateInfo>('check_for_updates'));
-      if (!info.has_update) {
+      const info = await checkForUpdates(true);
+      if (!info || !info.has_update) {
         onClose();
         return;
       }

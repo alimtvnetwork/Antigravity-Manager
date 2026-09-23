@@ -418,6 +418,13 @@ curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v
                     ["gh", "release", "upload", f"v{next_version}", str(manifest_file), "--repo", repo_slug, "--clobber"],
                     check=False,
                 )
+
+        # Enforce asset decoupling: ensure standalone installer scripts are never kept in binary assets
+        for script_name in ["install.ps1", "install.sh"]:
+            run_cmd(
+                ["gh", "release", "delete-asset", f"v{next_version}", script_name, "--repo", repo_slug, "-y"],
+                check=False,
+            )
     except Exception as e:
         print(f"[!] Warning creating GitHub release: {e}")
 
