@@ -270,15 +270,112 @@ resolve_pinned_version() {
     done
 }
 
-# Resolve target version with 4-candidate fallback queue
-get_version() {
-    _is_valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; }
+get_manifest_asset_key() {
+    if [[ "$PLATFORM" == "macos" ]]; then
+        if [[ "$ARCH_LABEL" == "aarch64" ]]; then
+            echo "macos_aarch64_dmg"
+            return 0
+        fi
+        echo "macos_x64_dmg"
+        return 0
+    fi
+    get_linux_manifest_asset_key
+}
 
-    resolve_pinned_version
+get_linux_manifest_asset_key() {
+    if [[ "$PKG_EXT" == "deb" ]]; then
+        if [[ "$DEB_ARCH" == "arm64" ]]; then
+            echo "linux_aarch64_deb"
+            return 0
+        fi
+        echo "linux_amd64_deb"
+        return 0
+    fi
+    get_linux_rpm_or_appimage_asset_key
+}
 
-    local is_pinned=0
+get_linux_rpm_or_appimage_asset_key() {
+    if [[ "$PKG_EXT" == "rpm" ]]; then
+        if [[ "$RPM_ARCH" == "aarch64" ]]; then
+            echo "linux_aarch64_rpm"
+            return 0
+        fi
+        echo "linux_x64_rpm"
+        return 0
+    fi
+    if [[ "$ARCH_LABEL" == "aarch64" ]]; then
+        echo "linux_aarch64_appimage"
+        return 0
+    fi
+    echo "linux_amd64_appimage"
+}
+
+parse_releases_manifest_py() {
+    local py_bin="$1"
+    local key="$2"
+    "$py_bin" -c "
+import json, sys
+try:
+    m = json.load(sys.stdin)
+    k = sys.argv[1]
+    for r in m.get('releases', []):
+        v = r.get('version', '')
+        t = r.get('tag_url', '')
+        a = r.get('assets', {}).get(k, '')
+        print(f'{v}\t{t}\t{a}')
+except Exception:
+    pass
+" "$key" 2>/dev/null
+}
+
+parse_releases_manifest_awk() {
+    local key="$1"
+    awk -v key="\"$key\":" '
+/^[[:space:]]*\{/ { in_obj=1; ver=""; tag_url=""; asset_url="" }
+in_obj && /^[[:space:]]*"version":/ { gsub(/.*"version":[[:space:]]*"|",?[[:space:]]*$/, ""); ver=$0 }
+in_obj && /^[[:space:]]*"tag_url":/ { gsub(/.*"tag_url":[[:space:]]*"|",?[[:space:]]*$/, ""); tag_url=$0 }
+in_obj && $0 ~ key { gsub(/.*:[[:space:]]*"|",?[[:space:]]*$/, ""); asset_url=$0 }
+in_obj && /^[[:space:]]*\},?/ && ver != "" { print ver "\t" tag_url "\t" asset_url; ver=""; tag_url=""; asset_url="" }
+'
+}
+
+parse_releases_manifest() {
+    local key="$1"
+    if python3 -c "import sys; sys.exit(0)" 2>/dev/null; then
+        parse_releases_manifest_py "python3" "$key"
+        return 0
+    fi
+    if python -c "import sys; sys.exit(0)" 2>/dev/null; then
+        parse_releases_manifest_py "python" "$key"
+        return 0
+    fi
+    parse_releases_manifest_awk "$key"
+}
+
+probe_cdn_manifest() {
+    local key
+    key=$(get_manifest_asset_key)
+    local urls=(
+        "https://raw.githubusercontent.com/${REPO}/main/releases-manifest.json"
+        "https://github.com/${REPO}/releases/latest/download/releases-manifest.json"
+    )
+    for u in "${urls[@]}"; do
+        local resp
+        resp=$(curl -fsSL --max-time 4 "$u" 2>/dev/null || true)
+        if [[ -n "$resp" ]]; then
+            echo "$resp" | parse_releases_manifest "$key"
+            return 0
+        fi
+    done
+    return 1
+}
+
+init_candidate_queues() {
     CANDIDATE_VERSIONS=()
-
+    CANDIDATE_TAG_URLS=()
+    CANDIDATE_ASSET_URLS=()
+    IS_PINNED=0
+    CLEAN_PINNED=""
     if [[ -n "${VERSION:-}" ]]; then
         local user_ver="${VERSION#v}"
         if [[ "$user_ver" =~ ^[0-9]+\.[0-9]+$ ]]; then
@@ -286,67 +383,162 @@ get_version() {
         fi
         if _is_valid_version "$user_ver"; then
             CANDIDATE_VERSIONS+=("$user_ver")
-            is_pinned=1
+            CANDIDATE_TAG_URLS+=("https://github.com/${REPO}/releases/tag/v${user_ver}")
+            CANDIDATE_ASSET_URLS+=("")
+            IS_PINNED=1
+            CLEAN_PINNED="$user_ver"
             info "Target pinned release version: v$user_ver"
         fi
     fi
+}
 
-    info "Discovering available release versions from GitHub..."
-
-    local api_urls=()
-    if [[ $is_pinned -eq 1 ]]; then
-        api_urls+=("${GITHUB_API}/tags/v${CANDIDATE_VERSIONS[0]}")
-        api_urls+=("${UPSTREAM_API}/tags/v${CANDIDATE_VERSIONS[0]}")
-    fi
-    api_urls+=(
-        "${GITHUB_API}?per_page=30"
-        "${UPSTREAM_API}?per_page=30"
-    )
-
-    for api_url in "${api_urls[@]}"; do
-        local resp
-        if resp=$(curl -fsSL --max-time 6 -H "User-Agent: Antigravity-Installer" "$api_url" 2>/dev/null); then
-            local tags
-            tags=$(echo "$resp" | grep '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]' || true)
-            while IFS= read -r tag; do
-                if _is_valid_version "$tag"; then
-                    local already_in=0
-                    for cv in "${CANDIDATE_VERSIONS[@]}"; do
-                        if [[ "$cv" == "$tag" ]]; then
-                            already_in=1
-                            break
-                        fi
-                    done
-                    if [[ $already_in -eq 0 ]]; then
-                        CANDIDATE_VERSIONS+=("$tag")
-                    fi
-                fi
-                if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
-                    break 2
-                fi
-            done <<< "$tags"
+is_version_in_candidates() {
+    local target="$1"
+    for cv in "${CANDIDATE_VERSIONS[@]}"; do
+        if [[ "$cv" == "$target" ]]; then
+            return 0
         fi
     done
+    return 1
+}
 
-    # Fallback ladder
-    local fallbacks=("4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
+append_manifest_candidate() {
+    local ver="$1"
+    local tag="$2"
+    local asset="$3"
+    if [[ $IS_PINNED -eq 0 ]]; then
+        if is_version_in_candidates "$ver"; then
+            return 0
+        fi
+        CANDIDATE_VERSIONS+=("$ver")
+        CANDIDATE_TAG_URLS+=("$tag")
+        CANDIDATE_ASSET_URLS+=("$asset")
+        return 0
+    fi
+    append_pinned_manifest_candidate "$ver" "$tag" "$asset"
+}
+
+append_pinned_manifest_candidate() {
+    local ver="$1"
+    local tag="$2"
+    local asset="$3"
+    if [[ "$ver" == "$CLEAN_PINNED" ]]; then
+        CANDIDATE_TAG_URLS[0]="$tag"
+        CANDIDATE_ASSET_URLS[0]="$asset"
+        return 0
+    fi
+    local lowest
+    lowest=$(printf "%s\n%s\n" "$ver" "$CLEAN_PINNED" | sort -V | head -n1)
+    if [[ "$lowest" == "$ver" ]]; then
+        if is_version_in_candidates "$ver"; then
+            return 0
+        fi
+        CANDIDATE_VERSIONS+=("$ver")
+        CANDIDATE_TAG_URLS+=("$tag")
+        CANDIDATE_ASSET_URLS+=("$asset")
+    fi
+}
+
+record_manifest_status() {
+    if [[ ${#CANDIDATE_VERSIONS[@]} -gt 0 ]]; then
+        MANIFEST_LOADED=1
+        info "Discovered releases from CDN manifest (${#CANDIDATE_VERSIONS[@]} versions available, rate-limit free)"
+    fi
+}
+
+discover_manifest_candidates() {
+    info "Discovering available release versions from GitHub..."
+    local manifest_data
+    manifest_data=$(probe_cdn_manifest || true)
+    if [[ -z "$manifest_data" ]]; then
+        return 0
+    fi
+    while IFS=$'\t' read -r m_ver m_tag m_asset; do
+        if _is_valid_version "$m_ver"; then
+            append_manifest_candidate "$m_ver" "$m_tag" "$m_asset"
+        fi
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
+            break
+        fi
+    done <<< "$manifest_data"
+    record_manifest_status
+}
+
+append_api_candidate() {
+    local tag="$1"
+    if is_version_in_candidates "$tag"; then
+        return 0
+    fi
+    CANDIDATE_VERSIONS+=("$tag")
+    CANDIDATE_TAG_URLS+=("https://github.com/${REPO}/releases/tag/v${tag}")
+    CANDIDATE_ASSET_URLS+=("")
+}
+
+fetch_api_release_tags() {
+    local api_url="$1"
+    local resp
+    resp=$(curl -fsSL --max-time 6 -H "User-Agent: Antigravity-Installer" "$api_url" 2>/dev/null || true)
+    if [[ -z "$resp" ]]; then
+        return 0
+    fi
+    local tags
+    tags=$(echo "$resp" | grep '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]' || true)
+    while IFS= read -r tag; do
+        if _is_valid_version "$tag"; then
+            append_api_candidate "$tag"
+        fi
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
+            break
+        fi
+    done <<< "$tags"
+}
+
+discover_api_candidates() {
+    if [[ ${MANIFEST_LOADED:-0} -eq 1 ]]; then
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 5 ]]; then
+            return 0
+        fi
+    fi
+    local api_urls=()
+    if [[ ${IS_PINNED:-0} -eq 1 ]]; then
+        api_urls+=("${GITHUB_API}/tags/v${CLEAN_PINNED}")
+        api_urls+=("${UPSTREAM_API}/tags/v${CLEAN_PINNED}")
+    fi
+    api_urls+=("${GITHUB_API}?per_page=30" "${UPSTREAM_API}?per_page=30")
+    for api_url in "${api_urls[@]}"; do
+        fetch_api_release_tags "$api_url"
+        if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
+            break
+        fi
+    done
+}
+
+populate_fallback_candidates() {
+    local fallbacks=("4.60.0" "4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
             break
         fi
-        local already_in=0
-        for cv in "${CANDIDATE_VERSIONS[@]}"; do
-            if [[ "$cv" == "$fb" ]]; then
-                already_in=1
-                break
-            fi
-        done
-        if [[ $already_in -eq 0 ]]; then
-            CANDIDATE_VERSIONS+=("$fb")
+        if is_version_in_candidates "$fb"; then
+            continue
         fi
+        CANDIDATE_VERSIONS+=("$fb")
+        CANDIDATE_TAG_URLS+=("https://github.com/${REPO}/releases/tag/v${fb}")
+        CANDIDATE_ASSET_URLS+=("")
     done
-
     CANDIDATE_VERSIONS=("${CANDIDATE_VERSIONS[@]:0:10}")
+    CANDIDATE_TAG_URLS=("${CANDIDATE_TAG_URLS[@]:0:10}")
+    CANDIDATE_ASSET_URLS=("${CANDIDATE_ASSET_URLS[@]:0:10}")
+}
+
+# Resolve target version with rate-limit-free CDN manifest and API fallback
+get_version() {
+    _is_valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; }
+    resolve_pinned_version
+    init_candidate_queues
+    discover_manifest_candidates
+    discover_api_candidates
+    populate_fallback_candidates
     RELEASE_VERSION="${CANDIDATE_VERSIONS[0]}"
 }
 
@@ -535,12 +727,14 @@ download_installer() {
     )
 
     # If requested version lacks specific platform package, include known upstream release candidate
-    if [[ "$RELEASE_VERSION" != "$FALLBACK_STABLE_VERSION" && "$PLATFORM" == "linux" ]]; then
-        local fallback_file="Antigravity.Tools_${FALLBACK_STABLE_VERSION}_${DEB_ARCH:-amd64}.deb"
-        if [[ "$PKG_EXT" == "rpm" ]]; then
-            fallback_file="Antigravity.Tools-${FALLBACK_STABLE_VERSION}-1.${RPM_ARCH:-x86_64}.rpm"
+    if [[ "$PLATFORM" == "linux" ]]; then
+        if [[ "$RELEASE_VERSION" != "$FALLBACK_STABLE_VERSION" ]]; then
+            local fallback_file="Antigravity.Tools_${FALLBACK_STABLE_VERSION}_${DEB_ARCH:-amd64}.deb"
+            if [[ "$PKG_EXT" == "rpm" ]]; then
+                fallback_file="Antigravity.Tools-${FALLBACK_STABLE_VERSION}-1.${RPM_ARCH:-x86_64}.rpm"
+            fi
+            candidate_urls+=("https://github.com/${UPSTREAM_REPO}/releases/download/v${FALLBACK_STABLE_VERSION}/${fallback_file}")
         fi
-        candidate_urls+=("https://github.com/${UPSTREAM_REPO}/releases/download/v${FALLBACK_STABLE_VERSION}/${fallback_file}")
     fi
 
     local download_success=0
@@ -1004,7 +1198,11 @@ main() {
     local attempt=0
     local installed_ok=0
 
-    for cand_ver in "${CANDIDATE_VERSIONS[@]}"; do
+    for i in "${!CANDIDATE_VERSIONS[@]}"; do
+        cand_ver="${CANDIDATE_VERSIONS[$i]}"
+        cand_tag_url="${CANDIDATE_TAG_URLS[$i]:-https://github.com/${REPO}/releases/tag/v${cand_ver}}"
+        cand_asset_url="${CANDIDATE_ASSET_URLS[$i]:-}"
+
         attempt=$((attempt + 1))
         if [[ $attempt -gt $max_attempts ]]; then
             break
@@ -1012,8 +1210,15 @@ main() {
 
         echo ""
         step "Installation attempt $attempt of $max_attempts: Release v$cand_ver"
+        info "Release tag URL     : $cand_tag_url"
         RELEASE_VERSION="$cand_ver"
-        build_download_url
+        if [[ -n "$cand_asset_url" ]]; then
+            DOWNLOAD_URL="$cand_asset_url"
+            FILENAME="$(basename "$DOWNLOAD_URL")"
+            info "Package download URL: $DOWNLOAD_URL"
+        else
+            build_download_url
+        fi
 
         if download_installer; then
             remove_previous_installation

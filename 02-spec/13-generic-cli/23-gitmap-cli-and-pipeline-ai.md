@@ -82,18 +82,24 @@ Tight polling loops (`while true { gh run view }`) burn API rate limits, consume
 When installing or updating GitMap and companion tools via standalone scripts, network instability, CDN propagation delays, or platform artifact omissions must never cause fatal aborts.
 
 ### Candidate Selection Algorithm
-1. **Discovery Phase**:
-   - Query GitHub Releases API (`/releases?per_page=30`) and GitHub Tags API.
-   - Collect up to 10 semantic release tags (e.g. `v4.60.0`, `v4.59.0`, `v4.57.0`, ..., `v4.49.0`).
-   - If API queries fail or rate-limit, fallback to an embedded array of verified historical versions.
-2. **Sequential Retreat Loop**:
+1. **Tier-1 CDN Manifest Discovery (`releases-manifest.json`)**:
+   - Installers probe `https://raw.githubusercontent.com/<owner>/<repo>/main/releases-manifest.json` and release asset URLs before issuing unauthenticated GitHub API calls.
+   - Bypasses GitHub API 60 req/hr rate limits completely.
+   - Resolves the last 10 releases, each with `tag_url`, `raw_tag_url`, `release_url`, and pre-computed binary asset download URLs for all operating systems and architectures.
+2. **Tier-2 GitHub API Discovery**:
+   - Query GitHub Releases API (`/releases?per_page=30`) and GitHub Tags API only if the CDN manifest is unreachable.
+   - Fallback to an embedded array of verified historical versions if API queries are exhausted.
+3. **Sequential Retreat Loop & Tag URL Telemetry**:
    - Attempt candidate 1 (latest available version).
+   - Display candidate telemetry:
+     - `Release tag URL     : <tag_url>`
+     - `Package download URL: <asset_url>`
    - If archive download, checksum validation, or execution fails:
      - Log non-fatal warning: `[!] Version vX.Y.Z failed. Retreating to preceding version vX.Y.(Z-1)...`
      - Attempt candidate 2.
      - Continue up to 10 sequential attempts.
    - Exit with success (`0`) as soon as any candidate installs and passes self-verification (`--version` check).
-3. **Pinned Version Override**:
+4. **Pinned Version Override**:
    - If `-Version "4.56.0"` or `--version 4.56.0` is explicitly provided, bypass the ladder and install the exact requested version.
    - Pinned mode must never silently retreat or substitute arbitrary versions.
 

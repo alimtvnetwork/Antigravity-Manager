@@ -406,6 +406,18 @@ curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v
             check=False,
         )
         print(f"[OK] Published GitHub release v{next_version} with Quick Install one-liners.")
+
+        manifest_script = REPO_ROOT / "03-ai-scripts" / "39-generate-releases-manifest.py"
+        if manifest_script.is_file():
+            print("[*] Generating rate-limit-free releases-manifest.json...")
+            run_cmd([sys.executable, str(manifest_script)], check=False)
+            manifest_file = REPO_ROOT / "releases-manifest.json"
+            if manifest_file.is_file():
+                print(f"[*] Uploading releases-manifest.json to release v{next_version}...")
+                run_cmd(
+                    ["gh", "release", "upload", f"v{next_version}", str(manifest_file), "--repo", repo_slug, "--clobber"],
+                    check=False,
+                )
     except Exception as e:
         print(f"[!] Warning creating GitHub release: {e}")
 

@@ -388,6 +388,10 @@ jobs:
             echo "::error::CRITICAL: No executable binary or installer packages found in release-files! Refusing to publish empty release."
             exit 1
           fi
+          # Generate rate-limit-free CDN releases manifest covering last 10 releases and tag URLs
+          python ../03-ai-scripts/39-generate-releases-manifest.py --output releases-manifest.json 2>/dev/null || true
+          cp releases-manifest.json ../releases-manifest.json 2>/dev/null || true
+
           # Generate SHA-256 checksums
           sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true
           cd ..

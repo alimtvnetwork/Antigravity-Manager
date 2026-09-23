@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReleasesManifest",
+  "description": "Schema for rate-limit-free CDN releases manifest consumed by Antigravity-Manager installers.",
+  "type": "object",
+  "required": [
+    "repo",
+    "latest_version",
+    "latest_tag",
+    "latest_tag_url",
+    "latest_raw_tag_url",
+    "releases"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repo": {
+      "type": "string"
+    },
+    "latest_version": {
+      "type": "string"
+    },
+    "latest_tag": {
+      "type": "string"
+    },
+    "latest_tag_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "latest_raw_tag_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "releases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "tag",
+          "tag_url",
+          "raw_tag_url",
+          "release_url",
+          "assets"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "tag_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "raw_tag_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "release_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "published_at": {
+            "type": "string"
+          },
+          "prerelease": {
+            "type": "boolean"
+          },
+          "assets": {
+            "type": "object",
+            "properties": {
+              "windows_x64_setup": { "type": "string" },
+              "windows_x64_zip": { "type": "string" },
+              "windows_x64_msi": { "type": "string" },
+              "macos_x64_dmg": { "type": "string" },
+              "macos_aarch64_dmg": { "type": "string" },
+              "linux_amd64_appimage": { "type": "string" },
+              "linux_aarch64_appimage": { "type": "string" },
+              "linux_amd64_deb": { "type": "string" },
+              "linux_aarch64_deb": { "type": "string" },
+              "linux_x64_rpm": { "type": "string" },
+              "linux_aarch64_rpm": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

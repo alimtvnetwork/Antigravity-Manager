@@ -24,23 +24,37 @@ This specification governs the design, behavior, and release requirements for st
 
 ## 3. Multi-Version Fallback Ladder Architecture
 
-### Candidate Queue Construction
-1. **API Discovery**: Query GitHub API endpoints (`/releases?per_page=30` and `/tags`) to collect up to 10 valid semantic release versions.
-2. **Historical Fallback List**: If the API is rate-limited, blocked, or offline, replenish the queue from an embedded array of known historical releases (e.g., `4.59.0`, `4.58.0`, `4.57.0`, `4.56.0`, etc.).
-3. **Queue Sizing**: The candidate queue maintains a minimum of 5 and a maximum of 10 candidate releases ordered descending by version.
-4. **Execution Ladder Loop**:
-   - The installer attempts to download and verify candidate `i` (Attempt 1 of 10).
-   - If candidate `i` succeeds, the installation completes and exits 0.
-   - If candidate `i` fails (HTTP 404, checksum mismatch, empty package, execution error), the installer catches the failure, logs a warning, and retreats to candidate `i+1`.
-   - Only when all 10 candidates fail does the installer exit with non-zero status.
+### Multi-Tier Candidate Discovery Hierarchy
+
+1. **Tier 1: Rate-Limit-Free CDN Manifest Probe (`releases-manifest.json`)**:
+   - Queries `https://raw.githubusercontent.com/<owner>/<repo>/main/releases-manifest.json` and `https://github.com/<owner>/<repo>/releases/latest/download/releases-manifest.json`.
+   - Immune to unauthenticated GitHub API rate limits (60 requests/hour per IP).
+   - Contains the last 10 releases with `version`, `tag_url`, `raw_tag_url`, `release_url`, and exact pre-computed binary asset URLs (`windows_x64_setup`, `linux_amd64_deb`, `macos_aarch64_dmg`, etc.).
+   - Directly injects exact download URLs, eliminating filename guessing and HTTP 404 penalties.
+2. **Tier 2: GitHub REST API Probe**:
+   - Executed only if Tier 1 is unreachable or yields fewer than 5 candidates.
+   - Queries `/releases?per_page=30` and `/releases/tags/vX.Y.Z`.
+3. **Tier 3: Embedded Historical Fallback List**:
+   - Embedded array of verified historical releases (e.g. `4.60.0`, `4.59.0`, `4.57.0`, ..., `4.7.6`).
+4. **Queue Sizing & Candidate Tag Telemetry**:
+   - The queue maintains up to 10 candidate releases ordered descending by version.
+   - For every attempt, the installer displays the candidate's exact tag URL and package download URL:
+     - `Release tag URL     : https://github.com/<owner>/<repo>/releases/tag/v<version>`
+     - `Package download URL: https://github.com/<owner>/<repo>/releases/download/v<version>/<asset>`
+
+### Execution Ladder Loop
+- The installer attempts to download and verify candidate `i` (Attempt 1 of 10).
+- If candidate `i` succeeds, the installation completes and exits 0.
+- If candidate `i` fails (HTTP 404, checksum mismatch, empty package, execution error), the installer catches the failure, logs a warning, and retreats to candidate `i+1`.
+- Only when all 10 candidates fail does the installer exit with non-zero status.
 
 ```text
-[Candidate Queue: v4.59.0, v4.58.0, v4.57.0, ..., v4.49.0] (Up to 10 releases)
+[Tier 1 CDN Manifest / Tier 2 API: v4.60.0, v4.59.0, v4.57.0, ..., v4.49.0] (Up to 10 releases)
        │
-       ▼ Attempt 1: v4.59.0
+       ▼ Attempt 1: v4.60.0 (Logs Tag URL & Asset URL)
    [Success?] ──Yes──► [Install & Verify] ──► [Exit 0]
-       │ No (404 / hash fail)
-       ▼ Attempt 2: v4.58.0 (Retreat)
+       │ No (404 / hash fail / missing build)
+       ▼ Attempt 2: v4.59.0 (Retreat to preceding release)
    [Success?] ──Yes──► [Install & Verify] ──► [Exit 0]
        │ No
        ▼ Attempt 3: v4.57.0 (Retreat)

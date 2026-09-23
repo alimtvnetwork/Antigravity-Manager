@@ -150,7 +150,9 @@ When the flag is set (or `INSTALL_RUN_FIX_REPO=1`):
 ## 10. Multi-Version Fallback Ladder & Asset Decoupling
 
 1. **Standalone Installer Decoupling:** Standalone installer scripts (`install.ps1`, `install.sh`) MUST NOT be uploaded as binary assets to GitHub Releases. They are distributed exclusively via the repository tree and raw GitHub tag endpoints.
-2. **Resilient 5–10 Version Fallback Ladder:** In implicit/latest mode, installers query GitHub releases/tags and maintain a list of 5 to 10 fallback candidate versions. If downloading or installing the latest version fails, the installer automatically retreats to the previous candidate and retries, up to 10 sequential attempts.
-3. **Dedicated Release Code Blocks:** Every release body MUST format installation commands into isolated Markdown code blocks (one block per variant) with 1-click copy support.
-4. **Mandatory Binary Asset Gate:** Release CI workflows must assert that at least one executable binary asset exists before publishing, preventing empty release pages.
+2. **Tier-1 Rate-Limit-Free CDN Manifest (`releases-manifest.json`):** Installers probe raw CDN endpoints for `releases-manifest.json` before querying GitHub REST APIs. The manifest yields up to 10 releases with pre-mapped platform download URLs and release tag URLs, avoiding unauthenticated rate limit blocks (60 req/hr).
+3. **Resilient 5–10 Version Fallback Ladder:** In implicit/latest mode, installers maintain a list of 5 to 10 fallback candidate versions. If downloading or installing the latest version fails, the installer automatically retreats to the previous candidate and retries, up to 10 sequential attempts.
+4. **Candidate Release Tag URL Telemetry:** For each attempt in the fallback sequence, installers print `Release tag URL : <tag_url>` alongside the package download URL for auditability and transparent developer inspection.
+5. **Dedicated Release Code Blocks:** Every release body MUST format installation commands into isolated Markdown code blocks (one block per variant) with 1-click copy support.
+6. **Mandatory Binary Asset Gate:** Release CI workflows must assert that at least one executable binary asset exists before publishing, preventing empty release pages.
 

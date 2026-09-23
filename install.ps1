@@ -948,60 +948,121 @@ if ($Version) {
 }
 
 Write-Step "Discovering available release versions from GitHub..."
-$apiEndpoints = @()
-if ($isPinned) {
-    $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
-    $apiEndpoints += "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
-}
-$apiEndpoints += @(
-    "https://api.github.com/repos/$Repo/releases?per_page=30",
-    "https://api.github.com/repos/$Repo/releases/latest",
-    "https://api.github.com/repos/$UpstreamRepo/releases?per_page=30",
-    "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+
+# Tier 1: Instant & Rate-Limit-Free CDN Manifest Probe (Last 10 releases + exact asset URLs + tag URLs)
+$manifestAssetUrlMap = @{}
+$manifestTagUrlMap = @{}
+$manifestRawTagUrlMap = @{}
+$manifestLoaded = $false
+
+$manifestEndpoints = @(
+    "https://raw.githubusercontent.com/$Repo/main/releases-manifest.json",
+    "https://github.com/$Repo/releases/latest/download/releases-manifest.json"
 )
 
-foreach ($endpoint in $apiEndpoints) {
+foreach ($mUrl in $manifestEndpoints) {
     try {
-        $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-        if ($resp -is [System.Array]) {
-            foreach ($rel in $resp) {
-                if ($rel.tag_name) {
-                    $tagVer = $rel.tag_name -replace "^v", ""
+        $mResp = Invoke-RestMethod -Uri $mUrl -TimeoutSec 4
+        if ($mResp -and $mResp.releases) {
+            foreach ($rel in $mResp.releases) {
+                $tagVer = $rel.version
+                $manifestTagUrlMap[$tagVer] = $rel.tag_url
+                $manifestRawTagUrlMap[$tagVer] = $rel.raw_tag_url
+
+                $winAsset = $null
+                if ($rel.assets) {
+                    if ($rel.assets.windows_x64_setup) {
+                        $winAsset = $rel.assets.windows_x64_setup
+                    } elseif ($rel.assets.windows_x64_zip) {
+                        $winAsset = $rel.assets.windows_x64_zip
+                    }
+                }
+                if ($winAsset) {
+                    $manifestAssetUrlMap[$tagVer] = $winAsset
+                }
+
+                if (-not $isPinned) {
+                    if (-not $candidateVersions.Contains($tagVer)) {
+                        $candidateVersions.Add($tagVer)
+                    }
+                } else {
+                    try {
+                        $pVer = Convert-ToSemVer $cleanPinned
+                        $tVer = Convert-ToSemVer $tagVer
+                        if ($tVer -lt $pVer) {
+                            if (-not $candidateVersions.Contains($tagVer)) {
+                                $candidateVersions.Add($tagVer)
+                            }
+                        }
+                    } catch {}
+                }
+            }
+            if ($candidateVersions.Count -gt 0) {
+                $manifestLoaded = $true
+                Write-Step "Discovered releases from CDN manifest ($($candidateVersions.Count) versions available, rate-limit free)"
+                break
+            }
+        }
+    } catch {}
+}
+
+# Tier 2: GitHub REST API (executed if manifest was not reached or yielded insufficient candidates)
+if (-not $manifestLoaded -or $candidateVersions.Count -lt 5) {
+    $apiEndpoints = @()
+    if ($isPinned) {
+        $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
+        $apiEndpoints += "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
+    }
+    $apiEndpoints += @(
+        "https://api.github.com/repos/$Repo/releases?per_page=30",
+        "https://api.github.com/repos/$Repo/releases/latest",
+        "https://api.github.com/repos/$UpstreamRepo/releases?per_page=30",
+        "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+    )
+
+    foreach ($endpoint in $apiEndpoints) {
+        try {
+            $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+            if ($resp -is [System.Array]) {
+                foreach ($rel in $resp) {
+                    if ($rel.tag_name) {
+                        $tagVer = $rel.tag_name -replace "^v", ""
+                        if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                            $releaseMetadataMap[$tagVer] = $rel
+                        }
+                        if (-not $isPinned) {
+                            if (-not $candidateVersions.Contains($tagVer)) {
+                                $candidateVersions.Add($tagVer)
+                            }
+                        } else {
+                            try {
+                                $pVer = Convert-ToSemVer $cleanPinned
+                                $cVer = Convert-ToSemVer $tagVer
+                                if ($cVer -lt $pVer) {
+                                    if (-not $candidateVersions.Contains($tagVer)) {
+                                        $candidateVersions.Add($tagVer)
+                                    }
+                                }
+                            } catch {}
+                        }
+                    }
+                }
+            } elseif ($resp) {
+                if ($resp.tag_name) {
+                    $tagVer = $resp.tag_name -replace "^v", ""
                     if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                        $releaseMetadataMap[$tagVer] = $rel
+                        $releaseMetadataMap[$tagVer] = $resp
                     }
                     if (-not $isPinned) {
                         if (-not $candidateVersions.Contains($tagVer)) {
                             $candidateVersions.Add($tagVer)
                         }
-                    } else {
-                        try {
-                            $pVer = Convert-ToSemVer $cleanPinned
-                            $cVer = Convert-ToSemVer $tagVer
-                            if ($cVer -lt $pVer) {
-                                if (-not $candidateVersions.Contains($tagVer)) {
-                                    $candidateVersions.Add($tagVer)
-                                }
-                            }
-                        } catch {}
                     }
                 }
             }
-        } elseif ($resp) {
-            if ($resp.tag_name) {
-                $tagVer = $resp.tag_name -replace "^v", ""
-                if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                    $releaseMetadataMap[$tagVer] = $resp
-                }
-                if (-not $isPinned) {
-                    if (-not $candidateVersions.Contains($tagVer)) {
-                        $candidateVersions.Add($tagVer)
-                    }
-                }
-            }
-        }
-    } catch {}
-    if ($candidateVersions.Count -ge 10) { break }
+        } catch {}
+        if ($candidateVersions.Count -ge 10) { break }
+    }
 }
 
 # If pinned release is not in GitHub releases, replenish queue with latest releases
@@ -1087,33 +1148,40 @@ foreach ($candVersion in $versionQueue) {
 
     Write-Host ""
     Write-Step "=== Installation Attempt $attempt of ${maxAttempts}: Release v$candVersion ==="
+    $candTagUrl = if ($manifestTagUrlMap.ContainsKey($candVersion)) { $manifestTagUrlMap[$candVersion] } else { "https://github.com/$Repo/releases/tag/v$candVersion" }
+    Write-Step "Release tag URL     : $candTagUrl"
 
     try {
-        $relData = $releaseMetadataMap[$candVersion]
-        if (-not $relData) {
-            try {
-                $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-            } catch {
+        $DownloadUrl = $null
+        if ($manifestAssetUrlMap.ContainsKey($candVersion) -and $manifestAssetUrlMap[$candVersion]) {
+            $DownloadUrl = $manifestAssetUrlMap[$candVersion]
+        } else {
+            $relData = $releaseMetadataMap[$candVersion]
+            if (-not $relData) {
                 try {
-                    $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                } catch {}
-            }
-        }
-
-        $matchedAsset = $null
-        if ($relData) {
-            if ($relData.assets) {
-                $matchedAsset = $relData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
-                if (-not $matchedAsset) {
-                    $matchedAsset = $relData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
+                    $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                } catch {
+                    try {
+                        $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                    } catch {}
                 }
             }
-        }
 
-        if ($matchedAsset) {
-            $DownloadUrl = $matchedAsset.browser_download_url
-        } else {
-            $DownloadUrl = "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_${Arch}-setup.exe"
+            $matchedAsset = $null
+            if ($relData) {
+                if ($relData.assets) {
+                    $matchedAsset = $relData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
+                    if (-not $matchedAsset) {
+                        $matchedAsset = $relData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
+                    }
+                }
+            }
+
+            if ($matchedAsset) {
+                $DownloadUrl = $matchedAsset.browser_download_url
+            } else {
+                $DownloadUrl = "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_${Arch}-setup.exe"
+            }
         }
 
         Write-Step "Package download URL: $DownloadUrl"
