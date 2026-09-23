@@ -92,13 +92,18 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     triggerManualRotation: async () => {
         set({ isLoading: true, error: null });
         try {
-            const result = await instanceService.triggerManualProfileRotation();
+            const targetId = get().activeInstanceId || 'default';
+            const result = await get().smartRotateProfileAccount(targetId);
+            const resumeNote = (result.resumedProjectsCount ?? 0) > 0
+                ? ` (Auto-resumed ${result.resumedProjectsCount} project(s) <1h)`
+                : '';
+            const msg = `Successfully rotated to profile '${result.instanceName}' with account '${result.accountEmail}'${resumeNote}`;
             await Promise.all([
                 get().fetchInstances(true),
                 get().fetchSwitcherStatus(),
             ]);
             set({ isLoading: false });
-            return result;
+            return msg;
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to trigger profile rotation' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.triggerManualRotation' });

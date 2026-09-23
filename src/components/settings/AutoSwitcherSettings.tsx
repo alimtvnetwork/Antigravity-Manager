@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
 export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ config, onChange }) => {
     const { t } = useTranslation();
     const currentConfig = config || DEFAULT_CONFIG;
-    const { triggerManualRotation } = useInstanceStore();
+    const { smartRotateProfileAccount, activeInstanceId } = useInstanceStore();
     const [rotationFeedback, setRotationFeedback] = useState<string | null>(null);
     const [isRotating, setIsRotating] = useState(false);
 
@@ -58,10 +58,14 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
         setIsRotating(true);
         setRotationFeedback(null);
         try {
-            const msg = await triggerManualRotation();
-            setRotationFeedback(msg);
+            const targetId = activeInstanceId || 'default';
+            const result = await smartRotateProfileAccount(targetId);
+            const resumeNote = (result.resumedProjectsCount ?? 0) > 0
+                ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
+                : '';
+            setRotationFeedback(`Successfully rotated to profile '${result.instanceName}' with account '${result.accountEmail}'${resumeNote}`);
         } catch (e: any) {
-            setRotationFeedback(`Error: ${e?.toString() || 'Rotation failed'}`);
+            setRotationFeedback(`Error: ${e?.message || e?.toString() || 'Rotation failed'}`);
         } finally {
             setIsRotating(false);
         }
