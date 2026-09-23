@@ -2,6 +2,17 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.65.1 (2026-09-24)**:
+        -   **[Release v4.65.1: Upstream PR #4 Integration, UI Fluidity, Plaintext Email Engine & Instance-Protected Smart Rotation] Complete PR #4 Merge, Smart Rotate Delegation, Full English Documentation & Sandboxed Instance Protection**:
+            -   **Upstream PR #4 Clean Integration**: Merged PR #4 into `main` without regressing our superior build architecture, `agm-alim` binary separation, `version.json` source-of-truth pipeline, and branding (*Title: Antigravity Manager Tools*, *Publisher: Maintained by Alim, Sponsored by RISEUP ASIA LLC*).
+            -   **Rotate Now Delegation to Smart Rotate**: In `AutoSwitcherSettings.tsx` and `useInstanceStore.ts`, unified the Settings "Rotate Now" button with the top navigation bar's Fast-Forward button to delegate directly to `smartRotateProfileAccount`.
+            -   **Instance Protection Guarantee**: Enforced strict per-instance `--user-data-dir` filtering in both Rust (`close_instance`) and frontend stores. Rotating or switching an instance closes *only* the target instance's process, leaving all other running instances and sandboxes 100% untouched and running.
+            -   **UI Fluidity & Error Fixes**: Resolved all 11 user screenshot issues including Tauri 2 ACL permissions for `opener:open_url` and window dragging, window maximize/restore/mini view navigation errors, quota display width extension in `QuotaItem.tsx`, removal of duplicate switch buttons, and repositioning of `UpdateNotification.tsx` to prevent pagination collision.
+            -   **100% Plaintext Outbound Email Engine**: Converted outbound notifications from heavy HTML to lightweight, spam-resistant plaintext ASCII format with pipe-delimited subject parsing (`agm ls`, `status`, `switch`, etc.) and SQLite 10-minute rate limit.
+            -   **Unified Encrypted Backup Modal**: Introduced `UnifiedBackupModal.tsx` supporting Web Crypto AES-GCM (PBKDF2 100k rounds SHA-256) password protection, reminder notices, and direct SMTP export.
+            -   **Multi-Instance Sequence Numbering (#seq) & Distributed agm ls**: Implemented sequential IDs (`#1`, `#2`, ...) stored in SQLite and enhanced `agm ls` to format instance ID, name, status, bound account, node IP, and data dir.
+            -   **Documentation Localization**: Translated `docs/release-guide.md`, `scripts/MANUAL_PR_CLOSE_GUIDE.md`, and helper scripts into 100% professional English.
+
     *   **v4.65.0 (2026-09-23)**:
         -   **[Release v4.65.0 与已安装应用品牌最终确立] 统一 Windows 安装列表主标题与发行者信息，全面集成 macOS Universal 二进制构建**:
             -   **Windows 已安装应用主标题与发行者品牌规范**: 将 Windows「已安装应用/添加或删除程序」列表中的主标题（DisplayName）统一精简为 **Antigravity Manager Tools**，副标题/发行者（Publisher）统一规范为 **Maintained by Alim, Sponsored by RISEUP ASIA LLC**，并在 NSIS 钩子（`src-tauri/hooks.nsh`）、`tauri.conf.json` 及 `install.ps1` 注册表同步逻辑中全链路生效。
@@ -3172,6 +3183,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.1 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.65.0 (2026-09-23)**:
         -   **[Release v4.65.0] Update installed app branding to Antigravity Manager Tools and bump to v4.65.0**:
             -   **Update System**: Automated release and version synchronization across all manifests.

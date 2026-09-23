@@ -3,6 +3,17 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.1 (2026-09-24)**:
+        -   **[Release v4.65.1: Upstream PR #4 Integration, UI Fluidity, Plaintext Email Engine & Instance-Protected Smart Rotation] Complete PR #4 Merge, Smart Rotate Delegation, Full English Documentation & Sandboxed Instance Protection**:
+            -   **Upstream PR #4 Clean Integration**: Merged PR #4 into `main` without regressing our superior build architecture, `agm-alim` binary separation, `version.json` source-of-truth pipeline, and branding (*Title: Antigravity Manager Tools*, *Publisher: Maintained by Alim, Sponsored by RISEUP ASIA LLC*).
+            -   **Rotate Now Delegation to Smart Rotate**: In `AutoSwitcherSettings.tsx` and `useInstanceStore.ts`, unified the Settings "Rotate Now" button with the top navigation bar's Fast-Forward button to delegate directly to `smartRotateProfileAccount`.
+            -   **Instance Protection Guarantee**: Enforced strict per-instance `--user-data-dir` filtering in both Rust (`close_instance`) and frontend stores. Rotating or switching an instance closes *only* the target instance's process, leaving all other running instances and sandboxes 100% untouched and running.
+            -   **UI Fluidity & Error Fixes**: Resolved all 11 user screenshot issues including Tauri 2 ACL permissions for `opener:open_url` and window dragging, window maximize/restore/mini view navigation errors, quota display width extension in `QuotaItem.tsx`, removal of duplicate switch buttons, and repositioning of `UpdateNotification.tsx` to prevent pagination collision.
+            -   **100% Plaintext Outbound Email Engine**: Converted outbound notifications from heavy HTML to lightweight, spam-resistant plaintext ASCII format with pipe-delimited subject parsing (`agm ls`, `status`, `switch`, etc.) and SQLite 10-minute rate limit.
+            -   **Unified Encrypted Backup Modal**: Introduced `UnifiedBackupModal.tsx` supporting Web Crypto AES-GCM (PBKDF2 100k rounds SHA-256) password protection, reminder notices, and direct SMTP export.
+            -   **Multi-Instance Sequence Numbering (#seq) & Distributed agm ls**: Implemented sequential IDs (`#1`, `#2`, ...) stored in SQLite and enhanced `agm ls` to format instance ID, name, status, bound account, node IP, and data dir.
+            -   **Documentation Localization**: Translated `docs/release-guide.md`, `scripts/MANUAL_PR_CLOSE_GUIDE.md`, and helper scripts into 100% professional English.
+
     *   **v4.65.0 (2026-09-23)**:
         -   **[Release v4.65.0 & Installed Apps Branding Alignment] Display Title & Publisher Finalization with Full macOS Universal Bundle Support**:
             -   **Windows Installed Apps Branding Alignment**: Formatted the Windows "Installed apps" entry to display Title: **Antigravity Manager Tools** with subtitle / Publisher line: **Maintained by Alim, Sponsored by RISEUP ASIA LLC**, stamped directly through NSIS post-install hooks (`src-tauri/hooks.nsh`), `tauri.conf.json`, and `install.ps1` registry sync logic.
