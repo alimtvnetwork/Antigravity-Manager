@@ -35,7 +35,9 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 
 ## Contents
 
-_No app issue analyses added yet. Add issue files as numbered entries within this folder._
+| # | File | Title | Severity | Status |
+|---|------|-------|:---:|:---:|
+| 02 | [02-smart-switch-scoring-and-window-controls-rca.md](02-smart-switch-scoring-and-window-controls-rca.md) | Smart Switch Scoring Defect, Window Controls ACL & Stack Trace Telemetry | High | Fixed |
 
 ---
 

@@ -955,6 +955,13 @@ pub fn run() {
             commands::test_telegram_bot,
             commands::get_telegram_status,
             commands::send_telegram_test_message,
+            // Window Management commands
+            commands::minimize_window,
+            commands::maximize_window,
+            commands::toggle_maximize_window,
+            commands::close_window,
+            commands::is_window_maximized,
+            commands::set_window_theme,
         ])
 
 

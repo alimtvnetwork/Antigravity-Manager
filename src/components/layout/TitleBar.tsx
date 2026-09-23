@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { isTauri, isMacOS } from '../../utils/env';
 import versionData from '../../../version.json';
@@ -24,7 +25,7 @@ export default function TitleBar() {
             }
         }).then((fn) => {
             unlistenResize = fn;
-        }).catch(() => {});
+        });
 
         return () => {
             if (unlistenResize) {
@@ -39,28 +40,41 @@ export default function TitleBar() {
 
     const handleMinimize = async () => {
         try {
-            await getCurrentWindow().minimize();
-        } catch (e) {
-            console.error('Failed to minimize window:', e);
+            await invoke('minimize_window');
+        } catch {
+            try {
+                await getCurrentWindow().minimize();
+            } catch (e) {
+                console.error('Failed to minimize window:', e);
+            }
         }
     };
 
     const handleToggleMaximize = async () => {
         try {
-            const win = getCurrentWindow();
-            await win.toggleMaximize();
-            const max = await win.isMaximized();
+            const max = await invoke<boolean>('toggle_maximize_window');
             setIsMaximized(max);
-        } catch (e) {
-            console.error('Failed to toggle maximize window:', e);
+        } catch {
+            try {
+                const win = getCurrentWindow();
+                await win.toggleMaximize();
+                const max = await win.isMaximized();
+                setIsMaximized(max);
+            } catch (e) {
+                console.error('Failed to toggle maximize window:', e);
+            }
         }
     };
 
     const handleClose = async () => {
         try {
-            await getCurrentWindow().close();
-        } catch (e) {
-            console.error('Failed to close window:', e);
+            await invoke('close_window');
+        } catch {
+            try {
+                await getCurrentWindow().close();
+            } catch (e) {
+                console.error('Failed to close window:', e);
+            }
         }
     };
 
@@ -85,30 +99,39 @@ export default function TitleBar() {
                     <div className="flex items-center gap-2 pl-3 h-full select-none">
                         <button
                             type="button"
+                            id="titlebar-mac-btn-close"
+                            name="titlebar-mac-btn-close"
+                            data-xpath="//*[@id='titlebar-mac-btn-close']"
                             onClick={handleClose}
                             className="w-3 h-3 rounded-full bg-[#FF5F56] hover:brightness-90 active:brightness-75 transition-all flex items-center justify-center group cursor-pointer"
                             title={t('common.close', 'Close')}
                             aria-label="Close"
                         >
-                            <span className="opacity-0 group-hover:opacity-100 text-[#4C0002] text-[8px] font-bold leading-none">✕</span>
+                            <span className="opacity-0 group-hover:opacity-100 text-[#4C0002] text-[8px] font-bold leading-none pointer-events-none">✕</span>
                         </button>
                         <button
                             type="button"
+                            id="titlebar-mac-btn-minimize"
+                            name="titlebar-mac-btn-minimize"
+                            data-xpath="//*[@id='titlebar-mac-btn-minimize']"
                             onClick={handleMinimize}
                             className="w-3 h-3 rounded-full bg-[#FFBD2E] hover:brightness-90 active:brightness-75 transition-all flex items-center justify-center group cursor-pointer"
                             title={t('common.minimize', 'Minimize')}
                             aria-label="Minimize"
                         >
-                            <span className="opacity-0 group-hover:opacity-100 text-[#5E3F00] text-[8px] font-bold leading-none">−</span>
+                            <span className="opacity-0 group-hover:opacity-100 text-[#5E3F00] text-[8px] font-bold leading-none pointer-events-none">−</span>
                         </button>
                         <button
                             type="button"
+                            id="titlebar-mac-btn-maximize"
+                            name="titlebar-mac-btn-maximize"
+                            data-xpath="//*[@id='titlebar-mac-btn-maximize']"
                             onClick={handleToggleMaximize}
                             className="w-3 h-3 rounded-full bg-[#27C93F] hover:brightness-90 active:brightness-75 transition-all flex items-center justify-center group cursor-pointer"
                             title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                             aria-label={isMaximized ? "Restore" : "Maximize"}
                         >
-                            <span className="opacity-0 group-hover:opacity-100 text-[#004D11] text-[8px] font-bold leading-none">＋</span>
+                            <span className="opacity-0 group-hover:opacity-100 text-[#004D11] text-[8px] font-bold leading-none pointer-events-none">＋</span>
                         </button>
                     </div>
                     <div className="flex-1 h-full flex items-center justify-center" data-tauri-drag-region>
@@ -140,12 +163,15 @@ export default function TitleBar() {
                         {/* Minimize Button */}
                         <button
                             type="button"
+                            id="titlebar-btn-minimize"
+                            name="titlebar-btn-minimize"
+                            data-xpath="//*[@id='titlebar-btn-minimize']"
                             onClick={handleMinimize}
                             className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
                             title={t('common.minimize', 'Minimize')}
                             aria-label="Minimize"
                         >
-                            <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+                            <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M2 8h12v1.5H2z" />
                             </svg>
                         </button>
@@ -153,18 +179,21 @@ export default function TitleBar() {
                         {/* Maximize / Restore Button */}
                         <button
                             type="button"
+                            id="titlebar-btn-maximize"
+                            name="titlebar-btn-maximize"
+                            data-xpath="//*[@id='titlebar-btn-maximize']"
                             onClick={handleToggleMaximize}
                             className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
                             title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                             aria-label={isMaximized ? "Restore" : "Maximize"}
                         >
                             {isMaximized ? (
-                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                     <rect x="4.5" y="1.5" width="10" height="10" rx="1" />
                                     <path d="M1.5 5.5v9h9" />
                                 </svg>
                             ) : (
-                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                     <rect x="2" y="2" width="12" height="12" rx="1.5" />
                                 </svg>
                             )}
@@ -173,12 +202,15 @@ export default function TitleBar() {
                         {/* Close Button */}
                         <button
                             type="button"
+                            id="titlebar-btn-close"
+                            name="titlebar-btn-close"
+                            data-xpath="//*[@id='titlebar-btn-close']"
                             onClick={handleClose}
                             className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-[#E81123] hover:text-white dark:hover:bg-[#E81123] dark:hover:text-white active:bg-[#C40E1E] transition-colors duration-150 cursor-pointer"
                             title={t('common.close', 'Close')}
                             aria-label="Close"
                         >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                            <svg className="w-3.5 h-3.5 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                 <path d="M3 3l10 10M13 3L3 13" />
                             </svg>
                         </button>

@@ -1108,6 +1108,43 @@ pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<()
     window.set_theme(tauri_theme).map_err(|e| e.to_string())
 }
 
+/// 最小化窗口
+#[tauri::command]
+pub async fn minimize_window(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+/// 最大化窗口
+#[tauri::command]
+pub async fn maximize_window(window: tauri::Window) -> Result<(), String> {
+    window.maximize().map_err(|e| e.to_string())
+}
+
+/// 切换最大化/还原窗口
+#[tauri::command]
+pub async fn toggle_maximize_window(window: tauri::Window) -> Result<bool, String> {
+    let is_max = window.is_maximized().map_err(|e| e.to_string())?;
+    if is_max {
+        window.unmaximize().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        window.maximize().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+}
+
+/// 关闭窗口
+#[tauri::command]
+pub async fn close_window(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+/// 查询窗口是否处于最大化状态
+#[tauri::command]
+pub async fn is_window_maximized(window: tauri::Window) -> Result<bool, String> {
+    window.is_maximized().map_err(|e| e.to_string())
+}
+
 /// 获取 Antigravity 可执行文件路径
 #[tauri::command]
 pub async fn get_antigravity_path(

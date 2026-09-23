@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import * as instanceService from '../services/instanceService';
+import * as accountService from '../services/accountService';
 import { useErrorStore } from './error-store';
+import type { Account } from '../types/account';
 import type {
     InstanceConfig,
     InstanceStatus,
@@ -420,42 +422,90 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 return true;
             });
 
-            if (eligibleAccounts.length === 0) {
+            const hasEligible = eligibleAccounts.length > 0;
+            if (!hasEligible) {
                 set({ isLoading: false });
                 throw new Error('No eligible accounts available for transfer');
             }
 
-            // 5. Select candidate accounts (preferring accounts not currently bound to other running instances and not current account)
-            let pool = eligibleAccounts.filter(a => {
-                const inUseByOther = activeInUseAccountIds.includes(a.id);
-                if (inUseByOther) return false;
-                const isCurrent = Boolean(currentAccountId && a.id === currentAccountId);
-                if (isCurrent) return false;
-                return true;
-            });
+            // 5. Rank candidate accounts based on Multiplicative Scoring:
+            // Score = S_active * M_tier * Q_weekly
+            let candidatePool = instanceService.rankSmartCandidates(
+                eligibleAccounts,
+                activeInUseAccountIds,
+                currentAccountId
+            );
 
-            if (pool.length === 0) {
-                pool = eligibleAccounts.filter(a => !activeInUseAccountIds.includes(a.id));
+            const hasCandidates = candidatePool.length > 0;
+            if (!hasCandidates) {
+                set({ isLoading: false });
+                throw new Error('No eligible candidates available for rotation');
             }
 
-            if (pool.length === 0) {
-                pool = eligibleAccounts;
+            // 6. Pre-activation Live Quota Refresh Verification Loop:
+            // Probe the top candidate with live quota refresh.
+            // If quota degraded or account is invalid, demote and try next best candidate.
+            let verifiedCandidate: Account | null = null;
+            const triedAccountIds = new Set<string>();
+
+            while (candidatePool.length > 0) {
+                const topCandidate = candidatePool[0];
+                if (!topCandidate) {
+                    break;
+                }
+                const alreadyTried = triedAccountIds.has(topCandidate.account.id);
+                if (alreadyTried) {
+                    break;
+                }
+                triedAccountIds.add(topCandidate.account.id);
+
+                try {
+                    // Live quota refresh probe
+                    const freshQuota = await accountService.fetchAccountQuota(topCandidate.account.id);
+                    const updatedAccount: Account = {
+                        ...topCandidate.account,
+                        quota: freshQuota,
+                    };
+
+                    // Re-evaluate score with live quota
+                    const reScored = instanceService.calculateMultiplicativeScore(
+                        updatedAccount,
+                        activeInUseAccountIds,
+                        currentAccountId
+                    );
+
+                    const isForbidden = Boolean(freshQuota.is_forbidden);
+                    const isBlocked = Boolean(updatedAccount.validation_blocked);
+                    const isDepleted = reScored.weeklyQuotaPercent <= 5;
+                    const isZeroScore = reScored.score <= 0;
+
+                    const isInvalid = isForbidden || isBlocked || isDepleted || isZeroScore;
+                    if (!isInvalid) {
+                        verifiedCandidate = updatedAccount;
+                        break;
+                    }
+
+                    // Demote candidate to bottom of pool and re-sort
+                    candidatePool = candidatePool
+                        .filter(c => c.account.id !== topCandidate.account.id)
+                        .concat({
+                            ...topCandidate,
+                            account: updatedAccount,
+                            score: 0,
+                            weeklyQuotaPercent: reScored.weeklyQuotaPercent,
+                        });
+                } catch (probeErr) {
+                    console.warn(`[useInstanceStore] Live quota refresh probe failed for ${topCandidate.account.id}, demoting:`, probeErr);
+                    candidatePool = candidatePool
+                        .filter(c => c.account.id !== topCandidate.account.id)
+                        .concat({
+                            ...topCandidate,
+                            score: 0,
+                        });
+                }
             }
 
-            // 6. Rank candidate accounts based on quota, tier, and idle time
-            const scoredPool = pool.map(acc => {
-                const weeklyQuota = instanceService.extractWeeklyQuotaPercent(acc);
-                const tierMultiplier = instanceService.getSubscriptionTierMultiplier(acc.quota?.subscription_tier);
-                const nowSec = Math.floor(Date.now() / 1000);
-                const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 999999;
-                const idleHours = Math.min(240, Math.floor(idleSec / 3600));
-
-                const score = (weeklyQuota * tierMultiplier) + (idleHours * 5);
-                return { account: acc, score, weeklyQuota };
-            });
-
-            scoredPool.sort((a, b) => b.score - a.score);
-            const targetCandidate = scoredPool[0]?.account || eligibleAccounts[0];
+            const targetCandidate = verifiedCandidate || candidatePool[0]?.account || eligibleAccounts[0];
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;

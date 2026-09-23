@@ -332,22 +332,41 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         1.0
     };
 
-    // 2. Weekly quota percentage (excluding banned models 3.0/3.1)
+    // 2. Weekly quota percentage from quota_groups or fallback to models
     let mut weekly_quota_percent = 100.0;
     if let Some(quota_data) = acc.quota.as_ref() {
-        let valid_models: Vec<_> = quota_data
-            .models
-            .iter()
-            .filter(|m| {
-                let name = m.name.to_lowercase();
-                let is_banned = name.contains("3.0") || name.contains("3.1");
-                !is_banned
-            })
-            .collect();
+        let mut weekly_values: Vec<f64> = Vec::new();
+        if let Some(ref groups) = quota_data.quota_groups {
+            for g in groups {
+                for b in &g.buckets {
+                    let win = b.window.to_lowercase();
+                    let bid = b.bucket_id.to_lowercase();
+                    let is_weekly = win.contains("week") || bid.contains("week");
+                    if is_weekly {
+                        weekly_values.push((b.remaining_fraction * 100.0).round());
+                    }
+                }
+            }
+        }
 
-        if !valid_models.is_empty() {
-            let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
-            weekly_quota_percent = (sum as f64 / valid_models.len() as f64).round();
+        if !weekly_values.is_empty() {
+            // Take minimum bottleneck across weekly quota groups
+            weekly_quota_percent = weekly_values.into_iter().fold(100.0, f64::min);
+        } else {
+            let valid_models: Vec<_> = quota_data
+                .models
+                .iter()
+                .filter(|m| {
+                    let name = m.name.to_lowercase();
+                    let is_banned = name.contains("3.0") || name.contains("3.1");
+                    !is_banned
+                })
+                .collect();
+
+            if !valid_models.is_empty() {
+                let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
+                weekly_quota_percent = (sum as f64 / valid_models.len() as f64).round();
+            }
         }
     }
 
@@ -1128,6 +1147,83 @@ mod tests {
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
         // Account A period finished resets to 100% (score: 1.0 * 1.0 * 100.0 = 100.0), higher than un-refilled 10% (score: 10.0)
+        assert!(score_a > score_b);
+    }
+
+    #[test]
+    fn test_score_candidate_account_weekly_quota_groups_bottleneck() {
+        let now_sec = 1790090000;
+        let future_time = "2026-09-30T14:30:00Z";
+
+        // Candidate A: Pro tier, 100% weekly Gemini, 100% weekly Claude
+        let mut acc_a = make_test_account("synth_acc_a", "synth_a@test.local", "gemini-pro", 100, future_time);
+        if let Some(ref mut q) = acc_a.quota {
+            q.quota_groups = Some(vec![
+                crate::models::quota::QuotaGroup {
+                    display_name: "Gemini Models".to_string(),
+                    description: None,
+                    buckets: vec![crate::models::quota::QuotaBucket {
+                        bucket_id: "gemini-weekly".to_string(),
+                        window: "weekly".to_string(),
+                        remaining_fraction: 1.0,
+                        reset_time: future_time.to_string(),
+                        display_name: None,
+                        description: None,
+                    }],
+                },
+                crate::models::quota::QuotaGroup {
+                    display_name: "Claude and GPT models".to_string(),
+                    description: None,
+                    buckets: vec![crate::models::quota::QuotaBucket {
+                        bucket_id: "claude-weekly".to_string(),
+                        window: "weekly".to_string(),
+                        remaining_fraction: 1.0,
+                        reset_time: future_time.to_string(),
+                        display_name: None,
+                        description: None,
+                    }],
+                },
+            ]);
+        }
+
+        // Candidate B: Pro tier, 21% weekly Gemini, 100% weekly Claude
+        let mut acc_b = make_test_account("synth_acc_b", "synth_b@test.local", "gemini-pro", 100, future_time);
+        if let Some(ref mut q) = acc_b.quota {
+            q.quota_groups = Some(vec![
+                crate::models::quota::QuotaGroup {
+                    display_name: "Gemini Models".to_string(),
+                    description: None,
+                    buckets: vec![crate::models::quota::QuotaBucket {
+                        bucket_id: "gemini-weekly".to_string(),
+                        window: "weekly".to_string(),
+                        remaining_fraction: 0.21,
+                        reset_time: future_time.to_string(),
+                        display_name: None,
+                        description: None,
+                    }],
+                },
+                crate::models::quota::QuotaGroup {
+                    display_name: "Claude and GPT models".to_string(),
+                    description: None,
+                    buckets: vec![crate::models::quota::QuotaBucket {
+                        bucket_id: "claude-weekly".to_string(),
+                        window: "weekly".to_string(),
+                        remaining_fraction: 1.0,
+                        reset_time: future_time.to_string(),
+                        display_name: None,
+                        description: None,
+                    }],
+                },
+            ]);
+        }
+
+        let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
+        let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
+
+        // Account A: 1.0 * 3.0 * 100 = 300.0
+        // Account B: 1.0 * 3.0 * 21 = 63.0
+        assert_eq!(score_a, 300.0);
+        assert_eq!(score_b, 63.0);
         assert!(score_a > score_b);
     }
 }

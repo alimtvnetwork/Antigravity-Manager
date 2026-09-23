@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sun, Moon, LogOut, Minimize2, Minus, X, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
@@ -65,43 +66,62 @@ export function NavSettings({
 
     const handleMinimize = async () => {
         try {
-            await getCurrentWindow().minimize();
-        } catch (e) {
-            console.error('Failed to minimize window:', e);
-            const captured = useErrorStore.getState().captureError(e, {
-                source: 'NavSettings.tsx',
-                triggerAction: 'handleMinimize',
-            });
-            useErrorStore.getState().openErrorModal(captured);
+            await invoke('minimize_window');
+        } catch (invokeErr) {
+            try {
+                await getCurrentWindow().minimize();
+            } catch (e) {
+                console.error('Failed to minimize window:', e);
+                const captured = useErrorStore.getState().captureError(e, {
+                    source: 'NavSettings.tsx',
+                    triggerComponent: 'NavSettings.WindowControls',
+                    triggerAction: 'handleMinimize',
+                    targetId: 'btn-window-minimize',
+                });
+                useErrorStore.getState().openErrorModal(captured);
+            }
         }
     };
 
     const handleToggleMaximize = async () => {
         try {
-            const win = getCurrentWindow();
-            await win.toggleMaximize();
-            const max = await win.isMaximized();
+            const max = await invoke<boolean>('toggle_maximize_window');
             setIsMaximized(max);
-        } catch (e) {
-            console.error('Failed to toggle maximize window:', e);
-            const captured = useErrorStore.getState().captureError(e, {
-                source: 'NavSettings.tsx',
-                triggerAction: 'handleToggleMaximize',
-            });
-            useErrorStore.getState().openErrorModal(captured);
+        } catch (invokeErr) {
+            try {
+                const win = getCurrentWindow();
+                await win.toggleMaximize();
+                const max = await win.isMaximized();
+                setIsMaximized(max);
+            } catch (e) {
+                console.error('Failed to toggle maximize window:', e);
+                const captured = useErrorStore.getState().captureError(e, {
+                    source: 'NavSettings.tsx',
+                    triggerComponent: 'NavSettings.WindowControls',
+                    triggerAction: 'handleToggleMaximize',
+                    targetId: 'btn-window-maximize',
+                });
+                useErrorStore.getState().openErrorModal(captured);
+            }
         }
     };
 
     const handleClose = async () => {
         try {
-            await getCurrentWindow().close();
-        } catch (e) {
-            console.error('Failed to close window:', e);
-            const captured = useErrorStore.getState().captureError(e, {
-                source: 'NavSettings.tsx',
-                triggerAction: 'handleClose',
-            });
-            useErrorStore.getState().openErrorModal(captured);
+            await invoke('close_window');
+        } catch (invokeErr) {
+            try {
+                await getCurrentWindow().close();
+            } catch (e) {
+                console.error('Failed to close window:', e);
+                const captured = useErrorStore.getState().captureError(e, {
+                    source: 'NavSettings.tsx',
+                    triggerComponent: 'NavSettings.WindowControls',
+                    triggerAction: 'handleClose',
+                    targetId: 'btn-window-close',
+                });
+                useErrorStore.getState().openErrorModal(captured);
+            }
         }
     };
 
@@ -189,28 +209,34 @@ export function NavSettings({
                 <div className="flex items-center gap-1 md:gap-1.5 shrink-0 z-50">
                     <button
                         type="button"
+                        id="btn-window-minimize"
+                        name="window-minimize"
+                        data-xpath="//*[@id='btn-window-minimize']"
                         onClick={handleMinimize}
                         className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                         title={t('common.minimize', 'Minimize')}
                         aria-label="Minimize"
                     >
-                        <Minus className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
+                        <Minus className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 pointer-events-none" />
                     </button>
 
                     <button
                         type="button"
+                        id="btn-window-maximize"
+                        name="window-maximize"
+                        data-xpath="//*[@id='btn-window-maximize']"
                         onClick={handleToggleMaximize}
                         className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                         title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                         aria-label={isMaximized ? "Restore" : "Maximize"}
                     >
                         {isMaximized ? (
-                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <rect x="4.5" y="1.5" width="10" height="10" rx="1" />
                                 <path d="M1.5 5.5v9h9" />
                             </svg>
                         ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <rect x="2" y="2" width="12" height="12" rx="1.5" />
                             </svg>
                         )}
@@ -218,12 +244,15 @@ export function NavSettings({
 
                     <button
                         type="button"
+                        id="btn-window-close"
+                        name="window-close"
+                        data-xpath="//*[@id='btn-window-close']"
                         onClick={handleClose}
                         className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer group"
                         title={t('common.close', 'Close')}
                         aria-label="Close"
                     >
-                        <X className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150" />
+                        <X className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none" />
                     </button>
                 </div>
             )}

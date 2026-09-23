@@ -2,6 +2,16 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.61.0 (2026-09-23)**:
+        -   **[智能切换评分、预激活校验、窗口控制与错误遥测] 智能多因子评分算法、周配额桶提取、预激活校验循环与窗口控制 ACL 强化**:
+            -   **智能多因子乘法评分**: 实现 $\text{Score} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$ 公式，彻底废除 100,000 点旧版闲置加分，仅在账户闲置时赋予激活因子 1，在用账户乘数为 0。Ultra 乘数 5、Pro 乘数 3、Free 乘数 1。
+            -   **周配额桶瓶颈提取**: 从 `quota_groups` 周配额桶中精准提取各模型组剩余百分比并取瓶颈最低值，彻底杜绝短周期（4H/5H）全满掩盖周配额耗尽的缺陷（避免如 21% 周配额账户被误选，优先选择 100% 满配额账户）。
+            -   **预激活实时刷新校验与降级循环**: 轮转前先向目标候选账户发起实时配额探测 (`fetch_account_quota`)，若配额不足 ($\le 5\%$)、账号受限或在用，直接降级至池底并循环探测下一顺位候选，直至命中健康账户。
+            -   **Tauri v2 窗口控制权限修复**: 配置 `src-tauri/capabilities/default.json` 显式开放 `core:window:*` 权限，提供 Rust 原生自定义窗口命令（最小化、最大化切换、关闭），并在全平台标题栏按钮注入唯一 ID、名称与 `data-xpath`，彻底根除 `plugin:window|* not allowed by ACL`。
+            -   **交互遥测与 XPath 计算**: 全局点击捕获向上溯源至最近交互元素（Button/A/Input 等），提取 `id`、`name`、`aria-label` 并自动计算完整 XPath 路径，杜绝仅记录裸 `svg`/`path`。
+            -   **错误弹窗堆栈兜底与预览**: 为字符串/IPC 错误合成前端调用堆栈，确保 `stackTrace` 永不为空，并在错误弹窗概览页新增一键复制堆栈预览卡片。
+            -   **匿名本地单元测试**: 建立纯合成标识符（零真实邮箱）的前后端单元测试，覆盖瓶颈提取、乘法评分与排序。
+
     *   **v4.60.0 (2026-09-22)**:
         -   **[MSVC 链接器与发布产物修复] 修复 MSVC 重复资源错误 (CVT1100 / LNK1123) 与安装脚本解耦**:
             -   **MSVC 重复资源修复**: 移除 `src-tauri/build.rs` 中冗余的 `resource.lib` 手动链接参数，交由 `tauri-build` 原生管理 Windows 清单与版本资源，根除 `CVTRES CVT1100` duplicate resource 与 `LNK1123`。
@@ -3130,6 +3140,10 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.61.0 (2026-09-23)**:
+        -   **[Release v4.61.0] Smart switch multi-factor scoring, pre-activation verification loop, window ACL controls, and XPath error telemetry**:
+            -   **Update System**: Automated release and version synchronization across all manifests.
+            -   **Enhancements**: Smart switch multi-factor scoring, pre-activation verification loop, window ACL controls, and XPath error telemetry.
     *   **v4.60.0 (2026-09-22)**:
         -   **[Release v4.60.0] Fix MSVC duplicate resource link error and release asset decoupling**:
             -   **Update System**: Automated release and version synchronization across all manifests.

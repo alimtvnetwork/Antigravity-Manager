@@ -389,6 +389,31 @@ export function getSubscriptionTierMultiplier(tierName?: string): number {
 }
 
 export function extractWeeklyQuotaPercent(acc: Account): number {
+    const quotaGroups = acc.quota?.quota_groups;
+    if (quotaGroups) {
+        if (quotaGroups.length > 0) {
+            const weeklyValues: number[] = [];
+            for (const group of quotaGroups) {
+                const buckets = group.buckets || [];
+                for (const b of buckets) {
+                    const win = (b.window || '').toLowerCase();
+                    const id = (b.bucket_id || '').toLowerCase();
+                    const isWeekly = win.includes('week') || id.includes('week');
+                    if (isWeekly) {
+                        if (typeof b.remaining_fraction === 'number') {
+                            weeklyValues.push(Math.round(b.remaining_fraction * 100));
+                        }
+                    }
+                }
+            }
+            const hasWeekly = weeklyValues.length > 0;
+            if (hasWeekly) {
+                // Bottleneck rule: take the minimum weekly remaining quota across groups
+                return Math.min(...weeklyValues);
+            }
+        }
+    }
+
     const models = acc.quota?.models || [];
     const validModels = models.filter(m => {
         return typeof m.percentage === 'number';

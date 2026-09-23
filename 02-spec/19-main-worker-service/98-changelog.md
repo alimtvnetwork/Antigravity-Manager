@@ -1,3 +1,9 @@
+## v4.61.0 — 2026-09-23 (Smart switch multi-factor scoring, pre-activation verification loop, window ACL controls, and XPath error telemetry)
+
+**Scope:** Version bump. Smart switch multi-factor scoring, pre-activation verification loop, window ACL controls, and XPath error telemetry.
+
+---
+
 ## v4.60.0 — 2026-09-22 (Fix MSVC duplicate resource link error and release asset decoupling)
 
 **Scope:** Version bump. Fix MSVC duplicate resource link error and release asset decoupling.

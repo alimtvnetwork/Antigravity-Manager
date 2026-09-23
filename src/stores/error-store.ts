@@ -13,6 +13,9 @@ export interface ClickEvent {
   element: string;
   text?: string;
   action: string;
+  targetId?: string;
+  name?: string;
+  xpath?: string;
   componentName?: string;
   route?: string;
   timestamp: number;
@@ -67,6 +70,7 @@ export interface CaptureErrorMeta {
   source?: string;
   triggerComponent?: string;
   triggerAction?: string;
+  targetId?: string;
   endpoint?: string;
   method?: string;
   status?: number;
@@ -99,7 +103,21 @@ export function formatClickPathArrow(clicks: ClickEvent[]): string {
     return 'No prior interactions recorded';
   }
   return clicks
-    .map((c) => `${c.element}${c.text ? ` "${c.text}"` : ''}`)
+    .map((c) => {
+      let desc = c.element;
+      if (c.targetId) {
+        desc += `#${c.targetId}`;
+      } else if (c.name) {
+        desc += `[name="${c.name}"]`;
+      }
+      if (c.text && c.text !== c.targetId && c.text !== c.name) {
+        desc += ` "${c.text}"`;
+      }
+      if (c.xpath) {
+        desc += ` [xpath: ${c.xpath}]`;
+      }
+      return desc;
+    })
     .join(' → ');
 }
 
@@ -225,7 +243,10 @@ export function buildCapturedError(
   context?: ErrorContext
 ): CapturedError {
   const norm = normalizeRawError(rawError);
-  const stack = rawError instanceof Error ? rawError.stack : undefined;
+  let stack = rawError instanceof Error ? rawError.stack : undefined;
+  if (!stack) {
+    stack = new Error(norm.message).stack;
+  }
   const parsed = parseFullStackTrace(stack);
   const clicks = getRecentClicks();
   const currentRoute = typeof window !== 'undefined' ? window.location.pathname : '/';

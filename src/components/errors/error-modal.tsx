@@ -365,6 +365,30 @@ function OverviewTab({
         </div>
       )}
 
+      {/* Stack Trace Preview Card */}
+      {(error.stackTrace || error.backendStackTrace) && (
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-2xs">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Stack Trace Preview
+            </h4>
+            <div className="flex items-center gap-2">
+              <ItemCopyButton text={(error.stackTrace || error.backendStackTrace)!} label="Copy Stack" />
+              <button
+                type="button"
+                onClick={() => onSelectTab('stack')}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
+              >
+                Full Stack →
+              </button>
+            </div>
+          </div>
+          <pre className="p-2.5 rounded-lg bg-slate-950 text-slate-100 font-mono text-[11px] overflow-x-auto max-h-36 whitespace-pre-wrap leading-relaxed border border-slate-800">
+            {error.stackTrace || error.backendStackTrace}
+          </pre>
+        </div>
+      )}
+
       {/* Suggested Fixes Card */}
       {fixes.length > 0 && (
         <div className="p-4 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 shadow-2xs">

@@ -3,6 +3,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.61.0 (2026-09-23)**:
+        -   **[Smart Switch Scoring, Pre-Activation Verification, Window Controls & Error Telemetry] Multi-Factor Multiplicative Scoring, Weekly Quota Group Extraction, Pre-Activation Refresh Verification Loop, & Window Control ACL Hardening**:
+            -   **Multi-Factor Multiplicative Scoring**: Implemented $\text{Score} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly}}$ across TypeScript and Rust backends. Completely eliminated legacy +100,000 idle bonuses; active in-use accounts receive multiplier 0, while inactive candidates receive 1. Ultra multiplier is 5, Pro multiplier is 3, and Free/other is 1.
+            -   **Weekly Quota Group Bottleneck Extraction**: Extracted remaining weekly percentages directly from `quota_groups` weekly buckets, taking the bottleneck minimum across model groups. Prevents misleading short-term (4H/5H) quota from choosing depleted accounts (e.g. 21% weekly Gemini accounts vs 100% full accounts).
+            -   **Pre-Activation Refresh Verification Loop**: Executed live `fetch_account_quota` probe before switching candidates. If candidate quota degraded ($\le 5\%$) or account is blocked/forbidden/in-use, demoted to score 0 and iterated to the next best candidate until verified.
+            -   **Tauri v2 Window Control ACL Fix**: Configured `src-tauri/capabilities/default.json` with explicit `core:window:*` permissions and exported native Tauri window commands (`minimize_window`, `maximize_window`, `toggle_maximize_window`, `close_window`), resolving `Command plugin:window|minimize not allowed by ACL`.
+            -   **Interaction Flow Telemetry & Calculated XPath**: Enhanced `handleClickCapture` to traverse to closest interactive ancestor (`button`, `a`, `input`, etc.), extracting `id`, `name`, `aria-label`, and computing exact XPath locators, preventing raw `svg`/`path` logging.
+            -   **Synthetic Stack Trace Capture & Preview**: Synthesized call stacks for string/IPC errors in `buildCapturedError`, ensuring `stackTrace` is never empty, and added a Stack Trace Preview card with 1-click copy to the Error Modal Overview tab.
+            -   **Anonymized Local Unit Tests**: Implemented pure synthetic test suites (zero real emails in codebase) verifying weekly quota bottleneck extraction and scoring.
     *   **v4.60.0 (2026-09-22)**:
         -   **[MSVC Linker & Release Assets] Fix Duplicate Resource Link Failure (CVT1100 / LNK1123) & Release Asset Decoupling**:
             -   **MSVC Duplicate Resource Fix**: Removed redundant `cargo:rustc-link-arg` for `resource.lib` in `src-tauri/build.rs`, allowing `tauri-build` to manage native Windows resources and manifests cleanly without triggering `CVTRES CVT1100` duplicate VERSION resource collision.

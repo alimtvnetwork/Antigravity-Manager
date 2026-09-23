@@ -5,22 +5,64 @@ import {
 
 let isInitialized = false;
 
+function getElementXPath(element: HTMLElement): string {
+  const dataXpath = element.getAttribute('data-xpath');
+  if (dataXpath) {
+    return dataXpath;
+  }
+  if (element.id) {
+    return `//*[@id='${element.id}']`;
+  }
+  const name = element.getAttribute('name');
+  if (name) {
+    return `//${element.tagName.toLowerCase()}[@name='${name}']`;
+  }
+  const parts: string[] = [];
+  let curr: HTMLElement | null = element;
+  while (curr && curr.nodeType === Node.ELEMENT_NODE && curr !== document.body && curr !== document.documentElement) {
+    let index = 1;
+    let sibling = curr.previousElementSibling;
+    while (sibling) {
+      if (sibling.tagName === curr.tagName) {
+        index++;
+      }
+      sibling = sibling.previousElementSibling;
+    }
+    const tag = curr.tagName.toLowerCase();
+    parts.unshift(`${tag}[${index}]`);
+    curr = curr.parentElement;
+  }
+  return `/${parts.join('/')}`;
+}
+
 function handleClickCapture(e: MouseEvent): void {
   const target = e.target as HTMLElement | null;
   if (!target) {
     return;
   }
-  const tag = target.tagName ? target.tagName.toLowerCase() : 'element';
-  const text = (target.innerText || target.getAttribute('title') || target.getAttribute('aria-label') || '')
-    .trim()
-    .slice(0, 30);
 
+  // Find nearest interactive ancestor (button, a, input, [role="button"], or element with id)
+  const interactive = (target.closest('button, a, input, select, textarea, [role="button"], [id]') as HTMLElement) || target;
+
+  const tag = interactive.tagName ? interactive.tagName.toLowerCase() : 'element';
+  const targetId = interactive.id || interactive.getAttribute('id') || undefined;
+  const name = interactive.getAttribute('name') || undefined;
+  const ariaLabel = interactive.getAttribute('aria-label') || undefined;
+  const title = interactive.getAttribute('title') || undefined;
+  const text = (interactive.innerText || title || ariaLabel || name || targetId || '')
+    .trim()
+    .slice(0, 40);
+
+  const xpath = getElementXPath(interactive);
   const route = typeof window !== 'undefined' ? window.location.pathname : '/';
 
   recordClickEvent({
     element: tag,
     text: text || undefined,
     action: 'click',
+    targetId,
+    name,
+    xpath,
     route,
   });
 }
