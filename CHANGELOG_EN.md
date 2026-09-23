@@ -3,6 +3,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.2 (2026-09-24)**:
+        -   **[Release v4.65.2: Big Screen UI Responsiveness, Scrollbar Elimination & Windows App List Version Stamping] Full High-Resolution Optimization, Native Scrollbar Elimination & Windows Installed Apps Versioning**:
+            -   **Big Screen UI Responsiveness & Wide Display Optimization**: Expanded container width constraints from `max-w-7xl` (1280px) to `max-w-[1920px]` across all 10 core application pages (`Accounts`, `Dashboard`, `Instances`, `ApiProxy`, `Settings`, `TokenStats`, `UserToken`, `Security`, `Monitor`, `Email`), eliminating artificial layout pinching and dead space on 1080p, 1440p, 4K, and ultrawide monitors.
+            -   **Chromium/WebView2 Horizontal Scrollbar Elimination**: Added `height: 0px` to `::-webkit-scrollbar` in `src/App.css` and defined a universal `.scrollbar-none` utility with cross-browser styling (`-ms-overflow-style: none`, `scrollbar-width: none`), eliminating native horizontal scrollbar tracks and arrow buttons in Windows WebView2.
+            -   **Full-Width Navbar & Window Controls Pinning**: Updated `Navbar.tsx` to `w-full` with balanced padding (`px-3 sm:px-4 md:px-6`), ensuring window control buttons (`Minimize`, `Maximize/Restore`, `Close`) firmly anchor to the far top-right corner.
+            -   **Accounts Filter Bar Flex Collision Prevention**: Added `lg:overflow-x-visible` and shifted toolbar flex-wrap breakpoint to `2xl:flex-nowrap` in `Accounts.tsx`, preventing the left search/filter block from being crushed against the right action buttons.
+            -   **AccountTable Actions Column Expansion**: Adjusted the sticky Actions column width in `AccountTable.tsx` to `w-[220px] xl:w-[280px]` to comfortably accommodate all 11 action buttons on larger viewports.
+            -   **Windows Installed Apps Version Stamping**: Updated `src-tauri/hooks.nsh` and `install.ps1` to display `Antigravity Manager Tools v${VERSION}` in Windows "Installed apps" / "Add or remove programs", ensuring instant version visibility in system settings.
+
     *   **v4.65.1 (2026-09-24)**:
         -   **[Release v4.65.1: Upstream PR #4 Integration, UI Fluidity, Plaintext Email Engine & Instance-Protected Smart Rotation] Complete PR #4 Merge, Smart Rotate Delegation, Full English Documentation & Sandboxed Instance Protection**:
             -   **Upstream PR #4 Clean Integration**: Merged PR #4 into `main` without regressing our superior build architecture, `agm-alim` binary separation, `version.json` source-of-truth pipeline, and branding (*Title: Antigravity Manager Tools*, *Publisher: Maintained by Alim, Sponsored by RISEUP ASIA LLC*).

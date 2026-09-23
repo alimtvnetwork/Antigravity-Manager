@@ -2,6 +2,15 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.65.2 (2026-09-24)**:
+        -   **[Release v4.65.2: 大屏 UI 深度优化、横向滚动条根治与已安装应用版本号规范] 大屏幕宽屏自适应、WebView2 滚动条彻底消除与 Windows 应用列表版本号显示**:
+            -   **全站大屏自适应与最大宽度扩展**: 将全局 10 大核心页面（`Accounts`、`Dashboard`、`Instances`、`ApiProxy`、`Settings`、`TokenStats`、`UserToken`、`Security`、`Monitor`、`Email`）的容器宽度限制从 `max-w-7xl`（1280px）提升至 `max-w-[1920px]`，彻底消除 1080p、1440p、4K 及带鱼屏上的严重留白与挤压问题。
+            -   **Chromium/WebView2 横向滚动条根除**: 在 `src/App.css` 的 `::-webkit-scrollbar` 中补齐 `height: 0px`，并建立全浏览器兼容的 `.scrollbar-none` 全局类（`-ms-overflow-style: none`, `scrollbar-width: none`），根除 Windows WebView2 下水平滚动条轨道与箭头残留。
+            -   **全宽顶部导航栏与窗口控制按钮定位**: 改造 `Navbar.tsx` 为 `w-full`（内衬 `px-3 sm:px-4 md:px-6`），使最小化、最大化/还原、关闭三联按钮真正吸附于大屏幕窗口右上角。
+            -   **账号页工具栏弹性碰撞消除**: 在 `Accounts.tsx` 中为过滤栏增加 `lg:overflow-x-visible`，并将换行断点调整为 `2xl:flex-nowrap`，杜绝搜索框与快捷操作按钮组发生空间重叠挤压。
+            -   **账号表格操作列自适应加宽**: 将 `AccountTable.tsx` 的吸顶操作列（Actions）宽度调整为 `w-[220px] xl:w-[280px]`，完美容纳高分屏下展示的全部 11 个操作图标。
+            -   **Windows 已安装应用列表显式版本号**: 优化 `src-tauri/hooks.nsh` 及 `install.ps1` 注册表写入逻辑，在已安装应用显示名称中显式包含版本号（`Antigravity Manager Tools v4.65.2`），方便系统设置中一目了然。
+
     *   **v4.65.1 (2026-09-24)**:
         -   **[Release v4.65.1: Upstream PR #4 Integration, UI Fluidity, Plaintext Email Engine & Instance-Protected Smart Rotation] Complete PR #4 Merge, Smart Rotate Delegation, Full English Documentation & Sandboxed Instance Protection**:
             -   **Upstream PR #4 Clean Integration**: Merged PR #4 into `main` without regressing our superior build architecture, `agm-alim` binary separation, `version.json` source-of-truth pipeline, and branding (*Title: Antigravity Manager Tools*, *Publisher: Maintained by Alim, Sponsored by RISEUP ASIA LLC*).
@@ -3183,6 +3192,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.65.2 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.65.1 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
