@@ -37,3 +37,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [34-rustfmt-auto-switcher-unit-test-rca.md](.ai-memory/cicd-issues/34-rustfmt-auto-switcher-unit-test-rca.md)
 - [35-macos-universal-bundle-agm-missing-binary-rca.md](.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md)
 - [36-ci-windows-setup-node-transient-hang-and-runner-concurrency-rca.md](.ai-memory/cicd-issues/36-ci-windows-setup-node-transient-hang-and-runner-concurrency-rca.md)
+- [37-windows-test-manifest-entrypoint-and-rate-limit-rca.md](.ai-memory/cicd-issues/37-windows-test-manifest-entrypoint-and-rate-limit-rca.md)

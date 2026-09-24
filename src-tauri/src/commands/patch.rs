@@ -109,10 +109,10 @@ pub async fn patch_agy_binary(file_path: String) -> Result<String, String> {
                 let leaq_idx = check_idx + 5 + 6;
                 if data[leaq_idx..leaq_idx + 3] == [0x48, 0x8d, 0x05] {
                     let mov_idx = leaq_idx + 7;
-                    if data[mov_idx..mov_idx + 2] == [0xbb, 0x18] {
-                        if data[check_idx + 5..check_idx + 11] == [0x90; 6] {
-                            return Ok("Binary is already patched.".into());
-                        }
+                    let is_mov_matched = data[mov_idx..mov_idx + 2] == [0xbb, 0x18];
+                    let is_nop_padded = data[check_idx + 5..check_idx + 11] == [0x90; 6];
+                    if is_mov_matched && is_nop_padded {
+                        return Ok("Binary is already patched.".into());
                     }
                 }
             }

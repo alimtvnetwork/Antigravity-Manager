@@ -60,18 +60,42 @@ if ([string]::IsNullOrWhiteSpace($BotToken) -and (Test-Path $configPath)) {
     }
 }
 
+# If token is still missing, prompt interactively or launch setup wizard
 if ([string]::IsNullOrWhiteSpace($BotToken)) {
-    Write-Host "[!] Bot Token not found in arguments or $configPath." -ForegroundColor Red
-    Write-Host "    Please run .\scripts\setup-telegram-bot.ps1 first, or pass -BotToken." -ForegroundColor Yellow
-    exit 1
+    Write-Host "[!] No saved Bot Token found in $configPath." -ForegroundColor Yellow
+    Write-Host "    A Telegram Bot Token from @BotFather is required." -ForegroundColor Gray
+    Write-Host ""
+    $tokenInput = Read-Host "Enter Telegram Bot Token (or press Enter to launch setup wizard)"
+    $tokenInput = $tokenInput.Trim()
+    if ([string]::IsNullOrWhiteSpace($tokenInput)) {
+        $setupScript = Join-Path $PSScriptRoot "setup-telegram-bot.ps1"
+        if (Test-Path $setupScript) {
+            Write-Host "[*] Launching interactive setup wizard..." -ForegroundColor Cyan
+            & $setupScript -RunAgent
+            exit 0
+        } else {
+            Write-Host "[ERROR] Setup script not found at $setupScript" -ForegroundColor Red
+            exit 1
+        }
+    }
+    $BotToken = $tokenInput
+}
+
+# Quick sanity check on token format
+if ($BotToken -notmatch '^\d+:[A-Za-z0-9_-]+$') {
+    Write-Host "[!] Warning: The token '$BotToken' does not match the standard Telegram format." -ForegroundColor Yellow
+    Write-Host "    Tokens typically look like: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" -ForegroundColor Gray
+    Write-Host ""
 }
 
 # 2. Verify Bot via getMe
+Write-Host "[*] Connecting to Telegram Bot API..." -ForegroundColor Gray
 $getMeUrl = "https://api.telegram.org/bot$BotToken/getMe"
 try {
     $meResp = Invoke-RestMethod -Uri $getMeUrl -Method Get -TimeoutSec 15
     if (-not $meResp.ok) {
-        Write-Error "Telegram API rejected token: $($meResp.description)"
+        Write-Host "[ERROR] Telegram API rejected token: $($meResp.description)" -ForegroundColor Red
+        Write-Host "        Please make sure you copied the entire token from @BotFather." -ForegroundColor Yellow
         exit 1
     }
     $botUsername = $meResp.result.username
@@ -83,7 +107,9 @@ try {
     Write-Host "================================================================================" -ForegroundColor Cyan
     Write-Host ""
 } catch {
-    Write-Error "Failed to connect to Telegram Bot API: $_"
+    Write-Host "[ERROR] Failed to connect to Telegram Bot API: $_" -ForegroundColor Red
+    Write-Host "        Token provided: '$BotToken'" -ForegroundColor Yellow
+    Write-Host "        Tip: Get a valid token by messaging @BotFather on Telegram." -ForegroundColor Yellow
     exit 1
 }
 
@@ -135,18 +161,18 @@ function Get-NodeSnapshotHtml {
     }
 
     return @"
-🌐 <b>Antigravity Node Snapshot</b>
+[Antigravity Cluster Snapshot]
 
-• Node: <b>$env:COMPUTERNAME</b>
-• IP Address: <code>$localIp</code>
-• OS: Windows ($env:OS)
-• Uptime: <b>$uptimeMin</b> minutes
-• AGM Gateway: <b>$proxyStatus</b>
+Node: <b>$env:COMPUTERNAME</b>
+IP Address: <code>$localIp</code>
+OS: Windows ($env:OS)
+Uptime: <b>$uptimeMin</b> minutes
+AGM Gateway: <b>$proxyStatus</b>
 
-📋 <b>Available Commands:</b>
-• <code>/status</code> or <code>SNAPSHOT</code> - Node telemetry
-• <code>FF</code> - Fast-Forward workspace profile
-• <code>CMD:&lt;command&gt;</code> - Execute PowerShell command
+Commands:
+- <code>/status</code> or <code>SNAPSHOT</code> (Node telemetry)
+- <code>FF</code> (Fast-Forward workspace profile)
+- <code>CMD:&lt;command&gt;</code> (Execute PowerShell command)
 "@
 }
 
@@ -186,14 +212,14 @@ while ($true) {
                 # A. Help / Start
                 if ($lower -eq "/start" -or $lower -eq "/help") {
                     $helpMsg = @"
-👋 <b>Welcome to Antigravity-Manager Bot!</b>
+<b>Antigravity-Manager Remote Agent</b>
 
 Connected to node: <b>$env:COMPUTERNAME</b>
 
 Available commands:
-• <code>/status</code> or <code>SNAPSHOT</code> - Cluster snapshot & uptime
-• <code>FF</code> or <code>/ff</code> - Fast-forward account rotation
-• <code>CMD:&lt;powershell-command&gt;</code> - Run terminal command
+- <code>/status</code> or <code>SNAPSHOT</code> - Cluster snapshot & uptime
+- <code>FF</code> or <code>/ff</code> - Fast-forward account rotation
+- <code>CMD:&lt;powershell-command&gt;</code> - Run terminal command
 "@
                     Send-TgMessage -ChatId $senderChatId -HtmlText $helpMsg
                     Write-Host "  [REPLY] Sent welcome menu." -ForegroundColor Green
@@ -218,9 +244,9 @@ Available commands:
                     } catch { }
 
                     $replyText = if ($switched) {
-                        "⏩ <b>Fast-Forward Triggered:</b> Workspace profile rotated to next highest credit account."
+                        "<b>Fast-Forward Triggered:</b> Workspace profile rotated to next highest credit account."
                     } else {
-                        "⏩ <b>Fast-Forward Signal Sent:</b> Local profile rotation signal processed on <code>$env:COMPUTERNAME</code>."
+                        "<b>Fast-Forward Signal Sent:</b> Local profile rotation signal processed on <code>$env:COMPUTERNAME</code>."
                     }
                     Send-TgMessage -ChatId $senderChatId -HtmlText $replyText
                     Write-Host "  [REPLY] Fast-Forward executed." -ForegroundColor Green
@@ -258,19 +284,20 @@ Available commands:
                             }
                             # HTML encode
                             $safeOutput = [System.Security.SecurityElement]::Escape($cmdOutput)
-                            $replyHtml = "⚡ <b>Execution Result on $env:COMPUTERNAME:</b>`n<code>$safeOutput</code>"
+                            $replyHtml = "<b>Execution Result on $env:COMPUTERNAME:</b>`n<code>$safeOutput</code>"
                             Send-TgMessage -ChatId $senderChatId -HtmlText $replyHtml
                             Write-Host "  [REPLY] Dispatched command execution output to Telegram." -ForegroundColor Green
                         } catch {
                             $errSafe = [System.Security.SecurityElement]::Escape($_)
-                            Send-TgMessage -ChatId $senderChatId -HtmlText "❌ <b>Execution Error:</b>`n<code>$errSafe</code>"
+                            Send-TgMessage -ChatId $senderChatId -HtmlText "<b>Execution Error:</b>`n<code>$errSafe</code>"
                         }
                     }
                     continue
                 }
 
                 # E. Unknown input fallback
-                $fallback = "❓ Unknown command: <code>$([System.Security.SecurityElement]::Escape($text))</code>`n`nSend <code>/help</code> or <code>/status</code> for available instructions."
+                $safeUnknown = [System.Security.SecurityElement]::Escape($text)
+                $fallback = "Unknown command: <code>$safeUnknown</code>`n`nSend <code>/help</code> or <code>/status</code> for available instructions."
                 Send-TgMessage -ChatId $senderChatId -HtmlText $fallback
             }
         }

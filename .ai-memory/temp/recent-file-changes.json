@@ -1,9 +1,11 @@
 {
   "version": 1,
-  "updated_at": "2026-09-22T12:00:29Z",
+  "updated_at": "2026-09-24T16:11:45Z",
   "files": [
     ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".github/workflows/ci.yml",
+    ".github/workflows/deploy-pages.yml",
+    "03-ai-scripts/34-purge-github-actions-artifacts.py",
     "deploy/arch/install.sh",
     "install.ps1",
     "install.sh",
@@ -34,6 +36,7 @@
     "src-tauri/src/modules/update_checker.rs",
     "src-tauri/src/modules/workspace_lease_manager.rs",
     "src-tauri/tauri.conf.json",
+    "src-tauri/windows-test.manifest",
     "src/App.tsx",
     "src/components/UpdateNotification.tsx",
     "src/components/accounts/AccountDetailsDialog.tsx",

@@ -49,6 +49,20 @@ def fetch_artifact_batch(repo: str, page: int = 1, per_page: int = 100):
     except Exception:
         return None
 
+def check_rate_limit_safety(threshold: int = 150) -> bool:
+    """Checks remaining GitHub API rate limit to prevent 403 API rate limit exceeded errors."""
+    cmd = ["gh", "api", "rate_limit", "--jq", ".resources.core.remaining"]
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if res.returncode == 0:
+        try:
+            remaining = int(res.stdout.strip())
+            if remaining < threshold:
+                print(f"⚠️ [RATE LIMIT GUARD] Remaining GitHub API requests low ({remaining} < {threshold}). Halting purge to preserve quota.", flush=True)
+                return False
+        except ValueError:
+            pass
+    return True
+
 def delete_single_artifact(repo: str, artifact_id: int) -> bool:
     cmd = ["gh", "api", "-X", "DELETE", f"repos/{repo}/actions/artifacts/{artifact_id}"]
     res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -58,6 +72,9 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
     print(f"\n========================================================", flush=True)
     print(f" Scanning artifacts for repository: {repo}", flush=True)
     print(f"========================================================", flush=True)
+
+    if not check_rate_limit_safety():
+        return
 
     first_batch = fetch_artifact_batch(repo, page=1, per_page=1)
     if not first_batch:
@@ -127,6 +144,9 @@ def purge_repo_caches(repo: str, max_workers: int = 8):
     print(f"\n========================================================", flush=True)
     print(f" Scanning caches for repository: {repo}", flush=True)
     print(f"========================================================", flush=True)
+
+    if not check_rate_limit_safety():
+        return
 
     first_batch = fetch_cache_batch(repo, page=1, per_page=1)
     if not first_batch:

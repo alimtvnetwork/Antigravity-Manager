@@ -4,9 +4,20 @@ fn main() {
     let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
 
     if target_os == "windows" && target_env == "msvc" {
-        let windows = tauri_build::WindowsAttributes::new();
+        let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
         let attrs = tauri_build::Attributes::new().windows_attributes(windows);
         tauri_build::try_build(attrs).expect("failed to run tauri-build");
+
+        // Embed Common-Controls 6.0 and Windows 10/11 compatibility manifest into all executables
+        // (both agm-alim.exe binary and antigravity_tools_lib test runner executables)
+        // using new_without_app_manifest to prevent duplicate resource (CVT1100) collisions.
+        let manifest_path = std::path::Path::new("windows-test.manifest");
+        if manifest_path.exists() {
+            if let Ok(abs_path) = manifest_path.canonicalize() {
+                println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
+            }
+        }
 
         let expected_arch_dir = match target_arch.as_str() {
             "x86_64" => "x64",
@@ -23,6 +34,7 @@ fn main() {
 
                 if let Some(target_dir) = debug_dir.parent() {
                     let _ = copy_dll_recursive(target_dir, &deps_dir, expected_arch_dir);
+                    let _ = copy_dll_recursive(target_dir, debug_dir, expected_arch_dir);
                 }
             }
         }

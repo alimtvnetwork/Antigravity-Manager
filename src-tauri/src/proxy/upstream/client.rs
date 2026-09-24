@@ -565,19 +565,6 @@ impl UpstreamClient {
         }
     }
 
-    /// Call v1internal API with 429 retry
-    /// Core request logic with error tolerance and retry support
-    ///
-    /// # Arguments
-    /// * `method` - API method (e.g., "generateContent")
-    /// * `query_string` - Optional query string (e.g., "?alt=sse")
-    /// * `get_credentials` - Closure to retrieve credentials (supports account rotation)
-    /// * `build_body` - Closure accepting project_id to construct request body
-    /// * `max_attempts` - Maximum retry attempts
-    ///
-    /// # Returns
-    /// HTTP Response
-
     /// Fetch available remote models list with multi-endpoint fallback
     #[allow(dead_code)] // API ready for future model discovery feature
     pub async fn fetch_available_models(

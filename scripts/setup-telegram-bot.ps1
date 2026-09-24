@@ -102,12 +102,14 @@ $getMeUrl = "https://api.telegram.org/bot$BotToken/getMe"
 try {
     $meResp = Invoke-RestMethod -Uri $getMeUrl -Method Get -TimeoutSec 15
 } catch {
-    Write-Error "Failed to connect to Telegram Bot API: $_"
+    Write-Host "[ERROR] Failed to connect to Telegram Bot API: $_" -ForegroundColor Red
+    Write-Host "        Token provided: '$BotToken'" -ForegroundColor Yellow
+    Write-Host "        Tip: Ensure you copied the full HTTP API token from @BotFather." -ForegroundColor Yellow
     exit 1
 }
 
 if (-not $meResp.ok) {
-    Write-Error "Telegram Bot API returned error: $($meResp.description)"
+    Write-Host "[ERROR] Telegram Bot API returned error: $($meResp.description)" -ForegroundColor Red
     exit 1
 }
 
@@ -221,7 +223,7 @@ if ($SendTest -and $AllowedChatId -ne 0) {
     $sendMessageUrl = "https://api.telegram.org/bot$BotToken/sendMessage"
     $nodeName = $env:COMPUTERNAME
     $timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-    $testText = "🚀 <b>Antigravity-Manager Alert Test</b>`n`nBot verification completed successfully!`nNode: <code>$nodeName</code>`nTimestamp: <code>$timestamp</code>`n`n📋 <b>Commands available:</b>`n• <code>/status</code> or <code>SNAPSHOT</code> (Cluster status)`n• <code>FF</code> (Fast-Forward profile rotation)`n• <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> (Execute remote instruction)"
+    $testText = "<b>Antigravity-Manager Alert Test</b>`n`nBot verification completed successfully!`nNode: <code>$nodeName</code>`nTimestamp: <code>$timestamp</code>`n`n<b>Commands available:</b>`n- <code>/status</code> or <code>SNAPSHOT</code> (Cluster status)`n- <code>FF</code> (Fast-Forward profile rotation)`n- <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> (Execute remote instruction)"
 
     $testPayload = @{
         chat_id = $AllowedChatId

@@ -313,8 +313,6 @@ pub fn merge_consecutive_messages(messages: &mut Vec<Message>) {
     *messages = merged;
 }
 
-/// 转换 Claude 请求为 Gemini v1internal 格式
-
 /// [FIX #709] Reorder serialized Gemini parts to ensure thinking blocks are first,
 /// deduplicate multiple thinking blocks to at most ONE per model turn, and clean out raw dot placeholders.
 fn reorder_gemini_parts(parts: &mut Vec<Value>) {
