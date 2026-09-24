@@ -7,6 +7,7 @@ import {
   Download,
   LayoutGrid,
   List,
+  Loader2,
   RefreshCw,
   Search,
   Sparkles,
@@ -61,7 +62,7 @@ function Accounts() {
     updateAccountLabel,
   } = useAccountStore();
   const { config, showAllQuotas, toggleShowAllQuotas } = useConfigStore();
-  const { updateInfo, setShowNotification } = useUpdateStore();
+  const { updateInfo, installUpdate, isInstalling } = useUpdateStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -1073,14 +1074,22 @@ function Accounts() {
               updateInfo?.has_update ? (
                 <button
                   type="button"
-                  onClick={() => setShowNotification(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 group"
-                  title="A newer version is available. Click to view and install."
+                  onClick={async () => {
+                    showToast(t("update_notification.installing_desc", "Launching official updater in background..."), "info");
+                    await installUpdate();
+                  }}
+                  disabled={isInstalling}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 group disabled:opacity-75 disabled:cursor-not-allowed"
+                  title="A newer version is available. Click to launch installer."
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-500 group-hover:rotate-12 transition-transform" />
+                  {isInstalling ? (
+                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500 group-hover:rotate-12 transition-transform" />
+                  )}
                   <span>Update Available: v{updateInfo.latest_version}</span>
-                  <span className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded font-semibold ml-0.5">
-                    Install Now
+                  <span className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded font-semibold ml-0.5 flex items-center gap-1">
+                    {isInstalling ? "Installing..." : "Install Now"}
                   </span>
                 </button>
               ) : null

@@ -595,64 +595,40 @@ pub async fn run_installer_update() -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let mut ps_cmd = tokio::process::Command::new("powershell");
-        ps_cmd.creation_flags_windows().args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-WindowStyle",
-            "Hidden",
-            "-ExecutionPolicy",
-            "Bypass",
-        ]);
-
-        if std::path::Path::new("install.ps1").exists() {
-            ps_cmd.args(["-File", ".\\install.ps1", "-Update", "-NoLaunch"]);
+        // On Windows, launch the installer in a visible, detached PowerShell process
+        // so the user sees live download/update progress in a dedicated window,
+        // and when the installer updates or restarts agm-alim.exe, it is not blocked or killed by parent process termination.
+        let ps_body = if std::path::Path::new("install.ps1").exists() {
+            "Write-Host 'Updating Antigravity Tools...' -ForegroundColor Cyan; .\\install.ps1 -Update"
         } else {
-            ps_cmd.args([
-                "-Command",
-                "& { $script = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($script)) -Update -NoLaunch }",
-            ]);
-        }
-
-        let result =
-            tokio::time::timeout(std::time::Duration::from_secs(300), ps_cmd.output()).await;
-
-        let output = match result {
-            Ok(Ok(o)) => o,
-            Ok(Err(e)) => return Err(format!("Failed to execute installer: {}", e)),
-            Err(_) => return Err("Installer timed out after 5 minutes".to_string()),
+            "Write-Host 'Updating Antigravity Tools from official release...' -ForegroundColor Cyan; $s = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($s)) -Update"
         };
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let mut spawn_cmd = std::process::Command::new("cmd.exe");
+        spawn_cmd.args([
+            "/c",
+            "start",
+            "Antigravity Tools Updater",
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            ps_body,
+        ]);
 
-        if output.status.success() {
-            logger::log_info(&format!("Installer update succeeded: {}", stdout));
-            Ok(stdout)
-        } else {
-            let error_detail = if !stderr.trim().is_empty() {
-                stderr.trim().to_string()
-            } else if !stdout.trim().is_empty() {
-                let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
-                lines
-                    .iter()
-                    .rev()
-                    .take(6)
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .rev()
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            } else {
-                format!("Process exited with status code {:?}", output.status.code())
-            };
-
-            logger::log_error(&format!(
-                "Installer update failed - stdout: {} stderr: {}",
-                stdout, stderr
-            ));
-            Err(format!("Installer update failed: {}", error_detail))
+        match spawn_cmd.spawn() {
+            Ok(_) => {
+                logger::log_info("Successfully launched visible detached installer process.");
+                Ok(
+                    "Official installer launched successfully! Check the update console window."
+                        .to_string(),
+                )
+            }
+            Err(e) => {
+                logger::log_error(&format!("Failed to spawn updater process: {}", e));
+                Err(format!("Failed to spawn updater: {}", e))
+            }
         }
     }
 

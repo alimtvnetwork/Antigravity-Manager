@@ -4,7 +4,7 @@ fn main() {
     let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
 
     if target_os == "windows" && target_env == "msvc" {
-        let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        let windows = tauri_build::WindowsAttributes::new();
         let attrs = tauri_build::Attributes::new().windows_attributes(windows);
         tauri_build::try_build(attrs).expect("failed to run tauri-build");
 

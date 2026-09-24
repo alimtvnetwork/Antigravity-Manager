@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Sparkles, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
-import { request as invoke } from '../utils/request';
 import { useTranslation } from 'react-i18next';
 import { relaunch as tauriRelaunch } from '@tauri-apps/plugin-process';
 import { useUpdateStore } from '../stores/use-update-store';
@@ -23,6 +22,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   const { t } = useTranslation();
   const storeInfo = useUpdateStore((state) => state.updateInfo);
   const checkForUpdates = useUpdateStore((state) => state.checkForUpdates);
+  const installUpdate = useUpdateStore((state) => state.installUpdate);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(storeInfo);
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -62,8 +62,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   const handleRunInstaller = async () => {
     setIsInstalling(true);
     try {
-      await invoke('run_installer_update');
-      setUpdateState('ready');
+      const res = await installUpdate();
+      if (res) {
+        setUpdateState('ready');
+      } else {
+        setUpdateState('manual');
+      }
     } catch (error) {
       console.error('Installer update failed:', error);
       setUpdateState('error');

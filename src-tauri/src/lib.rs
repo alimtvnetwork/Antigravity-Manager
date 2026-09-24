@@ -336,9 +336,15 @@ pub fn run() {
         return;
     }
 
-    // Disable Windows background throttling/EcoQoS
+    // Disable Windows background throttling/EcoQoS and Chromium background occlusion
     #[cfg(target_os = "windows")]
-    windows_api::disable_efficiency_mode();
+    {
+        windows_api::disable_efficiency_mode();
+        std::env::set_var(
+            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            "--disable-features=CalculateNativeWindowOcclusion --disable-backgrounding-occluded-windows --disable-renderer-backgrounding",
+        );
+    }
 
     // Check for headless mode
     let args: Vec<String> = std::env::args().collect();
@@ -589,19 +595,16 @@ pub fn run() {
 
             // Explicitly set window icon for main window on Windows/Linux and heal restored offscreen coordinates
             if let Some(window) = app.get_webview_window("main") {
-                if let Ok(pos) = window.outer_position() {
-                    let is_offscreen_x = pos.x < -1000;
-                    let is_offscreen_y = pos.y < -1000;
-                    if is_offscreen_x || is_offscreen_y {
-                        let _ = window.center();
-                    }
-                }
                 let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
                 if let Ok(img) = image::load_from_memory(icon_bytes) {
                     let rgba = img.to_rgba8();
                     let (width, height) = rgba.dimensions();
                     let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
                     let _ = window.set_icon(icon);
+                }
+                let is_minimized_arg = std::env::args().any(|arg| arg == "--minimized");
+                if !is_minimized_arg {
+                    restore_and_focus_window(&window);
                 }
             }
 

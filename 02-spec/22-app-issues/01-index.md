@@ -41,6 +41,10 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 03 | [03-ip-security-null-and-ipc-query-fix.md](03-ip-security-null-and-ipc-query-fix.md) | IP Security Statistics Null Column Conversion & IPC Access Log Argument Mismatch | High | Fixed |
 | 04 | [04-instance-delete-open-close-loop-and-focus-stealing-rca.md](04-instance-delete-open-close-loop-and-focus-stealing-rca.md) | Instance Delete Error Trace, Open/Close Restart Loop & Unwanted Focus Stealing RCA | High | Fixed |
 | 05 | [05-email-html-rendering-and-smart-rotator-ide-switch-rca.md](05-email-html-rendering-and-smart-rotator-ide-switch-rca.md) | Email HTML MIME Rendering, Node Identity Prefixing & Smart Rotator IDE Switch Delegation RCA | Critical | Fixed |
+| 06 | [06-blank-ui-and-taskbar-thumbnail-rca.md](06-blank-ui-and-taskbar-thumbnail-rca.md) | Blank UI & Windows Taskbar Preview Elimination via Occlusion Flag & Minimized State Exclusion | High | Fixed |
+| 07 | [07-installer-click-and-update-action-rca.md](07-installer-click-and-update-action-rca.md) | Installer Click Action Wiring & Visible Detached Process Execution on Windows RCA | High | Fixed |
+| 08 | [08-manifest-and-entrypoint-resolution-rca.md](08-manifest-and-entrypoint-resolution-rca.md) | Application Manifest Restoration, Entry Point Resolution & Blank Screen Elimination RCA | Critical | Fixed |
+
 
 ---
 

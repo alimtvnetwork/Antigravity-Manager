@@ -1126,7 +1126,7 @@ pub async fn migrate_data_dir(new_path: String, clean_source: bool) -> Result<()
 
 /// 显示主窗口
 #[tauri::command]
-pub async fn show_main_window(window: tauri::Window) -> Result<(), String> {
+pub async fn show_main_window(window: tauri::WebviewWindow) -> Result<(), String> {
     let icon_bytes: &[u8] = include_bytes!("../../icons/icon.png");
     if let Ok(img) = image::load_from_memory(icon_bytes) {
         let rgba = img.to_rgba8();
@@ -1134,8 +1134,8 @@ pub async fn show_main_window(window: tauri::Window) -> Result<(), String> {
         let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
         let _ = window.set_icon(icon);
     }
-    let _ = window.unminimize();
-    window.show().map_err(|e| e.to_string())
+    crate::restore_and_focus_window(&window);
+    Ok(())
 }
 
 /// 设置窗口主题（用于同步 Windows 标题栏按钮颜色）

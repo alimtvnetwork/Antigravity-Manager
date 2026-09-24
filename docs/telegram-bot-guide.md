@@ -18,7 +18,17 @@ Antigravity Manager features an autonomous background daemon that connects direc
 
 You can configure the bot either via the automated script, the AGM GUI, or manually via JSON.
 
-### Option A: Automated PowerShell Wizard (Recommended)
+### Option A: In-App GUI Setup (Antigravity-Manager)
+
+1. Launch Antigravity-Manager and click **Settings** (or the gear icon).
+2. Navigate to **Supabase Multi-Instance Sync** (or **Cluster & Cloud Sync**).
+3. Scroll down to the **Telegram Inbound Bot Integration** card.
+4. Enter your **Telegram Bot Token** and optional **Allowed Chat ID**.
+5. Click **Test Bot** to verify connectivity with Telegram's servers.
+6. Click **Send Test Message** to verify message delivery to your Telegram app.
+7. Toggle **Enable Telegram Inbound Daemon** to active and click **Save Telegram**.
+
+### Option B: Automated PowerShell Wizard (Recommended)
 
 Run the setup wizard from the project repository:
 
@@ -28,10 +38,26 @@ Run the setup wizard from the project repository:
 
 The script performs the following automatically:
 - Validates the token against the official Telegram API (`/getMe`).
-- Queries recent chat updates (`/getUpdates`) so you can select and bind your personal Telegram user account (`allowed_chat_id`).
+- Queries recent chat updates (`/getUpdates`) or listens live for you to message the bot.
+- Automatically captures and binds your personal Telegram user account (`allowed_chat_id`).
+- Dispatches a live test alert to your Telegram chat to verify end-to-end communication.
 - Writes the formatted configuration into `$HOME/.antigravity_tools/telegram_config.json`.
 
-### Option B: Manual Configuration
+### Option C: Standalone PowerShell Telegram Agent Daemon
+
+For headless servers or environments running without the Tauri desktop UI:
+
+```powershell
+.\scripts\telegram-agent-daemon.ps1
+```
+
+Or run the wizard directly into agent mode:
+
+```powershell
+.\scripts\setup-telegram-bot.ps1 -RunAgent
+```
+
+### Option D: Manual Configuration
 
 Edit or create `~/.antigravity_tools/telegram_config.json` (or `$env:ABV_DATA_DIR/telegram_config.json`):
 
