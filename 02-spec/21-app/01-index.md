@@ -132,6 +132,9 @@ The complete reverse-engineered architecture is documented across the following 
 | [19-inbound-email-remote-control-and-agm-cli.md](19-inbound-email-remote-control-and-agm-cli.md) | Inbound Email Remote Control & AGM Native Terminal CLI | Universal pipe-delimited email command grammar, 2-phase plaintext ACK/Result receipts, 10s sliding debounce stack, sender ACL, and native `agm` terminal CLI |
 | [20-agm-cli-expanded-commands.md](20-agm-cli-expanded-commands.md) | AGM CLI Expanded Commands Suite | Extended CLI command suite (doctor, accounts, switch, prompts, proxy, sync, pull, clean, logs) mirroring GitMap |
 | [21-pr4-upstream-sync-merge-and-architecture-protection.md](21-pr4-upstream-sync-merge-and-architecture-protection.md) | PR #4 Upstream Sync & Architecture Protection | Assimilating upstream features, preserving superior build/versioning/branding, and English translation |
+| [22-ui-fluidity-email-remote-instance-fleet-fixes.md](22-ui-fluidity-email-remote-instance-fleet-fixes.md) | UI Fluidity & Email Remote Instance Fleet Fixes | UI fluidity, auto-dismiss banners, zero-delay account refresh, and remote instance fleet |
+| [23-comprehensive-ui-quota-installer-and-settings-restoration.md](23-comprehensive-ui-quota-installer-and-settings-restoration.md) | Comprehensive UI, Quota & Settings Restoration | Quota 5-hour calculation fix, debounce protection, clean shortcut branding, and installer separation |
+| [24-instance-duplicate-default-selector-and-security-ip-fixes.md](24-instance-duplicate-default-selector-and-security-ip-fixes.md) | Instance Duplicate, Default Selector & Security Fixes | Restore clone/duplicate buttons, single navbar button (Fast-Forward), configurable shortcut (Ctrl+Shift+F), and Security IP null fixes |
 | [telegram-bot-setup-guide.md](telegram-bot-setup-guide.md) | Telegram Bot Setup & Automated PowerShell Guide | Guide and automated script for Telegram Bot creation, chat ID extraction, credential validation, and alert testing |
 
 ---
@@ -181,3 +184,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
 - **AC-APP-022 (UI Fluidity & Fleet Invariants):** Implemented in [`22-ui-fluidity-email-remote-instance-fleet-fixes.md`](./22-ui-fluidity-email-remote-instance-fleet-fixes.md).
 - **AC-APP-023 (Comprehensive UI, Quota & Settings Restoration):** Implemented in [`23-comprehensive-ui-quota-installer-and-settings-restoration.md`](./23-comprehensive-ui-quota-installer-and-settings-restoration.md).
+- **AC-APP-024 (Instance Duplicate, Default Selector & Security Fixes):** Implemented in [`24-instance-duplicate-default-selector-and-security-ip-fixes.md`](./24-instance-duplicate-default-selector-and-security-ip-fixes.md).

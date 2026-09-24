@@ -219,6 +219,7 @@ export interface AutoProfileSwitcherConfig {
     auto_focus_window?: boolean;
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
+    fast_forward_shortcut?: string;
 }
 
 // ============================================================================

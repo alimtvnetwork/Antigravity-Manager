@@ -2,6 +2,40 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+*   **版本历史记录 (Version History)**:
+    *   **v4.69.0 (2026-09-24)**:
+        -   **[Release v4.69.0: 完整 IDE 复制与仅配置文件复制克隆架构与 UI 布局对齐] IDE 与配置文件双克隆模式、导航栏操作按钮精准重排、独立发布命令块与双端一致性**:
+            -   **恢复完整的 "IDE 完整克隆 vs 仅配置文件复制" 架构**: 在顶部导航栏下拉面板 (`InstanceSelector.tsx`) 和主管理仪表盘 (`Instances.tsx`) 同步引入双重克隆模式。用户可明确选择 **IDE 完整克隆 (完整环境与会话)**（完整复制独立环境数据目录、工作区会话、扩展、缓存与运行状态）或 **仅配置文件复制 (偏好设置与代码片段)**（仅复制用户偏好、按键绑定与代码片段，不携带庞大运行时会话数据）。
+            -   **下拉菜单头部与每行操作按钮精准布局对齐**: 严格对齐用户提供的布局规范与截图 (`https://prnt.sc/dbDLrTd-Rfns`)。头部区域标题更新为 `多实例与配置` (INSTANCES / PROFILES)，配备直观的“克隆当前活动配置”操作。对每行操作按钮按规范重排，将重命名铅笔图标 (`Pencil`) 置于复制克隆图标 (`Copy`) 前方，形成 `启动/停止` -> `快速切换` -> `重命名` -> `克隆` -> `设为默认` -> `删除` 的标准操作链。
+            -   **外部导航栏极简单快进按钮保证**: 确保外部导航栏仅保留唯一的快进轮换按钮 (`[ ⏩ ]`)，具备全局快捷键 (`Ctrl+Shift+F`) 动态悬停提示与高对比度序号徽标 (`#1`, `#2`, `#3`...)，彻底移除多余的外部启动按钮。
+            -   **发布页面一键安装代码块隔离验证**: 验证并确保 GitHub Release 与发布说明中的直接最新安装与固定版本安装命令完全独立为互不包含的代码块，避免复制时夹带注释或多余脚本。
+
+    *   **v4.68.0 (2026-09-24)**:
+        -   **[Release v4.68.0: 实例克隆复制恢复、默认配置选择与防删、快进快捷键与安全诊断根治] 实例克隆复制深度恢复、精简外部快进单键、Ctrl+Shift+F 全局快进快捷键、默认实例独占标记与 SQLite 空聚合安全防崩**:
+            -   **恢复多实例克隆复制（Duplicate / Clone）交互**: 在顶部导航栏 `InstanceSelector.tsx` 下拉菜单顶部工具条与每个实例条目行均补齐「Duplicate Profile」克隆复制按钮（`Copy` 图标），支持一键完整复制或增量复制指定环境；在 `Instances.tsx` 页面卡片及底部工具栏全面恢复复制操作。
+            -   **外部导航栏极简快进单键与序号徽章加宽**: 彻底移除外部导航栏绿色运行按键，仅保留单颗蓝色极速快进（Fast-Forward `[ ⏩ ]`）核心操作键，悬浮显示动态快捷键提示；将下拉面板宽度自适应扩展为 `w-96 md:w-[420px]`，并渲染醒目的大号 `#1`、`#2`、`#3` 实例序列号徽章。
+            -   **默认实例选择与防止误删机制 (`set_default_instance`)**: 新增 `set_default_instance` Tauri IPC 指令与前端绑定，支持任意实例一键设为启动默认实例并独占标明 `DEFAULT` 徽章；在后端与前端双向拦截对默认实例的删除操作，杜绝误操作导致环境崩溃。
+            -   **可配置 Fast-Forward 快捷键与全局监听**: 新增配置字段 `fast_forward_shortcut`（默认 `Ctrl+Shift+F`），在 `AutoSwitcherSettings.tsx` 中提供快捷键预设选钮与自定义按键面板；通过全局钩子 `useFastForwardShortcut.ts` 在窗口任意位置一键无感调度多实例智能快进切号并弹出反馈通知。
+            -   **安全中心 SQLite 空聚合与 IPC 参数结构彻底修复**: 修复 `security_db.rs` 中空数据库调用 `SUM()` 产生 `NULL` 触发 `Invalid column type Null at index: 2, name: blocked` 的缺陷，统一包裹 `COALESCE(SUM(...), 0)` 并采用 `Option<u64>` 容错反序列化；在 `commands/security.rs` 中使 `get_ip_access_logs` 兼容嵌套结构体与扁平参数，彻底根治前端触发的 `missing required key query` 异常。
+
+    *   **v4.67.0 (2026-09-24)**:
+        -   **[Release v4.67.0: 自动切号 UI/UX 深度重构、本地多核秒级运行与 Docker 极速构建产物规范] 自动切号双卡片对称美化、暗色模式色块根除、全核并行编译与 Docker 官方二进制规范**:
+            -   **自动切号设置区域 UI/UX 深度重构**: 将左侧单薄裸露的模型选择下拉框升级为官方标准卡片，集成 `Cpu` 图标徽章、`Trigger Metric` 指标标签与详细说明，并新增根据所选模型动态展示的特性描述（Gemini 3.8 Flash 高速并发、Claude Sonnet 4.6 深度思考预算切换、Gemini Pro 标准基准）。内置 **Rotation Cooldown Guard** 冷却滑动条，使左右两侧卡片实现高度绝对平衡对称。
+            -   **暗色模式 Recency Cutoff 灰白底色根治**: 彻底消除 DaisyUI 与 Tailwind 暗色模式混合引起的白色高亮色块，以 Slate 原生深色调 (`bg-slate-100/90 dark:bg-slate-900/90 border-slate-700/80`) 重构最近活跃提示词恢复窗口面板，并在右侧统一构建 **Task Continuity & Watchdog** 守护面板。
+            -   **本地多核极速运行器升级 (`run.ps1`)**: 自动检测硬件核心数并导出 `$env:CARGO_BUILD_JOBS` 开启全核多线程并行编译；自动探测并接入 `sccache` 编译对象级缓存与 `lld-link` 极速链接器；新增 `-Quick` / `-Run` 免编译极速直启模式与 `-OptimizeIO` Windows Defender 排除向导。
+            -   **Docker 镜像编译与分发规范修复**: 修正 `docker/Dockerfile`、`Dockerfile.backend` 及 `Dockerfile.backend.localdist` 中过时的编译参数，统一绑定为官方最新 `agm-alim` 二进制并保持 `/app/antigravity-tools` 兼容软链接，打通无头 Linux 容器的高效流水线。
+
+    *   **v4.66.0 (2026-09-24)**:
+        -   **[Release v4.66.0: 5小时滚动配额精准恢复、进程品牌统一、实例序号徽章与邮箱样本预加载] 5小时滚动配额计算恢复、开箱即用邮箱样本、任务管理器官方品牌、Telegram BotFather 向导与发布页代码块独立分割**:
+            -   **恢复 5 小时滚动配额基准计算**: 修复 `src-tauri/src/modules/quota.rs` 中滚动配额选择器比较逻辑。当存在 5 小时滚动配额且周配额未耗尽（`remaining_fraction > 0.001`）时，系统无条件优先采用 5 小时滚动配额并显示精准倒计时（如 `4h 56m`），周配额倒计时（如 `6d 9h`）仅在周配额完全耗尽时展示。
+            -   **账号页面高频点击防白屏与操作按钮常驻可见**: 移除 `src/pages/Accounts.tsx` 中重复触发的单账号配额刷新调用，彻底杜绝 WebView2 密集重绘竞态。将 `src/components/accounts/AccountTable.tsx` 表格操作按钮从 `opacity-0` 隐式悬浮调整为常驻可见并具备高对比度悬浮交互。
+            -   **任务管理器官方品牌展示与开始菜单快捷方式无版本号**: 在 `src-tauri/tauri.conf.json` 中配置 `productName: "Antigravity Manager Tools"`，使 Windows 任务管理器展示正式软件全称。开始菜单与桌面快捷方式统一命名为无版本号的 `Antigravity Manager Tools.lnk`，同时 Windows 已安装应用列表精准保留显式版本号（`Antigravity Manager Tools 4.66.0`）。
+            -   **实例序号徽章（#1, #2, #3）与加宽卡片布局**: 在 `src/pages/Instances.tsx` 实例卡片及顶部导航栏 `InstanceSelector.tsx` 中为每个实例标记高对比度序号徽章（`#1`、`#2`...），增大卡片内边距与间距，并在页面头部提供快速「+ New Instance」创建按钮。
+            -   **入站邮件终端指令前缀剥离与 AI 提示词指令拦截**: 在 `src-tauri/src/commands/email.rs` 与 `src-tauri/src/modules/email_inbound.rs` 中自动过滤终端前缀（`powershell:`、`ps:`、`ps `、`bash:`、`sh:`、`cmd:`），Windows 系统默认无缝调用 PowerShell。对自然语言与 AI 指令（`Project:`、`Prompt:`、`AI:`、`Instruction:` 等）执行拦截仿真，避免触发 PowerShell 语法异常。
+            -   **邮箱样本账户一键预加载与小写 gitmap 命令模板**: 在 `EmailNotificationSettings.tsx` 空状态与操作下拉菜单中增加「Load Sample Mailboxes」快捷装载功能。优化 `MailboxExportModal.tsx` 自定义滚动条并将底层文本统一为「Antigravity Manager Tools」，并将快捷指令对齐为简洁 PowerShell 与规范小写 `gitmap`。
+            -   **Telegram 引导向导与自动切换器规则备份恢复**: 在 `SupabaseSyncSettings.tsx` 中增加 Telegram @BotFather 逐步创建引导弹窗并对齐表单高度。在 `AutoSwitcherSettings.tsx` 中增加 Actions 操作菜单支持 JSON 规则导入导出。在全局 Settings 工具栏与导航栏分别集成完整系统备份与调试控制台入口。
+            -   **发布页安装指令代码块彻底独立分割**: 将直接最新安装与固定版本安装指令在 `readme.md`、`README_EN.md` 及发布模板中拆分为两个独立的代码块，杜绝注释混合。验证并固化固定版本 PowerShell 指令：`& ([scriptblock]::Create((irm ...))) -Version 4.66.0`。
+
     *   **v4.65.3 (2026-09-24)**:
         -   **[Release v4.65.3: 邮箱全格式原生导出、单账号导入导出与 AI 嵌入式 JSON 语法] 邮箱交互式多格式预览弹窗、Tauri 原生文件对话框保存、单账号独立导入导出与嵌入式 JSON AI 指令段**:
             -   **交互式导出预览弹窗与 WebView2 导出失灵根治**: 新增 `MailboxExportModal.tsx` 组件，彻底解决 Windows WebView2 下点击导出仅弹出提示却无文件下载与无界面反馈的缺陷。点击导出即刻在屏幕中央呼出代码高亮预览弹窗，支持 **JSON**、**YAML**、**CSV** 三大主流格式实时热切换，支持一键复制代码与调用系统级原生保存文件对话框。
@@ -3201,6 +3235,26 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.69.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
+    *   **v4.68.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
+    *   **v4.67.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
+    *   **v4.66.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.65.3 (2026-09-24)**:
         -   **[Release v4.65.3: Mailbox Multi-Format Visual Export, Single-Account Import/Export & Embedded JSON AI Syntax] Interactive Export Preview Modal, Native OS File Saving, Single Account Form Drawer & Embedded JSON AI Instructions**:
             -   **Interactive Visual Export Modal & WebView2 Download Fix**: Introduced `MailboxExportModal.tsx` to eliminate WebView2 silent download failures where blob URL clicks were dropped without file or UI response. Clicking any export action immediately launches a syntax-highlighted dark modal with live switching between **JSON**, **YAML**, and **CSV**, instant clipboard copying, and native OS file saving.

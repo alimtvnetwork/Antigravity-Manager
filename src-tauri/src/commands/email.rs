@@ -351,18 +351,43 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
     }
 
     let lower_cmd = cmd_str.to_lowercase();
-    if lower_cmd.starts_with("project:") || lower_cmd.starts_with("prompt:") {
+    let is_ai_prompt = lower_cmd.starts_with("project:")
+        || lower_cmd.starts_with("prompt:")
+        || lower_cmd.starts_with("prompt ")
+        || lower_cmd.starts_with("prompt-name:")
+        || lower_cmd.starts_with("prompt instruction:")
+        || lower_cmd.starts_with("prompt injection:")
+        || lower_cmd.starts_with("prompt-injection:")
+        || lower_cmd.starts_with("ai:")
+        || lower_cmd.starts_with("instruction:")
+        || lower_cmd.starts_with("inject:");
+
+    if is_ai_prompt {
         let lines: Vec<&str> = cmd_str.lines().collect();
-        let project = if let Some(first_line) = lines.first() {
-            if let Some(pos) = first_line.find(':') {
-                first_line[pos + 1..].trim()
+        let mut project = "Default";
+        let mut prompt_lines: Vec<&str> = Vec::new();
+
+        for (idx, line) in lines.iter().enumerate() {
+            let l_trim = line.trim();
+            let l_lower = l_trim.to_lowercase();
+            if idx == 0 {
+                if let Some(pos) = l_trim.find(':') {
+                    let candidate = l_trim[pos + 1..].trim();
+                    if !candidate.is_empty() {
+                        project = candidate;
+                    }
+                }
+            } else if l_lower.starts_with("project:") {
+                let candidate = l_trim["project:".len()..].trim();
+                if !candidate.is_empty() {
+                    project = candidate;
+                }
             } else {
-                "Default"
+                prompt_lines.push(*line);
             }
-        } else {
-            "Default"
-        };
-        let prompt_text = lines.iter().skip(1).copied().collect::<Vec<&str>>().join("\n").trim().to_string();
+        }
+
+        let prompt_text = prompt_lines.join("\n").trim().to_string();
         let prompt_display = if prompt_text.is_empty() {
             cmd_str.to_string()
         } else {
@@ -375,7 +400,7 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
         return Ok(CliExecResult {
             exit_code: 0,
             stdout: format!(
-                "[AI Prompt Simulation]\nNode: {}\nTarget Project: {}\nInstructions: {}\n\nStatus: Prompt validated and ready for remote execution / agent injection.",
+                "[AI Prompt Simulation]\nNode: {}\nTarget Project: {}\nInstructions:\n{}\n\nStatus: Prompt validated and ready for remote execution / agent injection.",
                 machine_name, project, prompt_display
             ),
             stderr: String::new(),

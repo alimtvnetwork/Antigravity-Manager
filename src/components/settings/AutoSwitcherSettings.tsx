@@ -16,6 +16,9 @@ import {
     SlidersHorizontal,
     ChevronDown,
     RotateCcw,
+    Cpu,
+    ArrowRightLeft,
+    FastForward,
 } from 'lucide-react';
 import { showToast } from '../common/ToastContainer';
 import { AutoProfileSwitcherConfig } from '../../types/config';
@@ -218,14 +221,14 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             checked={currentConfig.is_enabled}
                             onChange={(e) => handleToggleEnabled(e.target.checked)}
                         />
-                        <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
+                        <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
                     </label>
                 </div>
             </div>
 
             {/* Config details when enabled */}
             {currentConfig.is_enabled && (
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-base-300 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Polling Interval */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2">
@@ -326,113 +329,306 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                        {/* Target Model to Evaluate */}
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
-                                {t('settings.auto_switcher.target_model_label', 'Primary Evaluated Model')}
-                            </label>
-                            <select
-                                value={currentConfig.target_model}
-                                onChange={(e) => onChange({ ...currentConfig, target_model: e.target.value })}
-                                className="select select-sm w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200"
-                            >
-                                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Primary, Recommended)</option>
-                                <option value="claude-sonnet-4.6">Claude Sonnet 4.6 (Failover / Fallback)</option>
-                                <option value="gemini-pro">Gemini Pro</option>
-                            </select>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+                        {/* Target Model & Failover Benchmark Card */}
+                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-4 shadow-2xs">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-500/30">
+                                            <Cpu className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">
+                                                {t('settings.auto_switcher.target_model_label', 'Primary Evaluated Model')}
+                                            </h4>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Quota benchmark evaluated to trigger automated account failover
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-500/20 font-semibold">
+                                        Trigger Metric
+                                    </span>
+                                </div>
+
+                                <div className="relative mt-3">
+                                    <select
+                                        value={currentConfig.target_model}
+                                        onChange={(e) => onChange({ ...currentConfig, target_model: e.target.value })}
+                                        className="w-full appearance-none px-3 py-2 pr-9 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all cursor-pointer"
+                                    >
+                                        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Primary, Recommended)</option>
+                                        <option value="claude-sonnet-4.6">Claude Sonnet 4.6 (Failover / Fallback)</option>
+                                        <option value="gemini-pro">Gemini Pro</option>
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 text-slate-400 pointer-events-none absolute right-3 top-2.5" />
+                                </div>
+
+                                {/* Contextual Model Traits / Hints */}
+                                <div className="mt-3 p-2.5 rounded-lg bg-blue-50/60 dark:bg-slate-900/60 border border-blue-100/80 dark:border-slate-700/60 text-[11px] space-y-1">
+                                    {currentConfig.target_model === 'gemini-3.8-flash' && (
+                                        <div className="flex items-start gap-1.5 text-blue-700 dark:text-blue-300">
+                                            <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                            <span><strong>High Throughput &amp; Large Budget:</strong> Optimized for real-time completions with rolling 5-hour quota reset tracking.</span>
+                                        </div>
+                                    )}
+                                    {currentConfig.target_model === 'claude-sonnet-4.6' && (
+                                        <div className="flex items-start gap-1.5 text-purple-700 dark:text-purple-300">
+                                            <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                            <span><strong>Deep Reasoning Budget:</strong> Failover activates when Claude Sonnet extended thinking budget hits low threshold.</span>
+                                        </div>
+                                    )}
+                                    {currentConfig.target_model === 'gemini-pro' && (
+                                        <div className="flex items-start gap-1.5 text-slate-700 dark:text-slate-300">
+                                            <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                            <span><strong>Standard Chat Baseline:</strong> Evaluates standard Gemini Pro quota headroom across all profile slots.</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Rotation Cooldown Period Setting */}
+                            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60">
+                                <div className="flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>Rotation Cooldown Guard</span>
+                                    </span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-mono font-bold">
+                                        {Math.round((currentConfig.cooldown_seconds || 180) / 60)} min ({currentConfig.cooldown_seconds || 180}s)
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="60"
+                                    max="600"
+                                    step="30"
+                                    value={currentConfig.cooldown_seconds || 180}
+                                    onChange={(e) => onChange({ ...currentConfig, cooldown_seconds: Number(e.target.value) })}
+                                    className="w-full accent-blue-600 cursor-pointer"
+                                />
+                                <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+                                    <span>1 min</span>
+                                    <span>3 min (Default)</span>
+                                    <span>5 min</span>
+                                    <span>10 min</span>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Task Resume Checkbox */}
-                        <div className="flex flex-col gap-2 pt-2">
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="auto_resume_cb"
-                                    checked={currentConfig.has_auto_resume}
-                                    onChange={(e) => onChange({ ...currentConfig, has_auto_resume: e.target.checked })}
-                                    className="checkbox checkbox-sm checkbox-primary rounded"
-                                />
-                                <label htmlFor="auto_resume_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                    {t('settings.auto_switcher.auto_resume_label', 'Snapshot and auto-resume pending tasks on restart')}
-                                </label>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="auto_ff_cb"
-                                    checked={currentConfig.auto_fast_forward_on_critical ?? true}
-                                    onChange={(e) => onChange({ ...currentConfig, auto_fast_forward_on_critical: e.target.checked })}
-                                    className="checkbox checkbox-sm checkbox-secondary rounded"
-                                />
-                                <label htmlFor="auto_ff_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                    Auto-trigger Fast-Forward when credits drop &le; 12% (Highest credit candidate)
-                                </label>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="auto_resume_recent_cb"
-                                    checked={currentConfig.auto_resume_recent_prompts ?? true}
-                                    onChange={(e) => onChange({ ...currentConfig, auto_resume_recent_prompts: e.target.checked })}
-                                    className="checkbox checkbox-sm checkbox-accent rounded"
-                                />
-                                <label htmlFor="auto_resume_recent_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                    Auto-Resume Recent Active Prompts on Fast-Forward (&lt; 1h with images)
-                                </label>
-                            </div>
-                            {(currentConfig.auto_resume_recent_prompts ?? true) && (
-                                <div className="ml-7 p-2.5 bg-gray-50 dark:bg-base-200/50 rounded-lg border border-gray-100 dark:border-base-300 text-xs flex flex-col gap-1.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-gray-600 dark:text-gray-400 font-medium">
-                                            Recency Cutoff Window:
-                                        </span>
-                                        <select
-                                            value={currentConfig.prompt_recency_threshold_seconds || 3600}
-                                            onChange={(e) => onChange({
-                                                ...currentConfig,
-                                                prompt_recency_threshold_seconds: Number(e.target.value),
-                                            })}
-                                            className="select select-xs select-bordered bg-white dark:bg-base-100 text-xs rounded"
-                                        >
-                                            <option value={1800}>30 Minutes</option>
-                                            <option value={3600}>1 Hour (Recommended)</option>
-                                            <option value={7200}>2 Hours</option>
-                                            <option value={18000}>5 Hours</option>
-                                            <option value={86400}>1 Day (24 Hours)</option>
-                                        </select>
+                        {/* Task Continuity & Watchdog Card */}
+                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-3 shadow-2xs">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/30">
+                                            <ShieldCheck className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">
+                                                Task Continuity &amp; Watchdog
+                                            </h4>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Zero-loss task resumption, prompt recovery, and process healing
+                                            </p>
+                                        </div>
                                     </div>
-                                    <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                                        Active projects run within this window are auto-resumed with their last prompt and attached images. Older inactive projects are safely skipped to spin up the clean boot process.
-                                    </p>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20 font-semibold">
+                                        Active Guard
+                                    </span>
                                 </div>
-                            )}
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="auto_focus_cb"
-                                    checked={currentConfig.auto_focus_window ?? true}
-                                    onChange={(e) => onChange({ ...currentConfig, auto_focus_window: e.target.checked })}
-                                    className="checkbox checkbox-sm checkbox-info rounded"
-                                />
-                                <label htmlFor="auto_focus_cb" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                    2-Minute IDE Crash &amp; Focus Watchdog (Auto-focus PID &amp; Auto-recover)
-                                </label>
+
+                                <div className="space-y-2 mt-3">
+                                    {/* Toggle 1: Auto-Resume Pending Tasks */}
+                                    <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            id="auto_resume_cb"
+                                            checked={currentConfig.has_auto_resume}
+                                            onChange={(e) => onChange({ ...currentConfig, has_auto_resume: e.target.checked })}
+                                            className="checkbox checkbox-xs checkbox-primary rounded mt-0.5"
+                                        />
+                                        <div className="text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                {t('settings.auto_switcher.auto_resume_label', 'Snapshot and auto-resume pending tasks on restart')}
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                                Preserves in-flight task queue state and restores session context upon account swap.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    {/* Toggle 2: Fast Forward on Critical */}
+                                    <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            id="auto_ff_cb"
+                                            checked={currentConfig.auto_fast_forward_on_critical ?? true}
+                                            onChange={(e) => onChange({ ...currentConfig, auto_fast_forward_on_critical: e.target.checked })}
+                                            className="checkbox checkbox-xs checkbox-secondary rounded mt-0.5"
+                                        />
+                                        <div className="text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                Auto-trigger Fast-Forward when credits drop &le; 12%
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                                Instantly delegates to the highest-credit candidate without waiting for full exhaustion.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    {/* Toggle 3: Auto-Resume Recent Active Prompts */}
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id="auto_resume_recent_cb"
+                                                checked={currentConfig.auto_resume_recent_prompts ?? true}
+                                                onChange={(e) => onChange({ ...currentConfig, auto_resume_recent_prompts: e.target.checked })}
+                                                className="checkbox checkbox-xs checkbox-accent rounded mt-0.5"
+                                            />
+                                            <div className="text-xs">
+                                                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                    Auto-Resume Recent Active Prompts on Fast-Forward
+                                                </span>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                                    Transfers recent prompt history and attached images into freshly booted IDE instance.
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        {/* Recency Cutoff Window Sub-Panel */}
+                                        {(currentConfig.auto_resume_recent_prompts ?? true) && (
+                                            <div className="ml-7 p-3 bg-slate-100/90 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150 shadow-2xs">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                        <Clock className="w-3.5 h-3.5 text-cyan-500" />
+                                                        <span>Recency Cutoff Window:</span>
+                                                    </span>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={currentConfig.prompt_recency_threshold_seconds || 3600}
+                                                            onChange={(e) => onChange({
+                                                                ...currentConfig,
+                                                                prompt_recency_threshold_seconds: Number(e.target.value),
+                                                            })}
+                                                            className="appearance-none px-2.5 py-1 pr-7 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 cursor-pointer"
+                                                        >
+                                                            <option value={1800}>30 Minutes</option>
+                                                            <option value={3600}>1 Hour (Recommended)</option>
+                                                            <option value={7200}>2 Hours</option>
+                                                            <option value={18000}>5 Hours</option>
+                                                            <option value={86400}>1 Day (24 Hours)</option>
+                                                        </select>
+                                                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2 top-1.5" />
+                                                    </div>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                                    Projects executed within this timeframe are seamlessly restored with full prompt context. Older idle workspaces are safely bypassed for a clean startup.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Toggle 4: 2-Minute IDE Crash & Focus Watchdog */}
+                                    <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            id="auto_focus_cb"
+                                            checked={currentConfig.auto_focus_window ?? true}
+                                            onChange={(e) => onChange({ ...currentConfig, auto_focus_window: e.target.checked })}
+                                            className="checkbox checkbox-xs checkbox-info rounded mt-0.5"
+                                        />
+                                        <div className="text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                2-Minute IDE Crash &amp; Focus Watchdog
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                                Auto-focuses foreground PID and automatically relaunches non-responsive IDE windows.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    {/* Fast-Forward Shortcut Configuration */}
+                                    <div className="p-3 bg-slate-100/90 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 shadow-2xs">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                <FastForward className="w-3.5 h-3.5 text-blue-500" />
+                                                <span>Fast-Forward Shortcut Key:</span>
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={currentConfig.fast_forward_shortcut || 'Ctrl+Shift+F'}
+                                                    onChange={(e) => onChange({
+                                                        ...currentConfig,
+                                                        fast_forward_shortcut: e.target.value.trim() || 'Ctrl+Shift+F',
+                                                    })}
+                                                    placeholder="Ctrl+Shift+F"
+                                                    className="w-32 px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-center text-blue-600 dark:text-blue-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({
+                                                        ...currentConfig,
+                                                        fast_forward_shortcut: 'Ctrl+Shift+F',
+                                                    })}
+                                                    className="btn btn-ghost btn-xs text-[10px] text-gray-500 hover:text-blue-600 cursor-pointer"
+                                                    title="Reset to default (Ctrl+Shift+F)"
+                                                >
+                                                    Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            <span>Triggers smart account rotation and active window fast-forward from anywhere in the app.</span>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Ctrl+Shift+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Ctrl+Shift+F
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Alt+Shift+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Alt+Shift+F
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Ctrl+Alt+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Ctrl+Alt+F
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Manual Rotation Action */}
-                    <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-blue-50/40 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100/80 dark:border-blue-800/40">
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                            <span className="font-semibold text-gray-900 dark:text-gray-200">Test Failover:</span>{' '}
-                            Manually rotate the IDE to the next best profile right now.
+                    <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-blue-50/50 dark:bg-blue-950/20 p-3.5 rounded-xl border border-blue-200/60 dark:border-blue-900/40 shadow-2xs">
+                        <div className="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="p-1 rounded-md bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">Test Failover:</span>{' '}
+                                Manually rotate the IDE to the next best profile candidate right now.
+                            </div>
                         </div>
                         <button
                             type="button"
                             onClick={handleManualRotate}
                             disabled={isRotating}
-                            className="btn btn-xs btn-primary gap-1.5 shadow-xs shrink-0"
+                            className="btn btn-xs btn-primary gap-1.5 shadow-xs shrink-0 cursor-pointer"
                         >
                             <Play size={12} className={isRotating ? 'animate-spin' : ''} />
                             <span>{isRotating ? 'Rotating...' : 'Rotate Now'}</span>
@@ -440,7 +636,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                     </div>
 
                     {rotationFeedback ? (
-                        <div className="p-2.5 rounded-lg bg-gray-100 dark:bg-base-100 text-xs flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                        <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 text-xs flex items-center gap-2 text-slate-800 dark:text-slate-200">
                             {rotationFeedback.startsWith('Error') ? (
                                 <AlertCircle size={14} className="text-rose-500 shrink-0" />
                             ) : (
@@ -453,7 +649,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
             )}
 
             {/* Prominent "How Auto Rotation Works" Guide */}
-            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-base-300">
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-sky-50/60 dark:from-slate-900/80 dark:via-slate-900/60 dark:to-slate-950/80 backdrop-blur-md border border-blue-100/80 dark:border-white/10 shadow-xs dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] space-y-3.5 transition-all duration-200">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">

@@ -122,6 +122,10 @@ export async function setActiveInstance(instanceId: string): Promise<void> {
     return await invoke('set_active_instance', { instanceId });
 }
 
+export async function setDefaultInstance(instanceId: string): Promise<void> {
+    return await invoke('set_default_instance', { instanceId });
+}
+
 export async function switchAccountToInstance(accountId: string, instanceId?: string): Promise<void> {
     try {
         return await invoke('switch_account_to_instance', { accountId, instanceId });
@@ -150,6 +154,7 @@ export interface AutoProfileSwitcherConfig {
     auto_focus_window?: boolean;
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
+    fast_forward_shortcut?: string;
 }
 
 export interface AutoResumePromptInfo {

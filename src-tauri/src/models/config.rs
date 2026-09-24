@@ -282,6 +282,8 @@ pub struct AutoProfileSwitcherConfig {
     pub watchdog_interval_seconds: u32,
     #[serde(default = "default_recency_threshold")]
     pub prompt_recency_threshold_seconds: u32,
+    #[serde(default = "default_fast_forward_shortcut")]
+    pub fast_forward_shortcut: String,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -301,8 +303,13 @@ impl Default for AutoProfileSwitcherConfig {
             auto_focus_window: false,
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
+            fast_forward_shortcut: "Ctrl+Shift+F".to_string(),
         }
     }
+}
+
+fn default_fast_forward_shortcut() -> String {
+    "Ctrl+Shift+F".to_string()
 }
 
 fn default_false() -> bool {

@@ -12,10 +12,12 @@ import {
     Download,
     Upload,
     AlertTriangle,
+    Star,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { useAccountStore } from '../../stores/useAccountStore';
+import { useConfigStore } from '../../stores/useConfigStore';
 import { useErrorStore } from '../../stores/error-store';
 import { cn } from '../../utils/cn';
 import { isTauri } from '../../utils/env';
@@ -30,6 +32,7 @@ export function InstanceSelector() {
         activeInstanceId,
         fetchInstances,
         setActiveInstance,
+        setDefaultInstance,
         createInstance,
         copyInstance,
         renameInstance,
@@ -41,6 +44,9 @@ export function InstanceSelector() {
         smartPlayInstance,
         smartRotateProfileAccount,
     } = useInstanceStore();
+
+    const config = useConfigStore(state => state.config);
+    const fastForwardShortcut = config?.auto_profile_switcher?.fast_forward_shortcut || 'Ctrl+Shift+F';
 
     const currentAccount = useAccountStore(state => state.currentAccount);
     const accounts = useAccountStore(state => state.accounts);
@@ -54,6 +60,7 @@ export function InstanceSelector() {
 
     const [newInstanceName, setNewInstanceName] = useState('');
     const [copyInstanceName, setCopyInstanceName] = useState('');
+    const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
     const [editInstanceName, setEditInstanceName] = useState('');
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
@@ -112,12 +119,13 @@ export function InstanceSelector() {
     const handleCopy = async () => {
         const trimmed = copyInstanceName.trim();
         if (!trimmed) return;
-        const target = activeInstance || instances[0];
+        const target = (copyTargetId ? instances.find(i => i.config.id === copyTargetId) : null) || activeInstance || instances[0];
         if (!target) return;
         try {
             const copied = await copyInstance(target.config.id, trimmed, cloneMode);
             await setActiveInstance(copied.id);
             setCopyInstanceName('');
+            setCopyTargetId(null);
             setIsCopyOpen(false);
             showToast(t('instances.copied_toast', 'Instance profile duplicated'), 'success');
         } catch (e: any) {
@@ -127,6 +135,23 @@ export function InstanceSelector() {
                 triggerComponent: 'InstanceSelector',
                 triggerAction: 'handleCopy',
                 context: { sourceInstanceId: target.config.id, copyInstanceName: trimmed, cloneMode },
+            });
+            useErrorStore.getState().openErrorModal(captured);
+            showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
+        }
+    };
+
+    const handleSetDefault = async (targetId: string) => {
+        try {
+            await setDefaultInstance(targetId);
+            showToast(t('instances.set_default_toast', 'Default profile updated successfully'), 'success');
+        } catch (e: any) {
+            console.error('Failed to set default instance:', e);
+            const captured = useErrorStore.getState().captureError(e, {
+                source: 'InstanceSelector.tsx',
+                triggerComponent: 'InstanceSelector',
+                triggerAction: 'handleSetDefault',
+                context: { targetId },
             });
             useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
@@ -159,7 +184,7 @@ export function InstanceSelector() {
     const handleDelete = async () => {
         if (!deleteTarget) return;
         const targetId = deleteTarget.config.id;
-        const isDefault = targetId === 'default';
+        const isDefault = Boolean(deleteTarget.config.is_default) || targetId === 'default';
         if (isDefault) {
             showToast(t('instances.cannot_delete_default', 'Cannot delete default profile'), 'warning');
             setIsDeleteOpen(false);
@@ -395,81 +420,61 @@ export function InstanceSelector() {
                 <span
                     className={`w-2 h-2 rounded-full shrink-0 ${isActiveRunning ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}
                 />
-                <span className="truncate max-w-[90px] md:max-w-[120px] text-gray-800 dark:text-gray-200">
+                <span className="truncate max-w-[95px] md:max-w-[130px] text-gray-800 dark:text-gray-200 font-medium">
                     {activeInstance ? `#${instances.findIndex(i => i.config.id === activeInstance.config.id) + 1} ${activeInstance.config.name}` : 'Default'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
             </button>
 
-            {/* 2. Top Action Bar: Play / Stop (Smart Play) */}
+            {/* 2. Top Action Bar: Fast-Forward only (Smart Switch) */}
             <button
                 type="button"
-                disabled={launchingId === activeInstance?.config.id}
-                onClick={() => {
-                    if (isActiveRunning) {
-                        handleToggleLaunch(activeInstance.config.id, true);
-                    } else {
-                        handleSmartPlay(activeInstance?.config.id);
-                    }
+                disabled={isRotating}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleSmartRotate(activeInstance?.config.id);
                 }}
-                className={`p-1.5 rounded-lg transition-colors duration-150 shrink-0 flex items-center gap-1 cursor-pointer ${
-                    isActiveRunning
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 border border-emerald-200 dark:border-emerald-800'
-                        : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs'
+                className={`flex p-1.5 rounded-lg text-white shadow-xs transition-colors duration-150 shrink-0 items-center justify-center cursor-pointer ${
+                    isRotating
+                        ? 'bg-blue-400 dark:bg-blue-800 cursor-not-allowed opacity-80'
+                        : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                 }`}
-                title={
-                    isActiveRunning
-                        ? t('instances.running_tooltip', 'Instance is running. Click to close window.')
-                        : t('instances.smart_play_tooltip', 'Smart Play: Auto-selects healthiest account and launches')
-                }
-            >
-                {isActiveRunning ? (
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                ) : (
-                    <Play className="w-3.5 h-3.5 fill-current" />
+                title={t(
+                    'instances.smart_switch_shortcut_tooltip',
+                    `Fast-Forward (${fastForwardShortcut}): Close running process, pick account with longest refill runway, and switch profile`
                 )}
+            >
+                <FastForward className={`w-3.5 h-3.5 fill-current ${isRotating ? 'animate-spin' : ''}`} />
             </button>
-
-            {/* 2b. Top Action Bar: Smart Switch (Process Teardown & Smart Account Rotation) */}
-            {(() => {
-                const tooltipText = t(
-                    'instances.smart_switch_tooltip',
-                    'Smart Switch: Close running process, pick account with longest refill runway, and switch profile'
-                );
-                return (
-                    <button
-                        type="button"
-                        disabled={isRotating}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleSmartRotate(activeInstance?.config.id);
-                        }}
-                        className={`hidden md:flex p-1.5 rounded-lg text-white shadow-xs transition-colors duration-150 shrink-0 items-center gap-1 cursor-pointer ${
-                            isRotating
-                                ? 'bg-blue-400 dark:bg-blue-800 cursor-not-allowed opacity-80'
-                                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
-                        }`}
-                        title={tooltipText}
-                    >
-                        <FastForward className={`w-3.5 h-3.5 fill-current ${isRotating ? 'animate-spin' : ''}`} />
-                    </button>
-                );
-            })()}
-
-
 
             {/* Dropdown Menu Popup (Strictly Above Page Content) */}
             {isOpen && (
                 <div
-                    className="absolute top-full right-0 mt-1.5 w-80 max-w-[calc(100vw-32px)] rounded-xl shadow-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95"
+                    className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95"
                     style={{ isolation: 'isolate' }}
                 >
-                    {/* Dropdown Header Bar with Import / Export Actions */}
+                    {/* Dropdown Header Bar with Duplicate, Import / Export Actions */}
                     <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 pb-1.5">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                            {t('instances.title', 'Profiles')}
+                            {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
                         <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const target = activeInstance || instances[0];
+                                    if (target) {
+                                        setCopyTargetId(target.config.id);
+                                        setCopyInstanceName(`${target.config.name} Copy`);
+                                        setCloneMode('full');
+                                        setIsCopyOpen(true);
+                                    }
+                                }}
+                                className="p-1 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('instances.duplicate_active', 'Duplicate Active Profile')}
+                            >
+                                <Copy className="w-3.5 h-3.5" />
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleImportProfiles}
@@ -504,7 +509,7 @@ export function InstanceSelector() {
                     </div>
 
                     {/* Filtered Profiles List */}
-                    <div className="max-h-56 overflow-y-auto py-1">
+                    <div className="max-h-60 overflow-y-auto py-1">
                         {filteredInstances.length === 0 ? (
                             <div className="px-3 py-4 text-center text-xs text-gray-400">
                                 {t('instances.no_profiles_found', 'No profiles found')}
@@ -512,10 +517,11 @@ export function InstanceSelector() {
                         ) : (
                             filteredInstances.map((inst) => {
                                 const isSelected = inst.config.id === activeInstanceId;
-                                const isDefault = inst.config.id === 'default';
+                                const isDefault = Boolean(inst.config.is_default);
                                 const isRunning = Boolean(inst.is_running);
                                 const linkedAccount = accounts.find(a => a.id === inst.config.bound_account_id || (inst.config.bound_email && a.email === inst.config.bound_email));
                                 const displayEmail = inst.config.bound_email || linkedAccount?.email || (isSelected ? currentAccount?.email : undefined);
+                                const seqNum = instances.findIndex(i => i.config.id === inst.config.id) + 1;
 
                                 return (
                                     <div
@@ -542,10 +548,15 @@ export function InstanceSelector() {
                                             />
                                             <div className="flex flex-col truncate min-w-0">
                                                 <div className="flex items-center gap-1.5 truncate">
-                                                    <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
-                                                        #{instances.findIndex(i => i.config.id === inst.config.id) + 1}
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
+                                                        #{seqNum}
                                                     </span>
-                                                    <span className="truncate font-medium">{inst.config.name}</span>
+                                                    <span className="truncate font-semibold">{inst.config.name}</span>
+                                                    {isDefault && (
+                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
+                                                            DEFAULT
+                                                        </span>
+                                                    )}
                                                     {isSelected && (
                                                         <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 dark:bg-amber-400/10 border border-amber-400/30 shrink-0">
                                                             ACTIVE
@@ -564,89 +575,122 @@ export function InstanceSelector() {
                                             </div>
                                         </button>
 
-                                        {/* Fixed 4-slot Action Columns for Perfect Alignment */}
-                                        <div className="grid grid-cols-4 gap-1 shrink-0 ml-auto items-center">
-                                            {/* Slot 1: Item Launch / Stop */}
-                                            <div className="w-6 h-6 flex items-center justify-center">
-                                                <button
-                                                    type="button"
-                                                    disabled={launchingId === inst.config.id}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleToggleLaunch(inst.config.id, isRunning);
-                                                    }}
-                                                    className={cn(
-                                                        "p-1 rounded transition-colors cursor-pointer flex items-center justify-center",
-                                                        isRunning
-                                                            ? "text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
-                                                            : "text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                                                    )}
-                                                    title={
-                                                        isRunning
-                                                            ? t('instances.close_title', 'Close window')
-                                                            : t('instances.launch_title', 'Run profile')
-                                                    }
-                                                >
-                                                    {isRunning ? (
-                                                        <Square className="w-3 h-3 fill-current" />
-                                                    ) : (
-                                                        <Play className="w-3 h-3 fill-current" />
-                                                    )}
-                                                </button>
-                                            </div>
-
-                                            {/* Slot 2: Item Smart Switch */}
-                                            <div className="w-6 h-6 flex items-center justify-center">
-                                                <button
-                                                    type="button"
-                                                    disabled={isRotating}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSmartRotate(inst.config.id);
-                                                    }}
-                                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title={t('instances.smart_switch_tooltip', 'Smart Switch: Close process, pick account with longest refill runway, and switch')}
-                                                >
-                                                    <FastForward className={`w-3 h-3 fill-current ${isRotating ? 'animate-spin' : ''}`} />
-                                                </button>
-                                            </div>
-
-                                            {/* Slot 3: Item Rename */}
-                                            <div className="w-6 h-6 flex items-center justify-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditTargetId(inst.config.id);
-                                                        setEditInstanceName(inst.config.name);
-                                                        setIsEditOpen(true);
-                                                    }}
-                                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-slate-800 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
-                                                    title={t('instances.edit_title', 'Rename profile')}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                            </div>
-
-                                            {/* Slot 4: Item Delete (Empty spacer slot for Default) */}
-                                            <div className="w-6 h-6 flex items-center justify-center">
-                                                {isDefault ? (
-                                                    <span className="w-3 h-3" aria-hidden="true" />
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDeleteTarget(inst);
-                                                            setIsDeleteOpen(true);
-                                                        }}
-                                                        className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
-                                                        title={t('instances.delete_title', 'Delete profile')}
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
+                                        {/* Action Buttons: Launch, Smart Switch, Duplicate, Rename, Set Default, Delete */}
+                                        <div className="flex items-center gap-1 shrink-0 ml-auto">
+                                            {/* 1: Item Launch / Stop */}
+                                            <button
+                                                type="button"
+                                                disabled={launchingId === inst.config.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleToggleLaunch(inst.config.id, isRunning);
+                                                }}
+                                                className={cn(
+                                                    "w-6 h-6 p-1 rounded transition-colors cursor-pointer flex items-center justify-center",
+                                                    isRunning
+                                                        ? "text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                                        : "text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
                                                 )}
-                                            </div>
+                                                title={
+                                                    isRunning
+                                                        ? t('instances.close_title', 'Close window')
+                                                        : t('instances.launch_title', 'Run profile')
+                                                }
+                                            >
+                                                {isRunning ? (
+                                                    <Square className="w-3 h-3 fill-current" />
+                                                ) : (
+                                                    <Play className="w-3 h-3 fill-current" />
+                                                )}
+                                            </button>
+
+                                            {/* 2: Item Smart Switch */}
+                                            <button
+                                                type="button"
+                                                disabled={isRotating}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSmartRotate(inst.config.id);
+                                                }}
+                                                className="w-6 h-6 p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={t('instances.smart_switch_tooltip', 'Smart Switch: Close process, pick account with longest refill runway, and switch')}
+                                            >
+                                                <FastForward className={`w-3 h-3 fill-current ${isRotating ? 'animate-spin' : ''}`} />
+                                            </button>
+
+                                            {/* 3: Item Rename (Pencil) */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditTargetId(inst.config.id);
+                                                    setEditInstanceName(inst.config.name);
+                                                    setIsEditOpen(true);
+                                                }}
+                                                className="w-6 h-6 p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-slate-800 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                title={t('instances.edit_title', 'Rename profile')}
+                                            >
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+
+                                            {/* 4: Item Duplicate / Clone (Copy) */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setCopyTargetId(inst.config.id);
+                                                    setCopyInstanceName(`${inst.config.name} Copy`);
+                                                    setCloneMode('full');
+                                                    setIsCopyOpen(true);
+                                                }}
+                                                className="w-6 h-6 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                title={t('instances.duplicate_title', 'Duplicate profile')}
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </button>
+
+                                            {/* 5: Set as Default Toggle */}
+                                            <button
+                                                type="button"
+                                                disabled={isDefault}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (!isDefault) {
+                                                        handleSetDefault(inst.config.id);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "w-6 h-6 p-1 rounded transition-colors flex items-center justify-center",
+                                                    isDefault
+                                                        ? "text-amber-500 cursor-default"
+                                                        : "text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 cursor-pointer opacity-70 group-hover:opacity-100"
+                                                )}
+                                                title={
+                                                    isDefault
+                                                        ? t('instances.is_default_title', 'Default profile')
+                                                        : t('instances.set_default_title', 'Set as default profile')
+                                                }
+                                            >
+                                                <Star className={cn("w-3 h-3", isDefault ? "fill-amber-400 text-amber-500" : "")} />
+                                            </button>
+
+                                            {/* 6: Item Delete (Hidden for Default profile) */}
+                                            {isDefault ? (
+                                                <span className="w-6 h-6" aria-hidden="true" />
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setDeleteTarget(inst);
+                                                        setIsDeleteOpen(true);
+                                                    }}
+                                                    className="w-6 h-6 p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                    title={t('instances.delete_title', 'Delete profile')}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -733,9 +777,9 @@ export function InstanceSelector() {
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3">
-                            <Copy className="w-5 h-5 text-indigo-600" />
+                            <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                             <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.copy_modal_title', 'Duplicate Profile')}
+                                {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                             </h3>
                         </div>
 
@@ -753,9 +797,9 @@ export function InstanceSelector() {
                         />
 
                         {/* Clone Mode Selection */}
-                        <div className="mb-4 bg-gray-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-gray-200/60 dark:border-slate-700">
+                        <div className="mb-4 bg-gray-50 dark:bg-slate-800/80 p-3 rounded-xl border border-gray-200/60 dark:border-slate-700">
                             <span className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
-                                {t('instances.clone_mode_label', 'Duplication Scope')}
+                                {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
                             </span>
                             <div className="flex flex-col gap-2">
                                 <label className="flex items-start gap-2 cursor-pointer text-xs">
@@ -769,10 +813,10 @@ export function InstanceSelector() {
                                     />
                                     <div>
                                         <div className="font-semibold text-gray-800 dark:text-gray-200">
-                                            {t('instances.clone_mode_full', 'Full Directory Copy (Recommended)')}
+                                            {t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}
                                         </div>
                                         <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                                            {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, and state.')}
+                                            {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, extensions, cache, and state.')}
                                         </div>
                                     </div>
                                 </label>
@@ -788,10 +832,10 @@ export function InstanceSelector() {
                                     />
                                     <div>
                                         <div className="font-semibold text-gray-800 dark:text-gray-200">
-                                            {t('instances.clone_mode_profile', 'Profile Only')}
+                                            {t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}
                                         </div>
                                         <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                                            {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets.')}
+                                            {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets without bulky runtime session state.')}
                                         </div>
                                     </div>
                                 </label>

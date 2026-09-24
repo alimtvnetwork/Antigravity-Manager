@@ -31,6 +31,7 @@ interface InstanceState {
     setInstanceExecutable: (instanceId: string, executablePath?: string) => Promise<void>;
     closeInstance: (instanceId: string) => Promise<void>;
     setActiveInstance: (instanceId: string) => Promise<void>;
+    setDefaultInstance: (instanceId: string) => Promise<void>;
     switchAccountToInstance: (accountId: string, instanceId?: string) => Promise<void>;
     exportInstancesJson: () => Promise<string>;
     importInstancesJson: (jsonContent: string) => Promise<InstanceConfig[]>;
@@ -240,6 +241,19 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to set active instance' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.setActiveInstance' });
+            throw err;
+        }
+    },
+
+    setDefaultInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            await instanceService.setDefaultInstance(instanceId);
+            await get().fetchInstances(true);
+            set({ isLoading: false });
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to set default instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.setDefaultInstance' });
             throw err;
         }
     },
