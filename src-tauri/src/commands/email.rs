@@ -300,22 +300,43 @@ pub async fn dispatch_custom_email_task(
     }
 
     let m_name = email_watcher::detect_machine_name();
-    let m_ip = email_watcher::detect_local_ip();
+    let _m_ip = email_watcher::detect_local_ip();
 
-    let full_subject =
-        subject.unwrap_or_else(|| format!("[AGM-TASK] [Node: {}] [Type: {}]", m_name, task_type));
+    // Clean any legacy prefixes (powershell:, ps:, prompt:, cmd:) from payload so Body has ONLY the prompt/command
+    let trimmed_payload = task_payload.trim();
+    let lower_payload = trimmed_payload.to_lowercase();
+    let clean_payload = if lower_payload.starts_with("powershell:") {
+        trimmed_payload["powershell:".len()..].trim()
+    } else if lower_payload.starts_with("ps:") {
+        trimmed_payload["ps:".len()..].trim()
+    } else if lower_payload.starts_with("cmd:") {
+        trimmed_payload["cmd:".len()..].trim()
+    } else if lower_payload.starts_with("prompt:") {
+        trimmed_payload["prompt:".len()..].trim()
+    } else {
+        trimmed_payload
+    };
 
+    let full_subject = subject.unwrap_or_else(|| {
+        let lower_type = task_type.trim().to_lowercase();
+        if lower_type.contains("ps")
+            || lower_type.contains("powershell")
+            || lower_type.contains("cli")
+        {
+            format!(
+                "{} | ps | {}",
+                m_name,
+                clean_payload.lines().next().unwrap_or("Get-Process")
+            )
+        } else {
+            format!("{} | prompt | proj-Antigravity-Manager", m_name)
+        }
+    });
+
+    // Body contains ONLY the prompt/payload in 100% plaintext (zero HTML tags)
     let full_body = format!(
-        "<div style=\"font-family: monospace; padding: 16px; background: #0f172a; color: #f8fafc; border-radius: 8px;\">\
-         <h2 style=\"color: #38bdf8; margin-top: 0;\">AGM Remote Task Instruction</h2>\
-         <p><b>Node:</b> {} ({})</p>\
-         <p><b>Task Type:</b> {}</p>\
-         <div style=\"background: #1e293b; padding: 12px; border-radius: 6px; border: 1px solid #334155; margin-top: 12px;\">\
-         <pre style=\"margin: 0; white-space: pre-wrap; color: #4ade80;\">{}: {}</pre>\
-         </div>\
-         <p style=\"color: #94a3b8; font-size: 11px; margin-top: 16px;\">Sent via Antigravity-Manager Developer Quick Dispatch</p>\
-         </div>",
-        m_name, m_ip, task_type, task_type, task_payload
+        "{}\n\n---\nAGM Plaintext Interactive Mail (Node: {})\nReply directly to this email with your next prompt in the body.\nSubject format: * | prompt | proj-Antigravity-Manager  OR  * | ps | Get-Process",
+        clean_payload, m_name
     );
 
     let res =

@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Sun, Moon, LogOut, Minus, X, RotateCcw, Bug } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Sun, Moon, LogOut, Minus, X, RotateCcw, Globe, ChevronDown, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
+import { useClickOutside } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
 import { useErrorStore } from '../../stores/error-store';
-import { useDebugConsole } from '../../stores/useDebugConsole';
 import { AgyCleanModal } from '../modals/agy-clean-modal';
 
 interface NavSettingsProps {
@@ -17,14 +16,6 @@ interface NavSettingsProps {
     onLanguageChange: (langCode: string) => void;
 }
 
-/**
- * Settings button component - handles responsiveness independently
- *
- * Responsive strategy:
- * - ≥ 1024px: standalone secondary buttons (quick clean, theme, language)
- * - < 1024px: secondary tools collapse into responsive kebab/overflow menu
- * - Window controls (Minimize, Maximize/Restore, Close): always permanently visible and pinned
- */
 export function NavSettings({
     theme,
     currentLanguage,
@@ -32,9 +23,23 @@ export function NavSettings({
     onLanguageChange
 }: NavSettingsProps) {
     const { t } = useTranslation();
-    const { enable, disable, isEnabled } = useDebugConsole();
     const [isMaximized, setIsMaximized] = useState(false);
     const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
+    const [isPrefsOpen, setIsPrefsOpen] = useState(false);
+    const prefsRef = useRef<HTMLDivElement>(null);
+
+    useClickOutside(prefsRef, () => setIsPrefsOpen(false));
+
+    useEffect(() => {
+        const handleOtherDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'nav-settings') {
+                setIsPrefsOpen(false);
+            }
+        };
+        window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+        return () => window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+    }, []);
 
     useEffect(() => {
         if (!isTauri()) return;
@@ -131,75 +136,91 @@ export function NavSettings({
         window.location.reload();
     };
 
+    const currentLangItem = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
+
     return (
         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-            {/* Collapsible Secondary Tools: Visible on >= 1024px */}
-            <div className="hidden lg:flex items-center gap-1.5 md:gap-2 shrink-0">
-                {/* Antigravity Quick Clean button */}
-                <button
-                    type="button"
-                    onClick={() => setIsCleanModalOpen(true)}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
-                    title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
-                    aria-label="Quick Clean"
-                >
-                    <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
+            {/* 1. Antigravity Quick Clean (Recycle) Icon Button */}
+            <button
+                type="button"
+                onClick={() => setIsCleanModalOpen(true)}
+                className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
+                title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
+                aria-label="Quick Clean"
+            >
+                <RotateCcw className="w-4 h-4" />
+            </button>
 
-                {/* Debug console trigger button */}
+            {/* 2. Combined Theme & Language Dropdown Button */}
+            <div className="relative" ref={prefsRef}>
                 <button
                     type="button"
                     onClick={() => {
-                        if (isEnabled) {
-                            disable();
-                        } else {
-                            enable();
+                        const next = !isPrefsOpen;
+                        setIsPrefsOpen(next);
+                        if (next) {
+                            window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
                         }
                     }}
-                    className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer ${
-                        isEnabled
-                            ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
-                            : 'bg-gray-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 text-gray-700 dark:text-gray-300'
-                    }`}
-                    title={isEnabled ? 'Disable Debug Overlay' : 'Enable Debug Overlay & Console'}
-                    aria-label="Debug Console"
-                >
-                    <Bug className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-
-                {/* Theme toggle button */}
-                <button
-                    type="button"
-                    onClick={onThemeToggle}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
-                    title={theme === 'light' ? t('nav.theme_to_dark') : t('nav.theme_to_light')}
-                    aria-label="Toggle Theme"
+                    className="h-9 px-2.5 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center gap-1.5 transition-all duration-150 ease-out shadow-xs cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-slate-700"
+                    title="Theme & Language Preferences"
                 >
                     {theme === 'light' ? (
-                        <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
+                        <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     ) : (
-                        <Sun className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300" />
+                        <Moon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                     )}
+                    <span className="uppercase">{currentLangItem.short}</span>
+                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Language switch dropdown */}
-                <LanguageDropdown
-                    currentLanguage={currentLanguage}
-                    languages={LANGUAGES}
-                    onLanguageChange={onLanguageChange}
-                />
-            </div>
+                {isPrefsOpen && (
+                    <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
+                        <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                            Appearance
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                onThemeToggle(e);
+                                setIsPrefsOpen(false);
+                            }}
+                            className="w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
+                        >
+                            <span className="flex items-center gap-2">
+                                {theme === 'light' ? <Moon className="w-3.5 h-3.5 text-blue-500" /> : <Sun className="w-3.5 h-3.5 text-amber-500" />}
+                                <span>{theme === 'light' ? t('nav.theme_to_dark', 'Switch to Dark Mode') : t('nav.theme_to_light', 'Switch to Light Mode')}</span>
+                            </span>
+                        </button>
 
-            {/* Kebab/Overflow menu for secondary tools on < 1024px */}
-            <div className="flex lg:hidden shrink-0">
-                <MoreDropdown
-                    theme={theme}
-                    currentLanguage={currentLanguage}
-                    languages={LANGUAGES}
-                    onThemeToggle={onThemeToggle}
-                    onLanguageChange={onLanguageChange}
-                    onOpenCleanModal={() => setIsCleanModalOpen(true)}
-                />
+                        <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
+                        <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                            <Globe className="w-3 h-3" />
+                            <span>Language</span>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                            {LANGUAGES.map((lang) => {
+                                const isCurrent = lang.code === currentLanguage;
+                                return (
+                                    <button
+                                        key={lang.code}
+                                        type="button"
+                                        onClick={() => {
+                                            onLanguageChange(lang.code);
+                                            setIsPrefsOpen(false);
+                                        }}
+                                        className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
+                                            isCurrent ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'
+                                        }`}
+                                    >
+                                        <span>{lang.label}</span>
+                                        {isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}

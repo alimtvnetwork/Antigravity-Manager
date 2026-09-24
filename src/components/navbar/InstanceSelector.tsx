@@ -67,6 +67,7 @@ export function InstanceSelector() {
     const [deleteTarget, setDeleteTarget] = useState<InstanceStatus | null>(null);
     const [launchingId, setLaunchingId] = useState<string | null>(null);
     const [isRotating, setIsRotating] = useState(false);
+    const [isIoOpen, setIsIoOpen] = useState(false);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,10 +87,22 @@ export function InstanceSelector() {
             const clickedInside = el.contains(event.target as Node);
             if (!clickedInside) {
                 setIsOpen(false);
+                setIsIoOpen(false);
+            }
+        };
+        const handleOtherDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'instance-selector') {
+                setIsOpen(false);
+                setIsIoOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+        };
     }, []);
 
     const activeInstance = instances.find(i => i.config.id === activeInstanceId) || instances[0];
@@ -413,7 +426,13 @@ export function InstanceSelector() {
             {/* 1. Profile Dropdown Trigger */}
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const next = !isOpen;
+                    setIsOpen(next);
+                    if (next) {
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'instance-selector' } }));
+                    }
+                }}
                 className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors border border-gray-200/60 dark:border-slate-700 shrink-0 cursor-pointer"
                 title={t('instances.selector_tooltip', 'Select active Antigravity instance')}
             >
@@ -453,12 +472,12 @@ export function InstanceSelector() {
                     className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95"
                     style={{ isolation: 'isolate' }}
                 >
-                    {/* Dropdown Header Bar with Duplicate, Import / Export Actions */}
+                    {/* Dropdown Header Bar with Duplicate and Combined Import / Export Dropdown */}
                     <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 pb-1.5">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                             {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 relative">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -475,22 +494,45 @@ export function InstanceSelector() {
                             >
                                 <Copy className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                                type="button"
-                                onClick={handleImportProfiles}
-                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                title={t('instances.import_json', 'Import Profiles (JSON)')}
-                            >
-                                <Upload className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleExportProfiles}
-                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                title={t('instances.export_json', 'Export Profiles (JSON)')}
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                            </button>
+
+                            {/* Combined Import / Export Icon Dropdown */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsIoOpen(!isIoOpen)}
+                                    className="px-1.5 py-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-0.5"
+                                    title="Import / Export Profiles (JSON)"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <ChevronDown className="w-2.5 h-2.5" />
+                                </button>
+                                {isIoOpen && (
+                                    <div className="absolute right-0 mt-1 w-44 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xl py-1 z-[9999] text-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsIoOpen(false);
+                                                handleImportProfiles();
+                                            }}
+                                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 cursor-pointer"
+                                        >
+                                            <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                                            <span>{t('instances.import_json', 'Import Profiles (JSON)')}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsIoOpen(false);
+                                                handleExportProfiles();
+                                            }}
+                                            className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 cursor-pointer"
+                                        >
+                                            <Download className="w-3.5 h-3.5 text-blue-500" />
+                                            <span>{t('instances.export_json', 'Export Profiles (JSON)')}</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 

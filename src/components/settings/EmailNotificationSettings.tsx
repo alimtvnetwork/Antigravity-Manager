@@ -719,7 +719,7 @@ export default function EmailNotificationSettings() {
         }
     };
 
-    const [testCliCommand, setTestCliCommand] = useState<string>('powershell: Get-Process | Select-Object -First 5');
+    const [testCliCommand, setTestCliCommand] = useState<string>('Get-Process | Select-Object -First 5');
     const [isExecutingCli, setIsExecutingCli] = useState<boolean>(false);
     const [cliExecResult, setCliExecResult] = useState<CliExecResult | null>(null);
 
@@ -747,15 +747,20 @@ export default function EmailNotificationSettings() {
     const handleTaskTypeChange = (type: string) => {
         setDeveloperTaskType(type);
         if (type === 'prompt') {
-            setDeveloperTaskPayload('Project: Antigravity-Manager\nScan repository health and report open issues');
+            setDeveloperCustomSubject('* | prompt | proj-Antigravity-Manager');
+            setDeveloperTaskPayload('Scan repository health and report open issues');
         } else if (type === 'powershell') {
+            setDeveloperCustomSubject('* | ps | Get-Process');
             setDeveloperTaskPayload('Get-Process | Select-Object -First 10');
         } else if (type === 'cmd') {
+            setDeveloperCustomSubject('* | cmd | dir');
             setDeveloperTaskPayload('dir /b & whoami');
         } else if (type === 'gitmap') {
+            setDeveloperCustomSubject('* | gitmap | status');
             setDeveloperTaskPayload('gitmap status --json');
         } else if (type === 'status') {
-            setDeveloperTaskPayload('telemetry: report quota and running profile status');
+            setDeveloperCustomSubject('* | status');
+            setDeveloperTaskPayload('Report quota and running profile status');
         }
     };
 
@@ -1810,24 +1815,24 @@ export default function EmailNotificationSettings() {
                         <button
                             type="button"
                             onClick={() => {
-                                const cmd = `.\\03-ai-scripts\\setup-telegram-bot.ps1 -BotToken "${telegramConfig?.bot_token || 'TOKEN'}" -ChatId "${telegramConfig?.allowed_chat_id || 'CHAT_ID'}"`;
+                                const cmd = `.\\03-ai-scripts\\telegram-bot-helper.ps1 -BotToken "${telegramConfig?.bot_token || 'TOKEN'}" -ChatId "${telegramConfig?.allowed_chat_id || 'CHAT_ID'}"`;
                                 navigator.clipboard.writeText(cmd);
                                 showToast('PowerShell verification command copied', 'info');
                             }}
                             className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                            title="Copy PowerShell script command"
+                            title="Copy PowerShell step-by-step helper command"
                         >
                             <Copy className="w-3.5 h-3.5" />
-                            <span>Copy PS Script</span>
+                            <span>Copy PS Helper Script</span>
                         </button>
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    {/* Bot Token & Allowed Chat ID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {/* Bot Token & Allowed Chat ID (Horizontally Aligned) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-end">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300 flex items-center justify-between">
+                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300 flex items-center justify-between h-5">
                                 <span>Telegram Bot Token</span>
                                 {telegramBotUsername && (
                                     <span className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold">
@@ -1852,7 +1857,7 @@ export default function EmailNotificationSettings() {
                                         )
                                     }
                                     placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                                    className="w-full px-3 py-2 pr-10 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                                    className="w-full h-9 px-3 py-2 pr-10 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
                                 />
                                 <button
                                     type="button"
@@ -1865,8 +1870,8 @@ export default function EmailNotificationSettings() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
-                                Allowed Chat ID (Numeric)
+                            <label className="text-xs font-medium text-gray-700 dark:text-slate-300 flex items-center justify-between h-5">
+                                <span>Allowed Chat ID (Numeric)</span>
                             </label>
                             <input
                                 type="number"
@@ -1886,7 +1891,7 @@ export default function EmailNotificationSettings() {
                                     );
                                 }}
                                 placeholder="987654321"
-                                className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                                className="w-full h-9 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
                             />
                         </div>
                     </div>

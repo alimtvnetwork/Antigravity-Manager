@@ -1,9 +1,10 @@
 import { startTransition } from 'react';
-import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useErrorStore } from '../../stores/error-store';
+import { useDebugConsole } from '../../stores/useDebugConsole';
 import { isLinux, isTauri } from '../../utils/env';
 import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
@@ -20,6 +21,7 @@ import type { NavItem } from './constants';
 function Navbar() {
     const { t, i18n } = useTranslation();
     const { config, saveConfig } = useConfigStore();
+    const { enable: enableDebug, disable: disableDebug, isEnabled: isDebugEnabled } = useDebugConsole();
 
     // Create navigation items with translated labels
     const navItems: NavItem[] = [
@@ -178,13 +180,32 @@ function Navbar() {
             <div className="w-full px-3 sm:px-4 md:px-6 relative" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}
                 <div className="flex items-center justify-between h-14 gap-1 sm:gap-2 md:gap-3 min-w-0">
-                    {/* Logo & Error Manager Badge */}
+                    {/* Logo, Debug Button & Error Manager Badge */}
                     <div
                         className="no-drag shrink-0 flex items-center gap-1 sm:gap-1.5 min-w-0"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
                         <NavLogo />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isDebugEnabled) {
+                                    disableDebug();
+                                } else {
+                                    enableDebug();
+                                }
+                            }}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer ${
+                                isDebugEnabled
+                                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                                    : 'bg-gray-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 text-gray-700 dark:text-gray-300'
+                            }`}
+                            title={isDebugEnabled ? 'Disable Debug Overlay' : 'Enable Debug Overlay & Console'}
+                            aria-label="Debug Console"
+                        >
+                            <Bug className="w-4 h-4" />
+                        </button>
                         <ErrorQueueBadge />
                     </div>
 

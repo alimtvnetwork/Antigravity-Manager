@@ -250,13 +250,14 @@ pub fn matches_target_node_or_ip(target: &str, local_ip: &str, local_name: &str)
     false
 }
 
-/// Extract prompt name and prompt instruction from email body
+/// Extract prompt name and prompt instruction from email body (stripping any footer after ---)
 pub fn parse_prompt_body(body: &str) -> (String, String) {
+    let body_before_footer = body.split("\n---").next().unwrap_or(body).trim();
     let mut prompt_name = String::new();
     let mut prompt_instruction = String::new();
     let mut in_instruction = false;
 
-    for line in body.lines() {
+    for line in body_before_footer.lines() {
         let trimmed = line.trim();
         let lower = trimmed.to_lowercase();
         if lower.starts_with("prompt-name:") {
@@ -274,7 +275,7 @@ pub fn parse_prompt_body(body: &str) -> (String, String) {
     }
 
     if prompt_instruction.is_empty() && prompt_name.is_empty() {
-        prompt_instruction = body.trim().to_string();
+        prompt_instruction = body_before_footer.to_string();
     }
 
     (prompt_name, prompt_instruction)

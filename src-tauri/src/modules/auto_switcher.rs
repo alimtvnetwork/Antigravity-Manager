@@ -121,6 +121,13 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
         }
     }
 
+    // Hierarchical match for Gemini 3.8 Flash High / Flash targets
+    if target.contains("flash") {
+        if let Some((_, pct, _)) = evaluate_hierarchical_quota(account) {
+            return Some(pct);
+        }
+    }
+
     // Fallback: average percentage across all models
     if !quota_data.models.is_empty() {
         let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
@@ -757,7 +764,10 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
     }
 }
 
-/// Calculate dynamic polling interval based on credit quota ladder
+/// Calculate dynamic polling interval based on credit quota ladder:
+/// - >= 15%: check_interval_seconds (default 300s / 5m)
+/// - < 15%: caution_interval_seconds (default 60s / 1m)
+/// - <= 12%: critical_interval_seconds (default 40s)
 pub fn calculate_next_interval_seconds(
     quota_percent: Option<f64>,
     cfg: &AutoProfileSwitcherConfig,
@@ -766,9 +776,15 @@ pub fn calculate_next_interval_seconds(
         return cfg.check_interval_seconds.max(15);
     };
 
+    let caution_threshold = if cfg.low_quota_threshold_percent > cfg.critical_threshold_percent {
+        cfg.low_quota_threshold_percent
+    } else {
+        15.0
+    };
+
     if quota <= cfg.critical_threshold_percent {
         cfg.critical_interval_seconds.max(10)
-    } else if quota < 20.0 {
+    } else if quota < caution_threshold {
         cfg.caution_interval_seconds.max(15)
     } else {
         cfg.check_interval_seconds.max(15)
@@ -881,12 +897,11 @@ pub fn get_status() -> AutoSwitcherStatus {
     }
 }
 
-/// Check active instance health, focus window if running, and auto-recover on crash
+/// Check active instance health passively without spawning IDE windows or stealing OS window focus
 pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
-    let is_watchdog_active = switcher_cfg.is_enabled || switcher_cfg.auto_focus_window;
-    if !is_watchdog_active {
+    if !switcher_cfg.is_enabled {
         return Ok(());
     }
 
@@ -900,55 +915,10 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     let pids = instance::find_pids_for_data_dir(&active_inst.data_dir, active_inst.is_default);
     let is_running = !pids.is_empty();
 
-    if is_running {
-        // Antigravity IDE is running normally: background watchdog must NOT steal focus
-    } else {
-        // Antigravity IDE is NOT running or crashed!
-        logger::log_warn(&format!(
-            "[CrashWatchdog] Active IDE instance '{}' is not running or crashed. Initiating fast-forward recovery...",
-            active_inst.id
-        ));
-
-        // 1. Clean stale lockfiles in target IDE profile
+    if !is_running {
+        // Only clean stale lockfiles passively; NEVER call trigger_manual_rotation() or launch IDE windows
+        // automatically in the background, as that causes open/close loops and steals focus from Windows Explorer.
         crate::modules::process::clean_antigravity_lockfiles(Some("ide"));
-
-        // 2. Trigger fast-forward profile rotation and restart
-        match trigger_manual_rotation().await {
-            Ok(msg) => {
-                logger::log_info(&format!(
-                    "[CrashWatchdog] Fast-forward recovery completed: {}",
-                    msg
-                ));
-
-                // 3. If auto_resume_recent_prompts is enabled:
-                if switcher_cfg.auto_resume_recent_prompts {
-                    let threshold = switcher_cfg.prompt_recency_threshold_seconds as i64;
-                    match crate::modules::repo_db::auto_resume_recent_prompts(
-                        &active_inst.id,
-                        threshold,
-                    ) {
-                        Ok(res) => {
-                            logger::log_info(&format!(
-                                "[CrashWatchdog] Auto-resumed {} recent projects (< 1h) with prompts (skipped {})",
-                                res.resumed_project_count, res.skipped_project_count
-                            ));
-                        }
-                        Err(e) => {
-                            logger::log_warn(&format!(
-                                "[CrashWatchdog] Prompt auto-resume warning: {}",
-                                e
-                            ));
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                logger::log_error(&format!(
-                    "[CrashWatchdog] Fast-forward recovery failed: {}",
-                    e
-                ));
-            }
-        }
     }
 
     Ok(())
@@ -1058,20 +1028,21 @@ mod tests {
 
     #[test]
     fn test_calculate_next_interval_seconds_ladder() {
-        let mut cfg = AutoProfileSwitcherConfig::default();
-        cfg.check_interval_seconds = 300;
-        cfg.caution_interval_seconds = 180;
-        cfg.critical_interval_seconds = 60;
-        cfg.critical_threshold_percent = 12.0;
+        let cfg = AutoProfileSwitcherConfig::default();
+        assert_eq!(cfg.check_interval_seconds, 300);
+        assert_eq!(cfg.caution_interval_seconds, 60);
+        assert_eq!(cfg.critical_interval_seconds, 40);
+        assert_eq!(cfg.low_quota_threshold_percent, 15.0);
+        assert_eq!(cfg.critical_threshold_percent, 12.0);
 
         assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(20.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(19.9), &cfg), 180);
-        assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 180);
-        assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 300);
+        assert_eq!(calculate_next_interval_seconds(Some(14.9), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 40);
     }
 
     #[test]

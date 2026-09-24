@@ -168,6 +168,85 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         modified = true;
     }
 
+    if let Some(switcher) = v
+        .get_mut("auto_profile_switcher")
+        .and_then(|s| s.as_object_mut())
+    {
+        let cur_model = switcher
+            .get("target_model")
+            .and_then(|m| m.as_str())
+            .unwrap_or("");
+        if cur_model.is_empty()
+            || cur_model.eq_ignore_ascii_case("gemini-pro")
+            || cur_model.eq_ignore_ascii_case("gemini pro")
+        {
+            switcher.insert(
+                "target_model".to_string(),
+                serde_json::Value::String("gemini-3.8-flash-high".to_string()),
+            );
+            modified = true;
+        }
+        if switcher
+            .get("check_interval_seconds")
+            .and_then(|n| n.as_u64())
+            == Some(480)
+        {
+            switcher.insert("check_interval_seconds".to_string(), serde_json::json!(300));
+            modified = true;
+        }
+        if switcher
+            .get("low_quota_threshold_percent")
+            .and_then(|n| n.as_f64())
+            == Some(10.0)
+        {
+            switcher.insert(
+                "low_quota_threshold_percent".to_string(),
+                serde_json::json!(15.0),
+            );
+            modified = true;
+        }
+        if switcher
+            .get("caution_interval_seconds")
+            .and_then(|n| n.as_u64())
+            == Some(180)
+        {
+            switcher.insert(
+                "caution_interval_seconds".to_string(),
+                serde_json::json!(60),
+            );
+            modified = true;
+        }
+        if switcher
+            .get("critical_interval_seconds")
+            .and_then(|n| n.as_u64())
+            == Some(60)
+        {
+            switcher.insert(
+                "critical_interval_seconds".to_string(),
+                serde_json::json!(40),
+            );
+            modified = true;
+        }
+        if switcher
+            .get("critical_threshold_percent")
+            .and_then(|n| n.as_f64())
+            == Some(10.0)
+        {
+            switcher.insert(
+                "critical_threshold_percent".to_string(),
+                serde_json::json!(12.0),
+            );
+            modified = true;
+        }
+        if switcher.get("auto_focus_window").and_then(|b| b.as_bool()) == Some(true) {
+            switcher.insert(
+                "auto_focus_window".to_string(),
+                serde_json::Value::Bool(false),
+            );
+            modified = true;
+        }
+    }
+
     // Migration logic
     if let Some(proxy) = v.get_mut("proxy") {
         // [FIX #1738] Enhanced type checking for custom_mapping

@@ -31,15 +31,18 @@ interface AutoSwitcherSettingsProps {
 
 const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     is_enabled: true,
-    check_interval_seconds: 60,
-    low_quota_threshold_percent: 10.0,
-    target_model: 'gemini-pro',
+    check_interval_seconds: 300,
+    low_quota_threshold_percent: 15.0,
+    target_model: 'gemini-3.8-flash-high',
     has_auto_resume: true,
     cooldown_seconds: 180,
     auto_resume_recent_prompts: true,
-    auto_focus_window: true,
+    auto_focus_window: false,
     watchdog_interval_seconds: 120,
     prompt_recency_threshold_seconds: 3600,
+    caution_interval_seconds: 60,
+    critical_interval_seconds: 40,
+    critical_threshold_percent: 12.0,
 };
 
 export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ config, onChange }) => {
@@ -111,7 +114,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
     };
 
     const handleThresholdChange = (val: number) => {
-        const low_quota_threshold_percent = Math.max(1.0, Math.min(50.0, val));
+        const low_quota_threshold_percent = Math.max(1.0, Math.min(95.0, val));
         onChange({ ...currentConfig, low_quota_threshold_percent });
     };
 
@@ -241,7 +244,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <input
                                 type="range"
                                 min="15"
-                                max="300"
+                                max="600"
                                 step="15"
                                 value={currentConfig.check_interval_seconds}
                                 onChange={(e) => handleIntervalChange(Number(e.target.value))}
@@ -249,9 +252,9 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             />
                             <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                 <span>15s</span>
-                                <span>60s (Default)</span>
-                                <span>120s</span>
-                                <span>300s</span>
+                                <span>60s</span>
+                                <span>300s (5m Default)</span>
+                                <span>600s</span>
                             </div>
                         </div>
 
@@ -266,7 +269,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <input
                                 type="range"
                                 min="1"
-                                max="50"
+                                max="95"
                                 step="1"
                                 value={currentConfig.low_quota_threshold_percent}
                                 onChange={(e) => handleThresholdChange(Number(e.target.value))}
@@ -275,32 +278,32 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                 <span>1%</span>
                                 <span>15% (Default)</span>
-                                <span>30%</span>
                                 <span>50%</span>
+                                <span>90% (Test)</span>
                             </div>
                         </div>
 
-                        {/* Caution Polling Interval (< 20% Credits) */}
+                        {/* Caution Polling Interval (< 15% Credits) */}
                         <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 space-y-2">
                             <div className="flex justify-between items-center text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                <span>Caution Polling Interval (&lt; 20% Credits)</span>
+                                <span>Caution Polling Interval (&lt; 15% Credits)</span>
                                 <span className="font-mono font-bold">
-                                    {Math.round((currentConfig.caution_interval_seconds || 180) / 60)} min ({currentConfig.caution_interval_seconds || 180}s)
+                                    {Math.round((currentConfig.caution_interval_seconds || 60) / 60)} min ({currentConfig.caution_interval_seconds || 60}s)
                                 </span>
                             </div>
                             <input
                                 type="range"
-                                min="60"
-                                max="300"
-                                step="30"
-                                value={currentConfig.caution_interval_seconds || 180}
+                                min="30"
+                                max="180"
+                                step="15"
+                                value={currentConfig.caution_interval_seconds || 60}
                                 onChange={(e) => onChange({ ...currentConfig, caution_interval_seconds: Number(e.target.value) })}
                                 className="w-full accent-amber-600 cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-amber-600/70 dark:text-amber-400/60 font-mono">
-                                <span>1 min</span>
-                                <span>3 min (Default)</span>
-                                <span>5 min</span>
+                                <span>30s</span>
+                                <span>60s (1m Default)</span>
+                                <span>180s</span>
                             </div>
                         </div>
 
@@ -309,21 +312,21 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <div className="flex justify-between items-center text-xs font-semibold text-rose-800 dark:text-rose-300">
                                 <span>Critical Polling Interval (&le; 12% Credits)</span>
                                 <span className="font-mono font-bold">
-                                    {currentConfig.critical_interval_seconds || 60}s
+                                    {currentConfig.critical_interval_seconds || 40}s
                                 </span>
                             </div>
                             <input
                                 type="range"
-                                min="15"
+                                min="10"
                                 max="120"
-                                step="15"
-                                value={currentConfig.critical_interval_seconds || 60}
+                                step="10"
+                                value={currentConfig.critical_interval_seconds || 40}
                                 onChange={(e) => onChange({ ...currentConfig, critical_interval_seconds: Number(e.target.value) })}
                                 className="w-full accent-rose-600 cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-rose-600/70 dark:text-rose-400/60 font-mono">
-                                <span>15s</span>
-                                <span>60s (Default)</span>
+                                <span>10s</span>
+                                <span>40s (Default)</span>
                                 <span>120s</span>
                             </div>
                         </div>
@@ -354,11 +357,11 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
 
                                 <div className="relative mt-3">
                                     <select
-                                        value={currentConfig.target_model}
+                                        value={currentConfig.target_model === 'gemini-pro' || currentConfig.target_model === 'gemini-3.8-flash' ? 'gemini-3.8-flash-high' : currentConfig.target_model}
                                         onChange={(e) => onChange({ ...currentConfig, target_model: e.target.value })}
                                         className="w-full appearance-none px-3 py-2 pr-9 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all cursor-pointer"
                                     >
-                                        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Primary, Recommended)</option>
+                                        <option value="gemini-3.8-flash-high">Gemini 3.8 Flash High (Primary, Recommended)</option>
                                         <option value="claude-sonnet-4.6">Claude Sonnet 4.6 (Failover / Fallback)</option>
                                         <option value="gemini-pro">Gemini Pro</option>
                                     </select>
@@ -367,10 +370,10 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
 
                                 {/* Contextual Model Traits / Hints */}
                                 <div className="mt-3 p-2.5 rounded-lg bg-blue-50/60 dark:bg-slate-900/60 border border-blue-100/80 dark:border-slate-700/60 text-[11px] space-y-1">
-                                    {currentConfig.target_model === 'gemini-3.8-flash' && (
+                                    {(currentConfig.target_model === 'gemini-3.8-flash-high' || currentConfig.target_model === 'gemini-3.8-flash' || currentConfig.target_model === 'gemini-pro') && (
                                         <div className="flex items-start gap-1.5 text-blue-700 dark:text-blue-300">
                                             <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                            <span><strong>High Throughput &amp; Large Budget:</strong> Optimized for real-time completions with rolling 5-hour quota reset tracking.</span>
+                                            <span><strong>High Throughput &amp; Large Budget:</strong> Gemini 3.8 Flash High polls every 5m (&ge;15%), 1m (&lt;15%), and 40s (&le;12%), automatically rotating and dispatching prompts + plaintext email alerts.</span>
                                         </div>
                                     )}
                                     {currentConfig.target_model === 'claude-sonnet-4.6' && (

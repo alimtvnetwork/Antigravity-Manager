@@ -39,6 +39,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 |---|------|-------|:---:|:---:|
 | 02 | [02-smart-switch-scoring-and-window-controls-rca.md](02-smart-switch-scoring-and-window-controls-rca.md) | Smart Switch Scoring Defect, Window Controls ACL & Stack Trace Telemetry | High | Fixed |
 | 03 | [03-ip-security-null-and-ipc-query-fix.md](03-ip-security-null-and-ipc-query-fix.md) | IP Security Statistics Null Column Conversion & IPC Access Log Argument Mismatch | High | Fixed |
+| 04 | [04-instance-delete-open-close-loop-and-focus-stealing-rca.md](04-instance-delete-open-close-loop-and-focus-stealing-rca.md) | Instance Delete Error Trace, Open/Close Restart Loop & Unwanted Focus Stealing RCA | High | Fixed |
 
 ---
 

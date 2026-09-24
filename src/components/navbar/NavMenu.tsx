@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, Menu, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -10,14 +10,6 @@ interface NavMenuProps {
     navItems: NavItem[];
 }
 
-/**
- * Navigation menu component - compact single menu button layout
- *
- * Layout strategy:
- * - Retain a single highly integrated Menu button in the center displaying the active page icon and label
- * - Clicking opens dropdown with all nav items, saving top bar space
- * - Ensures InstanceSelector and settings buttons have ample room across screen sizes
- */
 export function NavMenu({ navItems }: NavMenuProps) {
     const location = useLocation();
     const { t } = useTranslation();
@@ -26,6 +18,17 @@ export function NavMenu({ navItems }: NavMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useClickOutside(menuRef, () => setIsMenuOpen(false));
+
+    useEffect(() => {
+        const handleOtherDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'nav-menu') {
+                setIsMenuOpen(false);
+            }
+        };
+        window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+        return () => window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+    }, []);
 
     // Filter hidden menu items
     const visibleNavItems = navItems.filter(item => !isMenuItemHidden(item.path));
@@ -38,8 +41,14 @@ export function NavMenu({ navItems }: NavMenuProps) {
         <div className="relative" ref={menuRef}>
             <button
                 type="button"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 transition-colors border border-gray-200/60 dark:border-slate-700 shadow-xs"
+                onClick={() => {
+                    const next = !isMenuOpen;
+                    setIsMenuOpen(next);
+                    if (next) {
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-menu' } }));
+                    }
+                }}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 transition-colors border border-gray-200/60 dark:border-slate-700 shadow-xs cursor-pointer"
                 title={t('common.menu', 'Menu')}
             >
                 <CurrentIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -51,7 +60,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
             {/* Navigation dropdown menu */}
             {isMenuOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 origin-top">
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95 duration-150 origin-top">
                     <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                         {t('common.navigation', 'Navigation')}
                     </div>

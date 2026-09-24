@@ -533,6 +533,14 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
 
 /// Delete an instance profile
 pub fn delete_instance(instance_id: &str) -> Result<(), String> {
+    if instance_id == "default" {
+        return Err("Cannot delete the default instance".to_string());
+    }
+
+    // Automatically close the instance if it is running so delete never fails
+    let _ = close_instance(instance_id);
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
     let mut registry = load_registry()?;
     let pos = registry
         .instances
@@ -540,27 +548,38 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
         .position(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
 
-    if instance_id == "default" || registry.instances[pos].is_default {
+    if registry.instances[pos].is_default {
         return Err("Cannot delete the default instance".to_string());
     }
 
-    let config = &registry.instances[pos];
-    if is_instance_running(instance_id, &config.data_dir, config.pid) {
-        return Err("Cannot delete instance while it is running. Close it first.".to_string());
-    }
+    let data_dir_to_remove = registry.instances[pos].data_dir.clone();
+    let custom_exe_to_remove = registry.instances[pos].executable_path.clone();
 
-    // Remove directory
-    let instances_root = get_instances_dir()?;
-    let instance_folder = instances_root.join(instance_id);
-    if instance_folder.exists() {
-        let _ = fs::remove_dir_all(instance_folder);
-    }
-
+    // Update and persist registry first so DB/JSON state is immediately consistent
     registry.instances.remove(pos);
     if registry.active_instance_id == instance_id {
         registry.active_instance_id = "default".to_string();
     }
     save_registry(&registry)?;
+
+    // Remove instance folder and any legacy cloned executable resiliently
+    if let Ok(instances_root) = get_instances_dir() {
+        let instance_folder = instances_root.join(instance_id);
+        if instance_folder.exists() {
+            let _ = fs::remove_dir_all(&instance_folder);
+        }
+    }
+    if !data_dir_to_remove.is_empty() {
+        let data_pb = PathBuf::from(&data_dir_to_remove);
+        if data_pb.exists() && data_dir_to_remove.contains("instances") {
+            let _ = fs::remove_dir_all(&data_pb);
+        }
+    }
+    if let Some(custom_exe) = custom_exe_to_remove {
+        if custom_exe.contains(&format!("Antigravity-{}", instance_id)) {
+            let _ = fs::remove_file(custom_exe);
+        }
+    }
 
     Ok(())
 }
@@ -672,23 +691,14 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     // Determine executable FIRST while running processes are alive for discovery
     let exe_path = if let Some(ref p) = custom_exe {
         let pb = PathBuf::from(p);
-        let has_pb = pb.exists();
+        let has_pb = pb.exists() && !p.contains("Antigravity-inst-");
         if has_pb {
             pb
         } else {
             crate::modules::process::detect_antigravity_with_diagnostics(None)?
         }
     } else {
-        let is_custom_instance = !is_default;
-        if is_custom_instance {
-            if let Ok(cloned) = clone_instance_executable(instance_id) {
-                PathBuf::from(cloned)
-            } else {
-                crate::modules::process::detect_antigravity_with_diagnostics(None)?
-            }
-        } else {
-            crate::modules::process::detect_antigravity_with_diagnostics(None)?
-        }
+        crate::modules::process::detect_antigravity_with_diagnostics(None)?
     };
 
     // Close only the existing process for THIS target instance if running, allowing OS to unmap locks

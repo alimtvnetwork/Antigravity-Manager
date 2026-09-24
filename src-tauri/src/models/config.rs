@@ -238,11 +238,11 @@ fn default_caution_interval() -> u32 {
 }
 
 fn default_critical_interval() -> u32 {
-    60
+    40
 }
 
 fn default_critical_threshold() -> f64 {
-    10.0
+    12.0
 }
 
 fn default_true() -> bool {
@@ -290,14 +290,14 @@ impl Default for AutoProfileSwitcherConfig {
     fn default() -> Self {
         Self {
             is_enabled: true,
-            check_interval_seconds: 480,
-            low_quota_threshold_percent: 10.0,
-            target_model: "gemini-pro".to_string(),
+            check_interval_seconds: 300,
+            low_quota_threshold_percent: 15.0,
+            target_model: "gemini-3.8-flash-high".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
             caution_interval_seconds: 60,
-            critical_interval_seconds: 60,
-            critical_threshold_percent: 10.0,
+            critical_interval_seconds: 40,
+            critical_threshold_percent: 12.0,
             auto_fast_forward_on_critical: true,
             auto_resume_recent_prompts: true,
             auto_focus_window: false,
