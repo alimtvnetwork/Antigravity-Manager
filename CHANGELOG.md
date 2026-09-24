@@ -3,6 +3,21 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.74.0 (2026-09-25)**:
+        -   **[Release v4.74.0: 赞助者元数据规范化、单账号 429 自适应重试死锁根治与 GitMap LLM 链式发现体系] 官方支持邮箱与 Cargo 元数据统一迁移至 alim.karim@riseup-asia.com、单账号 GraceRetry 状态契约闭环、GitMap LLM 链式发现课程贯通**:
+            -   **赞助者与官方维护者元数据规范化 (`src-tauri/Cargo.toml`, `src-tauri/src/bin/agm.rs`, `03-ai-scripts/40-test-email-permutations-e2e.py`)**: 将项目 `Cargo.toml` 作者邮箱、CLI 诊断测试发信人及 E2E 测试用例中的维护者邮箱全面规范化迁移至 `Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)`。
+            -   **单账号 429 自适应重试死锁根治 (`src-tauri/src/proxy/handlers/common.rs`)**: 彻底解决网关在单账号模式下遭遇 429 限流时，`determine_retry_strategy_adaptive` 无条件返回 `RetryStrategy::GraceRetry` 而无视 `allow_grace_retry` 状态标志的严重缺陷。修复后严格校验 `allow_grace_retry`，耗尽后安全降级至 `FixedDelay`，Rust 测试执行耗时从 30+ 分钟超时缩减至 0.01 秒。
+            -   **GitMap LLM 链式发现与自动化技能生成 (`.agents/skills/gitmap/skill.md`)**: 接入 `gitmap llm train` 4-stage 自主 LLM 链式发现体系，更新并固化官方 GitMap 技能树与安全守护门禁规范。
+
+    *   **v4.73.2 (2026-09-25)**:
+        -   **[Release v4.73.2: 单账号 429 自适应重试死循环修复、GraceRetry 状态契约闭环与全平台 CI 测试熔断根除] 彻底解决单账号限流等待重复触发死锁、Rust 测试用例秒级通过、Windows/macOS/Ubuntu 持续集成全绿交付**:
+            -   **单账号 429 自适应重试死锁根治 (`src-tauri/src/proxy/handlers/common.rs`)**: 彻底解决网关在单账号模式下遭遇 429 限流时，`determine_retry_strategy_adaptive` 无条件返回 `RetryStrategy::GraceRetry` 而无视 `allow_grace_retry` 状态标志的严重缺陷。此前由于未校验 `allow_grace_retry`，当首次 GraceRetry 执行后再次遭遇限流时，继续返回 `GraceRetry` 导致重试循环内 `retry_same_account = true` 永不退出、`used_attempts` 无法向前推进，进而导致 `task_short_429_preserves_rotation_budget_and_structured_status` 测试死循环并触发全平台 CI 30 分钟超时熔断。修复后严格校验 `allow_grace_retry`，耗尽后安全降级至 `FixedDelay`，测试执行耗时从 30+ 分钟缩减至 0.01 秒。
+
+    *   **v4.73.1 (2026-09-25)**:
+        -   **[Release v4.73.1: Windows 应用清单与 comctl32 符号深度内嵌、测试二进制 EntryPoint 根治与 GITHUB_TOKEN 速率熔断防护] 彻底根除 0xc0000139 崩溃、Windows 10/11/Server 2025 兼容 GUID 标记与自动清理限流熔断防护**:
+            -   **测试与运行时二进制统一内嵌 Common-Controls 6.0 清单 (`src-tauri/build.rs`, `windows-test.manifest`)**: 解决 Windows Server 2025 CI 测试二进制缺失应用清单导致 `0xc0000139` 动态链接入口缺失崩溃，通过 `/MANIFEST:EMBED` 保证测试与运行环境完全具备 TaskDialog 等现代控件支持。
+            -   **GitHub Actions 速率熔断防护 (`03-ai-scripts/34-purge-github-actions-artifacts.py`)**: 增加 Rate Limit 检查门禁，防止制品清理脚本耗尽 `GITHUB_TOKEN` 配额。
+
     *   **v4.73.0 (2026-09-25)**:
         -   **[Release v4.73.0: Telegram 自动化远程代理守护进程、交互式配置向导、跨平台 PowerShell 编码根治与系统遥测指令全链路贯通] 独立 Telegram Agent 守护进程、全自动 Chat ID 捕获与双向握手验证、Windows PowerShell 5.1/7+ 纯 ASCII 语法加固与集群指令远程下发**:
             -   **独立 Telegram Agent 远程控制守护进程 (`scripts/telegram-agent-daemon.ps1`)**: 为无头服务器 (Headless)、远程工作站与开发者环境提供纯 PowerShell 实现的独立 Telegram 自动化 Agent 守护进程。通过官方 Telegram Bot API 长轮询 (`getUpdates`) 持续监听控制信道，全面支持 `/status` 与 `SNAPSHOT`（集群与节点遥测，含主机名、内网 IP、系统运行时长及网关健康状态）、`FF` 与 `/ff`（IDE 双通道账号快进切换）以及 `CMD:<command>`（远程控制台指令安全下发与实时回传截断输出）。
@@ -3291,6 +3306,21 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.74.0 (2026-09-25)**:
+        -   **[Release v4.74.0: Sponsor & Author Metadata Alignment, Single-Account 429 Adaptive GraceRetry Infinite Loop Fix, and GitMap LLM Chained Discovery Curriculum] Canonical Author Email alim.karim@riseup-asia.com, Single-Account GraceRetry State Contract Guard, and GitMap Autonomous Skill Generation**:
+            -   **Sponsor & Author Metadata Migration (`src-tauri/Cargo.toml`, `src-tauri/src/bin/agm.rs`, `03-ai-scripts/40-test-email-permutations-e2e.py`)**: Migrated author email in Cargo manifest, CLI test dispatchers, and E2E simulation suites to `Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)`.
+            -   **Single-Account 429 Adaptive GraceRetry Infinite Loop Fix (`src-tauri/src/proxy/handlers/common.rs`)**: Resolved a critical deadlock bug where single-account 429 rate limit responses unconditionally returned `RetryStrategy::GraceRetry` regardless of `allow_grace_retry`. Now properly enforces `allow_grace_retry` and safely falls back to `FixedDelay`, reducing test execution from 30+ minutes (timeout) to 0.01 seconds.
+            -   **GitMap LLM Chained Discovery Integration (`.agents/skills/gitmap/skill.md`)**: Integrated `gitmap llm train` 4-stage autonomous LLM curriculum to regenerate and solidify repository skill trees and operational guardrails.
+
+    *   **v4.73.2 (2026-09-25)**:
+        -   **[Release v4.73.2: 429 Adaptive GraceRetry Infinite Loop Fix] Prevent Infinite While-Loop on Repeated Rate Limits, Rust Unit Tests Pass in 0.01s**:
+            -   **Single-Account 429 Adaptive GraceRetry Infinite Loop Fix (`src-tauri/src/proxy/handlers/common.rs`)**: Enforced `allow_grace_retry` validation in single-account adaptive retry to avoid infinite retry loops on repeated 429 rate limits.
+
+    *   **v4.73.1 (2026-09-25)**:
+        -   **[Release v4.73.1: Windows Manifest Embedded Resource Alignment & comctl32.dll Entry Point 0xc0000139 Elimination] Common-Controls 6.0 Embedded in All Binaries**:
+            -   **Embedded Common-Controls 6.0 Manifest for Test Binaries & App (`src-tauri/build.rs`, `windows-test.manifest`)**: Embedded application manifest containing Microsoft.Windows.Common-Controls 6.0 into test and release executables via `/MANIFEST:EMBED` to prevent `0xc0000139` entry point missing errors on modern Windows runners.
+
+
     *   **v4.72.0 (2026-09-24)**:
         -   **[Release v4.72.0: Two-Bar Release Page Installation, Release Workflow Version Stamping, PowerShell History Pinned Version Resolution, and Win32/WebView2 DWM Blank UI Elimination] Dedicated Latest vs Pinned Installation Code Blocks, Strict Pinned Version Queue Adherence Without Drift, and Complete Taskbar Thumbnail/Window Occlusion Redraw Pipeline**:
             -   **Release Page Two-Bar Installation Layout (`02-spec/21-app/45-two-bar-installer-and-dwm-blank-ui-fix.md`)**: Replaced merged, single-block installation instructions with two distinct copyable code blocks ("bars") in GitHub release notes and project documentation. Users can now copy **Bar 1 (Latest Version)** for auto-updating bleeding-edge installations or **Bar 2 (Version-Based Installation)** with `-Version "<VER>"` explicitly bound to that exact tag.

@@ -234,14 +234,16 @@ pub fn determine_retry_strategy_adaptive(
             if pool_size <= 1 {
                 if let Some(delay) = parsed_delay {
                     let actual_ms = delay.actual_wait_ms();
-                    if actual_ms <= 30_000 {
+                    if actual_ms <= 30_000 && allow_grace_retry {
                         tracing::info!(
                             "[Retry] Single account 429: quotaResetDelay detected ({}ms), applying GraceRetry",
                             actual_ms
                         );
                         return RetryStrategy::GraceRetry(Duration::from_millis(actual_ms));
                     } else {
-                        return RetryStrategy::FixedDelay(Duration::from_millis(30_000));
+                        return RetryStrategy::FixedDelay(Duration::from_millis(
+                            actual_ms.min(30_000),
+                        ));
                     }
                 } else {
                     // 没有给出明确延迟时的保底退避 (单账号等待 3s~5s，杜绝 50ms 闪电耗尽重试)
@@ -250,7 +252,11 @@ pub fn determine_retry_strategy_adaptive(
                         "[Retry] Single account 429 without explicit delay: backing off {}ms",
                         backoff_ms
                     );
-                    return RetryStrategy::GraceRetry(Duration::from_millis(backoff_ms));
+                    if allow_grace_retry {
+                        return RetryStrategy::GraceRetry(Duration::from_millis(backoff_ms));
+                    } else {
+                        return RetryStrategy::FixedDelay(Duration::from_millis(backoff_ms));
+                    }
                 }
             }
 

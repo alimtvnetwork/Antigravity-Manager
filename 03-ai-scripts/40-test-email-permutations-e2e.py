@@ -56,7 +56,7 @@ def load_dynamic_credentials():
     print(f"[*] Reading credentials dynamically from local vault: {EMAIL_VAULT_DB}")
     if not EMAIL_VAULT_DB.exists():
         print(f"    {YELLOW}Warning: {EMAIL_VAULT_DB} not found. Running with mock vault context.{RESET}")
-        return {"accounts": [], "recipients": ["devorg.bd@gmail.com"]}
+        return {"accounts": [], "recipients": ["alim.karim@riseup-asia.com"]}
 
     conn = sqlite3.connect(EMAIL_VAULT_DB)
     cur = conn.cursor()
@@ -600,9 +600,9 @@ def test_debounce_stack_and_sender_acl(authorized_senders: list) -> bool:
         return True  # Allowed (first execution)
 
     # 1. Debounce Verification
-    allowed_1 = check_debounce("devorg.bd@gmail.com", "agm status", "VM3")
-    allowed_2 = check_debounce("devorg.bd@gmail.com", "agm status", "VM3")
-    allowed_3 = check_debounce("devorg.bd@gmail.com", "agm status", "VM3")
+    allowed_1 = check_debounce("alim.karim@riseup-asia.com", "agm status", "VM3")
+    allowed_2 = check_debounce("alim.karim@riseup-asia.com", "agm status", "VM3")
+    allowed_3 = check_debounce("alim.karim@riseup-asia.com", "agm status", "VM3")
 
     if allowed_1 and not allowed_2 and not allowed_3:
         print_pass("DEBOUNCE-10S", "Rapid identical commands correctly throttled in 10-second sliding window.")
@@ -612,10 +612,10 @@ def test_debounce_stack_and_sender_acl(authorized_senders: list) -> bool:
         debounce_ok = False
 
     # 2. ACL Verification
-    auth_sender = authorized_senders[0] if authorized_senders else "devorg.bd@gmail.com"
+    auth_sender = authorized_senders[0] if authorized_senders else "alim.karim@riseup-asia.com"
     unauth_sender = "malicious-spammer@evil.com"
 
-    auth_passed = auth_sender in authorized_senders or auth_sender == "devorg.bd@gmail.com"
+    auth_passed = auth_sender in authorized_senders or auth_sender == "alim.karim@riseup-asia.com"
     unauth_rejected = unauth_sender not in authorized_senders
 
     if auth_passed:

@@ -1221,7 +1221,7 @@ fn cmd_test_email(args: &[String]) {
         let target_rcpt = args
             .get(1)
             .map(|s| s.as_str())
-            .unwrap_or("devorg.bd@gmail.com");
+            .unwrap_or("alim.karim@riseup-asia.com");
         println!("[*] Sending test SMTP dispatch to '{}'...", target_rcpt);
         let (subj, body) = email_sender::render_help_email(
             &settings.local_machine_name,
@@ -1246,7 +1246,7 @@ fn cmd_test_email(args: &[String]) {
         let test_from = args
             .get(2)
             .map(|s| s.as_str())
-            .unwrap_or("Alim Ul Karim <devorg.bd@gmail.com>");
+            .unwrap_or("Alim Ul Karim <alim.karim@riseup-asia.com>");
         let test_body = args.get(3).map(|s| s.as_str()).unwrap_or("");
         println!("[*] Executing live end-to-end simulated inbound message:");
         println!("    From:    {}", test_from);
