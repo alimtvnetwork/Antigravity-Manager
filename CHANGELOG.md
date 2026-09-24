@@ -3,6 +3,16 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.70.0 (2026-09-24)**:
+        -   **[Release v4.70.0: 实例删除与反复启停循环根治、自动切号轮询阶梯与 Gemini 3.8 Flash High、导航栏互斥防穿透与 100% 纯文本邮件] 实例删除生命周期重构、原生沙箱防循环启动、5m/60s/40s 三阶智能轮询、Gemini 3.8 Flash High 默认评估基准、导航栏下拉面板广播互斥、右侧工具栏合并精简、无感静默守护与 100% 纯文本邮件规范**:
+            -   **实例删除生命周期重构与错误堆栈根除**: 彻底修复 `delete_instance` 因底层进程占用导致文件夹删除失败报错（Error trace）。重构删除生命周期安全顺序：优先调用 `close_instance()` 终止所有子进程，若当前活动实例即待删实例则先平滑切换至 `default` 实例，优先写入并持久化注册表与状态数据库，最后通过重试与安全解绑机制删除实例文件夹与二进制文件。
+            -   **原生母体沙箱启动与反复开启/关闭死循环根治**: 彻底根除新建多实例后进程反复打开、闪退、再打开的死循环现象。不再将主程序二进制拷贝至子目录启动，统一采用原生母体 `Antigravity.exe` 配合 `--user-data-dir` 独立路径拉起沙箱，彻底避免子进程重新拉起主进程的恶性递归。
+            -   **自动切换器三阶自适应轮询阶梯与 Gemini 3.8 Flash High 默认基准**: 实施全新轮询阶梯机制：默认基础检查间隔延长为 `300s`（5 分钟，降低空闲后台资源开销），当配额低于警戒水位 `15%` 时自动提速至 `60s`，当低于极危水位 `12%` 时加速至 `40s`。自动切换器默认目标评估模型升级为最新高性能基准 `gemini-3.8-flash-high`。触发切号时自动同步提示词快照至本地仓库数据库并发送桌面通知。
+            -   **导航栏下拉面板广播互斥与穿透遮挡消除**: 引入 `agm:dropdown-open` 全局自定义广播事件，在账号选择器与实例选择器下拉菜单之间建立互斥机制，任何一方展开时自动关闭另一方，杜绝双菜单同时开启导致的层叠穿透。
+            -   **顶部工具栏视觉精简与操作合并**: 将调试 Bug 图标移至左侧 Logo 品牌区域；合并主题切换与多语言选择为单颗综合设置下拉按钮，右侧仅保留极简「快捷清理 (Quick Clean)」垃圾桶图标；合并导入与导出为单颗双向导入/导出图标菜单，工具提示层级统一提升至 `z-[9999]`。
+            -   **窗口焦点抢夺根除与静默崩溃守护**: 将 `auto_focus_window` 默认禁用 (`false`)，避免切号或启动时强行抢夺用户当前活动窗口。重构崩溃守护进程 `check_and_recover_crashed_instance` 为纯静默模式，仅清理残留锁文件，坚决不在后台擅自拉起前台 IDE 窗口或强制切换账号。输出完整根因分析报告 `02-spec/22-app-issues/04-instance-delete-open-close-loop-and-focus-stealing-rca.md`。
+            -   **100% 纯文本邮件指令与 Telegram PS 对齐**: 出站邮件移除所有 HTML 标签，转为 100% 纯文本格式；严格规范邮件格式：主题（Subject）承载指令语法，邮件正文（Body）仅承载纯净 Prompt，去除所有装饰签名与尾注。入站解析端剥离尾注与终端前缀（`powershell:` 等）。Telegram 设置表单水平对齐底部，提供自动化配置脚本 `03-ai-scripts/telegram-bot-helper.ps1`。
+
     *   **v4.69.0 (2026-09-24)**:
         -   **[Release v4.69.0: 完整 IDE 复制与仅配置文件复制克隆架构与 UI 布局对齐] IDE 与配置文件双克隆模式、导航栏操作按钮精准重排、独立发布命令块与双端一致性**:
             -   **恢复完整的 "IDE 完整克隆 vs 仅配置文件复制" 架构**: 在顶部导航栏下拉面板 (`InstanceSelector.tsx`) 和主管理仪表盘 (`Instances.tsx`) 同步引入双重克隆模式。用户可明确选择 **IDE 完整克隆 (完整环境与会话)**（完整复制独立环境数据目录、工作区会话、扩展、缓存与运行状态）或 **仅配置文件复制 (偏好设置与代码片段)**（仅复制用户偏好、按键绑定与代码片段，不携带庞大运行时会话数据）。
@@ -3235,6 +3245,17 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.70.0 (2026-09-24)**:
+        -   **[Release v4.70.0: Instance Deletion Lifecycle Overhaul, Open/Close Loop Eradication, Adaptive Quota Ladder & Gemini 3.8 Flash High, Dropdown Mutual Exclusion, and 100% Plaintext Emails] Safe Instance Teardown, Native Binary Sandboxing, 300s/60s/40s Dynamic Polling Ladder, Gemini 3.8 Flash High Default, Mutual Dropdown Exclusion, Toolbar Consolidation, Silent Watchdog, and Pure Plaintext Emails**:
+            -   **Instance Deletion Lifecycle Overhaul & Error Trace Eradication**: Fixed `delete_instance` failing with an error trace due to running processes locking profile directories. Implemented a resilient teardown sequence: proactively terminate running processes via `close_instance()`, safely fallback `active_instance_id` to `"default"` if deleting the active profile, persist registry and state to SQLite first, and clean up directory locks before resiliently removing filesystem directories.
+            -   **Native Binary Sandboxing & Open/Close Death Loop Eradication**: Completely eliminated the issue where newly created instances repeatedly open and close in an infinite restart loop. Terminated the fragile executable-copying pattern (`copy_dir_all` / child binary invocation), standardizing on launching the native parent `Antigravity.exe` binary with `--user-data-dir` argument isolation.
+            -   **Adaptive Auto-Switcher Polling Ladder & Gemini 3.8 Flash High**: Implemented a 3-tier dynamic interval ladder: default safe interval relaxed to `300s` (5 minutes, saving system resources), accelerating to `60s` when quota falls below caution threshold (`15%`), and `40s` when at or below critical threshold (`12%`). Upgraded default evaluated model to `gemini-3.8-flash-high`. Automatic rotation seamlessly pushes running prompts and state snapshots to the local database and dispatches notifications.
+            -   **Mutual Dropdown Exclusion & Collision Eradication**: Integrated `agm:dropdown-open` custom events between Accounts and Instances dropdowns, guaranteeing mutual exclusion and eliminating double-dropdown overlap.
+            -   **Toolbar Visual Consolidation**: Relocated Bug debug icon to the left brand logo area; consolidated Theme and Language switchers into a single unified dropdown leaving only the Quick Clean (Recycle) button; consolidated Import and Export into a single unified icon dropdown with `z-[9999]` tooltips.
+            -   **Window Focus Stealing Eradication & Passive Crash Recovery**: Defaulted `auto_focus_window` to `false`. Refactored `check_and_recover_crashed_instance` into a purely passive watchdog that cleans lockfiles without launching unexpected foreground IDE windows or triggering forced rotations. Documented comprehensive root cause analysis in `02-spec/22-app-issues/04-instance-delete-open-close-loop-and-focus-stealing-rca.md`.
+            -   **100% Plaintext Subject-Driven Emails & Telegram Alignment**: Stripped all HTML tags from outgoing notification emails, enforcing pure plaintext format. Standardized subject-driven commands (`* | prompt | proj-...` or `* | ps | ...`) with pure prompts in the email body. Inbound email processing strips markdown footers and terminal prefixes (`powershell:`). Aligned Telegram Bot Token and Chat ID inputs horizontally (`items-end`) and provided `03-ai-scripts/telegram-bot-helper.ps1`.
+
+
     *   **v4.69.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
