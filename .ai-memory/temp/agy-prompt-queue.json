@@ -1,0 +1,21 @@
+{
+  "active": {
+    "id": 1,
+    "type": "read_memory",
+    "title": "Read Memory Protocol",
+    "prompt": "Execute enhanced Read Memory protocol. Defensively load memory, specs, constraints, and pending plans before taking action.",
+    "status": "queued",
+    "createdAt": "2026-09-22T14:53:25Z"
+  },
+  "queued": [
+    {
+      "id": 2,
+      "type": "user_prompt",
+      "title": "Prompt: read-all",
+      "prompt": "Execute enhanced Read Memory protocol. Defensively load memory, specs, constraints, and pending plans before taking action.\n\nxt",
+      "status": "queued",
+      "createdAt": "2026-09-22T14:53:25Z"
+    }
+  ],
+  "updatedAt": "2026-09-22T14:53:25Z"
+}

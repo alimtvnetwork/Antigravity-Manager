@@ -1,0 +1,3 @@
+Execute enhanced Read Memory protocol. Defensively load memory, specs, constraints, and pending plans before taking action.
+
+xt
