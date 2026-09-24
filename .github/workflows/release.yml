@@ -56,7 +56,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri"
-          cache-all-crates: "true"
 
       - name: Node.js setup
         uses: actions/setup-node@v4
@@ -140,6 +139,7 @@ jobs:
           name: updater-json-${{ matrix.platform }}-${{ strategy.job-index }}
           path: src-tauri/target/**/release/bundle/updater/*.json
           if-no-files-found: ignore
+          retention-days: 1
 
       # 打包 Windows 便携版 ZIP (直接可执行文件免安装包)
       - name: Package portable binary archive (Windows)
@@ -188,6 +188,7 @@ jobs:
             src-tauri/target/**/release/bundle/nsis/*.sig
             src-tauri/target/**/release/bundle/rpm/*.sig
           if-no-files-found: warn
+          retention-days: 1
 
   publish-release:
     needs: build-tauri
@@ -394,6 +395,14 @@ jobs:
           artifactErrorsFailBuild: false
           replacesArtifacts: true
           makeLatest: legacy
+
+      # 清理本次运行的中间 Artifacts 以维持零存储占用 (Release 资产已独立存放在 GitHub Releases)
+      - name: Purge Run Artifacts Post-Release
+        if: always() && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 03-ai-scripts/34-purge-github-actions-artifacts.py --repo "${{ github.repository }}" --artifacts-only || true
 
   docker-build-amd64:
     runs-on: ubuntu-latest
