@@ -1778,7 +1778,7 @@ pub fn bind_device_profile_with_profile(
     Ok(profile)
 }
 
-fn apply_profile_to_account(
+pub(crate) fn apply_profile_to_account(
     account: &mut Account,
     profile: DeviceProfile,
     label: Option<String>,
