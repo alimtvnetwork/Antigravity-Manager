@@ -2,6 +2,13 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.67.0 (2026-09-24)**:
+        -   **[Release v4.67.0: 自动切号 UI/UX 深度重构、本地多核秒级运行与 Docker 极速构建产物规范] 自动切号双卡片对称美化、暗色模式色块根除、全核并行编译与 Docker 官方二进制规范**:
+            -   **自动切号设置区域 UI/UX 深度重构**: 将左侧单薄裸露的模型选择下拉框升级为官方标准卡片，集成 `Cpu` 图标徽章、`Trigger Metric` 指标标签与详细说明，并新增根据所选模型动态展示的特性描述（Gemini 3.8 Flash 高速并发、Claude Sonnet 4.6 深度思考预算切换、Gemini Pro 标准基准）。内置 **Rotation Cooldown Guard** 冷却滑动条，使左右两侧卡片实现高度绝对平衡对称。
+            -   **暗色模式 Recency Cutoff 灰白底色根治**: 彻底消除 DaisyUI 与 Tailwind 暗色模式混合引起的白色高亮色块，以 Slate 原生深色调 (`bg-slate-100/90 dark:bg-slate-900/90 border-slate-700/80`) 重构最近活跃提示词恢复窗口面板，并在右侧统一构建 **Task Continuity & Watchdog** 守护面板。
+            -   **本地多核极速运行器升级 (`run.ps1`)**: 自动检测硬件核心数并导出 `$env:CARGO_BUILD_JOBS` 开启全核多线程并行编译；自动探测并接入 `sccache` 编译对象级缓存与 `lld-link` 极速链接器；新增 `-Quick` / `-Run` 免编译极速直启模式与 `-OptimizeIO` Windows Defender 排除向导。
+            -   **Docker 镜像编译与分发规范修复**: 修正 `docker/Dockerfile`、`Dockerfile.backend` 及 `Dockerfile.backend.localdist` 中过时的编译参数，统一绑定为官方最新 `agm-alim` 二进制并保持 `/app/antigravity-tools` 兼容软链接，打通无头 Linux 容器的高效流水线。
+
     *   **v4.66.0 (2026-09-24)**:
         -   **[Release v4.66.0: 5小时滚动配额精准恢复、进程品牌统一、实例序号徽章与邮箱样本预加载] 5小时滚动配额计算恢复、开箱即用邮箱样本、任务管理器官方品牌、Telegram BotFather 向导与发布页代码块独立分割**:
             -   **恢复 5 小时滚动配额基准计算**: 修复 `src-tauri/src/modules/quota.rs` 中滚动配额选择器比较逻辑。当存在 5 小时滚动配额且周配额未耗尽（`remaining_fraction > 0.001`）时，系统无条件优先采用 5 小时滚动配额并显示精准倒计时（如 `4h 56m`），周配额倒计时（如 `6d 9h`）仅在周配额完全耗尽时展示。
@@ -3212,6 +3219,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.67.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.66.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

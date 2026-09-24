@@ -35,7 +35,11 @@ param(
     [Alias("Debug")]
     [switch]$DebugMode,
     [switch]$FrontendOnly,
-    [switch]$InstallToolchain
+    [switch]$InstallToolchain,
+    [Alias("Run")]
+    [switch]$Quick,
+    [switch]$Fast,
+    [switch]$OptimizeIO
 )
 
 $ErrorActionPreference = "Stop"
@@ -140,11 +144,56 @@ if (-not (Test-Path $nodeModulesDir)) {
     Write-Success "Frontend dependencies installed successfully."
 }
 
-# 4. Dispatch Run Mode
+# 4. Instant Launch Mode (-Quick / -Run)
+if ($Quick) {
+    Write-Step "Fast launch mode requested..."
+    $exeRelease = Join-Path $ScriptDir "src-tauri\target\release\agm-alim.exe"
+    $exeDebug = Join-Path $ScriptDir "src-tauri\target\debug\agm-alim.exe"
+    if (Test-Path $exeRelease) {
+        Write-Success "Launching existing release executable: $exeRelease"
+        Start-Process $exeRelease
+        exit 0
+    } elseif (Test-Path $exeDebug) {
+        Write-Success "Launching existing debug executable: $exeDebug"
+        Start-Process $exeDebug
+        exit 0
+    } else {
+        Write-Warn "No pre-compiled binary found in target/. Proceeding with dev build..."
+    }
+}
+
+# 5. Compiler Parallelism & Speed Optimizations
+$cores = [System.Environment]::ProcessorCount
+$env:CARGO_BUILD_JOBS = $cores
+Write-Step "Parallel threads configured: $cores worker threads"
+
+$hasSccache = [bool](Get-Command sccache -ErrorAction SilentlyContinue)
+if ($hasSccache) {
+    $env:RUSTC_WRAPPER = "sccache"
+    Write-Success "Shared compiler cache (sccache) enabled"
+}
+
+$hasLld = [bool](Get-Command lld-link -ErrorAction SilentlyContinue)
+if ($hasLld -and -not $env:RUSTFLAGS) {
+    $env:RUSTFLAGS = "-C link-arg=-fuse-ld=lld"
+    Write-Success "Fast linker (lld-link) enabled"
+}
+
+if ($OptimizeIO) {
+    Write-Step "Configuring Windows Defender exclusion for project directory..."
+    try {
+        Add-MpPreference -ExclusionPath $ScriptDir -ErrorAction Stop
+        Write-Success "Windows Defender exclusion registered for $ScriptDir"
+    } catch {
+        Write-Warn "To enable real-time antivirus exclusion, run in Administrator PowerShell: Add-MpPreference -ExclusionPath '$ScriptDir'"
+    }
+}
+
+# 6. Dispatch Run Mode
 Set-Location -Path $ScriptDir
 
 if ($Build) {
-    Write-Step "Executing production build (npm run tauri build)..."
+    Write-Step "Executing parallel production build (npm run tauri build)..."
     npm run tauri build
 } elseif ($DebugMode) {
     Write-Step "Executing debug mode with verbose logs (RUST_LOG=debug npm run tauri dev)..."
