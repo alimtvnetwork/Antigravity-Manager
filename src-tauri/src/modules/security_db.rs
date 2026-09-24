@@ -294,22 +294,37 @@ pub fn get_ip_stats() -> Result<IpStats, String> {
     let (total_requests, unique_ips, blocked_count, today_requests): (u64, u64, u64, u64) = conn
         .query_row(
             "SELECT
-                COUNT(*) as total,
-                COUNT(DISTINCT client_ip) as unique_ips,
-                SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) as blocked,
-                SUM(CASE WHEN timestamp >= ?1 THEN 1 ELSE 0 END) as today
+                COALESCE(COUNT(*), 0) as total,
+                COALESCE(COUNT(DISTINCT client_ip), 0) as unique_ips,
+                COALESCE(SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END), 0) as blocked,
+                COALESCE(SUM(CASE WHEN timestamp >= ?1 THEN 1 ELSE 0 END), 0) as today
              FROM ip_access_logs",
             [today_start],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get::<_, Option<u64>>(0)?.unwrap_or(0),
+                    row.get::<_, Option<u64>>(1)?.unwrap_or(0),
+                    row.get::<_, Option<u64>>(2)?.unwrap_or(0),
+                    row.get::<_, Option<u64>>(3)?.unwrap_or(0),
+                ))
+            },
         )
         .map_err(|e| e.to_string())?;
 
     let blacklist_count: u64 = conn
-        .query_row("SELECT COUNT(*) FROM ip_blacklist", [], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(COUNT(*), 0) FROM ip_blacklist",
+            [],
+            |row| Ok(row.get::<_, Option<u64>>(0)?.unwrap_or(0)),
+        )
         .map_err(|e| e.to_string())?;
 
     let whitelist_count: u64 = conn
-        .query_row("SELECT COUNT(*) FROM ip_whitelist", [], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(COUNT(*), 0) FROM ip_whitelist",
+            [],
+            |row| Ok(row.get::<_, Option<u64>>(0)?.unwrap_or(0)),
+        )
         .map_err(|e| e.to_string())?;
 
     Ok(IpStats {

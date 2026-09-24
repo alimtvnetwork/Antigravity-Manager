@@ -38,6 +38,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | # | File | Title | Severity | Status |
 |---|------|-------|:---:|:---:|
 | 02 | [02-smart-switch-scoring-and-window-controls-rca.md](02-smart-switch-scoring-and-window-controls-rca.md) | Smart Switch Scoring Defect, Window Controls ACL & Stack Trace Telemetry | High | Fixed |
+| 03 | [03-ip-security-null-and-ipc-query-fix.md](03-ip-security-null-and-ipc-query-fix.md) | IP Security Statistics Null Column Conversion & IPC Access Log Argument Mismatch | High | Fixed |
 
 ---
 

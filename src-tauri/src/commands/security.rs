@@ -4,8 +4,8 @@ use tauri::State;
 
 // ==================== 请求/响应结构 ====================
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct IpAccessLogQuery {
     pub page: usize,
     pub page_size: usize,
@@ -46,14 +46,33 @@ pub struct IpStatsResponse {
 
 /// 获取 IP 访问日志列表
 #[tauri::command]
-pub async fn get_ip_access_logs(query: IpAccessLogQuery) -> Result<IpAccessLogResponse, String> {
-    let offset = (query.page.max(1) - 1) * query.page_size;
+pub async fn get_ip_access_logs(
+    query: Option<IpAccessLogQuery>,
+    page: Option<usize>,
+    page_size: Option<usize>,
+    search: Option<String>,
+    blocked_only: Option<bool>,
+) -> Result<IpAccessLogResponse, String> {
+    let resolved_page = query.as_ref().map(|q| q.page).or(page).unwrap_or(1);
+    let resolved_page_size = query
+        .as_ref()
+        .map(|q| q.page_size)
+        .or(page_size)
+        .unwrap_or(50);
+    let resolved_search = query.as_ref().and_then(|q| q.search.clone()).or(search);
+    let resolved_blocked_only = query
+        .as_ref()
+        .map(|q| q.blocked_only)
+        .or(blocked_only)
+        .unwrap_or(false);
+
+    let offset = (resolved_page.max(1) - 1) * resolved_page_size;
 
     let logs = security_db::get_ip_access_logs(
-        query.page_size,
+        resolved_page_size,
         offset,
-        query.search.as_deref(),
-        query.blocked_only,
+        resolved_search.as_deref(),
+        resolved_blocked_only,
     )?;
 
     // 简单计算总数 (如果需要精确分页,可以添加 count 函数)

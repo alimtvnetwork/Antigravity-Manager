@@ -10,9 +10,11 @@ import { ensureFullViewState } from '../../utils/windowManager';
 
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { useFastForwardShortcut } from '../../hooks/useFastForwardShortcut';
 
 function Layout() {
     const { isMiniView } = useViewStore();
+    useFastForwardShortcut();
 
     // Ensure correct window state when in Full View (not Mini View)
     // This handles the case where the app was closed in Mini View (small size, no decorations)

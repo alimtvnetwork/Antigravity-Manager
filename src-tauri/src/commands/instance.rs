@@ -79,6 +79,11 @@ pub fn set_active_instance(instance_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn set_default_instance(instance_id: String) -> Result<(), String> {
+    instance::set_default_instance(&instance_id)
+}
+
+#[tauri::command]
 pub async fn switch_account_to_instance(
     account_id: String,
     instance_id: Option<String>,

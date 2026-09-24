@@ -18,6 +18,7 @@ import {
     RotateCcw,
     Cpu,
     ArrowRightLeft,
+    FastForward,
 } from 'lucide-react';
 import { showToast } from '../common/ToastContainer';
 import { AutoProfileSwitcherConfig } from '../../types/config';
@@ -548,6 +549,65 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                             </p>
                                         </div>
                                     </label>
+
+                                    {/* Fast-Forward Shortcut Configuration */}
+                                    <div className="p-3 bg-slate-100/90 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 shadow-2xs">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                <FastForward className="w-3.5 h-3.5 text-blue-500" />
+                                                <span>Fast-Forward Shortcut Key:</span>
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={currentConfig.fast_forward_shortcut || 'Ctrl+Shift+F'}
+                                                    onChange={(e) => onChange({
+                                                        ...currentConfig,
+                                                        fast_forward_shortcut: e.target.value.trim() || 'Ctrl+Shift+F',
+                                                    })}
+                                                    placeholder="Ctrl+Shift+F"
+                                                    className="w-32 px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-center text-blue-600 dark:text-blue-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({
+                                                        ...currentConfig,
+                                                        fast_forward_shortcut: 'Ctrl+Shift+F',
+                                                    })}
+                                                    className="btn btn-ghost btn-xs text-[10px] text-gray-500 hover:text-blue-600 cursor-pointer"
+                                                    title="Reset to default (Ctrl+Shift+F)"
+                                                >
+                                                    Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            <span>Triggers smart account rotation and active window fast-forward from anywhere in the app.</span>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Ctrl+Shift+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Ctrl+Shift+F
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Alt+Shift+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Alt+Shift+F
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onChange({ ...currentConfig, fast_forward_shortcut: 'Ctrl+Alt+F' })}
+                                                    className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 dark:bg-slate-800 font-mono hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                >
+                                                    Ctrl+Alt+F
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

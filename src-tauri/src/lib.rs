@@ -917,6 +917,7 @@ pub fn run() {
             commands::close_instance,
             commands::get_active_instance,
             commands::set_active_instance,
+            commands::set_default_instance,
             commands::switch_account_to_instance,
             commands::export_instances_json,
             commands::import_instances_json,

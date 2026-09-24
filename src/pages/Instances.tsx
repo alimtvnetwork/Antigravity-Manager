@@ -20,6 +20,7 @@ import {
     Diamond,
     Circle,
     Sparkles,
+    Star,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -103,6 +104,7 @@ export default function Instances() {
         cloneInstanceExecutable,
         closeInstance,
         setActiveInstance,
+        setDefaultInstance,
         smartRotateProfileAccount,
         cleanAndRestartWorkspace,
     } = useInstanceStore();
@@ -493,17 +495,33 @@ export default function Instances() {
                                                         inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
                                                     )}
                                                 />
-                                                <span className="px-1.5 py-0.5 rounded text-[11px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                                                <span className="px-2 py-0.5 rounded-md text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
                                                     #{seqNumber}
                                                 </span>
                                                 <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
                                                 {inst.config.is_default ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-base-100 text-gray-600 dark:text-gray-400 shrink-0">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
                                                         DEFAULT
                                                     </span>
-                                                ) : null}
+                                                ) : (
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await setDefaultInstance(inst.config.id);
+                                                                showToast(t('instances.set_default_toast', 'Default profile updated successfully'), 'success');
+                                                            } catch (e: any) {
+                                                                setActionError(e?.toString() || 'Failed to set default profile');
+                                                            }
+                                                        }}
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-base-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                                        title="Set as default profile"
+                                                    >
+                                                        <Star className="w-2.5 h-2.5" />
+                                                        <span>Set Default</span>
+                                                    </button>
+                                                )}
                                             </div>
                                             <div className="shrink-0 flex items-center gap-1">
                                                 {isActive ? (
@@ -535,8 +553,8 @@ export default function Instances() {
                                                         setCopyTargetId(inst.config.id);
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
                                                     }}
-                                                    className="btn btn-ghost btn-xs p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-base-100 cursor-pointer"
-                                                    title="Clone profile settings and extensions"
+                                                    className="btn btn-ghost btn-xs p-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer"
+                                                    title="Clone / Duplicate profile settings and extensions"
                                                 >
                                                     <Copy className="w-3.5 h-3.5" />
                                                 </button>
@@ -749,6 +767,17 @@ export default function Instances() {
                                             >
                                                 <FastForward className="w-3 h-3" />
                                                 <span>Smart Switch</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setCopyTargetId(inst.config.id);
+                                                    setCopyInstanceName(`${inst.config.name} Copy`);
+                                                }}
+                                                className="btn btn-xs btn-outline btn-ghost gap-1 text-indigo-600 dark:text-indigo-400 cursor-pointer"
+                                                title="Clone profile settings and extensions"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                                <span>Clone</span>
                                             </button>
                                             <button
                                                 onClick={() => handleCloneExecutable(inst.config.id)}

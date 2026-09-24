@@ -534,15 +534,15 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
 /// Delete an instance profile
 pub fn delete_instance(instance_id: &str) -> Result<(), String> {
     let mut registry = load_registry()?;
-    if instance_id == "default" {
-        return Err("Cannot delete the default instance".to_string());
-    }
-
     let pos = registry
         .instances
         .iter()
         .position(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+
+    if instance_id == "default" || registry.instances[pos].is_default {
+        return Err("Cannot delete the default instance".to_string());
+    }
 
     let config = &registry.instances[pos];
     if is_instance_running(instance_id, &config.data_dir, config.pid) {
@@ -1063,6 +1063,19 @@ pub fn set_active_instance_id(instance_id: &str) -> Result<(), String> {
         return Err(format!("Instance {} does not exist", instance_id));
     }
     registry.active_instance_id = instance_id.to_string();
+    save_registry(&registry)?;
+    Ok(())
+}
+
+/// Set an instance as the default instance
+pub fn set_default_instance(instance_id: &str) -> Result<(), String> {
+    let mut registry = load_registry()?;
+    if !registry.instances.iter().any(|i| i.id == instance_id) {
+        return Err(format!("Instance {} does not exist", instance_id));
+    }
+    for inst in registry.instances.iter_mut() {
+        inst.is_default = inst.id == instance_id;
+    }
     save_registry(&registry)?;
     Ok(())
 }
