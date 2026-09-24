@@ -6,7 +6,7 @@
 //! PATH self-installation, GitHub auto-updates, and SSH remote machine management.
 
 use antigravity_tools_lib::modules::{
-    account, auto_switcher, email_vault_db, email_watcher, instance, proxy_db, repo_db,
+    account, auto_switcher, config, email_vault_db, email_watcher, instance, proxy_db, repo_db,
     security_db, supabase_sync,
 };
 use std::env;
@@ -76,6 +76,14 @@ fn main() {
             cmd_logs(&cmd_args);
         }
         "ff" | "smart-switch" | "fast-forward" => cmd_fast_forward(),
+        "test-switcher" | "test-auto-switch" | "auto-switch" => {
+            let cmd_args = if args.len() > 2 {
+                args[2..].to_vec()
+            } else {
+                Vec::new()
+            };
+            cmd_test_auto_switch(&cmd_args);
+        }
         "install" => cmd_install(),
         "update" => cmd_update(),
         "ssh" => {
@@ -991,6 +999,86 @@ fn cmd_fast_forward() {
         }
         Err(e) => {
             eprintln!("[ERROR] Fast-forward failed: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_test_auto_switch(args: &[String]) {
+    println!("[*] Testing Auto-Switcher on this machine...");
+    let threshold: f64 = args.first().and_then(|s| s.parse().ok()).unwrap_or(90.0);
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to initialize async runtime: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut app_cfg = match config::load_app_config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load config: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let orig_enabled = app_cfg.auto_profile_switcher.is_enabled;
+    let orig_low = app_cfg.auto_profile_switcher.low_quota_threshold_percent;
+    let orig_crit = app_cfg.auto_profile_switcher.critical_threshold_percent;
+
+    println!("    Target Model: {}", app_cfg.auto_profile_switcher.target_model);
+    println!("    Test Low-Quota Threshold: {:.1}%", threshold);
+
+    // Apply test threshold and enable switcher
+    app_cfg.auto_profile_switcher.is_enabled = true;
+    app_cfg.auto_profile_switcher.low_quota_threshold_percent = threshold;
+    app_cfg.auto_profile_switcher.critical_threshold_percent = threshold.min(15.0);
+    let _ = config::save_app_config(&app_cfg);
+
+    let status_before = auto_switcher::get_status();
+    println!("    Monitored Instance: {}", status_before.active_instance_id);
+    println!(
+        "    Current Bound Account: {}",
+        status_before.active_account_email.as_deref().unwrap_or("none")
+    );
+    println!(
+        "    Current Quota: {:.1}%",
+        status_before.current_quota_percent.unwrap_or(100.0)
+    );
+
+    let interval = auto_switcher::calculate_next_interval_seconds(
+        status_before.current_quota_percent,
+        &app_cfg.auto_profile_switcher,
+    );
+    println!("    Calculated Polling Interval: {}s", interval);
+
+    println!("[*] Triggering check_and_rotate_if_needed()...");
+    let rotate_res = rt.block_on(auto_switcher::check_and_rotate_if_needed());
+
+    // Restore original config
+    app_cfg.auto_profile_switcher.is_enabled = orig_enabled;
+    app_cfg.auto_profile_switcher.low_quota_threshold_percent = orig_low;
+    app_cfg.auto_profile_switcher.critical_threshold_percent = orig_crit;
+    let _ = config::save_app_config(&app_cfg);
+
+    match rotate_res {
+        Ok(Some(reason)) => {
+            println!("[SUCCESS] Auto-switcher rotated successfully!");
+            println!("          Reason: {}", reason);
+            if let Ok(Some(current)) = account::get_current_account() {
+                println!("          New Active Account: {}", current.email);
+            }
+        }
+        Ok(None) => {
+            println!(
+                "[INFO] Check cycle complete: No rotation needed (quota was above {:.1}% or candidate optimal).",
+                threshold
+            );
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Auto-switcher check failed: {}", e);
             std::process::exit(1);
         }
     }
