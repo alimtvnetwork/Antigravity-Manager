@@ -456,7 +456,7 @@ export function InstanceSelector() {
                     {/* Dropdown Header Bar with Duplicate, Import / Export Actions */}
                     <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 pb-1.5">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                            {t('instances.title', 'Profiles')}
+                            {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
                         <div className="flex items-center gap-1">
                             <button
@@ -466,6 +466,7 @@ export function InstanceSelector() {
                                     if (target) {
                                         setCopyTargetId(target.config.id);
                                         setCopyInstanceName(`${target.config.name} Copy`);
+                                        setCloneMode('full');
                                         setIsCopyOpen(true);
                                     }
                                 }}
@@ -617,22 +618,7 @@ export function InstanceSelector() {
                                                 <FastForward className={`w-3 h-3 fill-current ${isRotating ? 'animate-spin' : ''}`} />
                                             </button>
 
-                                            {/* 3: Item Duplicate / Clone */}
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setCopyTargetId(inst.config.id);
-                                                    setCopyInstanceName(`${inst.config.name} Copy`);
-                                                    setIsCopyOpen(true);
-                                                }}
-                                                className="w-6 h-6 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
-                                                title={t('instances.duplicate_title', 'Duplicate profile')}
-                                            >
-                                                <Copy className="w-3 h-3" />
-                                            </button>
-
-                                            {/* 4: Item Rename */}
+                                            {/* 3: Item Rename (Pencil) */}
                                             <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -645,6 +631,22 @@ export function InstanceSelector() {
                                                 title={t('instances.edit_title', 'Rename profile')}
                                             >
                                                 <Pencil className="w-3 h-3" />
+                                            </button>
+
+                                            {/* 4: Item Duplicate / Clone (Copy) */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setCopyTargetId(inst.config.id);
+                                                    setCopyInstanceName(`${inst.config.name} Copy`);
+                                                    setCloneMode('full');
+                                                    setIsCopyOpen(true);
+                                                }}
+                                                className="w-6 h-6 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                                                title={t('instances.duplicate_title', 'Duplicate profile')}
+                                            >
+                                                <Copy className="w-3 h-3" />
                                             </button>
 
                                             {/* 5: Set as Default Toggle */}
@@ -775,9 +777,9 @@ export function InstanceSelector() {
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-3">
-                            <Copy className="w-5 h-5 text-indigo-600" />
+                            <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                             <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.copy_modal_title', 'Duplicate Profile')}
+                                {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                             </h3>
                         </div>
 
@@ -795,9 +797,9 @@ export function InstanceSelector() {
                         />
 
                         {/* Clone Mode Selection */}
-                        <div className="mb-4 bg-gray-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-gray-200/60 dark:border-slate-700">
+                        <div className="mb-4 bg-gray-50 dark:bg-slate-800/80 p-3 rounded-xl border border-gray-200/60 dark:border-slate-700">
                             <span className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
-                                {t('instances.clone_mode_label', 'Duplication Scope')}
+                                {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
                             </span>
                             <div className="flex flex-col gap-2">
                                 <label className="flex items-start gap-2 cursor-pointer text-xs">
@@ -811,10 +813,10 @@ export function InstanceSelector() {
                                     />
                                     <div>
                                         <div className="font-semibold text-gray-800 dark:text-gray-200">
-                                            {t('instances.clone_mode_full', 'Full Directory Copy (Recommended)')}
+                                            {t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}
                                         </div>
                                         <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                                            {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, and state.')}
+                                            {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, extensions, cache, and state.')}
                                         </div>
                                     </div>
                                 </label>
@@ -830,10 +832,10 @@ export function InstanceSelector() {
                                     />
                                     <div>
                                         <div className="font-semibold text-gray-800 dark:text-gray-200">
-                                            {t('instances.clone_mode_profile', 'Profile Only')}
+                                            {t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}
                                         </div>
                                         <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                                            {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets.')}
+                                            {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets without bulky runtime session state.')}
                                         </div>
                                     </div>
                                 </label>

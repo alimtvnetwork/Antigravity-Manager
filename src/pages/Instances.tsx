@@ -121,6 +121,7 @@ export default function Instances() {
     const [newInstanceName, setNewInstanceName] = useState('');
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [copyInstanceName, setCopyInstanceName] = useState('');
+    const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export default function Instances() {
         if (!copyTargetId || !copyInstanceName.trim()) return;
         setActionError(null);
         try {
-            const copied = await copyInstance(copyTargetId, copyInstanceName.trim());
+            const copied = await copyInstance(copyTargetId, copyInstanceName.trim(), cloneMode);
             await setActiveInstance(copied.id);
             setCopyInstanceName('');
             setCopyTargetId(null);
@@ -854,36 +855,86 @@ export default function Instances() {
                 </div>
             )}
 
-            {/* Copy Modal */}
+            {/* Copy / Duplicate Modal */}
             {copyTargetId && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
                         <div className="flex items-center gap-2.5 mb-4">
-                            <Copy className="w-5 h-5 text-indigo-600" />
+                            <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                             <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
-                                {t('instances.copy_modal_title', 'Duplicate Profile')}
+                                {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                             </h3>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                            Copies extensions, preferences, and editor settings into a new isolated profile.
-                        </p>
+
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            {t('instances.copy_name_label', 'New Profile Name')}
+                        </label>
                         <input
                             type="text"
                             placeholder={t('instances.copy_placeholder', 'New profile name')}
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-5 text-sm"
+                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-sm"
                             autoFocus
                         />
+
+                        {/* Clone Mode Selection */}
+                        <div className="mb-5 bg-gray-50 dark:bg-base-100 p-3.5 rounded-xl border border-gray-200/60 dark:border-base-300">
+                            <span className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2.5 uppercase tracking-wider">
+                                {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
+                            </span>
+                            <div className="flex flex-col gap-2.5">
+                                <label className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-base-200/70 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="instances_page_clone_mode"
+                                        value="full"
+                                        checked={cloneMode === 'full'}
+                                        onChange={() => setCloneMode('full')}
+                                        className="radio radio-xs radio-primary mt-0.5"
+                                    />
+                                    <div>
+                                        <div className="font-semibold text-xs text-gray-800 dark:text-gray-200">
+                                            {t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
+                                            {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, extensions, cache, and state.')}
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-base-200/70 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="instances_page_clone_mode"
+                                        value="profile"
+                                        checked={cloneMode === 'profile'}
+                                        onChange={() => setCloneMode('profile')}
+                                        className="radio radio-xs radio-primary mt-0.5"
+                                    />
+                                    <div>
+                                        <div className="font-semibold text-xs text-gray-800 dark:text-gray-200">
+                                            {t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
+                                            {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets without bulky runtime session state.')}
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div className="flex justify-end gap-2.5">
                             <button
+                                type="button"
                                 onClick={() => setCopyTargetId(null)}
                                 className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
                             <button
+                                type="button"
                                 onClick={handleCopy}
                                 disabled={!copyInstanceName.trim()}
                                 className="btn btn-primary btn-sm"

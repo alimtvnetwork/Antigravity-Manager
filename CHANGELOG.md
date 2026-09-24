@@ -1,6 +1,15 @@
 # 📝 更新日志 (Changelog)
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
+
+*   **版本历史记录 (Version History)**:
+    *   **v4.69.0 (2026-09-24)**:
+        -   **[Release v4.69.0: 完整 IDE 复制与仅配置文件复制克隆架构与 UI 布局对齐] IDE 与配置文件双克隆模式、导航栏操作按钮精准重排、独立发布命令块与双端一致性**:
+            -   **恢复完整的 "IDE 完整克隆 vs 仅配置文件复制" 架构**: 在顶部导航栏下拉面板 (`InstanceSelector.tsx`) 和主管理仪表盘 (`Instances.tsx`) 同步引入双重克隆模式。用户可明确选择 **IDE 完整克隆 (完整环境与会话)**（完整复制独立环境数据目录、工作区会话、扩展、缓存与运行状态）或 **仅配置文件复制 (偏好设置与代码片段)**（仅复制用户偏好、按键绑定与代码片段，不携带庞大运行时会话数据）。
+            -   **下拉菜单头部与每行操作按钮精准布局对齐**: 严格对齐用户提供的布局规范与截图 (`https://prnt.sc/dbDLrTd-Rfns`)。头部区域标题更新为 `多实例与配置` (INSTANCES / PROFILES)，配备直观的“克隆当前活动配置”操作。对每行操作按钮按规范重排，将重命名铅笔图标 (`Pencil`) 置于复制克隆图标 (`Copy`) 前方，形成 `启动/停止` -> `快速切换` -> `重命名` -> `克隆` -> `设为默认` -> `删除` 的标准操作链。
+            -   **外部导航栏极简单快进按钮保证**: 确保外部导航栏仅保留唯一的快进轮换按钮 (`[ ⏩ ]`)，具备全局快捷键 (`Ctrl+Shift+F`) 动态悬停提示与高对比度序号徽标 (`#1`, `#2`, `#3`...)，彻底移除多余的外部启动按钮。
+            -   **发布页面一键安装代码块隔离验证**: 验证并确保 GitHub Release 与发布说明中的直接最新安装与固定版本安装命令完全独立为互不包含的代码块，避免复制时夹带注释或多余脚本。
+
     *   **v4.68.0 (2026-09-24)**:
         -   **[Release v4.68.0: 实例克隆复制恢复、默认配置选择与防删、快进快捷键与安全诊断根治] 实例克隆复制深度恢复、精简外部快进单键、Ctrl+Shift+F 全局快进快捷键、默认实例独占标记与 SQLite 空聚合安全防崩**:
             -   **恢复多实例克隆复制（Duplicate / Clone）交互**: 在顶部导航栏 `InstanceSelector.tsx` 下拉菜单顶部工具条与每个实例条目行均补齐「Duplicate Profile」克隆复制按钮（`Copy` 图标），支持一键完整复制或增量复制指定环境；在 `Instances.tsx` 页面卡片及底部工具栏全面恢复复制操作。
@@ -3226,6 +3235,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.69.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.68.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
