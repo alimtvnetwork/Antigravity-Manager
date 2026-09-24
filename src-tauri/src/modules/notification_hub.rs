@@ -71,23 +71,42 @@ fn dispatch_email_switch_alert(
     };
 
     let subject = format!(
-        "[Antigravity] Account Switched: {} -> {}",
-        instance_name, account_email
+        "[{} | {}] [Antigravity] Account Switched: {} -> {}",
+        m_name, m_ip, instance_name, account_email
     );
 
     let html = format!(
-        "<div style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\
-            <h2 style=\"color: #2563eb;\">Antigravity Account Switched</h2>\
-            <p>An account switch operation was executed on node <b>{}</b>.</p>\
-            <table style=\"border-collapse: collapse; width: 100%; max-width: 500px;\">\
-                <tr><td style=\"padding: 8px; border: 1px solid #ddd;\"><b>Target Account</b></td><td style=\"padding: 8px; border: 1px solid #ddd;\"><code>{}</code></td></tr>\
-                <tr><td style=\"padding: 8px; border: 1px solid #ddd;\"><b>Target Instance</b></td><td style=\"padding: 8px; border: 1px solid #ddd;\"><code>{}</code></td></tr>\
-                <tr><td style=\"padding: 8px; border: 1px solid #ddd;\"><b>Trigger</b></td><td style=\"padding: 8px; border: 1px solid #ddd;\">{}</td></tr>\
-                <tr><td style=\"padding: 8px; border: 1px solid #ddd;\"><b>Reason</b></td><td style=\"padding: 8px; border: 1px solid #ddd;\">{}</td></tr>\
-                <tr><td style=\"padding: 8px; border: 1px solid #ddd;\"><b>Machine</b></td><td style=\"padding: 8px; border: 1px solid #ddd;\">{} ({})</td></tr>\
-            </table>\
-        </div>",
-        m_name, account_email, instance_name, trigger_label, reason, m_name, m_ip
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+    <div style="background: #0f172a; padding: 20px 24px; color: #ffffff;">
+      <div style="margin-bottom: 8px;">
+        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {}]</span>
+        <span style="background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-left: 8px;">SWITCHED</span>
+      </div>
+      <h2 style="margin: 8px 0 0 0; font-size: 18px; color: #ffffff;">Antigravity Account Switched</h2>
+    </div>
+    <div style="padding: 24px;">
+      <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px;">An account rotation was executed successfully. Target credentials have been injected into IDE state storage.</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Target Account</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Target Instance</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Trigger Mode</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Reason</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
+      </table>
+    </div>
+    <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+      Automated Dispatcher · Antigravity Manager · Maintained by Alim, Sponsored by RISEUP ASIA LLC
+    </div>
+  </div>
+</body>
+</html>"#,
+        m_name, m_ip, account_email, instance_name, trigger_label, reason, m_name, m_ip
     );
 
     let _ = email_sender::dispatch_email_with_failover(&subject, &html, &active_recipients);

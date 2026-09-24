@@ -801,18 +801,23 @@ pub fn calculate_next_interval_seconds(
     }
 }
 
-/// Trigger manual rotation to the next best profile
-pub async fn trigger_manual_rotation() -> Result<String, String> {
+/// Trigger manual rotation to the next best profile for a specific instance (or active instance if None)
+pub async fn trigger_manual_rotation_for_instance(
+    target_instance_id: Option<&str>,
+) -> Result<String, String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
-    let active_id = instance::get_active_instance_id()?;
+    let inst_id = match target_instance_id {
+        Some(id) => instance::resolve_instance_id(id)?,
+        None => instance::get_active_instance_id()?,
+    };
     let in_use_account_ids = get_active_in_use_account_ids();
 
     let registry = instance::load_registry()?;
     let current_bound = registry
         .instances
         .iter()
-        .find(|i| i.id == active_id)
+        .find(|i| i.id == inst_id)
         .and_then(|i| i.bound_account_id.clone());
 
     let mut excluded: Vec<String> = in_use_account_ids;
@@ -822,20 +827,24 @@ pub async fn trigger_manual_rotation() -> Result<String, String> {
         }
     }
 
-    let candidate =
-        select_next_best_profile(&active_id, &switcher_cfg.target_model, 0.0, &excluded)?
-            .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
+    let candidate = select_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)?
+        .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
 
     let reason = "Manual rotation triggered by user".to_string();
     let email = candidate.email.clone();
-    let inst_id = candidate.instance_id.clone();
+    let effective_inst = candidate.instance_id.clone();
 
     execute_profile_rotation(candidate, reason, switcher_cfg.has_auto_resume).await?;
 
     Ok(format!(
-        "Successfully rotated to profile '{}' with account '{}'",
-        inst_id, email
+        "Successfully rotated profile '{}' to account '{}'",
+        effective_inst, email
     ))
+}
+
+/// Trigger manual rotation to the next best profile
+pub async fn trigger_manual_rotation() -> Result<String, String> {
+    trigger_manual_rotation_for_instance(None).await
 }
 
 /// Get current auto-switcher status

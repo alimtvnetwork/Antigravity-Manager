@@ -425,7 +425,39 @@ fn read_smtp_response(stream: &mut EmailStream) -> Result<String, String> {
     Ok(total_resp)
 }
 
-/// Build full MIME email message with strictly plaintext formatting (zero HTML)
+/// Detect if content contains HTML markup
+fn is_html_content(content: &str) -> bool {
+    let lower = content.trim().to_lowercase();
+    lower.contains("<html")
+        || lower.contains("<!doctype")
+        || lower.contains("<div")
+        || lower.contains("<table")
+        || lower.contains("<body")
+        || lower.contains("<span style=")
+}
+
+/// Strip HTML tags for clean RFC 2046 plaintext fallback
+fn strip_html_tags(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for c in html.chars() {
+        if c == '<' {
+            in_tag = true;
+        } else if c == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            out.push(c);
+        }
+    }
+    let lines: Vec<&str> = out
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join("\r\n")
+}
+
+/// Build full RFC 5322 / RFC 2046 MIME email message payload
 fn build_mime_message(
     account: &EmailAccount,
     subject: &str,
@@ -454,32 +486,82 @@ fn build_mime_message(
         clean_rcpts.join(", ")
     };
 
-    let mut headers = format!(
-        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.70.0\r\n",
-        account.alias,
-        account.email,
-        to_header,
-        encoded_subject,
-        date,
-        msg_id
-    );
+    let is_html = is_html_content(body);
+    if is_html {
+        let boundary = format!("===============AGM_{}==", Uuid::new_v4().simple());
+        let plain_fallback = strip_html_tags(body);
 
-    if let Some(reply_id) = in_reply_to {
-        let clean_reply_id = reply_id.trim();
-        if !clean_reply_id.is_empty() {
-            let formatted_id = if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
-                clean_reply_id.to_string()
-            } else {
-                format!("<{}>", clean_reply_id)
-            };
-            headers.push_str(&format!(
-                "In-Reply-To: {}\r\nReferences: {}\r\n",
-                formatted_id, formatted_id
-            ));
+        let mut headers = format!(
+            "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{}\"\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.0\r\n",
+            account.alias,
+            account.email,
+            to_header,
+            encoded_subject,
+            date,
+            msg_id,
+            boundary
+        );
+
+        if let Some(reply_id) = in_reply_to {
+            let clean_reply_id = reply_id.trim();
+            if !clean_reply_id.is_empty() {
+                let formatted_id =
+                    if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
+                        clean_reply_id.to_string()
+                    } else {
+                        format!("<{}>", clean_reply_id)
+                    };
+                headers.push_str(&format!(
+                    "In-Reply-To: {}\r\nReferences: {}\r\n",
+                    formatted_id, formatted_id
+                ));
+            }
         }
-    }
 
-    format!("{}\r\n{}", headers, body)
+        let mut payload = headers;
+        payload.push_str("\r\n");
+        // Part 1: text/plain fallback
+        payload.push_str(&format!(
+            "--{}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{}\r\n\r\n",
+            boundary, plain_fallback
+        ));
+        // Part 2: text/html rich layout
+        payload.push_str(&format!(
+            "--{}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{}\r\n\r\n",
+            boundary, body
+        ));
+        // End boundary
+        payload.push_str(&format!("--{}--\r\n", boundary));
+        payload
+    } else {
+        let mut headers = format!(
+            "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.0\r\n",
+            account.alias,
+            account.email,
+            to_header,
+            encoded_subject,
+            date,
+            msg_id
+        );
+
+        if let Some(reply_id) = in_reply_to {
+            let clean_reply_id = reply_id.trim();
+            if !clean_reply_id.is_empty() {
+                let formatted_id =
+                    if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
+                        clean_reply_id.to_string()
+                    } else {
+                        format!("<{}>", clean_reply_id)
+                    };
+                headers.push_str(&format!(
+                    "In-Reply-To: {}\r\nReferences: {}\r\n",
+                    formatted_id, formatted_id
+                ));
+            }
+        }
+
+        format!("{}\r\n{}", headers, body)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -516,8 +598,8 @@ pub fn render_quota_drop_email(
     machine_ip: &str,
 ) -> (String, String) {
     let subject = format!(
-        "[AGM Alert] Low Quota Warning ({:.1}%) - {}",
-        current_quota, email
+        "[{} | {}] [AGM Alert] Low Quota Warning ({:.1}%) - {}",
+        machine_name, machine_ip, current_quota, email
     );
     let content = format!(
         "[!] CREDIT THRESHOLD TRIGGER\r\n\r\n\
@@ -539,7 +621,10 @@ pub fn render_workspace_switch_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
-    let subject = format!("[AGM Notice] Workspace Auto-Switched: {}", to_instance);
+    let subject = format!(
+        "[{} | {}] [AGM Notice] Workspace Auto-Switched: {}",
+        machine_name, machine_ip, to_instance
+    );
     let content = format!(
         "[*] WORKSPACE SWITCHED\r\n\r\n\
          Antigravity Manager transitioned active tasks from '{}' to '{}'.\r\n\r\n\
@@ -562,7 +647,10 @@ pub fn render_idle_projects_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
-    let subject = "[AGM Prompt Request] Running Projects Idle - Ready for Instructions".to_string();
+    let subject = format!(
+        "[{} | {}] [AGM Prompt Request] Running Projects Idle - Ready for Instructions",
+        machine_name, machine_ip
+    );
     let mut proj_list = String::new();
     for p in projects {
         proj_list.push_str(&format!("  - {}\r\n", p));
@@ -596,7 +684,10 @@ pub fn render_exec_result_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
-    let subject = format!("[AGM Execution Report] exit: {} - {}", exit_code, cmd);
+    let subject = format!(
+        "[{} | {}] [AGM Execution Report] exit: {} - {}",
+        machine_name, machine_ip, exit_code, cmd
+    );
     let status = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
 
     let content = format!(
@@ -618,7 +709,10 @@ pub fn render_exec_result_email(
 
 /// Render plaintext email for help cheat sheet
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
-    let subject = "[AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet".to_string();
+    let subject = format!(
+        "[{} | {}] [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+        machine_name, machine_ip
+    );
     let content = format!(
         "You can remotely command this Antigravity Manager instance by sending emails\r\n\
          matching the following pipe-delimited syntax in the subject:\r\n\r\n\
@@ -656,7 +750,10 @@ pub fn render_self_test_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
-    let subject = format!("[AGM Test] Mailbox Connection Verified - {}", email);
+    let subject = format!(
+        "[{} | {}] [AGM Test] Mailbox Connection Verified - {}",
+        machine_name, machine_ip, email
+    );
     let content = format!(
         "[PASS] CONNECTION VERIFIED\r\n\r\n\
          This is an automated self-test verification email from Antigravity Manager.\r\n\r\n\
@@ -681,7 +778,10 @@ pub fn render_test_ping_email(
     machine_ip: &str,
     timestamp: i64,
 ) -> (String, String) {
-    let subject = format!("[AGM Ping] Test Command Ping: {}", project_name);
+    let subject = format!(
+        "[{} | {}] [AGM Ping] Test Command Ping: {}",
+        machine_name, machine_ip, project_name
+    );
     let content = format!(
         "[*] COMMAND TEST PING\r\n\r\n\
          Test ping dispatched for '{}' (epoch: {}).\r\n\r\n\
@@ -703,8 +803,41 @@ mod tests {
         let (subj, text) =
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
+        assert!(subj.starts_with("[my-pc | 192.168.1.50]"));
         assert!(text.contains("192.168.1.50"));
         assert!(!text.contains("<html"));
         assert!(!text.contains("<div"));
+    }
+
+    #[test]
+    fn test_build_mime_message_html_multipart() {
+        let account = EmailAccount {
+            id: "acc-1".to_string(),
+            alias: "Test Node".to_string(),
+            email: "test@example.com".to_string(),
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            imap_host: "imap.example.com".to_string(),
+            imap_port: 993,
+            encryption_type: "TLS".to_string(),
+            is_default: true,
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        };
+        let html_body = "<div style=\"color: red;\"><h1>Test Alert</h1><p>Running on VM3</p></div>";
+        let mime = build_mime_message(
+            &account,
+            "Test Subject",
+            html_body,
+            &["user@example.com".to_string()],
+            None,
+        );
+
+        assert!(mime.contains("Content-Type: multipart/alternative; boundary="));
+        assert!(mime.contains("Content-Type: text/plain; charset=UTF-8"));
+        assert!(mime.contains("Content-Type: text/html; charset=UTF-8"));
+        assert!(mime.contains("Test Alert"));
+        assert!(mime.contains("<div style="));
     }
 }

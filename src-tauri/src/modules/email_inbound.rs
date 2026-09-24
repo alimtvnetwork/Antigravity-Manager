@@ -55,9 +55,13 @@ pub enum InboundAction {
     InstanceCreate {
         profile_name: String,
     },
-    AccountRotate,
+    AccountRotate {
+        target: String,
+        instance_id: Option<String>,
+    },
     FastForward {
         target_node: String,
+        instance_id: Option<String>,
     },
     MultiNodeSnapshotQuery,
     StatusQuery {
@@ -72,6 +76,7 @@ pub enum InboundAction {
     AccountSwitch {
         target: String,
         email_query: String,
+        instance_id: Option<String>,
     },
     ProxyStatus {
         target: String,
@@ -233,6 +238,24 @@ pub fn strip_email_prefixes(subject: &str) -> String {
             clean = clean[15..].trim();
         } else if lower.starts_with("[agm status]") {
             clean = clean[12..].trim();
+        } else if clean.starts_with('[') {
+            if let Some(end) = clean.find(']') {
+                let inside = &clean[1..end];
+                let lower_inside = inside.to_lowercase();
+                if lower_inside.starts_with("agm")
+                    || lower_inside.contains('|')
+                    || lower_inside.contains('.')
+                    || lower_inside.starts_with("antigravity")
+                    || lower_inside.starts_with("vm")
+                {
+                    clean = clean[end + 1..].trim();
+                    continue;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
         } else {
             break;
         }
@@ -327,6 +350,8 @@ pub fn is_known_command(cmd: &str) -> bool {
             | "agm accounts"
             | "acc"
             | "agm acc"
+            | "rotate"
+            | "agm rotate"
             | "proxy"
             | "agm proxy"
             | "agm proxy status"
@@ -498,6 +523,7 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
             let mut cmd_str = "";
             let mut proj_str = "";
 
+            let mut arg_str = "";
             if parts.len() >= 3 {
                 if is_instance_specifier(parts[1])
                     || (!is_known_command(parts[1]) && is_known_command(parts[2]))
@@ -505,10 +531,12 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
                     instance_id = Some(extract_clean_instance_id(parts[1]));
                     cmd_str = parts[2];
                     if parts.len() >= 4 {
+                        arg_str = parts[3];
                         proj_str = parts[3];
                     }
                 } else {
                     cmd_str = parts[1];
+                    arg_str = parts[2];
                     if parts.len() >= 4 {
                         proj_str = parts[3];
                     } else if parts[2].to_lowercase().starts_with("proj-")
@@ -659,6 +687,14 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
             {
                 return InboundAction::FastForward {
                     target_node: target.to_string(),
+                    instance_id,
+                };
+            }
+
+            if lower_cmd == "rotate" || lower_cmd == "agm rotate" {
+                return InboundAction::AccountRotate {
+                    target: target.to_string(),
+                    instance_id,
                 };
             }
 
@@ -694,23 +730,24 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
             }
 
             if lower_cmd.starts_with("agm switch") || lower_cmd.starts_with("switch") {
-                let email_query = if lower_cmd.starts_with("agm switch") {
+                let inline_query = if lower_cmd.starts_with("agm switch") {
                     cmd_str["agm switch".len()..].trim().to_string()
                 } else if lower_cmd.starts_with("switch") {
                     cmd_str["switch".len()..].trim().to_string()
                 } else {
                     String::new()
                 };
-                let query = if !email_query.is_empty() {
-                    email_query
-                } else if parts.len() >= 3 {
-                    parts[2].trim().to_string()
+                let query = if !inline_query.is_empty() {
+                    inline_query
+                } else if !arg_str.is_empty() {
+                    arg_str.trim().to_string()
                 } else {
                     body.trim().to_string()
                 };
                 return InboundAction::AccountSwitch {
                     target: target.to_string(),
                     email_query: query,
+                    instance_id,
                 };
             }
 
@@ -830,14 +867,23 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
         };
     }
 
-    if lower_subj.starts_with("rotate: accounts") || lower_subj.starts_with("account: rotate") {
-        return InboundAction::AccountRotate;
+    if lower_subj.starts_with("rotate: accounts")
+        || lower_subj.starts_with("account: rotate")
+        || lower_subj == "rotate"
+        || lower_subj == "agm rotate"
+    {
+        return InboundAction::AccountRotate {
+            target: "*".to_string(),
+            instance_id: None,
+        };
     }
 
     if lower_subj == "ff"
         || lower_subj.starts_with("ff:")
         || lower_subj.starts_with("fast-forward")
         || lower_subj.starts_with("fastforward")
+        || lower_subj == "agm ff"
+        || lower_subj == "agm smart-switch"
     {
         let prefix_len = if lower_subj.starts_with("ff:") {
             "ff:".len()
@@ -851,7 +897,10 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
         } else {
             "*".to_string()
         };
-        return InboundAction::FastForward { target_node };
+        return InboundAction::FastForward {
+            target_node,
+            instance_id: None,
+        };
     }
 
     if lower_subj.contains("how many machines")
@@ -969,10 +1018,6 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
         };
     }
 
-    if lower_subj == "rotate" {
-        return InboundAction::AccountRotate;
-    }
-
     if lower_subj.starts_with("gitmap ") || lower_subj == "gitmap" {
         let sub = if lower_subj.starts_with("gitmap ") {
             clean_subj["gitmap ".len()..].trim().to_string()
@@ -985,15 +1030,22 @@ pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundActi
         };
     }
 
-    if lower_subj.starts_with("switch ") || lower_subj.starts_with("agm switch ") {
+    if lower_subj == "switch"
+        || lower_subj == "agm switch"
+        || lower_subj.starts_with("switch ")
+        || lower_subj.starts_with("agm switch ")
+    {
         let email_query = if lower_subj.starts_with("agm switch ") {
             clean_subj["agm switch ".len()..].trim().to_string()
-        } else {
+        } else if lower_subj.starts_with("switch ") {
             clean_subj["switch ".len()..].trim().to_string()
+        } else {
+            body.trim().to_string()
         };
         return InboundAction::AccountSwitch {
             target: "*".to_string(),
             email_query,
+            instance_id: None,
         };
     }
 
@@ -1086,26 +1138,160 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
 }
 
 /// Format an RFC 5322 reply subject that strictly preserves threading in Gmail / Outlook
+/// while prepending [NodeName | LocalIP] to identify the originating VM node clearly.
 pub fn format_reply_subject(
     original_subject: Option<&str>,
     fallback_prefix: &str,
     command_name: &str,
+    local_name: &str,
+    local_ip: &str,
 ) -> String {
+    let node_tag = format!("[{} | {}]", local_name, local_ip);
     if let Some(orig) = original_subject {
         let trimmed = orig.trim();
         if !trimmed.is_empty() {
-            let lower = trimmed.to_lowercase();
-            if lower.starts_with("re:") || lower.starts_with("re :") {
-                return trimmed.to_string();
+            // Strip any existing node tag bracket if present to avoid duplication
+            let clean_orig = if trimmed.starts_with('[') {
+                if let Some(end) = trimmed.find(']') {
+                    let inside = &trimmed[1..end];
+                    if inside.contains('|') || inside.contains('.') || inside.starts_with("vm") {
+                        trimmed[end + 1..].trim()
+                    } else {
+                        trimmed
+                    }
+                } else {
+                    trimmed
+                }
             } else {
-                return format!("Re: {}", trimmed);
+                trimmed
+            };
+
+            let lower = clean_orig.to_lowercase();
+            if lower.starts_with("re:") || lower.starts_with("re :") {
+                return format!("{} {}", node_tag, clean_orig);
+            } else {
+                return format!("{} Re: {}", node_tag, clean_orig);
             }
         }
     }
-    format!("{} {}", fallback_prefix, command_name)
+    format!("{} {} {}", node_tag, fallback_prefix, command_name)
 }
 
-/// Send Phase 1 Immediate Acknowledgment Plaintext Receipt
+/// Render responsive HTML card layout for inbound execution ACK and Result receipts
+pub fn render_html_receipt(
+    command_name: &str,
+    status_label: &str,
+    exit_code: Option<i32>,
+    output: &str,
+    local_name: &str,
+    local_ip: &str,
+    instance: &str,
+    target_or_query: &str,
+    is_ack: bool,
+) -> String {
+    let now_str = Utc::now().to_rfc3339();
+    let badge_color = if is_ack {
+        "#2563eb" // Blue
+    } else if exit_code == Some(0) || status_label.eq_ignore_ascii_case("success") {
+        "#059669" // Green
+    } else {
+        "#dc2626" // Red
+    };
+
+    let status_text = if is_ack {
+        "IN PROGRESS".to_string()
+    } else if let Some(code) = exit_code {
+        if code == 0 {
+            "COMPLETED (0)".to_string()
+        } else {
+            format!("FAILED ({})", code)
+        }
+    } else {
+        status_label.to_uppercase()
+    };
+
+    let title_text = if is_ack {
+        "Command Acknowledged"
+    } else {
+        "Execution Receipt"
+    };
+
+    let subtitle = if is_ack {
+        "Your command has been accepted and is executing in the background. A final completion receipt will follow upon finish."
+    } else {
+        "Command execution has concluded. Review status, metadata, and diagnostic logs below."
+    };
+
+    let query_row = if !target_or_query.is_empty() && target_or_query != "-" {
+        format!(
+            "<tr><td style=\"padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;\">Target / Query</td><td style=\"padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;\">{}</td></tr>",
+            target_or_query
+        )
+    } else {
+        String::new()
+    };
+
+    let output_block = if !output.trim().is_empty() {
+        format!(
+            r#"<div style="margin-top: 20px;">
+  <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; letter-spacing: 0.05em;">Execution Output &amp; Diagnostics</div>
+  <pre style="background: #0f172a; color: #38bdf8; padding: 14px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 500px; overflow-y: auto;">{}</pre>
+</div>"#,
+            output.trim()
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+    <div style="background: #0f172a; padding: 20px 24px; color: #ffffff;">
+      <div style="margin-bottom: 8px;">
+        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {}]</span>
+        <span style="background: {}; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-left: 8px;">{}</span>
+      </div>
+      <h2 style="margin: 8px 0 0 0; font-size: 18px; color: #ffffff; font-weight: 700;">{}</h2>
+    </div>
+    <div style="padding: 24px;">
+      <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;">{}</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Command</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;"><code>{}</code></td></tr>
+        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
+        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Target Instance</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        {}
+        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Timestamp</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;">{}</td></tr>
+      </table>
+      {}
+    </div>
+    <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+      Automated Remote Dispatcher · Antigravity Manager · Maintained by Alim, Sponsored by RISEUP ASIA LLC
+    </div>
+  </div>
+</body>
+</html>"#,
+        local_name,
+        local_ip,
+        badge_color,
+        status_text,
+        title_text,
+        subtitle,
+        command_name,
+        local_name,
+        local_ip,
+        instance,
+        query_row,
+        now_str,
+        output_block
+    )
+}
+
+/// Send Phase 1 Immediate Acknowledgment HTML Receipt
 pub fn send_ack_receipt(
     sender: &str,
     command_name: &str,
@@ -1117,19 +1303,30 @@ pub fn send_ack_receipt(
     in_reply_to: Option<&str>,
     original_subject: Option<&str>,
 ) {
-    let now_str = Utc::now().to_rfc3339();
-    let body = format!(
-        "================================================================================\n[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING\n================================================================================\nCommand:    {}\nTarget:     {}\nNode:       {} ({})\nInstance:   {}\nProject:    {}\nReceived:   {}\nStatus:     IN_PROGRESS\n\nExecution has started in the background. A completion receipt will follow.\n================================================================================",
-        command_name, target, local_name, local_ip, instance, project, now_str
-    );
-
     let clean_sender = extract_email_address(sender);
-    let subject = format_reply_subject(original_subject, "[AGM ACK] Running:", command_name);
+    let subject = format_reply_subject(
+        original_subject,
+        "[AGM ACK] Running:",
+        command_name,
+        local_name,
+        local_ip,
+    );
+    let body = render_html_receipt(
+        command_name,
+        "IN_PROGRESS",
+        None,
+        "",
+        local_name,
+        local_ip,
+        instance,
+        project,
+        true,
+    );
     let _ =
         email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
 }
 
-/// Send Phase 2 Completion Result Plaintext Receipt
+/// Send Phase 2 Completion Result HTML Receipt
 pub fn send_result_receipt(
     sender: &str,
     command_name: &str,
@@ -1142,18 +1339,24 @@ pub fn send_result_receipt(
     in_reply_to: Option<&str>,
     original_subject: Option<&str>,
 ) {
-    let now_str = Utc::now().to_rfc3339();
-    let body = format!(
-        "================================================================================\n[AGM Result] EXECUTION COMPLETED\n================================================================================\nCommand:    {}\nStatus:     {}
-Exit Code:  {}\nNode:       {} ({})\nInstance:   {}\nCompleted:  {}\n\nExecution Output:\n--------------------------------------------------------------------------------\n{}\n--------------------------------------------------------------------------------\n================================================================================",
-        command_name, status_label, exit_code, local_name, local_ip, instance, now_str, output
-    );
-
     let clean_sender = extract_email_address(sender);
     let subject = format_reply_subject(
         original_subject,
         &format!("[AGM Result] {}:", status_label),
         command_name,
+        local_name,
+        local_ip,
+    );
+    let body = render_html_receipt(
+        command_name,
+        status_label,
+        Some(exit_code),
+        output,
+        local_name,
+        local_ip,
+        instance,
+        "-",
+        false,
     );
     let _ =
         email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
@@ -1211,7 +1414,7 @@ pub fn execute_inbound_action(
     // 2b. SQLite 10-Minute Rate Limit for Heavy Actions
     let is_heavy_action = matches!(
         action,
-        InboundAction::AccountRotate
+        InboundAction::AccountRotate { .. }
             | InboundAction::SystemClean { .. }
             | InboundAction::UpdateExecution { .. }
     );
@@ -1602,7 +1805,10 @@ pub fn execute_inbound_action(
             }
         }
 
-        InboundAction::FastForward { target_node } => {
+        InboundAction::FastForward {
+            target_node,
+            instance_id,
+        } => {
             action_str = "fast_forward".to_string();
             if !matches_target_node_or_ip(&target_node, local_machine_ip, local_machine_name) {
                 status = "skipped".to_string();
@@ -1611,11 +1817,12 @@ pub fn execute_inbound_action(
                     target_node, local_machine_name
                 );
             } else {
+                let inst_label = instance_id.as_deref().unwrap_or("default");
                 send_ack_receipt(
                     &msg.from,
                     "agm ff",
                     &target_node,
-                    "default",
+                    inst_label,
                     "-",
                     local_machine_name,
                     local_machine_ip,
@@ -1625,7 +1832,11 @@ pub fn execute_inbound_action(
 
                 let rt = tokio::runtime::Runtime::new().ok();
                 let ff_result = if let Some(r) = rt {
-                    r.block_on(crate::modules::auto_switcher::trigger_manual_rotation())
+                    r.block_on(
+                        crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                            instance_id.as_deref(),
+                        ),
+                    )
                 } else {
                     Err("Failed to start runtime".to_string())
                 };
@@ -1661,7 +1872,7 @@ pub fn execute_inbound_action(
                     &output_text,
                     local_machine_name,
                     local_machine_ip,
-                    "default",
+                    inst_label,
                     Some(&msg.message_id),
                     Some(&msg.subject),
                 );
@@ -1852,17 +2063,19 @@ INDEX EMAIL                            STATUS
         InboundAction::AccountSwitch {
             target,
             email_query,
+            instance_id,
         } => {
             action_str = "switch_account".to_string();
             if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
                 status = "skipped".to_string();
                 result_summary = format!("Switch target mismatch: {}", target);
             } else {
+                let inst_label = instance_id.as_deref().unwrap_or("default");
                 send_ack_receipt(
                     &msg.from,
                     "agm switch",
                     &target,
-                    "default",
+                    inst_label,
                     &email_query,
                     local_machine_name,
                     local_machine_ip,
@@ -1881,20 +2094,70 @@ INDEX EMAIL                            STATUS
                 let mut new_email = String::new();
                 let mut switch_err = String::new();
 
-                if let Ok(index) = crate::modules::account::load_account_index() {
+                // If query is empty or requesting smart rotation
+                if query.is_empty()
+                    || query == "smart"
+                    || query == "ff"
+                    || query == "rotate"
+                    || query == "next"
+                {
+                    let rt = tokio::runtime::Runtime::new().ok();
+                    let rot_res = if let Some(r) = rt {
+                        r.block_on(
+                            crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                                instance_id.as_deref(),
+                            ),
+                        )
+                    } else {
+                        Err("Failed to start runtime".to_string())
+                    };
+
+                    match rot_res {
+                        Ok(details) => {
+                            switch_ok = true;
+                            new_email = crate::modules::account::get_current_account()
+                                .ok()
+                                .flatten()
+                                .map(|a| a.email)
+                                .unwrap_or_else(|| "Rotated Account".to_string());
+                            result_summary = format!(
+                                "Rotated to '{}' via Smart Rotator ({})",
+                                new_email, details
+                            );
+                        }
+                        Err(e) => {
+                            switch_err = format!("Smart rotation failed: {}", e);
+                        }
+                    }
+                } else if let Ok(index) = crate::modules::account::load_account_index() {
                     let matched = index.accounts.iter().find(|a| {
                         a.email.to_lowercase().contains(&query)
                             || a.id.to_lowercase().contains(&query)
                     });
                     if let Some(target_acc) = matched {
-                        if let Err(e) =
-                            crate::modules::account::set_current_account_id(&target_acc.id)
-                        {
-                            switch_err = format!("Failed to set active account: {}", e);
+                        let target_acc_id = target_acc.id.clone();
+                        let target_acc_email = target_acc.email.clone();
+                        let target_inst = instance_id.clone();
+
+                        let rt = tokio::runtime::Runtime::new().ok();
+                        let switch_res = if let Some(r) = rt {
+                            r.block_on(crate::modules::instance::switch_account_to_instance(
+                                &target_acc_id,
+                                target_inst.as_deref(),
+                            ))
                         } else {
-                            let _ = crate::modules::account::apply_device_profile(&target_acc.id);
-                            switch_ok = true;
-                            new_email = target_acc.email.clone();
+                            Err("Failed to start runtime".to_string())
+                        };
+
+                        match switch_res {
+                            Ok(_) => {
+                                switch_ok = true;
+                                new_email = target_acc_email;
+                            }
+                            Err(e) => {
+                                switch_err =
+                                    format!("Failed to inject account credentials to IDE: {}", e);
+                            }
                         }
                     } else {
                         switch_err = format!("No account found matching query '{}'", query);
@@ -1909,13 +2172,15 @@ INDEX EMAIL                            STATUS
 ACCOUNT SWITCH SUCCESS
 ================================================================================
 Node Name:          {}
+Target Instance:    {}
 Previous Account:   {}
 New Active Account: {}
+IDE Injection:      COMPLETED (state.vscdb updated, token refreshed, IDE synced)
 Status:             SUCCESS
 ================================================================================",
-                        local_machine_name, prev_email, new_email
+                        local_machine_name, inst_label, prev_email, new_email
                     );
-                    result_summary = format!("Switched to '{}'", new_email);
+                    result_summary = format!("Switched to '{}' on [{}]", new_email, inst_label);
                     send_result_receipt(
                         &msg.from,
                         "agm switch",
@@ -1924,7 +2189,7 @@ Status:             SUCCESS
                         &output_text,
                         local_machine_name,
                         local_machine_ip,
-                        "default",
+                        inst_label,
                         Some(&msg.message_id),
                         Some(&msg.subject),
                     );
@@ -1933,10 +2198,12 @@ Status:             SUCCESS
 "================================================================================
 ACCOUNT SWITCH FAILED
 ================================================================================
+Node Name:          {}
+Target Instance:    {}
 Error:              {}
 Previous Account:   {}
 ================================================================================",
-                        switch_err, prev_email
+                        local_machine_name, inst_label, switch_err, prev_email
                     );
                     result_summary = format!("Switch failed: {}", switch_err);
                     send_result_receipt(
@@ -1947,7 +2214,7 @@ Previous Account:   {}
                         &output_text,
                         local_machine_name,
                         local_machine_ip,
-                        "default",
+                        inst_label,
                         Some(&msg.message_id),
                         Some(&msg.subject),
                     );
@@ -2213,10 +2480,85 @@ Available Commands:
             result_summary = format!("Spawned instance profile '{}'", profile_name);
         }
 
-        InboundAction::AccountRotate => {
+        InboundAction::AccountRotate {
+            target,
+            instance_id,
+        } => {
             action_str = "rotate".to_string();
-            let _ = crate::modules::auto_switcher::check_and_rotate_if_needed();
-            result_summary = "Account rotation triggered".to_string();
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Rotate target mismatch: {}", target);
+            } else {
+                let inst_label = instance_id.as_deref().unwrap_or("default");
+                send_ack_receipt(
+                    &msg.from,
+                    "agm rotate",
+                    &target,
+                    inst_label,
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                    Some(&msg.message_id),
+                    Some(&msg.subject),
+                );
+
+                let rt = tokio::runtime::Runtime::new().ok();
+                let rot_result = if let Some(r) = rt {
+                    r.block_on(
+                        crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                            instance_id.as_deref(),
+                        ),
+                    )
+                } else {
+                    Err("Failed to start runtime".to_string())
+                };
+
+                let current_account =
+                    crate::modules::account::get_current_account().unwrap_or(None);
+                let current_email = current_account
+                    .map(|a| a.email)
+                    .unwrap_or_else(|| "Default".to_string());
+
+                match rot_result {
+                    Ok(msg_txt) => {
+                        output_text = format!(
+                            "Account rotation successfully executed via Smart Rotator.\nDetails: {}\nActive Account: {}",
+                            msg_txt, current_email
+                        );
+                        result_summary = format!("Rotation completed. Active: {}", current_email);
+                        send_result_receipt(
+                            &msg.from,
+                            "agm rotate",
+                            "SUCCESS",
+                            0,
+                            &output_text,
+                            local_machine_name,
+                            local_machine_ip,
+                            inst_label,
+                            Some(&msg.message_id),
+                            Some(&msg.subject),
+                        );
+                    }
+                    Err(e) => {
+                        exit_code = 1;
+                        status = "error".to_string();
+                        output_text = format!("Rotation error: {}", e);
+                        result_summary = format!("Rotation failed: {}", e);
+                        send_result_receipt(
+                            &msg.from,
+                            "agm rotate",
+                            "FAILED",
+                            1,
+                            &output_text,
+                            local_machine_name,
+                            local_machine_ip,
+                            inst_label,
+                            Some(&msg.message_id),
+                            Some(&msg.subject),
+                        );
+                    }
+                }
+            }
         }
 
         InboundAction::MultiNodeSnapshotQuery => {
@@ -2697,70 +3039,73 @@ mod tests {
             parse_email_command("VM3 | agm switch | abidul@example.com", ""),
             InboundAction::AccountSwitch {
                 target: "VM3".to_string(),
-                email_query: "abidul@example.com".to_string()
+                email_query: "abidul@example.com".to_string(),
+                instance_id: None,
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm proxy", ""),
             InboundAction::ProxyStatus {
                 target: "VM3".to_string(),
-                is_test: false
+                is_test: false,
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm proxy test", ""),
             InboundAction::ProxyStatus {
                 target: "VM3".to_string(),
-                is_test: true
+                is_test: true,
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm clean", ""),
             InboundAction::SystemClean {
-                target: "VM3".to_string()
+                target: "VM3".to_string(),
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm purge", ""),
             InboundAction::SystemClean {
-                target: "VM3".to_string()
+                target: "VM3".to_string(),
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm sync", ""),
             InboundAction::SyncState {
-                target: "VM3".to_string()
+                target: "VM3".to_string(),
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm prompts", ""),
             InboundAction::ListPrompts {
                 target: "VM3".to_string(),
-                is_gitmap: false
+                is_gitmap: false,
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm instances", ""),
             InboundAction::ListInstances {
-                target: "VM3".to_string()
+                target: "VM3".to_string(),
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm ls", ""),
             InboundAction::ListInstances {
-                target: "VM3".to_string()
+                target: "VM3".to_string(),
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm ff", ""),
             InboundAction::FastForward {
-                target_node: "VM3".to_string()
+                target_node: "VM3".to_string(),
+                instance_id: None,
             }
         );
         assert_eq!(
             parse_email_command("VM3 | agm smart-switch", ""),
             InboundAction::FastForward {
-                target_node: "VM3".to_string()
+                target_node: "VM3".to_string(),
+                instance_id: None,
             }
         );
         assert_eq!(
@@ -2974,22 +3319,47 @@ mod tests {
         );
         assert_eq!(
             parse_email_command("rotate", ""),
-            InboundAction::AccountRotate
+            InboundAction::AccountRotate {
+                target: "*".to_string(),
+                instance_id: None,
+            }
+        );
+        assert_eq!(
+            parse_email_command("agm rotate", ""),
+            InboundAction::AccountRotate {
+                target: "*".to_string(),
+                instance_id: None,
+            }
         );
     }
 
     #[test]
     fn test_format_reply_subject_preserves_threading() {
-        // Direct subject: should prepend Re:
+        let local_name = "VM3";
+        let local_ip = "192.168.1.12";
+
+        // Direct subject: should prepend node tag and Re:
         assert_eq!(
-            format_reply_subject(Some("VM3 | 1 | help"), "[AGM ACK]", "help"),
-            "Re: VM3 | 1 | help"
+            format_reply_subject(
+                Some("VM3 | 1 | help"),
+                "[AGM ACK]",
+                "help",
+                local_name,
+                local_ip
+            ),
+            "[VM3 | 192.168.1.12] Re: VM3 | 1 | help"
         );
 
         // Subject already has Re: should NOT duplicate Re:
         assert_eq!(
-            format_reply_subject(Some("Re: VM3 | 1 | help"), "[AGM ACK]", "help"),
-            "Re: VM3 | 1 | help"
+            format_reply_subject(
+                Some("Re: VM3 | 1 | help"),
+                "[AGM ACK]",
+                "help",
+                local_name,
+                local_ip
+            ),
+            "[VM3 | 192.168.1.12] Re: VM3 | 1 | help"
         );
 
         // Replying to existing notification:
@@ -2997,15 +3367,91 @@ mod tests {
             format_reply_subject(
                 Some("Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"),
                 "[AGM ACK]",
-                "help"
+                "help",
+                local_name,
+                local_ip
             ),
-            "Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"
+            "[VM3 | 192.168.1.12] Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"
         );
 
         // Fallback when no original subject:
         assert_eq!(
-            format_reply_subject(None, "[AGM ACK] Running:", "help"),
-            "[AGM ACK] Running: help"
+            format_reply_subject(None, "[AGM ACK] Running:", "help", local_name, local_ip),
+            "[VM3 | 192.168.1.12] [AGM ACK] Running: help"
+        );
+    }
+
+    #[test]
+    fn test_parse_flexible_pipe_spacing_and_instances() {
+        // 0 spaces
+        let zero_space_help = parse_email_command("VM3|1|help", "");
+        assert_eq!(
+            zero_space_help,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        let zero_space_switch = parse_email_command("VM3|1|switch|user@gmail.com", "");
+        assert_eq!(
+            zero_space_switch,
+            InboundAction::AccountSwitch {
+                target: "VM3".to_string(),
+                email_query: "user@gmail.com".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // 1 space
+        let one_space_switch = parse_email_command("VM3 | 1 | switch | user@gmail.com", "");
+        assert_eq!(
+            one_space_switch,
+            InboundAction::AccountSwitch {
+                target: "VM3".to_string(),
+                email_query: "user@gmail.com".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // Multiple spaces
+        let multi_space_help = parse_email_command("VM3   |   1   |   help", "");
+        assert_eq!(
+            multi_space_help,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        let multi_space_switch =
+            parse_email_command("VM3   |   1   |   switch   |   user@gmail.com", "");
+        assert_eq!(
+            multi_space_switch,
+            InboundAction::AccountSwitch {
+                target: "VM3".to_string(),
+                email_query: "user@gmail.com".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // Fast forward and rotate on specific instance
+        let ff_inst = parse_email_command("VM3 | 2 | ff", "");
+        assert_eq!(
+            ff_inst,
+            InboundAction::FastForward {
+                target_node: "VM3".to_string(),
+                instance_id: Some("2".to_string()),
+            }
+        );
+
+        let rotate_inst = parse_email_command("VM3 | 2 | rotate", "");
+        assert_eq!(
+            rotate_inst,
+            InboundAction::AccountRotate {
+                target: "VM3".to_string(),
+                instance_id: Some("2".to_string()),
+            }
         );
     }
 }

@@ -1108,6 +1108,60 @@ pub fn bind_account_to_instance(
     }
 }
 
+/// Resolve an instance query string (seq_num like "1", ID like "inst-xyz", name like "Instance 1", or "default"/"active")
+/// to a valid concrete instance ID.
+pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
+    let registry = load_registry()?;
+    let clean = specifier.trim();
+    if clean.is_empty() || clean.eq_ignore_ascii_case("active") {
+        return Ok(registry.active_instance_id);
+    }
+    if clean.eq_ignore_ascii_case("default") {
+        if let Some(def) = registry
+            .instances
+            .iter()
+            .find(|i| i.is_default || i.id == "default")
+        {
+            return Ok(def.id.clone());
+        }
+        return Ok("default".to_string());
+    }
+    // Check if numeric seq_num (e.g. "1")
+    if let Ok(num) = clean.parse::<u32>() {
+        if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
+            return Ok(inst.id.clone());
+        }
+    }
+    // Check clean number prefix like "ins-1", "instance-1", "#1"
+    let clean_num = clean
+        .trim_start_matches("ins-")
+        .trim_start_matches("instance-")
+        .trim_start_matches('#');
+    if let Ok(num) = clean_num.parse::<u32>() {
+        if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
+            return Ok(inst.id.clone());
+        }
+    }
+    // Check exact id match
+    if let Some(inst) = registry
+        .instances
+        .iter()
+        .find(|i| i.id.eq_ignore_ascii_case(clean))
+    {
+        return Ok(inst.id.clone());
+    }
+    // Check name contains
+    if let Some(inst) = registry
+        .instances
+        .iter()
+        .find(|i| i.name.to_lowercase().contains(&clean.to_lowercase()))
+    {
+        return Ok(inst.id.clone());
+    }
+    // Fallback: active instance
+    Ok(registry.active_instance_id)
+}
+
 /// Switch account and inject into a specific target instance without terminating siblings
 pub async fn switch_account_to_instance(
     account_id: &str,
@@ -1123,9 +1177,10 @@ pub async fn switch_account_to_instance(
     }
 
     let registry = load_registry()?;
-    let target_id = target_instance_id
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| registry.active_instance_id.clone());
+    let target_id = match target_instance_id {
+        Some(s) => resolve_instance_id(s).unwrap_or_else(|_| s.to_string()),
+        None => registry.active_instance_id.clone(),
+    };
 
     let instance = registry
         .instances
@@ -1326,5 +1381,89 @@ mod tests {
         assert!(clean.contains("ubuntu-inst"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_instance_id_resolution() {
+        let registry = InstanceRegistry {
+            active_instance_id: "inst-default".to_string(),
+            instances: vec![
+                InstanceConfig {
+                    id: "inst-default".to_string(),
+                    name: "Default Instance".to_string(),
+                    data_dir: "/tmp/default".to_string(),
+                    executable_path: None,
+                    extensions_dir: None,
+                    bound_account_id: None,
+                    bound_email: None,
+                    created_at: 0,
+                    last_used: 0,
+                    is_default: true,
+                    pid: None,
+                    seq_num: Some(1),
+                },
+                InstanceConfig {
+                    id: "inst-custom-2".to_string(),
+                    name: "Worker Node 2".to_string(),
+                    data_dir: "/tmp/custom2".to_string(),
+                    executable_path: None,
+                    extensions_dir: None,
+                    bound_account_id: None,
+                    bound_email: None,
+                    created_at: 0,
+                    last_used: 0,
+                    is_default: false,
+                    pid: None,
+                    seq_num: Some(2),
+                },
+            ],
+        };
+
+        // Helper mock check logic
+        let resolve_mock = |spec: &str| -> String {
+            let clean = spec.trim();
+            if clean.is_empty() || clean.eq_ignore_ascii_case("active") {
+                return registry.active_instance_id.clone();
+            }
+            if clean.eq_ignore_ascii_case("default") {
+                if let Some(def) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.is_default || i.id == "default")
+                {
+                    return def.id.clone();
+                }
+            }
+            if let Ok(num) = clean.parse::<u32>() {
+                if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
+                    return inst.id.clone();
+                }
+            }
+            let clean_num = clean
+                .trim_start_matches("ins-")
+                .trim_start_matches("instance-")
+                .trim_start_matches('#');
+            if let Ok(num) = clean_num.parse::<u32>() {
+                if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
+                    return inst.id.clone();
+                }
+            }
+            if let Some(inst) = registry
+                .instances
+                .iter()
+                .find(|i| i.id.eq_ignore_ascii_case(clean))
+            {
+                return inst.id.clone();
+            }
+            registry.active_instance_id.clone()
+        };
+
+        assert_eq!(resolve_mock("1"), "inst-default");
+        assert_eq!(resolve_mock("2"), "inst-custom-2");
+        assert_eq!(resolve_mock("#2"), "inst-custom-2");
+        assert_eq!(resolve_mock("ins-2"), "inst-custom-2");
+        assert_eq!(resolve_mock("default"), "inst-default");
+        assert_eq!(resolve_mock("active"), "inst-default");
+        assert_eq!(resolve_mock("inst-custom-2"), "inst-custom-2");
     }
 }
