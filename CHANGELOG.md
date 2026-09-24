@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.73.0 (2026-09-25)**:
+        -   **[Release v4.73.0: Telegram 自动化远程代理守护进程、交互式配置向导、跨平台 PowerShell 编码根治与系统遥测指令全链路贯通] 独立 Telegram Agent 守护进程、全自动 Chat ID 捕获与双向握手验证、Windows PowerShell 5.1/7+ 纯 ASCII 语法加固与集群指令远程下发**:
+            -   **独立 Telegram Agent 远程控制守护进程 (`scripts/telegram-agent-daemon.ps1`)**: 为无头服务器 (Headless)、远程工作站与开发者环境提供纯 PowerShell 实现的独立 Telegram 自动化 Agent 守护进程。通过官方 Telegram Bot API 长轮询 (`getUpdates`) 持续监听控制信道，全面支持 `/status` 与 `SNAPSHOT`（集群与节点遥测，含主机名、内网 IP、系统运行时长及网关健康状态）、`FF` 与 `/ff`（IDE 双通道账号快进切换）以及 `CMD:<command>`（远程控制台指令安全下发与实时回传截断输出）。
+            -   **自动化交互式配置与实时 Chat ID 捕获向导 (`scripts/setup-telegram-bot.ps1`)**: 全面升级 Telegram 机器人安装与配置向导。支持智能探测已保存凭据与交互式录入；通过 `/getMe` 进行权威 API 校验；在未指定 Chat ID 时启动 30 秒实时监听，自动捕获用户在 Telegram 发送的 `/start` 消息并绑定安全白名单；自动下发即时测试脉冲 (`sendMessage`) 确认双向触达；一键写入 `$HOME/.antigravity_tools/telegram_config.json` 保证桌面端与命令行守护进程 100% 数据同构。
+            -   **Windows PowerShell 5.1 编码崩溃根除与 ANSI/UTF-8 纯净加固**: 彻底解决 Windows PowerShell 5.1 在默认 Windows-1252 代码页下解析无 BOM 的 UTF-8 脚本时因多字节 Emoji（`❓`, `⚡`, `🚀` 等）被误判为 `0xE2` (`â`) 导致字符串意外提前截断与语法解析崩溃的隐患。全量重构脚本字符串为安全 ASCII 及标准 HTML 标签，变量引用规范化 `${ChatId}`，实现 PowerShell 5.1 与 PowerShell 7+ 全版本零报错无缝运行。
+            -   **安全白名单鉴权与审计防护**: 守护进程内建 `allowed_chat_id` 强校验过滤器，非白名单用户或匿名私聊指令自动静默丢弃并记录本地安全审计日志，杜绝控制信道未授权越权访问。
+
     *   **v4.72.0 (2026-09-24)**:
         -   **[Release v4.72.0: 发布页面双栏一键安装布局、Release 工作流子进程变量注入、PowerShell 交互历史提取版本与 Win32/WebView2 DWM 任务栏缩略图防白屏重绘] 发布页独立最新与版本化代码块、安装器版本队列严格锁定防漂移、任务栏实时缩略图与窗口重绘链路全线贯通**:
             -   **发布页面独立双栏一键安装命令布局 (`02-spec/21-app/45-two-bar-installer-and-dwm-blank-ui-fix.md`)**: 彻底解决 GitHub Release 与文档中将最新与固定版本混入单行注释代码块导致用户复制错误的痛点。在 release 工作流与 README 中统一重构为两条相互独立的复制栏（Bars）：**Bar 1 (最新自动更新版)** 与 **Bar 2 (指定版本安装)**，其中 Windows 命令显式绑定 `-Version "4.72.0"`，Linux/macOS 命令显式绑定 `--version "4.72.0"`，保证一键复制零歧义。
