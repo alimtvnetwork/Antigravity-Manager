@@ -91,4 +91,6 @@ Master directory of architectural and execution plans.
 - [43-email-autoswitch-training-settings-overhaul.md](completed/43-email-autoswitch-training-settings-overhaul.md): Inbound email threaded receipts, auto-switch rotation hardening, machine training REST API, and settings UI overhaul.
 - [70-training-api-and-settings-ui-overhaul.md](completed/70-training-api-and-settings-ui-overhaul.md): Machine Training REST API, full IDE credential injection, and Settings UI/UX menu overhaul adhering to screenshot specifications.
 - [71-email-autoswitch-training-and-settings-hamburger-ui.md](completed/71-email-autoswitch-training-and-settings-hamburger-ui.md): Email Base64 HTML cards, `[VM_ALIAS | LOCAL_IP]` subject headers, flexible pipe whitespace parsing, Smart Rotator IDE switch unification (`Kill-First -> Write-Second -> Start-With-Args-Third`), and Settings hamburger menu (`v4.71.2`).
+- [72-multi-agent-settings-crossed-debug-and-e2e.md](completed/72-multi-agent-settings-crossed-debug-and-e2e.md): Multi-agent verification, crossed-out `Debug` (`line-through`) in Settings Hamburger Dropdown linked to top-level titlebar Bug icon, and Remote Control + Training REST API toggles (`v4.71.2`).
+
 

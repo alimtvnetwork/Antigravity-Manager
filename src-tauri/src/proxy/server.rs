@@ -1047,6 +1047,18 @@ impl AxumServer {
                 "/training/machines",
                 post(crate::modules::training_api::handle_training_machines),
             )
+            .route(
+                "/v1/training/telemetry",
+                get(crate::modules::training_api::handle_training_telemetry),
+            )
+            .route(
+                "/v1/remote/control",
+                post(crate::modules::training_api::handle_training_machines),
+            )
+            .route(
+                "/api/v1/remote/control",
+                post(crate::modules::training_api::handle_training_machines),
+            )
             // Apply global monitoring and status layer (outer)
             .layer(axum::middleware::from_fn_with_state(
                 state.clone(),

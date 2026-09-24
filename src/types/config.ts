@@ -197,6 +197,7 @@ export interface AppConfig {
     instance_clone_mode?: 'full' | 'profile'; // [NEW] Instance clone mode: full directory copy or profile only
     conversation_cleanup?: ConversationCleanupConfig; // [NEW] Conversation history and cache auto-cleanup config
     training_api_enabled?: boolean; // [NEW] Enable /api/v1/training REST endpoints
+    remote_control_api_enabled?: boolean; // [NEW] Enable /api/v1/remote/control REST endpoints
 }
 
 export interface ConversationCleanupConfig {

@@ -43,7 +43,7 @@ function normalizeDataDirDisplay(path: string): string {
 function Settings() {
     const { t, i18n } = useTranslation();
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
-    const { enable, disable, isEnabled } = useDebugConsole();
+    const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
     const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.71.2');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -626,14 +626,20 @@ function Settings() {
                                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
                                                 }`}
                                             onClick={() => {
+                                                openDebugModal();
                                                 startTransition(() => setActiveTab('debug'));
                                                 setIsMoreDropdownOpen(false);
                                             }}
+                                            title="Debug is consolidated into the top-level titlebar Bug icon"
                                         >
                                             <Bug className="w-4 h-4 text-amber-500" />
                                             <div className="flex items-center justify-between flex-1">
-                                                <span>{t('settings.tabs.debug', 'Debug')}</span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">Console</span>
+                                                <span className="line-through decoration-2 decoration-rose-500 text-gray-400 dark:text-gray-500">
+                                                    {t('settings.tabs.debug', 'Debug')}
+                                                </span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">
+                                                    Top Bar ↗
+                                                </span>
                                             </div>
                                         </button>
                                         <div className="my-1 border-t border-gray-100 dark:border-base-300" />
@@ -849,6 +855,33 @@ function Settings() {
                                 </div>
                             )}
 
+                            {/* Remote Control REST API */}
+                            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-base-content flex items-center gap-2">
+                                        <span>Remote Control REST API</span>
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-mono">
+                                            /api/v1/remote/control
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        Allow remote REST clients to trigger Smart Rotator account switches, bind instances, and modify machine routing parameters.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={formData.remote_control_api_enabled ?? true}
+                                        onChange={(e) => {
+                                            const enabled = e.target.checked;
+                                            setFormData({ ...formData, remote_control_api_enabled: enabled });
+                                        }}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                </label>
+                            </div>
+
                             {/* Machine Training REST API */}
                             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
                                 <div>
@@ -866,7 +899,7 @@ function Settings() {
                                     <input
                                         type="checkbox"
                                         className="sr-only peer"
-                                        checked={formData.training_api_enabled ?? false}
+                                        checked={formData.training_api_enabled ?? true}
                                         onChange={(e) => {
                                             const enabled = e.target.checked;
                                             setFormData({ ...formData, training_api_enabled: enabled });

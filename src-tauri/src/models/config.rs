@@ -43,8 +43,10 @@ pub struct AppConfig {
     pub conversation_cleanup: ConversationCleanupConfig,
     #[serde(default)]
     pub lightweight_mode: bool, // [NEW] Lightweight mode: destroy webview on minimize/close to tray
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub training_api_enabled: bool, // [NEW] Enable /api/v1/training REST API endpoints
+    #[serde(default = "default_true")]
+    pub remote_control_api_enabled: bool, // [NEW] Enable /api/v1/remote/control REST API endpoints
 }
 
 fn default_auto_sync() -> bool {
@@ -231,7 +233,8 @@ impl AppConfig {
             instance_clone_mode: default_instance_clone_mode(),
             conversation_cleanup: ConversationCleanupConfig::default(),
             lightweight_mode: false,
-            training_api_enabled: false,
+            training_api_enabled: true,
+            remote_control_api_enabled: true,
         }
     }
 }
