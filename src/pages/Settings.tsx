@@ -1,5 +1,5 @@
 import { useState, useEffect, startTransition } from 'react';
-import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Bug } from 'lucide-react';
+import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Bug, Menu, ChevronDown, Sliders, Info } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -45,8 +45,9 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.71.1');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.71.2');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+    const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
         theme: 'system',
@@ -563,24 +564,97 @@ function Settings() {
                             {t('settings.tabs.supabase', 'Supabase')}
                         </button>
 
-                        <button
-                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'advanced'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                            onClick={() => startTransition(() => setActiveTab('advanced'))}
-                        >
-                            {t('settings.tabs.advanced', 'Advanced')}
-                        </button>
-                        <button
-                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'about'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                            onClick={() => startTransition(() => setActiveTab('about'))}
-                        >
-                            {t('settings.tabs.about', 'About')}
-                        </button>
+                        {/* Hamburger Dropdown for Advance, Debug, and About */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${['advanced', 'debug', 'about'].includes(activeTab)
+                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    }`}
+                                onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
+                                title={t('settings.tabs.more', 'More Options')}
+                            >
+                                {activeTab === 'advanced' ? (
+                                    <>
+                                        <Sliders className="w-3.5 h-3.5" />
+                                        <span>{t('settings.tabs.advanced', 'Advance')}</span>
+                                    </>
+                                ) : activeTab === 'debug' ? (
+                                    <>
+                                        <Bug className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>{t('settings.tabs.debug', 'Debug')}</span>
+                                    </>
+                                ) : activeTab === 'about' ? (
+                                    <>
+                                        <Info className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>{t('settings.tabs.about', 'About')}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Menu className="w-4 h-4" />
+                                    </>
+                                )}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isMoreDropdownOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setIsMoreDropdownOpen(false)}
+                                    />
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-base-100 rounded-2xl shadow-xl border border-gray-100 dark:border-base-300 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'advanced'
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                }`}
+                                            onClick={() => {
+                                                startTransition(() => setActiveTab('advanced'));
+                                                setIsMoreDropdownOpen(false);
+                                            }}
+                                        >
+                                            <Sliders className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                            <span>{t('settings.tabs.advanced', 'Advance')}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'debug'
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                }`}
+                                            onClick={() => {
+                                                startTransition(() => setActiveTab('debug'));
+                                                setIsMoreDropdownOpen(false);
+                                            }}
+                                        >
+                                            <Bug className="w-4 h-4 text-amber-500" />
+                                            <div className="flex items-center justify-between flex-1">
+                                                <span>{t('settings.tabs.debug', 'Debug')}</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">Console</span>
+                                            </div>
+                                        </button>
+                                        <div className="my-1 border-t border-gray-100 dark:border-base-300" />
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'about'
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                }`}
+                                            onClick={() => {
+                                                startTransition(() => setActiveTab('about'));
+                                                setIsMoreDropdownOpen(false);
+                                            }}
+                                        >
+                                            <Info className="w-4 h-4 text-blue-500" />
+                                            <span>{t('settings.tabs.about', 'About')}</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">

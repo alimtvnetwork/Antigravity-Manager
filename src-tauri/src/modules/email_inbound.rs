@@ -1150,31 +1150,16 @@ pub fn format_reply_subject(
     if let Some(orig) = original_subject {
         let trimmed = orig.trim();
         if !trimmed.is_empty() {
-            // Strip any existing node tag bracket if present to avoid duplication
-            let clean_orig = if trimmed.starts_with('[') {
-                if let Some(end) = trimmed.find(']') {
-                    let inside = &trimmed[1..end];
-                    if inside.contains('|') || inside.contains('.') || inside.starts_with("vm") {
-                        trimmed[end + 1..].trim()
-                    } else {
-                        trimmed
-                    }
-                } else {
-                    trimmed
-                }
-            } else {
-                trimmed
-            };
-
-            let lower = clean_orig.to_lowercase();
-            if lower.starts_with("re:") || lower.starts_with("re :") {
-                return format!("{} {}", node_tag, clean_orig);
-            } else {
-                return format!("{} Re: {}", node_tag, clean_orig);
+            let clean_orig = strip_email_prefixes(trimmed);
+            if !clean_orig.is_empty() {
+                return format!(
+                    "Re: {} {} {} ({})",
+                    node_tag, fallback_prefix, command_name, clean_orig
+                );
             }
         }
     }
-    format!("{} {} {}", node_tag, fallback_prefix, command_name)
+    format!("Re: {} {} {}", node_tag, fallback_prefix, command_name)
 }
 
 /// Render responsive HTML card layout for inbound execution ACK and Result receipts
@@ -2135,32 +2120,88 @@ INDEX EMAIL                            STATUS
                             || a.id.to_lowercase().contains(&query)
                     });
                     if let Some(target_acc) = matched {
-                        let target_acc_id = target_acc.id.clone();
-                        let target_acc_email = target_acc.email.clone();
+                        // Consult Smart Rotator: if target_acc is already the active account on this workspace,
+                        // rotate to the next best candidate via Smart Rotator instead of re-injecting the same account.
+                        let is_already_current = target_acc.email.eq_ignore_ascii_case(&prev_email);
                         let target_inst = instance_id.clone();
-
                         let rt = tokio::runtime::Runtime::new().ok();
-                        let switch_res = if let Some(r) = rt {
-                            r.block_on(crate::modules::instance::switch_account_to_instance(
-                                &target_acc_id,
-                                target_inst.as_deref(),
-                            ))
-                        } else {
-                            Err("Failed to start runtime".to_string())
-                        };
 
-                        match switch_res {
-                            Ok(_) => {
-                                switch_ok = true;
-                                new_email = target_acc_email;
+                        if is_already_current {
+                            let rot_res = if let Some(r) = rt {
+                                r.block_on(
+                                    crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                                        target_inst.as_deref(),
+                                    ),
+                                )
+                            } else {
+                                Err("Failed to start runtime".to_string())
+                            };
+                            match rot_res {
+                                Ok(_) => {
+                                    switch_ok = true;
+                                    new_email = crate::modules::account::get_current_account()
+                                        .ok()
+                                        .flatten()
+                                        .map(|a| a.email)
+                                        .unwrap_or_else(|| target_acc.email.clone());
+                                }
+                                Err(e) => {
+                                    switch_err = format!("Smart rotation failed: {}", e);
+                                }
                             }
-                            Err(e) => {
-                                switch_err =
-                                    format!("Failed to inject account credentials to IDE: {}", e);
+                        } else {
+                            let target_acc_id = target_acc.id.clone();
+                            let target_acc_email = target_acc.email.clone();
+                            let switch_res = if let Some(r) = rt {
+                                r.block_on(crate::modules::instance::switch_account_to_instance(
+                                    &target_acc_id,
+                                    target_inst.as_deref(),
+                                ))
+                            } else {
+                                Err("Failed to start runtime".to_string())
+                            };
+
+                            match switch_res {
+                                Ok(_) => {
+                                    switch_ok = true;
+                                    new_email = target_acc_email;
+                                }
+                                Err(e) => {
+                                    switch_err = format!(
+                                        "Failed to inject account credentials to IDE: {}",
+                                        e
+                                    );
+                                }
                             }
                         }
                     } else {
-                        switch_err = format!("No account found matching query '{}'", query);
+                        // No exact match for query -> delegate to Smart Rotator to pick the best candidate
+                        let rt = tokio::runtime::Runtime::new().ok();
+                        let rot_res = if let Some(r) = rt {
+                            r.block_on(
+                                crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                                    instance_id.as_deref(),
+                                ),
+                            )
+                        } else {
+                            Err("Failed to start runtime".to_string())
+                        };
+                        match rot_res {
+                            Ok(_) => {
+                                switch_ok = true;
+                                new_email = crate::modules::account::get_current_account()
+                                    .ok()
+                                    .flatten()
+                                    .map(|a| a.email)
+                                    .unwrap_or_else(|| "Smart Rotated Account".to_string());
+                            }
+                            Err(e) => {
+                                switch_err = format!(
+                                    "No account matched '{}' and Smart Rotator fallback failed: {}",
+                                    query, e
+                                );
+                            }
+                        }
                     }
                 } else {
                     switch_err = "Failed to load accounts index".to_string();

@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.71.2 (2026-09-24)**:
+        -   **[Release v4.71.2: RFC 2045 Base64 双段 HTML 邮件卡片彻底修复、主机节点别名与本地 IP 强制标题、智能轮换器 (Smart Rotator) 与默认 IDE 进程切号闭环、设置中心汉堡下拉菜单] 邮件 HTML 源码泄露与折叠问题彻底根治、高亮 `⇄` 切号按键全链路统一与设置中心二级汉堡菜单**:
+            -   **RFC 2045 Base64 双段 MIME 编码与自动 HTML 视觉卡片封装**: 彻底解决 Gmail 与主流邮箱客户端因 `8bit` 超过 998 字节行长断行导致 `<div style=...>` 源码作为纯文本外泄以及 `====` 分隔线被折叠为 `...` 的缺陷。在 `email_sender.rs` 中新增 `encode_mime_base64_body` 与 `wrap_html_email_card`，将所有出站邮件（即时 ACK 回执、远程命令结果、切号通知、配额告警与自检邮件）自动封装为响应式暗色 HTML 卡片并采用 76 字符 CRLF Base64 传输编码。
+            -   **所有出站邮件标题强制嵌入主机节点标识 `[<VM_ALIAS> | <LOCAL_IP>]`**: 强化 `build_mime_message` 与 `format_reply_subject`，确保任何通过 SMTP 发出的邮件主题均包含当前虚拟机别名与内网 IP（例如 `Re: [VM3 | 192.168.1.12] [AGM ACK] Running: help`），并支持管道符两侧 0 空格、单空格及多空格容错解析。
+            -   **智能轮换器 (Smart Rotator) 与 `default` 实例 `⇄` 切号全链路统一 (`Kill-First -> Write-Second -> Start-With-Args-Third`)**: 深度对齐账号页高亮 `⇄` (`ArrowRightLeft`) 切换按钮逻辑。修复 `is_instance_running` 与 `close_instance` 对无 `--user-data-dir` 参数的默认 `Antigravity.exe` 进程漏检问题；统一采用「先提取运行参数并终止进程 (`close_antigravity`) -> 后写入系统凭据库 (`write_to_system_keyring`)、设备指纹 (`device::write_profile`) 与 `state.vscdb` (`db::inject_token`) -> 再携带原参数重启 IDE」的安全顺序，杜绝 IDE 退出时内存旧 Token 覆盖新凭据。
+            -   **设置中心顶部精简导航与汉堡下拉菜单 (`Settings.tsx`)**: 主标签栏保留 `General`、`Account`、`Proxy`、`Email-Alerts`、`Supabase` 五大核心项，右侧新增汉堡下拉菜单收纳 `Advance`、`Debug`（直连顶部 Bug 控制台）与 `About`。
+            -   **根因分析文档固化**: 新增 `02-spec/22-app-issues/05-email-html-rendering-and-smart-rotator-ide-switch-rca.md`。
     *   **v4.71.1 (2026-09-24)**:
         -   **[Release v4.71.1: 设置中心极简 UI/UX 全面重构、机器训练 REST API 增强与 IDE 凭据全链路切号注入] 设置菜单项与操作按钮精简对齐、调试选项移至标题栏统一 Bug 图标、机器训练与遥测状态 REST 端点全量开放、智能轮换器深度绑定**:
             -   **设置中心菜单与操作按钮极简重构**: 严格按照用户视觉设计规范全面重构 `Settings.tsx` 标签栏与动作按钮。去除冗余文字：操作按钮统一精简为「`Save` (保存)」与「`Backup` (备份)」，标签栏统一优化为「`Proxy` (代理)」、「`Email-Alerts` (邮件告警)」、「`Supabase`」、「`Advanced` (高级)」与「`About` (关于)」，中英文国际化字典（`zh.json` 与 `en.json`）完全对齐。
@@ -3258,6 +3265,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.71.2 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.71.1 (2026-09-24)**:
         -   **[Release v4.71.1: Settings UI/UX Menu Overhaul, Machine Training REST API, and Full IDE Credential Injection] Concise Settings Tabs & Action Buttons, Redundant Debug Tab Consolidation to Titlebar Bug Icon, Machine Training Telemetry REST Endpoints, and Smart Rotator Deep Injection**:
             -   **Settings Menu & Action Button Streamlining**: Comprehensively overhauled `Settings.tsx` tab strip and header action buttons adhering strictly to user design specifications. Shortened button labels to strictly **Save** and **Backup**; simplified navigation tabs to **Proxy**, **Email-Alerts**, **Supabase**, **Advanced**, and **About**, eliminating wide and cluttered text. Aligned English (`en.json`) and Chinese (`zh.json`) translation dictionaries.

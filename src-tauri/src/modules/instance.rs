@@ -517,7 +517,8 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 /// Check if an instance is currently running using selective data dir and saved PID
 pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option<u32>) -> bool {
-    let pids = find_pids_for_data_dir(data_dir, false);
+    let is_default_inst = instance_id == "default";
+    let pids = find_pids_for_data_dir(data_dir, is_default_inst);
     if !pids.is_empty() {
         return true;
     }
@@ -935,7 +936,8 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     system.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     // 1. Gather all candidate PIDs for THIS specific instance only
-    let mut pids = find_pids_for_data_dir(&config.data_dir, false);
+    let is_default_inst = config.is_default || instance_id == "default";
+    let mut pids = find_pids_for_data_dir(&config.data_dir, is_default_inst);
     if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
         let is_alive = system.process(sysinfo::Pid::from_u32(saved_pid)).is_some();
         let not_contains = !pids.contains(&saved_pid);
@@ -1188,6 +1190,19 @@ pub async fn switch_account_to_instance(
         .find(|i| i.id == target_id)
         .ok_or_else(|| format!("Target instance {} not found", target_id))?;
 
+    let is_default_inst = instance.is_default || instance.id == "default";
+
+    // Ensure account has a bound device fingerprint profile for isolation
+    if account.device_profile.is_none() {
+        let new_profile = crate::modules::device::generate_profile();
+        let _ = crate::modules::account::apply_profile_to_account(
+            &mut account,
+            new_profile,
+            Some("auto_generated".to_string()),
+            true,
+        );
+    }
+
     let db_dir = PathBuf::from(&instance.data_dir)
         .join("User")
         .join("globalStorage");
@@ -1196,32 +1211,95 @@ pub async fn switch_account_to_instance(
     }
     let db_path = db_dir.join("state.vscdb");
 
-    // Close only this specific instance window before database injection
+    // Helper closure to inject credentials into all relevant state.vscdb & storage.json & OS keyring locations
+    let inject_all_credentials = |acc: &crate::models::Account| -> Result<(), String> {
+        let _ = crate::modules::integration::write_to_system_keyring(acc);
+
+        crate::modules::db::inject_token(
+            &db_path,
+            &acc.token.access_token,
+            &acc.token.refresh_token,
+            acc.token.expiry_timestamp,
+            &acc.email,
+            acc.token.is_gcp_tos,
+            acc.token.project_id.as_deref(),
+            acc.token.id_token.as_deref(),
+            acc.token.oauth_client_key.as_deref(),
+            None,
+        )?;
+
+        if let Some(ref profile) = acc.device_profile {
+            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+        }
+
+        if is_default_inst {
+            for target_hint in [None, Some("ide")] {
+                if let Ok(storage_path) = crate::modules::device::get_storage_path(target_hint) {
+                    if let Some(ref profile) = acc.device_profile {
+                        let _ = crate::modules::device::write_profile(&storage_path, profile);
+                    }
+                }
+                if let Ok(global_db_path) = crate::modules::db::get_db_path(target_hint) {
+                    if global_db_path != db_path
+                        && global_db_path.parent().map(|p| p.exists()).unwrap_or(false)
+                    {
+                        let _ = crate::modules::db::inject_token(
+                            &global_db_path,
+                            &acc.token.access_token,
+                            &acc.token.refresh_token,
+                            acc.token.expiry_timestamp,
+                            &acc.email,
+                            acc.token.is_gcp_tos,
+                            acc.token.project_id.as_deref(),
+                            acc.token.id_token.as_deref(),
+                            acc.token.oauth_client_key.as_deref(),
+                            target_hint,
+                        );
+                        if let Some(ref profile) = acc.device_profile {
+                            let _ = crate::modules::db::write_service_machine_id(
+                                &global_db_path,
+                                &profile.mac_machine_id,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    };
+
+    // 1. Snapshot running executable path & CLI workspace args BEFORE closing processes
+    let active_exe_path = if is_default_inst {
+        crate::modules::process::get_antigravity_executable_path(None)
+            .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+    } else {
+        None
+    };
+    let active_args = if is_default_inst {
+        crate::modules::process::get_args_from_running_process(None)
+            .or_else(|| crate::modules::process::get_args_from_running_process(Some("ide")))
+    } else {
+        None
+    };
+
+    // 2. Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
+    //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
+    //    prevents the exiting process from overwriting our newly injected credentials.
+    if is_default_inst {
+        if crate::modules::process::is_antigravity_running(None) {
+            let _ = crate::modules::process::close_antigravity(20, None);
+        }
+        if crate::modules::process::is_antigravity_running(Some("ide")) {
+            let _ = crate::modules::process::close_antigravity(20, Some("ide"));
+        }
+    }
     let _ = close_instance(&instance.id);
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    // Inject token directly into instance's isolated state.vscdb
-    crate::modules::db::inject_token(
-        &db_path,
-        &account.token.access_token,
-        &account.token.refresh_token,
-        account.token.expiry_timestamp,
-        &account.email,
-        account.token.is_gcp_tos,
-        account.token.project_id.as_deref(),
-        account.token.id_token.as_deref(),
-        account.token.oauth_client_key.as_deref(),
-        None,
-    )?;
+    // 3. Inject credentials into all relevant state.vscdb, storage.json, and OS keyring locations AFTER process exit
+    inject_all_credentials(&account)?;
 
-    if let Some(ref profile) = account.device_profile {
-        let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
-    }
-
-    // For modern Antigravity (>= 2.0.0), write token directly to system keyring so the app receives credentials
-    let _ = crate::modules::integration::write_to_system_keyring(&account);
-
-    // Bind account in registry and set as active
+    // 4. Bind account in registry and set as active
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let _ = set_active_instance_id(&instance.id);
     let _ = crate::modules::account::set_current_account_id(&account.id);
@@ -1229,14 +1307,28 @@ pub async fn switch_account_to_instance(
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);
 
-    // Launch instance
-    launch_instance(&instance.id).map_err(|e| e.to_string())?;
+    // 5. Relaunch Antigravity preserving exact executable path and workspace arguments (same as highlighted ⇄ switch button)
+    if is_default_inst {
+        if let Err(e) = crate::modules::process::start_antigravity_with_fallback_path(
+            None,
+            active_exe_path.as_deref(),
+            active_args.as_deref(),
+        ) {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] start_antigravity_with_fallback_path returned ({}), falling back to launch_instance",
+                e
+            ));
+            launch_instance(&instance.id).map_err(|err| err.to_string())?;
+        }
+    } else {
+        launch_instance(&instance.id).map_err(|e| e.to_string())?;
+    }
 
-    // Dispatch unified Email and Telegram switch notifications
+    // 6. Dispatch unified Email and Telegram switch notifications
     crate::modules::notification_hub::notify_account_switched(
         &account.email,
         &instance.name,
-        "User switched account to instance",
+        "Smart Rotator / Instance Account Switch",
         false,
     );
 

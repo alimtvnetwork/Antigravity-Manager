@@ -457,7 +457,90 @@ fn strip_html_tags(html: &str) -> String {
     lines.join("\r\n")
 }
 
+/// Encode string as RFC 2045 76-character CRLF-wrapped base64 payload
+fn encode_mime_base64_body(input: &str) -> String {
+    let b64 = BASE64_STANDARD.encode(input.as_bytes());
+    let mut wrapped = String::with_capacity(b64.len() + (b64.len() / 76) * 2 + 4);
+    for (idx, ch) in b64.chars().enumerate() {
+        if idx > 0 && idx % 76 == 0 {
+            wrapped.push_str("\r\n");
+        }
+        wrapped.push(ch);
+    }
+    wrapped
+}
+
+/// Escape basic HTML entities for safe inclusion in <pre> or table cells
+fn escape_html_entities(raw: &str) -> String {
+    raw.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// Build a rich, responsive HTML card for any notification or command output
+pub fn wrap_html_email_card(
+    title: &str,
+    content: &str,
+    machine_name: &str,
+    machine_ip: &str,
+) -> String {
+    let now_str = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let escaped_content = escape_html_entities(content.trim());
+    format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(15,23,42,0.08); border: 1px solid #e2e8f0;">
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 20px 24px; color: #ffffff;">
+      <div style="margin-bottom: 10px;">
+        <span style="background: #334155; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700; border: 1px solid #475569;">NODE: {} | IP: {}</span>
+        <span style="background: #2563eb; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 8px;">AGM TELEMETRY</span>
+      </div>
+      <h2 style="margin: 6px 0 0 0; font-size: 18px; color: #ffffff; font-weight: 700;">{}</h2>
+    </div>
+    <div style="padding: 24px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; width: 130px;">VM / Node Alias</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-family: monospace; font-weight: 700;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600;">Local IPv4</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-family: monospace;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Dispatched At</td>
+          <td style="padding: 8px 12px; color: #0f172a; font-family: monospace;">{}</td>
+        </tr>
+      </table>
+      <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; letter-spacing: 0.05em;">Message Details</div>
+      <pre style="background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>
+    </div>
+    <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+      Automated Remote Dispatcher &middot; Antigravity Manager &middot; Node {} ({})
+    </div>
+  </div>
+</body>
+</html>"#,
+        machine_name,
+        machine_ip,
+        escape_html_entities(title),
+        machine_name,
+        machine_ip,
+        now_str,
+        escaped_content,
+        machine_name,
+        machine_ip
+    )
+}
+
 /// Build full RFC 5322 / RFC 2046 MIME email message payload
+/// Guarantees:
+/// 1. Subject always contains `[<VM_ALIAS> | <LOCAL_IP>]`
+/// 2. Body is always rendered as a rich HTML card (`multipart/alternative` with Base64 transfer encoding)
 fn build_mime_message(
     account: &EmailAccount,
     subject: &str,
@@ -465,15 +548,33 @@ fn build_mime_message(
     recipients: &[String],
     in_reply_to: Option<&str>,
 ) -> String {
+    let m_name = crate::modules::email_watcher::detect_machine_name();
+    let m_ip = crate::modules::email_watcher::detect_local_ip();
+    let node_tag = format!("[{} | {}]", m_name, m_ip);
+
+    let normalized_subject = if subject.contains(&m_ip)
+        || (subject.contains('[') && subject.contains('|') && subject.contains(']'))
+    {
+        subject.trim().to_string()
+    } else if subject.trim().to_lowercase().starts_with("re:") {
+        let rest = subject.trim()[3..].trim();
+        format!("Re: {} {}", node_tag, rest)
+    } else {
+        format!("{} {}", node_tag, subject.trim())
+    };
+
     let msg_id = format!("<{}@{}>", Uuid::new_v4(), account.smtp_host);
     let date = Utc::now().to_rfc2822();
-    let is_pure_ascii = subject
+    let is_pure_ascii = normalized_subject
         .chars()
         .all(|c| c.is_ascii() && c != '\r' && c != '\n');
     let encoded_subject = if is_pure_ascii {
-        subject.to_string()
+        normalized_subject.clone()
     } else {
-        format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()))
+        format!(
+            "=?UTF-8?B?{}?=",
+            BASE64_STANDARD.encode(normalized_subject.as_bytes())
+        )
     };
     let clean_rcpts: Vec<String> = recipients
         .iter()
@@ -486,86 +587,64 @@ fn build_mime_message(
         clean_rcpts.join(", ")
     };
 
-    let is_html = is_html_content(body);
-    if is_html {
-        let boundary = format!("===============AGM_{}==", Uuid::new_v4().simple());
-        let plain_fallback = strip_html_tags(body);
-
-        let mut headers = format!(
-            "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{}\"\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.0\r\n",
-            account.alias,
-            account.email,
-            to_header,
-            encoded_subject,
-            date,
-            msg_id,
-            boundary
-        );
-
-        if let Some(reply_id) = in_reply_to {
-            let clean_reply_id = reply_id.trim();
-            if !clean_reply_id.is_empty() {
-                let formatted_id =
-                    if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
-                        clean_reply_id.to_string()
-                    } else {
-                        format!("<{}>", clean_reply_id)
-                    };
-                headers.push_str(&format!(
-                    "In-Reply-To: {}\r\nReferences: {}\r\n",
-                    formatted_id, formatted_id
-                ));
-            }
-        }
-
-        let mut payload = headers;
-        payload.push_str("\r\n");
-        // Part 1: text/plain fallback
-        payload.push_str(&format!(
-            "--{}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{}\r\n\r\n",
-            boundary, plain_fallback
-        ));
-        // Part 2: text/html rich layout
-        payload.push_str(&format!(
-            "--{}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{}\r\n\r\n",
-            boundary, body
-        ));
-        // End boundary
-        payload.push_str(&format!("--{}--\r\n", boundary));
-        payload
+    let html_body = if is_html_content(body) {
+        body.to_string()
     } else {
-        let mut headers = format!(
-            "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.0\r\n",
-            account.alias,
-            account.email,
-            to_header,
-            encoded_subject,
-            date,
-            msg_id
-        );
+        wrap_html_email_card(&normalized_subject, body, &m_name, &m_ip)
+    };
 
-        if let Some(reply_id) = in_reply_to {
-            let clean_reply_id = reply_id.trim();
-            if !clean_reply_id.is_empty() {
-                let formatted_id =
-                    if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
-                        clean_reply_id.to_string()
-                    } else {
-                        format!("<{}>", clean_reply_id)
-                    };
-                headers.push_str(&format!(
-                    "In-Reply-To: {}\r\nReferences: {}\r\n",
-                    formatted_id, formatted_id
-                ));
-            }
+    let boundary = format!("===============AGM_{}==", Uuid::new_v4().simple());
+    let plain_fallback = strip_html_tags(&html_body);
+    let b64_plain = encode_mime_base64_body(&plain_fallback);
+    let b64_html = encode_mime_base64_body(&html_body);
+
+    let mut headers = format!(
+        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{}\"\r\nX-Origin-Node: {}\r\nX-Origin-IP: {}\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.2\r\n",
+        account.alias,
+        account.email,
+        to_header,
+        encoded_subject,
+        date,
+        msg_id,
+        boundary,
+        m_name,
+        m_ip
+    );
+
+    if let Some(reply_id) = in_reply_to {
+        let clean_reply_id = reply_id.trim();
+        if !clean_reply_id.is_empty() {
+            let formatted_id = if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
+                clean_reply_id.to_string()
+            } else {
+                format!("<{}>", clean_reply_id)
+            };
+            headers.push_str(&format!(
+                "In-Reply-To: {}\r\nReferences: {}\r\n",
+                formatted_id, formatted_id
+            ));
         }
-
-        format!("{}\r\n{}", headers, body)
     }
+
+    let mut payload = headers;
+    payload.push_str("\r\n");
+    // Part 1: text/plain fallback (Base64 encoded for strict RFC 2045 MTA compliance)
+    payload.push_str(&format!(
+        "--{}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n\r\n",
+        boundary, b64_plain
+    ));
+    // Part 2: text/html rich layout (Base64 encoded so Gmail/Outlook never strip or flatten HTML)
+    payload.push_str(&format!(
+        "--{}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n\r\n",
+        boundary, b64_html
+    ));
+    // End boundary
+    payload.push_str(&format!("--{}--\r\n", boundary));
+    payload
 }
 
 // ---------------------------------------------------------------------------
-// Plaintext Email Templates (Strictly Plaintext, Zero HTML)
+// Rich HTML Email Templates (With Node Alias & Local IPv4 Telemetry)
 // ---------------------------------------------------------------------------
 
 fn wrap_plaintext_email(
@@ -574,22 +653,10 @@ fn wrap_plaintext_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> String {
-    format!(
-        "================================================================================\r\n\
-         ANTIGRAVITY MANAGER · {}\r\n\
-         ================================================================================\r\n\r\n\
-         {}\r\n\r\n\
-         --------------------------------------------------------------------------------\r\n\
-         Node: {} | IP: {}\r\n\
-         Automated Dispatcher · Antigravity Manager Tools · Maintained by Alim, Sponsored by RISEUP ASIA LLC\r\n",
-        title.to_uppercase(),
-        content.trim(),
-        machine_name,
-        machine_ip
-    )
+    wrap_html_email_card(title, content, machine_name, machine_ip)
 }
 
-/// Render plaintext email for low quota alerts
+/// Render HTML email for low quota alerts
 pub fn render_quota_drop_email(
     email: &str,
     current_quota: f64,
@@ -613,7 +680,7 @@ pub fn render_quota_drop_email(
     (subject, body)
 }
 
-/// Render plaintext email for automated workspace switch
+/// Render HTML email for automated workspace switch
 pub fn render_workspace_switch_email(
     from_instance: &str,
     to_instance: &str,
@@ -641,7 +708,7 @@ pub fn render_workspace_switch_email(
     (subject, body)
 }
 
-/// Render plaintext email for idle running projects alert
+/// Render HTML email for idle running projects alert
 pub fn render_idle_projects_email(
     projects: &[String],
     machine_name: &str,
@@ -676,7 +743,7 @@ pub fn render_idle_projects_email(
     (subject, body)
 }
 
-/// Render plaintext email for remote CLI execution results
+/// Render HTML email for remote CLI execution results
 pub fn render_exec_result_email(
     cmd: &str,
     exit_code: i32,
@@ -707,7 +774,7 @@ pub fn render_exec_result_email(
     (subject, body)
 }
 
-/// Render plaintext email for help cheat sheet
+/// Render HTML email for help cheat sheet
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
     let subject = format!(
         "[{} | {}] [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
@@ -715,25 +782,25 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
     );
     let content = format!(
         "You can remotely command this Antigravity Manager instance by sending emails\r\n\
-         matching the following pipe-delimited syntax in the subject:\r\n\r\n\
-         Format: sub: [node|ip|ins-X] | proj-{{name}} | <command>\r\n\r\n\
+         matching the following pipe-delimited syntax in the subject (spaces around '|' are optional):\r\n\r\n\
+         Format: [node|ip] | [instance] | <command>\r\n\
+         Examples: {0}|1|help   OR   {0} | 1 | help   OR   {0}   |   1   |   switch\r\n\r\n\
          Supported Commands & Subject Examples:\r\n\r\n\
          1. Inject Prompt to Workspace:\r\n\
-            Subject: sub: {} | proj-my-project | prompt\r\n\
+            Subject: {0} | 1 | prompt | proj-my-project\r\n\
             Body:    <Your prompt instruction here...>\r\n\r\n\
          2. Execute Command on Target Machine:\r\n\
-            Subject: sub: {} | exec: gitmap status\r\n\
+            Subject: {0} | 1 | gitmap status\r\n\
             Body:    (Optional command arguments)\r\n\r\n\
-         3. Launch New Sandbox Instance:\r\n\
-            Subject: sub: {} | instance: new\r\n\
-            Body:    <profile-name>\r\n\r\n\
-         4. Rotate to Next Highest Quota Account:\r\n\
-            Subject: sub: {} | rotate: accounts\r\n\r\n\
+         3. Rotate to Next Highest Quota Account (Smart Rotator):\r\n\
+            Subject: {0} | 1 | rotate\r\n\r\n\
+         4. Switch Account on Instance:\r\n\
+            Subject: {0} | 1 | switch | user@gmail.com\r\n\r\n\
          5. Query Status Telemetry & Health:\r\n\
-            Subject: sub: {} | status\r\n\r\n\
+            Subject: {0} | 1 | status\r\n\r\n\
          6. Help & Cheat Sheet:\r\n\
-            Subject: sub: {} | help",
-        machine_name, machine_ip, machine_name, machine_name, machine_name, machine_name
+            Subject: {0} | 1 | help",
+        machine_name
     );
     let body = wrap_plaintext_email(
         "Remote Instructions Cheat Sheet",
@@ -744,7 +811,7 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
     (subject, body)
 }
 
-/// Render plaintext email for self-test mailbox verification
+/// Render HTML email for self-test mailbox verification
 pub fn render_self_test_email(
     email: &str,
     machine_name: &str,
@@ -758,8 +825,8 @@ pub fn render_self_test_email(
         "[PASS] CONNECTION VERIFIED\r\n\r\n\
          This is an automated self-test verification email from Antigravity Manager.\r\n\r\n\
          Your mailbox account '{}' successfully authenticated via SMTP, passed credentials\r\n\
-         verification, and delivered this plaintext verification message.\r\n\r\n\
-         Remote commands, quota notifications, and failover routing are active for this account.",
+         verification, and delivered this rich HTML verification message.\r\n\r\n\
+         Remote commands, quota notifications, and Smart Rotator failover are active for this node.",
         email
     );
     let body = wrap_plaintext_email(
@@ -771,7 +838,7 @@ pub fn render_self_test_email(
     (subject, body)
 }
 
-/// Render plaintext email for test ping command verification
+/// Render HTML email for test ping command verification
 pub fn render_test_ping_email(
     project_name: &str,
     machine_name: &str,
@@ -785,10 +852,9 @@ pub fn render_test_ping_email(
     let content = format!(
         "[*] COMMAND TEST PING\r\n\r\n\
          Test ping dispatched for '{}' (epoch: {}).\r\n\r\n\
-         Reply to this message with a prompt to verify remote execution:\r\n\
-         Subject: sub: {} | proj-{}\r\n\r\n\
-         echo 'Ping verified!'",
-        project_name, timestamp, machine_name, project_name
+         Reply to this message with a command to verify remote execution:\r\n\
+         Subject: {} | 1 | help",
+        project_name, timestamp, machine_name
     );
     let body = wrap_plaintext_email("Command Test Ping", &content, machine_name, machine_ip);
     (subject, body)
@@ -805,8 +871,8 @@ mod tests {
         assert!(subj.contains("12.5%"));
         assert!(subj.starts_with("[my-pc | 192.168.1.50]"));
         assert!(text.contains("192.168.1.50"));
-        assert!(!text.contains("<html"));
-        assert!(!text.contains("<div"));
+        assert!(text.contains("<html"));
+        assert!(text.contains("<div"));
     }
 
     #[test]
@@ -837,7 +903,6 @@ mod tests {
         assert!(mime.contains("Content-Type: multipart/alternative; boundary="));
         assert!(mime.contains("Content-Type: text/plain; charset=UTF-8"));
         assert!(mime.contains("Content-Type: text/html; charset=UTF-8"));
-        assert!(mime.contains("Test Alert"));
-        assert!(mime.contains("<div style="));
+        assert!(mime.contains("Content-Transfer-Encoding: base64"));
     }
 }

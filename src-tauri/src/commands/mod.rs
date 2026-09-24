@@ -193,6 +193,10 @@ pub async fn switch_account(
         service
             .switch_account(&account_id, target_ide.as_deref())
             .await?;
+
+        if let Ok(acc) = modules::account::load_account(&account_id) {
+            let _ = modules::instance::bind_account_to_instance("default", &acc.id, &acc.email);
+        }
     }
 
     // 同步托盘
