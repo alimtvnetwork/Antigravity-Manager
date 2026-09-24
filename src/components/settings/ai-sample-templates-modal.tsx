@@ -73,7 +73,7 @@ const SAMPLE_CSV_DATA = `alias,email,password,smtp_host,smtp_port,imap_host,imap
 Primary Gmail,agent@gmail.com,app-password-here,smtp.gmail.com,587,imap.gmail.com,993,TLS,true,true
 Corporate Outlook,alerts@corp.com,app-token-here,smtp.office365.com,587,outlook.office365.com,993,STARTTLS,false,true`;
 
-const SAMPLE_AI_PROMPT = `Generate a JSON array of email mailboxes for Antigravity Manager (AGM) following this exact JSON syntax schema:
+const SAMPLE_AI_PROMPT = `Generate a JSON array of email mailboxes for Antigravity Manager Tools following this exact JSON syntax schema:
 
 \`\`\`json
 [

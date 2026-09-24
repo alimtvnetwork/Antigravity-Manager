@@ -96,7 +96,7 @@ If you like this project, you might also be interested in:
 | | |
 | :---: | :---: |
 | ![Dashboard - Global Quota Monitoring & One-click Switch](docs/images/dashboard-light.png) <br> Dashboard | ![Account List - High-density Quota Display & Smart 403 Labeling](docs/images/accounts-light.png) <br> Account List |
-| ![About Page - About Antigravity Tools](docs/images/about-dark.png) <br> About Page | ![API Proxy - Service Control](docs/images/v3/proxy-settings.png) <br> API Proxy |
+| ![About Page - About Antigravity Tools](docs/images/dashboard-modern.png) <br> Modern Dashboard | ![API Proxy - Service Control](docs/images/v3/proxy-settings.png) <br> API Proxy |
 | ![Settings - General Config](docs/images/settings-dark.png) <br> Settings | |
 
 ### 💡 Usage Examples

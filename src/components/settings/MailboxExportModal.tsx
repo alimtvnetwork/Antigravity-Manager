@@ -189,7 +189,7 @@ export default function MailboxExportModal({
 
                 {/* Code block */}
                 <div className="relative rounded-xl border border-gray-200 dark:border-slate-800 bg-slate-950 overflow-hidden shadow-inner">
-                    <pre className="p-3.5 text-slate-100 font-mono text-[11px] overflow-x-auto max-h-80 leading-relaxed select-all">
+                    <pre className="p-3.5 text-slate-100 font-mono text-[11px] overflow-auto max-h-72 leading-relaxed select-all">
                         {exportedContent}
                     </pre>
                 </div>
@@ -198,7 +198,7 @@ export default function MailboxExportModal({
                 <div className="pt-2 flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400">
                     <span className="flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        This formatted data can be directly imported into any AGM instance or provided to AI models.
+                        This formatted data can be directly imported into any Antigravity Manager Tools instance or provided to AI models.
                     </span>
                     <button
                         type="button"

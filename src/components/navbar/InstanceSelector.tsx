@@ -396,7 +396,7 @@ export function InstanceSelector() {
                     className={`w-2 h-2 rounded-full shrink-0 ${isActiveRunning ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}
                 />
                 <span className="truncate max-w-[90px] md:max-w-[120px] text-gray-800 dark:text-gray-200">
-                    {activeInstance?.config.name || 'Default'}
+                    {activeInstance ? `#${instances.findIndex(i => i.config.id === activeInstance.config.id) + 1} ${activeInstance.config.name}` : 'Default'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0" />
             </button>
@@ -542,6 +542,9 @@ export function InstanceSelector() {
                                             />
                                             <div className="flex flex-col truncate min-w-0">
                                                 <div className="flex items-center gap-1.5 truncate">
+                                                    <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                                                        #{instances.findIndex(i => i.config.id === inst.config.id) + 1}
+                                                    </span>
                                                     <span className="truncate font-medium">{inst.config.name}</span>
                                                     {isSelected && (
                                                         <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 dark:bg-amber-400/10 border border-amber-400/30 shrink-0">

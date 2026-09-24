@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sun, Moon, LogOut, Minus, X, RotateCcw } from 'lucide-react';
+import { Sun, Moon, LogOut, Minus, X, RotateCcw, Bug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -7,6 +7,7 @@ import { LanguageDropdown, MoreDropdown } from './NavDropdowns';
 import { LANGUAGES } from './constants';
 import { isTauri } from '../../utils/env';
 import { useErrorStore } from '../../stores/error-store';
+import { useDebugConsole } from '../../stores/useDebugConsole';
 import { AgyCleanModal } from '../modals/agy-clean-modal';
 
 interface NavSettingsProps {
@@ -31,6 +32,7 @@ export function NavSettings({
     onLanguageChange
 }: NavSettingsProps) {
     const { t } = useTranslation();
+    const { enable, disable, isEnabled } = useDebugConsole();
     const [isMaximized, setIsMaximized] = useState(false);
     const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
 
@@ -142,6 +144,27 @@ export function NavSettings({
                     aria-label="Quick Clean"
                 >
                     <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+
+                {/* Debug console trigger button */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (isEnabled) {
+                            disable();
+                        } else {
+                            enable();
+                        }
+                    }}
+                    className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer ${
+                        isEnabled
+                            ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                            : 'bg-gray-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 text-gray-700 dark:text-gray-300'
+                    }`}
+                    title={isEnabled ? 'Disable Debug Overlay' : 'Enable Debug Overlay & Console'}
+                    aria-label="Debug Console"
+                >
+                    <Bug className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 {/* Theme toggle button */}

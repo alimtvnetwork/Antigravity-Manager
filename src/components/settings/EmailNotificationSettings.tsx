@@ -794,15 +794,15 @@ export default function EmailNotificationSettings() {
                                 type="button"
                                 onClick={() => setIsActionsOpen(!isActionsOpen)}
                                 className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 hover:border-gray-400 dark:hover:border-slate-600 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                title="Mailbox & Vault Actions"
+                                title="Import / Export Mailboxes & Database Actions"
                             >
                                 <SlidersHorizontal className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
-                                <span>Actions</span>
+                                <span>Export / Import Actions</span>
                                 <ChevronDown className={`w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-150 ${isActionsOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isActionsOpen && (
-                                <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 divide-y divide-gray-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1">
+                                <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 divide-y divide-gray-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1">
                                     <div className="py-1">
                                         <button
                                             type="button"
@@ -811,6 +811,7 @@ export default function EmailNotificationSettings() {
                                                 handleExport('json');
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Export all mailboxes as structured JSON"
                                         >
                                             <FileJson className="w-3.5 h-3.5 text-amber-500" />
                                             <span>Export JSON</span>
@@ -822,6 +823,7 @@ export default function EmailNotificationSettings() {
                                                 handleExport('yaml');
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Export all mailboxes as clean YAML"
                                         >
                                             <FileCode className="w-3.5 h-3.5 text-emerald-500" />
                                             <span>Export YAML</span>
@@ -833,6 +835,7 @@ export default function EmailNotificationSettings() {
                                                 handleExport('csv');
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Export all mailboxes in CSV format"
                                         >
                                             <FileText className="w-3.5 h-3.5 text-blue-500" />
                                             <span>Export CSV</span>
@@ -844,6 +847,7 @@ export default function EmailNotificationSettings() {
                                                 handleExport('xlsx');
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Export all mailboxes to Microsoft Excel format"
                                         >
                                             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
                                             <span>Export Excel</span>
@@ -855,6 +859,7 @@ export default function EmailNotificationSettings() {
                                                 setIsImportModalOpen(true);
                                             }}
                                             className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Import mailboxes from JSON, YAML, or CSV files"
                                         >
                                             <Upload className="w-3.5 h-3.5 text-indigo-500" />
                                             <span>Import Accounts</span>

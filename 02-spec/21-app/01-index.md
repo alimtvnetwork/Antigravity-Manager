@@ -180,3 +180,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-003 (Storage Conformance):** Database connections must always execute with `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`.
 - **AC-APP-004 (Guideline Conformance):** All codebase modifications must conform to normative bindings in Section 6, with zero CI/CD lint violations.
 - **AC-APP-022 (UI Fluidity & Fleet Invariants):** Implemented in [`22-ui-fluidity-email-remote-instance-fleet-fixes.md`](./22-ui-fluidity-email-remote-instance-fleet-fixes.md).
+- **AC-APP-023 (Comprehensive UI, Quota & Settings Restoration):** Implemented in [`23-comprehensive-ui-quota-installer-and-settings-restoration.md`](./23-comprehensive-ui-quota-installer-and-settings-restoration.md).

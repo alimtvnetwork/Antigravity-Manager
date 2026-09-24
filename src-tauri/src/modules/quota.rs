@@ -480,10 +480,9 @@ pub async fn fetch_quota_with_cache(
                                             // If weekly quota is exhausted (<= 0.001), model is limited by weekly quota to 0%, use weekly reset
                                             if w.remaining_fraction <= 0.001 {
                                                 Some(w)
-                                            } else if h.remaining_fraction <= w.remaining_fraction {
-                                                Some(h)
                                             } else {
-                                                Some(w)
+                                                // When weekly quota is not exhausted, always use 5h bucket to accurately reflect 5h rolling quota and reset
+                                                Some(h)
                                             }
                                         }
                                         (Some(h), None) => Some(h),

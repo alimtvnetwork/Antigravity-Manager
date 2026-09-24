@@ -589,13 +589,25 @@ function Settings() {
                         </button>
                     </div>
 
-                    <button
-                        className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-sm"
-                        onClick={handleSave}
-                    >
-                        <Save className="w-4 h-4" />
-                        {t('settings.save')}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="px-3.5 py-2 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-base-300 transition-colors flex items-center gap-2 shadow-xs border border-gray-200 dark:border-base-100 cursor-pointer"
+                            onClick={() => setIsBackupModalOpen(true)}
+                            title="Encrypted Full System Backup & Restore"
+                        >
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <span>{t('settings.backup_restore', 'Backup & Restore')}</span>
+                        </button>
+
+                        <button
+                            className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+                            onClick={handleSave}
+                        >
+                            <Save className="w-4 h-4" />
+                            {t('settings.save')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Settings form */}

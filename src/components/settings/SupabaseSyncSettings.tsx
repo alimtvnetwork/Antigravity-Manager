@@ -17,7 +17,9 @@ import {
     Send,
     ArrowRightLeft,
     ShieldCheck,
+    HelpCircle,
 } from 'lucide-react';
+import { UnifiedBackupModal } from '../modals/UnifiedBackupModal';
 import {
     supabaseService,
     SupabaseConfig,
@@ -71,6 +73,8 @@ export default function SupabaseSyncSettings() {
     const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
     const [isSavingTelegram, setIsSavingTelegram] = useState(false);
     const [isSendingPing, setIsSendingPing] = useState(false);
+    const [isTgGuideOpen, setIsTgGuideOpen] = useState(false);
+    const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
     // Form state for adding/editing endpoint
     const [formEndpoint, setFormEndpoint] = useState<Partial<SupabaseEndpoint>>({
@@ -417,6 +421,14 @@ Here are my Supabase details:
                         AI Prompt Template
                     </button>
                     <button
+                        onClick={() => setIsBackupModalOpen(true)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition text-xs font-medium cursor-pointer"
+                        title="Encrypted Full System Backup & Restore"
+                    >
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        Backup / Restore
+                    </button>
+                    <button
                         onClick={() => handleOpenExport('json')}
                         className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700 flex items-center gap-1.5 transition text-xs"
                     >
@@ -663,10 +675,21 @@ Here are my Supabase details:
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h4 className="font-semibold text-white flex items-center gap-2">
-                            <Send className="w-4 h-4 text-sky-400" />
-                            Telegram Inbound Bot Integration
-                        </h4>
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-white flex items-center gap-2">
+                                <Send className="w-4 h-4 text-sky-400" />
+                                Telegram Inbound Bot Integration
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setIsTgGuideOpen(true)}
+                                className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20 transition flex items-center gap-1 cursor-pointer"
+                                title="Step-by-step instructions to create Telegram Bot"
+                            >
+                                <HelpCircle className="w-3 h-3" />
+                                <span>Create Bot Guide</span>
+                            </button>
+                        </div>
                         <p className="text-xs text-gray-400 mt-0.5">
                             Query cluster snapshots ("How many machines are running?"), fast-forward workspaces, and execute terminal commands from your phone via Telegram.
                         </p>
@@ -691,8 +714,8 @@ Here are my Supabase details:
                 {telegramConfig && (
                     <div className="space-y-3 pt-2 border-t border-slate-800/80">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-300 mb-1">
+                            <div className="flex flex-col">
+                                <label className="block text-xs font-medium text-gray-300 mb-1.5 h-4 leading-4 truncate">
                                     Telegram Bot Token
                                 </label>
                                 <input
@@ -702,12 +725,12 @@ Here are my Supabase details:
                                     onChange={(e) =>
                                         setTelegramConfig({ ...telegramConfig, bot_token: e.target.value })
                                     }
-                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
+                                    className="w-full h-9 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-medium text-gray-300 mb-1">
+                            <div className="flex flex-col">
+                                <label className="block text-xs font-medium text-gray-300 mb-1.5 h-4 leading-4 truncate">
                                     Allowed Chat ID (Optional Security Filter)
                                 </label>
                                 <input
@@ -720,7 +743,7 @@ Here are my Supabase details:
                                             allowed_chat_id: e.target.value ? Number(e.target.value) : null,
                                         })
                                     }
-                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
+                                    className="w-full h-9 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-sky-500 text-xs font-mono"
                                 />
                             </div>
                         </div>
@@ -1117,6 +1140,73 @@ Here are my Supabase details:
                     </div>
                 </div>
             </ModalDialog>
+
+            {/* Telegram Bot Setup Guide Modal */}
+            <ModalDialog
+                isOpen={isTgGuideOpen}
+                title="Telegram Bot Setup Guide"
+                type="info"
+                maxWidth="max-w-xl"
+                onClose={() => setIsTgGuideOpen(false)}
+                onConfirm={() => setIsTgGuideOpen(false)}
+            >
+                <div className="space-y-4 text-xs text-gray-300">
+                    <p className="text-gray-400">
+                        Follow these simple steps to configure your personal Telegram remote bot:
+                    </p>
+
+                    <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                            <div className="font-semibold text-sky-400 flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs">1</span>
+                                Create Bot via @BotFather
+                            </div>
+                            <p className="text-gray-400 pl-7 leading-relaxed">
+                                Open Telegram and search for <strong className="text-white">@BotFather</strong> (verified with blue checkmark).
+                                Send <code className="text-sky-300">/newbot</code>, choose a display name and a username ending in <code className="text-sky-300">bot</code>.
+                            </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                            <div className="font-semibold text-sky-400 flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs">2</span>
+                                Copy HTTP API Token
+                            </div>
+                            <p className="text-gray-400 pl-7 leading-relaxed">
+                                BotFather will provide an API token (e.g. <code className="text-sky-300">123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ</code>).
+                                Paste this token into the <strong>Telegram Bot Token</strong> field.
+                            </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                            <div className="font-semibold text-sky-400 flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs">3</span>
+                                Get your Telegram Chat ID (Security Filter)
+                            </div>
+                            <p className="text-gray-400 pl-7 leading-relaxed">
+                                Search for <strong className="text-white">@userinfobot</strong> or <strong className="text-white">@RawDataBot</strong> in Telegram and send <code className="text-sky-300">/start</code>.
+                                Copy the numeric <code className="text-sky-300">Id</code> and paste it into the <strong>Allowed Chat ID</strong> field to restrict bot access exclusively to your account.
+                            </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                            <div className="font-semibold text-sky-400 flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs">4</span>
+                                Start and Test
+                            </div>
+                            <p className="text-gray-400 pl-7 leading-relaxed">
+                                Click <strong>Test Bot</strong> to verify token connectivity, then click <strong>Save Telegram</strong> and send <code className="text-sky-300">/status</code> to your bot!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </ModalDialog>
+
+            {/* Unified Encrypted System Backup Modal */}
+            <UnifiedBackupModal
+                isOpen={isBackupModalOpen}
+                onClose={() => setIsBackupModalOpen(false)}
+            />
         </div>
     );
 }

@@ -357,7 +357,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 #### Pinned Version Install (v{next_version})
 ```powershell
-irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v{next_version}/install.ps1 | iex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Version "{next_version}"
 ```
 
 ---
@@ -371,7 +371,7 @@ curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/m
 
 #### Pinned Version Install (v{next_version})
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v{next_version}/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version "{next_version}"
 ```
 
 ---

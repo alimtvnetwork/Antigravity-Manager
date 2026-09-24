@@ -350,6 +350,59 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
         return Err(AppError::Config("Command cannot be empty".to_string()));
     }
 
+    let lower_cmd = cmd_str.to_lowercase();
+    if lower_cmd.starts_with("project:") || lower_cmd.starts_with("prompt:") {
+        let lines: Vec<&str> = cmd_str.lines().collect();
+        let project = if let Some(first_line) = lines.first() {
+            if let Some(pos) = first_line.find(':') {
+                first_line[pos + 1..].trim()
+            } else {
+                "Default"
+            }
+        } else {
+            "Default"
+        };
+        let prompt_text = lines.iter().skip(1).copied().collect::<Vec<&str>>().join("\n").trim().to_string();
+        let prompt_display = if prompt_text.is_empty() {
+            cmd_str.to_string()
+        } else {
+            prompt_text
+        };
+
+        let machine_name = email_watcher::detect_machine_name();
+        let machine_ip = email_watcher::detect_local_ip();
+
+        return Ok(CliExecResult {
+            exit_code: 0,
+            stdout: format!(
+                "[AI Prompt Simulation]\nNode: {}\nTarget Project: {}\nInstructions: {}\n\nStatus: Prompt validated and ready for remote execution / agent injection.",
+                machine_name, project, prompt_display
+            ),
+            stderr: String::new(),
+            success: true,
+            machine_name,
+            machine_ip,
+        });
+    }
+
+    // Strip shell prefixes if present
+    let mut clean_cmd = cmd_str;
+    if lower_cmd.starts_with("powershell:") {
+        clean_cmd = clean_cmd["powershell:".len()..].trim();
+    } else if lower_cmd.starts_with("ps:") {
+        clean_cmd = clean_cmd["ps:".len()..].trim();
+    } else if lower_cmd.starts_with("ps ") {
+        clean_cmd = clean_cmd[3..].trim();
+    } else if lower_cmd.starts_with("pwsh:") {
+        clean_cmd = clean_cmd["pwsh:".len()..].trim();
+    } else if lower_cmd.starts_with("bash:") {
+        clean_cmd = clean_cmd["bash:".len()..].trim();
+    } else if lower_cmd.starts_with("sh:") {
+        clean_cmd = clean_cmd["sh:".len()..].trim();
+    } else if lower_cmd.starts_with("cmd:") {
+        clean_cmd = clean_cmd["cmd:".len()..].trim();
+    }
+
     #[cfg(target_os = "windows")]
     let output = {
         let mut cmd = std::process::Command::new("powershell.exe");
@@ -361,7 +414,7 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            cmd_str,
+            clean_cmd,
         ]);
         cmd.output().map_err(|e| {
             AppError::Process(format!("Failed to execute PowerShell on Windows: {}", e))
@@ -370,7 +423,7 @@ pub async fn test_execute_cli_command(command: String) -> AppResult<CliExecResul
 
     #[cfg(not(target_os = "windows"))]
     let output = std::process::Command::new("sh")
-        .args(["-c", cmd_str])
+        .args(["-c", clean_cmd])
         .output()
         .map_err(|e| AppError::Process(format!("Failed to execute command on Unix: {}", e)))?;
 

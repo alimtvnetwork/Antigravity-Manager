@@ -371,14 +371,13 @@ function Accounts() {
   };
 
   const handleRefresh = async (accountId: string) => {
+    if (refreshingIds.has(accountId)) return;
     setRefreshingIds((prev) => {
       const next = new Set(prev);
       next.add(accountId);
       return next;
     });
     try {
-      await refreshQuota(accountId);
-      await refreshQuota(accountId);
       await refreshQuota(accountId);
       showToast(t("common.success"), "success");
     } catch (error) {

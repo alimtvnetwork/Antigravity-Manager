@@ -1741,8 +1741,26 @@ Available Commands:
 
 /// Helper to execute approved CLI command safely
 fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
-    if cmd_str.is_empty() {
+    let mut clean_cmd = cmd_str.trim();
+    if clean_cmd.is_empty() {
         return Err("Empty command instruction".to_string());
+    }
+
+    let lower = clean_cmd.to_lowercase();
+    if lower.starts_with("powershell:") {
+        clean_cmd = clean_cmd["powershell:".len()..].trim();
+    } else if lower.starts_with("ps:") {
+        clean_cmd = clean_cmd["ps:".len()..].trim();
+    } else if lower.starts_with("ps ") {
+        clean_cmd = clean_cmd[3..].trim();
+    } else if lower.starts_with("pwsh:") {
+        clean_cmd = clean_cmd["pwsh:".len()..].trim();
+    } else if lower.starts_with("bash:") {
+        clean_cmd = clean_cmd["bash:".len()..].trim();
+    } else if lower.starts_with("sh:") {
+        clean_cmd = clean_cmd["sh:".len()..].trim();
+    } else if lower.starts_with("cmd:") {
+        clean_cmd = clean_cmd["cmd:".len()..].trim();
     }
 
     #[cfg(target_os = "windows")]
@@ -1756,7 +1774,7 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            cmd_str,
+            clean_cmd,
         ]);
         cmd.output()
             .map_err(|e| format!("Failed to run command on Windows: {}", e))?
@@ -1764,7 +1782,7 @@ fn execute_safe_cli_command(cmd_str: &str) -> Result<String, String> {
 
     #[cfg(not(target_os = "windows"))]
     let output = Command::new("sh")
-        .args(["-c", cmd_str])
+        .args(["-c", clean_cmd])
         .output()
         .map_err(|e| format!("Failed to run command on Unix: {}", e))?;
 

@@ -359,16 +359,28 @@ export default function Instances() {
                 </div>
             ) : null}
 
-            {/* Search Filter */}
-            <div className="flex items-center gap-2 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-xl px-3 py-2 shadow-xs">
-                <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                <input
-                    type="text"
-                    placeholder={t('instances.search_placeholder', 'Search by profile name, ID, or bound email...')}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
-                />
+            {/* Search Filter & Quick Action */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-xl px-3 py-2 shadow-xs">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input
+                        type="text"
+                        placeholder={t('instances.search_placeholder', 'Search by profile name, ID, or bound email...')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
+                    />
+                </div>
+                <button
+                    onClick={() => {
+                        setNewInstanceName('');
+                        setIsCreateOpen(true);
+                    }}
+                    className="btn btn-primary btn-sm gap-1.5 shadow-sm"
+                >
+                    <Plus className="w-4 h-4" />
+                    <span>{t('instances.create_btn', 'New Instance')}</span>
+                </button>
             </div>
 
             {/* Instance Cards Grid or Empty / Loading States */}
@@ -428,8 +440,10 @@ export default function Instances() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredInstances.map((inst, index) => {
+                        const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
+                        const seqNumber = originalIndex !== -1 ? originalIndex + 1 : index + 1;
                         const isActive = inst.config.id === activeInstanceId;
                         const theme = INSTANCE_THEMES[index % INSTANCE_THEMES.length];
 
@@ -468,7 +482,7 @@ export default function Instances() {
                                 {/* Top Accent Bar identifying profile color */}
                                 <div className={cn("h-1.5 w-full bg-gradient-to-r", theme.accentBar)} />
 
-                                <div className="p-5 flex flex-col flex-1 justify-between">
+                                <div className="p-6 flex flex-col flex-1 justify-between min-h-[280px]">
                                     {/* Card Top */}
                                     <div>
                                         <div className="flex items-start justify-between gap-2 mb-3">
@@ -479,6 +493,9 @@ export default function Instances() {
                                                         inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
                                                     )}
                                                 />
+                                                <span className="px-1.5 py-0.5 rounded text-[11px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                                                    #{seqNumber}
+                                                </span>
                                                 <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>

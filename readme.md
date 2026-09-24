@@ -86,9 +86,9 @@
 | ![API Reverse Proxy - Gateway Controls](docs/images/v3/proxy-settings.png)<br><sub><b>API Gateway Controls</b>: Port binding, auth token validation, max body limits (100MB+), and CORS routing</sub> | ![Settings - System & Hardware Profile](docs/images/settings-dark.png)<br><sub><b>System Settings</b>: Device telemetry spoofing, baseline backup, and portable directory mapping</sub> |
 
 <p align="center">
-  <img src="docs/images/about-dark.png" alt="About Antigravity Tools" width="850" />
+  <img src="docs/images/dashboard-modern.png" alt="Antigravity Manager Tools - Modern Unified Dashboard" width="950" />
   <br>
-  <sub><b>About Antigravity Tools</b>: Native desktop engine running on Tauri v2 and Rust</sub>
+  <sub><b>Antigravity Manager Tools</b>: Unified multi-account dashboard, real-time quota metrics, and multi-instance management</sub>
 </p>
 
 ### Real-World Integration Gallery
@@ -116,7 +116,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 ##### Pinned Version Install (v4.65.3)
 ```powershell
-irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 | iex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Version 4.65.3
 ```
 
 ---
@@ -128,15 +128,15 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
-##### Pinned Version Install (v4.65.0)
+##### Pinned Version Install (v4.65.3)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.65.3
 ```
 
 > [!TIP]
 > **Advanced Script Options**:
-> - Install specific release: `curl -fsSL .../install.sh | bash -s -- --version 4.65.0`
-> - Dry-run verification: `curl -fsSL .../install.sh | bash -s -- --dry-run`
+> - Install specific release: `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.65.3`
+> - Dry-run verification: `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --dry-run`
 
 ---
 
