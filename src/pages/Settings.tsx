@@ -45,7 +45,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.65.3');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.66.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',

@@ -2,6 +2,17 @@
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
+    *   **v4.66.0 (2026-09-24)**:
+        -   **[Release v4.66.0: 5小时滚动配额精准恢复、进程品牌统一、实例序号徽章与邮箱样本预加载] 5小时滚动配额计算恢复、开箱即用邮箱样本、任务管理器官方品牌、Telegram BotFather 向导与发布页代码块独立分割**:
+            -   **恢复 5 小时滚动配额基准计算**: 修复 `src-tauri/src/modules/quota.rs` 中滚动配额选择器比较逻辑。当存在 5 小时滚动配额且周配额未耗尽（`remaining_fraction > 0.001`）时，系统无条件优先采用 5 小时滚动配额并显示精准倒计时（如 `4h 56m`），周配额倒计时（如 `6d 9h`）仅在周配额完全耗尽时展示。
+            -   **账号页面高频点击防白屏与操作按钮常驻可见**: 移除 `src/pages/Accounts.tsx` 中重复触发的单账号配额刷新调用，彻底杜绝 WebView2 密集重绘竞态。将 `src/components/accounts/AccountTable.tsx` 表格操作按钮从 `opacity-0` 隐式悬浮调整为常驻可见并具备高对比度悬浮交互。
+            -   **任务管理器官方品牌展示与开始菜单快捷方式无版本号**: 在 `src-tauri/tauri.conf.json` 中配置 `productName: "Antigravity Manager Tools"`，使 Windows 任务管理器展示正式软件全称。开始菜单与桌面快捷方式统一命名为无版本号的 `Antigravity Manager Tools.lnk`，同时 Windows 已安装应用列表精准保留显式版本号（`Antigravity Manager Tools 4.66.0`）。
+            -   **实例序号徽章（#1, #2, #3）与加宽卡片布局**: 在 `src/pages/Instances.tsx` 实例卡片及顶部导航栏 `InstanceSelector.tsx` 中为每个实例标记高对比度序号徽章（`#1`、`#2`...），增大卡片内边距与间距，并在页面头部提供快速「+ New Instance」创建按钮。
+            -   **入站邮件终端指令前缀剥离与 AI 提示词指令拦截**: 在 `src-tauri/src/commands/email.rs` 与 `src-tauri/src/modules/email_inbound.rs` 中自动过滤终端前缀（`powershell:`、`ps:`、`ps `、`bash:`、`sh:`、`cmd:`），Windows 系统默认无缝调用 PowerShell。对自然语言与 AI 指令（`Project:`、`Prompt:`、`AI:`、`Instruction:` 等）执行拦截仿真，避免触发 PowerShell 语法异常。
+            -   **邮箱样本账户一键预加载与小写 gitmap 命令模板**: 在 `EmailNotificationSettings.tsx` 空状态与操作下拉菜单中增加「Load Sample Mailboxes」快捷装载功能。优化 `MailboxExportModal.tsx` 自定义滚动条并将底层文本统一为「Antigravity Manager Tools」，并将快捷指令对齐为简洁 PowerShell 与规范小写 `gitmap`。
+            -   **Telegram 引导向导与自动切换器规则备份恢复**: 在 `SupabaseSyncSettings.tsx` 中增加 Telegram @BotFather 逐步创建引导弹窗并对齐表单高度。在 `AutoSwitcherSettings.tsx` 中增加 Actions 操作菜单支持 JSON 规则导入导出。在全局 Settings 工具栏与导航栏分别集成完整系统备份与调试控制台入口。
+            -   **发布页安装指令代码块彻底独立分割**: 将直接最新安装与固定版本安装指令在 `readme.md`、`README_EN.md` 及发布模板中拆分为两个独立的代码块，杜绝注释混合。验证并固化固定版本 PowerShell 指令：`& ([scriptblock]::Create((irm ...))) -Version 4.66.0`。
+
     *   **v4.65.3 (2026-09-24)**:
         -   **[Release v4.65.3: 邮箱全格式原生导出、单账号导入导出与 AI 嵌入式 JSON 语法] 邮箱交互式多格式预览弹窗、Tauri 原生文件对话框保存、单账号独立导入导出与嵌入式 JSON AI 指令段**:
             -   **交互式导出预览弹窗与 WebView2 导出失灵根治**: 新增 `MailboxExportModal.tsx` 组件，彻底解决 Windows WebView2 下点击导出仅弹出提示却无文件下载与无界面反馈的缺陷。点击导出即刻在屏幕中央呼出代码高亮预览弹窗，支持 **JSON**、**YAML**、**CSV** 三大主流格式实时热切换，支持一键复制代码与调用系统级原生保存文件对话框。
@@ -3201,6 +3212,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.66.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.65.3 (2026-09-24)**:
         -   **[Release v4.65.3: Mailbox Multi-Format Visual Export, Single-Account Import/Export & Embedded JSON AI Syntax] Interactive Export Preview Modal, Native OS File Saving, Single Account Form Drawer & Embedded JSON AI Instructions**:
             -   **Interactive Visual Export Modal & WebView2 Download Fix**: Introduced `MailboxExportModal.tsx` to eliminate WebView2 silent download failures where blob URL clicks were dropped without file or UI response. Clicking any export action immediately launches a syntax-highlighted dark modal with live switching between **JSON**, **YAML**, and **CSV**, instant clipboard copying, and native OS file saving.

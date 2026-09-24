@@ -630,6 +630,46 @@ export default function EmailNotificationSettings() {
         reader.readAsText(file);
     };
 
+    const handleLoadSampleMailboxes = async () => {
+        const sampleAccounts: EmailAccountInput[] = [
+            {
+                alias: "Primary Google Workspace",
+                email: "alerts@example.com",
+                password: "app-password-sample",
+                smtp_host: "smtp.gmail.com",
+                smtp_port: 587,
+                imap_host: "imap.gmail.com",
+                imap_port: 993,
+                encryption_type: "TLS",
+                is_default: true,
+                is_active: true
+            },
+            {
+                alias: "Backup Microsoft 365",
+                email: "agent@outlook.com",
+                password: "token-secret-sample",
+                smtp_host: "smtp.office365.com",
+                smtp_port: 587,
+                imap_host: "outlook.office365.com",
+                imap_port: 993,
+                encryption_type: "STARTTLS",
+                is_default: false,
+                is_active: true
+            }
+        ];
+        try {
+            let count = 0;
+            for (const acc of sampleAccounts) {
+                await addEmailAccount(acc);
+                count++;
+            }
+            await loadAll();
+            showToast(`Loaded ${count} sample mailboxes successfully`, 'success');
+        } catch (e: any) {
+            showToast('Failed to load sample mailboxes: ' + (e?.message || e), 'error');
+        }
+    };
+
     const handleBackupDb = async () => {
         try {
             const defaultFilename = `antigravity-email-vault-${Date.now()}.db`;
@@ -864,6 +904,18 @@ export default function EmailNotificationSettings() {
                                             <Upload className="w-3.5 h-3.5 text-indigo-500" />
                                             <span>Import Accounts</span>
                                         </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsActionsOpen(false);
+                                                handleLoadSampleMailboxes();
+                                            }}
+                                            className="w-full px-3 py-1.5 text-xs text-left text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30 flex items-center gap-2 transition-colors cursor-pointer"
+                                            title="Preload sample mailbox accounts for testing"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                                            <span>Load Sample Mailboxes</span>
+                                        </button>
                                     </div>
                                     <div className="py-1">
                                         <button
@@ -910,14 +962,25 @@ export default function EmailNotificationSettings() {
                         <Mail className="w-6 h-6 text-gray-400 dark:text-slate-500 mx-auto mb-1.5" />
                         <p className="text-xs font-medium text-gray-600 dark:text-slate-300">No mailboxes configured in vault</p>
                         <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5 mb-3">Add an SMTP/IMAP account to enable dispatch and remote command execution</p>
-                        <button
-                            type="button"
-                            onClick={handleOpenAddAccount}
-                            className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add Mailbox</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleOpenAddAccount}
+                                className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add Mailbox</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleLoadSampleMailboxes}
+                                className="px-3.5 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                title="Preload sample mailbox accounts for testing"
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Load Sample Mailboxes</span>
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -1584,38 +1647,43 @@ export default function EmailNotificationSettings() {
                     <span className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 mr-1">Templates:</span>
                     <button
                         type="button"
-                        onClick={() => setTestCliCommand('powershell: Get-Process | Select-Object -First 5')}
+                        onClick={() => setTestCliCommand('Get-Process | Select-Object -First 5')}
                         className="px-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 text-gray-700 dark:text-slate-300 font-mono transition-colors cursor-pointer"
+                        title="PowerShell process list (auto-detected on Windows)"
                     >
-                        PowerShell Processes
+                        PS Processes
                     </button>
                     <button
                         type="button"
-                        onClick={() => setTestCliCommand("powershell: Get-Service -Name '*wsl*', '*docker*' -ErrorAction SilentlyContinue")}
+                        onClick={() => setTestCliCommand("Get-Service -Name '*wsl*', '*docker*' -ErrorAction SilentlyContinue")}
                         className="px-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 text-gray-700 dark:text-slate-300 font-mono transition-colors cursor-pointer"
+                        title="PowerShell service inspection"
                     >
-                        PowerShell Services
+                        PS Services
                     </button>
                     <button
                         type="button"
                         onClick={() => setTestCliCommand('gitmap --version')}
                         className="px-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 text-gray-700 dark:text-slate-300 font-mono transition-colors cursor-pointer"
+                        title="Query gitmap version"
                     >
-                        GitMap Version
+                        gitmap Version
                     </button>
                     <button
                         type="button"
                         onClick={() => setTestCliCommand('gitmap status')}
                         className="px-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 text-gray-700 dark:text-slate-300 font-mono transition-colors cursor-pointer"
+                        title="Query gitmap status"
                     >
-                        GitMap Status
+                        gitmap Status
                     </button>
                     <button
                         type="button"
                         onClick={() => setTestCliCommand('Project: Antigravity-Manager\nScan repository health and report open issues')}
-                        className="px-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 text-gray-700 dark:text-slate-300 font-mono transition-colors cursor-pointer"
+                        className="px-2 py-1 text-[11px] rounded-md border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-mono transition-colors cursor-pointer"
+                        title="AI instruction simulation"
                     >
-                        Prompt Injection
+                        AI Prompt Instruction
                     </button>
                 </div>
 
@@ -1626,13 +1694,13 @@ export default function EmailNotificationSettings() {
                             rows={3}
                             value={testCliCommand}
                             onChange={(e) => setTestCliCommand(e.target.value)}
-                            placeholder="Enter CLI command (e.g. powershell: Get-Process) or AI prompt instruction..."
+                            placeholder="Enter CLI command (e.g. ps: Get-Process or Get-Process) or AI prompt instruction (e.g. Project: Antigravity-Manager)..."
                             className="w-full px-3 py-2.5 font-mono text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-900 text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed resize-y"
                         />
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="text-[11px] text-gray-500 dark:text-slate-400">
-                            Prefix with <code className="text-purple-600 dark:text-purple-400 font-bold">powershell:</code>, <code className="text-purple-600 dark:text-purple-400 font-bold">bash:</code>, or execute directly on path.
+                            Optional prefix: <code className="text-purple-600 dark:text-purple-400 font-bold">ps:</code>, <code className="text-purple-600 dark:text-purple-400 font-bold">bash:</code>, or execute directly (defaults to PowerShell on Windows). AI prompts starting with <code className="text-purple-600 dark:text-purple-400 font-bold">Project:</code> or <code className="text-purple-600 dark:text-purple-400 font-bold">Prompt:</code> simulate execution receipts.
                         </div>
                         <div className="flex items-center gap-2">
                             <button

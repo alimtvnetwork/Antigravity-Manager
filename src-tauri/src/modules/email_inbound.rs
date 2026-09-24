@@ -540,18 +540,56 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         }
     }
 
-    // 2. Legacy Prefix Support
-    if lower_subj.starts_with("project:") || lower_subj.starts_with("project-prompt:") {
-        let prefix_len = if lower_subj.starts_with("project:") {
-            "project:".len()
-        } else {
+    // 2. Legacy and Flexible Prefix Support
+    if lower_subj.starts_with("project:")
+        || lower_subj.starts_with("project-prompt:")
+        || lower_subj.starts_with("prompt:")
+        || lower_subj.starts_with("prompt ")
+        || lower_subj.starts_with("prompt injection:")
+        || lower_subj.starts_with("prompt-injection:")
+        || lower_subj.starts_with("ai:")
+        || lower_subj.starts_with("ai-task:")
+        || lower_subj.starts_with("instruction:")
+        || lower_subj.starts_with("inject:")
+    {
+        let prefix_len = if lower_subj.starts_with("project-prompt:") {
             "project-prompt:".len()
+        } else if lower_subj.starts_with("project:") {
+            "project:".len()
+        } else if lower_subj.starts_with("prompt injection:") {
+            "prompt injection:".len()
+        } else if lower_subj.starts_with("prompt-injection:") {
+            "prompt-injection:".len()
+        } else if lower_subj.starts_with("prompt:") {
+            "prompt:".len()
+        } else if lower_subj.starts_with("prompt ") {
+            "prompt ".len()
+        } else if lower_subj.starts_with("ai-task:") {
+            "ai-task:".len()
+        } else if lower_subj.starts_with("ai:") {
+            "ai:".len()
+        } else if lower_subj.starts_with("instruction:") {
+            "instruction:".len()
+        } else if lower_subj.starts_with("inject:") {
+            "inject:".len()
+        } else {
+            0
         };
         let project_name = clean_subj[prefix_len..].trim().to_string();
+        let (p_name, p_inst) = parse_prompt_body(body);
+        let final_prompt = if p_inst.is_empty() {
+            body.trim().to_string()
+        } else {
+            p_inst
+        };
         return InboundAction::PromptInjection {
-            project_name,
-            prompt_name: String::new(),
-            prompt: body.trim().to_string(),
+            project_name: if project_name.is_empty() {
+                "Default".to_string()
+            } else {
+                project_name
+            },
+            prompt_name: p_name,
+            prompt: final_prompt,
             instance_id: None,
         };
     }
