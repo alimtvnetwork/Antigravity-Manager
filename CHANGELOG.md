@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.71.4 (2026-09-24)**:
+        -   **[Release v4.71.4: 邮件 MIME 严格 HTML 模式、HTML5 规范容器封装与出站主题 `[v版本 | 节点别名 | 本地IP]` 规范化] 根除 Gmail 源码外泄缺陷、所有出站邮件主题前置版本与节点遥测前缀、Telegram 与 HTML 卡片徽章全链路同步**:
+            -   **RFC 2046 严格 HTML MIME 类型与 HTML5 规范容器封装 (`09-email-body-type-and-subject-version-rca.md`)**: 彻底解决 Gmail 客户端直接将 `<div style="...">` 源码当作纯文本原样转义输出的严重缺陷。在 `email_sender.rs` 中强化 `build_mime_message`，针对所有 HTML 正文自动封装标准的 `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body ...>` HTML5 容器，杜绝无外层 DOM 导致的排版退化；同时在 `multipart/alternative` 双段 MIME 中将 `text/html; charset=UTF-8` 作为终选高优先级部分并通过 76 字符 CRLF Base64 编码分发，确保所有邮件客户端 100% 渲染现代暗色卡片视觉。
+            -   **所有出站邮件主题统一前置标准遥测标签 `[v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`**: 新增 `format_subject_with_telemetry`，并在 `email_sender.rs`、`email_inbound.rs` 与 `notification_hub.rs` 中全链路统一，确保无论切号告警、配额监控、自检邮件、执行回执或回复邮件（`Re: ...`），邮件主题最左侧均醒目显示 `[v4.71.4 | VM3 | 192.168.1.12]`，支持多节点集群秒级识别，杜绝移动端或智能手表因主题截断遗漏关键节点与版本信息。
+            -   **Telegram 告警通知与 HTML 视觉卡片信息深度对齐**: 在切号 Telegram 消息通知与 HTML 视觉卡片中增设 `📦 Version: v4.71.4` 与 `Application Version` 专属遥测行与顶部醒目徽章，保证多端信息严格对齐。
+            -   **根因分析文档固化**: 新增 `02-spec/22-app-issues/09-email-body-type-and-subject-version-rca.md`，并在 `02-spec/22-app-issues/01-index.md` 建立索引。
+
     *   **v4.71.3 (2026-09-24)**:
         -   **[Release v4.71.3: Windows 应用清单与 ComCtl 6.0 深度嵌入、0xc0000139 符号缺失根治、全局 React 错误边界防白屏、任务栏实时缩略图与交互式独立安装器] 彻底根除 Entry Point Not Found 报错、DWM 缩略图灰框根除、React 全局崩溃保护与邮件 Base64 HTML 卡片全链路交付**:
             -   **RFC 2045 Base64 双段 MIME 编码与自动 HTML 视觉卡片封装**: 彻底解决 Gmail 与主流邮箱客户端因 `8bit` 超过 998 字节行长断行导致 `<div style=...>` 源码作为纯文本外泄以及 `====` 分隔线被折叠为 `...` 的缺陷。在 `email_sender.rs` 中新增 `encode_mime_base64_body` 与 `wrap_html_email_card`，将所有出站邮件（即时 ACK 回执、远程命令结果、切号通知、配额告警与自检邮件）自动封装为响应式暗色 HTML 卡片并采用 76 字符 CRLF Base64 传输编码。
@@ -3268,6 +3275,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.71.4 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.71.3 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

@@ -1138,7 +1138,7 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
 }
 
 /// Format an RFC 5322 reply subject that strictly preserves threading in Gmail / Outlook
-/// while prepending [NodeName | LocalIP] to identify the originating VM node clearly.
+/// while prepending [v<VERSION> | <VM_ALIAS> | <LOCAL_IP>] to identify the originating VM node clearly.
 pub fn format_reply_subject(
     original_subject: Option<&str>,
     fallback_prefix: &str,
@@ -1146,20 +1146,34 @@ pub fn format_reply_subject(
     local_name: &str,
     local_ip: &str,
 ) -> String {
-    let node_tag = format!("[{} | {}]", local_name, local_ip);
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let node_tag = format!("[{} | {} | {}]", pkg_ver, local_name, local_ip);
     if let Some(orig) = original_subject {
         let trimmed = orig.trim();
         if !trimmed.is_empty() {
             let clean_orig = strip_email_prefixes(trimmed);
-            if !clean_orig.is_empty() {
-                return format!(
-                    "Re: {} {} {} ({})",
-                    node_tag, fallback_prefix, command_name, clean_orig
-                );
+            // If clean_orig starts with an existing bracketed tag with a pipe, strip it
+            let final_orig = if clean_orig.starts_with('[') && clean_orig.contains(']') {
+                if let Some(end_idx) = clean_orig.find(']') {
+                    let inside = &clean_orig[1..end_idx];
+                    if inside.contains('|') {
+                        clean_orig[end_idx + 1..].trim()
+                    } else {
+                        &clean_orig
+                    }
+                } else {
+                    &clean_orig
+                }
+            } else {
+                &clean_orig
+            };
+
+            if !final_orig.is_empty() {
+                return format!("{} Re: {}", node_tag, final_orig);
             }
         }
     }
-    format!("Re: {} {} {}", node_tag, fallback_prefix, command_name)
+    format!("{} {} {}", node_tag, fallback_prefix, command_name)
 }
 
 /// Render responsive HTML card layout for inbound execution ACK and Result receipts
@@ -1174,6 +1188,7 @@ pub fn render_html_receipt(
     target_or_query: &str,
     is_ack: bool,
 ) -> String {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let now_str = Utc::now().to_rfc3339();
     let badge_color = if is_ack {
         "#2563eb" // Blue
@@ -1238,7 +1253,7 @@ pub fn render_html_receipt(
   <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
     <div style="background: #0f172a; padding: 20px 24px; color: #ffffff;">
       <div style="margin-bottom: 8px;">
-        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {}]</span>
+        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {} | {}]</span>
         <span style="background: {}; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-left: 8px;">{}</span>
       </div>
       <h2 style="margin: 8px 0 0 0; font-size: 18px; color: #ffffff; font-weight: 700;">{}</h2>
@@ -1246,6 +1261,7 @@ pub fn render_html_receipt(
     <div style="padding: 24px;">
       <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;">{}</p>
       <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Version</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;">{}</td></tr>
         <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Command</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;"><code>{}</code></td></tr>
         <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
         <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Target Instance</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
@@ -1255,24 +1271,27 @@ pub fn render_html_receipt(
       {}
     </div>
     <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
-      Automated Remote Dispatcher · Antigravity Manager · Maintained by Alim, Sponsored by RISEUP ASIA LLC
+      Automated Remote Dispatcher · Antigravity Manager {} · Maintained by Alim, Sponsored by RISEUP ASIA LLC
     </div>
   </div>
 </body>
 </html>"#,
+        pkg_ver,
         local_name,
         local_ip,
         badge_color,
         status_text,
         title_text,
         subtitle,
+        pkg_ver,
         command_name,
         local_name,
         local_ip,
         instance,
         query_row,
         now_str,
-        output_block
+        output_block,
+        pkg_ver
     )
 }
 
@@ -3378,6 +3397,8 @@ mod tests {
     fn test_format_reply_subject_preserves_threading() {
         let local_name = "VM3";
         let local_ip = "192.168.1.12";
+        let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+        let node_tag = format!("[{} | {} | {}]", pkg_ver, local_name, local_ip);
 
         // Direct subject: should prepend node tag and Re:
         assert_eq!(
@@ -3388,7 +3409,7 @@ mod tests {
                 local_name,
                 local_ip
             ),
-            "[VM3 | 192.168.1.12] Re: VM3 | 1 | help"
+            format!("{} Re: VM3 | 1 | help", node_tag)
         );
 
         // Subject already has Re: should NOT duplicate Re:
@@ -3400,7 +3421,7 @@ mod tests {
                 local_name,
                 local_ip
             ),
-            "[VM3 | 192.168.1.12] Re: VM3 | 1 | help"
+            format!("{} Re: VM3 | 1 | help", node_tag)
         );
 
         // Replying to existing notification:
@@ -3412,13 +3433,16 @@ mod tests {
                 local_name,
                 local_ip
             ),
-            "[VM3 | 192.168.1.12] Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"
+            format!(
+                "{} Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+                node_tag
+            )
         );
 
         // Fallback when no original subject:
         assert_eq!(
             format_reply_subject(None, "[AGM ACK] Running:", "help", local_name, local_ip),
-            "[VM3 | 192.168.1.12] [AGM ACK] Running: help"
+            format!("{} [AGM ACK] Running: help", node_tag)
         );
     }
 

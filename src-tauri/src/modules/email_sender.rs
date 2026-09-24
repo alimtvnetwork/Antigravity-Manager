@@ -477,6 +477,53 @@ fn escape_html_entities(raw: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Format an RFC 5322 subject with standard telemetry prefix: `[v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`
+/// Replaces any obsolete or unversioned prefix like `[VM | IP]`, preserves `Re:` prefix,
+/// and handles arbitrary whitespace around pipes.
+pub fn format_subject_with_telemetry(
+    subject: &str,
+    pkg_ver: &str,
+    machine_name: &str,
+    machine_ip: &str,
+) -> String {
+    let node_tag = format!("[{} | {} | {}]", pkg_ver, machine_name, machine_ip);
+    let trimmed = subject.trim();
+
+    // Already contains current version tag
+    if trimmed.starts_with(&node_tag) {
+        return trimmed.to_string();
+    }
+
+    // If subject starts with an existing telemetry tag `[... | ...]`, upgrade it
+    if trimmed.starts_with('[') {
+        if let Some(end_idx) = trimmed.find(']') {
+            let inside = &trimmed[1..end_idx];
+            if inside.contains('|') {
+                let rest = trimmed[end_idx + 1..].trim();
+                return format!("{} {}", node_tag, rest);
+            }
+        }
+    }
+
+    // Handles reply subjects: e.g. "Re: [VM3 | 192.168.1.12] ..." or "Re: ..."
+    if trimmed.to_lowercase().starts_with("re:") {
+        let after_re = trimmed[3..].trim();
+        // If after "Re:" there's already an existing bracketed tag with a pipe, replace it
+        if after_re.starts_with('[') {
+            if let Some(end_idx) = after_re.find(']') {
+                let inside = &after_re[1..end_idx];
+                if inside.contains('|') {
+                    let rest = after_re[end_idx + 1..].trim();
+                    return format!("{} Re: {}", node_tag, rest);
+                }
+            }
+        }
+        return format!("{} Re: {}", node_tag, after_re);
+    }
+
+    format!("{} {}", node_tag, trimmed)
+}
+
 /// Build a rich, responsive HTML card for any notification or command output
 pub fn wrap_html_email_card(
     title: &str,
@@ -484,6 +531,7 @@ pub fn wrap_html_email_card(
     machine_name: &str,
     machine_ip: &str,
 ) -> String {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let now_str = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     let escaped_content = escape_html_entities(content.trim());
     format!(
@@ -496,7 +544,7 @@ pub fn wrap_html_email_card(
   <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(15,23,42,0.08); border: 1px solid #e2e8f0;">
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 20px 24px; color: #ffffff;">
       <div style="margin-bottom: 10px;">
-        <span style="background: #334155; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700; border: 1px solid #475569;">NODE: {} | IP: {}</span>
+        <span style="background: #334155; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700; border: 1px solid #475569;">[{} | {} | {}]</span>
         <span style="background: #2563eb; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 8px;">AGM TELEMETRY</span>
       </div>
       <h2 style="margin: 6px 0 0 0; font-size: 18px; color: #ffffff; font-weight: 700;">{}</h2>
@@ -504,7 +552,11 @@ pub fn wrap_html_email_card(
     <div style="padding: 24px;">
       <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
         <tr>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; width: 130px;">VM / Node Alias</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; width: 140px;">Application Version</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-family: monospace; font-weight: 700;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600;">VM / Node Alias</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-family: monospace; font-weight: 700;">{}</td>
         </tr>
         <tr>
@@ -520,18 +572,21 @@ pub fn wrap_html_email_card(
       <pre style="background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>
     </div>
     <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
-      Automated Remote Dispatcher &middot; Antigravity Manager &middot; Node {} ({})
+      Automated Remote Dispatcher &middot; Antigravity Manager {} &middot; Node {} ({})
     </div>
   </div>
 </body>
 </html>"#,
+        pkg_ver,
         machine_name,
         machine_ip,
         escape_html_entities(title),
+        pkg_ver,
         machine_name,
         machine_ip,
         now_str,
         escaped_content,
+        pkg_ver,
         machine_name,
         machine_ip
     )
@@ -539,7 +594,7 @@ pub fn wrap_html_email_card(
 
 /// Build full RFC 5322 / RFC 2046 MIME email message payload
 /// Guarantees:
-/// 1. Subject always contains `[<VM_ALIAS> | <LOCAL_IP>]`
+/// 1. Subject always contains `[v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`
 /// 2. Body is always rendered as a rich HTML card (`multipart/alternative` with Base64 transfer encoding)
 fn build_mime_message(
     account: &EmailAccount,
@@ -548,20 +603,11 @@ fn build_mime_message(
     recipients: &[String],
     in_reply_to: Option<&str>,
 ) -> String {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let m_name = crate::modules::email_watcher::detect_machine_name();
     let m_ip = crate::modules::email_watcher::detect_local_ip();
-    let node_tag = format!("[{} | {}]", m_name, m_ip);
 
-    let normalized_subject = if subject.contains(&m_ip)
-        || (subject.contains('[') && subject.contains('|') && subject.contains(']'))
-    {
-        subject.trim().to_string()
-    } else if subject.trim().to_lowercase().starts_with("re:") {
-        let rest = subject.trim()[3..].trim();
-        format!("Re: {} {}", node_tag, rest)
-    } else {
-        format!("{} {}", node_tag, subject.trim())
-    };
+    let normalized_subject = format_subject_with_telemetry(subject, &pkg_ver, &m_name, &m_ip);
 
     let msg_id = format!("<{}@{}>", Uuid::new_v4(), account.smtp_host);
     let date = Utc::now().to_rfc2822();
@@ -587,8 +633,23 @@ fn build_mime_message(
         clean_rcpts.join(", ")
     };
 
-    let html_body = if is_html_content(body) {
+    let html_body = if body.trim().to_lowercase().starts_with("<!doctype")
+        || body.trim().to_lowercase().starts_with("<html")
+    {
         body.to_string()
+    } else if is_html_content(body) {
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+{}
+</body>
+</html>"#,
+            body.trim()
+        )
     } else {
         wrap_html_email_card(&normalized_subject, body, &m_name, &m_ip)
     };
@@ -599,7 +660,7 @@ fn build_mime_message(
     let b64_html = encode_mime_base64_body(&html_body);
 
     let mut headers = format!(
-        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{}\"\r\nX-Origin-Node: {}\r\nX-Origin-IP: {}\r\nX-Mailer: Antigravity-Manager-Mailer/4.71.2\r\n",
+        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"{}\"\r\nX-Origin-Node: {}\r\nX-Origin-IP: {}\r\nX-Origin-Version: {}\r\nX-Mailer: Antigravity-Manager-Mailer/{}\r\n",
         account.alias,
         account.email,
         to_header,
@@ -608,7 +669,9 @@ fn build_mime_message(
         msg_id,
         boundary,
         m_name,
-        m_ip
+        m_ip,
+        pkg_ver,
+        pkg_ver
     );
 
     if let Some(reply_id) = in_reply_to {
@@ -664,9 +727,10 @@ pub fn render_quota_drop_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Alert] Low Quota Warning ({:.1}%) - {}",
-        machine_name, machine_ip, current_quota, email
+        "[{} | {} | {}] [AGM Alert] Low Quota Warning ({:.1}%) - {}",
+        pkg_ver, machine_name, machine_ip, current_quota, email
     );
     let content = format!(
         "[!] CREDIT THRESHOLD TRIGGER\r\n\r\n\
@@ -688,9 +752,10 @@ pub fn render_workspace_switch_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Notice] Workspace Auto-Switched: {}",
-        machine_name, machine_ip, to_instance
+        "[{} | {} | {}] [AGM Notice] Workspace Auto-Switched: {}",
+        pkg_ver, machine_name, machine_ip, to_instance
     );
     let content = format!(
         "[*] WORKSPACE SWITCHED\r\n\r\n\
@@ -714,9 +779,10 @@ pub fn render_idle_projects_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Prompt Request] Running Projects Idle - Ready for Instructions",
-        machine_name, machine_ip
+        "[{} | {} | {}] [AGM Prompt Request] Running Projects Idle - Ready for Instructions",
+        pkg_ver, machine_name, machine_ip
     );
     let mut proj_list = String::new();
     for p in projects {
@@ -751,9 +817,10 @@ pub fn render_exec_result_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Execution Report] exit: {} - {}",
-        machine_name, machine_ip, exit_code, cmd
+        "[{} | {} | {}] [AGM Execution Report] exit: {} - {}",
+        pkg_ver, machine_name, machine_ip, exit_code, cmd
     );
     let status = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
 
@@ -776,9 +843,10 @@ pub fn render_exec_result_email(
 
 /// Render HTML email for help cheat sheet
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
-        machine_name, machine_ip
+        "[{} | {} | {}] [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+        pkg_ver, machine_name, machine_ip
     );
     let content = format!(
         "You can remotely command this Antigravity Manager instance by sending emails\r\n\
@@ -817,9 +885,10 @@ pub fn render_self_test_email(
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Test] Mailbox Connection Verified - {}",
-        machine_name, machine_ip, email
+        "[{} | {} | {}] [AGM Test] Mailbox Connection Verified - {}",
+        pkg_ver, machine_name, machine_ip, email
     );
     let content = format!(
         "[PASS] CONNECTION VERIFIED\r\n\r\n\
@@ -845,9 +914,10 @@ pub fn render_test_ping_email(
     machine_ip: &str,
     timestamp: i64,
 ) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {}] [AGM Ping] Test Command Ping: {}",
-        machine_name, machine_ip, project_name
+        "[{} | {} | {}] [AGM Ping] Test Command Ping: {}",
+        pkg_ver, machine_name, machine_ip, project_name
     );
     let content = format!(
         "[*] COMMAND TEST PING\r\n\r\n\
@@ -866,13 +936,45 @@ mod tests {
 
     #[test]
     fn test_template_rendering() {
+        let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
         let (subj, text) =
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
-        assert!(subj.starts_with("[my-pc | 192.168.1.50]"));
+        assert!(subj.starts_with(&format!("[{} | my-pc | 192.168.1.50]", pkg_ver)));
         assert!(text.contains("192.168.1.50"));
         assert!(text.contains("<html"));
         assert!(text.contains("<div"));
+    }
+
+    #[test]
+    fn test_format_subject_with_telemetry() {
+        let ver = "v4.71.4";
+        let node = "VM3";
+        let ip = "192.168.1.12";
+
+        // Plain subject
+        let s1 = format_subject_with_telemetry("[Antigravity] Account Switched", ver, node, ip);
+        assert_eq!(
+            s1,
+            "[v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Account Switched"
+        );
+
+        // Old tag upgrade
+        let s2 = format_subject_with_telemetry("[VM3 | 192.168.1.12] Alert", ver, node, ip);
+        assert_eq!(s2, "[v4.71.4 | VM3 | 192.168.1.12] Alert");
+
+        // Reply subject with old tag
+        let s3 = format_subject_with_telemetry("Re: [VM3 | 192.168.1.12] Result", ver, node, ip);
+        assert_eq!(s3, "[v4.71.4 | VM3 | 192.168.1.12] Re: Result");
+
+        // Reply subject without tag
+        let s4 = format_subject_with_telemetry("Re: help", ver, node, ip);
+        assert_eq!(s4, "[v4.71.4 | VM3 | 192.168.1.12] Re: help");
+
+        // Already tagged
+        let s5 =
+            format_subject_with_telemetry("[v4.71.4 | VM3 | 192.168.1.12] Status", ver, node, ip);
+        assert_eq!(s5, "[v4.71.4 | VM3 | 192.168.1.12] Status");
     }
 
     #[test]

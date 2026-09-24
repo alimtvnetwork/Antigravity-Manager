@@ -44,7 +44,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 06 | [06-blank-ui-and-taskbar-thumbnail-rca.md](06-blank-ui-and-taskbar-thumbnail-rca.md) | Blank UI & Windows Taskbar Preview Elimination via Occlusion Flag & Minimized State Exclusion | High | Fixed |
 | 07 | [07-installer-click-and-update-action-rca.md](07-installer-click-and-update-action-rca.md) | Installer Click Action Wiring & Visible Detached Process Execution on Windows RCA | High | Fixed |
 | 08 | [08-manifest-and-entrypoint-resolution-rca.md](08-manifest-and-entrypoint-resolution-rca.md) | Application Manifest Restoration, Entry Point Resolution & Blank Screen Elimination RCA | Critical | Fixed |
-
+| 09 | [09-email-body-type-and-subject-version-rca.md](09-email-body-type-and-subject-version-rca.md) | Email Body HTML MIME Type & Versioned Node Telemetry Subject RCA | Critical | Fixed |
 
 ---
 
