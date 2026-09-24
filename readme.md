@@ -109,28 +109,28 @@ Our universal installation script detects your operating system, CPU architectur
 
 #### Windows (PowerShell 5.1+)
 
-##### Direct Latest Install (Auto-Updating)
+**Bar 1: Latest Version (Auto-Updating)**
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-##### Pinned Version Install (v4.71.4)
+**Bar 2: Version-Based Installation (v4.72.0)**
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Version 4.66.0
+& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
 
 ---
 
 #### Linux & macOS (Bash)
 
-##### Direct Latest Install (Auto-Updating)
+**Bar 1: Latest Version (Auto-Updating)**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
-##### Pinned Version Install (v4.66.0)
+**Bar 2: Version-Based Installation (v4.72.0)**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.66.0
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.sh | bash -s -- --version "4.72.0"
 ```
 
 > [!TIP]

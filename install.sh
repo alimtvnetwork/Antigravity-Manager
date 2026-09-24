@@ -495,6 +495,9 @@ fetch_api_release_tags() {
 }
 
 discover_api_candidates() {
+    if [[ ${IS_PINNED:-0} -eq 1 ]]; then
+        return 0
+    fi
     local is_manifest_stale=0
     if [[ ${MANIFEST_LOADED:-0} -eq 1 && -n "${CURRENT_VERSION:-}" && ${#CANDIDATE_VERSIONS[@]} -gt 0 ]]; then
         local top_ver="${CANDIDATE_VERSIONS[0]}"
@@ -511,10 +514,6 @@ discover_api_candidates() {
         fi
     fi
     local api_urls=()
-    if [[ ${IS_PINNED:-0} -eq 1 ]]; then
-        api_urls+=("${GITHUB_API}/tags/v${CLEAN_PINNED}")
-        api_urls+=("${UPSTREAM_API}/tags/v${CLEAN_PINNED}")
-    fi
     api_urls+=("${GITHUB_API}?per_page=30" "${UPSTREAM_API}?per_page=30")
     for api_url in "${api_urls[@]}"; do
         fetch_api_release_tags "$api_url"
@@ -525,6 +524,9 @@ discover_api_candidates() {
 }
 
 populate_fallback_candidates() {
+    if [[ ${IS_PINNED:-0} -eq 1 ]]; then
+        return 0
+    fi
     local fallbacks=("4.65.0" "4.64.0" "4.63.0" "4.62.0" "4.61.0" "4.60.0" "4.59.0" "4.58.0" "4.57.0" "4.56.0" "4.55.0" "4.52.0" "4.51.0" "4.49.0" "4.48.0" "4.47.1" "4.41.0" "4.40.0" "4.39.0" "4.38.1" "4.38.0" "4.37.0" "4.36.0" "4.35.0" "4.34.0" "4.33.0" "4.32.0" "4.31.0" "4.30.0" "4.7.6")
     for fb in "${fallbacks[@]}"; do
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then

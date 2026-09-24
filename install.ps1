@@ -162,6 +162,26 @@ function Get-InvocationHistoryCandidates {
             }
         }
     } catch {}
+    try {
+        (Get-History -Count 15 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CommandLine) | ForEach-Object {
+            if ($_) { $candidates.Add($_) }
+        }
+    } catch {}
+    try {
+        if ([System.Management.Automation.Language.Parser]) {
+            [Microsoft.PowerShell.PSConsoleReadLine]::GetHistoryItems() | Select-Object -Last 15 | ForEach-Object {
+                if ($_.CommandLine) { $candidates.Add($_.CommandLine) }
+            }
+        }
+    } catch {}
+    try {
+        $historyPath = (Get-PSReadLineOption -ErrorAction SilentlyContinue).HistorySavePath
+        if ($historyPath -and (Test-Path $historyPath)) {
+            Get-Content -Path $historyPath -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object {
+                if ($_) { $candidates.Add($_) }
+            }
+        }
+    } catch {}
     return $candidates
 }
 
@@ -192,7 +212,7 @@ function Resolve-PinnedVersion {
         return $clean
     }
     if ($BakedVersion) {
-        if ($BakedVersion -ne "__PINNED_VERSION__") {
+        if ($BakedVersion -ne "__PINNED_VERSION__" -and $BakedVersion.Trim().Length -gt 0) {
             Write-Step "Respecting pinned installer version: v$BakedVersion"
             $clean = ($BakedVersion -replace "^v", "").Trim()
             $parts = $clean.Split("-")[0].Split(".")
@@ -203,17 +223,23 @@ function Resolve-PinnedVersion {
         }
     }
     $entries = Get-InvocationHistoryCandidates
-    # Strictly scope to Antigravity-Manager or agm-alim URLs so unrelated command lines never pollute version
-    $regex = '(?i)(?:releases/download/|raw\.githubusercontent\.com/[^/]+/(?:Antigravity-Manager|agm-alim|antigravity)/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/'
+    # Strictly scope to Antigravity-Manager or agm-alim URLs or explicit -Version arguments so unrelated command lines never pollute version
+    $regexes = @(
+        '(?i)(?:releases/download/|raw\.githubusercontent\.com/[^/]+/(?:Antigravity-Manager|agm-alim|antigravity)/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/',
+        '(?i)-(?:Version|-version)\s+["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
+        '(?i)AGM_VERSION\s*=\s*["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?'
+    )
     foreach ($entry in $entries) {
-        if ($entry -match $regex) {
-            $detected = $Matches[1]
-            $parts = $detected.Split("-")[0].Split(".")
-            if ($parts.Length -eq 2) {
-                $detected = "$detected.0"
+        foreach ($regex in $regexes) {
+            if ($entry -match $regex) {
+                $detected = $Matches[1]
+                $parts = $detected.Split("-")[0].Split(".")
+                if ($parts.Length -eq 2) {
+                    $detected = "$detected.0"
+                }
+                Write-Step "Detected pinned version from download URL / invocation: v$detected"
+                return $detected
             }
-            Write-Step "Detected pinned version from download URL: v$detected"
-            return $detected
         }
     }
     return $null
@@ -1068,16 +1094,6 @@ foreach ($mUrl in $manifestEndpoints) {
                     if (-not $candidateVersions.Contains($tagVer)) {
                         $candidateVersions.Add($tagVer)
                     }
-                } else {
-                    try {
-                        $pVer = Convert-ToSemVer $cleanPinned
-                        $tVer = Convert-ToSemVer $tagVer
-                        if ($tVer -lt $pVer) {
-                            if (-not $candidateVersions.Contains($tagVer)) {
-                                $candidateVersions.Add($tagVer)
-                            }
-                        }
-                    } catch {}
                 }
             }
             if ($candidateVersions.Count -gt 0) {
@@ -1091,7 +1107,7 @@ foreach ($mUrl in $manifestEndpoints) {
 
 # Tier 2: GitHub REST API (executed if manifest was not reached, yielded insufficient candidates, or manifest is stale)
 $isManifestStale = $false
-if ($manifestLoaded -and $CurrentVersion -and $candidateVersions.Count -gt 0) {
+if (-not $isPinned -and $manifestLoaded -and $CurrentVersion -and $candidateVersions.Count -gt 0) {
     try {
         $topSemVer = Convert-ToSemVer $candidateVersions[0]
         $curSemVer = Convert-ToSemVer $CurrentVersion
@@ -1102,13 +1118,8 @@ if ($manifestLoaded -and $CurrentVersion -and $candidateVersions.Count -gt 0) {
     } catch {}
 }
 
-if (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale) {
-    $apiEndpoints = @()
-    if ($isPinned) {
-        $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
-        $apiEndpoints += "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
-    }
-    $apiEndpoints += @(
+if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale)) {
+    $apiEndpoints = @(
         "https://api.github.com/repos/$Repo/releases?per_page=30",
         "https://api.github.com/repos/$Repo/releases/latest",
         "https://api.github.com/repos/$UpstreamRepo/releases?per_page=30",
@@ -1125,20 +1136,8 @@ if (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale
                         if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
                             $releaseMetadataMap[$tagVer] = $rel
                         }
-                        if (-not $isPinned) {
-                            if (-not $candidateVersions.Contains($tagVer)) {
-                                $candidateVersions.Add($tagVer)
-                            }
-                        } else {
-                            try {
-                                $pVer = Convert-ToSemVer $cleanPinned
-                                $cVer = Convert-ToSemVer $tagVer
-                                if ($cVer -lt $pVer) {
-                                    if (-not $candidateVersions.Contains($tagVer)) {
-                                        $candidateVersions.Add($tagVer)
-                                    }
-                                }
-                            } catch {}
+                        if (-not $candidateVersions.Contains($tagVer)) {
+                            $candidateVersions.Add($tagVer)
                         }
                     }
                 }
@@ -1148,64 +1147,64 @@ if (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale
                     if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
                         $releaseMetadataMap[$tagVer] = $resp
                     }
-                    if (-not $isPinned) {
-                        if (-not $candidateVersions.Contains($tagVer)) {
-                            $candidateVersions.Add($tagVer)
-                        }
+                    if (-not $candidateVersions.Contains($tagVer)) {
+                        $candidateVersions.Add($tagVer)
                     }
                 }
             }
         } catch {}
         if ($candidateVersions.Count -ge 10) { break }
     }
-}
-
-# If pinned release is not in GitHub releases, replenish queue with latest releases
-if ($isPinned) {
-    if (-not $releaseMetadataMap.ContainsKey($cleanPinned)) {
-        Write-Warn "Requested release v$cleanPinned does not exist on GitHub releases. Replenishing queue with available releases..."
-        foreach ($tagVer in $releaseMetadataMap.Keys) {
-            if (-not $candidateVersions.Contains($tagVer)) {
-                $candidateVersions.Add($tagVer)
-            }
-            if ($candidateVersions.Count -ge 10) { break }
+} elseif ($isPinned) {
+    # If pinned, only query the specific release tag endpoint to fetch metadata if not in manifest
+    if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
+        $apiEndpoints = @(
+            "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned",
+            "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
+        )
+        foreach ($endpoint in $apiEndpoints) {
+            try {
+                $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                if ($resp -and $resp.tag_name) {
+                    $tagVer = $resp.tag_name -replace "^v", ""
+                    $releaseMetadataMap[$tagVer] = $resp
+                    break
+                }
+            } catch {}
         }
     }
 }
 
-# Fallback known historical releases
-$knownFallbacks = @("4.65.0", "4.64.0", "4.63.0", "4.62.0", "4.61.0", "4.60.0", "4.59.0", "4.58.0", "4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
-foreach ($kb in $knownFallbacks) {
-    if ($candidateVersions.Count -ge 10) { break }
-    if (-not $isPinned) {
+# If pinned, ensure deterministic direct asset fallback without drifting to unrequested versions
+if ($isPinned) {
+    if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
+        $directSetupUrl = "https://github.com/$Repo/releases/download/v$cleanPinned/agm-alim_${cleanPinned}_x64-setup.exe"
+        $manifestAssetUrlMap[$cleanPinned] = $directSetupUrl
+        Write-Step "Configured deterministic direct asset target for pinned release: v$cleanPinned"
+    }
+}
+
+# Fallback known historical releases (unpinned only)
+if (-not $isPinned) {
+    $knownFallbacks = @("4.65.0", "4.64.0", "4.63.0", "4.62.0", "4.61.0", "4.60.0", "4.59.0", "4.58.0", "4.57.0", "4.56.0", "4.55.0", "4.52.0", "4.51.0", "4.49.0", "4.48.0", "4.47.1", "4.41.0", "4.40.0", "4.39.0", "4.38.1", "4.38.0", "4.37.0", "4.36.0", "4.35.0", "4.34.0", "4.33.0", "4.32.0", "4.31.0", "4.30.0", "4.7.6")
+    foreach ($kb in $knownFallbacks) {
+        if ($candidateVersions.Count -ge 10) { break }
         if (-not $candidateVersions.Contains($kb)) {
             $candidateVersions.Add($kb)
         }
-    } else {
-        try {
-            $pVer = Convert-ToSemVer $cleanPinned
-            $kVer = Convert-ToSemVer $kb
-            if ($kVer -lt $pVer) {
-                if (-not $candidateVersions.Contains($kb)) {
-                    $candidateVersions.Add($kb)
-                }
-            }
-        } catch {}
     }
 }
 
-# Build multi-version fallback queue (up to 10 releases sorted descending by version)
+# Build multi-version fallback queue
 if ($isPinned -and $cleanPinned) {
-    $remaining = @($candidateVersions | Where-Object { $_ -ne $cleanPinned } | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
-    $sortedCandidates = @($cleanPinned) + $remaining
+    $versionQueue = @($cleanPinned)
 } else {
     $sortedCandidates = @($candidateVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
-}
-
-$versionQueue = @()
-foreach ($v in $sortedCandidates) {
-    if (-not $versionQueue.Contains($v) -and $versionQueue.Count -lt 10) {
-        $versionQueue += $v
+    $versionQueue = @()
+    foreach ($v in $sortedCandidates) {
+        if (-not $versionQueue.Contains($v) -and $versionQueue.Count -lt 10) {
+            $versionQueue += $v
+        }
     }
 }
 

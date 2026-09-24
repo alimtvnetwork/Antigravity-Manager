@@ -154,6 +154,36 @@ function App() {
     };
   }, [fetchCurrentAccount, fetchAccounts]);
 
+  // Eliminate Windows DWM blank UI / occluded canvas freeze on focus and restoration
+  useEffect(() => {
+    const handleRestoreRedraw = () => {
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    window.addEventListener('focus', handleRestoreRedraw);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleRestoreRedraw();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    let unlistenRestored: (() => void) | undefined;
+    if (isTauri()) {
+      listen('window-restored', handleRestoreRedraw).then(fn => {
+        unlistenRestored = fn;
+      });
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleRestoreRedraw);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (unlistenRestored) {
+        unlistenRestored();
+      }
+    };
+  }, []);
+
   // Update notification state from central store
   const { showNotification, setShowNotification, checkForUpdates } = useUpdateStore();
 

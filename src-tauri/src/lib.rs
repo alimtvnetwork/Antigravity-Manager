@@ -105,6 +105,22 @@ pub fn force_restore_and_focus_win32(window: &tauri::WebviewWindow) {
         fn GetWindowThreadProcessId(hwnd: *mut c_void, lpdw_process_id: *mut u32) -> u32;
         fn AttachThreadInput(id_attach: u32, id_attach_to: u32, f_attach: i32) -> i32;
         fn GetForegroundWindow() -> *mut c_void;
+        fn InvalidateRect(hwnd: *mut c_void, lp_rect: *const c_void, b_erase: i32) -> i32;
+        fn RedrawWindow(
+            hwnd: *mut c_void,
+            lprc_update: *const c_void,
+            hrgn_update: *mut c_void,
+            flags: u32,
+        ) -> i32;
+        fn SetWindowPos(
+            hwnd: *mut c_void,
+            hwnd_insert_after: *mut c_void,
+            x: i32,
+            y: i32,
+            cx: i32,
+            cy: i32,
+            flags: u32,
+        ) -> i32;
     }
 
     if let Ok(hwnd) = window.hwnd() {
@@ -117,6 +133,33 @@ pub fn force_restore_and_focus_win32(window: &tauri::WebviewWindow) {
             } else {
                 ShowWindow(hwnd_ptr, 5); // SW_SHOW
             }
+
+            // Force DWM frame recalculation and repaint to eliminate blank gray preview / occluded window freeze
+            const SWP_NOSIZE: u32 = 0x0001;
+            const SWP_NOMOVE: u32 = 0x0002;
+            const SWP_NOZORDER: u32 = 0x0004;
+            const SWP_FRAMECHANGED: u32 = 0x0020;
+            SetWindowPos(
+                hwnd_ptr,
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
+
+            const RDW_INVALIDATE: u32 = 0x0001;
+            const RDW_INTERNALPAINT: u32 = 0x0002;
+            const RDW_ALLCHILDREN: u32 = 0x0080;
+            const RDW_UPDATENOW: u32 = 0x0100;
+            InvalidateRect(hwnd_ptr, std::ptr::null(), 1);
+            RedrawWindow(
+                hwnd_ptr,
+                std::ptr::null(),
+                std::ptr::null_mut(),
+                RDW_INVALIDATE | RDW_INTERNALPAINT | RDW_UPDATENOW | RDW_ALLCHILDREN,
+            );
 
             let fg_hwnd = GetForegroundWindow();
             let fg_thread = GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut());
@@ -180,6 +223,9 @@ pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
             .set_activation_policy(tauri::ActivationPolicy::Regular)
             .unwrap_or(());
     }
+    let _ = window.eval(
+        "window.dispatchEvent(new Event('resize')); if (document.body) { document.body.style.transform = 'translateZ(0)'; }",
+    );
     let _ = window.emit("window-restored", ());
 }
 
@@ -342,7 +388,7 @@ pub fn run() {
         windows_api::disable_efficiency_mode();
         std::env::set_var(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            "--disable-features=CalculateNativeWindowOcclusion --disable-backgrounding-occluded-windows --disable-renderer-backgrounding",
+            "--disable-features=CalculateNativeWinOcclusion,CalculateNativeWindowOcclusion --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling",
         );
     }
 

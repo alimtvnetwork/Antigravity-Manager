@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.71.4)
+> Professional AI Account Management & Protocol Proxy System (v4.72.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.71.4-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.72.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -128,24 +128,30 @@ graph TD
 
 Automatically detects your OS, architecture, and package manager — one command to download and install.
 
-**Linux / macOS (Direct Latest):**
-```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
-```
+#### Windows (PowerShell 5.1+)
 
-**Linux / macOS (Pinned Version):**
-```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --version 4.66.0
-```
-
-**Windows PowerShell (Direct Latest):**
+**Bar 1: Latest Version (Auto-Updating)**
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Windows PowerShell (Pinned Version):**
+**Bar 2: Version-Based Installation (v4.72.0)**
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Version 4.66.0
+& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
+```
+
+---
+
+#### Linux & macOS (Bash)
+
+**Bar 1: Latest Version (Auto-Updating)**
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
+```
+
+**Bar 2: Version-Based Installation (v4.72.0)**
+```bash
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.sh | bash -s -- --version "4.72.0"
 ```
 
 > **Supported formats**: Linux (`.deb` / `.rpm` / `.AppImage`) | macOS (`.dmg`) | Windows (NSIS `.exe`)

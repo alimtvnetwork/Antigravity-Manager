@@ -70,9 +70,7 @@ pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 pub fn exit_lightweight_mode(app: &AppHandle) -> Result<WebviewWindow, String> {
     let window = ensure_main_window(app)?;
 
-    let _ = window.show();
-    let _ = window.unminimize();
-    let _ = window.set_focus();
+    crate::restore_and_focus_window(&window);
 
     #[cfg(target_os = "macos")]
     {
