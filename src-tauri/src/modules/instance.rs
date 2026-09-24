@@ -1169,6 +1169,7 @@ pub async fn switch_account_to_instance(
     // Bind account in registry and set as active
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let _ = set_active_instance_id(&instance.id);
+    let _ = crate::modules::account::set_current_account_id(&account.id);
 
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);

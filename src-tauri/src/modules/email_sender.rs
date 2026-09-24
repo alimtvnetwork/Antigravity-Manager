@@ -126,11 +126,36 @@ pub struct SendResult {
     pub message: String,
 }
 
+/// Clean recipient string into RFC 5321 pure email address
+pub fn clean_recipient_email(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if let Some(start) = trimmed.find('<') {
+        if let Some(end) = trimmed[start + 1..].find('>') {
+            let inner = &trimmed[start + 1..start + 1 + end];
+            return inner.trim().to_string();
+        }
+    }
+    trimmed
+        .trim_matches(|c| c == '<' || c == '>' || c == '"' || c == '\'')
+        .trim()
+        .to_string()
+}
+
 /// Send an email with automatic failover pool swapping across active accounts
 pub fn dispatch_email_with_failover(
     subject: &str,
     html_body: &str,
     recipients: &[String],
+) -> Result<SendResult, String> {
+    dispatch_reply_with_failover(subject, html_body, recipients, None)
+}
+
+/// Send an email with threading headers (In-Reply-To, References) and failover
+pub fn dispatch_reply_with_failover(
+    subject: &str,
+    html_body: &str,
+    recipients: &[String],
+    in_reply_to: Option<&str>,
 ) -> Result<SendResult, String> {
     if recipients.is_empty() {
         return Err("No recipients specified for delivery".to_string());
@@ -152,7 +177,14 @@ pub fn dispatch_email_with_failover(
 
     for account in prioritized {
         attempts += 1;
-        match send_via_account(&account, subject, html_body, recipients) {
+        match send_via_account_credentials_with_reply(
+            &account,
+            &email_vault_db::get_account_secret(&account.id).unwrap_or_default(),
+            subject,
+            html_body,
+            recipients,
+            in_reply_to,
+        ) {
             Ok(_) => {
                 crate::modules::logger::log_info(&format!(
                     "[EmailDispatcher] Successfully sent email '{}' via account '{}'",
@@ -200,6 +232,18 @@ pub fn send_via_account_credentials(
     subject: &str,
     html_body: &str,
     recipients: &[String],
+) -> Result<(), String> {
+    send_via_account_credentials_with_reply(account, password, subject, html_body, recipients, None)
+}
+
+/// Send email through an account with explicitly passed credentials and optional threading headers
+pub fn send_via_account_credentials_with_reply(
+    account: &EmailAccount,
+    password: &str,
+    subject: &str,
+    html_body: &str,
+    recipients: &[String],
+    in_reply_to: Option<&str>,
 ) -> Result<(), String> {
     let addr = format!("{}:{}", account.smtp_host, account.smtp_port);
 
@@ -281,9 +325,13 @@ pub fn send_via_account_credentials(
     )?;
     read_smtp_response(&mut stream)?;
 
-    // RCPT TO
+    // RCPT TO (RFC 5321 pure address without display name or nested brackets)
     for rcpt in recipients {
-        send_smtp_cmd(&mut stream, &format!("RCPT TO:<{}>", rcpt), false)?;
+        let clean_rcpt = clean_recipient_email(rcpt);
+        if clean_rcpt.is_empty() {
+            continue;
+        }
+        send_smtp_cmd(&mut stream, &format!("RCPT TO:<{}>", clean_rcpt), false)?;
         read_smtp_response(&mut stream)?;
     }
 
@@ -292,7 +340,7 @@ pub fn send_via_account_credentials(
     read_smtp_response(&mut stream)?;
 
     // Build MIME payload
-    let mime = build_mime_message(account, subject, html_body, recipients);
+    let mime = build_mime_message(account, subject, html_body, recipients, in_reply_to);
     stream
         .write_all(mime.as_bytes())
         .map_err(|e| format!("Failed to write MIME data: {}", e))?;
@@ -383,21 +431,48 @@ fn build_mime_message(
     subject: &str,
     body: &str,
     recipients: &[String],
+    in_reply_to: Option<&str>,
 ) -> String {
     let msg_id = format!("<{}@{}>", Uuid::new_v4(), account.smtp_host);
     let date = Utc::now().to_rfc2822();
     let encoded_subject = format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()));
+    let clean_rcpts: Vec<String> = recipients
+        .iter()
+        .map(|r| clean_recipient_email(r))
+        .filter(|s| !s.is_empty())
+        .collect();
+    let to_header = if clean_rcpts.is_empty() {
+        recipients.join(", ")
+    } else {
+        clean_rcpts.join(", ")
+    };
 
-    format!(
-        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.65.0\r\n\r\n{}",
+    let mut headers = format!(
+        "From: {} <{}>\r\nTo: {}\r\nSubject: {}\r\nDate: {}\r\nMessage-ID: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Mailer: Antigravity-Manager-Mailer/4.70.0\r\n",
         account.alias,
         account.email,
-        recipients.join(", "),
+        to_header,
         encoded_subject,
         date,
-        msg_id,
-        body
-    )
+        msg_id
+    );
+
+    if let Some(reply_id) = in_reply_to {
+        let clean_reply_id = reply_id.trim();
+        if !clean_reply_id.is_empty() {
+            let formatted_id = if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
+                clean_reply_id.to_string()
+            } else {
+                format!("<{}>", clean_reply_id)
+            };
+            headers.push_str(&format!(
+                "In-Reply-To: {}\r\nReferences: {}\r\n",
+                formatted_id, formatted_id
+            ));
+        }
+    }
+
+    format!("{}\r\n{}", headers, body)
 }
 
 // ---------------------------------------------------------------------------

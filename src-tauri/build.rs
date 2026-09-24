@@ -8,14 +8,6 @@ fn main() {
         let attrs = tauri_build::Attributes::new().windows_attributes(windows);
         tauri_build::try_build(attrs).expect("failed to run tauri-build");
 
-        let manifest_path = std::path::Path::new("windows-test.manifest");
-        if manifest_path.exists() {
-            println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
-            if let Ok(abs_path) = manifest_path.canonicalize() {
-                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
-            }
-        }
-
         let expected_arch_dir = match target_arch.as_str() {
             "x86_64" => "x64",
             "x86" => "x86",

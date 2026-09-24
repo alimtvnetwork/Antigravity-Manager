@@ -749,6 +749,9 @@ pub fn run() {
             // Config commands
             commands::load_config,
             commands::save_config,
+            commands::get_training_api_status,
+            commands::set_training_api_status,
+            commands::get_training_telemetry,
             // Additional commands
             commands::prepare_oauth_url,
             commands::start_oauth_login,

@@ -446,15 +446,18 @@
     "copy_appeal_url": "Copy Appeal URL"
   },
   "settings": {
-    "save": "Save Settings",
+    "save": "Save",
+    "backup_restore": "Backup",
     "tabs": {
       "general": "General",
       "account": "Account",
-      "proxy": "Proxy Settings",
-      "email": "Email & Alerts",
+      "proxy": "Proxy",
+      "email": "Email-Alerts",
+      "supabase": "Supabase",
       "advanced": "Advanced",
       "debug": "Debug",
-      "about": "About"
+      "about": "About",
+      "more": "More"
     },
     "general": {
       "title": "General Settings",

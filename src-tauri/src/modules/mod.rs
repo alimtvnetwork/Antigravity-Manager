@@ -40,6 +40,7 @@ pub mod supabase_schema;
 pub mod supabase_sync;
 pub mod telegram_inbound;
 pub mod token_stats;
+pub mod training_api;
 pub mod tray;
 pub mod update_checker;
 pub mod user_token_db;

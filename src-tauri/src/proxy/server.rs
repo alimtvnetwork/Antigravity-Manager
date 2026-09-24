@@ -1006,6 +1006,31 @@ impl AxumServer {
             .merge(proxy_routes)
             // Public routes (no authentication required)
             .route("/auth/callback", get(handle_oauth_callback))
+            // Training REST API Endpoints (Guarded by training_api_enabled setting toggle)
+            .route(
+                "/api/v1/training/telemetry",
+                get(crate::modules::training_api::handle_training_telemetry),
+            )
+            .route(
+                "/api/v1/training/learn",
+                post(crate::modules::training_api::handle_training_learn),
+            )
+            .route(
+                "/api/v1/training/machines",
+                post(crate::modules::training_api::handle_training_machines),
+            )
+            .route(
+                "/training/telemetry",
+                get(crate::modules::training_api::handle_training_telemetry),
+            )
+            .route(
+                "/training/learn",
+                post(crate::modules::training_api::handle_training_learn),
+            )
+            .route(
+                "/training/machines",
+                post(crate::modules::training_api::handle_training_machines),
+            )
             // Apply global monitoring and status layer (outer)
             .layer(axum::middleware::from_fn_with_state(
                 state.clone(),

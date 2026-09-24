@@ -224,6 +224,17 @@ pub fn evaluate_account_period_status(
         }
     }
 
+    if matched_model.is_none() && target.contains("flash") {
+        for m in &quota_data.models {
+            let name_lower = m.name.to_lowercase();
+            let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+            if !is_banned && name_lower.contains("flash") && name_lower.contains("gemini") {
+                matched_model = Some(m);
+                break;
+            }
+        }
+    }
+
     let (quota_percent, reset_time_str) = if let Some(m) = matched_model {
         (m.percentage as f64, m.reset_time.as_str())
     } else if !quota_data.models.is_empty() {
@@ -665,12 +676,11 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
             .map(|s| s.is_period_finished)
             .unwrap_or(false);
 
-        // Filter out accounts in use by OTHER instances
-        let excluded_accounts: Vec<String> = in_use_account_ids
-            .iter()
-            .filter(|id| *id != bound_acc_id)
-            .cloned()
-            .collect();
+        // Filter out accounts in use by ANY running/active instances, AND explicitly exclude the current bound account to rotate away from it
+        let mut excluded_accounts: Vec<String> = in_use_account_ids.clone();
+        if !excluded_accounts.contains(bound_acc_id) {
+            excluded_accounts.push(bound_acc_id.clone());
+        }
 
         // 1. Critical threshold check (<= 12.0% or configured critical_threshold_percent)
         let is_critical = quota_percent <= switcher_cfg.critical_threshold_percent;
@@ -805,10 +815,12 @@ pub async fn trigger_manual_rotation() -> Result<String, String> {
         .find(|i| i.id == active_id)
         .and_then(|i| i.bound_account_id.clone());
 
-    let excluded: Vec<String> = in_use_account_ids
-        .into_iter()
-        .filter(|id| Some(id) != current_bound.as_ref())
-        .collect();
+    let mut excluded: Vec<String> = in_use_account_ids;
+    if let Some(ref curr) = current_bound {
+        if !excluded.contains(curr) {
+            excluded.push(curr.clone());
+        }
+    }
 
     let candidate =
         select_next_best_profile(&active_id, &switcher_cfg.target_model, 0.0, &excluded)?

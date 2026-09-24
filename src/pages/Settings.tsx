@@ -1,5 +1,5 @@
 import { useState, useEffect, startTransition } from 'react';
-import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck } from 'lucide-react';
+import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Menu, ChevronDown, Bug, Info, Sliders } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -45,6 +45,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
+    const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.70.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -116,6 +117,7 @@ function Settings() {
             interval_hours: 1,
             keep_count: 40,
         },
+        training_api_enabled: false,
     });
 
     // Dialog state
@@ -203,6 +205,7 @@ function Settings() {
                     interval_hours: 1,
                     keep_count: 40,
                 },
+                training_api_enabled: config.training_api_enabled ?? false,
             });
         }
     }, [config]);
@@ -512,12 +515,12 @@ function Settings() {
         <div className="h-full w-full overflow-y-auto">
             <div className="px-4 sm:px-6 pt-2 pb-4 space-y-4 max-w-[1920px] mx-auto">
                 {/* Top toolbar: Tab navigation and save button */}
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap gap-2 justify-between items-center">
                     {/* Tab navigation */}
                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1 w-fit">
                         <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'general'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'general'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
                             onClick={() => startTransition(() => setActiveTab('general'))}
@@ -525,8 +528,8 @@ function Settings() {
                             {t('settings.tabs.general')}
                         </button>
                         <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'account'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'account'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
                             onClick={() => startTransition(() => setActiveTab('account'))}
@@ -534,59 +537,109 @@ function Settings() {
                             {t('settings.tabs.account')}
                         </button>
                         <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'proxy'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'proxy'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
                             onClick={() => startTransition(() => setActiveTab('proxy'))}
                         >
-                            {t('settings.tabs.proxy')}
+                            {t('settings.tabs.proxy', 'Proxy')}
                         </button>
                         <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'email'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'email'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
                             onClick={() => setActiveTab('email')}
                         >
-                            {t('settings.tabs.email', 'Email & Alerts')}
+                            {t('settings.tabs.email', 'Email-Alerts')}
                         </button>
                         <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'supabase'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'supabase'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
                             onClick={() => setActiveTab('supabase')}
                         >
-                            {t('settings.tabs.supabase', 'Supabase Sync')}
+                            {t('settings.tabs.supabase', 'Supabase')}
                         </button>
-                        <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'advanced'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+
+                        {/* Hamburger dropdown menu for Advanced, Debug, and About */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    ['advanced', 'debug', 'about'].includes(activeTab)
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                            onClick={() => startTransition(() => setActiveTab('advanced'))}
-                        >
-                            {t('settings.tabs.advanced')}
-                        </button>
-                        <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'debug'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                            onClick={() => startTransition(() => setActiveTab('debug'))}
-                        >
-                            {t('settings.tabs.debug')}
-                        </button>
-                        <button
-                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'about'
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                            onClick={() => startTransition(() => setActiveTab('about'))}
-                        >
-                            {t('settings.tabs.about')}
-                        </button>
+                                onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
+                                title="More settings (Advanced, Debug, About)"
+                            >
+                                <Menu className="w-3.5 h-3.5" />
+                                <span>{['advanced', 'debug', 'about'].includes(activeTab) ? t(`settings.tabs.${activeTab}`) : t('settings.tabs.more', 'More')}</span>
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isMoreDropdownOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setIsMoreDropdownOpen(false)}
+                                    />
+                                    <div className="absolute left-0 mt-1.5 w-52 bg-white dark:bg-base-100 rounded-xl shadow-xl border border-gray-100 dark:border-base-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${
+                                                activeTab === 'advanced'
+                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                            }`}
+                                            onClick={() => {
+                                                setIsMoreDropdownOpen(false);
+                                                startTransition(() => setActiveTab('advanced'));
+                                            }}
+                                        >
+                                            <Sliders className="w-4 h-4 text-gray-500" />
+                                            <span>{t('settings.tabs.advanced', 'Advanced')}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center justify-between transition-colors cursor-pointer ${
+                                                activeTab === 'debug'
+                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                            }`}
+                                            onClick={() => {
+                                                setIsMoreDropdownOpen(false);
+                                                startTransition(() => setActiveTab('debug'));
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-2.5">
+                                                <Bug className="w-4 h-4 text-amber-500" />
+                                                <span>{t('settings.tabs.debug', 'Debug')}</span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-base-200 px-1.5 py-0.5 rounded">Console</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${
+                                                activeTab === 'about'
+                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                            }`}
+                                            onClick={() => {
+                                                setIsMoreDropdownOpen(false);
+                                                startTransition(() => setActiveTab('about'));
+                                            }}
+                                        >
+                                            <Info className="w-4 h-4 text-gray-500" />
+                                            <span>{t('settings.tabs.about', 'About')}</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -597,15 +650,15 @@ function Settings() {
                             title="Encrypted Full System Backup & Restore"
                         >
                             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>{t('settings.backup_restore', 'Backup & Restore')}</span>
+                            <span>{t('settings.backup_restore', 'Backup')}</span>
                         </button>
 
                         <button
-                            className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+                            className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
                             onClick={handleSave}
                         >
                             <Save className="w-4 h-4" />
-                            {t('settings.save')}
+                            <span>{t('settings.save', 'Save')}</span>
                         </button>
                     </div>
                 </div>
@@ -781,7 +834,34 @@ function Settings() {
                                 </div>
                             )}
 
-                                {/* Menu display settings */}
+                            {/* Machine Training REST API */}
+                            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-base-content flex items-center gap-2">
+                                        <span>Machine Training REST API</span>
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono">
+                                            /api/v1/training
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        Expose external REST API endpoints for seeking into node telemetry, ingesting reinforcement learning feedback, and remotely managing machine models.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={formData.training_api_enabled ?? false}
+                                        onChange={(e) => {
+                                            const enabled = e.target.checked;
+                                            setFormData({ ...formData, training_api_enabled: enabled });
+                                        }}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                </label>
+                            </div>
+
+                            {/* Menu display settings */}
                                 <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
                                     <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.menu.title')}</h3>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -1561,6 +1641,14 @@ function Settings() {
                     {/* Debug settings */}
                     {activeTab === 'debug' && (
                         <div className="space-y-4 animate-in fade-in duration-500">
+                            {/* Header Quick-Access Tip */}
+                            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                                <Bug className="w-4 h-4 shrink-0 text-amber-500" />
+                                <span>
+                                    <strong>Header Quick-Access:</strong> You can toggle the global floating debug overlay from any page at any time by clicking the <strong>Bug icon</strong> in the top header navbar.
+                                </span>
+                            </div>
+
                             {/* Title and toggle */}
                             <div className="flex items-center justify-between">
                                 <div>

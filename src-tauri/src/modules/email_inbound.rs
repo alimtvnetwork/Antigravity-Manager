@@ -10,6 +10,7 @@ use crate::modules::email_sender::{self, EmailStream};
 use crate::modules::email_vault_db::{self, EmailAccount, EmailInboundAuditLog};
 #[cfg(target_os = "windows")]
 use crate::utils::command::CommandExtWrapper;
+use base64::prelude::*;
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -82,7 +83,10 @@ pub enum InboundAction {
     SyncState {
         target: String,
     },
-    HelpRequest,
+    HelpRequest {
+        target: String,
+        instance_id: Option<String>,
+    },
     Ignored {
         reason: String,
     },
@@ -193,21 +197,204 @@ pub fn strip_email_prefixes(subject: &str) -> String {
         let lower = clean.to_lowercase();
         if lower.starts_with("re:") {
             clean = clean[3..].trim();
+        } else if lower.starts_with("re :") {
+            clean = clean[4..].trim();
         } else if lower.starts_with("fwd:") {
             clean = clean[4..].trim();
+        } else if lower.starts_with("fwd :") {
+            clean = clean[5..].trim();
         } else if lower.starts_with("fw:") {
             clean = clean[3..].trim();
+        } else if lower.starts_with("fw :") {
+            clean = clean[4..].trim();
         } else if lower.starts_with("sub:") {
             clean = clean[4..].trim();
         } else if lower.starts_with("subject:") {
             clean = clean[8..].trim();
         } else if lower.starts_with("[agm]:") {
             clean = clean[6..].trim();
+        } else if lower.starts_with("[agm]") {
+            clean = clean[5..].trim();
+        } else if lower.starts_with("[agm-task]") {
+            clean = clean[10..].trim();
+        } else if lower.starts_with("[agm ack]") {
+            clean = clean[9..].trim();
+        } else if lower.starts_with("[agm result]") {
+            clean = clean[12..].trim();
+        } else if lower.starts_with("[agm alert]") {
+            clean = clean[11..].trim();
         } else {
             break;
         }
     }
+
+    // Support responses to "[Node: AI-MAIN] [Type: prompt]"
+    let lower_clean = clean.to_lowercase();
+    if lower_clean.starts_with("[node:") {
+        if let Some(node_end) = clean.find(']') {
+            let node_name = clean["[node:".len()..node_end].trim();
+            let after_node = clean[node_end + 1..].trim();
+            let lower_after = after_node.to_lowercase();
+            if lower_after.starts_with("[type:") {
+                if let Some(type_end) = after_node.find(']') {
+                    let task_type = after_node["[type:".len()..type_end].trim();
+                    return format!("{} | {}", node_name, task_type);
+                }
+            }
+        }
+    }
+
     clean.to_string()
+}
+
+/// Check if a pipe segment is an instance specifier (e.g. "1", "#1", "ins-1", "default")
+pub fn is_instance_specifier(part: &str) -> bool {
+    let lower = part.trim().to_lowercase();
+    if lower.starts_with("ins-") || lower.starts_with("instance-") || lower.starts_with("instance:")
+    {
+        return true;
+    }
+    if lower.starts_with('#') && lower[1..].chars().all(|c| c.is_ascii_digit()) && lower.len() > 1 {
+        return true;
+    }
+    if !lower.is_empty() && lower.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    if lower == "default" || lower == "active" {
+        return true;
+    }
+    false
+}
+
+/// Extract clean instance name/number from instance specifier
+pub fn extract_clean_instance_id(part: &str) -> String {
+    let trimmed = part.trim();
+    let lower = trimmed.to_lowercase();
+    if lower.starts_with("ins-") {
+        trimmed["ins-".len()..].trim().to_string()
+    } else if lower.starts_with("instance-") {
+        trimmed["instance-".len()..].trim().to_string()
+    } else if lower.starts_with("instance:") {
+        trimmed["instance:".len()..].trim().to_string()
+    } else if lower.starts_with('#') {
+        trimmed["#".len()..].trim().to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Check if a pipe segment represents a known AGM command
+pub fn is_known_command(cmd: &str) -> bool {
+    let lower = cmd.trim().to_lowercase();
+    matches!(
+        lower.as_str(),
+        "help"
+            | "status"
+            | "agm status"
+            | "cmd"
+            | "update"
+            | "agm update"
+            | "gitmap update"
+            | "ls"
+            | "agm ls"
+            | "instances"
+            | "agm instances"
+            | "ff"
+            | "agm ff"
+            | "smart-switch"
+            | "agm smart-switch"
+            | "agm ff/smart-switch"
+            | "prompts"
+            | "agm prompts"
+            | "agm prompts ls"
+            | "agy prompts ls"
+            | "gitmap prompts ls"
+            | "doctor"
+            | "agm doctor"
+            | "check"
+            | "agm check"
+            | "accounts"
+            | "agm accounts"
+            | "acc"
+            | "agm acc"
+            | "proxy"
+            | "agm proxy"
+            | "agm proxy status"
+            | "proxy test"
+            | "agm proxy test"
+            | "clean"
+            | "agm clean"
+            | "purge"
+            | "agm purge"
+            | "sync"
+            | "agm sync"
+            | "prompt"
+    ) || lower.starts_with("gitmap")
+        || lower.starts_with("switch")
+        || lower.starts_with("agm switch")
+}
+
+/// Decode RFC 2047 encoded words in email headers (e.g. =?UTF-8?B?...?= or =?UTF-8?Q?...?=)
+pub fn decode_rfc2047(input: &str) -> String {
+    if !input.contains("=?") || !input.contains("?=") {
+        return input.to_string();
+    }
+    let mut result = String::new();
+    let mut remaining = input;
+    while let Some(start) = remaining.find("=?") {
+        result.push_str(&remaining[..start]);
+        let after_start = &remaining[start + 2..];
+        if let Some(end) = after_start.find("?=") {
+            let token = &after_start[..end];
+            let parts: Vec<&str> = token.split('?').collect();
+            if parts.len() == 3 {
+                let enc = parts[1].to_uppercase();
+                let payload = parts[2];
+                let decoded_opt = if enc == "B" {
+                    BASE64_STANDARD
+                        .decode(payload.trim())
+                        .ok()
+                        .and_then(|bytes| String::from_utf8(bytes).ok())
+                } else if enc == "Q" {
+                    let mut bytes = Vec::new();
+                    let mut chars = payload.chars().peekable();
+                    while let Some(c) = chars.next() {
+                        if c == '_' {
+                            bytes.push(b' ');
+                        } else if c == '=' {
+                            let hex1 = chars.next();
+                            let hex2 = chars.next();
+                            if let (Some(h1), Some(h2)) = (hex1, hex2) {
+                                let hex_str = format!("{}{}", h1, h2);
+                                if let Ok(b) = u8::from_str_radix(&hex_str, 16) {
+                                    bytes.push(b);
+                                }
+                            }
+                        } else {
+                            bytes.push(c as u8);
+                        }
+                    }
+                    String::from_utf8(bytes).ok()
+                } else {
+                    None
+                };
+
+                if let Some(decoded) = decoded_opt {
+                    result.push_str(&decoded);
+                } else {
+                    result.push_str(&format!("=?{}?=", token));
+                }
+            } else {
+                result.push_str(&format!("=?{}?=", token));
+            }
+            remaining = &after_start[end + 2..];
+        } else {
+            result.push_str("=?");
+            remaining = after_start;
+        }
+    }
+    result.push_str(remaining);
+    result
 }
 
 /// Check if target matches local machine name, IP, partial octet, or wildcard
@@ -301,29 +488,34 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
             let mut cmd_str = "";
             let mut proj_str = "";
 
-            if parts.len() >= 2 {
-                let p1 = parts[1];
-                if p1.to_lowercase().starts_with("ins-") {
-                    instance_id = Some(p1["ins-".len()..].trim().to_string());
-                    if parts.len() >= 3 {
-                        cmd_str = parts[2];
-                    }
+            if parts.len() >= 3 {
+                if is_instance_specifier(parts[1])
+                    || (!is_known_command(parts[1]) && is_known_command(parts[2]))
+                {
+                    instance_id = Some(extract_clean_instance_id(parts[1]));
+                    cmd_str = parts[2];
                     if parts.len() >= 4 {
                         proj_str = parts[3];
                     }
                 } else {
-                    cmd_str = p1;
-                    if parts.len() >= 3 {
-                        // Check if part 2 is another command argument (e.g. "* | gitmap | status")
-                        if parts.len() >= 4 {
-                            proj_str = parts[3];
-                        } else if parts[2].to_lowercase().starts_with("proj-")
-                            || parts[2].to_lowercase().starts_with("project:")
-                        {
-                            proj_str = parts[2];
-                        }
+                    cmd_str = parts[1];
+                    if parts.len() >= 4 {
+                        proj_str = parts[3];
+                    } else if parts[2].to_lowercase().starts_with("proj-")
+                        || parts[2].to_lowercase().starts_with("project:")
+                    {
+                        proj_str = parts[2];
                     }
                 }
+            } else if parts.len() >= 2 {
+                if is_instance_specifier(parts[1]) {
+                    instance_id = Some(extract_clean_instance_id(parts[1]));
+                    cmd_str = "status";
+                } else {
+                    cmd_str = parts[1];
+                }
+            } else {
+                cmd_str = "help";
             }
 
             let project_name = if !proj_str.is_empty() {
@@ -438,7 +630,10 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
             }
 
             if lower_cmd == "help" {
-                return InboundAction::HelpRequest;
+                return InboundAction::HelpRequest {
+                    target: target.to_string(),
+                    instance_id: instance_id.clone(),
+                };
             }
 
             if lower_cmd == "agm status" {
@@ -683,7 +878,10 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
     }
 
     if lower_subj == "help" {
-        return InboundAction::HelpRequest;
+        return InboundAction::HelpRequest {
+            target: "*".to_string(),
+            instance_id: None,
+        };
     }
 
     InboundAction::Ignored {
@@ -703,6 +901,7 @@ pub fn send_ack_receipt(
     project: &str,
     local_name: &str,
     local_ip: &str,
+    in_reply_to: Option<&str>,
 ) {
     let now_str = Utc::now().to_rfc3339();
     let body = format!(
@@ -722,8 +921,14 @@ Execution has started in the background. A completion receipt will follow.
         command_name, target, local_name, local_ip, instance, project, now_str
     );
 
-    let subject = format!("[AGM ACK] Running: {}", command_name);
-    let _ = email_sender::dispatch_email_with_failover(&subject, &body, &[sender.to_string()]);
+    let clean_sender = extract_email_address(sender);
+    let subject = if in_reply_to.is_some() {
+        format!("Re: [AGM ACK] Running: {}", command_name)
+    } else {
+        format!("[AGM ACK] Running: {}", command_name)
+    };
+    let _ =
+        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
 }
 
 /// Send Phase 2 Completion Result Plaintext Receipt
@@ -736,6 +941,7 @@ pub fn send_result_receipt(
     local_name: &str,
     local_ip: &str,
     instance: &str,
+    in_reply_to: Option<&str>,
 ) {
     let now_str = Utc::now().to_rfc3339();
     let body = format!(
@@ -757,8 +963,14 @@ Execution Output:
         command_name, status_label, exit_code, local_name, local_ip, instance, now_str, output
     );
 
-    let subject = format!("[AGM Result] {}: {}", status_label, command_name);
-    let _ = email_sender::dispatch_email_with_failover(&subject, &body, &[sender.to_string()]);
+    let clean_sender = extract_email_address(sender);
+    let subject = if in_reply_to.is_some() {
+        format!("Re: [AGM Result] {}: {}", status_label, command_name)
+    } else {
+        format!("[AGM Result] {}: {}", status_label, command_name)
+    };
+    let _ =
+        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
 }
 
 /// Process a parsed inbound email action and dispatch bidirectional 2-phase receipts
@@ -840,7 +1052,7 @@ pub fn execute_inbound_action(
         }
     }
 
-    let action_str;
+    let mut action_str = "unknown".to_string();
     let mut status = "success".to_string();
     let mut result_summary;
     let mut output_text = String::new();
@@ -865,6 +1077,7 @@ pub fn execute_inbound_action(
                 &project_name,
                 local_machine_name,
                 local_machine_ip,
+                Some(&msg.message_id),
             );
 
             // Resolve effective prompt content
@@ -932,6 +1145,7 @@ pub fn execute_inbound_action(
                 local_machine_name,
                 local_machine_ip,
                 inst_str,
+                Some(&msg.message_id),
             );
         }
 
@@ -953,6 +1167,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let res = execute_gitmap_command(&command);
@@ -980,6 +1195,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1001,6 +1217,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let trimmed_cmd = command.trim();
@@ -1022,6 +1239,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1045,6 +1263,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 if is_gitmap {
@@ -1075,6 +1294,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1093,6 +1313,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let instances = crate::modules::instance::list_instances().unwrap_or_default();
@@ -1126,6 +1347,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1149,6 +1371,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 if is_gitmap {
@@ -1176,6 +1399,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1197,6 +1421,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let rt = tokio::runtime::Runtime::new().ok();
@@ -1238,6 +1463,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1256,6 +1482,7 @@ pub fn execute_inbound_action(
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
@@ -1296,6 +1523,7 @@ Prompts in Queue:   {}
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1314,6 +1542,7 @@ Prompts in Queue:   {}
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let accounts_cnt = crate::modules::account::load_account_index()
@@ -1355,6 +1584,7 @@ System Status:      HEALTHY
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1373,6 +1603,7 @@ System Status:      HEALTHY
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let index_res = crate::modules::account::load_account_index();
@@ -1407,6 +1638,7 @@ INDEX EMAIL                            STATUS
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1428,6 +1660,7 @@ INDEX EMAIL                            STATUS
                     &email_query,
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let query = email_query.trim().to_lowercase();
@@ -1485,6 +1718,7 @@ Status:             SUCCESS
                         local_machine_name,
                         local_machine_ip,
                         "default",
+                        Some(&msg.message_id),
                     );
                 } else {
                     output_text = format!(
@@ -1506,6 +1740,7 @@ Previous Account:   {}
                         local_machine_name,
                         local_machine_ip,
                         "default",
+                        Some(&msg.message_id),
                     );
                 }
             }
@@ -1525,6 +1760,7 @@ Previous Account:   {}
                     if is_test { "test" } else { "status" },
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let proxy_online = std::net::TcpStream::connect_timeout(
@@ -1556,6 +1792,7 @@ Supported Routes:   /v1/messages, /v1/chat/completions, /v1beta/models/*
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1574,6 +1811,7 @@ Supported Routes:   /v1/messages, /v1/chat/completions, /v1beta/models/*
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let mut cleaned_cnt = 0;
@@ -1621,6 +1859,7 @@ Status:             SUCCESS
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
@@ -1639,6 +1878,7 @@ Status:             SUCCESS
                     "-",
                     local_machine_name,
                     local_machine_ip,
+                    Some(&msg.message_id),
                 );
 
                 let acc_cnt = crate::modules::account::load_account_index()
@@ -1671,24 +1911,34 @@ Status:             SUCCESS
                     local_machine_name,
                     local_machine_ip,
                     "default",
+                    Some(&msg.message_id),
                 );
             }
         }
 
-        InboundAction::HelpRequest => {
+        InboundAction::HelpRequest {
+            target,
+            instance_id,
+        } => {
             action_str = "help".to_string();
-            send_ack_receipt(
-                &msg.from,
-                "help",
-                "*",
-                "default",
-                "-",
-                local_machine_name,
-                local_machine_ip,
-            );
+            if !matches_target_node_or_ip(&target, local_machine_ip, local_machine_name) {
+                status = "skipped".to_string();
+                result_summary = format!("Help target mismatch: {}", target);
+            } else {
+                let inst_str = instance_id.as_deref().unwrap_or("default");
+                send_ack_receipt(
+                    &msg.from,
+                    "help",
+                    &target,
+                    inst_str,
+                    "-",
+                    local_machine_name,
+                    local_machine_ip,
+                    Some(&msg.message_id),
+                );
 
-            output_text = format!(
-                "================================================================================
+                output_text = format!(
+"================================================================================
 ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL
 ================================================================================
 Format:
@@ -1718,19 +1968,21 @@ Available Commands:
 - agy prompts ls: Lists backed-up workspace prompts.
 - gitmap prompts ls: Lists GitMap automated prompts.
 ================================================================================"
-            );
-            result_summary = "Help dispatched".to_string();
+                );
+                result_summary = "Help dispatched".to_string();
 
-            send_result_receipt(
-                &msg.from,
-                "help",
-                "SUCCESS",
-                0,
-                &output_text,
-                local_machine_name,
-                local_machine_ip,
-                "default",
-            );
+                send_result_receipt(
+                    &msg.from,
+                    "help",
+                    "SUCCESS",
+                    0,
+                    &output_text,
+                    local_machine_name,
+                    local_machine_ip,
+                    inst_str,
+                    Some(&msg.message_id),
+                );
+            }
         }
 
         InboundAction::NamedPromptExecution { prompt_query } => {
@@ -1929,12 +2181,12 @@ pub fn poll_unread_messages(
         EmailStream::Plain(tcp_stream)
     };
 
-    let _ = read_imap_response(&mut stream);
+    let _ = read_imap_greeting(&mut stream);
 
     let is_starttls = is_starttls_imap(account.imap_port, &account.encryption_type);
     if is_starttls {
         send_imap_cmd(&mut stream, "A00", "STARTTLS", false)?;
-        let starttls_resp = read_imap_response(&mut stream)?;
+        let starttls_resp = read_imap_tagged_response(&mut stream, "A00")?;
         if starttls_resp.contains("OK") {
             stream = stream.upgrade_to_tls(&account.imap_host)?;
         }
@@ -1946,16 +2198,16 @@ pub fn poll_unread_messages(
         &format!("LOGIN \"{}\" \"{}\"", account.email, password),
         true,
     )?;
-    let login_resp = read_imap_response(&mut stream)?;
+    let login_resp = read_imap_tagged_response(&mut stream, "A01")?;
     if !login_resp.contains("OK") {
         return Err(format!("IMAP login failed: {}", login_resp));
     }
 
     send_imap_cmd(&mut stream, "A02", "SELECT INBOX", false)?;
-    let _ = read_imap_response(&mut stream);
+    let _ = read_imap_tagged_response(&mut stream, "A02");
 
     send_imap_cmd(&mut stream, "A03", "SEARCH UNSEEN", false)?;
-    let search_resp = read_imap_response(&mut stream)?;
+    let search_resp = read_imap_tagged_response(&mut stream, "A03")?;
 
     let mut ids: Vec<&str> = search_resp
         .lines()
@@ -1981,13 +2233,14 @@ pub fn poll_unread_messages(
             ),
             false,
         )?;
-        let fetch_resp = read_imap_response(&mut stream)?;
+        let fetch_resp = read_imap_tagged_response(&mut stream, &tag)?;
         if let Some(msg) = parse_raw_fetch_response(&fetch_resp) {
             messages.push(msg);
         }
     }
 
     let _ = send_imap_cmd(&mut stream, "A99", "LOGOUT", false);
+    let _ = read_imap_tagged_response(&mut stream, "A99");
     Ok(messages)
 }
 
@@ -2007,10 +2260,52 @@ fn send_imap_cmd(
     })
 }
 
-fn read_imap_response(stream: &mut EmailStream) -> Result<String, String> {
+fn read_imap_greeting(stream: &mut EmailStream) -> Result<String, String> {
+    let mut accumulated = Vec::new();
+    let mut buf = [0u8; 1024];
+    loop {
+        let n = stream
+            .read(&mut buf)
+            .map_err(|e| format!("IMAP greeting read error: {}", e))?;
+        if n == 0 {
+            break;
+        }
+        accumulated.extend_from_slice(&buf[..n]);
+        let text = String::from_utf8_lossy(&accumulated);
+        if text.contains("\r\n") {
+            return Ok(text.to_string());
+        }
+    }
+    Ok(String::from_utf8_lossy(&accumulated).to_string())
+}
+
+fn read_imap_tagged_response(stream: &mut EmailStream, tag: &str) -> Result<String, String> {
+    let mut accumulated = Vec::new();
     let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    Ok(String::from_utf8_lossy(&buf[0..n]).to_string())
+    let ok_marker = format!("{} OK", tag);
+    let no_marker = format!("{} NO", tag);
+    let bad_marker = format!("{} BAD", tag);
+
+    loop {
+        let n = stream
+            .read(&mut buf)
+            .map_err(|e| format!("IMAP read error for tag '{}': {}", tag, e))?;
+        if n == 0 {
+            break;
+        }
+        accumulated.extend_from_slice(&buf[..n]);
+        let text = String::from_utf8_lossy(&accumulated);
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with(&ok_marker)
+                || trimmed.starts_with(&no_marker)
+                || trimmed.starts_with(&bad_marker)
+            {
+                return Ok(text.to_string());
+            }
+        }
+    }
+    Ok(String::from_utf8_lossy(&accumulated).to_string())
 }
 
 fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
@@ -2021,20 +2316,29 @@ fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
     for line in resp.lines() {
         let lower = line.to_lowercase();
         if lower.starts_with("subject:") {
-            subject = line["subject:".len()..].trim().to_string();
+            subject = decode_rfc2047(line["subject:".len()..].trim());
         } else if lower.starts_with("from:") {
             from = line["from:".len()..].trim().to_string();
         } else if lower.starts_with("message-id:") {
-            message_id = line["message-id:".len()..].trim().to_string();
+            let raw_id = line["message-id:".len()..].trim();
+            let clean = raw_id.trim_matches(|c| c == '<' || c == '>').trim();
+            if !clean.is_empty() {
+                message_id = clean.to_string();
+            }
         }
     }
 
-    let body = resp
-        .split("\r\n\r\n")
-        .nth(1)
-        .unwrap_or("")
-        .trim()
-        .to_string();
+    if subject.is_empty() && from.is_empty() {
+        return None;
+    }
+
+    let body = if let Some(pos) = resp.find("\r\n\r\n") {
+        resp[pos + 4..].trim().to_string()
+    } else if let Some(pos) = resp.find("\n\n") {
+        resp[pos + 2..].trim().to_string()
+    } else {
+        String::new()
+    };
 
     Some(RawEmailMessage {
         message_id,
@@ -2319,5 +2623,47 @@ mod tests {
         assert!(!check_debounce_rate_limit(sender, cmd, target, now + 4));
         // After 10s: resets
         assert!(check_debounce_rate_limit(sender, cmd, target, now + 11));
+    }
+
+    #[test]
+    fn test_parse_vm3_instance_help_command() {
+        // User's exact subject: "VM3 | 1 | help"
+        let action = parse_email_command("VM3 | 1 | help", "");
+        assert_eq!(
+            action,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // With Re: prefix: "Re: VM3 | 1 | help"
+        let action_re = parse_email_command("Re: VM3 | 1 | help", "");
+        assert_eq!(
+            action_re,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // Without instance part: "VM3 | help"
+        let action_simple = parse_email_command("VM3 | help", "");
+        assert_eq!(
+            action_simple,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_rfc2047_decoding() {
+        let raw = "=?UTF-8?B?Vk0zIHwgMSB8IGhlbHA=?=";
+        assert_eq!(decode_rfc2047(raw), "VM3 | 1 | help");
+
+        let plain = "VM3 | 1 | help";
+        assert_eq!(decode_rfc2047(plain), "VM3 | 1 | help");
     }
 }
