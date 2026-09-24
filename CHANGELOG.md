@@ -1,6 +1,13 @@
 # 📝 更新日志 (Changelog)
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
+    *   **v4.68.0 (2026-09-24)**:
+        -   **[Release v4.68.0: 实例克隆复制恢复、默认配置选择与防删、快进快捷键与安全诊断根治] 实例克隆复制深度恢复、精简外部快进单键、Ctrl+Shift+F 全局快进快捷键、默认实例独占标记与 SQLite 空聚合安全防崩**:
+            -   **恢复多实例克隆复制（Duplicate / Clone）交互**: 在顶部导航栏 `InstanceSelector.tsx` 下拉菜单顶部工具条与每个实例条目行均补齐「Duplicate Profile」克隆复制按钮（`Copy` 图标），支持一键完整复制或增量复制指定环境；在 `Instances.tsx` 页面卡片及底部工具栏全面恢复复制操作。
+            -   **外部导航栏极简快进单键与序号徽章加宽**: 彻底移除外部导航栏绿色运行按键，仅保留单颗蓝色极速快进（Fast-Forward `[ ⏩ ]`）核心操作键，悬浮显示动态快捷键提示；将下拉面板宽度自适应扩展为 `w-96 md:w-[420px]`，并渲染醒目的大号 `#1`、`#2`、`#3` 实例序列号徽章。
+            -   **默认实例选择与防止误删机制 (`set_default_instance`)**: 新增 `set_default_instance` Tauri IPC 指令与前端绑定，支持任意实例一键设为启动默认实例并独占标明 `DEFAULT` 徽章；在后端与前端双向拦截对默认实例的删除操作，杜绝误操作导致环境崩溃。
+            -   **可配置 Fast-Forward 快捷键与全局监听**: 新增配置字段 `fast_forward_shortcut`（默认 `Ctrl+Shift+F`），在 `AutoSwitcherSettings.tsx` 中提供快捷键预设选钮与自定义按键面板；通过全局钩子 `useFastForwardShortcut.ts` 在窗口任意位置一键无感调度多实例智能快进切号并弹出反馈通知。
+            -   **安全中心 SQLite 空聚合与 IPC 参数结构彻底修复**: 修复 `security_db.rs` 中空数据库调用 `SUM()` 产生 `NULL` 触发 `Invalid column type Null at index: 2, name: blocked` 的缺陷，统一包裹 `COALESCE(SUM(...), 0)` 并采用 `Option<u64>` 容错反序列化；在 `commands/security.rs` 中使 `get_ip_access_logs` 兼容嵌套结构体与扁平参数，彻底根治前端触发的 `missing required key query` 异常。
 
     *   **v4.67.0 (2026-09-24)**:
         -   **[Release v4.67.0: 自动切号 UI/UX 深度重构、本地多核秒级运行与 Docker 极速构建产物规范] 自动切号双卡片对称美化、暗色模式色块根除、全核并行编译与 Docker 官方二进制规范**:
@@ -3219,6 +3226,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.68.0 (2026-09-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.67.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
