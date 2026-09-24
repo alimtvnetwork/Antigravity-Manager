@@ -435,7 +435,14 @@ fn build_mime_message(
 ) -> String {
     let msg_id = format!("<{}@{}>", Uuid::new_v4(), account.smtp_host);
     let date = Utc::now().to_rfc2822();
-    let encoded_subject = format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()));
+    let is_pure_ascii = subject
+        .chars()
+        .all(|c| c.is_ascii() && c != '\r' && c != '\n');
+    let encoded_subject = if is_pure_ascii {
+        subject.to_string()
+    } else {
+        format!("=?UTF-8?B?{}?=", BASE64_STANDARD.encode(subject.as_bytes()))
+    };
     let clean_rcpts: Vec<String> = recipients
         .iter()
         .map(|r| clean_recipient_email(r))

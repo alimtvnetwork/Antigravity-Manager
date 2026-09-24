@@ -1247,14 +1247,18 @@ fn cmd_test_email(args: &[String]) {
             .get(2)
             .map(|s| s.as_str())
             .unwrap_or("Alim Ul Karim <devorg.bd@gmail.com>");
+        let test_body = args.get(3).map(|s| s.as_str()).unwrap_or("");
         println!("[*] Executing live end-to-end simulated inbound message:");
         println!("    From:    {}", test_from);
         println!("    Subject: {}", test_subject);
+        if !test_body.is_empty() {
+            println!("    Body:    {}", test_body);
+        }
         let mock_msg = email_inbound::RawEmailMessage {
             message_id: format!("<test-{}@agm>", uuid::Uuid::new_v4()),
             from: test_from.to_string(),
             subject: test_subject.to_string(),
-            body: String::new(),
+            body: test_body.to_string(),
         };
         let action = email_inbound::parse_email_command(&mock_msg.subject, &mock_msg.body);
         println!("    Parsed Action: {:?}", action);
@@ -1268,6 +1272,30 @@ fn cmd_test_email(args: &[String]) {
             Err(e) => {
                 eprintln!("[ERROR] Inbound execution failed: {}", e);
             }
+        }
+    }
+
+    // 8. Optional process live unread messages: agm test-email poll
+    if args.first().map(|s| s.as_str()) == Some("poll") {
+        println!("[*] Polling and executing real unread messages from IMAP...");
+        match email_inbound::poll_unread_messages(&default_acc, 5) {
+            Ok(msgs) => {
+                println!("    Found {} unread message(s)", msgs.len());
+                let local_ip = email_watcher::detect_local_ip();
+                let local_name = email_watcher::detect_machine_name();
+                for (i, m) in msgs.iter().enumerate() {
+                    println!("    [{}] Message-ID: {}", i + 1, m.message_id);
+                    println!("        From: {}", m.from);
+                    println!("        Subject: {}", m.subject);
+                    let action = email_inbound::parse_email_command(&m.subject, &m.body);
+                    println!("        Action: {:?}", action);
+                    match email_inbound::execute_inbound_action(m, action, &local_ip, &local_name) {
+                        Ok(res) => println!("        [SUCCESS] {}", res),
+                        Err(e) => eprintln!("        [ERROR] {}", e),
+                    }
+                }
+            }
+            Err(e) => eprintln!("[ERROR] Polling failed: {}", e),
         }
     }
 }

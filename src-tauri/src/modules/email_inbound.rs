@@ -223,6 +223,16 @@ pub fn strip_email_prefixes(subject: &str) -> String {
             clean = clean[12..].trim();
         } else if lower.starts_with("[agm alert]") {
             clean = clean[11..].trim();
+        } else if lower.starts_with("[agm help]:") {
+            clean = clean[11..].trim();
+        } else if lower.starts_with("[agm help]") {
+            clean = clean[10..].trim();
+        } else if lower.starts_with("[agm execution report]") {
+            clean = clean[22..].trim();
+        } else if lower.starts_with("[agm test ping]") {
+            clean = clean[15..].trim();
+        } else if lower.starts_with("[agm status]") {
+            clean = clean[12..].trim();
         } else {
             break;
         }
@@ -468,9 +478,9 @@ pub fn parse_prompt_body(body: &str) -> (String, String) {
     (prompt_name, prompt_instruction)
 }
 
-/// Parse subject and body into strongly typed InboundAction
-pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
-    let clean_subj = strip_email_prefixes(subject);
+/// Parse single command line string and body into strongly typed InboundAction
+pub fn parse_single_command_string(command_str: &str, body: &str) -> InboundAction {
+    let clean_subj = strip_email_prefixes(command_str);
     let lower_subj = clean_subj.to_lowercase();
 
     // 1. Unified Pipe-Delimited Grammar
@@ -636,7 +646,7 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
                 };
             }
 
-            if lower_cmd == "agm status" {
+            if lower_cmd == "status" || lower_cmd == "agm status" {
                 return InboundAction::StatusQuery {
                     target: target.to_string(),
                 };
@@ -877,19 +887,222 @@ pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
         };
     }
 
-    if lower_subj == "help" {
+    if lower_subj == "help"
+        || lower_subj == "man"
+        || lower_subj == "manual"
+        || lower_subj == "agm help"
+    {
         return InboundAction::HelpRequest {
             target: "*".to_string(),
             instance_id: None,
         };
     }
 
+    if lower_subj == "accounts"
+        || lower_subj == "acc"
+        || lower_subj == "agm accounts"
+        || lower_subj == "agm acc"
+    {
+        return InboundAction::ListAccounts {
+            target: "*".to_string(),
+        };
+    }
+
+    if lower_subj == "instances"
+        || lower_subj == "ls"
+        || lower_subj == "agm instances"
+        || lower_subj == "agm ls"
+    {
+        return InboundAction::ListInstances {
+            target: "*".to_string(),
+        };
+    }
+
+    if lower_subj == "doctor"
+        || lower_subj == "check"
+        || lower_subj == "agm doctor"
+        || lower_subj == "agm check"
+    {
+        return InboundAction::DoctorDiagnostic {
+            target: "*".to_string(),
+        };
+    }
+
+    if lower_subj == "clean"
+        || lower_subj == "purge"
+        || lower_subj == "agm clean"
+        || lower_subj == "agm purge"
+    {
+        return InboundAction::SystemClean {
+            target: "*".to_string(),
+        };
+    }
+
+    if lower_subj == "sync" || lower_subj == "agm sync" {
+        return InboundAction::SyncState {
+            target: "*".to_string(),
+        };
+    }
+
+    if lower_subj == "proxy" || lower_subj == "agm proxy" || lower_subj == "agm proxy status" {
+        return InboundAction::ProxyStatus {
+            target: "*".to_string(),
+            is_test: false,
+        };
+    }
+
+    if lower_subj == "proxy test" || lower_subj == "agm proxy test" {
+        return InboundAction::ProxyStatus {
+            target: "*".to_string(),
+            is_test: true,
+        };
+    }
+
+    if lower_subj == "prompts"
+        || lower_subj == "agm prompts"
+        || lower_subj == "agm prompts ls"
+        || lower_subj == "agy prompts ls"
+    {
+        return InboundAction::ListPrompts {
+            target: "*".to_string(),
+            is_gitmap: false,
+        };
+    }
+
+    if lower_subj == "rotate" {
+        return InboundAction::AccountRotate;
+    }
+
+    if lower_subj.starts_with("gitmap ") || lower_subj == "gitmap" {
+        let sub = if lower_subj.starts_with("gitmap ") {
+            clean_subj["gitmap ".len()..].trim().to_string()
+        } else {
+            "status".to_string()
+        };
+        return InboundAction::GitMapExecution {
+            target: "*".to_string(),
+            command: sub,
+        };
+    }
+
+    if lower_subj.starts_with("switch ") || lower_subj.starts_with("agm switch ") {
+        let email_query = if lower_subj.starts_with("agm switch ") {
+            clean_subj["agm switch ".len()..].trim().to_string()
+        } else {
+            clean_subj["switch ".len()..].trim().to_string()
+        };
+        return InboundAction::AccountSwitch {
+            target: "*".to_string(),
+            email_query,
+        };
+    }
+
     InboundAction::Ignored {
         reason: format!(
-            "Subject '{}' does not match any recognized command pattern",
-            subject
+            "Input '{}' does not match any recognized command pattern",
+            command_str
         ),
     }
+}
+
+/// Extract clean user content from email body, discarding quoted reply text and signatures
+pub fn extract_clean_reply_body(body: &str) -> (String, String) {
+    let mut clean_lines: Vec<&str> = Vec::new();
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        let lower = trimmed.to_lowercase();
+
+        // Detect quotation block boundaries common in Gmail, Outlook, Apple Mail, Thunderbird
+        if lower.starts_with('>')
+            || (lower.starts_with("on ") && (lower.ends_with("wrote:") || lower.contains("wrote:")))
+            || lower.starts_with("-----original message-----")
+            || lower.starts_with("--- original message ---")
+            || lower.starts_with("________________________________")
+            || (lower.starts_with("from:") && !clean_lines.is_empty())
+            || (lower.starts_with("sent:") && !clean_lines.is_empty())
+        {
+            break;
+        }
+
+        clean_lines.push(trimmed);
+    }
+
+    let mut first_cmd = String::new();
+    let mut remaining = Vec::new();
+    let mut found_first = false;
+
+    for line in clean_lines {
+        if !found_first {
+            if !line.is_empty() {
+                first_cmd = line.to_string();
+                found_first = true;
+            }
+        } else {
+            remaining.push(line);
+        }
+    }
+
+    (first_cmd, remaining.join("\n").trim().to_string())
+}
+
+/// Parse subject and body into strongly typed InboundAction with bidirectional reply support
+pub fn parse_email_command(subject: &str, body: &str) -> InboundAction {
+    let lower_subj_raw = subject.trim().to_lowercase();
+    let is_reply_or_fwd = lower_subj_raw.starts_with("re:")
+        || lower_subj_raw.starts_with("re :")
+        || lower_subj_raw.starts_with("fwd:")
+        || lower_subj_raw.starts_with("fw:");
+
+    // 1. If this is an email reply, user's command is usually typed in the body
+    if is_reply_or_fwd {
+        let (first_cmd, remaining_body) = extract_clean_reply_body(body);
+        if !first_cmd.is_empty() {
+            let body_action = parse_single_command_string(&first_cmd, &remaining_body);
+            if !matches!(body_action, InboundAction::Ignored { .. }) {
+                return body_action;
+            }
+        }
+    }
+
+    // 2. Try parsing the subject line
+    let subject_action = parse_single_command_string(subject, body);
+    if !matches!(subject_action, InboundAction::Ignored { .. }) {
+        return subject_action;
+    }
+
+    // 3. Fallback: Check the body even if subject wasn't explicitly marked as reply
+    if !is_reply_or_fwd {
+        let (first_cmd, remaining_body) = extract_clean_reply_body(body);
+        if !first_cmd.is_empty() {
+            let body_action = parse_single_command_string(&first_cmd, &remaining_body);
+            if !matches!(body_action, InboundAction::Ignored { .. }) {
+                return body_action;
+            }
+        }
+    }
+
+    subject_action
+}
+
+/// Format an RFC 5322 reply subject that strictly preserves threading in Gmail / Outlook
+pub fn format_reply_subject(
+    original_subject: Option<&str>,
+    fallback_prefix: &str,
+    command_name: &str,
+) -> String {
+    if let Some(orig) = original_subject {
+        let trimmed = orig.trim();
+        if !trimmed.is_empty() {
+            let lower = trimmed.to_lowercase();
+            if lower.starts_with("re:") || lower.starts_with("re :") {
+                return trimmed.to_string();
+            } else {
+                return format!("Re: {}", trimmed);
+            }
+        }
+    }
+    format!("{} {}", fallback_prefix, command_name)
 }
 
 /// Send Phase 1 Immediate Acknowledgment Plaintext Receipt
@@ -902,31 +1115,16 @@ pub fn send_ack_receipt(
     local_name: &str,
     local_ip: &str,
     in_reply_to: Option<&str>,
+    original_subject: Option<&str>,
 ) {
     let now_str = Utc::now().to_rfc3339();
     let body = format!(
-        "================================================================================
-[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING
-================================================================================
-Command:    {}
-Target:     {}
-Node:       {} ({})
-Instance:   {}
-Project:    {}
-Received:   {}
-Status:     IN_PROGRESS
-
-Execution has started in the background. A completion receipt will follow.
-================================================================================",
+        "================================================================================\n[AGM ACK] COMMAND ACKNOWLEDGED AND RUNNING\n================================================================================\nCommand:    {}\nTarget:     {}\nNode:       {} ({})\nInstance:   {}\nProject:    {}\nReceived:   {}\nStatus:     IN_PROGRESS\n\nExecution has started in the background. A completion receipt will follow.\n================================================================================",
         command_name, target, local_name, local_ip, instance, project, now_str
     );
 
     let clean_sender = extract_email_address(sender);
-    let subject = if in_reply_to.is_some() {
-        format!("Re: [AGM ACK] Running: {}", command_name)
-    } else {
-        format!("[AGM ACK] Running: {}", command_name)
-    };
+    let subject = format_reply_subject(original_subject, "[AGM ACK] Running:", command_name);
     let _ =
         email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
 }
@@ -942,33 +1140,21 @@ pub fn send_result_receipt(
     local_ip: &str,
     instance: &str,
     in_reply_to: Option<&str>,
+    original_subject: Option<&str>,
 ) {
     let now_str = Utc::now().to_rfc3339();
     let body = format!(
-        "================================================================================
-[AGM Result] EXECUTION COMPLETED
-================================================================================
-Command:    {}
-Status:     {}
-Exit Code:  {}
-Node:       {} ({})
-Instance:   {}
-Completed:  {}
-
-Execution Output:
---------------------------------------------------------------------------------
-{}
---------------------------------------------------------------------------------
-================================================================================",
+        "================================================================================\n[AGM Result] EXECUTION COMPLETED\n================================================================================\nCommand:    {}\nStatus:     {}
+Exit Code:  {}\nNode:       {} ({})\nInstance:   {}\nCompleted:  {}\n\nExecution Output:\n--------------------------------------------------------------------------------\n{}\n--------------------------------------------------------------------------------\n================================================================================",
         command_name, status_label, exit_code, local_name, local_ip, instance, now_str, output
     );
 
     let clean_sender = extract_email_address(sender);
-    let subject = if in_reply_to.is_some() {
-        format!("Re: [AGM Result] {}: {}", status_label, command_name)
-    } else {
-        format!("[AGM Result] {}: {}", status_label, command_name)
-    };
+    let subject = format_reply_subject(
+        original_subject,
+        &format!("[AGM Result] {}:", status_label),
+        command_name,
+    );
     let _ =
         email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
 }
@@ -1078,6 +1264,7 @@ pub fn execute_inbound_action(
                 local_machine_name,
                 local_machine_ip,
                 Some(&msg.message_id),
+                Some(&msg.subject),
             );
 
             // Resolve effective prompt content
@@ -1146,6 +1333,7 @@ pub fn execute_inbound_action(
                 local_machine_ip,
                 inst_str,
                 Some(&msg.message_id),
+                Some(&msg.subject),
             );
         }
 
@@ -1168,6 +1356,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let res = execute_gitmap_command(&command);
@@ -1196,6 +1385,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1218,6 +1408,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let trimmed_cmd = command.trim();
@@ -1240,6 +1431,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1264,6 +1456,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 if is_gitmap {
@@ -1295,6 +1488,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1314,6 +1508,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let instances = crate::modules::instance::list_instances().unwrap_or_default();
@@ -1348,6 +1543,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1372,6 +1568,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 if is_gitmap {
@@ -1400,6 +1597,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1422,6 +1620,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let rt = tokio::runtime::Runtime::new().ok();
@@ -1464,6 +1663,7 @@ pub fn execute_inbound_action(
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1483,6 +1683,7 @@ pub fn execute_inbound_action(
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
@@ -1524,6 +1725,7 @@ Prompts in Queue:   {}
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1543,6 +1745,7 @@ Prompts in Queue:   {}
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let accounts_cnt = crate::modules::account::load_account_index()
@@ -1585,6 +1788,7 @@ System Status:      HEALTHY
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1604,6 +1808,7 @@ System Status:      HEALTHY
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let index_res = crate::modules::account::load_account_index();
@@ -1639,6 +1844,7 @@ INDEX EMAIL                            STATUS
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1661,6 +1867,7 @@ INDEX EMAIL                            STATUS
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let query = email_query.trim().to_lowercase();
@@ -1719,6 +1926,7 @@ Status:             SUCCESS
                         local_machine_ip,
                         "default",
                         Some(&msg.message_id),
+                        Some(&msg.subject),
                     );
                 } else {
                     output_text = format!(
@@ -1741,6 +1949,7 @@ Previous Account:   {}
                         local_machine_ip,
                         "default",
                         Some(&msg.message_id),
+                        Some(&msg.subject),
                     );
                 }
             }
@@ -1761,6 +1970,7 @@ Previous Account:   {}
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let proxy_online = std::net::TcpStream::connect_timeout(
@@ -1793,6 +2003,7 @@ Supported Routes:   /v1/messages, /v1/chat/completions, /v1beta/models/*
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1812,6 +2023,7 @@ Supported Routes:   /v1/messages, /v1/chat/completions, /v1beta/models/*
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let mut cleaned_cnt = 0;
@@ -1860,6 +2072,7 @@ Status:             SUCCESS
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1879,6 +2092,7 @@ Status:             SUCCESS
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 let acc_cnt = crate::modules::account::load_account_index()
@@ -1912,6 +2126,7 @@ Status:             SUCCESS
                     local_machine_ip,
                     "default",
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -1935,6 +2150,7 @@ Status:             SUCCESS
                     local_machine_name,
                     local_machine_ip,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
 
                 output_text = format!(
@@ -1981,6 +2197,7 @@ Available Commands:
                     local_machine_ip,
                     inst_str,
                     Some(&msg.message_id),
+                    Some(&msg.subject),
                 );
             }
         }
@@ -2665,5 +2882,130 @@ mod tests {
 
         let plain = "VM3 | 1 | help";
         assert_eq!(decode_rfc2047(plain), "VM3 | 1 | help");
+    }
+
+    #[test]
+    fn test_extract_clean_reply_body_strips_quotes() {
+        let gmail_reply = "VM3 | 1 | help\r\n\r\nOn Thu, Sep 24, 2026 at 7:45 PM ai-agm-tool-v1 <...> wrote:\r\n> ================================================================================\r\n> [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet\r\n> ...";
+        let (first_cmd, remaining) = extract_clean_reply_body(gmail_reply);
+        assert_eq!(first_cmd, "VM3 | 1 | help");
+        assert_eq!(remaining, "");
+
+        let outlook_reply = "status\r\n\r\n-----Original Message-----\r\nFrom: ai-agm-tool-v1\r\nSent: Thursday, September 24, 2026\r\nTo: user\r\nSubject: [AGM Help]";
+        let (first_cmd2, remaining2) = extract_clean_reply_body(outlook_reply);
+        assert_eq!(first_cmd2, "status");
+        assert_eq!(remaining2, "");
+    }
+
+    #[test]
+    fn test_parse_reply_with_body_command() {
+        // User clicks "Reply" to Cheat Sheet in Gmail:
+        // Subject: "Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"
+        // Body: "VM3 | 1 | help\n\nOn Thu, Sep 24, 2026... wrote:\n> ..."
+        let action = parse_email_command(
+            "Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+            "VM3 | 1 | help\r\n\r\nOn Thu, Sep 24, 2026 at 7:45 PM ai-agm-tool-v1 <...> wrote:\r\n> [AGM Help] ...",
+        );
+        assert_eq!(
+            action,
+            InboundAction::HelpRequest {
+                target: "VM3".to_string(),
+                instance_id: Some("1".to_string()),
+            }
+        );
+
+        // User clicks "Reply" and types just "status" in body:
+        let action_status = parse_email_command(
+            "Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+            "status\r\n\r\n> [AGM Help] ...",
+        );
+        assert_eq!(
+            action_status,
+            InboundAction::StatusQuery {
+                target: "*".to_string(),
+            }
+        );
+
+        // User clicks "Reply" and types "accounts" in body:
+        let action_acc = parse_email_command(
+            "Re: [AGM Result] SUCCESS: help",
+            "accounts\r\n\r\nOn Wed, Sep 24... wrote:\n> ...",
+        );
+        assert_eq!(
+            action_acc,
+            InboundAction::ListAccounts {
+                target: "*".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_single_word_commands() {
+        assert_eq!(
+            parse_email_command("help", ""),
+            InboundAction::HelpRequest {
+                target: "*".to_string(),
+                instance_id: None,
+            }
+        );
+        assert_eq!(
+            parse_email_command("status", ""),
+            InboundAction::StatusQuery {
+                target: "*".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_email_command("accounts", ""),
+            InboundAction::ListAccounts {
+                target: "*".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_email_command("instances", ""),
+            InboundAction::ListInstances {
+                target: "*".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_email_command("doctor", ""),
+            InboundAction::DoctorDiagnostic {
+                target: "*".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_email_command("rotate", ""),
+            InboundAction::AccountRotate
+        );
+    }
+
+    #[test]
+    fn test_format_reply_subject_preserves_threading() {
+        // Direct subject: should prepend Re:
+        assert_eq!(
+            format_reply_subject(Some("VM3 | 1 | help"), "[AGM ACK]", "help"),
+            "Re: VM3 | 1 | help"
+        );
+
+        // Subject already has Re: should NOT duplicate Re:
+        assert_eq!(
+            format_reply_subject(Some("Re: VM3 | 1 | help"), "[AGM ACK]", "help"),
+            "Re: VM3 | 1 | help"
+        );
+
+        // Replying to existing notification:
+        assert_eq!(
+            format_reply_subject(
+                Some("Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"),
+                "[AGM ACK]",
+                "help"
+            ),
+            "Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet"
+        );
+
+        // Fallback when no original subject:
+        assert_eq!(
+            format_reply_subject(None, "[AGM ACK] Running:", "help"),
+            "[AGM ACK] Running: help"
+        );
     }
 }
