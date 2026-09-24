@@ -1008,6 +1008,14 @@ impl AxumServer {
             .route("/auth/callback", get(handle_oauth_callback))
             // Training REST API Endpoints (Guarded by training_api_enabled setting toggle)
             .route(
+                "/api/v1/training",
+                get(crate::modules::training_api::handle_training_telemetry),
+            )
+            .route(
+                "/api/v1/status",
+                get(crate::modules::training_api::handle_training_telemetry),
+            )
+            .route(
                 "/api/v1/training/telemetry",
                 get(crate::modules::training_api::handle_training_telemetry),
             )
@@ -1017,6 +1025,14 @@ impl AxumServer {
             )
             .route(
                 "/api/v1/training/machines",
+                post(crate::modules::training_api::handle_training_machines),
+            )
+            .route(
+                "/api/v1/training/modify",
+                post(crate::modules::training_api::handle_training_machines),
+            )
+            .route(
+                "/api/v1/machines",
                 post(crate::modules::training_api::handle_training_machines),
             )
             .route(

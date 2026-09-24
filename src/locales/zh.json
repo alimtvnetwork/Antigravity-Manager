@@ -444,12 +444,14 @@
     "switch_to_agy": "Switch to Antigravity CLI (agy)"
   },
   "settings": {
-    "save": "保存设置",
+    "save": "保存",
+    "backup_restore": "备份",
     "tabs": {
       "general": "通用",
       "account": "账号",
-      "proxy": "代理设置",
-      "email": "邮件与告警",
+      "proxy": "代理",
+      "email": "邮件告警",
+      "supabase": "Supabase",
       "advanced": "高级",
       "debug": "调试",
       "about": "关于"

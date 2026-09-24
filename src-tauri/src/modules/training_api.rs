@@ -436,20 +436,18 @@ pub async fn execute_machine_modify(
                 .find(|a| a.email.eq_ignore_ascii_case(&query) || a.id == query)
                 .ok_or_else(|| format!("Account matching '{}' not found", query))?;
 
-            crate::modules::account::set_current_account_id(&target.id)?;
-            let _ = crate::modules::account::apply_device_profile(&target.id);
-
             let inst_id = req.instance_id.unwrap_or_else(|| "default".to_string());
-            let _ = crate::modules::instance::bind_account_to_instance(
-                &inst_id,
-                &target.id,
-                &target.email,
-            );
+            crate::modules::instance::switch_account_to_instance(&target.id, Some(&inst_id))
+                .await
+                .map_err(|e| format!("Failed to switch account to instance: {}", e))?;
 
             Ok(MachineModifyResponse {
                 success: true,
                 action: req.action,
-                message: format!("Successfully switched active account to {}", target.email),
+                message: format!(
+                    "Successfully switched active account to {} on instance '{}'",
+                    target.email, inst_id
+                ),
                 current_active_account: Some(target.email),
                 current_target_model: app_cfg.auto_profile_switcher.target_model,
             })
@@ -528,7 +526,10 @@ pub async fn execute_machine_modify(
             })
         }
         "trigger_rotation" => {
-            let result = crate::modules::auto_switcher::trigger_manual_rotation().await?;
+            let result = crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                req.instance_id.as_deref(),
+            )
+            .await?;
             let active_acc = crate::modules::account::get_current_account()
                 .ok()
                 .flatten()

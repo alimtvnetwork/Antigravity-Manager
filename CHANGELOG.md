@@ -3,6 +3,12 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.71.1 (2026-09-24)**:
+        -   **[Release v4.71.1: 设置中心极简 UI/UX 全面重构、机器训练 REST API 增强与 IDE 凭据全链路切号注入] 设置菜单项与操作按钮精简对齐、调试选项移至标题栏统一 Bug 图标、机器训练与遥测状态 REST 端点全量开放、智能轮换器深度绑定**:
+            -   **设置中心菜单与操作按钮极简重构**: 严格按照用户视觉设计规范全面重构 `Settings.tsx` 标签栏与动作按钮。去除冗余文字：操作按钮统一精简为「`Save` (保存)」与「`Backup` (备份)」，标签栏统一优化为「`Proxy` (代理)」、「`Email-Alerts` (邮件告警)」、「`Supabase`」、「`Advanced` (高级)」与「`About` (关于)」，中英文国际化字典（`zh.json` 与 `en.json`）完全对齐。
+            -   **标签栏冗余调试选项剔除与标题栏 Bug 终端统一联动**: 彻底解决标签栏多余 Debug 选项挤占布局的痛点。完全移除设置页主标签栏中的 Debug 项，将其统一引导至应用顶部标题栏常驻的 **Bug 图标**；同时在「高级设置 (Advanced)」底部增设直观的「Debug 控制台与日志快速访问卡片」，支持一键呼出悬浮调试控制台与实时 IPC 诊断日志。
+            -   **机器训练 REST API 端点全量开放与别名映射**: 新增并完善一组外部自动化与模型自学习 REST API 端点：`/api/v1/training`、`/api/v1/status`、`/api/v1/training/telemetry`、`/api/v1/training/learn`、`/api/v1/training/machines` 与 `/api/v1/training/modify`。支持外部训练集群随时读取单节点完整遥测状态（含健康账号池、多实例运行状态、活跃提示词等），并接收模型强化学习反馈与动态路由微调。所有训练端点均受「通用设置」中 `training_api_enabled` 开关保护。
+            -   **远程机器修改与 IDE 智能切号全链路注入**: 强化训练 API 的 `switch_account` 与 `trigger_rotation` 远程修改动作。账号切换直接调用 `switch_account_to_instance(&target.id, Some(&inst_id))`，执行 Google OAuth 令牌刷新、加密写入 IDE 沙箱数据库 (`state.vscdb`)、更新系统凭据保管库 (Keyring) 及重启沙箱实例，彻底确保远程指令切号在 IDE 内部 100% 即刻生效。
     *   **v4.71.0 (2026-09-24)**:
         -   **[Release v4.71.0: 远程邮件现代化 HTML 卡片回执、主机节点别名与本地 IP 标题标识、多空格管道容错与 IDE 智能切号凭据深层注入] RFC 2046 双重 MIME 响应卡片、主机节点标识前缀、全场景弹性管道解析、智能轮换器深度绑定与 IDE 凭据无感刷新重启**:
             -   **现代响应式 HTML 邮件回执与 RFC 2046 双重 MIME 渲染**: 彻底修复 Gmail 和 Outlook 中出站回执将 HTML 标签作为纯文本原样转义输出的问题。在 `email_sender.rs` 中引入 `is_html_content` 与 `strip_html_tags`，自动构建合规的 `multipart/alternative` 结构，同步分发纯文本备选段与现代暗色卡片 HTML 视觉段，涵盖节点状态、彩色执行徽章、参数矩阵及终端高亮输出。
@@ -3252,6 +3258,14 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.71.1 (2026-09-24)**:
+        -   **[Release v4.71.1: Settings UI/UX Menu Overhaul, Machine Training REST API, and Full IDE Credential Injection] Concise Settings Tabs & Action Buttons, Redundant Debug Tab Consolidation to Titlebar Bug Icon, Machine Training Telemetry REST Endpoints, and Smart Rotator Deep Injection**:
+            -   **Settings Menu & Action Button Streamlining**: Comprehensively overhauled `Settings.tsx` tab strip and header action buttons adhering strictly to user design specifications. Shortened button labels to strictly **Save** and **Backup**; simplified navigation tabs to **Proxy**, **Email-Alerts**, **Supabase**, **Advanced**, and **About**, eliminating wide and cluttered text. Aligned English (`en.json`) and Chinese (`zh.json`) translation dictionaries.
+            -   **Redundant Debug Tab Removal & Titlebar Bug Icon Integration**: Completely removed the redundant Debug option from the settings tab strip, centralizing all debug console controls into the permanent **Bug icon** in the top navigation titlebar. Added an unobtrusive quick-access card inside the Advanced tab for fast inspection of IPC calls and runtime logs.
+            -   **Machine Training REST API Endpoints**: Exposed comprehensive REST endpoints for external training systems and model self-learning: `/api/v1/training`, `/api/v1/status`, `/api/v1/training/telemetry`, `/api/v1/training/learn`, `/api/v1/training/machines`, and `/api/v1/training/modify`. External agents can seek into full node telemetry (healthy accounts, instance runtimes, prompt status) and ingest reinforcement learning feedback to dynamically optimize model routing. Guarded by the `training_api_enabled` toggle in General Settings.
+            -   **Remote Machine Modification & Complete IDE Account Injection**: Hardened the training API's `switch_account` and `trigger_rotation` actions to invoke `switch_account_to_instance(&target.id, Some(&inst_id))` and `trigger_manual_rotation_for_instance(req.instance_id.as_deref())`. This executes full OAuth token refresh, encrypted injection into the IDE sandbox database (`state.vscdb`), OS keyring synchronization, and instance process restart for 100% active credential adoption.
+
+
     *   **v4.71.0 (2026-09-24)**:
         -   **[Release v4.71.0: Modern Responsive HTML Email Cards, Origin Node Alias & Local IP in Subject, Flexible Whitespace Pipe Parsing, and Deep IDE Smart Account Injection] RFC 2046 Dual MIME Email Responses, Origin Node Identification Prefix, Zero/Single/Multi-Space Pipe Tokenization, Smart Rotator Candidate Scoring, and Comprehensive IDE Credential Injection**:
             -   **Modern Responsive HTML Email Receipts & RFC 2046 Dual MIME Engine**: Completely resolved the issue where Gmail and Outlook rendered raw HTML tags as literal text in outbound email replies. Refactored `email_sender.rs` to detect HTML markup via `is_html_content` and `strip_html_tags`, automatically constructing RFC 2046 `multipart/alternative` MIME messages with both a clean plain-text fallback and a styled dark-theme HTML card layout featuring colored execution badges, parameter matrices, and terminal outputs.

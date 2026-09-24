@@ -1,5 +1,5 @@
 import { useState, useEffect, startTransition } from 'react';
-import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Menu, ChevronDown, Bug, Info, Sliders } from 'lucide-react';
+import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Bug } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -45,8 +45,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.71.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.71.1');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
@@ -564,82 +563,24 @@ function Settings() {
                             {t('settings.tabs.supabase', 'Supabase')}
                         </button>
 
-                        {/* Hamburger dropdown menu for Advanced, Debug, and About */}
-                        <div className="relative">
-                            <button
-                                type="button"
-                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                                    ['advanced', 'debug', 'about'].includes(activeTab)
-                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                        <button
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'advanced'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                 }`}
-                                onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
-                                title="More settings (Advanced, Debug, About)"
-                            >
-                                <Menu className="w-3.5 h-3.5" />
-                                <span>{['advanced', 'debug', 'about'].includes(activeTab) ? t(`settings.tabs.${activeTab}`) : t('settings.tabs.more', 'More')}</span>
-                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {isMoreDropdownOpen && (
-                                <>
-                                    <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={() => setIsMoreDropdownOpen(false)}
-                                    />
-                                    <div className="absolute left-0 mt-1.5 w-52 bg-white dark:bg-base-100 rounded-xl shadow-xl border border-gray-100 dark:border-base-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                        <button
-                                            type="button"
-                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${
-                                                activeTab === 'advanced'
-                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
-                                            }`}
-                                            onClick={() => {
-                                                setIsMoreDropdownOpen(false);
-                                                startTransition(() => setActiveTab('advanced'));
-                                            }}
-                                        >
-                                            <Sliders className="w-4 h-4 text-gray-500" />
-                                            <span>{t('settings.tabs.advanced', 'Advanced')}</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center justify-between transition-colors cursor-pointer ${
-                                                activeTab === 'debug'
-                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
-                                            }`}
-                                            onClick={() => {
-                                                setIsMoreDropdownOpen(false);
-                                                startTransition(() => setActiveTab('debug'));
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-2.5">
-                                                <Bug className="w-4 h-4 text-amber-500" />
-                                                <span>{t('settings.tabs.debug', 'Debug')}</span>
-                                            </div>
-                                            <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-base-200 px-1.5 py-0.5 rounded">Console</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${
-                                                activeTab === 'about'
-                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
-                                            }`}
-                                            onClick={() => {
-                                                setIsMoreDropdownOpen(false);
-                                                startTransition(() => setActiveTab('about'));
-                                            }}
-                                        >
-                                            <Info className="w-4 h-4 text-gray-500" />
-                                            <span>{t('settings.tabs.about', 'About')}</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                            onClick={() => startTransition(() => setActiveTab('advanced'))}
+                        >
+                            {t('settings.tabs.advanced', 'Advanced')}
+                        </button>
+                        <button
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'about'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                            onClick={() => startTransition(() => setActiveTab('about'))}
+                        >
+                            {t('settings.tabs.about', 'About')}
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1630,6 +1571,36 @@ function Settings() {
                                                 </div>
                                             </>
                                         )}
+                                    </div>
+                                </div>
+
+                                {/* Debug Console Quick-Access Card */}
+                                <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                                    <div className="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/60 dark:border-amber-900/30">
+                                        <div className="flex items-center gap-3">
+                                            <Bug className="w-5 h-5 text-amber-500 shrink-0" />
+                                            <div>
+                                                <div className="font-medium text-gray-900 dark:text-base-content text-sm">
+                                                    {t('settings.debug.title', 'Debug Console & Logs')}
+                                                </div>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                                    Inspect IPC traffic and live runtime logs. Also accessible via the Bug icon in the top header navbar.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition-colors shadow-xs cursor-pointer"
+                                            onClick={() => {
+                                                if (isEnabled) {
+                                                    disable();
+                                                } else {
+                                                    enable();
+                                                }
+                                            }}
+                                        >
+                                            {isEnabled ? 'Close Debug Overlay' : 'Open Debug Console'}
+                                        </button>
                                     </div>
                                 </div>
 
