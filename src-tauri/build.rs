@@ -32,9 +32,10 @@ fn main() {
                 let deps_dir = debug_dir.join("deps");
                 let _ = std::fs::create_dir_all(&deps_dir);
 
-                if let Some(target_dir) = debug_dir.parent() {
-                    let _ = copy_dll_recursive(target_dir, &deps_dir, expected_arch_dir);
-                    let _ = copy_dll_recursive(target_dir, debug_dir, expected_arch_dir);
+                let build_dir = debug_dir.join("build");
+                if build_dir.exists() {
+                    let _ = copy_dll_recursive(&build_dir, &deps_dir, expected_arch_dir);
+                    let _ = copy_dll_recursive(&build_dir, debug_dir, expected_arch_dir);
                 }
             }
         }

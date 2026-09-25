@@ -31,7 +31,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "deb",
+      "app",
+      "dmg"
+    ],
     "createUpdaterArtifacts": false,
     "publisher": "Maintained by Alim, Sponsored by RISEUP ASIA LLC",
     "copyright": "Copyright \u00a9 2026 Alim. Sponsored by RISEUP ASIA LLC. All rights reserved.",
