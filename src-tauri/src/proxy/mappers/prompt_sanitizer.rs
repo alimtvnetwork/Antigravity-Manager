@@ -95,9 +95,9 @@ const NEUTRAL_IDENTITY: &str = "You are an AI Agent.";
 static RE_IDENTITY_DECLARATION: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
         // A. Identity opening (word boundary required to avoid matching inside phrases)
-        r"(?i:\b(?:you\s+are|you're|i\s+am|i'm|)\b[\s,，:：]*)",
+        r"(?i:\b(?:you\s+are|you're|i\s+am|i'm)\b[\s,，:：]*)",
         // B. Identity noun phrase: optional article + <=8 modifiers + optional AI + identity noun
-        r"(?i:(?:an?\s+)?(?:[\w'\-]+[\s,，]+){0,8}(?:ai[\s,，]+)?(?:agent\b|assistant\b|ai\b|))",
+        r"(?i:(?:an?\s+)?(?:[\w'\-]+[\s,，]+){0,8}(?:ai[\s,，]+)?(?:agent\b|assistant\b|ai\b))",
         // C. Attribution / version declaration (verb + preposition, or based on)
         //    Transition window permits comma (covering 'You are a Claude agent, built on Anthropic\'s ...'),
         //    but forbids crossing sentence ends, newlines, and XML tags, with max length of 8 characters.

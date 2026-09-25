@@ -697,7 +697,7 @@ impl TokenManager {
                 ) else {
                     continue;
                 };
-                if !crate::proxy::rate_limit::is_active_persisted_long_limit(
+                if !crate::proxy::rate_limit::is_active_persisted_long_image_limit(
                     model_key, &status, now,
                 ) {
                     continue;
@@ -708,7 +708,7 @@ impl TokenManager {
                 ) else {
                     continue;
                 };
-                self.rate_limit_tracker.restore_persisted_long_limit(
+                self.rate_limit_tracker.restore_persisted_long_image_limit(
                     &account_id,
                     std::time::SystemTime::UNIX_EPOCH
                         + std::time::Duration::from_secs(until_seconds),

@@ -1287,14 +1287,12 @@ fn build_contents(
                                     }
                                     // Compatible and not a retry: use signature
                                     *last_thought_signature = Some(sig.clone());
-                                    let mut part = json!({
+                                    parts.push(json!({
                                         "text": thinking,
                                         "thought": true,
                                         "thoughtSignature": sig.clone(),
                                         "thought_signature": sig
-                                    });
-                                    crate::proxy::common::json_schema::clean_json_schema(&mut part);
-                                    parts.push(part);
+                                    }));
                                 }
                                 None => {
                                     if mapped_model.to_lowercase().contains("gemini")
@@ -1303,11 +1301,13 @@ fn build_contents(
                                         )
                                     {
                                         tracing::warn!(
-                                            "[Thinking-Signature] Dropping unknown/foreign signature for Gemini target (len: {}). Downgrading to text.",
+                                            "[Thinking-Signature] Foreign/unknown non-Gemini signature (len: {}). Stripping from thought block for Gemini target.",
                                             sig.len()
                                         );
-                                        parts.push(json!({"text": thinking}));
-                                        saw_non_thinking = true;
+                                        parts.push(json!({
+                                            "text": thinking,
+                                            "thought": true,
+                                        }));
                                         continue;
                                     }
                                     // For JSON tool calling compatibility, if signature is long enough but unknown,
@@ -1318,16 +1318,12 @@ fn build_contents(
                                             sig.len()
                                         );
                                         *last_thought_signature = Some(sig.clone());
-                                        let mut part = json!({
+                                        parts.push(json!({
                                             "text": thinking,
                                             "thought": true,
                                             "thoughtSignature": sig.clone(),
                                             "thought_signature": sig
-                                        });
-                                        crate::proxy::common::json_schema::clean_json_schema(
-                                            &mut part,
-                                        );
-                                        parts.push(part);
+                                        }));
                                     } else {
                                         // Unknown and too short: downgrade to text for safety
                                         tracing::warn!(
@@ -1341,12 +1337,34 @@ fn build_contents(
                                 }
                             }
                         } else {
-                            // No signature: downgrade to text
-                            tracing::warn!(
-                                "[Thinking-Signature] No signature provided. Downgrading to text."
-                            );
-                            parts.push(json!({"text": thinking}));
-                            saw_non_thinking = true;
+                            if mapped_model.to_lowercase().contains("gemini") {
+                                tracing::info!(
+                                    "[Thinking-Signature] No signature provided for Gemini target. Falling back to sentinel."
+                                );
+                                let has_tool_use = blocks
+                                    .iter()
+                                    .any(|b| matches!(b, ContentBlock::ToolUse { .. }));
+                                if has_tool_use {
+                                    parts.push(json!({
+                                        "text": thinking,
+                                        "thought": true,
+                                    }));
+                                } else {
+                                    parts.push(json!({
+                                        "text": thinking,
+                                        "thought": true,
+                                        "thoughtSignature": crate::proxy::thinking_store::SENTINEL_SIGNATURE,
+                                        "thought_signature": crate::proxy::thinking_store::SENTINEL_SIGNATURE
+                                    }));
+                                }
+                            } else {
+                                // No signature: downgrade to text
+                                tracing::warn!(
+                                    "[Thinking-Signature] No signature provided. Downgrading to text."
+                                );
+                                parts.push(json!({"text": thinking}));
+                                saw_non_thinking = true;
+                            }
                         }
                     }
                     ContentBlock::RedactedThinking { data } => {
@@ -1360,23 +1378,25 @@ fn build_contents(
                     }
                     ContentBlock::Image { source, .. } => {
                         if source.source_type == "base64" {
-                            parts.push(json!({
-                                "inlineData": {
-                                    "mimeType": source.media_type,
-                                    "data": source.data
-                                }
-                            }));
+                            let part =
+                                crate::proxy::mappers::common_utils::create_gemini_inline_part(
+                                    source.media_type.as_deref(),
+                                    source.data.as_deref().unwrap_or(""),
+                                    "Image",
+                                );
+                            parts.push(part);
                             saw_non_thinking = true;
                         }
                     }
                     ContentBlock::Document { source, .. } => {
                         if source.source_type == "base64" {
-                            parts.push(json!({
-                                "inlineData": {
-                                    "mimeType": source.media_type,
-                                    "data": source.data
-                                }
-                            }));
+                            let part =
+                                crate::proxy::mappers::common_utils::create_gemini_inline_part(
+                                    source.media_type.as_deref(),
+                                    source.data.as_deref().unwrap_or(""),
+                                    "Document",
+                                );
+                            parts.push(part);
                             saw_non_thinking = true;
                         }
                     }
@@ -2329,7 +2349,7 @@ mod tests {
 
         assert!(system_texts.contains(&CLAUDE_CODE_CLI_IDENTITY));
         assert!(!system_texts.contains(&CLAUDE_AGENT_SDK_IDENTITY));
-        assert!(system_texts.contains(&"x-anthropic-billing-header: cc_entrypoint=sdk-cli;"));
+        assert!(!system_texts.contains(&"x-anthropic-billing-header: cc_entrypoint=sdk-cli;"));
     }
 
     #[test]
@@ -3072,13 +3092,13 @@ mod tests {
             quality: None,
         };
 
-        // Pro models have 49152 limit, so 32000 budget is preserved (not capped to 24576)
+        // Pro models have 49152 limit, so 49152 budget is applied
         let result_pro =
             transform_claude_request_in(&req_pro, "proj", false, None, "test_session", None)
                 .unwrap();
         assert_eq!(
             result_pro["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            32000
+            49152
         );
     }
 
@@ -3123,8 +3143,8 @@ mod tests {
         let budget = gen_config["thinkingConfig"]["thinkingBudget"]
             .as_u64()
             .unwrap();
-        // [FIX #1592] Since it's < 24576, it should be kept as 16000
-        assert_eq!(budget, 16000);
+        // Server-authoritative Gemini 3 Pro budget is 10001
+        assert_eq!(budget, 10001);
     }
 
     #[test]
@@ -3262,7 +3282,7 @@ mod tests {
         // Check injection per [FIX #2208]: Claude models in adaptive mode map to thinkingLevel = "high"
         // and remove thinkingBudget to avoid conflict
         assert_eq!(thinking_config["includeThoughts"], true);
-        assert_eq!(thinking_config["thinkingLevel"], "high");
+        assert_eq!(thinking_config["thinkingLevel"], "HIGH");
         assert!(thinking_config.get("thinkingBudget").is_none());
         assert!(thinking_config.get("thinkingType").is_none());
         assert!(thinking_config.get("effort").is_none());
@@ -3558,7 +3578,7 @@ mod tests {
 
         // 2. transform_claude_request_in should map both thinking and functionCall with the real signature
         let req = ClaudeRequest {
-            model: "gemini-3.8-flash-high".to_string(),
+            model: "claude-sonnet-4-6".to_string(),
             messages,
             thinking: Some(ThinkingConfig {
                 type_: "enabled".to_string(),

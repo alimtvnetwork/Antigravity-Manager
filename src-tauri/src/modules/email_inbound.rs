@@ -3434,7 +3434,7 @@ mod tests {
                 local_ip
             ),
             format!(
-                "{} Re: [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+                "{} Re: Inbound Remote Mailbox Instructions Cheat Sheet",
                 node_tag
             )
         );

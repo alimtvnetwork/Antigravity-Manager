@@ -36,6 +36,7 @@ pub struct AppConfig {
     pub hidden_menu_items: Vec<String>, // Hidden menu item path list
     #[serde(default)]
     pub cloudflared: CloudflaredConfig, // [NEW] Cloudflared configuration
+    #[serde(default)]
     pub auto_profile_switcher: AutoProfileSwitcherConfig, // [NEW] Auto profile switcher configuration
     #[serde(default = "default_instance_clone_mode")]
     pub instance_clone_mode: String,

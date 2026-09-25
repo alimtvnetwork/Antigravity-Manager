@@ -1748,7 +1748,6 @@ mod tests {
 
     #[test]
     fn test_gemini_pro_thinking_budget_processing() {
-        let _test_lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let _config_lock = crate::proxy::config::TEST_CONFIG_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
@@ -1805,7 +1804,6 @@ mod tests {
 
         #[test]
         fn test_claude_no_root_thinking_injection() {
-            let _test_lock = super::TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
             let _config_lock = crate::proxy::config::TEST_CONFIG_LOCK
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
@@ -1856,14 +1854,13 @@ mod tests {
                 .as_u64()
                 .expect("thinkingBudget should be a number");
             assert_eq!(
-                budget, 16000,
-                "Claude default thinking budget should be 16000"
+                budget, 16384,
+                "Claude default thinking budget should be 16384"
             );
         }
 
         #[test]
         fn test_gemini_thinking_injection_default() {
-            let _test_lock = super::TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
             let _config_lock = crate::proxy::config::TEST_CONFIG_LOCK
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
@@ -1898,7 +1895,6 @@ mod tests {
 
     #[test]
     fn test_gemini_pro_auto_inject_thinking() {
-        let _test_lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let _config_lock = crate::proxy::config::TEST_CONFIG_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
@@ -2095,7 +2091,10 @@ mod tests {
 
     #[test]
     fn test_gemini_anthropic_alignment_thinking_and_signatures() {
-        let valid_sig = "A".repeat(60); // 60 chars valid signature
+        use base64::Engine;
+        let mut raw = vec![0x12u8];
+        raw.resize(45, b'A');
+        let valid_sig = base64::engine::general_purpose::STANDARD.encode(&raw);
         let body = json!({
             "contents": [
                 {
@@ -2172,7 +2171,7 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 10000);
+        assert_eq!(tc["thinkingBudget"], 16384);
         assert!(tc.get("thinkingLevel").is_none());
 
         // 2. Bare Flash models adopt client thinkingLevel
@@ -2191,7 +2190,7 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 10000);
+        assert_eq!(tc["thinkingBudget"], 16384);
         assert!(tc.get("thinkingLevel").is_none());
 
         let req_flash_low = json!({
@@ -2202,10 +2201,10 @@ mod tests {
         });
         let wrapped = wrap_request(&req_flash_low, "test-p", "gemini-3-flash", None, None, None);
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 1000);
+        assert_eq!(tc["thinkingBudget"], 1024);
         assert!(tc.get("thinkingLevel").is_none());
 
-        // 3. Bare Flash models enforce -medium fallback (4000) when client sends NONE or omits
+        // 3. Bare Flash models enforce -medium fallback (4096) when client sends NONE or omits
         let req_flash_none = json!({
             "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
             "generationConfig": {
@@ -2221,7 +2220,7 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 4000);
+        assert_eq!(tc["thinkingBudget"], 4096);
         assert!(tc.get("thinkingLevel").is_none());
 
         let req_flash_empty = json!({
@@ -2236,7 +2235,7 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 4000);
+        assert_eq!(tc["thinkingBudget"], 4096);
 
         // 4. Bare Flash models ignore custom client thinkingBudget in favor of authoritative server level
         let req_flash_custom_budget = json!({
@@ -2254,7 +2253,7 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 4000);
+        assert_eq!(tc["thinkingBudget"], 4096);
 
         let req_flash_high_custom_budget = json!({
             "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
@@ -2271,6 +2270,6 @@ mod tests {
             None,
         );
         let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
-        assert_eq!(tc["thinkingBudget"], 10000);
+        assert_eq!(tc["thinkingBudget"], 16384);
     }
 }

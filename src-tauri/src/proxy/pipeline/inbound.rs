@@ -87,7 +87,7 @@ impl InboundThinkingPipeline {
                                         }
                                         None => {
                                             if target_model.to_lowercase().contains("gemini") {
-                                                crate::proxy::thinking_store::is_likely_gemini_signature(sig)
+                                                crate::proxy::thinking_store::is_compatible_gemini_signature(sig)
                                             } else if is_claude {
                                                 crate::proxy::thinking_store::is_claude_signature(
                                                     sig,
@@ -154,7 +154,7 @@ impl InboundThinkingPipeline {
                                 if let Some(fc_sig) =
                                     part.get("thoughtSignature").and_then(|s| s.as_str())
                                 {
-                                    if !crate::proxy::thinking_store::is_likely_gemini_signature(
+                                    if !crate::proxy::thinking_store::is_compatible_gemini_signature(
                                         fc_sig,
                                     ) {
                                         tracing::warn!(

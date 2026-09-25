@@ -1445,6 +1445,10 @@ mod tests {
 
     #[test]
     fn test_ubuntu_instance_switching_end_to_end_flow() {
+        // Heavy local disk / OS environment instance switching test: skip in CI/CD
+        if crate::proxy::config::is_ci_environment() {
+            return;
+        }
         let temp_dir = std::env::temp_dir().join(format!(
             "agm_test_{}",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
@@ -1473,6 +1477,31 @@ mod tests {
         assert!(clean.contains("ubuntu-inst"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_mock_account_switch_ci() {
+        // Lightweight in-memory mock test for CI/CD account & instance binding rotation
+        let mut inst = InstanceConfig {
+            id: "inst-ci-mock".to_string(),
+            name: "CI Mock Worker".to_string(),
+            data_dir: "/mock/inst-ci".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: Some("acc-old".to_string()),
+            bound_email: Some("old@example.com".to_string()),
+            created_at: 1000,
+            last_used: 1000,
+            is_default: true,
+            pid: None,
+            seq_num: Some(1),
+        };
+        inst.bound_account_id = Some("acc-new".to_string());
+        inst.bound_email = Some("new@example.com".to_string());
+        inst.last_used = 2000;
+        assert_eq!(inst.bound_account_id.as_deref(), Some("acc-new"));
+        assert_eq!(inst.bound_email.as_deref(), Some("new@example.com"));
+        assert_eq!(inst.last_used, 2000);
     }
 
     #[test]

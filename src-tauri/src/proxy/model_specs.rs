@@ -560,11 +560,31 @@ pub fn resolve_custom_budget(
                     None
                 }
             } else {
-                // Medium / default balanced tier
-                if tb_config.flash_medium > 0 {
-                    Some(tb_config.flash_medium as i64)
-                } else {
-                    None
+                // Bare Flash model: adopts client effort/level if provided, otherwise defaults to balanced medium tier
+                let client_level = client_effort.and_then(normalize_client_thinking_level);
+                match client_level {
+                    Some("HIGH") => {
+                        if tb_config.flash_high > 0 {
+                            Some(tb_config.flash_high as i64)
+                        } else {
+                            None
+                        }
+                    }
+                    Some("LOW") => {
+                        if tb_config.flash_low > 0 {
+                            Some(tb_config.flash_low as i64)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => {
+                        // Medium / default balanced tier (NONE or omitted)
+                        if tb_config.flash_medium > 0 {
+                            Some(tb_config.flash_medium as i64)
+                        } else {
+                            None
+                        }
+                    }
                 }
             }
         }

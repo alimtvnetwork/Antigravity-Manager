@@ -46,6 +46,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 08 | [08-manifest-and-entrypoint-resolution-rca.md](08-manifest-and-entrypoint-resolution-rca.md) | Application Manifest Restoration, Entry Point Resolution & Blank Screen Elimination RCA | Critical | Fixed |
 | 09 | [09-email-body-type-and-subject-version-rca.md](09-email-body-type-and-subject-version-rca.md) | Email Body HTML MIME Type & Versioned Node Telemetry Subject RCA | Critical | Fixed |
 | 10 | [10-blank-ui-dwm-occlusion-and-versioned-installer-rca.md](10-blank-ui-dwm-occlusion-and-versioned-installer-rca.md) | Blank UI DWM Thumbnail Freeze, Workflow Version Stamping & Two-Bar Release Installation RCA | Critical | Fixed |
+| 11 | [11-ci-cd-test-isolation-and-upstream-sync-rca.md](11-ci-cd-test-isolation-and-upstream-sync-rca.md) | CI/CD Unit Test Isolation, Mock Test Coverage & Upstream Sync Resolution RCA | Critical | Fixed |
 
 ---
 

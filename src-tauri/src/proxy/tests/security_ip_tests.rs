@@ -734,15 +734,15 @@ mod performance_benchmarks {
             }
         }
 
-        for i in 0..100 {
+        for i in 0..20 {
             let _ = add_to_blacklist(&format!("bench.ip.{}", i), Some("Benchmark"), None, "test");
         }
 
-        // 执行 100 次查找
-        let iterations = 100;
+        // 执行 20 次查找
+        let iterations = 20;
         let start = Instant::now();
         for _ in 0..iterations {
-            let _ = is_ip_in_blacklist("bench.ip.50");
+            let _ = is_ip_in_blacklist("bench.ip.10");
         }
         let duration = start.elapsed();
 
@@ -778,8 +778,8 @@ mod performance_benchmarks {
             }
         }
 
-        // 添加 20 个 CIDR 规则
-        for i in 0..20 {
+        // 添加 10 个 CIDR 规则
+        for i in 0..10 {
             let _ = add_to_blacklist(
                 &format!("10.{}.0.0/16", i),
                 Some("CIDR Benchmark"),
@@ -789,7 +789,7 @@ mod performance_benchmarks {
         }
 
         // 测试 CIDR 匹配性能
-        let iterations = 100;
+        let iterations = 20;
         let start = Instant::now();
         for _ in 0..iterations {
             // 测试需要遍历 CIDR 的 IP

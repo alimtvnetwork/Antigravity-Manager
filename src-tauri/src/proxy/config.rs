@@ -27,10 +27,18 @@ pub fn normalize_proxy_url(url: &str) -> String {
 #[cfg(test)]
 pub static TEST_CONFIG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Returns true when running in CI/CD (e.g. GitHub Actions) unless AGM_RUN_HEAVY_LOCAL_TESTS=1 is explicitly set.
+pub fn is_ci_environment() -> bool {
+    if std::env::var("AGM_RUN_HEAVY_LOCAL_TESTS").as_deref() == Ok("1") {
+        return false;
+    }
+    std::env::var("CI").is_ok() || std::env::var("GITHUB_ACTIONS").is_ok()
+}
+
 static GLOBAL_THINKING_BUDGET_CONFIG: OnceLock<RwLock<ThinkingBudgetConfig>> = OnceLock::new();
 
 #[cfg(test)]
-pub static TEST_THINKING_BUDGET_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub static TEST_THINKING_BUDGET_MUTEX: &std::sync::Mutex<()> = &TEST_CONFIG_LOCK;
 
 /// 获取当前 Thinking Budget 配置
 pub fn get_thinking_budget_config() -> ThinkingBudgetConfig {

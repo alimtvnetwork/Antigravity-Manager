@@ -140,7 +140,7 @@ pub fn resolve_real_model(canonical: &str, tier: VariantTier) -> Option<RealMode
 
         if is_canonical {
             if family.canonical_id == "gemini-3.7-flash" {
-                spec.id = family.canonical_id;
+                spec.id = "gemini-3.7-flash-tiered";
             }
         }
 

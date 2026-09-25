@@ -1453,7 +1453,7 @@ mod retention_tests {
             serde_json::from_str::<LogRetentionConfig>("{}")
                 .unwrap()
                 .max_disk_mb,
-            1024
+            LogRetentionConfig::default().max_disk_mb
         );
         config.proxy.log_retention.max_disk_mb = 8;
         crate::modules::config::save_app_config(&config).unwrap();

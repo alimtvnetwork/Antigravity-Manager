@@ -1133,20 +1133,20 @@ mod tests {
         let tracker = RateLimitTracker::new();
         let backoff_steps = vec![60, 300, 1800, 7200];
 
-        // 模拟连续 5 次 5xx 错误
+        // 模拟连续 5 次 529 (ServerError) 错误
         for i in 1..=5 {
             let info = tracker.parse_from_error(
                 "acc1",
-                503,
+                529,
                 None,
-                "Service Unavailable",
+                "Service Overloaded",
                 None,
                 &backoff_steps,
             );
-            assert!(info.is_some(), "第 {} 次 5xx 应该返回 RateLimitInfo", i);
+            assert!(info.is_some(), "第 {} 次 529 应该返回 RateLimitInfo", i);
             let info = info.unwrap();
-            // 5xx 应该始终锁定 8 秒，不受 failure_count 影响
-            assert_eq!(info.retry_after_sec, 8, "5xx 第 {} 次应该锁定 8 秒", i);
+            // 529 应该始终锁定 8 秒，不受 failure_count 影响
+            assert_eq!(info.retry_after_sec, 8, "529 第 {} 次应该锁定 8 秒", i);
         }
 
         // 现在触发一次 429 QuotaExhausted（没有 quotaResetDelay）

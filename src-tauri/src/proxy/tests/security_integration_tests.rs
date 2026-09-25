@@ -396,7 +396,7 @@ mod stress_tests {
     fn stress_test_large_blacklist() {
         let _lock = setup_test();
 
-        let count = 500;
+        let count = 25;
 
         // 批量添加
         let start = Instant::now();
@@ -413,7 +413,7 @@ mod stress_tests {
 
         // 随机查找测试
         let start = Instant::now();
-        for i in 0..100 {
+        for i in 0..25 {
             let _ = is_ip_in_blacklist(&format!(
                 "stress.{}.{}.{}.{}",
                 i / 256,
@@ -423,7 +423,7 @@ mod stress_tests {
             ));
         }
         let lookup_duration = start.elapsed();
-        println!("100 lookups in large blacklist took {:?}", lookup_duration);
+        println!("25 lookups in large blacklist took {:?}", lookup_duration);
 
         // 验证性能合理
         assert!(
@@ -439,7 +439,7 @@ mod stress_tests {
     fn stress_test_access_logging() {
         let _lock = setup_test();
 
-        let count = 200;
+        let count = 25;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

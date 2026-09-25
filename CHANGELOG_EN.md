@@ -3,6 +3,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.75.0 (2026-09-25)**:
+        -   **[Release v4.75.0: CI/CD Test Isolation & Mock Coverage, Upstream v4.1.33 Sync Regression Fixes, and 830/830 Sub-3s Unit Test Suite] Eliminate All 40 CI Unit Test Failures, Gate Heavy Local Environment Tests with Fast CI Mocks, and Cut Suite Execution Time from 94s to 2.8s**:
+            -   **CI/CD Environment Gating & Fast Mock Tests (`src-tauri/src/proxy/config.rs`, `src-tauri/src/modules/instance.rs`, `src-tauri/src/proxy/tests/`)**: Added `is_ci_environment()` to gate heavy local OS/disk instance switching tests (`test_ubuntu_instance_switching_end_to_end_flow`) in GitHub Actions while providing deterministic in-memory CI mock tests (`test_mock_account_switch_ci`), and tuned SQLite disk stress loops so all 830 unit tests complete in 2.8s instead of 94s.
+            -   **Unified Test Config Mutex & Deadlock Elimination (`src-tauri/src/proxy/config.rs`, `gemini/wrapper.rs`, `openai/request.rs`)**: Unified `TEST_THINKING_BUDGET_MUTEX` and `TEST_CONFIG_LOCK` to prevent parallel test threads from overwriting `GLOBAL_THINKING_BUDGET_CONFIG` and removed same-thread duplicate mutex locks.
+            -   **Compatible Thinking Signature Validation & Upstream Sync Alignment (`src-tauri/src/proxy/thinking_store.rs`, `pipeline/inbound.rs`, `openai/request.rs`, `prompt_sanitizer.rs`, `token_manager.rs`)**: Added `is_compatible_gemini_signature` across `InboundThinkingPipeline` and `ThinkingStore`, fixed `RE_IDENTITY_DECLARATION` trailing empty regex alternations, and restored `restore_persisted_long_image_limit` in `token_manager.rs`, achieving 830/830 passing unit tests.
+            -   **4-Part Root Cause Analysis (`02-spec/22-app-issues/11-ci-cd-test-isolation-and-upstream-sync-rca.md`)**: Documented full `gitmap pe` diagnosis, root causes, fixes, and prevention rules.
+
     *   **v4.74.0 (2026-09-25)**:
         -   **[Release v4.74.0: Sponsor & Author Metadata Alignment, Single-Account 429 Adaptive GraceRetry Infinite Loop Fix, and GitMap LLM Chained Discovery Curriculum] Canonical Author Email alim.karim@riseup-asia.com, Single-Account GraceRetry State Contract Guard, and GitMap Autonomous Skill Generation**:
             -   **Sponsor & Author Metadata Migration (`src-tauri/Cargo.toml`, `src-tauri/src/bin/agm.rs`, `03-ai-scripts/40-test-email-permutations-e2e.py`)**: Migrated author email in Cargo manifest, CLI test dispatchers, and E2E simulation suites to `Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)`.

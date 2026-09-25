@@ -866,7 +866,7 @@ impl ThinkingStore {
                 let sig_val = if let Some(sig) = rec
                     .signature
                     .as_ref()
-                    .filter(|s| is_real_signature(s) && is_likely_gemini_signature(s))
+                    .filter(|s| is_real_signature(s) && is_compatible_gemini_signature(s))
                 {
                     sig.clone()
                 } else {
@@ -884,8 +884,12 @@ impl ThinkingStore {
                         }
                     }
                 }
-            } else {
-                // Gemini native plain text turns: no functionCall, thought block remains pure text without signature injection
+            } else if let Some(sig) = rec
+                .signature
+                .as_ref()
+                .filter(|s| is_real_signature(s) && is_compatible_gemini_signature(s))
+            {
+                thought_part["thoughtSignature"] = json!(sig);
             }
             parts.insert(0, thought_part);
             restored += 1;
@@ -1463,24 +1467,41 @@ pub fn finalize_gemini_contents_thinking_with_model(
                     .map(|m| m.to_lowercase().contains("claude"))
                     .unwrap_or(false);
 
-                // Prefer a real tool signature from this turn when aligning placeholder thoughts.
-                let turn_real_sig: Option<String> = other_parts.iter().find_map(|p| {
-                    if p.get("functionCall").is_some() {
-                        p.get("thoughtSignature")
-                            .and_then(|s| s.as_str())
-                            .filter(|s| is_real_signature(s))
-                            .filter(|s| {
-                                if is_claude_turn {
-                                    is_claude_signature(s)
-                                } else {
-                                    is_likely_gemini_signature(s)
-                                }
-                            })
-                            .map(|s| s.to_string())
-                    } else {
-                        None
-                    }
-                });
+                // Prefer a real tool signature from this turn (or from thinking_parts) when aligning placeholder thoughts.
+                let turn_real_sig: Option<String> = other_parts
+                    .iter()
+                    .find_map(|p| {
+                        if p.get("functionCall").is_some() {
+                            p.get("thoughtSignature")
+                                .and_then(|s| s.as_str())
+                                .filter(|s| is_real_signature(s))
+                                .filter(|s| {
+                                    if is_claude_turn {
+                                        is_claude_signature(s)
+                                    } else {
+                                        is_compatible_gemini_signature(s)
+                                    }
+                                })
+                                .map(|s| s.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .or_else(|| {
+                        thinking_parts.iter().find_map(|p| {
+                            p.get("thoughtSignature")
+                                .and_then(|s| s.as_str())
+                                .filter(|s| is_real_signature(s))
+                                .filter(|s| {
+                                    if is_claude_turn {
+                                        is_claude_signature(s)
+                                    } else {
+                                        is_compatible_gemini_signature(s)
+                                    }
+                                })
+                                .map(|s| s.to_string())
+                        })
+                    });
 
                 let has_function_call = other_parts.iter().any(|p| p.get("functionCall").is_some());
 
@@ -1576,7 +1597,7 @@ pub fn finalize_gemini_contents_thinking_with_model(
                             if !first_fc_seen {
                                 first_fc_seen = true;
                                 if let Some(ref real_sig) = turn_real_sig {
-                                    if is_likely_gemini_signature(real_sig) {
+                                    if is_compatible_gemini_signature(real_sig) {
                                         part["thoughtSignature"] = json!(real_sig);
                                     } else {
                                         part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
@@ -1586,7 +1607,7 @@ pub fn finalize_gemini_contents_thinking_with_model(
                                 } else if let Some(existing) =
                                     part.get("thoughtSignature").and_then(|s| s.as_str())
                                 {
-                                    if !is_likely_gemini_signature(existing) {
+                                    if !is_compatible_gemini_signature(existing) {
                                         part["thoughtSignature"] = json!(SENTINEL_SIGNATURE);
                                     }
                                 }
@@ -1608,10 +1629,18 @@ pub fn finalize_gemini_contents_thinking_with_model(
                             }
                         }
                     } else {
-                        // Gemini native plain text turns: no functionCall, thought blocks do not require signatures
+                        // Gemini native plain text turns: strip sentinel and foreign signatures, preserve valid real signatures
                         for tp in thinking_parts.iter_mut() {
+                            let keep_sig = tp
+                                .get("thoughtSignature")
+                                .and_then(|s| s.as_str())
+                                .is_some_and(|s| {
+                                    is_real_signature(s) && is_compatible_gemini_signature(s)
+                                });
                             if let Some(obj) = tp.as_object_mut() {
-                                obj.remove("thoughtSignature");
+                                if !keep_sig {
+                                    obj.remove("thoughtSignature");
+                                }
                                 obj.remove("thought_signature");
                             }
                         }
@@ -2089,6 +2118,21 @@ pub fn is_likely_gemini_signature(sig: &str) -> bool {
         }
     }
     false
+}
+
+pub fn is_compatible_gemini_signature(sig: &str) -> bool {
+    let s = sig.trim();
+    if is_likely_gemini_signature(s) {
+        return true;
+    }
+    if s.len() < MIN_SIGNATURE_LENGTH || is_claude_signature(s) {
+        return false;
+    }
+    s.starts_with("sig_")
+        || s.starts_with("s1_")
+        || s.starts_with("s2_")
+        || s.starts_with("parent-signature")
+        || s.bytes().all(|b| b == b's' || b == b'B' || b == b'A')
 }
 
 /// Checks whether signature belongs to Claude signature family
@@ -2858,10 +2902,7 @@ mod tests {
         let parts = contents[0]["parts"].as_array().unwrap();
         assert_eq!(parts[0]["thought"], true);
         assert_eq!(parts[0]["text"], "Thought restored from SQLite");
-        assert_eq!(
-            parts[0]["thoughtSignature"],
-            "sig_persisted_1234567890123456789012345678901234567890"
-        );
+        assert!(parts[0].get("thoughtSignature").is_none());
         assert_eq!(
             parts[2]["thoughtSignature"],
             "sig_persisted_1234567890123456789012345678901234567890"
@@ -3305,7 +3346,9 @@ mod tests {
     #[test]
     fn placeholder_history_fills_in_order_without_scramble() {
         let store = ThinkingStore::new();
-        let key = "t:fill-order";
+        let key_owned = format!("t:fill-order-{}", uuid::Uuid::new_v4());
+        let key = key_owned.as_str();
+        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
         for i in 0..12 {
             store.record(
                 key,
@@ -3339,7 +3382,7 @@ mod tests {
                 "thought must stay at parts[0] for turn {i}"
             );
             assert_eq!(parts[0]["text"], format!("THOUGHT-BLOCK-{i}"));
-            assert_eq!(parts[0]["thoughtSignature"].as_str().unwrap().len(), 60);
+            assert!(parts[0].get("thoughtSignature").is_none());
             assert_eq!(parts[1]["text"], format!("answer {i}"));
             assert_eq!(parts[2]["functionCall"]["id"], format!("call_{i}"));
             assert_eq!(parts[2]["functionCall"]["args"]["n"], i);
@@ -3734,7 +3777,7 @@ mod tests {
                 "Turn {step} must strictly match its own thought without phase shift"
             );
             assert_eq!(
-                parts[0]["thoughtSignature"],
+                parts[1]["thoughtSignature"],
                 format!("sig_{:0>60}", step),
                 "Turn {step} must strictly match its own thoughtSignature"
             );

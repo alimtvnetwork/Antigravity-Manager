@@ -11,18 +11,19 @@ use std::time::Duration;
 #[test]
 fn test_retry_strategy_404() {
     let strategy = determine_retry_strategy(404, "", false);
-    match strategy {
-        RetryStrategy::FixedDelay(d) => assert_eq!(d, Duration::from_millis(300)),
-        other => panic!("Expected FixedDelay(300ms), got {:?}", other),
-    }
+    assert!(
+        matches!(strategy, RetryStrategy::NoRetry),
+        "Expected NoRetry for 404 model not found, got {:?}",
+        strategy
+    );
 }
 
 #[test]
 fn test_retry_strategy_429_no_delay() {
     let strategy = determine_retry_strategy(429, "rate limited", false);
     assert!(
-        matches!(strategy, RetryStrategy::LinearBackoff { base_ms: 5000 }),
-        "Expected LinearBackoff {{ base_ms: 5000 }}, got {:?}",
+        matches!(strategy, RetryStrategy::GraceRetry(d) if d == Duration::from_millis(3000)),
+        "Expected GraceRetry(3s), got {:?}",
         strategy
     );
 }
@@ -34,11 +35,11 @@ fn test_retry_strategy_503() {
         matches!(
             strategy,
             RetryStrategy::ExponentialBackoff {
-                base_ms: 10000,
-                max_ms: 60000
+                base_ms: 5000,
+                max_ms: 30000
             }
         ),
-        "Expected ExponentialBackoff {{ base_ms: 10000, max_ms: 60000 }}, got {:?}",
+        "Expected ExponentialBackoff {{ base_ms: 5000, max_ms: 30000 }}, got {:?}",
         strategy
     );
 }
@@ -50,11 +51,11 @@ fn test_retry_strategy_529() {
         matches!(
             strategy,
             RetryStrategy::ExponentialBackoff {
-                base_ms: 10000,
-                max_ms: 60000
+                base_ms: 5000,
+                max_ms: 30000
             }
         ),
-        "Expected ExponentialBackoff {{ base_ms: 10000, max_ms: 60000 }}, got {:?}",
+        "Expected ExponentialBackoff {{ base_ms: 5000, max_ms: 30000 }}, got {:?}",
         strategy
     );
 }

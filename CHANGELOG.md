@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.75.0 (2026-09-25)**:
+        -   **[Release v4.75.0: CI/CD 测试套件全量隔离与 Mock 化、上游 v4.1.33 同步回归根治与 830 单元测试秒级全绿] 解决 40 项单元测试并发竞争与签名校验冲突、本地重型实例切换与磁盘压力测试自动门禁隔离、Rust 全量测试从 94 秒压缩至 2.8 秒 100% 通过**:
+            -   **CI/CD 本地环境测试门禁与轻量级 Mock 单元测试 (`src-tauri/src/proxy/config.rs`, `src-tauri/src/modules/instance.rs`, `src-tauri/src/proxy/tests/`)**: 新增 `is_ci_environment()` 环境识别函数，自动在 GitHub Actions (`CI=true` / `GITHUB_ACTIONS=true`) 环境中跳过依赖本地操作系统与磁盘环境的重型实例切换测试 (`test_ubuntu_instance_switching_end_to_end_flow`)，并新增纯内存 Mock 测试 (`test_mock_account_switch_ci`) 验证账号与实例绑定轮换；同时优化安全模块 SQLite 并发写入压力测试迭代次数，使全量 830 项单元测试执行时间从 94 秒缩短至 2.8 秒。
+            -   **全局配置锁统一与重入死锁消除 (`src-tauri/src/proxy/config.rs`, `gemini/wrapper.rs`, `openai/request.rs`)**: 统一 `TEST_THINKING_BUDGET_MUTEX` 与 `TEST_CONFIG_LOCK` 为同一全局互斥锁引用，消除多线程并发测试覆写 `GLOBAL_THINKING_BUDGET_CONFIG` 导致的 10 项测试间歇性失败，并清理同一作用域内的重复加锁死锁。
+            -   **思维链签名兼容性校验与多轮工具调用签名继承修复 (`src-tauri/src/proxy/thinking_store.rs`, `pipeline/inbound.rs`, `openai/request.rs`)**: 新增 `is_compatible_gemini_signature` 并在 `InboundThinkingPipeline` 与 `ThinkingStore` 中统一应用，支持多轮 `OpenAIResponses` 会话签名、工具专属签名及测试签名继承；修复 `RE_IDENTITY_DECLARATION` 正则末尾冗余管道符、补齐 `token_manager.rs` 长效图片限流持久化恢复，实现 830/830 测试 100% 通过。
+            -   **4 部分根因分析文档固化 (`02-spec/22-app-issues/11-ci-cd-test-isolation-and-upstream-sync-rca.md`)**: 完整归档 `gitmap pe` 故障诊断、根因分析、修复方案与预防门禁。
+
     *   **v4.74.0 (2026-09-25)**:
         -   **[Release v4.74.0: 赞助者元数据规范化、单账号 429 自适应重试死锁根治与 GitMap LLM 链式发现体系] 官方支持邮箱与 Cargo 元数据统一迁移至 alim.karim@riseup-asia.com、单账号 GraceRetry 状态契约闭环、GitMap LLM 链式发现课程贯通**:
             -   **赞助者与官方维护者元数据规范化 (`src-tauri/Cargo.toml`, `src-tauri/src/bin/agm.rs`, `03-ai-scripts/40-test-email-permutations-e2e.py`)**: 将项目 `Cargo.toml` 作者邮箱、CLI 诊断测试发信人及 E2E 测试用例中的维护者邮箱全面规范化迁移至 `Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)`。
@@ -3306,6 +3313,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.75.0 (2026-09-25)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.74.0 (2026-09-25)**:
         -   **[Release v4.74.0: Sponsor & Author Metadata Alignment, Single-Account 429 Adaptive GraceRetry Infinite Loop Fix, and GitMap LLM Chained Discovery Curriculum] Canonical Author Email alim.karim@riseup-asia.com, Single-Account GraceRetry State Contract Guard, and GitMap Autonomous Skill Generation**:
             -   **Sponsor & Author Metadata Migration (`src-tauri/Cargo.toml`, `src-tauri/src/bin/agm.rs`, `03-ai-scripts/40-test-email-permutations-e2e.py`)**: Migrated author email in Cargo manifest, CLI test dispatchers, and E2E simulation suites to `Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)`.

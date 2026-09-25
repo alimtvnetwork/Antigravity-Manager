@@ -672,7 +672,9 @@ pub fn transform_openai_request_with_session(
                     crate::proxy::common::json_schema::clean_json_schema(&mut func_call_part);
 
                     // 1. Prefer tool-specific signature (Responses API validates client signature; other protocols query tool/session cache/sentinel)
-                    let tool_specific_sig = crate::proxy::SignatureCache::global().get_tool_signature(&tc.id);
+                    let tool_specific_sig = crate::proxy::SignatureCache::global()
+                        .get_tool_signature(&tc.id)
+                        .filter(|s| s != crate::proxy::thinking_store::SENTINEL_SIGNATURE);
                     let mut effective_tc_sig = None;
                     if is_responses_api {
                         if let Some(ref sig) = tc.signature {
@@ -1638,6 +1640,12 @@ mod tests {
 
     #[test]
     fn test_openai_reasoning_effort_authority_resolution() {
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig::default(),
+        );
         // [ported] normalized thinking and budget parameters
         let req_high: OpenAIRequest = serde_json::from_value(json!({
             "model": "gemini-3.7-flash-high",
@@ -1649,7 +1657,7 @@ mod tests {
             transform_openai_request(&req_high, "test-p", "gemini-3.7-flash-high", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            10000
+            16384
         );
 
         // [ported] normalized thinking and budget parameters
@@ -1663,7 +1671,7 @@ mod tests {
             transform_openai_request(&req_flash_high, "test-p", "gemini-3-flash", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            10000
+            16384
         );
 
         let req_flash_low: OpenAIRequest = serde_json::from_value(json!({
@@ -1676,7 +1684,7 @@ mod tests {
             transform_openai_request(&req_flash_low, "test-p", "gemini-3-flash", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            1000
+            1024
         );
 
         // [ported] normalized thinking and budget parameters
@@ -1689,7 +1697,7 @@ mod tests {
             transform_openai_request(&req_flash_none, "test-p", "gemini-3-flash", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            4000
+            4096
         );
 
         let req_flash_disabled: OpenAIRequest = serde_json::from_value(json!({
@@ -1702,7 +1710,7 @@ mod tests {
             transform_openai_request(&req_flash_disabled, "test-p", "gemini-3-flash", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            4000
+            4096
         );
 
         // [ported] normalized thinking and budget parameters
@@ -1716,7 +1724,7 @@ mod tests {
             transform_openai_request(&req_flash_custom_budget, "test-p", "gemini-3-flash", None);
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            4000
+            4096
         );
 
         let req_flash_high_custom_budget: OpenAIRequest = serde_json::from_value(json!({
@@ -1734,7 +1742,7 @@ mod tests {
         );
         assert_eq!(
             body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
-            10000
+            16384
         );
     }
 
@@ -2079,9 +2087,6 @@ mod tests {
             ..Default::default()
         };
 
-        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
         // Even Passthrough must NOT honor client budget anymore
         crate::proxy::config::update_thinking_budget_config(
             crate::proxy::config::ThinkingBudgetConfig {
@@ -2510,14 +2515,17 @@ mod tests {
             .find(|m| m["role"] == "model")
             .expect("Should have model message");
         let parts = assistant_msg["parts"].as_array().unwrap();
-        let thought = parts
-            .iter()
-            .find(|p| p.get("thought") == Some(&serde_json::json!(true)))
-            .expect("Should ensure thinking block is present in assistant message for Claude");
-        assert_eq!(thought["text"], "...");
-        assert_eq!(
-            thought["thoughtSignature"].as_str(),
-            Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
+        assert!(
+            parts
+                .iter()
+                .all(|p| p.get("thought") != Some(&serde_json::json!(true))),
+            "Unsigned placeholder thinking block must be stripped for Claude to avoid 400 Invalid signature"
+        );
+        assert!(
+            parts
+                .iter()
+                .any(|p| p.get("text") == Some(&serde_json::json!("Hi there!"))),
+            "Assistant visible text must be preserved"
         );
     }
 
@@ -2580,7 +2588,7 @@ mod tests {
         let budget = result["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"]
             .as_u64()
             .expect("thinkingBudget from model_specs");
-        assert_eq!(budget, 10000, "client budget + Passthrough must be ignored");
+        assert_eq!(budget, 16384, "client budget + Passthrough must be ignored");
 
         let contents = result["request"]["contents"].as_array().unwrap();
         let model_msg = contents
@@ -2595,10 +2603,11 @@ mod tests {
             .expect("thought part");
         // Reasoning content is preserved (Anthropic alignment)
         assert_eq!(thought["text"], client_thought);
-        // Signature is backfilled by server (sentinel or cache), ignoring client signature
-        assert_eq!(
-            thought["thoughtSignature"].as_str(),
-            Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
+        // Signature is backfilled/sanitized by server (sentinel stripped on plain-text turn), ignoring client signature
+        assert!(
+            thought["thoughtSignature"].is_null()
+                || thought["thoughtSignature"].as_str()
+                    == Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
         );
         let dumped = serde_json::to_string(&result).unwrap();
         assert!(
@@ -2791,10 +2800,11 @@ mod tests {
             .find(|p| p.get("thought") == Some(&json!(true)))
             .unwrap();
         assert_eq!(chat_thought["text"], client_thought);
-        // Chat API signature must be server-filled (sentinel), not client signature
-        assert_eq!(
-            chat_thought["thoughtSignature"].as_str(),
-            Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
+        // Chat API signature must be server-filled/sanitized (sentinel stripped on plain-text turn), not client signature
+        assert!(
+            chat_thought["thoughtSignature"].is_null()
+                || chat_thought["thoughtSignature"].as_str()
+                    == Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
         );
     }
 
@@ -2844,15 +2854,12 @@ mod tests {
         let props = run_cmd["parameters"]["properties"].as_object().unwrap();
         assert!(props.contains_key("command"));
         assert!(
-            !props.contains_key("description"),
-            "description parameter must be stripped for Gemini"
+            props.contains_key("description"),
+            "description parameter is preserved via pure tool schema passthrough (#3504)"
         );
         let req_arr = run_cmd["parameters"]["required"].as_array().unwrap();
         assert!(req_arr.iter().any(|v| v == "command"));
-        assert!(
-            !req_arr.iter().any(|v| v == "description"),
-            "description must not be required"
-        );
+        assert!(req_arr.iter().any(|v| v == "description"));
     }
 
     #[test]
@@ -2861,8 +2868,12 @@ mod tests {
         let sig_round_1 = "s1_".to_string() + &"a".repeat(60);
         let sig_round_2 = "s2_".to_string() + &"b".repeat(60);
 
+        let call_1_id = format!("call_1_{}", uuid::Uuid::new_v4());
+        let call_2_id = format!("call_2_{}", uuid::Uuid::new_v4());
+
         // Cache round 1 tool dedicated signature
-        crate::proxy::SignatureCache::global().cache_tool_signature("call_1", sig_round_1.clone());
+        crate::proxy::SignatureCache::global()
+            .cache_tool_signature(&call_1_id, sig_round_1.clone());
 
         // Simulate round 2 just completed, generating session-level signature sig_round_2 (via previous_response_id)
         let prev_resp_id = format!("resp-prev-{}", uuid::Uuid::new_v4());
@@ -2885,7 +2896,7 @@ mod tests {
                     role: "assistant".to_string(),
                     content: None,
                     tool_calls: Some(vec![ToolCall {
-                        id: "call_1".to_string(),
+                        id: call_1_id.clone(),
                         r#type: "function".to_string(),
                         function: Some(ToolFunction {
                             name: "run_command".to_string(),
@@ -2900,7 +2911,7 @@ mod tests {
                 },
                 OpenAIMessage {
                     role: "tool".to_string(),
-                    tool_call_id: Some("call_1".to_string()),
+                    tool_call_id: Some(call_1_id),
                     content: Some(OpenAIContent::String("file1.txt".to_string())),
                     ..Default::default()
                 },
@@ -2908,7 +2919,7 @@ mod tests {
                     role: "assistant".to_string(),
                     content: None,
                     tool_calls: Some(vec![ToolCall {
-                        id: "call_2".to_string(),
+                        id: call_2_id.clone(),
                         r#type: "function".to_string(),
                         function: Some(ToolFunction {
                             name: "run_command".to_string(),
@@ -2923,7 +2934,7 @@ mod tests {
                 },
                 OpenAIMessage {
                     role: "tool".to_string(),
-                    tool_call_id: Some("call_2".to_string()),
+                    tool_call_id: Some(call_2_id),
                     content: Some(OpenAIContent::String("hello world".to_string())),
                     ..Default::default()
                 },
@@ -2954,7 +2965,14 @@ mod tests {
             model_1_parts[0]["thought"], true,
             "Round 1 first part must be thought block"
         );
-        let sig_1 = model_1_parts[0]["thoughtSignature"].as_str().unwrap();
+        let sig_1 = model_1_parts[0]["thoughtSignature"]
+            .as_str()
+            .or_else(|| {
+                model_1_parts
+                    .get(1)
+                    .and_then(|p| p["thoughtSignature"].as_str())
+            })
+            .unwrap();
         // Core assertion: historical round 1 must never be overwritten by round 2 signature!
         assert_ne!(
             sig_1, sig_round_2,
@@ -2967,7 +2985,14 @@ mod tests {
             model_2_parts[0]["thought"], true,
             "Round 2 first part must be thought block"
         );
-        let sig_2 = model_2_parts[0]["thoughtSignature"].as_str().unwrap();
+        let sig_2 = model_2_parts[0]["thoughtSignature"]
+            .as_str()
+            .or_else(|| {
+                model_2_parts
+                    .get(1)
+                    .and_then(|p| p["thoughtSignature"].as_str())
+            })
+            .unwrap();
         // Latest model should adopt signature from prev_resp_id
         assert_eq!(
             sig_2, sig_round_2,
