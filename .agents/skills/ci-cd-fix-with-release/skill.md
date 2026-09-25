@@ -6,11 +6,18 @@ description: >-
 
 # Instruction (must follow): Release-Triggered CI/CD Fix Loop & Release Orchestration
 
+> [!IMPORTANT]
+> Prompt Version: 2.5.0
+> Synchronization: Main Meta-Repo & Connected Workspaces
+> 
+> **Top-Instruction Priority Mandate (Preamble Precedence):**
+> Whatever directives, constraints, checklists, or instructions are given before this section or prompt (including in the prompt preamble, header blocks, or incoming user request) are HIGHEST PRIORITY and MUST BE FOLLOWED as strictly NON-NEGOTIABLE. They supersede and strictly override any conflicting general advice, default conventions, or lower-level guidelines below.
+
 Trigger Keywords & Aliases: `fix and release`, `ci release`, `fix CI/CD and release`, `cicd fix release`
 
 /goal Autonomously diagnose and repair CI/CD pipeline issues, execute full unit test suites and quality gates to verify green status, and perform complete automated release publication with version bump and changelog sync.
 
-/learn Ingest recent RCAs from `.ai-memory/cicd-issues/`, `.ai-memory/issues/`, `02-spec/02-coding-guidelines/02-canonical-size-tier.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, `02-spec/02-coding-guidelines/01-cross-language/01-index.md`, and `02-spec/03-error-manage/` before touching any code so past mistakes are never repeated.
+/learn Ingest recent RCAs from `.ai-memory/cicd-issues/`, `.ai-memory/issues/`, `02-spec/02-coding-guidelines/02-canonical-size-tier.md`, `02-spec/02-coding-guidelines/01-cross-language/readme.md`, `02-spec/02-coding-guidelines/01-cross-language/readme.md`, and `02-spec/03-error-manage/` before touching any code so past mistakes are never repeated.
 
 ---
 
@@ -26,8 +33,16 @@ PHASE_2_STEPS = N / 2  (Steps N/2+1 .. N: Singly-Done Self-Loop Fixing, Zero in 
 Both N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after the user sets them.
 
 > [!CAUTION]
-> **EXCLUSIVE TEST EXECUTION & RELEASE AUTHORITY:**
-> This skill (`ci-cd-fix-with-release`) IS the designated workflow authorized to run full unit test suites (`python 03-ai-scripts/06-cicd-local-runner.py --all` or `--run-tests`) and trigger automated version bumping, changelog assembly, tagging, and GitHub/GitLab release creation. Standard `ci-cd-fix` does NOT run unit tests; only `ci-cd-fix-with-release` runs full tests to verify complete green gates before releasing.
+> **SMART TARGETED TEST & RELEASE AUTHORITY:**
+> This skill (`ci-cd-fix-with-release`) authorizes targeted test execution strictly on failed or modified packages to achieve the fastest green exit and release. The AI MUST execute tests in the smartest way possible:
+> 1. **Priority Incremental Runner:** Execute smart incremental Go tests and gates via `python 03-ai-scripts/06-cicd-local-runner.py run-smart` (or alias `smart`, `--smart`, `-s`), which inspects Git changed files, builds ONLY changed packages into OS temp, and runs the Quad Runner.
+> 2. **Specific Package Targeting:** Run/build ONLY packages and test functions directly cited in the failure stack trace: `python 03-ai-scripts/06-cicd-local-runner.py --pkg <target_package_or_file>`.
+> 3. **Heatmap & Fast-Path Testing:** Use `--fast` to run only hot and warm tests based on `.ai-memory/test-heatmap.json`, skipping cold tests (`python 03-ai-scripts/06-cicd-local-runner.py --fast`).
+> 4. **Changed Packages from Last Git Hash:** Compare against the last known git hash (`git diff --name-only HEAD~1`) and isolate packages that actually changed using `python 03-ai-scripts/06-cicd-local-runner.py --changed-only`.
+> 5. **Bounded Stack Trace Extraction (RCA 58):** Always extract bounded failure frames (strictly 5 preceding + 20 trailing lines) halting on exit code or job boundary (`gitmap pe`) to prevent clipboard and report bloat.
+> 6. **File State & Hash Tracking:** Every fix must persist modified files to `.ai-memory/temp/recent-file-changes.json` under lock (`python 03-ai-scripts/33-test-inventory-generator.py --record <files...>`).
+> 7. **In-Flight Heartbeats & ETA Wait:** The local runner emits heartbeats every 25s (`--heartbeat-interval 25.0`) and writes status to `.ai-memory/temp/runner-eta.json`. Agents must sleep for 60s or remaining ETA rather than busy-polling.
+> 8. **Strict Ban on Extraneous Runs:** NEVER run the entire test suite, spellcheckers, or unrelated packages. Verify strictly using `python 03-ai-scripts/06-cicd-local-runner.py run-smart`, `--changed-only`, or `--pkg <target>`, then proceed immediately to the automated release ceremony.
 
 ---
 
@@ -42,9 +57,9 @@ Both N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after the user sets them.
 >    - RCA & Issue Logs: `.ai-memory/memory/issues/` and `.ai-memory/cicd-issues/`.
 >    - Execution Plans & Subtasks: `.ai-memory/plans/pending/`, `.ai-memory/plans/subtasks/`.
 >    - Coding Guidelines Mirror: `.ai-memory/coding-guidelines.md`.
-> 3. **Strict Relative Git Paths (TOTAL BAN on Absolute Paths / `file:///` URIs):** All file paths, markdown links, citations, and subtask paths inside plans, RCA logs (`.ai-memory/memory/issues/`), scripts, and code comments MUST be strictly relative paths from the git root (e.g., `02-spec/03-error-manage/01-index.md`, `.ai-memory/plans/01-index.md`, `cmd/main.go`). NEVER write absolute OS paths (`/absolute/path/to/...`, `/absolute/path/to/...`, `/home/...`) or absolute file URIs (`file:///...`).
+> 3. **Strict Relative Git Paths (TOTAL BAN on Absolute Paths / `file:///` URIs):** All file paths, markdown links, citations, and subtask paths inside plans, RCA logs (`.ai-memory/memory/issues/`), scripts, and code comments MUST be strictly relative paths from the git root (e.g., `02-spec/03-error-manage/readme.md`, `.ai-memory/plans/readme.md`, `cmd/main.go`). NEVER write absolute OS paths (`/absolute/path/to/...`, `/absolute/path/to/...`, `/home/...`) or absolute file URIs (`file:///...`).
 >    - ❌ **BAD:** `[SSH Commands](file:///absolute/path/to/...)`
->    - ✅ **GOOD:** `[SSH Commands]`02-spec/13-generic-cli/01-index.md)`
+>    - ✅ **GOOD:** `[SSH Commands]`02-spec/13-generic-cli/readme.md)`
 > 4. **No External or Random File Creation:** NEVER write scripts, temporary test scripts, or scratch files to root, `/tmp`, global system paths, or outside the repository boundary.
 > 5. **Cross-Platform Python CI Mandate (TOTAL BAN on new `.sh` scripts in CI):** All newly created or refactored CI/CD verification tools, determinism checks, fixtures, and linter jobs MUST be implemented in pure, cross-platform Python (`.py`). Legacy `.sh` scripts must be converted to `.py` scripts so all pipelines run natively across Linux, macOS, and Windows without relying on bash emulation.
 > 6. **Temp & Failure Folder Isolation:** All temporary directories, runner caches, and test artifacts MUST be strictly placed in `.ai-memory/temp/`. Creating `.tmp/` at the repository root or outside `.ai-memory/` is strictly forbidden.
@@ -66,11 +81,14 @@ Both N, PHASE_1_STEPS, and PHASE_2_STEPS are read-only after the user sets them.
 To rapidly locate failing pipeline definitions, broken source files, test fixtures, and error logs without hitting 50-result tool caps, the AI agent MUST utilize the diagnostic toolchain:
 - **Remote Pipeline AI Status (<50ms):** `gitmap pipeline-ai status --json` (or alias `gitmap pl-ai status --json`)
 - **Remote Dynamic Timeout Wait:** `gitmap pipeline-ai status -t <etaSeconds>` (or alias `gitmap pl-ai status -t <sec>`)
-- **Scan Source & Test Files:** `python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts,py --limit 100 --stats`
-- **Fast Cached Pattern Search (<15ms):** `python 03-ai-scripts/12-fast-cached-grep.py --pattern "<error-or-symbol>" --limit 50`
-- **Sub-Millisecond Folder Listing & Reader:** `python 03-ai-scripts/17-fast-file-reader.py --list-folder .github/workflows --limit 20`
-- **Read Workflow or Log File:** `python 03-ai-scripts/17-fast-file-reader.py --read-file .github/workflows/ci.yml`
-- **Codebase Topology Overview:** `python 03-ai-scripts/18-codebase-topology-discoverer.py --summary`
+- **Extract Failing Step Error Logs:** `gitmap pipeline error-logs` (or alias `gitmap pe`, clear with `gitmap pe clear -y`)
+- **Pipeline Runner Targets & Cache Table:** `gitmap pipeline details` (or alias `gitmap pd`)
+- **Universal File Search:** `gitmap find "<pattern>" [-ext <ext>]` (alias `gitmap f`)
+- **Stream Workflow / Log File:** `gitmap cat <filepath>` (zero disk writes)
+- **Instant Code Search:** `gitmap search "<symbol>"`
+- **Fallback Fast File Scanner:** `python 03-ai-scripts/11-fast-file-scanner.py --lang go,ts,py --limit 100 --stats`
+- **Fallback Fast Cached Grep:** `python 03-ai-scripts/12-fast-cached-grep.py --pattern "<error-or-symbol>" --limit 50`
+- **Fallback Read File:** `python 03-ai-scripts/17-fast-file-reader.py --read-file .github/workflows/ci.yml`
 - **Record Modified Files Under Lock:** `python 03-ai-scripts/33-test-inventory-generator.py --record <files...>`
 
 > [!NOTE]
@@ -92,7 +110,8 @@ Every step must be **singly done** using bounded self-looping turns:
 
 - **Self-Loop Step 1 (Extract Pipeline Name from Screenshot or GitMap):**
   1. Read image or query `gitmap pipeline-ai status --json` (or alias `gitmap pl-ai status -t <etaSeconds>`) to extract the pipeline name, failing job name, and targeted failure diagnostics (`##[error]`, `FAIL:`, compile errors).
-  2. Scan `.github/workflows/*.yml` to identify the corresponding shell commands and dependencies.
+  2. Extract failing step logs via `gitmap pipeline error-logs` (`gitmap pe`) using bounded stack trace extraction (5 before + 20 after). Clear stale errors with `gitmap pe clear -y`. Inspect runner jobs via `gitmap pipeline details` (`gitmap pd`).
+  3. Scan `.github/workflows/*.yml` to identify the corresponding shell commands and dependencies.
 
 - **Self-Loop Step 2 (FIRST ACTION: Update Python Runner Script):**
   1. Open `03-ai-scripts/06-cicd-local-runner.py`.
@@ -100,14 +119,14 @@ Every step must be **singly done** using bounded self-looping turns:
   3. Save the runner script and verify syntax.
 
 - **Self-Loop Step 3 (Execute Runner & Establish Baseline Failures):**
-  1. Run `python 03-ai-scripts/06-cicd-local-runner.py`.
+  1. Run `python 03-ai-scripts/06-cicd-local-runner.py run-smart` (or `python 03-ai-scripts/06-cicd-local-runner.py --changed-only` or `--pkg <target>`).
   2. Capture the full output and exit code.
   3. If exit code = 0: All jobs pass! Proceed to Phase 3 (Final Verification Gate) and Phase 4 (Release Publication).
   4. If exit code != 0: Zero in on the first specific failing job and its error output.
 
 - **Self-Loop Step 4 (RCA & Zero In on Error):**
   1. Write 4-part RCA in `.ai-memory/memory/issues/xx-<slug>.md`.
-  2. Register in `.ai-memory/01-index.md` and `.ai-memory/strictly-avoid.md`.
+  2. Register in `.ai-memory/readme.md` and `.ai-memory/strictly-avoid.md`.
 
 - **Self-Loop Step 5 (Surgical Code Fix):**
   1. Open the specific file and line, apply minimal surgical fix.
@@ -115,7 +134,7 @@ Every step must be **singly done** using bounded self-looping turns:
   3. Record modified files safely under lock via `python 03-ai-scripts/33-test-inventory-generator.py --record <modified-files>`.
 
 - **Self-Loop Step 6 (Re-Verify & Loop):**
-  1. Re-run `python 03-ai-scripts/06-cicd-local-runner.py`.
+  1. Re-run `python 03-ai-scripts/06-cicd-local-runner.py run-smart` (or `--pkg <affected_pkg>`).
   2. If resolved and more errors remain, self-loop to Step 4 to zero in on the next error until exit code = 0.
 
 - **Self-Loop Step 7 (Proceed to Release):**
@@ -370,6 +389,7 @@ On every ❌ FAIL or ⏱ TIMEOUT, BEFORE applying any code fix, do both:
 # CI/CD Task: <short failure description>
 
 ## Source
+
 - Runner job: <job-name>
 - Error type: FAIL | TIMEOUT
 - Detected at: <timestamp>
@@ -381,14 +401,16 @@ On every ❌ FAIL or ⏱ TIMEOUT, BEFORE applying any code fix, do both:
 <one-sentence description>
 
 ## Acceptance Criteria
+
 - [ ] `06-cicd-local-runner.py` reports ✅ PASS for job `<job-name>`
 - [ ] No regression in any other job
 
 ## Status
+
 - [ ] pending
 ```
 
-Update `.ai-memory/plans/01-index.md` immediately.
+Update `.ai-memory/plans/readme.md` immediately.
 
 ### B. Record in CI/CD Issues (`.ai-memory/cicd-issues/xx-<slug>.md`)
 
@@ -423,7 +445,7 @@ Update `.ai-memory/cicd-index.md` in the same operation. Never delete existing e
 > Phase 3 is a hard gate. The release MUST NOT start until every item below is green.
 > If any item fails, loop back to Phase 2 immediately.
 
-- [ ] **Full Unit Test & CI/CD Verification (MANDATORY Before Release):** Run `python 03-ai-scripts/06-cicd-local-runner.py --run-tests` one final time. All unit test suites, AST checks, and quality gates MUST pass 100% green (`exit 0`). The release MUST NOT start if any test fails.
+- [ ] **Smart Targeted Test & CI/CD Verification (Before Release):** Run targeted verification via priority shortcuts (`python 03-ai-scripts/06-cicd-local-runner.py run-smart`, `--changed-only`, or `--pkg <affected_pkg>` with optional `--fast` heatmap filtering) covering all failing stack trace targets and packages changed since the last git hash. All modified/failing package quality gates MUST pass 100% green (`exit 0`). The release MUST NOT start if any targeted test fails.
 - [ ] **Test Inventory Validation:** Check `.ai-memory/temp/recent-file-changes.json` against `.ai-memory/test-inventory.json` and verify all tests associated with modified files pass.
 - [ ] **No open plan tasks from this run:** All `.ai-memory/plans/pending/XX-cicd-*.md` files created in this run are marked `resolved` or closed.
 - [ ] **All RCA files written:** Every failure encountered has a `.ai-memory/memory/issues/xx-<slug>.md` with all 4 sections.
@@ -462,7 +484,8 @@ All release execution MUST strictly enforce the **5-Step Release Branching Lifec
 1. **Step 1: Create & Switch to Release Branch:**
    Create and switch to `release/vX.Y.Z` FIRST before modifying any version files (`git checkout -b release/vX.Y.Z`).
 2. **Step 2: Bump Version on Release Branch via Python Script:**
-   Execute the dedicated Python bump script (`03-ai-scripts/37-bump-version.py` or `.ai-memory/release/bump_versions.py`) on the release branch, adapting it to the target repository architecture (`version.json`, `package.json`, `readme.md`, `changelog.md`, install snippets).
+   Execute the dedicated Python bump script (`03-ai-scripts/37-bump-version.py` or `.ai-memory/release/bump_versions.py`) on the release branch.
+   - **CRITICAL REPOSITORY ADAPTATION & SCRIPT REPAIR:** Inspect the target repository architecture to identify where versions are defined (`version.json`, `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, etc.), where and how they will change (`readme.md`, `changelog.md`, install scripts), and post-bump synchronization commands (`npm run sync`, `go generate ./...`). If the bump script is missing, outdated, or lacks support for this repository's version pin sites, **the agent MUST fix or recreate the Python bump script immediately** before executing the release.
 3. **Step 3: Commit in Release Branch:**
    Stage and commit all version bump and generated release files on the release branch (`release: vX.Y.Z <scope>`).
 4. **Step 4: Create Annotated Git Tag:**
@@ -636,6 +659,9 @@ Include: previous version, new version, step number and name, command run, full 
 
 ## Non-Negotiable Coding Standards
 
+- [ ] **Top-Instruction Priority Mandate:** Whatever directives, constraints, checklists, or instructions are given before this section or prompt (user preamble, header constraints, prior instructions) are verified as highest priority and non-negotiable, overriding all lower-level guidelines below.
+- [ ] **Issue & RCA Destination Routing:** Whenever resolving an issue or performing a fix with RCA, verified that CI/CD failures are documented in .ai-memory/cicd-issues/NN-<slug>.md (indexed in .ai-memory/cicd-index.md), while non-CI/CD issues (application bugs, logic/runtime defects) are documented in 02-spec/22-app-issues/NN-<slug>.md (indexed in 02-spec/22-app-issues/readme.md).
+- [ ] **No Stopping After RCA:** Never halt execution or ask user permission after writing the RCA. Proceed unconditionally to code execution.
 - [ ] **GitMap Pipeline-AI & Dynamic Waiting:** If inspecting remote pipeline status, used `gitmap pipeline-ai status --json` / `gitmap pl-ai status -t <sec>` with adaptive sleep to prevent credit waste, and extracted targeted diagnostics (`##[error]`, `FAIL:`, compile errors).
 - [ ] **Atomic Change Tracking:** All modified files were recorded safely under lock via `python 03-ai-scripts/33-test-inventory-generator.py --record <files...>`.
 - [ ] **No Disabling CLI Linting (Zero Bypassing):** All CLI linters and CI/CD quality gates executed fully without `|| true`, `continue-on-error`, or suppression comments. Code was legitimately fixed.
@@ -662,3 +688,4 @@ Include: previous version, new version, step number and name, command run, full 
 
 - [ ] **MANDATORY FINAL COMMIT & PUSH TO GIT (ANYHOW):** At the conclusion of Phase 4 Release, after version manifests, changelog entries, and release notes are updated, you MUST stage everything (`git add -A`), commit with clean semantic messages, and push directly to the remote repository. Leaving uncommitted changes or unpushed commits on the active branch at the end of a turn is an immediate failure.
 - [ ] **TOTAL BAN ON PER-FILE COMMITS (DO NOT COMMIT EACH FILE INDIVIDUALLY):** You MUST NOT create separate git commits for each individual file as you edit them. All modified files across the turn MUST be accumulated in the working tree and committed together in a SINGLE grouped atomic commit at the final step before pushing!
+

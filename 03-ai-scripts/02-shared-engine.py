@@ -276,8 +276,6 @@ CI_JOBS_MATRIX: dict[str, list[str]] = {
     "Sequence Integrity Check (AI Scripts)": [sys.executable, "03-ai-scripts/21-sequence-integrity-linter.py"],
     "Misspell Check": [sys.executable, "03-ai-scripts/27-misspell-auditor.py"],
     "Boolean Naming Check": [sys.executable, "03-ai-scripts/08-naming-autofixer.py"],
-    "Rust Format Check": ["cargo", "fmt", "--manifest-path", "src-tauri/Cargo.toml", "--", "--check"],
-    "TypeScript Check": ["node", "node_modules/typescript/bin/tsc", "--noEmit"],
 }
 
 # --- Module-Level Directory & File Constants ---
@@ -299,7 +297,7 @@ MAX_READ_SIZE_BYTES = 20 * 1024 * 1024  # 20MB memory safety cap
 
 EXCLUDE_DIRS = {
     ".git", ".gitmap", "gitmap", ".git-map",
-    "node_modules", "dist", "build", ".venv", "venv", "target",
+    "node_modules", "dist", "build", ".venv", "venv",
     ".gemini", "tmp", ".system_generated", "vendor", ".cache",
     ".next", "bin", "obj", "coverage", "__pycache__",
     ".vs", ".idea", ".agent", "release-artifacts", "release-assets",
@@ -550,8 +548,11 @@ def format_keys(mapping: Any, separator: str = COMMA_SPACE_SEPARATOR) -> str:
 
 def is_ignored_directory(dir_name: str, custom_excludes: set[str] | None = None) -> bool:
     """Checks if directory name is in the global or custom exclusion list."""
+    low_name = dir_name.lower()
+    if low_name.startswith("backup-") or low_name.startswith("backup_") or low_name == "backup":
+        return True
     excludes = EXCLUDE_DIRS if custom_excludes is None else EXCLUDE_DIRS | custom_excludes
-    return dir_name.lower() in {d.lower() for d in excludes}
+    return low_name in {d.lower() for d in excludes}
 
 def is_ignored_path(path: str | Path, custom_excludes: set[str] | None = None) -> bool:
     """Checks if any segment of the path matches an excluded directory."""

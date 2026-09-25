@@ -10,7 +10,7 @@ Usage:
   python 03-ai-scripts/34-purge-github-actions-artifacts.py
 
   # Purge from a specific repository:
-  python 03-ai-scripts/34-purge-github-actions-artifacts.py --repo alimtvnetwork/Antigravity-Manager
+  python 03-ai-scripts/34-purge-github-actions-artifacts.py --repo alimtvnetwork/coding-guidelines-v24
 
   # Purge only artifacts:
   python 03-ai-scripts/34-purge-github-actions-artifacts.py --artifacts-only
@@ -33,6 +33,11 @@ TARGET_REPOS = [
     "alimtvnetwork/Antigravity-Manager",
     "alimtvnetwork/coding-guidelines-v24",
     "alimtvnetwork/gitmap-v28",
+    "alimtvnetwork/img-pdf-v2",
+    "alimtvnetwork/macro-ahk-v55",
+    "alimtvnetwork/movie-cli-v8",
+    "alimtvnetwork/cat-my-v12",
+    "alimtvnetwork/scripts-fixer-v20",
 ]
 
 def fetch_artifact_batch(repo: str, page: int = 1, per_page: int = 100):
@@ -49,37 +54,15 @@ def fetch_artifact_batch(repo: str, page: int = 1, per_page: int = 100):
     except Exception:
         return None
 
-def check_rate_limit_safety(threshold: int = 150) -> bool:
-    """Checks remaining GitHub API rate limit to prevent 403 API rate limit exceeded errors."""
-    cmd = ["gh", "api", "rate_limit", "--jq", ".resources.core.remaining"]
-    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if res.returncode == 0:
-        try:
-            remaining = int(res.stdout.strip())
-            if remaining < threshold:
-                print(f"⚠️ [RATE LIMIT GUARD] Remaining GitHub API requests low ({remaining} < {threshold}). Halting purge to preserve quota.", flush=True)
-                return False
-        except ValueError:
-            pass
-    return True
-
 def delete_single_artifact(repo: str, artifact_id: int) -> bool:
     cmd = ["gh", "api", "-X", "DELETE", f"repos/{repo}/actions/artifacts/{artifact_id}"]
     res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return res.returncode == 0
 
 def purge_repo_artifacts(repo: str, max_workers: int = 12):
-    import os
-    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
-        print(f"ℹ️ Skipping artifact purge inside CI/GitHub Actions to preserve GITHUB_TOKEN installation rate limit (artifacts already use retention-days: 1).", flush=True)
-        return
-
     print(f"\n========================================================", flush=True)
     print(f" Scanning artifacts for repository: {repo}", flush=True)
     print(f"========================================================", flush=True)
-
-    if not check_rate_limit_safety(threshold=400):
-        return
 
     first_batch = fetch_artifact_batch(repo, page=1, per_page=1)
     if not first_batch:
@@ -96,8 +79,6 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
     freed_bytes = 0
 
     while True:
-        if not check_rate_limit_safety(threshold=400):
-            break
         batch = fetch_artifact_batch(repo, page=1, per_page=100)
         if not batch or not batch.get("artifacts"):
             break
@@ -109,7 +90,6 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
         batch_size = len(artifacts)
         print(f"Deleting batch of {batch_size} artifact(s) using {max_workers} worker threads...", flush=True)
 
-        batch_deleted = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_art = {
                 executor.submit(delete_single_artifact, repo, art["id"]): art
@@ -119,13 +99,8 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
                 art = future_to_art[future]
                 is_success = future.result()
                 if is_success:
-                    batch_deleted += 1
                     deleted_count += 1
                     freed_bytes += art.get("size", 0)
-
-        if batch_deleted == 0:
-            print("⚠️ Zero artifacts deleted in batch (insufficient token permissions or 403). Stopping immediately to prevent rate-limit exhaustion.", flush=True)
-            break
 
         mb_freed = freed_bytes / (1024 * 1024)
         print(f"Progress: {deleted_count}/{total_count} artifacts deleted (~{mb_freed:.2f} MB freed)...", flush=True)
@@ -157,9 +132,6 @@ def purge_repo_caches(repo: str, max_workers: int = 8):
     print(f"\n========================================================", flush=True)
     print(f" Scanning caches for repository: {repo}", flush=True)
     print(f"========================================================", flush=True)
-
-    if not check_rate_limit_safety():
-        return
 
     first_batch = fetch_cache_batch(repo, page=1, per_page=1)
     if not first_batch:
