@@ -27,6 +27,9 @@ import shutil
 import subprocess
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
 
 TARGET_REPOS = [
@@ -335,7 +338,7 @@ def sync_repo(target: Path, dry_run: bool = False, no_push: bool = False) -> dic
         run_cmd(f"git push origin {backup_branch}", target)
         result["pushed"] = True
 
-    print(f"✔ Completed sync & release for {target.name} ({release_tag}).")
+    print(f"[OK] Completed sync & release for {target.name} ({release_tag}).")
     return result
 
 
