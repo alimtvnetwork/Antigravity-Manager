@@ -105,8 +105,9 @@ tempfile = "3.10"
 debug = 0
 
 [profile.release]
-opt-level = 3
-codegen-units = 16
-lto = "thin"
+opt-level = 2
+codegen-units = 64
+lto = false
 panic = "abort"
-strip = "symbols"
+strip = "none"
+debug = 0

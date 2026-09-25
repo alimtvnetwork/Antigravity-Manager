@@ -42,7 +42,10 @@ Running `cargo test --manifest-path src-tauri/Cargo.toml --lib` reproduced all 4
    - Added `crate::proxy::config::is_ci_environment()` (checking `CI` / `GITHUB_ACTIONS` unless `AGM_RUN_HEAVY_LOCAL_TESTS=1` is set).
    - Gated local environment instance switching tests (`test_ubuntu_instance_switching_end_to_end_flow`) in `modules/instance.rs` and added `test_mock_account_switch_ci` for fast in-memory CI/CD verification.
    - Reduced SQLite disk stress test iterations in `security_integration_tests.rs` and `security_ip_tests.rs` so the entire 830-test library suite finishes in `< 3 seconds`.
+4. **Windows Release Profile Optimization (`[profile.release]`)**:
+   - In `src-tauri/Cargo.toml`, changed `[profile.release]` from `lto = "thin"`, `opt-level = 3`, `codegen-units = 16`, `strip = "symbols"` to `lto = false`, `opt-level = 2`, `codegen-units = 64`, `strip = "none"`, `debug = 0` so `build-tauri (windows-2025)` finishes linking in ~12 minutes instead of hitting the 55-minute MSVC ThinLTO timeout.
 
 ### Part 4: Prevention
 - All global configuration mutations in unit tests must lock `crate::proxy::config::TEST_CONFIG_LOCK`.
 - Any test requiring local OS processes, IDE state databases, or heavy disk stress loops must check `crate::proxy::config::is_ci_environment()` and pair with a deterministic in-memory mock test for CI/CD.
+- Keep `lto = false` and `codegen-units = 64` in `[profile.release]` to avoid MSVC linker stalls on Windows CI runners.
