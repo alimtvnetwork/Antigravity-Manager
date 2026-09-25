@@ -48,4 +48,7 @@ Running `cargo test --manifest-path src-tauri/Cargo.toml --lib` reproduced all 4
 ### Part 4: Prevention
 - All global configuration mutations in unit tests must lock `crate::proxy::config::TEST_CONFIG_LOCK`.
 - Any test requiring local OS processes, IDE state databases, or heavy disk stress loops must check `crate::proxy::config::is_ci_environment()` and pair with a deterministic in-memory mock test for CI/CD.
-- Keep `lto = false` and `codegen-units = 64` in `[profile.release]` to avoid MSVC linker stalls on Windows CI runners.
+- Keep `lto = false`, `opt-level = 1`, and `codegen-units = 256` in `[profile.release]` to maximize parallel rustc codegen across 2–4 vCPU GitHub Actions runners.
+- Restrict `bundle.targets` in `src-tauri/tauri.conf.json` to `["nsis", "deb", "app", "dmg"]` so Windows builds never invoke WiX v3 `light.exe` (`msi`), which deadlocks during COM ICE validation on `windows-2025`.
+- Ensure `03-ai-scripts/34-purge-github-actions-artifacts.py` exits immediately (`0` API calls) when running inside `GITHUB_ACTIONS=true` and breaks out of its deletion loop whenever `batch_deleted == 0` so `publish-release` (`permissions: contents: write`) never spins in an infinite `403` loop and exhausts the `GITHUB_TOKEN` installation rate limit (1,000 requests/hour).
+

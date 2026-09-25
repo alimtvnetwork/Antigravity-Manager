@@ -69,11 +69,16 @@ def delete_single_artifact(repo: str, artifact_id: int) -> bool:
     return res.returncode == 0
 
 def purge_repo_artifacts(repo: str, max_workers: int = 12):
+    import os
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
+        print(f"ℹ️ Skipping artifact purge inside CI/GitHub Actions to preserve GITHUB_TOKEN installation rate limit (artifacts already use retention-days: 1).", flush=True)
+        return
+
     print(f"\n========================================================", flush=True)
     print(f" Scanning artifacts for repository: {repo}", flush=True)
     print(f"========================================================", flush=True)
 
-    if not check_rate_limit_safety():
+    if not check_rate_limit_safety(threshold=400):
         return
 
     first_batch = fetch_artifact_batch(repo, page=1, per_page=1)
@@ -91,6 +96,8 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
     freed_bytes = 0
 
     while True:
+        if not check_rate_limit_safety(threshold=400):
+            break
         batch = fetch_artifact_batch(repo, page=1, per_page=100)
         if not batch or not batch.get("artifacts"):
             break
@@ -102,6 +109,7 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
         batch_size = len(artifacts)
         print(f"Deleting batch of {batch_size} artifact(s) using {max_workers} worker threads...", flush=True)
 
+        batch_deleted = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_art = {
                 executor.submit(delete_single_artifact, repo, art["id"]): art
@@ -111,8 +119,13 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
                 art = future_to_art[future]
                 is_success = future.result()
                 if is_success:
+                    batch_deleted += 1
                     deleted_count += 1
                     freed_bytes += art.get("size", 0)
+
+        if batch_deleted == 0:
+            print("⚠️ Zero artifacts deleted in batch (insufficient token permissions or 403). Stopping immediately to prevent rate-limit exhaustion.", flush=True)
+            break
 
         mb_freed = freed_bytes / (1024 * 1024)
         print(f"Progress: {deleted_count}/{total_count} artifacts deleted (~{mb_freed:.2f} MB freed)...", flush=True)
