@@ -290,11 +290,20 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
     let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
     for token in content.split_whitespace() {
         let clean = token.trim_matches(|c| {
-            c == '"' || c == '\'' || c == '(' || c == ')' || c == '[' || c == ']' || c == '<' || c == '>'
+            c == '"'
+                || c == '\''
+                || c == '('
+                || c == ')'
+                || c == '['
+                || c == ']'
+                || c == '<'
+                || c == '>'
         });
         let lower = clean.to_lowercase();
         if img_exts.iter().any(|ext| lower.ends_with(ext)) {
-            let p_str = clean.strip_prefix("file:///").unwrap_or_else(|| clean.strip_prefix("file://").unwrap_or(clean));
+            let p_str = clean
+                .strip_prefix("file:///")
+                .unwrap_or_else(|| clean.strip_prefix("file://").unwrap_or(clean));
             if !found_paths.contains(&p_str.to_string()) {
                 found_paths.push(p_str.to_string());
             }
@@ -361,7 +370,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
                         if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
                             if !txt.trim().is_empty() {
-                                let img = v.get("image_payload").and_then(|i| i.as_str()).map(|s| s.to_string());
+                                let img = v
+                                    .get("image_payload")
+                                    .and_then(|i| i.as_str())
+                                    .map(|s| s.to_string());
                                 extracted_prompts.push((txt.to_string(), img));
                             }
                         }
@@ -381,9 +393,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 )
                 .ok();
             if let Some(ref mut c_stmt) = check_stmt {
-                if let Ok((txt, img)) = c_stmt.query_row(rusqlite::params![&project.repo_path, &project.id, &proj_like], |r| {
-                    Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
-                }) {
+                if let Ok((txt, img)) = c_stmt.query_row(
+                    rusqlite::params![&project.repo_path, &project.id, &proj_like],
+                    |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)),
+                ) {
                     if !txt.trim().is_empty() {
                         extracted_prompts.push((txt, img));
                     }
@@ -784,14 +797,17 @@ pub fn auto_resume_recent_prompts(
             .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
 
         let mut maybe_prompt = prompt_stmt
-            .query_row(rusqlite::params![&project.id, &project.repo_path, &proj_like], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, Option<String>>(3)?,
-                ))
-            })
+            .query_row(
+                rusqlite::params![&project.id, &project.repo_path, &proj_like],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                },
+            )
             .ok();
 
         // If not found in DB, check existing .antigravity_resume_task.json
@@ -802,9 +818,19 @@ pub fn auto_resume_recent_prompts(
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
                         if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
                             if !txt.trim().is_empty() {
-                                let pid = v.get("prompt_id").and_then(|i| i.as_str()).unwrap_or(&project.id).to_string();
-                                let m = v.get("model").and_then(|m| m.as_str()).map(|s| s.to_string());
-                                let img = v.get("image_payload").and_then(|i| i.as_str()).map(|s| s.to_string());
+                                let pid = v
+                                    .get("prompt_id")
+                                    .and_then(|i| i.as_str())
+                                    .unwrap_or(&project.id)
+                                    .to_string();
+                                let m = v
+                                    .get("model")
+                                    .and_then(|m| m.as_str())
+                                    .map(|s| s.to_string());
+                                let img = v
+                                    .get("image_payload")
+                                    .and_then(|i| i.as_str())
+                                    .map(|s| s.to_string());
                                 maybe_prompt = Some((pid, txt.to_string(), m, img));
                             }
                         }

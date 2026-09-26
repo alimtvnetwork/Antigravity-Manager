@@ -19,7 +19,10 @@ pub async fn bind_account_proxy(
     } else {
         // Fallback: persist binding to app configuration directly when proxy service is stopped
         let mut cfg = crate::modules::config::load_app_config().unwrap_or_default();
-        cfg.proxy.proxy_pool.account_bindings.insert(account_id, proxy_id);
+        cfg.proxy
+            .proxy_pool
+            .account_bindings
+            .insert(account_id, proxy_id);
         crate::modules::config::save_app_config(&cfg).map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -62,7 +65,12 @@ pub async fn get_account_proxy_binding(
             .get_account_binding(&account_id))
     } else {
         let cfg = crate::modules::config::load_app_config().unwrap_or_default();
-        Ok(cfg.proxy.proxy_pool.account_bindings.get(&account_id).cloned())
+        Ok(cfg
+            .proxy
+            .proxy_pool
+            .account_bindings
+            .get(&account_id)
+            .cloned())
     }
 }
 

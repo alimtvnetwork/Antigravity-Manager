@@ -149,7 +149,10 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
                     || win.contains("4h")
                     || bid.contains("5h")
                     || bid.contains("4h")
-                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                    || (!win.contains("week")
+                        && !win.contains("7d")
+                        && !bid.contains("week")
+                        && !bid.contains("7d"));
                 if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
                     let pct = (b.remaining_fraction * 100.0).round();
                     min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
@@ -317,7 +320,10 @@ pub fn evaluate_account_period_status(
                     || win.contains("4h")
                     || bid.contains("5h")
                     || bid.contains("4h")
-                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                    || (!win.contains("week")
+                        && !win.contains("7d")
+                        && !bid.contains("week")
+                        && !bid.contains("7d"));
                 if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
                     let bucket_pct = (b.remaining_fraction * 100.0).round();
                     if bucket_pct < quota_percent {
@@ -501,7 +507,10 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
                     || win.contains("4h")
                     || bid.contains("5h")
                     || bid.contains("4h")
-                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                    || (!win.contains("week")
+                        && !win.contains("7d")
+                        && !bid.contains("week")
+                        && !bid.contains("7d"));
                 if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
                     let pct = (b.remaining_fraction * 100.0).round();
                     min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
@@ -856,7 +865,9 @@ pub async fn select_and_verify_next_best_profile(
         return Ok(Some(fallback));
     }
 
-    logger::log_warn("[AutoSwitcher] No candidates with healthy quota found after live verification.");
+    logger::log_warn(
+        "[AutoSwitcher] No candidates with healthy quota found after live verification.",
+    );
     Ok(None)
 }
 
@@ -1065,7 +1076,8 @@ pub async fn check_and_rotate_with_options(
                 switcher_cfg.critical_threshold_percent,
                 &excluded_accounts,
             )
-            .await? {
+            .await?
+            {
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     predicted_email: Some(candidate.email.clone()),
@@ -1126,7 +1138,8 @@ pub async fn check_and_rotate_with_options(
                 effective_low_threshold,
                 &excluded_accounts,
             )
-            .await? {
+            .await?
+            {
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     predicted_email: Some(candidate.email.clone()),
@@ -1222,9 +1235,10 @@ pub async fn trigger_manual_rotation_for_instance(
         }
     }
 
-    let candidate = select_and_verify_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)
-        .await?
-        .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
+    let candidate =
+        select_and_verify_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)
+            .await?
+            .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
 
     let reason = "Manual rotation triggered by user".to_string();
     let email = candidate.email.clone();

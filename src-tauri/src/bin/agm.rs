@@ -653,8 +653,7 @@ fn cmd_which_prompts_running(args: &[String]) {
             continue;
         }
         let already_included = rows.iter().any(|r| {
-            r["id"].as_str() == Some(&p.project_id)
-                || r["repo_path"].as_str() == Some(&p.repo_path)
+            r["id"].as_str() == Some(&p.project_id) || r["repo_path"].as_str() == Some(&p.repo_path)
         });
         if !already_included {
             seq += 1;
@@ -1535,7 +1534,10 @@ fn cmd_resend_running_commands(args: &[String]) {
         if let Ok(js_str) = serde_json::to_string_pretty(&items) {
             let _ = fs::write(&target_path, js_str);
             if !is_json {
-                println!("[SUCCESS] Saved resend commands payload to \"{}\"", target_path);
+                println!(
+                    "[SUCCESS] Saved resend commands payload to \"{}\"",
+                    target_path
+                );
             }
         }
     }
@@ -1570,7 +1572,11 @@ fn cmd_resend_running_commands(args: &[String]) {
     for item in &items {
         let seq = item["seq"].as_u64().unwrap_or(0);
         let id_str = item["id"].as_str().unwrap_or("");
-        let short_id = if id_str.len() > 8 { &id_str[..8] } else { id_str };
+        let short_id = if id_str.len() > 8 {
+            &id_str[..8]
+        } else {
+            id_str
+        };
         let proj = item["project"].as_str().unwrap_or("-");
         let status = item["status"].as_str().unwrap_or("running");
         let has_img = item["has_images"].as_bool().unwrap_or(false);
