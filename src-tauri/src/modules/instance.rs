@@ -1192,6 +1192,28 @@ pub async fn switch_account_to_instance(
 
     let is_default_inst = instance.is_default || instance.id == "default";
 
+    if let Some(prev_email) = instance
+        .bound_email
+        .clone()
+        .or_else(|| {
+            instance.bound_account_id.as_ref().and_then(|id| {
+                crate::modules::account::load_account(id)
+                    .ok()
+                    .map(|a| a.email)
+            })
+        })
+        .or_else(|| {
+            crate::modules::account::get_current_account()
+                .ok()
+                .flatten()
+                .map(|a| a.email)
+        })
+    {
+        if !prev_email.is_empty() {
+            crate::modules::notification_hub::record_previous_email(&prev_email);
+        }
+    }
+
     // Ensure account has a bound device fingerprint profile for isolation
     if account.device_profile.is_none() {
         let new_profile = crate::modules::device::generate_profile();

@@ -113,16 +113,50 @@ pub fn snapshot_task_state(
 pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<f64> {
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
+    let is_flash_target = target.contains("flash");
 
-    // Direct model match
+    let mut min_pct: Option<f64> = None;
+
+    // 1. Minimum across models matching target (and non-banned flash models when target is flash)
     for m in &quota_data.models {
-        if m.name.to_lowercase().contains(&target) {
-            return Some(m.percentage as f64);
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        let is_direct = name_lower.contains(&target);
+        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        if is_direct || is_flash {
+            let pct = m.percentage as f64;
+            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
     }
 
+    // 2. Minimum across any actively consumed non-banned models (percentage < 100)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        if !is_banned && m.percentage < 100 {
+            let pct = m.percentage as f64;
+            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+        }
+    }
+
+    // 3. Minimum across quota_groups buckets
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            for b in &g.buckets {
+                if (0.0..=1.0).contains(&b.remaining_fraction) {
+                    let pct = (b.remaining_fraction * 100.0).round();
+                    min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+                }
+            }
+        }
+    }
+
+    if let Some(pct) = min_pct {
+        return Some(pct);
+    }
+
     // Hierarchical match for Gemini 3.8 Flash High / Flash targets
-    if target.contains("flash") {
+    if is_flash_target {
         if let Some((_, pct, _)) = evaluate_hierarchical_quota(account) {
             return Some(pct);
         }
@@ -215,27 +249,37 @@ pub fn evaluate_account_period_status(
 ) -> Option<QuotaPeriodStatus> {
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
+    let is_flash_target = target.contains("flash");
 
-    let mut matched_model = None;
+    let mut matched_model: Option<&crate::models::quota::ModelQuota> = None;
     for m in &quota_data.models {
-        if m.name.to_lowercase().contains(&target) {
-            matched_model = Some(m);
-            break;
-        }
-    }
-
-    if matched_model.is_none() && target.contains("flash") {
-        for m in &quota_data.models {
-            let name_lower = m.name.to_lowercase();
-            let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-            if !is_banned && name_lower.contains("flash") && name_lower.contains("gemini") {
-                matched_model = Some(m);
-                break;
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        let is_direct = name_lower.contains(&target);
+        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        if is_direct || is_flash {
+            match matched_model {
+                Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
+                None => matched_model = Some(m),
+                _ => {}
             }
         }
     }
 
-    let (quota_percent, reset_time_str) = if let Some(m) = matched_model {
+    // Also check if any non-banned model has been consumed below 100% or <= threshold_percent
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        if !is_banned && (m.percentage as f64 <= threshold_percent || m.percentage < 100) {
+            match matched_model {
+                Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
+                None => matched_model = Some(m),
+                _ => {}
+            }
+        }
+    }
+
+    let (mut quota_percent, mut reset_time_str) = if let Some(m) = matched_model {
         (m.percentage as f64, m.reset_time.as_str())
     } else if !quota_data.models.is_empty() {
         let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
@@ -247,9 +291,31 @@ pub fn evaluate_account_period_status(
             .map(|m| m.reset_time.as_str())
             .unwrap_or("");
         (avg, first_reset)
+    } else if quota_data
+        .quota_groups
+        .as_ref()
+        .is_some_and(|g| !g.is_empty())
+    {
+        (100.0, "")
     } else {
         return None;
     };
+
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            for b in &g.buckets {
+                if (0.0..=1.0).contains(&b.remaining_fraction) {
+                    let bucket_pct = (b.remaining_fraction * 100.0).round();
+                    if bucket_pct < quota_percent {
+                        quota_percent = bucket_pct;
+                        if !b.reset_time.is_empty() {
+                            reset_time_str = b.reset_time.as_str();
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let reset_timestamp = parse_reset_time_to_unix(reset_time_str);
     let (seconds_until_reset, is_period_finished) = match reset_timestamp {
@@ -456,7 +522,7 @@ pub fn select_next_best_profile(
                 .as_ref()
                 .map(|s| s.quota_percent)
                 .or_else(|| calculate_account_quota(&acc, target_model))
-                .unwrap_or(0.0);
+                .unwrap_or(100.0);
 
             let is_period_finished = period_status
                 .as_ref()
@@ -495,7 +561,7 @@ pub fn select_next_best_profile(
 
     // 2. Check unbound accounts in pool
     let all_accounts = account::list_accounts().unwrap_or_default();
-    for acc in all_accounts {
+    for acc in &all_accounts {
         if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
             continue;
         }
@@ -512,12 +578,12 @@ pub fn select_next_best_profile(
             continue;
         }
 
-        let period_status = evaluate_account_period_status(&acc, target_model, threshold, now_sec);
+        let period_status = evaluate_account_period_status(acc, target_model, threshold, now_sec);
         let quota = period_status
             .as_ref()
             .map(|s| s.quota_percent)
-            .or_else(|| calculate_account_quota(&acc, target_model))
-            .unwrap_or(0.0);
+            .or_else(|| calculate_account_quota(acc, target_model))
+            .unwrap_or(100.0);
 
         let is_period_finished = period_status
             .as_ref()
@@ -532,7 +598,7 @@ pub fn select_next_best_profile(
         }
 
         if is_eligible {
-            let score = score_candidate_account(&acc, target_model, now_sec);
+            let score = score_candidate_account(acc, target_model, now_sec);
             let effective_quota = if is_period_finished {
                 if quota <= threshold {
                     100.0
@@ -545,22 +611,71 @@ pub fn select_next_best_profile(
 
             candidates.push(ProfileCandidate {
                 instance_id: current_instance_id.to_string(),
-                account_id: acc.id,
-                email: acc.email,
+                account_id: acc.id.clone(),
+                email: acc.email.clone(),
                 quota_percent: effective_quota,
                 score,
             });
         }
     }
 
-    // Sort descending by multiplicative score with randomized directional tie-breaker
+    // 3. Fallback pass when testing with a high threshold (e.g., 98%) where standby accounts are at 16%-97%
+    if candidates.is_empty() {
+        for acc in &all_accounts {
+            if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
+                continue;
+            }
+            if acc.disabled || acc.validation_blocked {
+                continue;
+            }
+            if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
+                continue;
+            }
+
+            let period_status = evaluate_account_period_status(acc, target_model, 15.0, now_sec);
+            let quota = period_status
+                .as_ref()
+                .map(|s| s.quota_percent)
+                .or_else(|| calculate_account_quota(acc, target_model))
+                .unwrap_or(100.0);
+
+            let is_period_finished = period_status
+                .as_ref()
+                .map(|s| s.is_period_finished)
+                .unwrap_or(false);
+
+            if quota > 15.0 || is_period_finished {
+                let score = score_candidate_account(acc, target_model, now_sec);
+                let effective_quota = if is_period_finished && quota <= 15.0 {
+                    100.0
+                } else {
+                    quota
+                };
+
+                candidates.push(ProfileCandidate {
+                    instance_id: current_instance_id.to_string(),
+                    account_id: acc.id.clone(),
+                    email: acc.email.clone(),
+                    quota_percent: effective_quota,
+                    score,
+                });
+            }
+        }
+    }
+
+    // Sort descending by multiplicative score with quota and randomized directional tie-breaker
     let is_ascending: bool = rand::random();
     candidates.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
         Some(std::cmp::Ordering::Equal) | None => {
-            if is_ascending {
-                a.email.to_lowercase().cmp(&b.email.to_lowercase())
-            } else {
-                b.email.to_lowercase().cmp(&a.email.to_lowercase())
+            match b.quota_percent.partial_cmp(&a.quota_percent) {
+                Some(std::cmp::Ordering::Equal) | None => {
+                    if is_ascending {
+                        a.email.to_lowercase().cmp(&b.email.to_lowercase())
+                    } else {
+                        b.email.to_lowercase().cmp(&a.email.to_lowercase())
+                    }
+                }
+                Some(q_ord) => q_ord,
             }
         }
         Some(ord) => ord,
@@ -1011,6 +1126,22 @@ pub fn start_auto_switcher() {
             state.is_running = true;
         }
 
+        let initial_cfg = config::load_app_config()
+            .unwrap_or_default()
+            .auto_profile_switcher;
+        let mut last_enabled = initial_cfg.is_enabled;
+        let mut last_threshold = initial_cfg.low_quota_threshold_percent;
+
+        if last_enabled {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            if let Err(e) = check_and_rotate_if_needed().await {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Error during initial check cycle: {}",
+                    e
+                ));
+            }
+        }
+
         loop {
             let app_config = config::load_app_config().unwrap_or_default();
             let switcher_cfg = app_config.auto_profile_switcher;
@@ -1024,9 +1155,36 @@ pub fn start_auto_switcher() {
                     None => Some(q),
                 });
             let interval_secs =
-                calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg);
+                calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg) as u64;
 
-            tokio::time::sleep(Duration::from_secs(interval_secs as u64)).await;
+            let tick = 5u64;
+            let mut elapsed = 0u64;
+            while elapsed < interval_secs {
+                let sleep_dur = tick.min(interval_secs.saturating_sub(elapsed));
+                if sleep_dur == 0 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(sleep_dur)).await;
+                elapsed += sleep_dur;
+
+                let latest_cfg = config::load_app_config()
+                    .unwrap_or_default()
+                    .auto_profile_switcher;
+                let enabled_turned_on = !last_enabled && latest_cfg.is_enabled;
+                let threshold_changed =
+                    (latest_cfg.low_quota_threshold_percent - last_threshold).abs() > f64::EPSILON;
+
+                last_enabled = latest_cfg.is_enabled;
+                last_threshold = latest_cfg.low_quota_threshold_percent;
+
+                if enabled_turned_on || threshold_changed {
+                    logger::log_info(&format!(
+                        "[AutoSwitcher] Config change detected (enabled={}, threshold={:.1}%), triggering immediate check.",
+                        latest_cfg.is_enabled, latest_cfg.low_quota_threshold_percent
+                    ));
+                    break;
+                }
+            }
 
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));

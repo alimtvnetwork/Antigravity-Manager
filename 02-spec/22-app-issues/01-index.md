@@ -47,6 +47,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 09 | [09-email-body-type-and-subject-version-rca.md](09-email-body-type-and-subject-version-rca.md) | Email Body HTML MIME Type & Versioned Node Telemetry Subject RCA | Critical | Fixed |
 | 10 | [10-blank-ui-dwm-occlusion-and-versioned-installer-rca.md](10-blank-ui-dwm-occlusion-and-versioned-installer-rca.md) | Blank UI DWM Thumbnail Freeze, Workflow Version Stamping & Two-Bar Release Installation RCA | Critical | Fixed |
 | 11 | [11-ci-cd-test-isolation-and-upstream-sync-rca.md](11-ci-cd-test-isolation-and-upstream-sync-rca.md) | CI/CD Unit Test Isolation, Mock Test Coverage & Upstream Sync Resolution RCA | Critical | Fixed |
+| 12 | [12-auto-switcher-quota-and-instance-rotation-rca.md](12-auto-switcher-quota-and-instance-rotation-rca.md) | Auto-Switcher 98% Threshold Evaluation, Candidate Fallback & Switch Telemetry RCA | Critical | Fixed |
 
 ---
 

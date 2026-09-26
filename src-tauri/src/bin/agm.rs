@@ -2007,24 +2007,35 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances create "name" [--data-only | --do]
+    // Subcommand: agm instances create "name" [--data-only | --do | do]
     if non_flag_args
         .first()
         .map(|s| s.eq_ignore_ascii_case("create") || s.eq_ignore_ascii_case("add"))
         .unwrap_or(false)
     {
-        let is_data_only = args
-            .iter()
-            .any(|a| a == "--data-only" || a == "-data-only" || a == "--do" || a == "-do");
+        let is_data_only = args.iter().any(|a| {
+            a.eq_ignore_ascii_case("--data-only")
+                || a.eq_ignore_ascii_case("-data-only")
+                || a.eq_ignore_ascii_case("--do")
+                || a.eq_ignore_ascii_case("-do")
+                || a.eq_ignore_ascii_case("do")
+        });
         let name = non_flag_args
-            .get(1)
+            .iter()
+            .skip(1)
+            .find(|s| !s.eq_ignore_ascii_case("do"))
             .map(|s| (*s).clone())
             .unwrap_or_else(|| format!("Instance-{}", chrono::Utc::now().timestamp() % 1000));
 
-        match instance::create_instance(name) {
-            Ok(cfg) => {
+        let create_res = instance::copy_instance("default", name.clone(), Some("full"))
+            .or_else(|_| instance::create_instance(name));
+
+        match create_res {
+            Ok(mut cfg) => {
                 if !is_data_only {
-                    let _ = instance::clone_instance_executable(&cfg.id);
+                    if let Ok(exe_path) = instance::clone_instance_executable(&cfg.id) {
+                        cfg.executable_path = Some(exe_path);
+                    }
                 }
                 if is_json {
                     println!("{}", serde_json::to_string_pretty(&cfg).unwrap_or_default());
@@ -2310,11 +2321,15 @@ fn cmd_fast_forward(args: &[String]) {
 
 fn cmd_email(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json");
-    let sub = args
-        .first()
-        .filter(|s| !s.starts_with('-'))
-        .map(|s| s.to_lowercase())
-        .unwrap_or_else(|| "status".to_string());
+    let is_help_flag = args.iter().any(|a| a == "-h" || a == "--help");
+    let sub = if is_help_flag {
+        "--help".to_string()
+    } else {
+        args.first()
+            .filter(|s| !s.starts_with('-'))
+            .map(|s| s.to_lowercase())
+            .unwrap_or_else(|| "status".to_string())
+    };
 
     match sub.as_str() {
         "help" | "-h" | "--help" => {
@@ -2327,8 +2342,9 @@ fn cmd_email(args: &[String]) {
             );
             println!("CLI Subcommands:");
             println!(
-                "  agm email [status] [--json]               Show email settings & active sender"
+                "  agm email [status] [--json]               Show email settings & dispatch status email"
             );
+            println!("  agm email help                            Show guide & dispatch help email to recipients");
             println!("  agm email ls [--json]                     List configured mailboxes & recipients");
             println!("  agm email add <email> <password> [opts]   Add SMTP/IMAP account (sends JSON self-email)");
             println!("  agm email add <email> --recipient         Add notification recipient (sends JSON self-email)");
@@ -2349,6 +2365,47 @@ fn cmd_email(args: &[String]) {
             println!("    VM1 | 1 | agm status");
             println!("    *   | gitmap | prompt Run full test suite");
             println!();
+
+            if sub == "help" {
+                let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
+                let recipients = email_vault_db::list_notify_recipients().unwrap_or_default();
+                let mut target_recipients: Vec<String> = recipients
+                    .iter()
+                    .filter(|r| r.is_active)
+                    .map(|r| r.email.clone())
+                    .collect();
+                if target_recipients.is_empty() {
+                    if let Some(def_acc) = accounts
+                        .iter()
+                        .find(|a| a.is_default && a.is_active)
+                        .or_else(|| accounts.iter().find(|a| a.is_active))
+                    {
+                        target_recipients.push(def_acc.email.clone());
+                    }
+                }
+                if !target_recipients.is_empty() {
+                    let m_name = email_watcher::detect_machine_name();
+                    let m_ip = email_watcher::detect_local_ip();
+                    let (subject, html) = email_sender::render_help_email(&m_name, &m_ip);
+                    match email_sender::dispatch_email_with_failover(
+                        &subject,
+                        &html,
+                        &target_recipients,
+                    ) {
+                        Ok(res) => {
+                            println!(
+                                "[SUCCESS] Dispatched help instructions email via '{}' to {} recipient(s): {}",
+                                res.used_account_email,
+                                target_recipients.len(),
+                                target_recipients.join(", ")
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!("[WARN] Failed to dispatch help email: {}", e);
+                        }
+                    }
+                }
+            }
         }
         "status" => {
             let settings = email_vault_db::get_notification_settings().unwrap_or_default();
@@ -2359,16 +2416,40 @@ fn cmd_email(args: &[String]) {
                 .find(|a| a.is_default)
                 .or_else(|| accounts.first());
 
+            let m_name = email_watcher::detect_machine_name();
+            let m_ip = email_watcher::detect_local_ip();
+            let active_acc = account::get_current_account().ok().flatten();
+            let (immediate_quota, weekly_quota, tier) = match active_acc.as_ref() {
+                Some(acc) => extract_immediate_and_weekly_credits(acc),
+                None => (0.0, 0.0, "NONE".to_string()),
+            };
+            let instances_list = instance::list_instances().unwrap_or_default();
+            let running_instances = instances_list.iter().filter(|i| i.is_running).count();
+            let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+            let running_prompts = all_prompts
+                .iter()
+                .filter(|p| {
+                    p.status == "running" || p.status == "dispatched" || p.status == "backed_up"
+                })
+                .count();
+
             if is_json {
                 let out = serde_json::json!({
                     "enabled": settings.is_enabled,
-                    "local_machine_name": email_watcher::detect_machine_name(),
-                    "local_machine_ip": email_watcher::detect_local_ip(),
+                    "version": VERSION,
+                    "local_machine_name": m_name,
+                    "local_machine_ip": m_ip,
                     "polling_interval_minutes": settings.polling_interval_minutes,
                     "inbox_check_interval_minutes": settings.inbox_check_interval_minutes,
                     "default_sender": default_acc.map(|a| &a.email),
                     "accounts_count": accounts.len(),
                     "recipients_count": recipients.len(),
+                    "active_account": active_acc.as_ref().map(|a| &a.email),
+                    "tier": tier,
+                    "immediate_quota_percent": immediate_quota,
+                    "weekly_quota_percent": weekly_quota,
+                    "instances_running": running_instances,
+                    "prompts_running": running_prompts,
                 });
                 println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
                 return;
@@ -2376,11 +2457,7 @@ fn cmd_email(args: &[String]) {
 
             println!("[*] AGM Email Telemetry & Notification Status:");
             println!("    Enabled:               {}", settings.is_enabled);
-            println!(
-                "    Node Identity:         {} ({})",
-                email_watcher::detect_machine_name(),
-                email_watcher::detect_local_ip()
-            );
+            println!("    Node Identity:         {} ({})", m_name, m_ip);
             println!(
                 "    Default Sender:        {}",
                 default_acc
@@ -2393,6 +2470,108 @@ fn cmd_email(args: &[String]) {
                 "    Inbox Poll Interval:   {} min",
                 settings.inbox_check_interval_minutes
             );
+            println!(
+                "    Active Account:        {} [{}] (Immediate: {:.1}%, Weekly: {:.1}%)",
+                active_acc
+                    .as_ref()
+                    .map(|a| a.email.as_str())
+                    .unwrap_or("(None)"),
+                tier,
+                immediate_quota,
+                weekly_quota
+            );
+            println!(
+                "    Running Instances:     {} / {} | Running Prompts: {}",
+                running_instances,
+                instances_list.len(),
+                running_prompts
+            );
+
+            let mut target_recipients: Vec<String> = recipients
+                .iter()
+                .filter(|r| r.is_active)
+                .map(|r| r.email.clone())
+                .collect();
+            if target_recipients.is_empty() {
+                if let Some(def_acc) = accounts
+                    .iter()
+                    .find(|a| a.is_default && a.is_active)
+                    .or_else(|| accounts.iter().find(|a| a.is_active))
+                {
+                    target_recipients.push(def_acc.email.clone());
+                }
+            }
+
+            if !target_recipients.is_empty() {
+                let status_json = serde_json::json!({
+                    "event": "node_and_credits_status",
+                    "version": VERSION,
+                    "machine_name": m_name,
+                    "local_ip": m_ip,
+                    "active_account": active_acc.as_ref().map(|a| a.email.clone()),
+                    "tier": tier,
+                    "immediate_quota_percent": immediate_quota,
+                    "weekly_quota_percent": weekly_quota,
+                    "instances_total": instances_list.len(),
+                    "instances_running": running_instances,
+                    "prompts_running": running_prompts,
+                    "email_accounts_count": accounts.len(),
+                    "email_recipients_count": recipients.len(),
+                });
+                let body_text = format!(
+                    "Node & Credits Status Report\r\n\
+                     Version:           v{}\r\n\
+                     Machine Name:      {}\r\n\
+                     Local IP:          {}\r\n\
+                     Active Account:    {} [{}]\r\n\
+                     Immediate Credits: {:.1}%\r\n\
+                     Weekly Credits:    {:.1}%\r\n\
+                     Running Instances: {} / {}\r\n\
+                     Running Prompts:   {}\r\n\r\n\
+                     [JSON]\r\n{}",
+                    VERSION,
+                    m_name,
+                    m_ip,
+                    active_acc
+                        .as_ref()
+                        .map(|a| a.email.as_str())
+                        .unwrap_or("(None)"),
+                    tier,
+                    immediate_quota,
+                    weekly_quota,
+                    running_instances,
+                    instances_list.len(),
+                    running_prompts,
+                    serde_json::to_string_pretty(&status_json).unwrap_or_default()
+                );
+                let subject = format!(
+                    "[Antigravity | v{} | {} | {}] [Antigravity] [JSON] Node & Credits Status",
+                    VERSION, m_name, m_ip
+                );
+                let html = email_sender::wrap_html_email_card(
+                    "Node & Credits Status",
+                    &body_text,
+                    &m_name,
+                    &m_ip,
+                );
+                match email_sender::dispatch_email_with_failover(
+                    &subject,
+                    &html,
+                    &target_recipients,
+                ) {
+                    Ok(res) => {
+                        println!(
+                            "[SUCCESS] Dispatched status email via '{}' to {} recipient(s): {}",
+                            res.used_account_email,
+                            target_recipients.len(),
+                            target_recipients.join(", ")
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("[WARN] Failed to dispatch status email: {}", e);
+                    }
+                }
+            }
         }
         "ls" | "list" => {
             let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
@@ -2766,36 +2945,51 @@ fn cmd_email(args: &[String]) {
 }
 
 fn recreate_single_workspace(target_spec: &str) {
-    // Resolve target_spec to a concrete folder path
-    let resolved_path: PathBuf = {
-        let direct = PathBuf::from(target_spec);
+    let trimmed_spec = target_spec.trim();
+    if trimmed_spec.is_empty() {
+        return;
+    }
+
+    // Resolve target_spec to a concrete folder path (supports <seq>, #seq, id, repo_name, or path)
+    let projects = repo_db::list_running_projects().unwrap_or_default();
+    let clean_seq = trimmed_spec.trim_start_matches('#');
+    let seq_matched_path = if let Ok(seq_num) = clean_seq.parse::<usize>() {
+        if seq_num >= 1 && seq_num <= projects.len() {
+            Some(PathBuf::from(&projects[seq_num - 1].repo_path))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let resolved_path: PathBuf = if let Some(p) = seq_matched_path {
+        p
+    } else {
+        let direct = PathBuf::from(trimmed_spec);
         if direct.exists() {
             direct.canonicalize().unwrap_or(direct)
-        } else {
-            // Check running_projects in repo_db by name or id
-            let projects = repo_db::list_running_projects().unwrap_or_default();
-            if let Some(found) = projects.into_iter().find(|p| {
-                p.repo_name.eq_ignore_ascii_case(target_spec)
-                    || p.id.eq_ignore_ascii_case(target_spec)
-                    || p.repo_path
-                        .to_lowercase()
-                        .contains(&target_spec.to_lowercase())
-            }) {
-                PathBuf::from(found.repo_path)
-            } else if let Ok(cwd) = env::current_dir() {
-                if let Some(parent) = cwd.parent() {
-                    let sibling = parent.join(target_spec);
-                    if sibling.exists() {
-                        sibling
-                    } else {
-                        direct
-                    }
+        } else if let Some(found) = projects.into_iter().find(|p| {
+            p.repo_name.eq_ignore_ascii_case(trimmed_spec)
+                || p.id.eq_ignore_ascii_case(trimmed_spec)
+                || p.repo_path
+                    .to_lowercase()
+                    .contains(&trimmed_spec.to_lowercase())
+        }) {
+            PathBuf::from(found.repo_path)
+        } else if let Ok(cwd) = env::current_dir() {
+            if let Some(parent) = cwd.parent() {
+                let sibling = parent.join(trimmed_spec);
+                if sibling.exists() {
+                    sibling
                 } else {
                     direct
                 }
             } else {
                 direct
             }
+        } else {
+            direct
         }
     };
 
@@ -2804,7 +2998,7 @@ fn recreate_single_workspace(target_spec: &str) {
     let repo_name = resolved_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| target_spec.to_string());
+        .unwrap_or_else(|| trimmed_spec.to_string());
 
     println!(
         "[*] Recreating project workspace '{}' ({})...",
@@ -2832,6 +3026,7 @@ fn recreate_single_workspace(target_spec: &str) {
                             if let Ok(content) = fs::read_to_string(&ws_json) {
                                 let content_norm = content
                                     .to_lowercase()
+                                    .replace("%20", " ")
                                     .replace("%3a", ":")
                                     .replace('\\', "/");
                                 if content_norm.contains(&norm_target) {
@@ -2849,7 +3044,60 @@ fn recreate_single_workspace(target_spec: &str) {
         }
     }
 
-    // 3. Remove stale active_prompts and running_projects rows in repo_db
+    // 3. Prune matching conversation .db files and brain/<cid> directories under ~/.gemini/antigravity/
+    if let Some(ag_root) = agy_cleaner::get_gemini_base_dir() {
+        let norm_target = clean_str.to_lowercase().replace('\\', "/");
+        let repo_lower = repo_name.to_lowercase();
+        let all_convs = agy_cleaner::scan_conversations(0);
+        let mut pruned_convs = 0usize;
+        for conv in all_convs {
+            let uris_norm = conv
+                .workspace_uris
+                .to_lowercase()
+                .replace("%20", " ")
+                .replace("%3a", ":")
+                .replace('\\', "/");
+            let is_match = (!norm_target.is_empty() && uris_norm.contains(&norm_target))
+                || (!repo_lower.is_empty() && uris_norm.contains(&repo_lower));
+            if is_match {
+                let db_p = PathBuf::from(&conv.db_path);
+                if db_p.exists() {
+                    let _ = fs::remove_file(&db_p);
+                }
+                let brain_dir = ag_root.join("brain").join(&conv.conversation_id);
+                if brain_dir.exists() {
+                    let _ = fs::remove_dir_all(&brain_dir);
+                }
+                pruned_convs += 1;
+            }
+        }
+        if pruned_convs > 0 {
+            println!(
+                "    [✓] Pruned {} previous conversation(s) & brain cache(s) for '{}'",
+                pruned_convs, repo_name
+            );
+        }
+    }
+
+    // 4. Reset repo_prompts.db state and seed fresh initial conversation prompt
+    let initial_prompt = "read all files and memory to understand the project";
+    let now = chrono::Utc::now().timestamp();
+    let inst_id = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    let proj_slug = repo_name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let proj_id = if proj_slug.is_empty() {
+        "workspace".to_string()
+    } else {
+        proj_slug
+    };
+    let prompt_id = uuid::Uuid::new_v4().to_string();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
     if let Ok(conn) = repo_db::connect_db() {
         let _ = conn.execute(
             "DELETE FROM active_prompts WHERE LOWER(repo_path) = LOWER(?1) OR LOWER(project_id) LIKE LOWER(?2)",
@@ -2859,10 +3107,49 @@ fn recreate_single_workspace(target_spec: &str) {
             "DELETE FROM running_projects WHERE LOWER(repo_path) = LOWER(?1) OR LOWER(repo_name) = LOWER(?2)",
             rusqlite::params![&clean_str, &repo_name],
         );
-        println!("    [✓] Cleared tracked prompt/session state in repo_prompts.db");
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO running_projects \
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, NULL, 1, ?5, ?5)",
+            rusqlite::params![&proj_id, &inst_id, &repo_name, &clean_str, now],
+        );
+        let _ = conn.execute(
+            "INSERT INTO active_prompts \
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?6, 'dispatched', ?7, ?7)",
+            rusqlite::params![
+                &prompt_id,
+                &proj_id,
+                &inst_id,
+                &clean_str,
+                initial_prompt,
+                &session_id,
+                now
+            ],
+        );
+        println!(
+            "    [✓] Cleared old state and seeded initial prompt '{}' in repo_prompts.db",
+            initial_prompt
+        );
     }
 
-    // 4. Re-open project in Antigravity IDE (agy)
+    if resolved_path.exists() {
+        let task_payload = serde_json::json!({
+            "prompt_id": prompt_id,
+            "project_id": proj_id,
+            "instance_id": inst_id,
+            "repo_path": clean_str,
+            "session_id": session_id,
+            "prompt_content": initial_prompt,
+            "auto_boot": true,
+            "dispatched_at": now,
+        });
+        if let Ok(js) = serde_json::to_string_pretty(&task_payload) {
+            let _ = fs::write(&resume_file, js);
+        }
+    }
+
+    // 5. Re-open project in Antigravity IDE (agy)
     if resolved_path.exists() {
         let launched = Command::new("agy")
             .arg(&clean_str)
@@ -2897,15 +3184,34 @@ fn recreate_single_workspace(target_spec: &str) {
 }
 
 fn cmd_recreate_project(args: &[String]) {
-    let target = args
+    let explicit: Vec<String> = args
         .iter()
-        .find(|a| !a.starts_with('-'))
-        .cloned()
-        .unwrap_or_else(|| {
-            env::current_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| ".".to_string())
-        });
+        .filter(|a| !a.starts_with('-'))
+        .flat_map(|a| a.split(','))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if !explicit.is_empty() {
+        for t in explicit {
+            recreate_single_workspace(&t);
+        }
+        return;
+    }
+
+    let git_root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let target = git_root.unwrap_or_else(|| {
+        env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    });
     recreate_single_workspace(&target);
 }
 
@@ -2913,7 +3219,9 @@ fn cmd_recreate(args: &[String]) {
     let targets: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with('-'))
-        .cloned()
+        .flat_map(|a| a.split(','))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
         .collect();
     if targets.is_empty() {
         cmd_recreate_project(args);

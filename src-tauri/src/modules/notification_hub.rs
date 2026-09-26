@@ -9,6 +9,107 @@ use crate::modules::email_vault_db;
 use crate::modules::email_watcher;
 use crate::modules::logger;
 use crate::modules::telegram_inbound;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+static PREVIOUS_EMAIL_STATE: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+static LAST_SWITCH_DISPATCH: Lazy<Mutex<(String, i64)>> =
+    Lazy::new(|| Mutex::new((String::new(), 0)));
+
+/// Record the previous account email prior to switching so telemetry can report old_email accurately
+pub fn record_previous_email(email: &str) {
+    let trimmed = email.trim();
+    if !trimmed.is_empty() {
+        if let Ok(mut guard) = PREVIOUS_EMAIL_STATE.lock() {
+            *guard = Some(trimmed.to_string());
+        }
+    }
+}
+
+fn resolve_switch_context(
+    new_email: &str,
+    instance_spec: &str,
+) -> (String, String, String, String) {
+    let mut old_email = String::new();
+    if let Ok(mut guard) = PREVIOUS_EMAIL_STATE.lock() {
+        if let Some(prev) = guard.take() {
+            if !prev.is_empty() {
+                old_email = prev;
+            }
+        }
+    }
+
+    let mut inst_id = instance_spec.to_string();
+    let mut inst_name = instance_spec.to_string();
+    let mut is_default = instance_spec.eq_ignore_ascii_case("default");
+
+    if let Ok(registry) = crate::modules::instance::load_registry() {
+        let found = registry
+            .instances
+            .iter()
+            .find(|i| {
+                i.id.eq_ignore_ascii_case(instance_spec)
+                    || i.name.eq_ignore_ascii_case(instance_spec)
+            })
+            .or_else(|| {
+                registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == registry.active_instance_id)
+            });
+
+        if let Some(inst) = found {
+            inst_id = inst.id.clone();
+            inst_name = inst.name.clone();
+            is_default = inst.is_default || inst.id == "default";
+
+            if old_email.is_empty() || old_email.eq_ignore_ascii_case(new_email) {
+                if let Some(ref b_email) = inst.bound_email {
+                    if !b_email.is_empty() && !b_email.eq_ignore_ascii_case(new_email) {
+                        old_email = b_email.clone();
+                    } else if old_email.is_empty() && !b_email.is_empty() {
+                        old_email = b_email.clone();
+                    }
+                }
+                if old_email.is_empty() || old_email.eq_ignore_ascii_case(new_email) {
+                    if let Some(ref b_id) = inst.bound_account_id {
+                        if let Ok(acc) = crate::modules::account::load_account(b_id) {
+                            if !acc.email.is_empty() && !acc.email.eq_ignore_ascii_case(new_email) {
+                                old_email = acc.email;
+                            } else if old_email.is_empty() && !acc.email.is_empty() {
+                                old_email = acc.email;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if old_email.is_empty() || old_email.eq_ignore_ascii_case(new_email) {
+        if let Ok(Some(cur_acc)) = crate::modules::account::get_current_account() {
+            if !cur_acc.email.is_empty() && !cur_acc.email.eq_ignore_ascii_case(new_email) {
+                old_email = cur_acc.email;
+            } else if old_email.is_empty() && !cur_acc.email.is_empty() {
+                old_email = cur_acc.email;
+            }
+        }
+    }
+
+    if !new_email.trim().is_empty() {
+        if let Ok(mut guard) = PREVIOUS_EMAIL_STATE.lock() {
+            *guard = Some(new_email.trim().to_string());
+        }
+    }
+
+    let instance_mode = if is_default {
+        "default".to_string()
+    } else {
+        "isolated".to_string()
+    };
+
+    (old_email, inst_id, inst_name, instance_mode)
+}
 
 /// Dispatch notifications across Email and Telegram upon account/instance switch
 pub fn notify_account_switched(
@@ -17,20 +118,41 @@ pub fn notify_account_switched(
     reason: &str,
     is_auto: bool,
 ) {
+    let now_ts = chrono::Utc::now().timestamp();
+    if let Ok(mut guard) = LAST_SWITCH_DISPATCH.lock() {
+        if guard.0.eq_ignore_ascii_case(account_email.trim()) && (now_ts - guard.1).abs() <= 5 {
+            return;
+        }
+        *guard = (account_email.trim().to_string(), now_ts);
+    }
+
+    let (old_email, inst_id, inst_name, instance_mode) =
+        resolve_switch_context(account_email, instance_name);
+
     let email_copy = account_email.to_string();
-    let instance_copy = instance_name.to_string();
     let reason_copy = reason.to_string();
 
     tokio::spawn(async move {
-        dispatch_email_switch_alert(&email_copy, &instance_copy, &reason_copy, is_auto);
-        dispatch_telegram_switch_alert(&email_copy, &instance_copy, &reason_copy, is_auto).await;
+        dispatch_email_switch_alert(
+            &old_email,
+            &email_copy,
+            &inst_id,
+            &inst_name,
+            &instance_mode,
+            &reason_copy,
+            is_auto,
+        );
+        dispatch_telegram_switch_alert(&email_copy, &inst_name, &reason_copy, is_auto).await;
     });
 }
 
 /// Helper to render and dispatch email switch notification
 fn dispatch_email_switch_alert(
+    old_email: &str,
     account_email: &str,
+    instance_id: &str,
     instance_name: &str,
+    instance_mode: &str,
     reason: &str,
     is_auto: bool,
 ) {
@@ -71,6 +193,21 @@ fn dispatch_email_switch_alert(
         "Manual User Switch"
     };
 
+    let condition = if is_auto {
+        let r_lower = reason.to_lowercase();
+        if r_lower.contains("critical") {
+            "critical_quota"
+        } else if r_lower.contains("depleted") {
+            "depleted_before_finish"
+        } else if r_lower.contains("force") {
+            "forced_rotation"
+        } else {
+            "low_quota_threshold"
+        }
+    } else {
+        "manual_switch"
+    };
+
     let subject = format!(
         "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Account Switched: {} -> {}",
         pkg_ver, m_name, m_ip, instance_name, account_email
@@ -81,15 +218,22 @@ fn dispatch_email_switch_alert(
         "agm_version": pkg_ver,
         "vm_name": m_name,
         "local_ip": m_ip,
-        "old_email": "",
+        "old_email": old_email,
         "new_email": account_email,
-        "instance_id": instance_name,
+        "instance_id": instance_id,
         "instance_name": instance_name,
+        "instance_mode": instance_mode,
         "switch_mode": if is_auto { "auto" } else { "manual" },
+        "condition": condition,
         "reason": reason,
         "timestamp": now_ts,
     });
     let telemetry_json_pretty = serde_json::to_string_pretty(&telemetry_data).unwrap_or_default();
+    let prev_email_display = if old_email.is_empty() {
+        "N/A"
+    } else {
+        old_email
+    };
 
     let html = format!(
         r#"<!DOCTYPE html>
@@ -110,8 +254,10 @@ fn dispatch_email_switch_alert(
       <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px;">An account rotation was executed successfully. Target credentials have been injected into IDE state storage.</p>
       <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Version</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Previous Account</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Target Account</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Target Instance</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Instance Mode</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Trigger Mode</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Reason</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
@@ -131,8 +277,10 @@ fn dispatch_email_switch_alert(
         m_name,
         m_ip,
         pkg_ver,
+        prev_email_display,
         account_email,
         instance_name,
+        instance_mode,
         trigger_label,
         reason,
         m_name,

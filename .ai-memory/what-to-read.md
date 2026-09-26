@@ -5,6 +5,7 @@
 
 ## Changelog
 
+- 2026-09-26T20:25:00Z, CLI & Auto-Switcher Deep Verification: completed minimum-bottleneck quota evaluation, 5s reactive threshold loop, `[JSON]` switch telemetry state machine (`old_email`, `instance_mode`, `condition`), `agm email status/help` dispatch, `agm instances create --data-only(do)`, and `agm recreate-project` conversation cleanup & bootstrap prompt seeding (`02-spec/22-app-issues/12-auto-switcher-quota-and-instance-rotation-rca.md`).
 - 2026-09-23T13:00:00Z, Memory write: installer multi-version fallback ladder (10 releases), release asset decoupling, quiet aria2c delegation, and bottom-bar reactive update trigger recorded in learned/20-installer-multi-version-fallback-ladder-and-release-blocks.md.
 - 2026-09-22T07:25:00Z, Skills Suite & Memory write: created 6 specialized domain skills for Antigravity-Manager (agm-proxy-engine, agm-thinking-store, agm-multi-instance-sandboxing, agm-split-sqlite-architecture, agm-frontend-react-tauri, agm-email-remote-control) and recorded learned/17-agm-dedicated-domain-skills-suite.md.
 - 2026-09-19T02:00:00Z, Memory write: v4.18.0 email management, split security vault DB, bidirectional remote control, 20 CI/CD RCAs, and quality resilience recorded in learned/16-v4-18-0-email-management-split-security-db-and-pipeline-resilience.md.
