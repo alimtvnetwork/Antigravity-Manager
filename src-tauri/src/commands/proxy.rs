@@ -752,36 +752,34 @@ pub async fn set_preferred_account(
     account_id: Option<String>,
 ) -> Result<(), String> {
     let instance_lock = state.instance.read().await;
-    if let Some(instance) = instance_lock.as_ref() {
-        // 过滤空字符串为 None
-        let cleaned_id = account_id.filter(|s| !s.trim().is_empty());
+    // 过滤空字符串为 None
+    let cleaned_id = account_id.filter(|s| !s.trim().is_empty());
 
+    if let Some(instance) = instance_lock.as_ref() {
         // 1. 更新内存状态
         instance
             .token_manager
             .set_preferred_account(cleaned_id.clone())
             .await;
-
-        // 2. 持久化到配置文件 (修复 Issue #820 自动关闭问题)
-        let mut app_config = crate::modules::config::load_app_config()
-            .map_err(|e| format!("加载配置失败: {}", e))?;
-        app_config.proxy.preferred_account_id = cleaned_id.clone();
-        crate::modules::config::save_app_config(&app_config)
-            .map_err(|e| format!("保存配置失败: {}", e))?;
-
-        if let Some(ref id) = cleaned_id {
-            tracing::info!(
-                "🔒 [FIX #820] Fixed account mode enabled and persisted: {}",
-                id
-            );
-        } else {
-            tracing::info!("🔄 [FIX #820] Round-robin mode enabled and persisted");
-        }
-
-        Ok(())
-    } else {
-        Err("服务未运行".to_string())
     }
+
+    // 2. 持久化到配置文件 (修复 Issue #820 自动关闭问题)
+    let mut app_config =
+        crate::modules::config::load_app_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    app_config.proxy.preferred_account_id = cleaned_id.clone();
+    crate::modules::config::save_app_config(&app_config)
+        .map_err(|e| format!("保存配置失败: {}", e))?;
+
+    if let Some(ref id) = cleaned_id {
+        tracing::info!(
+            "🔒 [FIX #820] Fixed account mode enabled and persisted: {}",
+            id
+        );
+    } else {
+        tracing::info!("🔄 [FIX #820] Round-robin mode enabled and persisted");
+    }
+
+    Ok(())
 }
 
 /// 获取当前优先使用的账号ID
@@ -793,7 +791,8 @@ pub async fn get_preferred_account(
     if let Some(instance) = instance_lock.as_ref() {
         Ok(instance.token_manager.get_preferred_account().await)
     } else {
-        Ok(None)
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        Ok(cfg.proxy.preferred_account_id)
     }
 }
 
@@ -855,6 +854,7 @@ pub async fn get_proxy_pool_config(
         let config = instance.axum_server.proxy_pool_state.read().await;
         Ok(config.clone())
     } else {
-        Err("服务未运行".to_string())
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        Ok(cfg.proxy.proxy_pool)
     }
 }

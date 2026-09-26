@@ -45,7 +45,7 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
         if (config.enabled) { // Only poll if proxy pool is enabled
             interval = setInterval(async () => {
                 try {
-                    const liveConfig = await request<ProxyPoolConfig>('get_proxy_pool_config');
+                    const liveConfig = await request<ProxyPoolConfig>('get_proxy_pool_config', { _suppressGlobalModal: true });
                     if (liveConfig && liveConfig.proxies) {
                         // Create a map for quick lookups
                         const liveMap = new Map(liveConfig.proxies.map(p => [p.id, p]));
@@ -79,7 +79,7 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
 
     const fetchBindings = async () => {
         try {
-            const bindings = await request<Record<string, string>>('get_all_account_bindings');
+            const bindings = await request<Record<string, string>>('get_all_account_bindings', { _suppressGlobalModal: true });
             if (bindings) setAccountBindings(bindings);
         } catch (e) {
             console.error('Fetch bindings failed:', e);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-24T16:11:45Z",
+  "updated_at": "2026-09-26T18:48:17Z",
   "files": [
     ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".github/workflows/ci.yml",
@@ -16,6 +16,7 @@
     "src-tauri/src/commands/email.rs",
     "src-tauri/src/commands/instance.rs",
     "src-tauri/src/commands/mod.rs",
+    "src-tauri/src/commands/proxy.rs",
     "src-tauri/src/commands/supabase.rs",
     "src-tauri/src/commands/telegram.rs",
     "src-tauri/src/lib.rs",
@@ -58,7 +59,9 @@
     "src/components/navbar/constants.ts",
     "src/components/settings/AutoSwitcherSettings.tsx",
     "src/components/settings/EmailNotificationSettings.tsx",
+    "src/components/settings/ProxyPoolSettings.tsx",
     "src/components/settings/SupabaseSyncSettings.tsx",
+    "src/components/settings/proxy/ProxyBindingManager.tsx",
     "src/pages/Accounts.tsx",
     "src/pages/Settings.tsx",
     "src/services/emailService.ts",

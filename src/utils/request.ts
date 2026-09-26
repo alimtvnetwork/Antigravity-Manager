@@ -179,14 +179,21 @@ const COMMAND_MAPPING: Record<string, { url: string; method: 'GET' | 'POST' | 'D
 };
 
 export async function request<T>(cmd: string, args?: any): Promise<T> {
-  // 1. Tauri 环境：直接使用 invoke ...
+  const suppressGlobalModal = Boolean(args?._suppressGlobalModal);
+  let cleanedArgs = args;
+  if (args && typeof args === 'object' && '_suppressGlobalModal' in args) {
+    const { _suppressGlobalModal, ...rest } = args;
+    cleanedArgs = Object.keys(rest).length > 0 ? rest : undefined;
+  }
+
+  // 1. Tauri 环境：直接使用 invoke
   if (isTauri) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      return await invoke<T>(cmd, args);
+      return await invoke<T>(cmd, cleanedArgs);
     } catch (error) {
       console.error(`Tauri Invoke Error [${cmd}]:`, error);
-      if (!args?._suppressGlobalModal) {
+      if (!suppressGlobalModal) {
         useErrorStore.getState().captureError(error, {
           source: `tauri.${cmd}`,
           endpoint: cmd,
@@ -207,14 +214,14 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
 
   let url = mapping.url;
   // [FIX] 创建 args 副本，用于移除已使用的路径参数
-  let bodyArgs = args ? { ...args } : undefined;
+  let bodyArgs = cleanedArgs ? { ...cleanedArgs } : undefined;
 
-  // 通用路径参数处理：替换 :key 为 args[key]
-  if (args) {
-    Object.keys(args).forEach(key => {
+  // 通用路径参数处理：替换 :key 为 cleanedArgs[key]
+  if (cleanedArgs) {
+    Object.keys(cleanedArgs).forEach(key => {
       const placeholder = `:${key}`;
       if (url.includes(placeholder)) {
-        url = url.replace(placeholder, encodeURIComponent(String(args[key])));
+        url = url.replace(placeholder, encodeURIComponent(String(cleanedArgs[key])));
         // [FIX] 从 body 参数中移除已用于路径的参数
         if (bodyArgs) {
           delete bodyArgs[key];
@@ -287,7 +294,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     }
   } catch (error) {
     console.error(`Web Fetch Error [${cmd}]:`, error);
-    if (!args?._suppressGlobalModal) {
+    if (!suppressGlobalModal) {
       useErrorStore.getState().captureError(error, {
         source: `web.${cmd}`,
         endpoint: url,

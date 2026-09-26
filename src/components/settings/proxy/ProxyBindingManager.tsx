@@ -33,7 +33,7 @@ export default function ProxyBindingManager({ isOpen, onClose, proxies }: ProxyB
         setIsLoading(true);
         try {
             await fetchAccounts();
-            const currentBindings = await request<Record<string, string>>('get_all_account_bindings');
+            const currentBindings = await request<Record<string, string>>('get_all_account_bindings', { _suppressGlobalModal: true });
             setBindings(currentBindings || {});
         } catch (error) {
             console.error('Failed to load bindings:', error);
