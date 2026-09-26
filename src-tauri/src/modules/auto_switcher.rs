@@ -799,6 +799,7 @@ pub async fn check_and_rotate_with_options(
         // Live Quota Refresh from Google API before threshold evaluation
         if let Ok(fresh_quota) = account::fetch_quota_with_retry(&mut bound_acc).await {
             bound_acc.quota = Some(fresh_quota);
+            let _ = account::save_account(&bound_acc);
         }
 
         let period_status = evaluate_account_period_status(

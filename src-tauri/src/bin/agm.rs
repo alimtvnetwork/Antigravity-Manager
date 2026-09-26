@@ -1913,11 +1913,25 @@ fn cmd_clear_cache(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg = &args[i];
-        if arg == "--keep" || arg == "-k" {
+        if arg == "--keep"
+            || arg == "-k"
+            || arg == "--keep/k"
+            || arg == "-keep/k"
+            || arg == "keep/k"
+            || arg == "-keep"
+        {
             if i + 1 < args.len() {
                 keep_count = args[i + 1].parse::<usize>().unwrap_or(10);
                 i += 2;
                 continue;
+            }
+        } else if arg.starts_with("--keep=")
+            || arg.starts_with("-k=")
+            || arg.starts_with("--keep/k=")
+            || arg.starts_with("-keep/k=")
+        {
+            if let Some(val) = arg.split('=').nth(1) {
+                keep_count = val.parse::<usize>().unwrap_or(10);
             }
         } else if !arg.starts_with('-') {
             if let Ok(n) = arg.parse::<usize>() {

@@ -186,6 +186,12 @@ pub async fn switch_account(
     if let Some(inst_id) = instance_target {
         modules::instance::switch_account_to_instance(&account_id, Some(&inst_id)).await?;
     } else {
+        if let Ok(Some(prev_acc)) = modules::account::get_current_account() {
+            if !prev_acc.email.is_empty() {
+                modules::notification_hub::record_previous_email(&prev_acc.email);
+            }
+        }
+
         let service = modules::account_service::AccountService::new(
             crate::modules::integration::SystemManager::Desktop(app.clone()),
         );
@@ -196,6 +202,14 @@ pub async fn switch_account(
 
         if let Ok(acc) = modules::account::load_account(&account_id) {
             let _ = modules::instance::bind_account_to_instance("default", &acc.id, &acc.email);
+            if !acc.email.is_empty() {
+                modules::notification_hub::notify_account_switched(
+                    &acc.email,
+                    "default",
+                    "Smart Fast-Forward / Account Switch",
+                    false,
+                );
+            }
         }
     }
 
@@ -564,6 +578,12 @@ pub async fn save_config(
             .update_circuit_breaker_config(config.circuit_breaker.clone())
             .await;
         tracing::debug!("已同步热更新反代服务配置");
+    }
+
+    if config.auto_profile_switcher.is_enabled {
+        tokio::spawn(async move {
+            crate::modules::auto_switcher::check_and_rotate_if_needed().await;
+        });
     }
 
     Ok(())

@@ -760,7 +760,7 @@ pub fn render_workspace_switch_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Notice] Workspace Auto-Switched: {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] [Notice] Workspace Auto-Switched: {}",
         pkg_ver, machine_name, machine_ip, to_instance
     );
     let content = format!(
@@ -787,7 +787,7 @@ pub fn render_idle_projects_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Prompt Request] Running Projects Idle - Ready for Instructions",
+        "[Antigravity | {} | {} | {}] [Antigravity] [Prompt Request] Running Projects Idle - Ready for Instructions",
         pkg_ver, machine_name, machine_ip
     );
     let mut proj_list = String::new();
@@ -825,7 +825,7 @@ pub fn render_exec_result_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Execution Report] exit: {} - {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] [Execution Report] exit: {} - {}",
         pkg_ver, machine_name, machine_ip, exit_code, cmd
     );
     let status = if exit_code == 0 { "SUCCESS" } else { "FAILED" };

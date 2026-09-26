@@ -101,9 +101,16 @@ pub fn get_auto_switcher_status(
 pub fn update_auto_switcher_config(
     config: crate::models::config::AutoProfileSwitcherConfig,
 ) -> Result<(), String> {
+    let is_enabled = config.is_enabled;
     let mut app_config = crate::modules::config::load_app_config()?;
     app_config.auto_profile_switcher = config;
-    crate::modules::config::save_app_config(&app_config)
+    crate::modules::config::save_app_config(&app_config)?;
+    if is_enabled {
+        tokio::spawn(async move {
+            crate::modules::auto_switcher::check_and_rotate_if_needed().await;
+        });
+    }
+    Ok(())
 }
 
 #[tauri::command]

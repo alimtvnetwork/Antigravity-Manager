@@ -379,6 +379,16 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
     fs::create_dir_all(&instance_data_dir)
         .map_err(|e| format!("Failed to create instance directory: {}", e))?;
 
+    let user_dir = instance_data_dir.join("User");
+    let _ = fs::create_dir_all(&user_dir);
+    if let Ok(default_dir) = get_default_antigravity_data_dir() {
+        let default_settings = default_dir.join("User").join("settings.json");
+        let dest_settings = user_dir.join("settings.json");
+        if default_settings.exists() && !dest_settings.exists() {
+            let _ = fs::copy(default_settings, dest_settings);
+        }
+    }
+
     let next_seq = registry
         .instances
         .iter()
@@ -1128,10 +1138,13 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
         }
         return Ok("default".to_string());
     }
-    // Check if numeric seq_num (e.g. "1")
+    // Check if numeric seq_num (e.g. "1") or 1-based index
     if let Ok(num) = clean.parse::<u32>() {
         if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
             return Ok(inst.id.clone());
+        }
+        if num >= 1 && (num as usize) <= registry.instances.len() {
+            return Ok(registry.instances[(num as usize) - 1].id.clone());
         }
     }
     // Check clean number prefix like "ins-1", "instance-1", "#1"
@@ -1142,6 +1155,9 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     if let Ok(num) = clean_num.parse::<u32>() {
         if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
             return Ok(inst.id.clone());
+        }
+        if num >= 1 && (num as usize) <= registry.instances.len() {
+            return Ok(registry.instances[(num as usize) - 1].id.clone());
         }
     }
     // Check exact id match
@@ -1160,8 +1176,10 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     {
         return Ok(inst.id.clone());
     }
-    // Fallback: active instance
-    Ok(registry.active_instance_id)
+    if clean.is_empty() {
+        return Ok(registry.active_instance_id);
+    }
+    Err(format!("Instance '{}' not found", target))
 }
 
 /// Switch account and inject into a specific target instance without terminating siblings
@@ -1285,6 +1303,11 @@ pub async fn switch_account_to_instance(
                         }
                     }
                 }
+            }
+        } else {
+            let instance_storage_path = db_dir.join("storage.json");
+            if let Some(ref profile) = acc.device_profile {
+                let _ = crate::modules::device::write_profile(&instance_storage_path, profile);
             }
         }
         Ok(())
