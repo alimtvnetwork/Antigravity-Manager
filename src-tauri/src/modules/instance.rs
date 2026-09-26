@@ -381,12 +381,11 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 
     let user_dir = instance_data_dir.join("User");
     let _ = fs::create_dir_all(&user_dir);
-    if let Ok(default_dir) = get_default_antigravity_data_dir() {
-        let default_settings = default_dir.join("User").join("settings.json");
-        let dest_settings = user_dir.join("settings.json");
-        if default_settings.exists() && !dest_settings.exists() {
-            let _ = fs::copy(default_settings, dest_settings);
-        }
+    let default_dir = get_default_antigravity_data_dir();
+    let default_settings = default_dir.join("User").join("settings.json");
+    let dest_settings = user_dir.join("settings.json");
+    if default_settings.exists() && !dest_settings.exists() {
+        let _ = fs::copy(default_settings, dest_settings);
     }
 
     let next_seq = registry
@@ -1179,7 +1178,7 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     if clean.is_empty() {
         return Ok(registry.active_instance_id);
     }
-    Err(format!("Instance '{}' not found", target))
+    Err(format!("Instance '{}' not found", clean))
 }
 
 /// Switch account and inject into a specific target instance without terminating siblings
@@ -1327,6 +1326,9 @@ pub async fn switch_account_to_instance(
         None
     };
 
+    // 1.5. Snapshot and backup all running prompts across active workspaces into SQLite BEFORE closing IDE
+    let _ = crate::modules::repo_db::backup_running_prompts(&instance.id);
+
     // 2. Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
@@ -1368,6 +1370,9 @@ pub async fn switch_account_to_instance(
     } else {
         launch_instance(&instance.id).map_err(|e| e.to_string())?;
     }
+
+    // 5.5. Immediately restore and dispatch running prompts to workspaces so they run as soon as switch happens
+    let _ = crate::modules::repo_db::resend_all_running_commands(20);
 
     // 6. Dispatch unified Email and Telegram switch notifications
     crate::modules::notification_hub::notify_account_switched(

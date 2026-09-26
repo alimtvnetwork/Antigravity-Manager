@@ -17,7 +17,11 @@ pub async fn bind_account_proxy(
             .bind_account_to_proxy(account_id, proxy_id)
             .await
     } else {
-        Err("Service not running".to_string())
+        // Fallback: persist binding to app configuration directly when proxy service is stopped
+        let mut cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        cfg.proxy.proxy_pool.account_bindings.insert(account_id, proxy_id);
+        crate::modules::config::save_app_config(&cfg).map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -36,7 +40,11 @@ pub async fn unbind_account_proxy(
             .await;
         Ok(())
     } else {
-        Err("Service not running".to_string())
+        // Fallback: remove binding from app configuration directly when proxy service is stopped
+        let mut cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        cfg.proxy.proxy_pool.account_bindings.remove(&account_id);
+        crate::modules::config::save_app_config(&cfg).map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -53,7 +61,8 @@ pub async fn get_account_proxy_binding(
             .proxy_pool_manager
             .get_account_binding(&account_id))
     } else {
-        Err("Service not running".to_string())
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        Ok(cfg.proxy.proxy_pool.account_bindings.get(&account_id).cloned())
     }
 }
 
@@ -65,12 +74,12 @@ pub async fn get_all_account_bindings(
     let instance_lock = state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
         // Since get_all_bindings returns a DashMap ref or clone, we need to convert it to HashMap for serialization
-        // Assuming we add a method to ProxyPoolManager to get a snapshot
         Ok(instance
             .axum_server
             .proxy_pool_manager
             .get_all_bindings_snapshot())
     } else {
-        Err("Service not running".to_string())
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        Ok(cfg.proxy.proxy_pool.account_bindings)
     }
 }

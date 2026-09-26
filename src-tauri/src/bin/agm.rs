@@ -54,6 +54,9 @@ fn main() {
         "rerun" => cmd_rerun(&cmd_args),
         "prompts-export" | "pe" => cmd_prompts_export(&cmd_args),
         "prompts-import" | "pi" => cmd_prompts_import(&cmd_args),
+        "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
+            cmd_resend_running_commands(&cmd_args);
+        }
         "proxy" => cmd_proxy(&cmd_args),
         "sync" => cmd_sync(),
         "pull" => cmd_pull(),
@@ -139,6 +142,9 @@ fn print_help() {
     println!("  prompt \"<text>\" [--prefix C] [--suffix C] Dispatch prompt with git pull & 01-prompts templates");
     println!(
         "  rerun [prompts [N]] [-prefix <cat>]   Git pull and rerun last N prompts with template"
+    );
+    println!(
+        "  resend-running-commands, rrc [N] [--json] [-f [path]] Resend commands before close/switch & sync image paths"
     );
     println!();
     println!("Instance & Workspace Management Commands:");
@@ -639,6 +645,33 @@ fn cmd_which_prompts_running(args: &[String]) {
             "prompts_count": queue_count,
             "is_running": proj.is_running,
         }));
+    }
+
+    // Also include any active/running prompts whose project wasn't listed in projects registry
+    for p in &all_prompts {
+        if p.status != "running" && p.status != "backed_up" && p.status != "dispatched" {
+            continue;
+        }
+        let already_included = rows.iter().any(|r| {
+            r["id"].as_str() == Some(&p.project_id)
+                || r["repo_path"].as_str() == Some(&p.repo_path)
+        });
+        if !already_included {
+            seq += 1;
+            let conv_id = p.session_id.clone().unwrap_or_else(|| "-".to_string());
+            let conv_name = p.project_id.clone();
+            rows.push(serde_json::json!({
+                "seq": seq,
+                "project": p.project_id,
+                "id": p.project_id,
+                "instance_id": p.instance_id,
+                "repo_path": p.repo_path,
+                "conv_id": conv_id,
+                "conv_name": conv_name,
+                "prompts_count": 1,
+                "is_running": true,
+            }));
+        }
     }
 
     if is_json {
@@ -1291,6 +1324,12 @@ fn cmd_prompt_dispatch(args: &[String]) {
 
     if let Ok(conn) = repo_db::connect_db() {
         let _ = conn.execute(
+            "INSERT OR REPLACE INTO running_projects \
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, '', 1, ?5, ?5)",
+            rusqlite::params![&slug, &inst_id, &slug, &cwd_str, now],
+        );
+        let _ = conn.execute(
             "INSERT INTO active_prompts \
              (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?2, 'dispatched', ?6, ?6)",
@@ -1423,6 +1462,135 @@ fn cmd_rerun(args: &[String]) {
     println!(
         "[SUCCESS] Queued and dispatched {} prompt(s) for rerun.",
         prompts.len()
+    );
+}
+
+fn cmd_resend_running_commands(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let mut limit_n = 20usize;
+    let mut file_out: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "-f" || arg == "--file" {
+            if i + 1 < args.len() {
+                file_out = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(n) = arg.parse::<usize>() {
+                limit_n = n.max(1);
+            }
+        }
+        i += 1;
+    }
+
+    // Step 1: Backup current in-flight prompts from workspaceStorage into SQLite before resend
+    let active_inst = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    let _ = repo_db::backup_running_prompts(&active_inst);
+
+    // Step 2: Resend running commands from SQLite DB and write .antigravity_resume_task.json
+    let resent_prompts = match repo_db::resend_all_running_commands(limit_n) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to resend running commands: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut items = Vec::new();
+    for (idx, p) in resent_prompts.iter().enumerate() {
+        let (extracted_img, img_paths) = repo_db::extract_image_payload_or_path(&p.prompt_content);
+        let final_img = p.image_payload.clone().or(extracted_img);
+        let has_image = final_img.is_some() || !img_paths.is_empty();
+        let (snippet, word_count) = truncate_words(&p.prompt_content, 100);
+
+        items.push(serde_json::json!({
+            "seq": idx + 1,
+            "id": p.id,
+            "project": p.project_id,
+            "instance_id": p.instance_id,
+            "repo_path": p.repo_path,
+            "status": "running",
+            "prompt": snippet,
+            "word_count": word_count,
+            "has_images": has_image,
+            "image_paths": img_paths,
+            "image_payload": final_img,
+            "resent_via": ".antigravity_resume_task.json",
+            "resend_status": "success",
+            "updated_at": p.updated_at,
+        }));
+    }
+
+    if let Some(ref path) = file_out {
+        let target_path = if path.trim().is_empty() {
+            let m_name = email_watcher::detect_machine_name();
+            format!("agm-{}-resend.json", m_name.to_lowercase())
+        } else {
+            path.clone()
+        };
+        if let Ok(js_str) = serde_json::to_string_pretty(&items) {
+            let _ = fs::write(&target_path, js_str);
+            if !is_json {
+                println!("[SUCCESS] Saved resend commands payload to \"{}\"", target_path);
+            }
+        }
+    }
+
+    if is_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+        );
+        return;
+    }
+
+    println!("\n================================================================================");
+    println!("  AGM RESEND RUNNING COMMANDS (RRC)");
+    println!("================================================================================");
+    println!(
+        "[Table Mode: Resending {} running command(s) across active project(s) via .antigravity_resume_task.json]\n",
+        items.len()
+    );
+
+    if items.is_empty() {
+        println!("No active or previously running commands tracked in SQLite database.");
+        return;
+    }
+
+    println!(
+        "{:<5} {:<10} {:<24} {:<10} {:<18} {}",
+        "SEQ", "ID", "PROJECT", "STATUS", "IMAGES", "PROMPT SNIPPET"
+    );
+    println!("{}", "-".repeat(110));
+
+    for item in &items {
+        let seq = item["seq"].as_u64().unwrap_or(0);
+        let id_str = item["id"].as_str().unwrap_or("");
+        let short_id = if id_str.len() > 8 { &id_str[..8] } else { id_str };
+        let proj = item["project"].as_str().unwrap_or("-");
+        let status = item["status"].as_str().unwrap_or("running");
+        let has_img = item["has_images"].as_bool().unwrap_or(false);
+        let img_paths = item["image_paths"].as_array();
+        let img_label = if has_img {
+            let count = img_paths.map(|a| a.len()).unwrap_or(1).max(1);
+            format!("Yes ({} file(s))", count)
+        } else {
+            "None".to_string()
+        };
+        let prompt_txt = item["prompt"].as_str().unwrap_or("");
+        println!(
+            "#{:<4} {:<10} {:<24} {:<10} {:<18} {}",
+            seq, short_id, proj, status, img_label, prompt_txt
+        );
+    }
+    println!();
+    println!(
+        "[SUCCESS] Resent and queued {} command(s) for execution. SQLite DB synchronized with image file paths.",
+        items.len()
     );
 }
 
@@ -2252,21 +2420,17 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
     let is_low_credit = active_acc.is_none() || current_quota_percent <= threshold_percent;
 
     // Find next possible account
-    let accounts = account::load_accounts().unwrap_or_default();
-    let current_id = active_acc.as_ref().map(|a| a.id.as_str()).unwrap_or("");
     let excluded = auto_switcher::get_active_in_use_account_ids();
     let best_candidate = auto_switcher::select_next_best_profile(
-        &accounts,
-        current_id,
+        "default",
         &target_model,
         threshold_percent,
-        now_sec,
         &excluded,
-    );
+    )
+    .ok()
+    .flatten();
     let next_possible_account = best_candidate.as_ref().map(|a| a.email.clone());
-    let next_possible_quota_percent = best_candidate
-        .as_ref()
-        .and_then(|a| auto_switcher::calculate_account_quota(a, &target_model));
+    let next_possible_quota_percent = best_candidate.as_ref().map(|a| a.quota_percent);
 
     // Detect active running prompt and image payload
     let mut running_prompt: Option<String> = None;

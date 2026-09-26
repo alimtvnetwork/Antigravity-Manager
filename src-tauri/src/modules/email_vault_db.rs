@@ -523,6 +523,17 @@ pub fn set_default_email_account(account_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Get designated default email account (or first active account if none marked default)
+pub fn get_default_account() -> Result<Option<EmailAccount>, String> {
+    let accounts = list_email_accounts()?;
+    let def = accounts
+        .iter()
+        .find(|a| a.is_default && a.is_active)
+        .or_else(|| accounts.iter().find(|a| a.is_active))
+        .cloned();
+    Ok(def)
+}
+
 /// Retrieve decrypted password from separate split passwords database
 pub fn get_account_secret(account_id: &str) -> Result<String, String> {
     let conn = connect_passwords_db()?;

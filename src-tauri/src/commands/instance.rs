@@ -107,7 +107,7 @@ pub fn update_auto_switcher_config(
     crate::modules::config::save_app_config(&app_config)?;
     if is_enabled {
         tokio::spawn(async move {
-            crate::modules::auto_switcher::check_and_rotate_if_needed().await;
+            let _ = crate::modules::auto_switcher::check_and_rotate_if_needed().await;
         });
     }
     Ok(())

@@ -1,0 +1,11 @@
+{
+  "prompt_id": "b0fb35de-c1fb-408e-b858-00527a477c1a",
+  "project_id": "antigravity-manager",
+  "instance_id": "default",
+  "repo_path": "D:\\work\\antigravity-manager",
+  "prompt_content": "Implement multi-tier cache synchronization and verify C:/work/Antigravity-Manager/assets/diagram.png",
+  "model": "gemini-3.8-flash-high",
+  "image_payload": "Qzovd29yay9BbnRpZ3Jhdml0eS1NYW5hZ2VyL2Fzc2V0cy9kaWFncmFtLnBuZw==",
+  "auto_boot": true,
+  "imported_at": 1790440654
+}

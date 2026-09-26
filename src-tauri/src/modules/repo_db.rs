@@ -269,6 +269,45 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
     Ok(projects)
 }
 
+/// Extract image data URI, file path, or markdown image reference from text
+pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<String>) {
+    let mut found_paths: Vec<String> = Vec::new();
+    let mut raw_payload = None;
+
+    if content.contains("data:image/") {
+        if let Some(start) = content.find("data:image/") {
+            let tail = &content[start..];
+            let end = tail
+                .find('"')
+                .or_else(|| tail.find('\''))
+                .or_else(|| tail.find(' '))
+                .or_else(|| tail.find(')'))
+                .unwrap_or(tail.len());
+            raw_payload = Some(tail[..end].to_string());
+        }
+    }
+
+    let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
+    for token in content.split_whitespace() {
+        let clean = token.trim_matches(|c| {
+            c == '"' || c == '\'' || c == '(' || c == ')' || c == '[' || c == ']' || c == '<' || c == '>'
+        });
+        let lower = clean.to_lowercase();
+        if img_exts.iter().any(|ext| lower.ends_with(ext)) {
+            let p_str = clean.strip_prefix("file:///").unwrap_or_else(|| clean.strip_prefix("file://").unwrap_or(clean));
+            if !found_paths.contains(&p_str.to_string()) {
+                found_paths.push(p_str.to_string());
+            }
+        }
+    }
+
+    if raw_payload.is_none() && !found_paths.is_empty() {
+        raw_payload = Some(found_paths.join(";"));
+    }
+
+    (raw_payload, found_paths)
+}
+
 /// Backup all currently running prompts across active projects before switching
 pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let projects = detect_running_projects(instance_id)?;
@@ -304,18 +343,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                             for item in rows.flatten() {
                                 let content = item.1;
                                 if !content.trim().is_empty() && content.len() > 10 {
-                                    let mut img_payload = None;
-                                    if content.contains("data:image/") {
-                                        if let Some(start) = content.find("data:image/") {
-                                            let tail = &content[start..];
-                                            let end = tail
-                                                .find('"')
-                                                .or_else(|| tail.find('\''))
-                                                .or_else(|| tail.find(' '))
-                                                .unwrap_or(tail.len());
-                                            img_payload = Some(tail[..end].to_string());
-                                        }
-                                    }
+                                    let (img_payload, _) = extract_image_payload_or_path(&content);
                                     extracted_prompts.push((content, img_payload));
                                 }
                             }
@@ -325,7 +353,45 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             }
         }
 
-        // If no raw prompt string was extracted from workspace DB, create a project task snapshot
+        // Check if project has an existing .antigravity_resume_task.json on disk
+        if extracted_prompts.is_empty() {
+            let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
+            if task_file.exists() {
+                if let Ok(c) = fs::read_to_string(&task_file) {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
+                        if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
+                            if !txt.trim().is_empty() {
+                                let img = v.get("image_payload").and_then(|i| i.as_str()).map(|s| s.to_string());
+                                extracted_prompts.push((txt.to_string(), img));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if SQLite active_prompts already has an existing prompt for this repo_path or project
+        if extracted_prompts.is_empty() {
+            let proj_like = format!("%{}%", project.repo_name.to_lowercase());
+            let mut check_stmt = conn
+                .prepare(
+                    "SELECT prompt_content, image_payload FROM active_prompts \
+                     WHERE repo_path = ?1 OR project_id = ?2 OR project_id LIKE ?3 \
+                     ORDER BY updated_at DESC LIMIT 1",
+                )
+                .ok();
+            if let Some(ref mut c_stmt) = check_stmt {
+                if let Ok((txt, img)) = c_stmt.query_row(rusqlite::params![&project.repo_path, &project.id, &proj_like], |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+                }) {
+                    if !txt.trim().is_empty() {
+                        extracted_prompts.push((txt, img));
+                    }
+                }
+            }
+        }
+
+        // Fallback snapshot only if absolutely nothing could be discovered
         if extracted_prompts.is_empty() {
             let fallback_snapshot = format!(
                 "Active project snapshot for '{}' [{}] before instance rotation at {}",
@@ -563,6 +629,87 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     Ok(rows)
 }
 
+/// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch
+pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
+             FROM active_prompts 
+             ORDER BY created_at DESC LIMIT ?",
+        )
+        .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
+
+    let prompts = stmt
+        .query_map([limit], |row| {
+            Ok(ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
+            })
+        })
+        .map_err(|e| format!("Failed to query prompts for resend: {}", e))?
+        .flatten()
+        .collect::<Vec<ActivePrompt>>();
+
+    let mut resent = Vec::new();
+
+    for mut prompt in prompts {
+        let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt.prompt_content);
+        if prompt.image_payload.is_none() && extracted_img.is_some() {
+            prompt.image_payload = extracted_img.clone();
+        }
+        let has_image = prompt.image_payload.is_some() || !img_paths.is_empty();
+
+        // Write .antigravity_resume_task.json to project directory
+        let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
+        let payload = serde_json::json!({
+            "prompt_id": prompt.id,
+            "project_id": prompt.project_id,
+            "instance_id": prompt.instance_id,
+            "repo_path": prompt.repo_path,
+            "prompt_content": prompt.prompt_content,
+            "model": prompt.model,
+            "image_payload": prompt.image_payload,
+            "image_paths": img_paths,
+            "has_image": has_image,
+            "auto_boot": true,
+            "status": "running",
+            "resumed_at": now,
+        });
+
+        if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            let _ = fs::write(&task_file, json_str);
+        }
+
+        // Update database status to running and update timestamps
+        let _ = conn.execute(
+            "UPDATE active_prompts SET status = 'running', updated_at = ?, image_payload = ? WHERE id = ?",
+            rusqlite::params![now, &prompt.image_payload, &prompt.id],
+        );
+        let _ = conn.execute(
+            "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?",
+            rusqlite::params![now, now, &prompt.project_id],
+        );
+
+        prompt.status = "running".to_string();
+        prompt.updated_at = now;
+        resent.push(prompt);
+    }
+
+    Ok(resent)
+}
+
 /// Auto-resume recent prompts for projects active within max_age_seconds (strictly skips projects older than threshold)
 pub fn auto_resume_recent_prompts(
     instance_id: &str,
@@ -626,17 +773,18 @@ pub fn auto_resume_recent_prompts(
         }
 
         // Project was active within < 1 hour! Find its most recent prompt + image
+        let proj_like = format!("%{}%", project.repo_name.to_lowercase());
         let mut prompt_stmt = conn
             .prepare(
                 "SELECT id, prompt_content, model, image_payload 
                  FROM active_prompts 
-                 WHERE project_id = ? 
+                 WHERE project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3
                  ORDER BY created_at DESC LIMIT 1",
             )
             .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
 
-        let maybe_prompt = prompt_stmt
-            .query_row([&project.id], |row| {
+        let mut maybe_prompt = prompt_stmt
+            .query_row(rusqlite::params![&project.id, &project.repo_path, &proj_like], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -645,6 +793,25 @@ pub fn auto_resume_recent_prompts(
                 ))
             })
             .ok();
+
+        // If not found in DB, check existing .antigravity_resume_task.json
+        if maybe_prompt.is_none() {
+            let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
+            if task_file.exists() {
+                if let Ok(c) = fs::read_to_string(&task_file) {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
+                        if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
+                            if !txt.trim().is_empty() {
+                                let pid = v.get("prompt_id").and_then(|i| i.as_str()).unwrap_or(&project.id).to_string();
+                                let m = v.get("model").and_then(|m| m.as_str()).map(|s| s.to_string());
+                                let img = v.get("image_payload").and_then(|i| i.as_str()).map(|s| s.to_string());
+                                maybe_prompt = Some((pid, txt.to_string(), m, img));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let (prompt_id, prompt_text, prompt_model, image_payload) = match maybe_prompt {
             Some((id, content, model, img)) => (id, content, model, img),

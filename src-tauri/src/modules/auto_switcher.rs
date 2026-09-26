@@ -139,11 +139,18 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
         }
     }
 
-    // 3. Minimum across quota_groups buckets
+    // 3. Minimum across 4h / 5h short-window quota_groups buckets (immediate rolling quota)
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
             for b in &g.buckets {
-                if (0.0..=1.0).contains(&b.remaining_fraction) {
+                let win = b.window.to_lowercase();
+                let bid = b.bucket_id.to_lowercase();
+                let is_short_window = win.contains("5h")
+                    || win.contains("4h")
+                    || bid.contains("5h")
+                    || bid.contains("4h")
+                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
                     let pct = (b.remaining_fraction * 100.0).round();
                     min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
                 }
@@ -304,7 +311,14 @@ pub fn evaluate_account_period_status(
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
             for b in &g.buckets {
-                if (0.0..=1.0).contains(&b.remaining_fraction) {
+                let win = b.window.to_lowercase();
+                let bid = b.bucket_id.to_lowercase();
+                let is_short_window = win.contains("5h")
+                    || win.contains("4h")
+                    || bid.contains("5h")
+                    || bid.contains("4h")
+                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
                     let bucket_pct = (b.remaining_fraction * 100.0).round();
                     if bucket_pct < quota_percent {
                         quota_percent = bucket_pct;
@@ -379,7 +393,7 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
         let acc_id_opt = inst
             .bound_account_id
             .clone()
-            .or_else(|| account::get_current_account_id().ok());
+            .or_else(|| account::get_current_account_id().ok().flatten());
         if let Some(acc_id) = acc_id_opt {
             if !in_use.contains(&acc_id) {
                 in_use.push(acc_id);
@@ -469,13 +483,70 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
     active_factor * tier_multiplier * weekly_quota_percent
 }
 
-/// Find next best candidate profile with healthy quota, excluding accounts in active use by other instances
-pub fn select_next_best_profile(
+/// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
+pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Option<f64> {
+    let quota_data = account.quota.as_ref()?;
+    let target = target_model.to_lowercase();
+    let is_flash_target = target.contains("flash");
+
+    let mut min_pct: Option<f64> = None;
+
+    // 1. Check quota_groups for 4h / 5h short-window buckets
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            for b in &g.buckets {
+                let win = b.window.to_lowercase();
+                let bid = b.bucket_id.to_lowercase();
+                let is_short_window = win.contains("5h")
+                    || win.contains("4h")
+                    || bid.contains("5h")
+                    || bid.contains("4h")
+                    || (!win.contains("week") && !win.contains("7d") && !bid.contains("week") && !bid.contains("7d"));
+                if is_short_window && (0.0..=1.0).contains(&b.remaining_fraction) {
+                    let pct = (b.remaining_fraction * 100.0).round();
+                    min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+                }
+            }
+        }
+    }
+
+    // 2. Minimum across models matching target (and non-banned flash models when target is flash)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        let is_direct = name_lower.contains(&target);
+        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        if is_direct || is_flash {
+            let pct = m.percentage as f64;
+            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+        }
+    }
+
+    // 3. Minimum across any actively consumed non-banned models (percentage < 100)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+        if !is_banned && m.percentage < 100 {
+            let pct = m.percentage as f64;
+            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+        }
+    }
+
+    if let Some(pct) = min_pct {
+        return Some(pct);
+    }
+
+    // Fallback: general calculate_account_quota
+    calculate_account_quota(account, target_model)
+}
+
+/// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
+pub fn select_candidate_profiles(
     current_instance_id: &str,
     target_model: &str,
     threshold: f64,
     excluded_account_ids: &[String],
-) -> Result<Option<ProfileCandidate>, String> {
+) -> Result<Vec<ProfileCandidate>, String> {
     let registry = instance::load_registry()?;
     let now_sec = chrono::Utc::now().timestamp();
     let mut candidates = Vec::new();
@@ -506,10 +577,7 @@ pub fn select_next_best_profile(
             if effective_exclusions.contains(&acc.email) {
                 continue;
             }
-            if acc.disabled {
-                continue;
-            }
-            if acc.validation_blocked {
+            if acc.disabled || acc.validation_blocked {
                 continue;
             }
             if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
@@ -521,7 +589,7 @@ pub fn select_next_best_profile(
             let quota = period_status
                 .as_ref()
                 .map(|s| s.quota_percent)
-                .or_else(|| calculate_account_quota(&acc, target_model))
+                .or_else(|| calculate_4h_window_quota(&acc, target_model))
                 .unwrap_or(100.0);
 
             let is_period_finished = period_status
@@ -529,30 +597,13 @@ pub fn select_next_best_profile(
                 .map(|s| s.is_period_finished)
                 .unwrap_or(false);
 
-            let mut is_eligible = false;
-            if quota > threshold {
-                is_eligible = true;
-            } else if is_period_finished {
-                is_eligible = true;
-            }
-
-            if is_eligible {
+            if quota > threshold || is_period_finished {
                 let score = score_candidate_account(&acc, target_model, now_sec);
-                let effective_quota = if is_period_finished {
-                    if quota <= threshold {
-                        100.0
-                    } else {
-                        quota
-                    }
-                } else {
-                    quota
-                };
-
                 candidates.push(ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
-                    quota_percent: effective_quota,
+                    quota_percent: quota,
                     score,
                 });
             }
@@ -565,10 +616,7 @@ pub fn select_next_best_profile(
         if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
             continue;
         }
-        if acc.disabled {
-            continue;
-        }
-        if acc.validation_blocked {
+        if acc.disabled || acc.validation_blocked {
             continue;
         }
         if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
@@ -582,7 +630,7 @@ pub fn select_next_best_profile(
         let quota = period_status
             .as_ref()
             .map(|s| s.quota_percent)
-            .or_else(|| calculate_account_quota(acc, target_model))
+            .or_else(|| calculate_4h_window_quota(acc, target_model))
             .unwrap_or(100.0);
 
         let is_period_finished = period_status
@@ -590,30 +638,13 @@ pub fn select_next_best_profile(
             .map(|s| s.is_period_finished)
             .unwrap_or(false);
 
-        let mut is_eligible = false;
-        if quota > threshold {
-            is_eligible = true;
-        } else if is_period_finished {
-            is_eligible = true;
-        }
-
-        if is_eligible {
+        if quota > threshold || is_period_finished {
             let score = score_candidate_account(acc, target_model, now_sec);
-            let effective_quota = if is_period_finished {
-                if quota <= threshold {
-                    100.0
-                } else {
-                    quota
-                }
-            } else {
-                quota
-            };
-
             candidates.push(ProfileCandidate {
                 instance_id: current_instance_id.to_string(),
                 account_id: acc.id.clone(),
                 email: acc.email.clone(),
-                quota_percent: effective_quota,
+                quota_percent: quota,
                 score,
             });
         }
@@ -636,7 +667,7 @@ pub fn select_next_best_profile(
             let quota = period_status
                 .as_ref()
                 .map(|s| s.quota_percent)
-                .or_else(|| calculate_account_quota(acc, target_model))
+                .or_else(|| calculate_4h_window_quota(acc, target_model))
                 .unwrap_or(100.0);
 
             let is_period_finished = period_status
@@ -646,45 +677,186 @@ pub fn select_next_best_profile(
 
             if quota > 15.0 || is_period_finished {
                 let score = score_candidate_account(acc, target_model, now_sec);
-                let effective_quota = if is_period_finished && quota <= 15.0 {
-                    100.0
-                } else {
-                    quota
-                };
-
                 candidates.push(ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
-                    quota_percent: effective_quota,
+                    quota_percent: quota,
                     score,
                 });
             }
         }
     }
 
-    // Sort descending by multiplicative score with quota and randomized directional tie-breaker
-    let is_ascending: bool = rand::random();
-    candidates.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
-        Some(std::cmp::Ordering::Equal) | None => {
-            match b.quota_percent.partial_cmp(&a.quota_percent) {
-                Some(std::cmp::Ordering::Equal) | None => {
-                    if is_ascending {
-                        a.email.to_lowercase().cmp(&b.email.to_lowercase())
-                    } else {
-                        b.email.to_lowercase().cmp(&a.email.to_lowercase())
+    // Priority Sorting:
+    // 1. Accounts with quota_percent >= 100.0 strictly precede accounts with < 100.0.
+    // 2. Among >= 100.0 accounts: sort by subscription tier score descending (Ultra > Pro > Free).
+    // 3. Among < 100.0 accounts: sort by quota_percent descending, then score descending.
+    // 4. Tie-breaker: deterministic email ordering.
+    candidates.sort_by(|a, b| {
+        let a_full = a.quota_percent >= 100.0;
+        let b_full = b.quota_percent >= 100.0;
+        match (a_full, b_full) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => {
+                if !a_full && !b_full {
+                    match b.quota_percent.partial_cmp(&a.quota_percent) {
+                        Some(std::cmp::Ordering::Equal) | None => {
+                            match b.score.partial_cmp(&a.score) {
+                                Some(std::cmp::Ordering::Equal) | None => {
+                                    a.email.to_lowercase().cmp(&b.email.to_lowercase())
+                                }
+                                Some(ord) => ord,
+                            }
+                        }
+                        Some(ord) => ord,
+                    }
+                } else {
+                    match b.score.partial_cmp(&a.score) {
+                        Some(std::cmp::Ordering::Equal) | None => {
+                            a.email.to_lowercase().cmp(&b.email.to_lowercase())
+                        }
+                        Some(ord) => ord,
                     }
                 }
-                Some(q_ord) => q_ord,
             }
         }
-        Some(ord) => ord,
     });
 
-    if let Some(best) = candidates.into_iter().next() {
-        return Ok(Some(best));
+    Ok(candidates)
+}
+
+/// Find next best candidate profile with healthy quota, prioritizing 100% quota accounts
+pub fn select_next_best_profile(
+    current_instance_id: &str,
+    target_model: &str,
+    threshold: f64,
+    excluded_account_ids: &[String],
+) -> Result<Option<ProfileCandidate>, String> {
+    let candidates = select_candidate_profiles(
+        current_instance_id,
+        target_model,
+        threshold,
+        excluded_account_ids,
+    )?;
+    Ok(candidates.into_iter().next())
+}
+
+/// Find and live-verify next best candidate profile with Google API refresh:
+/// Strictly confirms candidate has 100% quota for 4-hour window before selecting!
+pub async fn select_and_verify_next_best_profile(
+    current_instance_id: &str,
+    target_model: &str,
+    threshold: f64,
+    excluded_account_ids: &[String],
+) -> Result<Option<ProfileCandidate>, String> {
+    let candidates = select_candidate_profiles(
+        current_instance_id,
+        target_model,
+        threshold,
+        excluded_account_ids,
+    )?;
+
+    if candidates.is_empty() {
+        return Ok(None);
     }
 
+    let mut verified_fallback: Option<ProfileCandidate> = None;
+
+    for candidate in candidates {
+        logger::log_info(&format!(
+            "[AutoSwitcher] Pre-switch live verification: checking candidate '{}' (cached quota: {:.1}%)...",
+            candidate.email, candidate.quota_percent
+        ));
+
+        let mut cand_acc = match account::load_account(&candidate.account_id) {
+            Ok(acc) => acc,
+            Err(e) => {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Could not load candidate account '{}': {}. Skipping...",
+                    candidate.email, e
+                ));
+                continue;
+            }
+        };
+
+        // Live API Quota Refresh directly from Google API
+        let fetch_res = account::fetch_quota_with_retry(&mut cand_acc).await;
+        let fresh_4h_quota = match fetch_res {
+            Ok(fresh_q) => {
+                cand_acc.quota = Some(fresh_q);
+                let _ = account::save_account(&cand_acc);
+                let q_val = calculate_4h_window_quota(&cand_acc, target_model).unwrap_or(100.0);
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (4-hour window)",
+                    candidate.email, q_val
+                ));
+                q_val
+            }
+            Err(e) => {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Skipping...",
+                    candidate.email, e
+                ));
+                continue;
+            }
+        };
+
+        // Strict 100% requirement for 4-hour window:
+        if fresh_4h_quota >= 100.0 {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Candidate '{}' confirmed with 100.0% quota for 4h window. Selected for switch!",
+                candidate.email
+            ));
+            return Ok(Some(ProfileCandidate {
+                instance_id: candidate.instance_id,
+                account_id: candidate.account_id,
+                email: candidate.email,
+                quota_percent: fresh_4h_quota,
+                score: candidate.score,
+            }));
+        } else {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Rejecting candidate and moving to next best...",
+                candidate.email, fresh_4h_quota
+            ));
+
+            if fresh_4h_quota > threshold {
+                match verified_fallback {
+                    Some(ref cur) if fresh_4h_quota > cur.quota_percent => {
+                        verified_fallback = Some(ProfileCandidate {
+                            instance_id: candidate.instance_id.clone(),
+                            account_id: candidate.account_id.clone(),
+                            email: candidate.email.clone(),
+                            quota_percent: fresh_4h_quota,
+                            score: candidate.score,
+                        });
+                    }
+                    None => {
+                        verified_fallback = Some(ProfileCandidate {
+                            instance_id: candidate.instance_id.clone(),
+                            account_id: candidate.account_id.clone(),
+                            email: candidate.email.clone(),
+                            quota_percent: fresh_4h_quota,
+                            score: candidate.score,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if let Some(fallback) = verified_fallback {
+        logger::log_info(&format!(
+            "[AutoSwitcher] No candidates verified at 100.0% for 4h window. Using highest verified candidate: '{}' ({:.1}%)",
+            fallback.email, fallback.quota_percent
+        ));
+        return Ok(Some(fallback));
+    }
+
+    logger::log_warn("[AutoSwitcher] No candidates with healthy quota found after live verification.");
     Ok(None)
 }
 
@@ -757,6 +929,7 @@ pub async fn execute_profile_rotation_with_context(
 
     // Step 3: Split Repo DB - Directly send/dispatch backed-up prompts to running projects without queuing
     let _ = crate::modules::repo_db::dispatch_running_prompts(inst_id);
+    let _ = crate::modules::repo_db::resend_all_running_commands(20);
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();
@@ -819,7 +992,7 @@ pub async fn check_and_rotate_with_options(
         let bound_acc_id_opt = inst
             .bound_account_id
             .clone()
-            .or_else(|| account::get_current_account_id().ok());
+            .or_else(|| account::get_current_account_id().ok().flatten());
 
         let Some(bound_acc_id) = bound_acc_id_opt else {
             continue;
@@ -886,12 +1059,13 @@ pub async fn check_and_rotate_with_options(
             };
             logger::log_warn(&format!("[AutoSwitcher] {}", reason));
 
-            if let Some(candidate) = select_next_best_profile(
+            if let Some(candidate) = select_and_verify_next_best_profile(
                 &inst.id,
                 &switcher_cfg.target_model,
                 switcher_cfg.critical_threshold_percent,
                 &excluded_accounts,
-            )? {
+            )
+            .await? {
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     predicted_email: Some(candidate.email.clone()),
@@ -946,12 +1120,13 @@ pub async fn check_and_rotate_with_options(
 
             logger::log_info(&format!("[AutoSwitcher] {}", reason));
 
-            if let Some(candidate) = select_next_best_profile(
+            if let Some(candidate) = select_and_verify_next_best_profile(
                 &inst.id,
                 &switcher_cfg.target_model,
                 effective_low_threshold,
                 &excluded_accounts,
-            )? {
+            )
+            .await? {
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     predicted_email: Some(candidate.email.clone()),
@@ -1038,7 +1213,7 @@ pub async fn trigger_manual_rotation_for_instance(
         .iter()
         .find(|i| i.id == inst_id)
         .and_then(|i| i.bound_account_id.clone())
-        .or_else(|| account::get_current_account_id().ok());
+        .or_else(|| account::get_current_account_id().ok().flatten());
 
     let mut excluded: Vec<String> = in_use_account_ids;
     if let Some(ref curr) = current_bound {
@@ -1047,7 +1222,8 @@ pub async fn trigger_manual_rotation_for_instance(
         }
     }
 
-    let candidate = select_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)?
+    let candidate = select_and_verify_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)
+        .await?
         .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
 
     let reason = "Manual rotation triggered by user".to_string();
@@ -1116,7 +1292,7 @@ pub fn get_status() -> AutoSwitcherStatus {
         let acc_id_opt = inst
             .bound_account_id
             .clone()
-            .or_else(|| account::get_current_account_id().ok());
+            .or_else(|| account::get_current_account_id().ok().flatten());
         let mut email_opt = inst.bound_email.clone();
 
         if let Some(ref acc_id) = acc_id_opt {

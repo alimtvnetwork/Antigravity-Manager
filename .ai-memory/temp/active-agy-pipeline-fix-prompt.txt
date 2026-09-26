@@ -1,3 +1,538 @@
-Execute enhanced Read Memory protocol. Defensively load memory, specs, constraints, and pending plans before taking action.
+# Fix CI/CD Pipeline Errors with 4-Part Root Cause Analysis (RCA)
 
-xt
+> **Target Repository:** `alimtvnetwork/Antigravity-Manager`
+> **Failing Workflow Run:** `#36247889199`
+> **Commit SHA:** `282d3acafc2ec798720bab26e87996db0d331e20`
+
+/goal Autonomously analyze and fix the failing CI/CD pipeline errors documented below using 4-part Root Cause Analysis (RCA), strictly adhere to coding guidelines, and verify all quality gates pass.
+
+
+## Recent Git Commit History
+
+```text
+commit 282d3acafc2ec798720bab26e87996db0d331e20
+Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
+Date:   Sat Sep 26 22:15:20 2026 +0800
+
+    feat(auto-switch): capture previous quota and threshold in trigger_manual_rotation_for_instance
+
+ src-tauri/src/modules/auto_switcher.rs | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+commit 44c80603afcec854eccf642b67760a42241a1fbb
+Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
+Date:   Sat Sep 26 22:11:53 2026 +0800
+
+    docs(spec): record CLI & auto-switcher deep verification audit and plan 51 consolidation
+
+ .ai-memory/plans/01-index.md                       |  1 +
+ ...switch-deep-verification-and-execution-audit.md | 38 +++++++++
+ .ai-memory/what-to-read.md                         |  1 +
+ 02-spec/21-app/01-index.md                         |  1 +
+ ...switch-deep-verification-and-execution-audit.md | 93 ++++++++++++++++++++++
+ 5 files changed, 134 insertions(+)
+
+commit da67cd197f23310b37efbfe23e3c15fead424557
+Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
+Date:   Sat Sep 26 22:08:36 2026 +0800
+
+    feat(cli): enhance switch telemetry with previous/predicted/selected accounts, credit before switch, threshold, and prompt resend status
+
+ .ai-memory/plans/01-index.md                       |   1 +
+ ...omprehensive-cli-and-autoswitch-verification.md |  32 ++
+ .ai-memory/what-to-read.md                         |   2 +
+ 02-spec/21-app/01-index.md                         |   1 +
+ ...omprehensive-cli-and-autoswitch-verification.md |  93 +++++
+ src-tauri/src/bin/agm.rs                           | 405 ++++++++++++++++++---
+ src-tauri/src/modules/auto_switcher.rs             |  98 ++++-
+ src-tauri/src/modules/email_inbound.rs             |   7 +-
+ src-tauri/src/modules/notification_hub.rs          | 313 +++++++++++-----
+ 9 files changed, 799 insertions(+), 153 deletions(-)
+
+commit 664425cc04203f5a63790274952ae6a0e478a243
+Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
+Date:   Sat Sep 26 21:44:17 2026 +0800
+
+    feat(telemetry): enrich email switch prompt/image telemetry and add is-low-credit-for-switch CLI
+
+ .ai-memory/plans/01-index.md                       |   1 +
+ ...prompt-telemetry-and-low-credit-switch-query.md |  31 ++
+ .ai-memory/what-to-read.md                         |   1 +
+ 02-spec/21-app/01-index.md                         |   1 +
+ ...prompt-telemetry-and-low-credit-switch-query.md |  79 +++++
+ .../email-switch-prompt-telemetry-01.png           | Bin 0 -> 143983 bytes
+ src-tauri/src/bin/agm.rs                           | 349 +++++++++++++++++++--
+ src-tauri/src/modules/notification_hub.rs          | 137 +++++++-
+ 8 files changed, 568 insertions(+), 31 deletions(-)
+
+commit 88891fb441a3525c3b4d7333044aae82f5e8c2dd
+Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
+Date:   Sat Sep 26 21:34:38 2026 +0800
+
+    feat(auto-switcher): integrate UI smart fast-forward hook, persist live quota, and harden instance telemetry
+
+ .ai-memory/plans/01-index.md                       |   3 +-
+ ...st-forward-autoswitch-and-instance-hardening.md |  20 ++++
+ .ai-memory/what-to-read.md                         |   1 +
+ ...uto-switcher-quota-and-instance-rotation-rca.md |  45 ++++----
+ src-tauri/src/bin/agm.rs                           |  16 ++-
+ src-tauri/src/commands/instance.rs                 |   9 +-
+ src-tauri/src/commands/mod.rs                      |  20 ++++
+ src-tauri/src/modules/auto_switcher.rs             |   1 +
+ src-tauri/src/modules/email_sender.rs              |   6 +-
+ src-tauri/src/modules/instance.rs                  |  29 ++++-
+ src/components/common/BackgroundTaskRunner.tsx     | 128 +++++++++++++++++++++
+ 11 files changed, 247 insertions(+), 31 deletions(-)
+```
+
+## Failing CI/CD Pipeline Error Logs
+
+```text
+================================================================================
+GITMAP PIPELINE ERROR REPORT
+================================================================================
+Repo:                 alimtvnetwork/Antigravity-Manager
+Repo URL:             https://github.com/alimtvnetwork/Antigravity-Manager
+Branch:               main
+Last Commit:          282d3ac
+Last Release:         v4.75.4
+Open PRs:             1
+Status:               completed (conclusion: failure)
+Pipeline Run URL:     https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/36247889199
+================================================================================
+
+FAILED PIPELINE CHECKS TREE:
+  Commit 282d3ac:
+    └── ✖ CI (#36247889199)
+        ├── ✖ Build Frontend [Step: TypeScript check]
+        ├── ✖ Build Tauri App (macos-latest) [Step: Build Tauri app (debug)]
+        ├── ✖ Build Tauri App (windows-2025) [Step: Build Tauri app (debug)]
+        ├── ✖ Check Rust Code (windows-2025)
+        ├── ✖ Check Rust Code (macos-latest) [Step: Run Clippy]
+        ├── ✖ Check Rust Code (ubuntu-latest) [Step: Run Clippy]
+        └── ✖ Build Tauri App (ubuntu-latest) [Step: Build Tauri app (debug)]
+
+● Combined Pipeline Section Failures [7 failed section(s)]:
+
+  ┌─ Section [1/7]: CI #36247889199 ➔ Job: Build Frontend | Step: TypeScript check
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   Process completed with exit code 2.
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [2/7]: CI #36247889199 ➔ Job: Build Tauri App (macos-latest) | Step: Build Tauri app (debug)
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   beforeBuildCommand `npm run build` failed with exit code 2
+  │   Error beforeBuildCommand `npm run build` failed with exit code 2
+  │   Process completed with exit code 1.
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [3/7]: CI #36247889199 ➔ Job: Build Tauri App (windows-2025) | Step: Build Tauri app (debug)
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   beforeBuildCommand `npm run build` failed with exit code 2
+  │   Error beforeBuildCommand `npm run build` failed with exit code 2
+  │   Process completed with exit code 1.
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [4/7]: CI #36247889199 ➔ Job: Check Rust Code (windows-2025) | Step: Job Execution
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   Job 'Check Rust Code (windows-2025)' ended with conclusion 'cancelled'
+  │   Job 'Check Rust Code (windows-2025)' conclusion: cancelled
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [5/7]: CI #36247889199 ➔ Job: Check Rust Code (macos-latest) | Step: Run Clippy
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │       --> src/modules/email_inbound.rs:2972:45
+  │       |
+  │       2972 |     let default_acc = match email_vault_db::get_default_account() {
+  │       |                                             ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+  │   error[E0425]: cannot find value `target` in this scope
+  │       --> src/modules/instance.rs:1182:44
+  │       |
+  │       1182 |     Err(format!("Instance '{}' not found", target))
+  │       |                                            ^^^^^^ not found in this scope
+  │   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │       --> src/modules/notification_hub.rs:608:56
+  │       |
+  │       608 |         if let Ok(Some(default_acc)) = email_vault_db::get_default_account() {
+  │       |                                                        ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:822:25
+  │       |
+  │       822 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       822 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:1041:21
+  │       |
+  │       1041 |         .or_else(|| account::get_current_account_id().ok());
+  │       |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       1041 |         .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                           +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:382:25
+  │       |
+  │       382 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       382 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:1119:25
+  │       |
+  │       1119 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       1119 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/instance.rs:384:12
+  │       |
+  │       384 |     if let Ok(default_dir) = get_default_antigravity_data_dir() {
+  │       |            ^^^^^^^^^^^^^^^   ---------------------------------- this expression has type `std::path::PathBuf`
+  │       |            |
+  │       |            expected `PathBuf`, found `Result<_, _>`
+  │       |
+  │       = note: expected struct `std::path::PathBuf`
+  │       found enum `std::result::Result<_, _>`
+  │       Some errors have detailed explanations: E0308, E0425.
+  │       For more information about an error, try `rustc --explain E0308`.
+  │   error: could not compile `agm-alim` (lib) due to 8 previous errors
+  │   error: could not compile `agm-alim` (lib test) due to 8 previous errors
+  │   Process completed with exit code 101.
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [6/7]: CI #36247889199 ➔ Job: Check Rust Code (ubuntu-latest) | Step: Run Clippy
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │       --> src/modules/email_inbound.rs:2972:45
+  │       |
+  │       2972 |     let default_acc = match email_vault_db::get_default_account() {
+  │       |                                             ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+  │   error[E0425]: cannot find value `target` in this scope
+  │       --> src/modules/instance.rs:1182:44
+  │       |
+  │       1182 |     Err(format!("Instance '{}' not found", target))
+  │       |                                            ^^^^^^ not found in this scope
+  │   error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+  │       --> src/modules/notification_hub.rs:608:56
+  │       |
+  │       608 |         if let Ok(Some(default_acc)) = email_vault_db::get_default_account() {
+  │       |                                                        ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:822:25
+  │       |
+  │       822 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       822 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:1041:21
+  │       |
+  │       1041 |         .or_else(|| account::get_current_account_id().ok());
+  │       |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       1041 |         .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                           +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:382:25
+  │       |
+  │       382 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       382 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/auto_switcher.rs:1119:25
+  │       |
+  │       1119 |             .or_else(|| account::get_current_account_id().ok());
+  │       |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+  │       |
+  │       = note: expected enum `std::option::Option<std::string::String>`
+  │       found enum `std::option::Option<std::option::Option<std::string::String>>`
+  │       help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+  │       |
+  │       1119 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+  │       |                                                               +++++++++++++++++
+  │   error[E0308]: mismatched types
+  │       --> src/modules/instance.rs:384:12
+  │       |
+  │       384 |     if let Ok(default_dir) = get_default_antigravity_data_dir() {
+  │       |            ^^^^^^^^^^^^^^^   ---------------------------------- this expression has type `std::path::PathBuf`
+  │       |            |
+  │       |            expected `PathBuf`, found `Result<_, _>`
+  │       |
+  │       = note: expected struct `std::path::PathBuf`
+  │       found enum `std::result::Result<_, _>`
+  │       Some errors have detailed explanations: E0308, E0425.
+  │       For more information about an error, try `rustc --explain E0308`.
+  │   error: could not compile `agm-alim` (lib) due to 8 previous errors
+  │   error: could not compile `agm-alim` (lib test) due to 8 previous errors
+  │   Process completed with exit code 101.
+  └──────────────────────────────────────────────────────────
+
+  ┌─ Section [7/7]: CI #36247889199 ➔ Job: Build Tauri App (ubuntu-latest) | Step: Build Tauri app (debug)
+  │ When Run:  2026-09-26 14:15:27 UTC (2h ago)
+  │ Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+  │ Summary:   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+  │   beforeBuildCommand `npm run build` failed with exit code 2
+  │   Error beforeBuildCommand `npm run build` failed with exit code 2
+  │   Process completed with exit code 1.
+  └──────────────────────────────────────────────────────────
+
+================================================================================
+DETAILED PIPELINE RUN BREAKDOWNS
+================================================================================
+
+==> Failed Run: CI (#36247889199)
+    When Run:  2026-09-26 14:15:27 UTC (2h ago)
+    Duration:  35m 8s
+    Branch:    main | Commit: 282d3acafc2ec798720bab26e87996db0d331e20
+    Saved Log: C:/Users/Administrator/AppData/Local/gitmap-cli/data/pipeline/alimtvnetwork-antigravity-manager/36247889199.log
+    URL:       https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/36247889199
+    ● Job: Build Frontend | Step: TypeScript check
+      Summary: src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+      Process completed with exit code 2.
+    ● Job: Build Tauri App (macos-latest) | Step: Build Tauri app (debug)
+      Summary: src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+      beforeBuildCommand `npm run build` failed with exit code 2
+      Error beforeBuildCommand `npm run build` failed with exit code 2
+      Process completed with exit code 1.
+    ● Job: Build Tauri App (windows-2025) | Step: Build Tauri app (debug)
+      Summary: src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+      beforeBuildCommand `npm run build` failed with exit code 2
+      Error beforeBuildCommand `npm run build` failed with exit code 2
+      Process completed with exit code 1.
+    ● Job: Check Rust Code (windows-2025) | Step: Job Execution
+      Summary: Job 'Check Rust Code (windows-2025)' ended with conclusion 'cancelled'
+      Job 'Check Rust Code (windows-2025)' conclusion: cancelled
+    ● Job: Check Rust Code (macos-latest) | Step: Run Clippy
+      Warnings: (1 detected)
+        warning: build failed, waiting for other jobs to finish...
+      Summary: error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+          --> src/modules/email_inbound.rs:2972:45
+          |
+          2972 |     let default_acc = match email_vault_db::get_default_account() {
+          |                                             ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+      error[E0425]: cannot find value `target` in this scope
+          --> src/modules/instance.rs:1182:44
+          |
+          1182 |     Err(format!("Instance '{}' not found", target))
+          |                                            ^^^^^^ not found in this scope
+          --> src/modules/notification_hub.rs:608:56
+          |
+          608 |         if let Ok(Some(default_acc)) = email_vault_db::get_default_account() {
+          |                                                        ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:822:25
+          |
+          822 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          822 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:1041:21
+          |
+          1041 |         .or_else(|| account::get_current_account_id().ok());
+          |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          1041 |         .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                           +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:382:25
+          |
+          382 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          382 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:1119:25
+          |
+          1119 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          1119 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/instance.rs:384:12
+          |
+          384 |     if let Ok(default_dir) = get_default_antigravity_data_dir() {
+          |            ^^^^^^^^^^^^^^^   ---------------------------------- this expression has type `std::path::PathBuf`
+          |            |
+          |            expected `PathBuf`, found `Result<_, _>`
+          |
+          = note: expected struct `std::path::PathBuf`
+          found enum `std::result::Result<_, _>`
+          Some errors have detailed explanations: E0308, E0425.
+          For more information about an error, try `rustc --explain E0308`.
+      error: could not compile `agm-alim` (lib) due to 8 previous errors
+      error: could not compile `agm-alim` (lib test) due to 8 previous errors
+      Process completed with exit code 101.
+    ● Job: Check Rust Code (ubuntu-latest) | Step: Run Clippy
+      Warnings: (1 detected)
+        warning: build failed, waiting for other jobs to finish...
+      Summary: error[E0425]: cannot find function `get_default_account` in module `email_vault_db`
+          --> src/modules/email_inbound.rs:2972:45
+          |
+          2972 |     let default_acc = match email_vault_db::get_default_account() {
+          |                                             ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+      error[E0425]: cannot find value `target` in this scope
+          --> src/modules/instance.rs:1182:44
+          |
+          1182 |     Err(format!("Instance '{}' not found", target))
+          |                                            ^^^^^^ not found in this scope
+          --> src/modules/notification_hub.rs:608:56
+          |
+          608 |         if let Ok(Some(default_acc)) = email_vault_db::get_default_account() {
+          |                                                        ^^^^^^^^^^^^^^^^^^^ not found in `email_vault_db`
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:822:25
+          |
+          822 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          822 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:1041:21
+          |
+          1041 |         .or_else(|| account::get_current_account_id().ok());
+          |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          1041 |         .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                           +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:382:25
+          |
+          382 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          382 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/auto_switcher.rs:1119:25
+          |
+          1119 |             .or_else(|| account::get_current_account_id().ok());
+          |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<Option<String>>`
+          |
+          = note: expected enum `std::option::Option<std::string::String>`
+          found enum `std::option::Option<std::option::Option<std::string::String>>`
+          help: consider using `Option::expect` to unwrap the `std::option::Option<std::option::Option<std::string::String>>` value, panicking if the value is an `Option::None`
+          |
+          1119 |             .or_else(|| account::get_current_account_id().ok().expect("REASON"));
+          |                                                               +++++++++++++++++
+      error[E0308]: mismatched types
+          --> src/modules/instance.rs:384:12
+          |
+          384 |     if let Ok(default_dir) = get_default_antigravity_data_dir() {
+          |            ^^^^^^^^^^^^^^^   ---------------------------------- this expression has type `std::path::PathBuf`
+          |            |
+          |            expected `PathBuf`, found `Result<_, _>`
+          |
+          = note: expected struct `std::path::PathBuf`
+          found enum `std::result::Result<_, _>`
+          Some errors have detailed explanations: E0308, E0425.
+          For more information about an error, try `rustc --explain E0308`.
+      error: could not compile `agm-alim` (lib) due to 8 previous errors
+      error: could not compile `agm-alim` (lib test) due to 8 previous errors
+      Process completed with exit code 101.
+    ● Job: Build Tauri App (ubuntu-latest) | Step: Build Tauri app (debug)
+      Summary: src/components/common/BackgroundTaskRunner.tsx(175,77): error TS2339: Property 'email' does not exist on type '{ accountEmail: string; instanceName: string; daysUntilRefill: number; resumedProjectsCount?: number | undefined; skippedProjectsCount?: number | undefined; }'.
+      beforeBuildCommand `npm run build` failed with exit code 2
+      Error beforeBuildCommand `npm run build` failed with exit code 2
+      Process completed with exit code 1.
+```
+
+# Bug Fix with 4-Part RCA & Regression Verification — Workflow (must follow)
+
+/goal Autonomously fix the failing CI/CD pipeline errors, strictly enforcing coding guidelines, and document the complete RCA before pushing.
+
+## The 4-Part RCA Requirement (Mandatory Memory File)
+Before modifying code, document the issue in .ai-memory/memory/issues/xx-<slug>.md:
+1. Why it happened: High-level architectural breakdown of the failure.
+2. How it happened: Technical execution flow that triggered the error.
+3. Root Cause: Exact file, line, and dependency responsible.
+4. Code Fix: Exact code snippets showing the remediation.
+
+## Non-Negotiable Rules
+- Functions <= 8-15 lines.
+- Affirmative booleans only (is*, has*).
+- Zero naked panics or unhandled errors; wrap with *apperror.AppError.
+- Group all changes into a single atomic commit at the final step.
