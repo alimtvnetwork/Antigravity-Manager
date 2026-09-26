@@ -191,3 +191,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-043 (Email Threaded Replies, Auto-Switcher Verification, Machine Training REST API, and Settings UI/UX):** Implemented in [`43-email-autoswitch-training-settings-overhaul.md`](./43-email-autoswitch-training-settings-overhaul.md).
 - **AC-APP-044 (Settings Hamburger UI, Machine Training REST API & E2E Verification):** Implemented in [`44-settings-hamburger-ui-and-system-e2e-verification.md`](./44-settings-hamburger-ui-and-system-e2e-verification.md).
 - **AC-APP-045 (Two-Bar Release Installation & DWM Blank UI Elimination):** Implemented in [`45-two-bar-installer-and-dwm-blank-ui-fix.md`](./45-two-bar-installer-and-dwm-blank-ui-fix.md).
+- **AC-APP-046 (CLI Expansion, Auto-Switch If Low Credit & Email Multi-VM Telemetry):** Implemented in [`46-cli-expansion-auto-switch-and-email-telemetry.md`](./46-cli-expansion-auto-switch-and-email-telemetry.md).

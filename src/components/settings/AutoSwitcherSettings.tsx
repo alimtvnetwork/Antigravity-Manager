@@ -114,7 +114,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
     };
 
     const handleThresholdChange = (val: number) => {
-        const low_quota_threshold_percent = Math.max(1.0, Math.min(95.0, val));
+        const low_quota_threshold_percent = Math.max(1.0, Math.min(99.0, val));
         onChange({ ...currentConfig, low_quota_threshold_percent });
     };
 
@@ -269,7 +269,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                             <input
                                 type="range"
                                 min="1"
-                                max="95"
+                                max="99"
                                 step="1"
                                 value={currentConfig.low_quota_threshold_percent}
                                 onChange={(e) => handleThresholdChange(Number(e.target.value))}
@@ -279,7 +279,7 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 <span>1%</span>
                                 <span>15% (Default)</span>
                                 <span>50%</span>
-                                <span>90% (Test)</span>
+                                <span>98% (Test)</span>
                             </div>
                         </div>
 

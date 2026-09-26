@@ -6,8 +6,9 @@
 //! PATH self-installation, GitHub auto-updates, and SSH remote machine management.
 
 use antigravity_tools_lib::modules::{
-    account, auto_switcher, config, email_inbound, email_sender, email_vault_db, email_watcher,
-    instance, proxy_db, repo_db, security_db, supabase_sync, training_api,
+    account, agy_cleaner, auto_switcher, config, email_inbound, email_io, email_sender,
+    email_vault_db, email_watcher, instance, notification_hub, proxy_db, repo_db, security_db,
+    supabase_sync, training_api,
 };
 use std::env;
 use std::fs;
@@ -28,88 +29,60 @@ fn main() {
     }
 
     let subcommand = args[1].to_lowercase();
+    let cmd_args = if args.len() > 2 {
+        args[2..].to_vec()
+    } else {
+        Vec::new()
+    };
+
     match subcommand.as_str() {
-        "status" => cmd_status(),
-        "instances" | "instance" | "ls" => cmd_instances(),
+        "status" | "credits" | "credit" | "status/credits" => cmd_status(&cmd_args),
+        "instances" | "instance" | "ls" => cmd_instances(&cmd_args),
+        "instances-all" => cmd_instances_all(&cmd_args),
         "doctor" | "check" => cmd_doctor(),
-        "accounts" | "account" | "acc" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_accounts(&cmd_args);
+        "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
+        "switch" => cmd_switch(&cmd_args),
+        "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
+            cmd_switch_if_low_credit(&cmd_args);
         }
-        "switch" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_switch(&cmd_args);
-        }
-        "prompts" | "prompt" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_prompts(&cmd_args);
-        }
-        "proxy" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_proxy(&cmd_args);
-        }
+        "which-prompts-running" | "wpr" => cmd_which_prompts_running(&cmd_args),
+        "prompts" => cmd_prompts(&cmd_args),
+        "prompt" => cmd_prompt_dispatch(&cmd_args),
+        "rerun" => cmd_rerun(&cmd_args),
+        "prompts-export" | "pe" => cmd_prompts_export(&cmd_args),
+        "prompts-import" | "pi" => cmd_prompts_import(&cmd_args),
+        "proxy" => cmd_proxy(&cmd_args),
         "sync" => cmd_sync(),
         "pull" => cmd_pull(),
         "clean" | "purge" => cmd_clean(),
-        "logs" | "log" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
+        "clear-cache" | "cache-clear" => cmd_clear_cache(&cmd_args),
+        "clear" => {
+            if cmd_args
+                .first()
+                .map(|s| s.eq_ignore_ascii_case("cache"))
+                .unwrap_or(false)
+            {
+                let rest = if cmd_args.len() > 1 {
+                    cmd_args[1..].to_vec()
+                } else {
+                    Vec::new()
+                };
+                cmd_clear_cache(&rest);
             } else {
-                Vec::new()
-            };
-            cmd_logs(&cmd_args);
+                cmd_clear_cache(&cmd_args);
+            }
         }
-        "ff" | "smart-switch" | "fast-forward" => cmd_fast_forward(),
-        "test-switcher" | "test-auto-switch" | "auto-switch" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_test_auto_switch(&cmd_args);
-        }
-        "test-email" | "email-test" | "check-email" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_test_email(&cmd_args);
-        }
-        "test-training" | "training" | "train" => {
-            let cmd_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_test_training(&cmd_args);
-        }
+        "recreate-project" => cmd_recreate_project(&cmd_args),
+        "recreate" => cmd_recreate(&cmd_args),
+        "email" => cmd_email(&cmd_args),
+        "logs" | "log" => cmd_logs(&cmd_args),
+        "ff" | "smart-switch" | "fast-forward" => cmd_fast_forward(&cmd_args),
+        "test-switcher" | "test-auto-switch" | "auto-switch" => cmd_test_auto_switch(&cmd_args),
+        "test-email" | "email-test" | "check-email" => cmd_test_email(&cmd_args),
+        "test-training" | "training" | "train" => cmd_test_training(&cmd_args),
         "install" => cmd_install(),
         "update" => cmd_update(),
-        "ssh" => {
-            let ssh_args = if args.len() > 2 {
-                args[2..].to_vec()
-            } else {
-                Vec::new()
-            };
-            cmd_ssh(&ssh_args);
-        }
+        "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
             println!("agm v{}", VERSION);
         }
@@ -139,46 +112,75 @@ fn print_help() {
     println!("Usage:");
     println!("  agm <command> [arguments] [options]");
     println!();
-    println!("Core Commands:");
-    println!("  status                      Show current node status, proxy, active profile & IP");
-    println!("  instances, ls               List all registered sandbox profiles and running PIDs");
-    println!("  doctor, check               Run comprehensive pre-flight system health checks");
-    println!("  accounts, acc [--active]    List registered accounts, tiers, and weekly quotas");
-    println!("  switch <email|prefix|id>    Switch active account directly without opening GUI");
-    println!("  prompts [--running]         List tracked prompt tasks and available templates");
+    println!("Core Status & Account Rotation Commands:");
     println!(
-        "  proxy [status|test]         Check local proxy service status or test loopback ping"
+        "  status, credits [--json]              Show node status, immediate & weekly credits"
     );
-    println!("  sync                        Synchronize local accounts, instances, and DB vaults");
-    println!("  pull                        Execute git pull origin main in repository root");
-    println!("  clean, purge                Safely clean temp caches while protecting DB vaults");
-    println!("  logs [--tail N] [-f text]   View recent application and proxy log lines");
-    println!("  ff, smart-switch            Trigger fast-forward rotation to freshest account");
-    println!("  install                     Install 'agm' executable into system PATH and profile");
-    println!("  update                      Check GitHub releases and update AGM binary");
     println!(
-        "  ssh <target> [options]      Connect to remote VM via SSH or run remote auto-update"
+        "  ff, smart-switch                      Trigger fast-forward rotation to freshest account"
     );
-    println!("  version, -v                 Print agm CLI version");
-    println!("  help, -h                    Display this help manual");
+    println!(
+        "  switch-if-low-credit, swlc, sfc [pct] Check live quota and rotate if below threshold"
+    );
+    println!("  accounts, acc [--active] [--json]     List registered accounts, tiers, and quotas");
+    println!("  switch <email|prefix|id>              Switch active account directly without GUI");
     println!();
-    println!("SSH Options:");
-    println!("  agm ssh <[user@]host> [-p port] [--password <pwd>] [--update]");
-    println!("  --password <pwd>            Provide SSH password non-interactively");
-    println!("  --update                    Auto-update or install AGM on the remote VM via SSH");
-    println!("  -p <port>                   Specify custom SSH port (default: 22)");
+    println!("Prompt Inspection, Export/Import & Rerun Commands:");
+    println!("  which-prompts-running, wpr [--json]   List running projects, conv IDs, and prompt queues");
+    println!("  prompts ls [N] [--json] [--words W]   Show N running prompts in ASC stack order");
+    println!("  prompts-export, pe [N] [-f <path>]    Export prompts with Base64 images to JSON");
+    println!("  prompts-import, pi [-f <path>]        Import and rerun prompts from JSON file(s)");
+    println!("  prompt \"<text>\" [--prefix C] [--suffix C] Dispatch prompt with git pull & 01-prompts templates");
+    println!(
+        "  rerun [prompts [N]] [-prefix <cat>]   Git pull and rerun last N prompts with template"
+    );
     println!();
-    println!("Examples:");
-    println!("  agm status");
-    println!("  agm doctor");
-    println!("  agm accounts");
-    println!("  agm switch abidul");
-    println!("  agm proxy test");
-    println!("  agm prompts --running");
-    println!("  agm sync");
-    println!("  agm clean");
-    println!("  agm ssh root@192.168.1.50");
-    println!("  agm ssh 192.168.1.50 --update");
+    println!("Instance & Workspace Management Commands:");
+    println!("  instances [ls] [--json]               List all sandbox profiles and running PIDs");
+    println!(
+        "  instances <seq|id|alias> [switch] ff  Fast-forward rotate account for specific instance"
+    );
+    println!(
+        "  instances-all ff                      Fast-forward rotate accounts across ALL instances"
+    );
+    println!("  instances create \"<name>\" [--data-only] Create a new isolated sandbox instance profile");
+    println!("  instances rm <seq|id|alias>           Remove a specific sandbox instance profile");
+    println!("  instances rm-all                      Remove all non-default instances (preserves default)");
+    println!("  recreate-project [path]               Purge workspace cache & conversations and reopen in agy");
+    println!("  recreate [project-or-path...]         Purge & recreate one or more projects in fresh session");
+    println!("  clear-cache, cache-clear [-k N]       Prune old conversations (keep N=10) & clean caches");
+    println!();
+    println!("Email Telemetry & Vault Commands:");
+    println!("  email [status] [--json]               Show email notification & IMAP/SMTP status");
+    println!("  email help                            Show detailed email command & subject syntax guide");
+    println!(
+        "  email ls [--json]                     List configured email accounts and recipients"
+    );
+    println!("  email add <email> [pwd] [options]     Add sender account or recipient (sends JSON self-email)");
+    println!("  email rm <seq|id|email>               Remove email account or recipient");
+    println!("  email mv <seq|id|email> --default     Promote an email account to default sender");
+    println!("  email export [-f <path>]              Export email configuration bundle to JSON");
+    println!();
+    println!("System & Maintenance Commands:");
+    println!(
+        "  doctor, check                         Run comprehensive pre-flight system health checks"
+    );
+    println!(
+        "  proxy [status|test]                   Check local proxy service status or test loopback"
+    );
+    println!("  sync                                  Synchronize local accounts, instances, and DB vaults");
+    println!(
+        "  pull                                  Execute git pull origin main in repository root"
+    );
+    println!("  clean, purge                          Safely clean temp caches while protecting DB vaults");
+    println!("  logs [--tail N] [-f text]             View recent application and proxy log lines");
+    println!("  install                               Install 'agm' executable into system PATH");
+    println!("  update                                Check GitHub releases and update AGM binary");
+    println!(
+        "  ssh <target> [options]                Connect to remote VM via SSH or run auto-update"
+    );
+    println!("  version, -v                           Print agm CLI version");
+    println!("  help, -h                              Display this help manual");
     println!();
 }
 
@@ -532,74 +534,890 @@ fn cmd_switch(args: &[String]) {
     println!("          Active:   {} (ID: {})", target.email, target.id);
 }
 
-fn cmd_prompts(args: &[String]) {
-    let running_only = args.iter().any(|a| a == "--running");
+fn derive_current_repo_slug() -> String {
+    env::current_dir()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        .map(|s| {
+            s.to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .trim_matches('-')
+                .to_string()
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "workspace".to_string())
+}
 
-    match repo_db::connect_db() {
-        Ok(conn) => {
-            let query = if running_only {
-                "SELECT id, project_id, instance_id, prompt_content, model, status, updated_at \
-                 FROM active_prompts WHERE status = 'running' ORDER BY updated_at DESC LIMIT 50"
-            } else {
-                "SELECT id, project_id, instance_id, prompt_content, model, status, updated_at \
-                 FROM active_prompts ORDER BY updated_at DESC LIMIT 50"
-            };
+fn truncate_words(text: &str, max_words: usize) -> (String, usize) {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let total = words.len();
+    if total <= max_words {
+        (words.join(" "), total)
+    } else {
+        (format!("{} ...", words[..max_words].join(" ")), total)
+    }
+}
 
-            let mut stmt = match conn.prepare(query) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("[ERROR] Failed to query active_prompts: {}", e);
-                    return;
-                }
-            };
+fn cmd_which_prompts_running(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
 
-            let prompts = stmt
-                .query_map([], |row| {
-                    let id: String = row.get(0)?;
-                    let proj: String = row.get(1)?;
-                    let _inst: String = row.get(2)?;
-                    let content: String = row.get(3)?;
-                    let model: Option<String> = row.get(4)?;
-                    let status: String = row.get(5)?;
-                    let updated: i64 = row.get(6)?;
-                    Ok((id, proj, content, model, status, updated))
-                })
-                .map(|rows| rows.flatten().collect::<Vec<_>>())
-                .unwrap_or_default();
-
-            if prompts.is_empty() {
-                println!("No active prompt tasks tracked in repo_prompts.db.");
-            } else {
-                println!("\nTracked Prompt Tasks ({} total):", prompts.len());
-                println!(
-                    "{:<12} {:<24} {:<12} {:<14} {}",
-                    "PROMPT ID", "PROJECT", "STATUS", "MODEL", "SNIPPET"
-                );
-                println!("{}", "-".repeat(95));
-                for (id, proj, content, model, status, _) in prompts {
-                    let snippet: String = content
-                        .lines()
-                        .next()
-                        .unwrap_or("")
-                        .chars()
-                        .take(40)
-                        .collect();
-                    let model_str = model.unwrap_or_else(|| "default".to_string());
-                    let short_id: String = id.chars().take(8).collect();
-                    println!(
-                        "{:<12} {:<24} {:<12} {:<14} {}",
-                        short_id, proj, status, model_str, snippet
-                    );
-                }
-                println!();
-            }
-        }
-        Err(e) => {
-            eprintln!("[WARN] Could not connect to repo_prompts.db: {}", e);
+    // Refresh live projects across registered instances
+    if let Ok(reg) = instance::load_registry() {
+        for inst in &reg.instances {
+            let _ = repo_db::detect_running_projects(&inst.id);
         }
     }
 
-    scan_prompt_templates();
+    let projects = repo_db::list_running_projects().unwrap_or_default();
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let conversations = agy_cleaner::scan_conversations(100);
+
+    let mut rows = Vec::new();
+    let mut seq = 0usize;
+
+    for proj in &projects {
+        let proj_prompts: Vec<&repo_db::ActivePrompt> = all_prompts
+            .iter()
+            .filter(|p| {
+                (p.project_id == proj.id || p.repo_path.eq_ignore_ascii_case(&proj.repo_path))
+                    && (p.status == "running"
+                        || p.status == "backed_up"
+                        || p.status == "dispatched")
+            })
+            .collect();
+
+        if !proj.is_running && proj_prompts.is_empty() {
+            continue;
+        }
+
+        seq += 1;
+        let repo_norm = proj.repo_path.to_lowercase().replace('\\', "/");
+        let matched_conv = conversations.iter().find(|c| {
+            let uris_norm = c.workspace_uris.to_lowercase().replace('\\', "/");
+            (!repo_norm.is_empty() && uris_norm.contains(&repo_norm))
+                || (!proj.repo_name.is_empty()
+                    && uris_norm.contains(&proj.repo_name.to_lowercase()))
+        });
+
+        let conv_id = matched_conv
+            .map(|c| c.conversation_id.clone())
+            .or_else(|| proj_prompts.first().and_then(|p| p.session_id.clone()))
+            .unwrap_or_else(|| "-".to_string());
+
+        let conv_name = matched_conv
+            .and_then(|c| {
+                if c.title.trim().is_empty() {
+                    None
+                } else {
+                    Some(c.title.clone())
+                }
+            })
+            .unwrap_or_else(|| proj.repo_name.clone());
+
+        let queue_count = if proj_prompts.is_empty() && proj.is_running {
+            1usize
+        } else {
+            proj_prompts.len()
+        };
+
+        rows.push(serde_json::json!({
+            "seq": seq,
+            "project": proj.repo_name,
+            "id": proj.id,
+            "instance_id": proj.instance_id,
+            "repo_path": proj.repo_path,
+            "conv_id": conv_id,
+            "conv_name": conv_name,
+            "prompts_count": queue_count,
+            "is_running": proj.is_running,
+        }));
+    }
+
+    if is_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&rows).unwrap_or_else(|_| "[]".to_string())
+        );
+        return;
+    }
+
+    if rows.is_empty() {
+        println!("No projects currently have running or queued prompts.");
+        return;
+    }
+
+    println!(
+        "\nProjects with Running / Queued Prompts ({} active):",
+        rows.len()
+    );
+    println!(
+        "{:<5} {:<22} {:<24} {:<16} {:<26} {}",
+        "SEQ", "PROJECT", "ID", "CONV ID", "CONV NAME", "PROMPTS (QUEUE)"
+    );
+    println!("{}", "-".repeat(110));
+
+    for item in &rows {
+        let s = item["seq"].as_u64().unwrap_or(0);
+        let proj = item["project"].as_str().unwrap_or("-");
+        let id: String = item["id"]
+            .as_str()
+            .unwrap_or("-")
+            .chars()
+            .take(22)
+            .collect();
+        let cid: String = item["conv_id"]
+            .as_str()
+            .unwrap_or("-")
+            .chars()
+            .take(14)
+            .collect();
+        let cname: String = item["conv_name"]
+            .as_str()
+            .unwrap_or("-")
+            .chars()
+            .take(24)
+            .collect();
+        let qcount = item["prompts_count"].as_u64().unwrap_or(0);
+        println!(
+            "#{:<4} {:<22} {:<24} {:<16} {:<26} {}",
+            s, proj, id, cid, cname, qcount
+        );
+    }
+    println!();
+}
+
+fn cmd_prompts(args: &[String]) {
+    if let Some(first) = args.first() {
+        if first.eq_ignore_ascii_case("export") || first.eq_ignore_ascii_case("pe") {
+            cmd_prompts_export(&args[1..]);
+            return;
+        }
+        if first.eq_ignore_ascii_case("import") || first.eq_ignore_ascii_case("pi") {
+            cmd_prompts_import(&args[1..]);
+            return;
+        }
+    }
+
+    let is_ls = args
+        .first()
+        .map(|a| a.eq_ignore_ascii_case("ls") || a.eq_ignore_ascii_case("list"))
+        .unwrap_or(false);
+    let is_json = args.iter().any(|a| a == "--json");
+    let running_only = args.iter().any(|a| a == "--running") || is_ls;
+
+    let mut limit_n: usize = 10;
+    let mut max_words: usize = 100;
+
+    let mut i = if is_ls { 1 } else { 0 };
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--words" || arg == "-w" {
+            if i + 1 < args.len() {
+                max_words = args[i + 1].parse().unwrap_or(100);
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(n) = arg.parse::<usize>() {
+                limit_n = n.max(1);
+            }
+        }
+        i += 1;
+    }
+
+    let cwd_opt = env::current_dir()
+        .ok()
+        .map(|p| p.to_string_lossy().to_lowercase().replace('\\', "/"));
+
+    let mut all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+
+    // Filter to current repo if we are inside a repo folder that has tracked prompts
+    if let Some(ref cwd) = cwd_opt {
+        let repo_matches: Vec<repo_db::ActivePrompt> = all_prompts
+            .iter()
+            .filter(|p| {
+                let rp = p.repo_path.to_lowercase().replace('\\', "/");
+                !rp.is_empty() && (cwd.starts_with(&rp) || rp.starts_with(cwd))
+            })
+            .cloned()
+            .collect();
+        if !repo_matches.is_empty() {
+            all_prompts = repo_matches;
+        }
+    }
+
+    if running_only {
+        let running_filtered: Vec<repo_db::ActivePrompt> = all_prompts
+            .iter()
+            .filter(|p| {
+                p.status == "running" || p.status == "dispatched" || p.status == "backed_up"
+            })
+            .cloned()
+            .collect();
+        if !running_filtered.is_empty() {
+            all_prompts = running_filtered;
+        }
+    }
+
+    // Take top N most recent and reverse into ASC stack order (oldest -> newest in the N window)
+    all_prompts.truncate(limit_n);
+    all_prompts.reverse();
+
+    let mut stack_items = Vec::new();
+    for (idx, p) in all_prompts.iter().enumerate() {
+        let (snippet, word_count) = truncate_words(&p.prompt_content, max_words);
+        stack_items.push(serde_json::json!({
+            "seq": idx + 1,
+            "id": p.id,
+            "project_id": p.project_id,
+            "instance_id": p.instance_id,
+            "repo_path": p.repo_path,
+            "status": p.status,
+            "model": p.model.clone().unwrap_or_else(|| "default".to_string()),
+            "word_count": word_count,
+            "words_limit": max_words,
+            "prompt": snippet,
+            "has_image": p.image_payload.is_some(),
+            "updated_at": p.updated_at,
+        }));
+    }
+
+    if is_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&stack_items).unwrap_or_else(|_| "[]".to_string())
+        );
+        return;
+    }
+
+    println!(
+        "\n[Table Mode: Displaying {} prompt(s) in ASC stack order (truncated to {} words; pass --json for raw JSON)]",
+        stack_items.len(),
+        max_words
+    );
+
+    if stack_items.is_empty() {
+        println!("No active prompt tasks tracked in repo_prompts.db.");
+    } else {
+        println!(
+            "{:<5} {:<10} {:<22} {:<12} {:<10} {}",
+            "SEQ", "ID", "PROJECT", "STATUS", "WORDS", "PROMPT SNIPPET (ASC STACK)"
+        );
+        println!("{}", "-".repeat(110));
+        for item in &stack_items {
+            let seq = item["seq"].as_u64().unwrap_or(0);
+            let short_id: String = item["id"].as_str().unwrap_or("-").chars().take(8).collect();
+            let proj: String = item["project_id"]
+                .as_str()
+                .unwrap_or("-")
+                .chars()
+                .take(20)
+                .collect();
+            let status = item["status"].as_str().unwrap_or("-");
+            let wc = item["word_count"].as_u64().unwrap_or(0);
+            let prompt_txt = item["prompt"].as_str().unwrap_or("");
+            println!(
+                "#{:<4} {:<10} {:<22} {:<12} {:<10} {}",
+                seq, short_id, proj, status, wc, prompt_txt
+            );
+        }
+        println!();
+    }
+
+    if !is_ls {
+        scan_prompt_templates();
+    }
+}
+
+fn cmd_prompts_export(args: &[String]) {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    let mut limit_n: usize = 50;
+    let mut target_file: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "-f" || arg == "--file" || arg == "-file" {
+            if i + 1 < args.len() && !args[i + 1].starts_with('-') {
+                target_file = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(n) = arg.parse::<usize>() {
+                limit_n = n.max(1);
+            } else if target_file.is_none() {
+                target_file = Some(arg.clone());
+            }
+        }
+        i += 1;
+    }
+
+    let slug = derive_current_repo_slug();
+    let default_filename = format!("agm-{}-prompts.json", slug);
+    let out_path = match target_file {
+        Some(ref f) if !f.trim().is_empty() => PathBuf::from(f.trim()),
+        _ => PathBuf::from(&default_filename),
+    };
+
+    let mut prompts = repo_db::list_all_prompts().unwrap_or_default();
+    if let Ok(cwd) = env::current_dir() {
+        let cwd_norm = cwd.to_string_lossy().to_lowercase().replace('\\', "/");
+        let matched: Vec<repo_db::ActivePrompt> = prompts
+            .iter()
+            .filter(|p| {
+                let rp = p.repo_path.to_lowercase().replace('\\', "/");
+                !rp.is_empty() && (cwd_norm.starts_with(&rp) || rp.starts_with(&cwd_norm))
+            })
+            .cloned()
+            .collect();
+        if !matched.is_empty() {
+            prompts = matched;
+        }
+    }
+
+    prompts.truncate(limit_n);
+    prompts.reverse(); // ASC stack order
+
+    let exported_items: Vec<serde_json::Value> = prompts
+        .iter()
+        .enumerate()
+        .map(|(idx, p)| {
+            let b64_image = p.image_payload.as_ref().map(|img| {
+                if img.starts_with("data:image/") || img.len() > 128 {
+                    img.clone()
+                } else if Path::new(img).exists() {
+                    fs::read(img)
+                        .map(|bytes| format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
+                        .unwrap_or_else(|_| STANDARD.encode(img.as_bytes()))
+                } else {
+                    STANDARD.encode(img.as_bytes())
+                }
+            });
+            serde_json::json!({
+                "seq": idx + 1,
+                "id": p.id,
+                "project_id": p.project_id,
+                "instance_id": p.instance_id,
+                "repo_path": p.repo_path,
+                "prompt_content": p.prompt_content,
+                "model": p.model,
+                "session_id": p.session_id,
+                "status": p.status,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+                "image_base64": b64_image,
+            })
+        })
+        .collect();
+
+    let bundle = serde_json::json!({
+        "schema": "agm-prompts-export-v1",
+        "repo_slug": slug,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "count": exported_items.len(),
+        "prompts": exported_items,
+    });
+
+    let json_str = serde_json::to_string_pretty(&bundle).unwrap_or_else(|_| "{}".to_string());
+    if let Err(e) = fs::write(&out_path, &json_str) {
+        eprintln!(
+            "[ERROR] Failed to write prompts export to {:?}: {}",
+            out_path, e
+        );
+        std::process::exit(1);
+    }
+
+    println!(
+        "[SUCCESS] Exported {} prompt(s) (with Base64 image encoding) to {:?}",
+        exported_items.len(),
+        out_path
+    );
+}
+
+fn cmd_prompts_import(args: &[String]) {
+    let mut explicit_file: Option<String> = None;
+    let auto_yes = args.iter().any(|a| a == "--yes" || a == "-y");
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "-f" || arg == "--file" || arg == "-file" {
+            if i + 1 < args.len() && !args[i + 1].starts_with('-') {
+                explicit_file = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') && explicit_file.is_none() {
+            explicit_file = Some(arg.clone());
+        }
+        i += 1;
+    }
+
+    let slug = derive_current_repo_slug();
+    let default_filename = format!("agm-{}-prompts.json", slug);
+
+    let mut files_to_import: Vec<PathBuf> = Vec::new();
+    if let Some(ref f) = explicit_file {
+        files_to_import.push(PathBuf::from(f));
+    } else {
+        let default_path = PathBuf::from(&default_filename);
+        if default_path.exists() {
+            files_to_import.push(default_path.clone());
+        }
+
+        // Scan current directory for other prompt JSON files
+        if let Ok(entries) = fs::read_dir(".") {
+            let mut other_jsons = Vec::new();
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("json") {
+                    let fname = p
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    if fname != default_filename
+                        && (fname.contains("prompt") || fname.starts_with("agm-"))
+                    {
+                        other_jsons.push(p);
+                    }
+                }
+            }
+
+            if !other_jsons.is_empty() {
+                if auto_yes {
+                    files_to_import.extend(other_jsons);
+                } else {
+                    println!(
+                        "[*] Found {} additional prompt JSON file(s) in current folder:",
+                        other_jsons.len()
+                    );
+                    for oj in &other_jsons {
+                        println!("    - {}", oj.display());
+                    }
+                    print!("Do you want to import and rerun these additional JSON files as well? [y/N]: ");
+                    let _ = io::stdout().flush();
+                    let mut answer = String::new();
+                    if io::stdin().read_line(&mut answer).is_ok() {
+                        let trimmed = answer.trim().to_lowercase();
+                        if trimmed == "y" || trimmed == "yes" {
+                            files_to_import.extend(other_jsons);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if files_to_import.is_empty() {
+        eprintln!(
+            "[ERROR] No prompt JSON file found to import (expected '{}' or specify -f <path>).",
+            default_filename
+        );
+        std::process::exit(1);
+    }
+
+    let conn = match repo_db::connect_db() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to connect to repo_prompts.db: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let cwd_str = env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| ".".to_string());
+    let now = chrono::Utc::now().timestamp();
+    let mut total_imported = 0usize;
+
+    for file_path in &files_to_import {
+        let content = match fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[WARN] Failed to read {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+        let parsed: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[WARN] Invalid JSON in {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        let arr = parsed
+            .get("prompts")
+            .and_then(|v| v.as_array())
+            .or_else(|| parsed.as_array());
+
+        let Some(items) = arr else {
+            continue;
+        };
+
+        for item in items {
+            let prompt_content = item
+                .get("prompt_content")
+                .or_else(|| item.get("prompt"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if prompt_content.trim().is_empty() {
+                continue;
+            }
+
+            let id = uuid::Uuid::new_v4().to_string();
+            let proj_id = item
+                .get("project_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&slug)
+                .to_string();
+            let inst_id = item
+                .get("instance_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default")
+                .to_string();
+            let repo_path = item
+                .get("repo_path")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&cwd_str)
+                .to_string();
+            let model = item
+                .get("model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| Some("gemini-3.8-flash-high".to_string()));
+            let img = item
+                .get("image_base64")
+                .or_else(|| item.get("image_payload"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let _ = conn.execute(
+                "INSERT INTO active_prompts \
+                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'dispatched', ?8, ?8, ?9)",
+                rusqlite::params![
+                    &id,
+                    &proj_id,
+                    &inst_id,
+                    &repo_path,
+                    &prompt_content,
+                    &model,
+                    &proj_id,
+                    now,
+                    &img,
+                ],
+            );
+
+            // Also write .antigravity_resume_task.json in target repo to trigger immediate rerun
+            let task_file = PathBuf::from(&repo_path).join(".antigravity_resume_task.json");
+            let task_payload = serde_json::json!({
+                "prompt_id": id,
+                "project_id": proj_id,
+                "instance_id": inst_id,
+                "repo_path": repo_path,
+                "prompt_content": prompt_content,
+                "model": model,
+                "image_payload": img,
+                "auto_boot": true,
+                "imported_at": now,
+            });
+            if let Ok(js) = serde_json::to_string_pretty(&task_payload) {
+                let _ = fs::write(&task_file, js);
+            }
+
+            total_imported += 1;
+        }
+    }
+
+    println!(
+        "[SUCCESS] Imported and queued {} prompt(s) for rerun across {} file(s).",
+        total_imported,
+        files_to_import.len()
+    );
+}
+
+fn resolve_prompt_template(category_or_name: &str) -> Option<String> {
+    let query = category_or_name.trim().to_lowercase();
+    if query.is_empty() {
+        return None;
+    }
+
+    let mut search_roots = vec![PathBuf::from("01-prompts")];
+    if let Ok(cwd) = env::current_dir() {
+        search_roots.push(cwd.join("01-prompts"));
+        if let Some(parent) = cwd.parent() {
+            search_roots.push(parent.join("coding-guidelines").join("01-prompts"));
+            search_roots.push(parent.join("Antigravity-Manager").join("01-prompts"));
+        }
+    }
+
+    for root in search_roots {
+        if !root.exists() {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let fname = entry.file_name().to_string_lossy().to_lowercase();
+                if fname.contains(&query) {
+                    if path.is_file() {
+                        if let Ok(content) = fs::read_to_string(&path) {
+                            return Some(content.trim().to_string());
+                        }
+                    } else if path.is_dir() {
+                        if let Ok(sub_entries) = fs::read_dir(&path) {
+                            let mut md_files: Vec<PathBuf> = sub_entries
+                                .flatten()
+                                .map(|e| e.path())
+                                .filter(|p| p.is_file())
+                                .collect();
+                            md_files.sort();
+                            if let Some(first_file) = md_files.first() {
+                                if let Ok(content) = fs::read_to_string(first_file) {
+                                    return Some(content.trim().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn wrap_prompt_with_templates(
+    raw_prompt: &str,
+    prefix_cat: Option<&str>,
+    suffix_cat: Option<&str>,
+) -> String {
+    let mut parts = Vec::new();
+    if let Some(pref) = prefix_cat {
+        if let Some(tpl) = resolve_prompt_template(pref) {
+            parts.push(tpl);
+        } else {
+            parts.push(format!("[Template Prefix: {}]", pref));
+        }
+    }
+    if !raw_prompt.trim().is_empty() {
+        parts.push(raw_prompt.trim().to_string());
+    }
+    if let Some(suff) = suffix_cat {
+        if let Some(tpl) = resolve_prompt_template(suff) {
+            parts.push(tpl);
+        } else {
+            parts.push(format!("[Template Suffix: {}]", suff));
+        }
+    }
+    parts.join("\n\n")
+}
+
+fn cmd_prompt_dispatch(args: &[String]) {
+    if args.is_empty() {
+        cmd_prompts(args);
+        return;
+    }
+
+    // If first arg is "ls" or "--running", delegate to cmd_prompts
+    if let Some(first) = args.first() {
+        if first == "ls" || first == "list" || first == "--running" {
+            cmd_prompts(args);
+            return;
+        }
+    }
+
+    let mut prefix_cat: Option<String> = None;
+    let mut suffix_cat: Option<String> = None;
+    let mut text_parts: Vec<String> = Vec::new();
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--prefix" || arg == "-prefix" {
+            if i + 1 < args.len() {
+                prefix_cat = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if arg == "--suffix" || arg == "-suffix" {
+            if i + 1 < args.len() {
+                suffix_cat = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else {
+            text_parts.push(arg.clone());
+        }
+        i += 1;
+    }
+
+    // Pull latest changes before dispatching prompt
+    if Path::new(".git").exists() {
+        println!("[*] Synchronizing repository via git pull before prompt dispatch...");
+        let _ = Command::new("git").args(["pull"]).status();
+    }
+
+    let raw_text = text_parts.join(" ");
+    let final_prompt =
+        wrap_prompt_with_templates(&raw_text, prefix_cat.as_deref(), suffix_cat.as_deref());
+
+    if final_prompt.trim().is_empty() {
+        eprintln!("[ERROR] Prompt content cannot be empty.");
+        std::process::exit(1);
+    }
+
+    let slug = derive_current_repo_slug();
+    let cwd_str = env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| ".".to_string());
+    let now = chrono::Utc::now().timestamp();
+    let prompt_id = uuid::Uuid::new_v4().to_string();
+    let inst_id = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+
+    if let Ok(conn) = repo_db::connect_db() {
+        let _ = conn.execute(
+            "INSERT INTO active_prompts \
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?2, 'dispatched', ?6, ?6)",
+            rusqlite::params![&prompt_id, &slug, &inst_id, &cwd_str, &final_prompt, now],
+        );
+    }
+
+    let task_file = PathBuf::from(&cwd_str).join(".antigravity_resume_task.json");
+    let payload = serde_json::json!({
+        "prompt_id": prompt_id,
+        "project_id": slug,
+        "instance_id": inst_id,
+        "repo_path": cwd_str,
+        "prompt_content": final_prompt,
+        "prefix_template": prefix_cat,
+        "suffix_template": suffix_cat,
+        "dispatched_at": now,
+    });
+    if let Ok(js) = serde_json::to_string_pretty(&payload) {
+        let _ = fs::write(&task_file, js);
+    }
+
+    println!(
+        "[SUCCESS] Dispatched prompt ({} chars) to workspace '{}' [Instance: {}].",
+        final_prompt.len(),
+        slug,
+        inst_id
+    );
+}
+
+fn cmd_rerun(args: &[String]) {
+    let mut count_n: usize = 1;
+    let mut prefix_cat: Option<String> = None;
+    let mut suffix_cat: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg.eq_ignore_ascii_case("prompts") || arg.eq_ignore_ascii_case("prompt") {
+            i += 1;
+            continue;
+        } else if arg == "-prefix" || arg == "--prefix" {
+            if i + 1 < args.len() {
+                prefix_cat = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if arg == "-suffix" || arg == "--suffix" {
+            if i + 1 < args.len() {
+                suffix_cat = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if let Ok(n) = arg.parse::<usize>() {
+            count_n = n.max(1);
+        }
+        i += 1;
+    }
+
+    if Path::new(".git").exists() {
+        println!("[*] Running git pull before rerunning prompt(s)...");
+        let _ = Command::new("git").args(["pull"]).status();
+    }
+
+    let mut prompts = repo_db::list_all_prompts().unwrap_or_default();
+    if let Ok(cwd) = env::current_dir() {
+        let cwd_norm = cwd.to_string_lossy().to_lowercase().replace('\\', "/");
+        let repo_matched: Vec<repo_db::ActivePrompt> = prompts
+            .iter()
+            .filter(|p| {
+                let rp = p.repo_path.to_lowercase().replace('\\', "/");
+                !rp.is_empty() && (cwd_norm.starts_with(&rp) || rp.starts_with(&cwd_norm))
+            })
+            .cloned()
+            .collect();
+        if !repo_matched.is_empty() {
+            prompts = repo_matched;
+        }
+    }
+
+    if prompts.is_empty() {
+        eprintln!("[ERROR] No historical prompts found in repo_prompts.db to rerun.");
+        std::process::exit(1);
+    }
+
+    prompts.truncate(count_n);
+    prompts.reverse(); // Rerun in chronological ASC order
+
+    let now = chrono::Utc::now().timestamp();
+    let conn_opt = repo_db::connect_db().ok();
+
+    for (idx, p) in prompts.iter().enumerate() {
+        let wrapped = wrap_prompt_with_templates(
+            &p.prompt_content,
+            prefix_cat.as_deref(),
+            suffix_cat.as_deref(),
+        );
+        if let Some(ref conn) = conn_opt {
+            let _ = conn.execute(
+                "UPDATE active_prompts SET prompt_content = ?1, status = 'dispatched', updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![&wrapped, now, &p.id],
+            );
+        }
+
+        let task_file = PathBuf::from(&p.repo_path).join(".antigravity_resume_task.json");
+        let payload = serde_json::json!({
+            "prompt_id": p.id,
+            "project_id": p.project_id,
+            "instance_id": p.instance_id,
+            "repo_path": p.repo_path,
+            "prompt_content": wrapped,
+            "model": p.model,
+            "image_payload": p.image_payload,
+            "rerun_seq": idx + 1,
+            "resumed_at": now,
+        });
+        if let Ok(js) = serde_json::to_string_pretty(&payload) {
+            let _ = fs::write(&task_file, js);
+        }
+
+        let (preview, _) = truncate_words(&wrapped, 20);
+        println!(
+            "  [Rerun #{}] Project '{}' -> {}",
+            idx + 1,
+            p.project_id,
+            preview
+        );
+    }
+
+    println!(
+        "[SUCCESS] Queued and dispatched {} prompt(s) for rerun.",
+        prompts.len()
+    );
 }
 
 fn scan_prompt_templates() {
@@ -892,61 +1710,469 @@ fn cmd_logs(args: &[String]) {
     }
 }
 
-fn cmd_status() {
-    let machine_name = email_watcher::detect_machine_name();
-    let local_ip = email_watcher::detect_local_ip();
+fn extract_immediate_and_weekly_credits(
+    acc: &antigravity_tools_lib::models::Account,
+) -> (f64, f64, String) {
+    let tier = acc
+        .quota
+        .as_ref()
+        .and_then(|q| q.subscription_tier.clone())
+        .unwrap_or_else(|| "FREE".to_string());
 
-    println!("[*] Antigravity-Manager Node Status:");
-    println!("    Machine Name:    {}", machine_name);
-    println!("    Local IP:        {}", local_ip);
-    println!("    CLI Version:     v{}", VERSION);
+    let app_cfg = config::load_app_config().unwrap_or_default();
+    let target_model = &app_cfg.auto_profile_switcher.target_model;
 
-    // Active Account
-    match account::get_current_account() {
-        Ok(Some(acc)) => {
-            println!("    Active Account:  {}", acc.email);
-            println!(
-                "    Account Name:    {}",
-                acc.name.as_deref().unwrap_or("-")
-            );
-        }
-        Ok(None) => {
-            println!("    Active Account:  (None / Default)");
-        }
-        Err(e) => {
-            println!("    Active Account:  Error querying ({})", e);
+    let immediate_pct = auto_switcher::calculate_account_quota(acc, target_model).unwrap_or(100.0);
+
+    let mut weekly_pct = immediate_pct;
+    if let Some(ref q) = acc.quota {
+        if let Some(ref groups) = q.quota_groups {
+            let mut weekly_vals = Vec::new();
+            for g in groups {
+                for b in &g.buckets {
+                    let w = b.window.to_lowercase();
+                    let bid = b.bucket_id.to_lowercase();
+                    if w.contains("week") || bid.contains("week") {
+                        weekly_vals.push((b.remaining_fraction * 100.0).round());
+                    }
+                }
+            }
+            if !weekly_vals.is_empty() {
+                weekly_pct = weekly_vals.into_iter().fold(100.0, f64::min);
+            }
         }
     }
 
-    // Instances Count
-    match instance::list_instances() {
-        Ok(list) => {
-            let running_count = list.iter().filter(|i| i.is_running).count();
-            println!(
-                "    Sandbox Profiles: {} configured ({} currently running)",
-                list.len(),
-                running_count
-            );
+    (immediate_pct, weekly_pct, tier)
+}
+
+fn cmd_status(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let machine_name = email_watcher::detect_machine_name();
+    let local_ip = email_watcher::detect_local_ip();
+    let active_acc = account::get_current_account().ok().flatten();
+
+    let (immediate_quota, weekly_quota, tier) = match active_acc.as_ref() {
+        Some(acc) => extract_immediate_and_weekly_credits(acc),
+        None => (0.0, 0.0, "NONE".to_string()),
+    };
+
+    let instances_list = instance::list_instances().unwrap_or_default();
+    let running_instances = instances_list.iter().filter(|i| i.is_running).count();
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let running_prompts = all_prompts
+        .iter()
+        .filter(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+        .count();
+
+    if is_json {
+        let out = serde_json::json!({
+            "version": VERSION,
+            "machine_name": machine_name,
+            "local_ip": local_ip,
+            "active_account": active_acc.as_ref().map(|a| a.email.clone()),
+            "active_account_id": active_acc.as_ref().map(|a| a.id.clone()),
+            "tier": tier,
+            "immediate_quota_percent": immediate_quota,
+            "weekly_quota_percent": weekly_quota,
+            "instances_total": instances_list.len(),
+            "instances_running": running_instances,
+            "prompts_running": running_prompts,
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&out).unwrap_or_else(|_| "{}".to_string())
+        );
+        return;
+    }
+
+    println!("[*] Antigravity-Manager Node & Credits Status:");
+    println!("    Machine Name:      {}", machine_name);
+    println!("    Local IP:          {}", local_ip);
+    println!("    CLI Version:       v{}", VERSION);
+
+    if let Some(acc) = active_acc {
+        println!("    Active Account:    {} [{}]", acc.email, tier);
+        println!(
+            "    Account Name:      {}",
+            acc.name.as_deref().unwrap_or("-")
+        );
+        println!("    Immediate Credits: {:.1}% remaining", immediate_quota);
+        println!("    Weekly Credits:    {:.1}% remaining", weekly_quota);
+    } else {
+        println!("    Active Account:    (None / Default)");
+    }
+
+    println!(
+        "    Sandbox Profiles:  {} configured ({} currently running)",
+        instances_list.len(),
+        running_instances
+    );
+    println!("    Queued/Running Prompts: {}", running_prompts);
+}
+
+fn cmd_switch_if_low_credit(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let force = args.iter().any(|a| a == "--force" || a == "-f");
+    let mut custom_threshold: Option<f64> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--threshold" || arg == "-t" {
+            if i + 1 < args.len() {
+                custom_threshold = args[i + 1].parse::<f64>().ok();
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(val) = arg.parse::<f64>() {
+                custom_threshold = Some(val);
+            }
+        }
+        i += 1;
+    }
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to initialize async runtime: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let status_before = auto_switcher::get_status();
+    let res = rt.block_on(auto_switcher::check_and_rotate_for_threshold(
+        custom_threshold,
+        force,
+    ));
+    let status_after = auto_switcher::get_status();
+
+    match res {
+        Ok(Some(reason)) => {
+            if is_json {
+                let out = serde_json::json!({
+                    "rotated": true,
+                    "reason": reason,
+                    "previous_account": status_before.active_account_email,
+                    "active_account": status_after.active_account_email,
+                    "quota_percent": status_after.current_quota_percent,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            } else {
+                println!("[SUCCESS] Low-credit rotation triggered!");
+                println!("          Reason: {}", reason);
+                println!(
+                    "          Active Account: {}",
+                    status_after
+                        .active_account_email
+                        .as_deref()
+                        .unwrap_or("(None)")
+                );
+            }
+        }
+        Ok(None) => {
+            if is_json {
+                let out = serde_json::json!({
+                    "rotated": false,
+                    "reason": "Quota is healthy (above threshold) or no alternative candidate needed",
+                    "active_account": status_after.active_account_email,
+                    "quota_percent": status_after.current_quota_percent,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            } else {
+                println!(
+                    "[OK] Credits are sufficient ({:.1}% remaining on {}). No switch needed.",
+                    status_after.current_quota_percent.unwrap_or(100.0),
+                    status_after
+                        .active_account_email
+                        .as_deref()
+                        .unwrap_or("current profile")
+                );
+            }
         }
         Err(e) => {
-            println!("    Sandbox Profiles: Error querying ({})", e);
+            if is_json {
+                let out = serde_json::json!({
+                    "rotated": false,
+                    "error": e,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            } else {
+                eprintln!("[ERROR] switch-if-low-credit failed: {}", e);
+            }
+            std::process::exit(1);
         }
     }
 }
 
-fn cmd_instances() {
+fn cmd_clear_cache(args: &[String]) {
+    let mut keep_count: usize = 10;
+    let is_json = args.iter().any(|a| a == "--json");
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--keep" || arg == "-k" {
+            if i + 1 < args.len() {
+                keep_count = args[i + 1].parse::<usize>().unwrap_or(10);
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(n) = arg.parse::<usize>() {
+                keep_count = n;
+            }
+        }
+        i += 1;
+    }
+
+    if !is_json {
+        println!(
+            "[*] Pruning old conversations (keeping {} most recent) and cleaning application caches...",
+            keep_count
+        );
+    }
+
+    match agy_cleaner::prune_and_clean(keep_count) {
+        Ok(res) => {
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&res).unwrap_or_default());
+            } else {
+                println!(
+                    "    [✓] Conversations preserved: {} | pruned: {}",
+                    res.preserved_count, res.pruned_count
+                );
+                println!(
+                    "    [✓] Total disk space freed: {:.2} MB (Staged at: {})",
+                    res.total_freed_bytes as f64 / 1024.0 / 1024.0,
+                    res.staging_dir
+                );
+                cmd_clean();
+            }
+        }
+        Err(e) => {
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({ "error": e }))
+                        .unwrap_or_default()
+                );
+            } else {
+                eprintln!("[WARN] Conversation prune warning: {}", e);
+                cmd_clean();
+            }
+        }
+    }
+}
+
+fn cmd_instances(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+
+    // Subcommand: agm instances all ff
+    if non_flag_args.len() >= 2
+        && non_flag_args[0].eq_ignore_ascii_case("all")
+        && (non_flag_args[1].eq_ignore_ascii_case("ff")
+            || non_flag_args[1].eq_ignore_ascii_case("switch"))
+    {
+        cmd_instances_all(args);
+        return;
+    }
+
+    // Subcommand: agm instances rm-all
+    if args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("rm-all") || s.eq_ignore_ascii_case("remove-all"))
+        .unwrap_or(false)
+    {
+        let instances = instance::list_instances().unwrap_or_default();
+        let mut removed = 0usize;
+        for inst in instances {
+            if inst.config.is_default || inst.config.id == "default" {
+                continue;
+            }
+            if instance::delete_instance(&inst.config.id).is_ok() {
+                println!(
+                    "  [✓] Removed instance '{}' ({})",
+                    inst.config.name, inst.config.id
+                );
+                removed += 1;
+            }
+        }
+        println!(
+            "[SUCCESS] Removed {} non-default instance(s). Default profile preserved.",
+            removed
+        );
+        return;
+    }
+
+    // Subcommand: agm instances create "name" [--data-only | --do]
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("create") || s.eq_ignore_ascii_case("add"))
+        .unwrap_or(false)
+    {
+        let is_data_only = args
+            .iter()
+            .any(|a| a == "--data-only" || a == "-data-only" || a == "--do" || a == "-do");
+        let name = non_flag_args
+            .get(1)
+            .map(|s| (*s).clone())
+            .unwrap_or_else(|| format!("Instance-{}", chrono::Utc::now().timestamp() % 1000));
+
+        match instance::create_instance(name) {
+            Ok(cfg) => {
+                if !is_data_only {
+                    let _ = instance::clone_instance_executable(&cfg.id);
+                }
+                if is_json {
+                    println!("{}", serde_json::to_string_pretty(&cfg).unwrap_or_default());
+                } else {
+                    println!(
+                        "[SUCCESS] Created instance #{}: '{}' (ID: {}, data_only: {}, dir: {})",
+                        cfg.seq_num.unwrap_or(1),
+                        cfg.name,
+                        cfg.id,
+                        is_data_only,
+                        cfg.data_dir
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to create instance: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // Subcommand: agm instances rm <target> OR agm instances <target> rm
+    if non_flag_args.len() >= 2
+        && (non_flag_args[0].eq_ignore_ascii_case("rm")
+            || non_flag_args[0].eq_ignore_ascii_case("remove")
+            || non_flag_args[0].eq_ignore_ascii_case("delete")
+            || non_flag_args[1].eq_ignore_ascii_case("rm")
+            || non_flag_args[1].eq_ignore_ascii_case("remove"))
+    {
+        let target_spec = if non_flag_args[0].eq_ignore_ascii_case("rm")
+            || non_flag_args[0].eq_ignore_ascii_case("remove")
+            || non_flag_args[0].eq_ignore_ascii_case("delete")
+        {
+            non_flag_args[1]
+        } else {
+            non_flag_args[0]
+        };
+
+        let resolved_id = match instance::resolve_instance_id(target_spec) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Could not resolve instance '{}': {}",
+                    target_spec, e
+                );
+                std::process::exit(1);
+            }
+        };
+
+        match instance::delete_instance(&resolved_id) {
+            Ok(_) => println!("[SUCCESS] Deleted instance '{}'.", resolved_id),
+            Err(e) => {
+                eprintln!("[ERROR] Failed to delete instance '{}': {}", resolved_id, e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // Subcommand: agm instances <seq|id|alias> [switch] ff
+    if non_flag_args.len() >= 2 {
+        let last_arg = non_flag_args.last().unwrap().to_lowercase();
+        let second_arg = non_flag_args[1].to_lowercase();
+        if last_arg == "ff"
+            || last_arg == "fast-forward"
+            || second_arg == "ff"
+            || second_arg == "switch"
+        {
+            let target_spec = non_flag_args[0];
+            let resolved_id = match instance::resolve_instance_id(target_spec) {
+                Ok(id) => id,
+                Err(e) => {
+                    eprintln!(
+                        "[ERROR] Could not resolve instance '{}': {}",
+                        target_spec, e
+                    );
+                    std::process::exit(1);
+                }
+            };
+            println!(
+                "[*] Fast-forward rotating account for instance '{}' (resolved from '{}')...",
+                resolved_id, target_spec
+            );
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
+                &resolved_id,
+            ))) {
+                Ok(msg) => println!("[SUCCESS] {}", msg),
+                Err(e) => {
+                    eprintln!("[ERROR] Instance fast-forward failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
+    }
+
+    // Default: agm instances [ls] [--json]
     match instance::list_instances() {
         Ok(instances) => {
-            if instances.is_empty() {
-                println!("No sandbox profiles registered yet.");
-                println!("Create one via AGM GUI or 'agm-alim --create-profile <name>'.");
+            let node_alias = supabase_sync::load_config()
+                .map(|c| c.node_alias)
+                .unwrap_or_else(|_| email_watcher::detect_machine_name());
+            let local_ip = supabase_sync::get_local_ip();
+
+            if is_json {
+                let items: Vec<serde_json::Value> = instances
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, inst)| {
+                        let seq = inst.config.seq_num.unwrap_or((idx + 1) as u32);
+                        let eff_email = inst.config.bound_email.clone().or_else(|| {
+                            if inst.config.is_default || inst.config.id == "default" {
+                                account::get_current_account()
+                                    .ok()
+                                    .flatten()
+                                    .map(|a| a.email)
+                            } else {
+                                None
+                            }
+                        });
+                        serde_json::json!({
+                            "seq": seq,
+                            "id": inst.config.id,
+                            "name": inst.config.name,
+                            "is_default": inst.config.is_default,
+                            "is_running": inst.is_running,
+                            "pid": inst.pid,
+                            "bound_account_id": inst.config.bound_account_id,
+                            "bound_email": eff_email,
+                            "node": node_alias,
+                            "local_ip": local_ip,
+                            "data_dir": inst.config.data_dir,
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+                );
                 return;
             }
 
-            let node_alias = supabase_sync::load_config()
-                .map(|c| c.node_alias)
-                .unwrap_or_else(|_| "Local".to_string());
-            let local_ip = supabase_sync::get_local_ip();
+            if instances.is_empty() {
+                println!("No sandbox profiles registered yet.");
+                return;
+            }
 
             println!(
                 "\nRegistered Sandbox Profiles ({} total) [Node: {} | IP: {}]:",
@@ -974,6 +2200,16 @@ fn cmd_instances() {
                     .config
                     .bound_email
                     .clone()
+                    .or_else(|| {
+                        if inst.config.is_default || inst.config.id == "default" {
+                            account::get_current_account()
+                                .ok()
+                                .flatten()
+                                .map(|a| a.email)
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_else(|| "-".to_string());
                 let node_info = format!("{}/{}", node_alias, local_ip);
                 println!(
@@ -996,7 +2232,59 @@ fn cmd_instances() {
     }
 }
 
-fn cmd_fast_forward() {
+fn cmd_instances_all(_args: &[String]) {
+    let instances = match instance::list_instances() {
+        Ok(list) => list,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to query instances: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    println!(
+        "[*] Triggering fast-forward rotation across all {} registered instance(s)...",
+        instances.len()
+    );
+    let rt = tokio::runtime::Runtime::new().expect("Failed to initialize async runtime");
+
+    for inst in instances {
+        print!(
+            "  -> Instance '{}' ({}): ",
+            inst.config.name, inst.config.id
+        );
+        let _ = io::stdout().flush();
+        match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
+            &inst.config.id,
+        ))) {
+            Ok(msg) => println!("[OK] {}", msg),
+            Err(e) => println!("[SKIPPED/WARN] {}", e),
+        }
+    }
+}
+
+fn cmd_fast_forward(args: &[String]) {
+    if let Some(target) = args.first() {
+        if !target.starts_with('-') {
+            let resolved =
+                instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string());
+            println!(
+                "[*] Triggering fast-forward account rotation for instance '{}'...",
+                resolved
+            );
+            let rt = tokio::runtime::Runtime::new().expect("Failed to initialize async runtime");
+            match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
+                &resolved,
+            ))) {
+                Ok(result) => println!("[OK] {}", result),
+                Err(e) => {
+                    eprintln!("[ERROR] Fast-forward failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
+    }
+
     println!("[*] Triggering fast-forward account rotation...");
     let rt = match tokio::runtime::Runtime::new() {
         Ok(r) => r,
@@ -1017,6 +2305,622 @@ fn cmd_fast_forward() {
             eprintln!("[ERROR] Fast-forward failed: {}", e);
             std::process::exit(1);
         }
+    }
+}
+
+fn cmd_email(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let sub = args
+        .first()
+        .filter(|s| !s.starts_with('-'))
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "status".to_string());
+
+    match sub.as_str() {
+        "help" | "-h" | "--help" => {
+            println!(
+                "================================================================================"
+            );
+            println!("  AGM EMAIL TELEMETRY, VAULT & REMOTE COMMAND CONTROL");
+            println!(
+                "================================================================================"
+            );
+            println!("CLI Subcommands:");
+            println!(
+                "  agm email [status] [--json]               Show email settings & active sender"
+            );
+            println!("  agm email ls [--json]                     List configured mailboxes & recipients");
+            println!("  agm email add <email> <password> [opts]   Add SMTP/IMAP account (sends JSON self-email)");
+            println!("  agm email add <email> --recipient         Add notification recipient (sends JSON self-email)");
+            println!(
+                "  agm email rm <seq|id|email>               Remove email account or recipient"
+            );
+            println!("  agm email mv <seq|id|email> --default     Promote mailbox account to default sender");
+            println!("  agm email export [-f <path>]              Export email config & encrypted secrets to JSON");
+            println!(
+                "  agm email import [-f <path>]              Import email config bundle from JSON"
+            );
+            println!();
+            println!("Inbound Email Remote Command Subject Syntax:");
+            println!("  <VM_NAME_OR_*> | <INSTANCE_SEQ_OR_REPO> | <ACTION>");
+            println!("  Examples:");
+            println!("    VM1 | 1 | help");
+            println!("    VM1 | 1 | ff");
+            println!("    VM1 | 1 | agm status");
+            println!("    *   | gitmap | prompt Run full test suite");
+            println!();
+        }
+        "status" => {
+            let settings = email_vault_db::get_notification_settings().unwrap_or_default();
+            let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
+            let recipients = email_vault_db::list_notify_recipients().unwrap_or_default();
+            let default_acc = accounts
+                .iter()
+                .find(|a| a.is_default)
+                .or_else(|| accounts.first());
+
+            if is_json {
+                let out = serde_json::json!({
+                    "enabled": settings.is_enabled,
+                    "local_machine_name": email_watcher::detect_machine_name(),
+                    "local_machine_ip": email_watcher::detect_local_ip(),
+                    "polling_interval_minutes": settings.polling_interval_minutes,
+                    "inbox_check_interval_minutes": settings.inbox_check_interval_minutes,
+                    "default_sender": default_acc.map(|a| &a.email),
+                    "accounts_count": accounts.len(),
+                    "recipients_count": recipients.len(),
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                return;
+            }
+
+            println!("[*] AGM Email Telemetry & Notification Status:");
+            println!("    Enabled:               {}", settings.is_enabled);
+            println!(
+                "    Node Identity:         {} ({})",
+                email_watcher::detect_machine_name(),
+                email_watcher::detect_local_ip()
+            );
+            println!(
+                "    Default Sender:        {}",
+                default_acc
+                    .map(|a| a.email.as_str())
+                    .unwrap_or("(None configured)")
+            );
+            println!("    Configured Mailboxes:  {}", accounts.len());
+            println!("    Notifier Recipients:   {}", recipients.len());
+            println!(
+                "    Inbox Poll Interval:   {} min",
+                settings.inbox_check_interval_minutes
+            );
+        }
+        "ls" | "list" => {
+            let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
+            let recipients = email_vault_db::list_notify_recipients().unwrap_or_default();
+
+            if is_json {
+                let out = serde_json::json!({
+                    "accounts": accounts,
+                    "recipients": recipients,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                return;
+            }
+
+            println!("\nConfigured Email Accounts ({} total):", accounts.len());
+            println!(
+                "{:<5} {:<20} {:<30} {:<22} {:<22} {:<8} {}",
+                "SEQ", "ID", "EMAIL", "SMTP", "IMAP", "DEFAULT", "ACTIVE"
+            );
+            println!("{}", "-".repeat(115));
+            for (idx, a) in accounts.iter().enumerate() {
+                let short_id: String = a.id.chars().take(18).collect();
+                let smtp = format!("{}:{}", a.smtp_host, a.smtp_port);
+                let imap = format!("{}:{}", a.imap_host, a.imap_port);
+                println!(
+                    "#{:<4} {:<20} {:<30} {:<22} {:<22} {:<8} {}",
+                    idx + 1,
+                    short_id,
+                    a.email,
+                    smtp,
+                    imap,
+                    a.is_default,
+                    a.is_active
+                );
+            }
+
+            println!("\nNotification Recipients ({} total):", recipients.len());
+            println!(
+                "{:<5} {:<20} {:<32} {:<14} {}",
+                "SEQ", "ID", "EMAIL", "GROUP", "ACTIVE"
+            );
+            println!("{}", "-".repeat(85));
+            for (idx, r) in recipients.iter().enumerate() {
+                let short_id: String = r.id.chars().take(18).collect();
+                println!(
+                    "#{:<4} {:<20} {:<32} {:<14} {}",
+                    idx + 1,
+                    short_id,
+                    r.email,
+                    r.group_name,
+                    r.is_active
+                );
+            }
+            println!();
+        }
+        "add" => {
+            let rest = &args[1..];
+            if rest.is_empty() {
+                eprintln!("Usage: agm email add <email> [password] [--smtp-host H] [--imap-host H] [--default] [--recipient]");
+                std::process::exit(1);
+            }
+
+            let is_recipient = rest.iter().any(|a| a == "--recipient" || a == "-r");
+            let is_default = rest.iter().any(|a| a == "--default" || a == "-d");
+            let mut email_addr = String::new();
+            let mut password: Option<String> = None;
+            let mut smtp_host: Option<String> = None;
+            let mut smtp_port: u16 = 587;
+            let mut imap_host: Option<String> = None;
+            let mut imap_port: u16 = 993;
+            let mut alias: Option<String> = None;
+
+            let mut i = 0;
+            while i < rest.len() {
+                let arg = &rest[i];
+                if arg == "--smtp-host" && i + 1 < rest.len() {
+                    smtp_host = Some(rest[i + 1].clone());
+                    i += 2;
+                    continue;
+                } else if arg == "--smtp-port" && i + 1 < rest.len() {
+                    smtp_port = rest[i + 1].parse().unwrap_or(587);
+                    i += 2;
+                    continue;
+                } else if arg == "--imap-host" && i + 1 < rest.len() {
+                    imap_host = Some(rest[i + 1].clone());
+                    i += 2;
+                    continue;
+                } else if arg == "--imap-port" && i + 1 < rest.len() {
+                    imap_port = rest[i + 1].parse().unwrap_or(993);
+                    i += 2;
+                    continue;
+                } else if arg == "--alias" && i + 1 < rest.len() {
+                    alias = Some(rest[i + 1].clone());
+                    i += 2;
+                    continue;
+                } else if arg.starts_with('-') {
+                    i += 1;
+                    continue;
+                } else if email_addr.is_empty() {
+                    email_addr = arg.clone();
+                } else if password.is_none() {
+                    password = Some(arg.clone());
+                }
+                i += 1;
+            }
+
+            if email_addr.is_empty() {
+                eprintln!("[ERROR] Email address is required.");
+                std::process::exit(1);
+            }
+
+            if is_recipient || password.is_none() {
+                let input = email_vault_db::NotifyRecipientInput {
+                    email: email_addr.clone(),
+                    group_name: Some("default".to_string()),
+                    is_active: Some(true),
+                };
+                match email_vault_db::add_notify_recipient(input) {
+                    Ok(rec) => {
+                        notification_hub::notify_email_config_added(
+                            "Notification Recipient Added (CLI)",
+                            serde_json::json!({
+                                "event": "notify_recipient_added",
+                                "id": rec.id,
+                                "email": rec.email,
+                                "group_name": rec.group_name,
+                                "is_active": rec.is_active,
+                            }),
+                        );
+                        println!(
+                            "[SUCCESS] Added notification recipient '{}' (ID: {}) and queued JSON self-email.",
+                            rec.email, rec.id
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to add recipient: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
+
+            let domain = email_addr.split('@').nth(1).unwrap_or("gmail.com");
+            let eff_smtp = smtp_host.unwrap_or_else(|| format!("smtp.{}", domain));
+            let eff_imap = imap_host.unwrap_or_else(|| format!("imap.{}", domain));
+            let eff_alias = alias.unwrap_or_else(|| email_addr.clone());
+            let existing = email_vault_db::list_email_accounts().unwrap_or_default();
+            let eff_default = is_default || existing.is_empty();
+
+            let input = email_vault_db::EmailAccountInput {
+                id: None,
+                alias: eff_alias,
+                email: email_addr,
+                password,
+                smtp_host: eff_smtp,
+                smtp_port,
+                imap_host: eff_imap,
+                imap_port,
+                encryption_type: "TLS".to_string(),
+                is_default: eff_default,
+                is_active: true,
+            };
+
+            match email_vault_db::upsert_email_account(input) {
+                Ok(acc) => {
+                    notification_hub::notify_email_config_added(
+                        "Email Account Added (CLI)",
+                        serde_json::json!({
+                            "event": "email_account_added",
+                            "account_id": acc.id,
+                            "alias": acc.alias,
+                            "email": acc.email,
+                            "smtp_host": acc.smtp_host,
+                            "smtp_port": acc.smtp_port,
+                            "imap_host": acc.imap_host,
+                            "imap_port": acc.imap_port,
+                            "is_default": acc.is_default,
+                            "is_active": acc.is_active,
+                        }),
+                    );
+                    println!(
+                        "[SUCCESS] Added email account '{}' (ID: {}, default: {}) and dispatched JSON self-email.",
+                        acc.email, acc.id, acc.is_default
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to add email account: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "rm" | "remove" | "delete" => {
+            let target = match args.get(1) {
+                Some(t) => t.trim(),
+                None => {
+                    eprintln!("Usage: agm email rm <seq|id|email>");
+                    std::process::exit(1);
+                }
+            };
+
+            let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
+            let clean_seq = target.trim_start_matches('#');
+            let matched_acc = if let Ok(seq) = clean_seq.parse::<usize>() {
+                if seq >= 1 && seq <= accounts.len() {
+                    Some(accounts[seq - 1].clone())
+                } else {
+                    None
+                }
+            } else {
+                accounts
+                    .iter()
+                    .find(|a| {
+                        a.id.eq_ignore_ascii_case(target)
+                            || a.email.eq_ignore_ascii_case(target)
+                            || a.alias.eq_ignore_ascii_case(target)
+                    })
+                    .cloned()
+            };
+
+            if let Some(acc) = matched_acc {
+                match email_vault_db::delete_email_account(&acc.id) {
+                    Ok(_) => {
+                        println!(
+                            "[SUCCESS] Removed email account '{}' (ID: {}).",
+                            acc.email, acc.id
+                        );
+                        return;
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to remove email account: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            let recipients = email_vault_db::list_notify_recipients().unwrap_or_default();
+            if let Some(rec) = recipients
+                .iter()
+                .find(|r| r.id.eq_ignore_ascii_case(target) || r.email.eq_ignore_ascii_case(target))
+            {
+                match email_vault_db::delete_notify_recipient(&rec.id) {
+                    Ok(_) => {
+                        println!(
+                            "[SUCCESS] Removed notification recipient '{}' (ID: {}).",
+                            rec.email, rec.id
+                        );
+                        return;
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to remove recipient: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            eprintln!(
+                "[ERROR] No email account or recipient matched '{}'.",
+                target
+            );
+            std::process::exit(1);
+        }
+        "mv" | "default" | "set-default" => {
+            let target = args
+                .iter()
+                .skip(1)
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.trim())
+                .unwrap_or("");
+            if target.is_empty() {
+                eprintln!("Usage: agm email mv <seq|id|email> --default");
+                std::process::exit(1);
+            }
+
+            let accounts = email_vault_db::list_email_accounts().unwrap_or_default();
+            let clean_seq = target.trim_start_matches('#');
+            let matched = if let Ok(seq) = clean_seq.parse::<usize>() {
+                if seq >= 1 && seq <= accounts.len() {
+                    Some(accounts[seq - 1].clone())
+                } else {
+                    None
+                }
+            } else {
+                accounts
+                    .iter()
+                    .find(|a| {
+                        a.id.eq_ignore_ascii_case(target)
+                            || a.email.eq_ignore_ascii_case(target)
+                            || a.alias.eq_ignore_ascii_case(target)
+                    })
+                    .cloned()
+            };
+
+            let Some(acc) = matched else {
+                eprintln!("[ERROR] Email account '{}' not found.", target);
+                std::process::exit(1);
+            };
+
+            match email_vault_db::set_default_email_account(&acc.id) {
+                Ok(_) => println!(
+                    "[SUCCESS] Set '{}' (ID: {}) as the default email account.",
+                    acc.email, acc.id
+                ),
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set default email account: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "export" => {
+            let mut out_file: Option<String> = None;
+            let mut i = 1;
+            while i < args.len() {
+                if (args[i] == "-f" || args[i] == "--file") && i + 1 < args.len() {
+                    out_file = Some(args[i + 1].clone());
+                    i += 2;
+                    continue;
+                } else if !args[i].starts_with('-') && out_file.is_none() {
+                    out_file = Some(args[i].clone());
+                }
+                i += 1;
+            }
+
+            let json = match email_io::export_to_json() {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to export email config: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            let target_path = out_file.unwrap_or_else(|| "agm-email-config.json".to_string());
+            if let Err(e) = fs::write(&target_path, &json) {
+                eprintln!("[ERROR] Failed to write {}: {}", target_path, e);
+                std::process::exit(1);
+            }
+            println!(
+                "[SUCCESS] Exported email configuration bundle to '{}'.",
+                target_path
+            );
+        }
+        "import" => {
+            let target_path = args
+                .iter()
+                .skip(1)
+                .find(|a| !a.starts_with('-'))
+                .cloned()
+                .unwrap_or_else(|| "agm-email-config.json".to_string());
+            let payload = match fs::read_to_string(&target_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to read '{}': {}", target_path, e);
+                    std::process::exit(1);
+                }
+            };
+            match email_io::import_from_json(&payload) {
+                Ok(sum) => println!(
+                    "[SUCCESS] Imported {} account(s) and {} recipient(s) from '{}'.",
+                    sum.accounts_imported, sum.recipients_imported, target_path
+                ),
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to import email config: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            eprintln!("Unknown email subcommand: '{}'. Run 'agm email help'.", sub);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn recreate_single_workspace(target_spec: &str) {
+    // Resolve target_spec to a concrete folder path
+    let resolved_path: PathBuf = {
+        let direct = PathBuf::from(target_spec);
+        if direct.exists() {
+            direct.canonicalize().unwrap_or(direct)
+        } else {
+            // Check running_projects in repo_db by name or id
+            let projects = repo_db::list_running_projects().unwrap_or_default();
+            if let Some(found) = projects.into_iter().find(|p| {
+                p.repo_name.eq_ignore_ascii_case(target_spec)
+                    || p.id.eq_ignore_ascii_case(target_spec)
+                    || p.repo_path
+                        .to_lowercase()
+                        .contains(&target_spec.to_lowercase())
+            }) {
+                PathBuf::from(found.repo_path)
+            } else if let Ok(cwd) = env::current_dir() {
+                if let Some(parent) = cwd.parent() {
+                    let sibling = parent.join(target_spec);
+                    if sibling.exists() {
+                        sibling
+                    } else {
+                        direct
+                    }
+                } else {
+                    direct
+                }
+            } else {
+                direct
+            }
+        }
+    };
+
+    let path_str = resolved_path.to_string_lossy().to_string();
+    let clean_str = path_str.trim_start_matches(r"\\?\").to_string();
+    let repo_name = resolved_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| target_spec.to_string());
+
+    println!(
+        "[*] Recreating project workspace '{}' ({})...",
+        repo_name, clean_str
+    );
+
+    // 1. Remove .antigravity_resume_task.json if present
+    let resume_file = resolved_path.join(".antigravity_resume_task.json");
+    if resume_file.exists() {
+        let _ = fs::remove_file(&resume_file);
+    }
+
+    // 2. Clean matching workspaceStorage folders across instances
+    if let Ok(reg) = instance::load_registry() {
+        let norm_target = clean_str.to_lowercase().replace('\\', "/");
+        for inst in &reg.instances {
+            let ws_root = PathBuf::from(&inst.data_dir)
+                .join("User")
+                .join("workspaceStorage");
+            if ws_root.is_dir() {
+                if let Ok(entries) = fs::read_dir(&ws_root) {
+                    for entry in entries.flatten() {
+                        let ws_json = entry.path().join("workspace.json");
+                        if ws_json.is_file() {
+                            if let Ok(content) = fs::read_to_string(&ws_json) {
+                                let content_norm = content
+                                    .to_lowercase()
+                                    .replace("%3a", ":")
+                                    .replace('\\', "/");
+                                if content_norm.contains(&norm_target) {
+                                    let _ = fs::remove_dir_all(entry.path());
+                                    println!(
+                                        "    [✓] Purged cached workspaceStorage: {:?}",
+                                        entry.file_name()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Remove stale active_prompts and running_projects rows in repo_db
+    if let Ok(conn) = repo_db::connect_db() {
+        let _ = conn.execute(
+            "DELETE FROM active_prompts WHERE LOWER(repo_path) = LOWER(?1) OR LOWER(project_id) LIKE LOWER(?2)",
+            rusqlite::params![&clean_str, format!("%{}%", repo_name)],
+        );
+        let _ = conn.execute(
+            "DELETE FROM running_projects WHERE LOWER(repo_path) = LOWER(?1) OR LOWER(repo_name) = LOWER(?2)",
+            rusqlite::params![&clean_str, &repo_name],
+        );
+        println!("    [✓] Cleared tracked prompt/session state in repo_prompts.db");
+    }
+
+    // 4. Re-open project in Antigravity IDE (agy)
+    if resolved_path.exists() {
+        let launched = Command::new("agy")
+            .arg(&clean_str)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .is_ok();
+        if launched {
+            println!(
+                "    [✓] Spawned fresh Antigravity IDE session for '{}'",
+                clean_str
+            );
+        } else if let Ok(exe) =
+            antigravity_tools_lib::modules::process::detect_antigravity_with_diagnostics(None)
+        {
+            let _ = Command::new(exe)
+                .arg("--new-window")
+                .arg(&clean_str)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn();
+            println!(
+                "    [✓] Launched Antigravity binary directly for '{}'",
+                clean_str
+            );
+        }
+    }
+
+    println!("[SUCCESS] Project '{}' recreated cleanly.", repo_name);
+}
+
+fn cmd_recreate_project(args: &[String]) {
+    let target = args
+        .iter()
+        .find(|a| !a.starts_with('-'))
+        .cloned()
+        .unwrap_or_else(|| {
+            env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| ".".to_string())
+        });
+    recreate_single_workspace(&target);
+}
+
+fn cmd_recreate(args: &[String]) {
+    let targets: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+    if targets.is_empty() {
+        cmd_recreate_project(args);
+        return;
+    }
+    for t in targets {
+        recreate_single_workspace(&t);
     }
 }
 

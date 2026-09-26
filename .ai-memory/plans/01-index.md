@@ -93,5 +93,6 @@ Master directory of architectural and execution plans.
 - [70-training-api-and-settings-ui-overhaul.md](completed/70-training-api-and-settings-ui-overhaul.md): Machine Training REST API, full IDE credential injection, and Settings UI/UX menu overhaul adhering to screenshot specifications.
 - [71-email-autoswitch-training-and-settings-hamburger-ui.md](completed/71-email-autoswitch-training-and-settings-hamburger-ui.md): Email Base64 HTML cards, `[VM_ALIAS | LOCAL_IP]` subject headers, flexible pipe whitespace parsing, Smart Rotator IDE switch unification (`Kill-First -> Write-Second -> Start-With-Args-Third`), and Settings hamburger menu (`v4.71.2`).
 - [72-multi-agent-settings-crossed-debug-and-e2e.md](completed/72-multi-agent-settings-crossed-debug-and-e2e.md): Multi-agent verification, crossed-out `Debug` (`line-through`) in Settings Hamburger Dropdown linked to top-level titlebar Bug icon, and Remote Control + Training REST API toggles (`v4.71.2`).
+- [46-cli-expansion-auto-switch-and-email-telemetry.md](completed/46-cli-expansion-auto-switch-and-email-telemetry.md): CLI Expansion (`status/credits`, `swlc`, `wpr`, `prompts ls/export/import`, `prompt`, `rerun`, `clear-cache`, `instances`, `email`, `recreate`), Auto-Switch If Low Credit RCA fix, and Email Multi-VM `[JSON]` Telemetry State Machine.
 
 

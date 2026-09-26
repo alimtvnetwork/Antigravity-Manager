@@ -2967,6 +2967,68 @@ fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
     })
 }
 
+/// Query IMAP inbox for recent account switch [JSON] telemetry events from sibling VMs
+pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<String> {
+    let default_acc = match email_vault_db::get_default_account() {
+        Ok(Some(acc)) => acc,
+        _ => return Vec::new(),
+    };
+
+    let messages = match poll_unread_messages(&default_acc, 20) {
+        Ok(msgs) => msgs,
+        Err(_) => return Vec::new(),
+    };
+
+    let my_vm = crate::modules::email_watcher::detect_machine_name();
+    let my_ip = crate::modules::email_watcher::detect_local_ip();
+    let now = Utc::now().timestamp();
+    let cutoff = now - lookback_seconds;
+    let mut excluded = Vec::new();
+
+    for msg in messages {
+        let is_json_switch =
+            msg.subject.contains("[JSON]") && msg.subject.contains("Account Switched");
+        if !is_json_switch {
+            continue;
+        }
+
+        let json_start = match msg.body.find('{') {
+            Some(idx) => idx,
+            None => continue,
+        };
+        let json_end = match msg.body.rfind('}') {
+            Some(idx) => idx,
+            None => continue,
+        };
+        if json_end <= json_start {
+            continue;
+        }
+
+        let json_str = &msg.body[json_start..=json_end];
+        let val: serde_json::Value = match serde_json::from_str(json_str) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let vm_name = val.get("vm_name").and_then(|v| v.as_str()).unwrap_or("");
+        let local_ip = val.get("local_ip").and_then(|v| v.as_str()).unwrap_or("");
+        let timestamp = val.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
+        let new_email = val.get("new_email").and_then(|v| v.as_str()).unwrap_or("");
+
+        let is_same_machine = vm_name == my_vm && local_ip == my_ip;
+        let is_recent = timestamp >= cutoff;
+
+        if !is_same_machine && is_recent && !new_email.is_empty() {
+            let email_clean = new_email.trim().to_string();
+            if !excluded.contains(&email_clean) {
+                excluded.push(email_clean);
+            }
+        }
+    }
+
+    excluded
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

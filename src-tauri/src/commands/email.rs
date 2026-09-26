@@ -40,12 +40,24 @@ pub async fn list_email_accounts() -> AppResult<Vec<EmailAccount>> {
 
 #[tauri::command]
 pub async fn add_email_account(account: EmailAccountInput) -> AppResult<EmailAccount> {
-    email_vault_db::upsert_email_account(account).map_err(AppError::Email)
+    let result = email_vault_db::upsert_email_account(account).map_err(AppError::Email)?;
+    let val = serde_json::to_value(&result).unwrap_or_default();
+    crate::modules::notification_hub::notify_email_config_added(
+        &format!("Mailbox Account Added ({})", result.email),
+        val,
+    );
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn update_email_account(account: EmailAccountInput) -> AppResult<EmailAccount> {
-    email_vault_db::upsert_email_account(account).map_err(AppError::Email)
+    let result = email_vault_db::upsert_email_account(account).map_err(AppError::Email)?;
+    let val = serde_json::to_value(&result).unwrap_or_default();
+    crate::modules::notification_hub::notify_email_config_added(
+        &format!("Mailbox Account Updated ({})", result.email),
+        val,
+    );
+    Ok(result)
 }
 
 #[tauri::command]
@@ -65,7 +77,13 @@ pub async fn list_notify_recipients() -> AppResult<Vec<NotifyRecipient>> {
 
 #[tauri::command]
 pub async fn add_notify_recipient(recipient: NotifyRecipientInput) -> AppResult<NotifyRecipient> {
-    email_vault_db::add_notify_recipient(recipient).map_err(AppError::Email)
+    let result = email_vault_db::add_notify_recipient(recipient).map_err(AppError::Email)?;
+    let val = serde_json::to_value(&result).unwrap_or_default();
+    crate::modules::notification_hub::notify_email_config_added(
+        &format!("Notifier Recipient Added ({})", result.email),
+        val,
+    );
+    Ok(result)
 }
 
 #[tauri::command]

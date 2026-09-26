@@ -477,8 +477,8 @@ fn escape_html_entities(raw: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// Format an RFC 5322 subject with standard telemetry prefix: `[v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`
-/// Replaces any obsolete or unversioned prefix like `[VM | IP]`, preserves `Re:` prefix,
+/// Format an RFC 5322 subject with standard telemetry prefix: `[Antigravity | v<VERSION> | <VM_ALIAS> | <LOCAL_IP>] [Antigravity]`
+/// Replaces any obsolete or unversioned prefix like `[VM | IP]` or `[vX | VM | IP]`, preserves `Re:` prefix,
 /// and handles arbitrary whitespace around pipes.
 pub fn format_subject_with_telemetry(
     subject: &str,
@@ -486,42 +486,48 @@ pub fn format_subject_with_telemetry(
     machine_name: &str,
     machine_ip: &str,
 ) -> String {
-    let node_tag = format!("[{} | {} | {}]", pkg_ver, machine_name, machine_ip);
-    let trimmed = subject.trim();
+    let prefix = format!(
+        "[Antigravity | {} | {} | {}] [Antigravity]",
+        pkg_ver, machine_name, machine_ip
+    );
+    let mut trimmed = subject.trim();
 
-    // Already contains current version tag
-    if trimmed.starts_with(&node_tag) {
+    // Already contains current canonical prefix
+    if trimmed.starts_with(&prefix) {
         return trimmed.to_string();
     }
 
-    // If subject starts with an existing telemetry tag `[... | ...]`, upgrade it
+    let is_reply = trimmed.to_lowercase().starts_with("re:");
+    if is_reply {
+        trimmed = trimmed[3..].trim();
+    }
+
+    // Strip any leading telemetry tag like [Antigravity | ...], [v4.75.0 | ...], or [VM | IP]
     if trimmed.starts_with('[') {
         if let Some(end_idx) = trimmed.find(']') {
             let inside = &trimmed[1..end_idx];
             if inside.contains('|') {
-                let rest = trimmed[end_idx + 1..].trim();
-                return format!("{} {}", node_tag, rest);
+                trimmed = trimmed[end_idx + 1..].trim();
             }
         }
     }
 
-    // Handles reply subjects: e.g. "Re: [VM3 | 192.168.1.12] ..." or "Re: ..."
-    if trimmed.to_lowercase().starts_with("re:") {
-        let after_re = trimmed[3..].trim();
-        // If after "Re:" there's already an existing bracketed tag with a pipe, replace it
-        if after_re.starts_with('[') {
-            if let Some(end_idx) = after_re.find(']') {
-                let inside = &after_re[1..end_idx];
-                if inside.contains('|') {
-                    let rest = after_re[end_idx + 1..].trim();
-                    return format!("{} Re: {}", node_tag, rest);
-                }
-            }
-        }
-        return format!("{} Re: {}", node_tag, after_re);
+    // Strip leading [Antigravity] if present (since prefix already ends with [Antigravity])
+    if trimmed.to_lowercase().starts_with("[antigravity]") {
+        trimmed = trimmed["[antigravity]".len()..].trim();
     }
 
-    format!("{} {}", node_tag, trimmed)
+    if is_reply {
+        if trimmed.is_empty() {
+            format!("{} Re:", prefix)
+        } else {
+            format!("{} Re: {}", prefix, trimmed)
+        }
+    } else if trimmed.is_empty() {
+        prefix
+    } else {
+        format!("{} {}", prefix, trimmed)
+    }
 }
 
 /// Build a rich, responsive HTML card for any notification or command output
@@ -729,7 +735,7 @@ pub fn render_quota_drop_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Alert] Low Quota Warning ({:.1}%) - {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] Low Quota Warning ({:.1}%) - {}",
         pkg_ver, machine_name, machine_ip, current_quota, email
     );
     let content = format!(
@@ -845,7 +851,7 @@ pub fn render_exec_result_email(
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Help] Inbound Remote Mailbox Instructions Cheat Sheet",
+        "[Antigravity | {} | {} | {}] [Antigravity] Inbound Remote Mailbox Instructions Cheat Sheet",
         pkg_ver, machine_name, machine_ip
     );
     let content = format!(
@@ -887,7 +893,7 @@ pub fn render_self_test_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Test] Mailbox Connection Verified - {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] Mailbox Connection Verified - {}",
         pkg_ver, machine_name, machine_ip, email
     );
     let content = format!(
@@ -916,7 +922,7 @@ pub fn render_test_ping_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[{} | {} | {}] [AGM Ping] Test Command Ping: {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] Test Command Ping: {}",
         pkg_ver, machine_name, machine_ip, project_name
     );
     let content = format!(
@@ -940,7 +946,10 @@ mod tests {
         let (subj, text) =
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
-        assert!(subj.starts_with(&format!("[{} | my-pc | 192.168.1.50]", pkg_ver)));
+        assert!(subj.starts_with(&format!(
+            "[Antigravity | {} | my-pc | 192.168.1.50] [Antigravity]",
+            pkg_ver
+        )));
         assert!(text.contains("192.168.1.50"));
         assert!(text.contains("<html"));
         assert!(text.contains("<div"));
@@ -956,25 +965,53 @@ mod tests {
         let s1 = format_subject_with_telemetry("[Antigravity] Account Switched", ver, node, ip);
         assert_eq!(
             s1,
-            "[v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Account Switched"
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Account Switched"
         );
 
         // Old tag upgrade
         let s2 = format_subject_with_telemetry("[VM3 | 192.168.1.12] Alert", ver, node, ip);
-        assert_eq!(s2, "[v4.71.4 | VM3 | 192.168.1.12] Alert");
+        assert_eq!(
+            s2,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Alert"
+        );
 
         // Reply subject with old tag
         let s3 = format_subject_with_telemetry("Re: [VM3 | 192.168.1.12] Result", ver, node, ip);
-        assert_eq!(s3, "[v4.71.4 | VM3 | 192.168.1.12] Re: Result");
+        assert_eq!(
+            s3,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Re: Result"
+        );
 
         // Reply subject without tag
         let s4 = format_subject_with_telemetry("Re: help", ver, node, ip);
-        assert_eq!(s4, "[v4.71.4 | VM3 | 192.168.1.12] Re: help");
+        assert_eq!(
+            s4,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Re: help"
+        );
 
         // Already tagged
-        let s5 =
-            format_subject_with_telemetry("[v4.71.4 | VM3 | 192.168.1.12] Status", ver, node, ip);
-        assert_eq!(s5, "[v4.71.4 | VM3 | 192.168.1.12] Status");
+        let s5 = format_subject_with_telemetry(
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Status",
+            ver,
+            node,
+            ip,
+        );
+        assert_eq!(
+            s5,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Status"
+        );
+
+        // User request sample upgrade
+        let s6 = format_subject_with_telemetry(
+            "[v4.75.0 | VM3 | 192.168.1.12] [Antigravity] Write the subject",
+            ver,
+            node,
+            ip,
+        );
+        assert_eq!(
+            s6,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [Antigravity] Write the subject"
+        );
     }
 
     #[test]

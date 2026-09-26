@@ -72,9 +72,24 @@ fn dispatch_email_switch_alert(
     };
 
     let subject = format!(
-        "[{} | {} | {}] [Antigravity] Account Switched: {} -> {}",
+        "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Account Switched: {} -> {}",
         pkg_ver, m_name, m_ip, instance_name, account_email
     );
+
+    let now_ts = chrono::Utc::now().timestamp();
+    let telemetry_data = serde_json::json!({
+        "agm_version": pkg_ver,
+        "vm_name": m_name,
+        "local_ip": m_ip,
+        "old_email": "",
+        "new_email": account_email,
+        "instance_id": instance_name,
+        "instance_name": instance_name,
+        "switch_mode": if is_auto { "auto" } else { "manual" },
+        "reason": reason,
+        "timestamp": now_ts,
+    });
+    let telemetry_json_pretty = serde_json::to_string_pretty(&telemetry_data).unwrap_or_default();
 
     let html = format!(
         r#"<!DOCTYPE html>
@@ -86,7 +101,7 @@ fn dispatch_email_switch_alert(
   <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
     <div style="background: #0f172a; padding: 20px 24px; color: #ffffff;">
       <div style="margin-bottom: 8px;">
-        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {} | {}]</span>
+        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[Antigravity | {} | {} | {}]</span>
         <span style="background: #059669; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-left: 8px;">SWITCHED</span>
       </div>
       <h2 style="margin: 8px 0 0 0; font-size: 18px; color: #ffffff;">Antigravity Account Switched</h2>
@@ -101,6 +116,10 @@ fn dispatch_email_switch_alert(
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Reason</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
       </table>
+      <div style="margin-top: 16px;">
+        <span style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Machine Telemetry (JSON State Machine)</span>
+        <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-top: 6px;">{}</pre>
+      </div>
     </div>
     <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
       Automated Dispatcher · Antigravity Manager {} · Maintained by Alim, Sponsored by RISEUP ASIA LLC
@@ -118,6 +137,7 @@ fn dispatch_email_switch_alert(
         reason,
         m_name,
         m_ip,
+        telemetry_json_pretty,
         pkg_ver
     );
 
@@ -180,6 +200,59 @@ async fn dispatch_telegram_switch_alert(
             e
         ));
     }
+}
+
+/// Dispatch self-notification email when an email account or recipient is added/updated
+pub fn notify_email_config_added(title: &str, details: serde_json::Value) {
+    let title_str = title.to_string();
+    tokio::spawn(async move {
+        dispatch_email_config_added_alert(&title_str, details);
+    });
+}
+
+fn dispatch_email_config_added_alert(title: &str, details: serde_json::Value) {
+    let recipients = email_vault_db::list_notify_recipients().unwrap_or_default();
+    let mut target_recipients: Vec<String> = recipients
+        .into_iter()
+        .filter(|r| r.is_active)
+        .map(|r| r.email)
+        .collect();
+
+    if target_recipients.is_empty() {
+        if let Ok(Some(default_acc)) = email_vault_db::get_default_account() {
+            target_recipients.push(default_acc.email);
+        }
+    }
+
+    if target_recipients.is_empty() {
+        return;
+    }
+
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let m_name = email_watcher::detect_machine_name();
+    let m_ip = email_watcher::detect_local_ip();
+
+    let subject = format!(
+        "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Email Config Added: {}",
+        pkg_ver, m_name, m_ip, title
+    );
+
+    let json_pretty = serde_json::to_string_pretty(&details).unwrap_or_default();
+    let card_content = format!(
+        "Email configuration updated successfully.\r\n\r\n\
+         Configuration Payload (JSON State Machine):\r\n\
+         {}\r\n",
+        json_pretty
+    );
+
+    let html = email_sender::wrap_html_email_card(
+        &format!("Configuration Added: {}", title),
+        &card_content,
+        &m_name,
+        &m_ip,
+    );
+
+    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &target_recipients);
 }
 
 #[cfg(test)]

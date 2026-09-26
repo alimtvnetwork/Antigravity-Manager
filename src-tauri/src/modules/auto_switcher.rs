@@ -310,7 +310,11 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
     let instances = list_running_or_active_instances().unwrap_or_default();
     let mut in_use = Vec::new();
     for inst in instances {
-        if let Some(acc_id) = inst.bound_account_id {
+        let acc_id_opt = inst
+            .bound_account_id
+            .clone()
+            .or_else(|| account::get_current_account_id().ok());
+        if let Some(acc_id) = acc_id_opt {
             if !in_use.contains(&acc_id) {
                 in_use.push(acc_id);
             }
@@ -410,6 +414,14 @@ pub fn select_next_best_profile(
     let now_sec = chrono::Utc::now().timestamp();
     let mut candidates = Vec::new();
 
+    let mut effective_exclusions = excluded_account_ids.to_vec();
+    for cross_vm_acc in crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
+    {
+        if !effective_exclusions.contains(&cross_vm_acc) {
+            effective_exclusions.push(cross_vm_acc);
+        }
+    }
+
     // 1. Inspect instances not in active use
     for inst in &registry.instances {
         if inst.id == current_instance_id {
@@ -420,11 +432,14 @@ pub fn select_next_best_profile(
             continue;
         };
 
-        if excluded_account_ids.contains(acc_id) {
+        if effective_exclusions.contains(acc_id) {
             continue;
         }
 
         if let Ok(acc) = account::load_account(acc_id) {
+            if effective_exclusions.contains(&acc.email) {
+                continue;
+            }
             if acc.disabled {
                 continue;
             }
@@ -481,7 +496,7 @@ pub fn select_next_best_profile(
     // 2. Check unbound accounts in pool
     let all_accounts = account::list_accounts().unwrap_or_default();
     for acc in all_accounts {
-        if excluded_account_ids.contains(&acc.id) {
+        if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
             continue;
         }
         if acc.disabled {
@@ -621,11 +636,15 @@ pub async fn execute_profile_rotation(
 }
 
 /// Check all monitored instance copies' quota and auto-rotate any instance below threshold
-pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
+pub async fn check_and_rotate_with_options(
+    custom_threshold: Option<f64>,
+    force: bool,
+) -> Result<Option<String>, String> {
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
 
-    if !switcher_cfg.is_enabled {
+    let has_custom = custom_threshold.is_some();
+    if !switcher_cfg.is_enabled && !force && !has_custom {
         return Ok(None);
     }
 
@@ -641,22 +660,36 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
         state.last_check_timestamp = now;
     }
 
+    let effective_low_threshold = custom_threshold
+        .unwrap_or(switcher_cfg.low_quota_threshold_percent)
+        .clamp(0.0, 99.0);
+
     let mut rotated_reasons = Vec::new();
 
     for inst in monitored_instances {
-        let Some(ref bound_acc_id) = inst.bound_account_id else {
+        let bound_acc_id_opt = inst
+            .bound_account_id
+            .clone()
+            .or_else(|| account::get_current_account_id().ok());
+
+        let Some(bound_acc_id) = bound_acc_id_opt else {
             continue;
         };
 
-        let bound_acc = match account::load_account(bound_acc_id) {
+        let mut bound_acc = match account::load_account(&bound_acc_id) {
             Ok(acc) => acc,
             Err(_) => continue,
         };
 
+        // Live Quota Refresh from Google API before threshold evaluation
+        if let Ok(fresh_quota) = account::fetch_quota_with_retry(&mut bound_acc).await {
+            bound_acc.quota = Some(fresh_quota);
+        }
+
         let period_status = evaluate_account_period_status(
             &bound_acc,
             &switcher_cfg.target_model,
-            switcher_cfg.low_quota_threshold_percent,
+            effective_low_threshold,
             now,
         );
 
@@ -678,35 +711,41 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
 
         // Filter out accounts in use by ANY running/active instances, AND explicitly exclude the current bound account to rotate away from it
         let mut excluded_accounts: Vec<String> = in_use_account_ids.clone();
-        if !excluded_accounts.contains(bound_acc_id) {
+        if !excluded_accounts.contains(&bound_acc_id) {
             excluded_accounts.push(bound_acc_id.clone());
         }
+        if !excluded_accounts.contains(&bound_acc.email) {
+            excluded_accounts.push(bound_acc.email.clone());
+        }
 
-        // 1. Critical threshold check (<= 12.0% or configured critical_threshold_percent)
+        // 1. Critical threshold check or forced rotation
         let is_critical = quota_percent <= switcher_cfg.critical_threshold_percent;
-        if is_critical {
-            if switcher_cfg.auto_fast_forward_on_critical {
-                let reason = format!(
+        let should_force_or_critical =
+            force || (is_critical && switcher_cfg.auto_fast_forward_on_critical);
+        if should_force_or_critical {
+            let reason = if force {
+                format!(
+                    "Forced rotation on instance '{}' (active email: {}, quota: {:.1}%)",
+                    inst.id, bound_acc.email, quota_percent
+                )
+            } else {
+                format!(
                     "Critical quota alert on instance '{}': model '{}' dropped to {:.1}% (<= {:.1}%). Fast-forwarding to highest credit candidate...",
                     inst.id, switcher_cfg.target_model, quota_percent, switcher_cfg.critical_threshold_percent
-                );
-                logger::log_warn(&format!("[AutoSwitcher] {}", reason));
+                )
+            };
+            logger::log_warn(&format!("[AutoSwitcher] {}", reason));
 
-                if let Some(candidate) = select_next_best_profile(
-                    &inst.id,
-                    &switcher_cfg.target_model,
-                    switcher_cfg.critical_threshold_percent,
-                    &excluded_accounts,
-                )? {
-                    execute_profile_rotation(
-                        candidate,
-                        reason.clone(),
-                        switcher_cfg.has_auto_resume,
-                    )
+            if let Some(candidate) = select_next_best_profile(
+                &inst.id,
+                &switcher_cfg.target_model,
+                switcher_cfg.critical_threshold_percent,
+                &excluded_accounts,
+            )? {
+                execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
                     .await?;
-                    rotated_reasons.push(reason);
-                    continue;
-                }
+                rotated_reasons.push(reason);
+                continue;
             }
         }
 
@@ -719,7 +758,7 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
             continue;
         }
 
-        let is_low_quota = quota_percent <= switcher_cfg.low_quota_threshold_percent;
+        let is_low_quota = quota_percent <= effective_low_threshold;
         let mut should_rotate = false;
         if is_depleted_before_finish {
             should_rotate = true;
@@ -740,10 +779,7 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
             } else {
                 format!(
                     "Quota for model '{}' on instance '{}' dropped to {:.1}% (threshold: {:.1}%)",
-                    switcher_cfg.target_model,
-                    inst.id,
-                    quota_percent,
-                    switcher_cfg.low_quota_threshold_percent
+                    switcher_cfg.target_model, inst.id, quota_percent, effective_low_threshold
                 )
             };
 
@@ -752,7 +788,7 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
             if let Some(candidate) = select_next_best_profile(
                 &inst.id,
                 &switcher_cfg.target_model,
-                switcher_cfg.low_quota_threshold_percent,
+                effective_low_threshold,
                 &excluded_accounts,
             )? {
                 execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
@@ -772,6 +808,17 @@ pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
     } else {
         Ok(Some(rotated_reasons.join("; ")))
     }
+}
+
+pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
+    check_and_rotate_with_options(None, false).await
+}
+
+pub async fn check_and_rotate_for_threshold(
+    custom_threshold: Option<f64>,
+    force: bool,
+) -> Result<Option<String>, String> {
+    check_and_rotate_with_options(custom_threshold, force).await
 }
 
 /// Calculate dynamic polling interval based on credit quota ladder:
@@ -818,7 +865,8 @@ pub async fn trigger_manual_rotation_for_instance(
         .instances
         .iter()
         .find(|i| i.id == inst_id)
-        .and_then(|i| i.bound_account_id.clone());
+        .and_then(|i| i.bound_account_id.clone())
+        .or_else(|| account::get_current_account_id().ok());
 
     let mut excluded: Vec<String> = in_use_account_ids;
     if let Some(ref curr) = current_bound {
@@ -869,8 +917,17 @@ pub fn get_status() -> AutoSwitcherStatus {
         let mut secs_until = None;
         let mut is_depleted_before_finish = false;
 
-        if let Some(ref acc_id) = inst.bound_account_id {
+        let acc_id_opt = inst
+            .bound_account_id
+            .clone()
+            .or_else(|| account::get_current_account_id().ok());
+        let mut email_opt = inst.bound_email.clone();
+
+        if let Some(ref acc_id) = acc_id_opt {
             if let Ok(acc) = account::load_account(acc_id) {
+                if email_opt.is_none() {
+                    email_opt = Some(acc.email.clone());
+                }
                 if let Some(period_stat) = evaluate_account_period_status(
                     &acc,
                     &switcher_cfg.target_model,
@@ -888,14 +945,14 @@ pub fn get_status() -> AutoSwitcherStatus {
         }
 
         if inst.id == active_id {
-            active_email = inst.bound_email.clone();
+            active_email = email_opt.clone();
             active_quota = quota_pct;
         }
 
         monitored_instances.push(InstanceQuotaSummary {
             instance_id: inst.id.clone(),
             instance_name: inst.name.clone(),
-            bound_email: inst.bound_email.clone(),
+            bound_email: email_opt,
             quota_percent: quota_pct,
             reset_time_iso: reset_iso,
             seconds_until_reset: secs_until,
