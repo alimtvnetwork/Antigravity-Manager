@@ -1755,6 +1755,9 @@ fn extract_immediate_and_weekly_credits(
 fn cmd_status(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json");
     let machine_name = email_watcher::detect_machine_name();
+    let node_alias = supabase_sync::load_config()
+        .map(|c| c.node_alias)
+        .unwrap_or_else(|_| machine_name.clone());
     let local_ip = email_watcher::detect_local_ip();
     let active_acc = account::get_current_account().ok().flatten();
 
@@ -1763,6 +1766,10 @@ fn cmd_status(args: &[String]) {
         None => (0.0, 0.0, "NONE".to_string()),
     };
 
+    let app_cfg = config::load_app_config().unwrap_or_default();
+    let threshold_percent = app_cfg.auto_profile_switcher.low_quota_threshold_percent;
+    let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
     let instances_list = instance::list_instances().unwrap_or_default();
     let running_instances = instances_list.iter().filter(|i| i.is_running).count();
     let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
@@ -1770,20 +1777,49 @@ fn cmd_status(args: &[String]) {
         .iter()
         .filter(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
         .count();
+    let has_images = all_prompts.iter().any(|p| {
+        (p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+            && p.image_payload.is_some()
+    });
+    let prompts_resent = running_prompts > 0;
+
+    let excluded = auto_switcher::get_active_in_use_account_ids();
+    let predicted_candidate = auto_switcher::select_next_best_profile(
+        "default",
+        &target_model,
+        threshold_percent,
+        &excluded,
+    )
+    .ok()
+    .flatten();
+    let predicted_next_account = predicted_candidate.as_ref().map(|c| c.email.clone());
+    let predicted_next_quota = predicted_candidate.as_ref().map(|c| c.quota_percent);
 
     if is_json {
         let out = serde_json::json!({
             "version": VERSION,
             "machine_name": machine_name,
+            "node_alias": node_alias,
+            "vm_alias": node_alias,
             "local_ip": local_ip,
             "active_account": active_acc.as_ref().map(|a| a.email.clone()),
             "active_account_id": active_acc.as_ref().map(|a| a.id.clone()),
+            "previous_account": active_acc.as_ref().map(|a| a.email.clone()),
+            "predicted_next_account": predicted_next_account,
+            "predicted_next_quota_percent": predicted_next_quota,
+            "selected_account": active_acc.as_ref().map(|a| a.email.clone()),
             "tier": tier,
+            "credit_before_switch": immediate_quota,
             "immediate_quota_percent": immediate_quota,
             "weekly_quota_percent": weekly_quota,
+            "threshold_percent": threshold_percent,
+            "threshold_activated": threshold_percent,
+            "target_model": target_model,
             "instances_total": instances_list.len(),
             "instances_running": running_instances,
             "prompts_running": running_prompts,
+            "prompts_resent": prompts_resent,
+            "has_images": has_images,
         });
         println!(
             "{}",
@@ -1794,6 +1830,7 @@ fn cmd_status(args: &[String]) {
 
     println!("[*] Antigravity-Manager Node & Credits Status:");
     println!("    Machine Name:      {}", machine_name);
+    println!("    Node / VM Alias:   {}", node_alias);
     println!("    Local IP:          {}", local_ip);
     println!("    CLI Version:       v{}", VERSION);
 
@@ -1805,6 +1842,19 @@ fn cmd_status(args: &[String]) {
         );
         println!("    Immediate Credits: {:.1}% remaining", immediate_quota);
         println!("    Weekly Credits:    {:.1}% remaining", weekly_quota);
+        println!(
+            "    Threshold Target:  {:.1}% ({})",
+            threshold_percent, target_model
+        );
+        if let Some(ref pred) = predicted_next_account {
+            println!(
+                "    Predicted Next:    {} ({:.1}% quota)",
+                pred,
+                predicted_next_quota.unwrap_or(100.0)
+            );
+        } else {
+            println!("    Predicted Next:    (No candidate available in pool)");
+        }
     } else {
         println!("    Active Account:    (None / Default)");
     }
@@ -1814,7 +1864,17 @@ fn cmd_status(args: &[String]) {
         instances_list.len(),
         running_instances
     );
-    println!("    Queued/Running Prompts: {}", running_prompts);
+    let resent_str = if prompts_resent {
+        "Yes (Auto-Resumed via resume task file)"
+    } else {
+        "No (0 active in queue)"
+    };
+    println!(
+        "    Queued/Running Prompts: {} [Resent: {} | Images: {}]",
+        running_prompts,
+        resent_str,
+        if has_images { "Yes" } else { "None" }
+    );
 }
 
 fn resolve_switch_filename(custom_path: Option<&str>, node_alias: &str) -> String {
@@ -1942,26 +2002,58 @@ fn cmd_switch_if_low_credit(args: &[String]) {
     }
 
     let status_before = auto_switcher::get_status();
+    let app_cfg = config::load_app_config().unwrap_or_default();
+    let effective_threshold =
+        custom_threshold.unwrap_or(app_cfg.auto_profile_switcher.low_quota_threshold_percent);
+
     let res = rt.block_on(auto_switcher::check_and_rotate_for_threshold(
         custom_threshold,
         force,
     ));
     let status_after = auto_switcher::get_status();
 
+    let running_prompts_count = if running_prompt_snippet.is_some() {
+        repo_db::list_all_prompts()
+            .unwrap_or_default()
+            .iter()
+            .filter(|p| {
+                p.status == "running" || p.status == "dispatched" || p.status == "backed_up"
+            })
+            .count()
+            .max(1)
+    } else {
+        0
+    };
+
     match res {
         Ok(Some(reason)) => {
+            let prompts_resent = running_prompts_count > 0;
+            let prev_email = status_before.active_account_email.clone();
+            let selected_email = status_after.active_account_email.clone();
+            let predicted_email = selected_email.clone();
+            let credit_before = status_before.current_quota_percent;
+
             let out = serde_json::json!({
                 "rotated": true,
                 "reason": reason,
                 "machine_name": machine_name,
                 "node_alias": node_alias,
+                "vm_alias": node_alias,
                 "local_ip": local_ip,
                 "tool_version": tool_version,
-                "previous_account": status_before.active_account_email,
+                "previous_account": prev_email,
+                "predicted_next_account": predicted_email,
+                "selected_account": selected_email,
                 "active_account": status_after.active_account_email,
+                "credit_before_switch": credit_before,
+                "threshold_activated": effective_threshold,
                 "quota_percent": status_after.current_quota_percent,
+                "running_prompts_count": running_prompts_count,
+                "prompts_resent": prompts_resent,
+                "is_reinjecting": prompts_resent,
                 "running_prompt": running_prompt_snippet,
                 "has_images": has_images,
+                "images_attached": has_images,
                 "timestamp": chrono::Utc::now().timestamp(),
             });
             let out_str = serde_json::to_string_pretty(&out).unwrap_or_default();
@@ -1976,28 +2068,72 @@ fn cmd_switch_if_low_credit(args: &[String]) {
                 println!("{}", out_str);
             } else {
                 println!("[SUCCESS] Low-credit rotation triggered!");
-                println!("          Reason: {}", reason);
+                println!("          Reason:                 {}", reason);
                 println!(
-                    "          Active Account: {}",
-                    status_after
-                        .active_account_email
-                        .as_deref()
-                        .unwrap_or("(None)")
+                    "          Previous Account:       {}",
+                    prev_email.as_deref().unwrap_or("(none / standby)")
+                );
+                println!(
+                    "          Predicted Next Account: {}",
+                    predicted_email.as_deref().unwrap_or("(none)")
+                );
+                println!(
+                    "          Selected Account:       {}",
+                    selected_email.as_deref().unwrap_or("(none)")
+                );
+                println!(
+                    "          Credit Before Switch:   {:.1}%",
+                    credit_before.unwrap_or(0.0)
+                );
+                println!(
+                    "          Threshold Activated:    {:.1}%",
+                    effective_threshold
+                );
+                println!(
+                    "          Running Prompts:        {} (Resent / Re-injected: {})",
+                    running_prompts_count,
+                    if prompts_resent {
+                        "Yes (Auto-Resumed)"
+                    } else {
+                        "No"
+                    }
+                );
+                println!(
+                    "          Attached Images:        {}",
+                    if has_images {
+                        "Yes (Preserved)"
+                    } else {
+                        "None"
+                    }
                 );
             }
         }
         Ok(None) => {
+            let current_email = status_after.active_account_email.clone();
+            let credit_before = status_after.current_quota_percent;
+
             let out = serde_json::json!({
                 "rotated": false,
                 "reason": "Quota is healthy (above threshold) or no alternative candidate needed",
                 "machine_name": machine_name,
                 "node_alias": node_alias,
+                "vm_alias": node_alias,
                 "local_ip": local_ip,
                 "tool_version": tool_version,
+                "previous_account": current_email,
+                "current_account": current_email,
+                "predicted_next_account": current_email,
+                "selected_account": current_email,
                 "active_account": status_after.active_account_email,
+                "credit_before_switch": credit_before,
+                "threshold_activated": effective_threshold,
                 "quota_percent": status_after.current_quota_percent,
+                "running_prompts_count": running_prompts_count,
+                "prompts_resent": false,
+                "is_reinjecting": false,
                 "running_prompt": running_prompt_snippet,
                 "has_images": has_images,
+                "images_attached": has_images,
                 "timestamp": chrono::Utc::now().timestamp(),
             });
             let out_str = serde_json::to_string_pretty(&out).unwrap_or_default();
@@ -2019,6 +2155,19 @@ fn cmd_switch_if_low_credit(args: &[String]) {
                         .as_deref()
                         .unwrap_or("current profile")
                 );
+                println!(
+                    "     Active Account:       {}",
+                    status_after
+                        .active_account_email
+                        .as_deref()
+                        .unwrap_or("none")
+                );
+                println!(
+                    "     Credit Before Check:  {:.1}%",
+                    credit_before.unwrap_or(100.0)
+                );
+                println!("     Configured Threshold: {:.1}%", effective_threshold);
+                println!("     Running Prompts:      {}", running_prompts_count);
             }
         }
         Err(e) => {
@@ -2179,21 +2328,32 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
     let local_ip = email_watcher::detect_local_ip();
     let tool_version = format!("v{}", VERSION);
     let current_account = active_acc.map(|a| a.email);
+    let running_prompts_count = if running_prompt.is_some() { 1 } else { 0 };
 
     let payload = serde_json::json!({
         "is_low_credit": is_low_credit,
         "machine_name": machine_name,
         "node_alias": node_alias,
+        "vm_alias": node_alias,
         "local_ip": local_ip,
         "current_account": current_account,
+        "previous_account": current_account,
+        "predicted_next_account": next_possible_account,
+        "selected_account": if is_low_credit { next_possible_account.clone() } else { current_account.clone() },
+        "credit_before_switch": current_quota_percent,
         "current_quota_percent": current_quota_percent,
         "threshold_percent": threshold_percent,
+        "threshold_activated": threshold_percent,
         "target_model": target_model,
         "tool_version": tool_version,
         "next_possible_account": next_possible_account,
         "next_possible_quota_percent": next_possible_quota_percent,
+        "running_prompts_count": running_prompts_count,
+        "prompts_resent": false,
+        "is_reinjecting": false,
         "running_prompt": running_prompt,
         "has_images": has_images,
+        "images_attached": has_images,
         "timestamp": now_sec,
     });
 
@@ -2593,29 +2753,27 @@ fn cmd_instances_all(_args: &[String]) {
 }
 
 fn cmd_fast_forward(args: &[String]) {
-    if let Some(target) = args.first() {
-        if !target.starts_with('-') {
-            let resolved =
-                instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string());
-            println!(
-                "[*] Triggering fast-forward account rotation for instance '{}'...",
-                resolved
-            );
-            let rt = tokio::runtime::Runtime::new().expect("Failed to initialize async runtime");
-            match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
-                &resolved,
-            ))) {
-                Ok(result) => println!("[OK] {}", result),
-                Err(e) => {
-                    eprintln!("[ERROR] Fast-forward failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
-            return;
-        }
-    }
+    let is_json = args.iter().any(|a| a == "--json");
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let target_opt = non_flag_args.first().map(|s| s.as_str());
 
-    println!("[*] Triggering fast-forward account rotation...");
+    let machine_name = email_watcher::detect_machine_name();
+    let node_alias = supabase_sync::load_config()
+        .map(|c| c.node_alias)
+        .unwrap_or_else(|_| machine_name.clone());
+    let local_ip = email_watcher::detect_local_ip();
+    let status_before = auto_switcher::get_status();
+
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let running_prompts_count = all_prompts
+        .iter()
+        .filter(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+        .count();
+    let has_images = all_prompts.iter().any(|p| {
+        (p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+            && p.image_payload.is_some()
+    });
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(r) => r,
         Err(e) => {
@@ -2624,15 +2782,73 @@ fn cmd_fast_forward(args: &[String]) {
         }
     };
 
-    match rt.block_on(auto_switcher::trigger_manual_rotation()) {
-        Ok(result) => {
-            println!("[OK] Fast-forward completed: {}", result);
-            if let Ok(Some(current)) = account::get_current_account() {
-                println!("     New Active Profile: {}", current.email);
+    let result = if let Some(target) = target_opt {
+        let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string());
+        if !is_json {
+            println!(
+                "[*] Triggering fast-forward account rotation for instance '{}'...",
+                resolved
+            );
+        }
+        rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
+            &resolved,
+        )))
+    } else {
+        if !is_json {
+            println!("[*] Triggering fast-forward account rotation...");
+        }
+        rt.block_on(auto_switcher::trigger_manual_rotation())
+    };
+
+    let status_after = auto_switcher::get_status();
+
+    match result {
+        Ok(res_msg) => {
+            let prompts_resent = running_prompts_count > 0;
+            if is_json {
+                let out = serde_json::json!({
+                    "success": true,
+                    "result": res_msg,
+                    "machine_name": machine_name,
+                    "node_alias": node_alias,
+                    "vm_alias": node_alias,
+                    "local_ip": local_ip,
+                    "tool_version": format!("v{}", VERSION),
+                    "previous_account": status_before.active_account_email,
+                    "predicted_next_account": status_after.active_account_email,
+                    "selected_account": status_after.active_account_email,
+                    "active_account": status_after.active_account_email,
+                    "credit_before_switch": status_before.current_quota_percent,
+                    "current_quota_percent": status_after.current_quota_percent,
+                    "prompts_running": running_prompts_count,
+                    "prompts_resent": prompts_resent,
+                    "has_images": has_images,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            } else {
+                println!("[OK] Fast-forward completed: {}", res_msg);
+                if let Ok(Some(current)) = account::get_current_account() {
+                    println!("     New Active Profile: {}", current.email);
+                }
             }
         }
         Err(e) => {
-            eprintln!("[ERROR] Fast-forward failed: {}", e);
+            if is_json {
+                let out = serde_json::json!({
+                    "success": false,
+                    "error": e,
+                    "machine_name": machine_name,
+                    "node_alias": node_alias,
+                    "vm_alias": node_alias,
+                    "local_ip": local_ip,
+                    "tool_version": format!("v{}", VERSION),
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            } else {
+                eprintln!("[ERROR] Fast-forward failed: {}", e);
+            }
             std::process::exit(1);
         }
     }
@@ -2742,6 +2958,13 @@ fn cmd_email(args: &[String]) {
                 Some(acc) => extract_immediate_and_weekly_credits(acc),
                 None => (0.0, 0.0, "NONE".to_string()),
             };
+            let node_alias = supabase_sync::load_config()
+                .map(|c| c.node_alias)
+                .unwrap_or_else(|_| m_name.clone());
+            let app_cfg = config::load_app_config().unwrap_or_default();
+            let threshold_percent = app_cfg.auto_profile_switcher.low_quota_threshold_percent;
+            let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
             let instances_list = instance::list_instances().unwrap_or_default();
             let running_instances = instances_list.iter().filter(|i| i.is_running).count();
             let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
@@ -2751,24 +2974,54 @@ fn cmd_email(args: &[String]) {
                     p.status == "running" || p.status == "dispatched" || p.status == "backed_up"
                 })
                 .count();
+            let has_images = all_prompts.iter().any(|p| {
+                (p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+                    && p.image_payload.is_some()
+            });
+            let prompts_resent = running_prompts > 0;
+
+            let excluded = auto_switcher::get_active_in_use_account_ids();
+            let predicted_candidate = auto_switcher::select_next_best_profile(
+                "default",
+                &target_model,
+                threshold_percent,
+                &excluded,
+            )
+            .ok()
+            .flatten();
+            let predicted_next_account = predicted_candidate.as_ref().map(|c| c.email.clone());
+            let predicted_next_quota = predicted_candidate.as_ref().map(|c| c.quota_percent);
 
             if is_json {
                 let out = serde_json::json!({
                     "enabled": settings.is_enabled,
                     "version": VERSION,
+                    "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "vm_alias": node_alias,
                     "local_machine_name": m_name,
                     "local_machine_ip": m_ip,
+                    "local_ip": m_ip,
                     "polling_interval_minutes": settings.polling_interval_minutes,
                     "inbox_check_interval_minutes": settings.inbox_check_interval_minutes,
                     "default_sender": default_acc.map(|a| &a.email),
                     "accounts_count": accounts.len(),
                     "recipients_count": recipients.len(),
                     "active_account": active_acc.as_ref().map(|a| &a.email),
+                    "previous_account": active_acc.as_ref().map(|a| &a.email),
+                    "predicted_next_account": predicted_next_account,
+                    "predicted_next_quota_percent": predicted_next_quota,
+                    "selected_account": active_acc.as_ref().map(|a| &a.email),
                     "tier": tier,
+                    "credit_before_switch": immediate_quota,
                     "immediate_quota_percent": immediate_quota,
                     "weekly_quota_percent": weekly_quota,
+                    "threshold_percent": threshold_percent,
+                    "threshold_activated": threshold_percent,
                     "instances_running": running_instances,
                     "prompts_running": running_prompts,
+                    "prompts_resent": prompts_resent,
+                    "has_images": has_images,
                 });
                 println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
                 return;
@@ -2776,7 +3029,7 @@ fn cmd_email(args: &[String]) {
 
             println!("[*] AGM Email Telemetry & Notification Status:");
             println!("    Enabled:               {}", settings.is_enabled);
-            println!("    Node Identity:         {} ({})", m_name, m_ip);
+            println!("    Node Identity:         {} ({})", node_alias, m_ip);
             println!(
                 "    Default Sender:        {}",
                 default_acc
@@ -2800,10 +3053,37 @@ fn cmd_email(args: &[String]) {
                 weekly_quota
             );
             println!(
+                "    Threshold Target:      {:.1}% ({})",
+                threshold_percent, target_model
+            );
+            if let Some(ref pred) = predicted_next_account {
+                println!(
+                    "    Predicted Next:        {} ({:.1}% quota)",
+                    pred,
+                    predicted_next_quota.unwrap_or(100.0)
+                );
+            }
+            println!(
                 "    Running Instances:     {} / {} | Running Prompts: {}",
                 running_instances,
                 instances_list.len(),
                 running_prompts
+            );
+            println!(
+                "    Prompts Resent:        {}",
+                if prompts_resent {
+                    "Yes (Auto-Resumed via .antigravity_resume_task.json)"
+                } else {
+                    "No"
+                }
+            );
+            println!(
+                "    Attached Images:       {}",
+                if has_images {
+                    "Yes (Base64 payload preserved)"
+                } else {
+                    "None"
+                }
             );
 
             let mut target_recipients: Vec<String> = recipients
@@ -2826,51 +3106,82 @@ fn cmd_email(args: &[String]) {
                     "event": "node_and_credits_status",
                     "version": VERSION,
                     "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "vm_alias": node_alias,
                     "local_ip": m_ip,
                     "active_account": active_acc.as_ref().map(|a| a.email.clone()),
+                    "previous_account": active_acc.as_ref().map(|a| a.email.clone()),
+                    "predicted_next_account": predicted_next_account,
+                    "predicted_next_quota_percent": predicted_next_quota,
+                    "selected_account": active_acc.as_ref().map(|a| a.email.clone()),
                     "tier": tier,
+                    "credit_before_switch": immediate_quota,
                     "immediate_quota_percent": immediate_quota,
                     "weekly_quota_percent": weekly_quota,
+                    "threshold_percent": threshold_percent,
+                    "threshold_activated": threshold_percent,
                     "instances_total": instances_list.len(),
                     "instances_running": running_instances,
                     "prompts_running": running_prompts,
+                    "prompts_resent": prompts_resent,
+                    "has_images": has_images,
                     "email_accounts_count": accounts.len(),
                     "email_recipients_count": recipients.len(),
                 });
                 let body_text = format!(
                     "Node & Credits Status Report\r\n\
-                     Version:           v{}\r\n\
-                     Machine Name:      {}\r\n\
-                     Local IP:          {}\r\n\
-                     Active Account:    {} [{}]\r\n\
-                     Immediate Credits: {:.1}%\r\n\
-                     Weekly Credits:    {:.1}%\r\n\
-                     Running Instances: {} / {}\r\n\
-                     Running Prompts:   {}\r\n\r\n\
+                     Version:              v{}\r\n\
+                     Machine Name:         {}\r\n\
+                     Node Alias:           {}\r\n\
+                     Local IP:             {}\r\n\
+                     Active Account:       {} [{}]\r\n\
+                     Predicted Next:       {}\r\n\
+                     Immediate Credits:    {:.1}%\r\n\
+                     Weekly Credits:       {:.1}%\r\n\
+                     Threshold Activated:  {:.1}%\r\n\
+                     Running Instances:    {} / {}\r\n\
+                     Running Prompts:      {}\r\n\
+                     Prompts Resent:       {}\r\n\
+                     Attached Images:      {}\r\n\r\n\
                      [JSON]\r\n{}",
                     VERSION,
                     m_name,
+                    node_alias,
                     m_ip,
                     active_acc
                         .as_ref()
                         .map(|a| a.email.as_str())
                         .unwrap_or("(None)"),
                     tier,
+                    predicted_next_account
+                        .as_deref()
+                        .unwrap_or("None / Standby"),
                     immediate_quota,
                     weekly_quota,
+                    threshold_percent,
                     running_instances,
                     instances_list.len(),
                     running_prompts,
+                    if prompts_resent {
+                        "Yes (Auto-Resumed via .antigravity_resume_task.json)"
+                    } else {
+                        "No"
+                    },
+                    if has_images {
+                        "Yes (Base64 payload preserved)"
+                    } else {
+                        "None"
+                    },
                     serde_json::to_string_pretty(&status_json).unwrap_or_default()
                 );
                 let subject = format!(
                     "[Antigravity | v{} | {} | {}] [Antigravity] [JSON] Node & Credits Status",
-                    VERSION, m_name, m_ip
+                    VERSION, node_alias, m_ip
                 );
                 let html = email_sender::wrap_html_email_card(
                     "Node & Credits Status",
                     &body_text,
-                    &m_name,
+                    &node_alias,
                     &m_ip,
                 );
                 match email_sender::dispatch_email_with_failover(

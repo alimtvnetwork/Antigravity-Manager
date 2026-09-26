@@ -688,11 +688,20 @@ pub fn select_next_best_profile(
     Ok(None)
 }
 
-/// Execute rotation to target candidate
-pub async fn execute_profile_rotation(
+#[derive(Debug, Clone, Default)]
+pub struct RotationContext {
+    pub previous_email: Option<String>,
+    pub predicted_email: Option<String>,
+    pub credit_before_switch: Option<f64>,
+    pub threshold_activated: Option<f64>,
+}
+
+/// Execute rotation to target candidate with rich telemetry context
+pub async fn execute_profile_rotation_with_context(
     target: ProfileCandidate,
     reason: String,
     has_auto_resume: bool,
+    ctx: Option<RotationContext>,
 ) -> Result<(), String> {
     let inst_id = &target.instance_id;
 
@@ -709,11 +718,27 @@ pub async fn execute_profile_rotation(
     ));
 
     // Step 2: Trigger unified Email and Telegram notifications before switch
-    crate::modules::notification_hub::notify_account_switched(
-        &target.email,
-        inst_id,
-        &reason,
-        true,
+    let prev_email = ctx.as_ref().and_then(|c| c.previous_email.clone());
+    let predicted = ctx
+        .as_ref()
+        .and_then(|c| c.predicted_email.clone())
+        .unwrap_or_else(|| target.email.clone());
+    let credit_before = ctx.as_ref().and_then(|c| c.credit_before_switch);
+    let thresh = ctx.as_ref().and_then(|c| c.threshold_activated);
+
+    crate::modules::notification_hub::notify_account_switched_details(
+        crate::modules::notification_hub::SwitchNotificationDetails {
+            previous_email: prev_email,
+            predicted_next_email: Some(predicted),
+            selected_email: target.email.clone(),
+            credit_before_switch: credit_before,
+            threshold_activated: thresh,
+            instance_id: inst_id.clone(),
+            instance_name: inst_id.clone(),
+            instance_mode: String::new(),
+            reason: reason.clone(),
+            is_auto: true,
+        },
     );
 
     instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
@@ -748,6 +773,15 @@ pub async fn execute_profile_rotation(
     state.last_switch_reason = Some(reason);
 
     Ok(())
+}
+
+/// Execute rotation to target candidate (backward-compatible wrapper)
+pub async fn execute_profile_rotation(
+    target: ProfileCandidate,
+    reason: String,
+    has_auto_resume: bool,
+) -> Result<(), String> {
+    execute_profile_rotation_with_context(target, reason, has_auto_resume, None).await
 }
 
 /// Check all monitored instance copies' quota and auto-rotate any instance below threshold
@@ -858,8 +892,19 @@ pub async fn check_and_rotate_with_options(
                 switcher_cfg.critical_threshold_percent,
                 &excluded_accounts,
             )? {
-                execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
-                    .await?;
+                let rot_ctx = RotationContext {
+                    previous_email: Some(bound_acc.email.clone()),
+                    predicted_email: Some(candidate.email.clone()),
+                    credit_before_switch: Some(quota_percent),
+                    threshold_activated: Some(switcher_cfg.critical_threshold_percent),
+                };
+                execute_profile_rotation_with_context(
+                    candidate,
+                    reason.clone(),
+                    switcher_cfg.has_auto_resume,
+                    Some(rot_ctx),
+                )
+                .await?;
                 rotated_reasons.push(reason);
                 continue;
             }
@@ -907,8 +952,19 @@ pub async fn check_and_rotate_with_options(
                 effective_low_threshold,
                 &excluded_accounts,
             )? {
-                execute_profile_rotation(candidate, reason.clone(), switcher_cfg.has_auto_resume)
-                    .await?;
+                let rot_ctx = RotationContext {
+                    previous_email: Some(bound_acc.email.clone()),
+                    predicted_email: Some(candidate.email.clone()),
+                    credit_before_switch: Some(quota_percent),
+                    threshold_activated: Some(effective_low_threshold),
+                };
+                execute_profile_rotation_with_context(
+                    candidate,
+                    reason.clone(),
+                    switcher_cfg.has_auto_resume,
+                    Some(rot_ctx),
+                )
+                .await?;
                 rotated_reasons.push(reason);
             } else {
                 logger::log_warn(&format!(
@@ -998,7 +1054,25 @@ pub async fn trigger_manual_rotation_for_instance(
     let email = candidate.email.clone();
     let effective_inst = candidate.instance_id.clone();
 
-    execute_profile_rotation(candidate, reason, switcher_cfg.has_auto_resume).await?;
+    let prev_email = current_bound
+        .as_ref()
+        .and_then(|id| account::load_account(id).ok())
+        .map(|a| a.email);
+
+    let rot_ctx = RotationContext {
+        previous_email: prev_email,
+        predicted_email: Some(email.clone()),
+        credit_before_switch: None,
+        threshold_activated: Some(0.0),
+    };
+
+    execute_profile_rotation_with_context(
+        candidate,
+        reason,
+        switcher_cfg.has_auto_resume,
+        Some(rot_ctx),
+    )
+    .await?;
 
     Ok(format!(
         "Successfully rotated profile '{}' to account '{}'",

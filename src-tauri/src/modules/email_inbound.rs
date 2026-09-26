@@ -3013,7 +3013,12 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
         let vm_name = val.get("vm_name").and_then(|v| v.as_str()).unwrap_or("");
         let local_ip = val.get("local_ip").and_then(|v| v.as_str()).unwrap_or("");
         let timestamp = val.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-        let new_email = val.get("new_email").and_then(|v| v.as_str()).unwrap_or("");
+        let new_email = val
+            .get("new_email")
+            .or_else(|| val.get("selected_email"))
+            .or_else(|| val.get("target_account"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         let is_same_machine = vm_name == my_vm && local_ip == my_ip;
         let is_recent = timestamp >= cutoff;

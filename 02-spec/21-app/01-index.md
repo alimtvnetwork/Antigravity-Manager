@@ -193,3 +193,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-045 (Two-Bar Release Installation & DWM Blank UI Elimination):** Implemented in [`45-two-bar-installer-and-dwm-blank-ui-fix.md`](./45-two-bar-installer-and-dwm-blank-ui-fix.md).
 - **AC-APP-046 (CLI Expansion, Auto-Switch If Low Credit & Email Multi-VM Telemetry):** Implemented in [`46-cli-expansion-auto-switch-and-email-telemetry.md`](./46-cli-expansion-auto-switch-and-email-telemetry.md).
 - **AC-APP-047 (Email Prompt Telemetry & Low-Credit Switch Query):** Implemented in [`47-email-prompt-telemetry-and-low-credit-switch-query.md`](./47-email-prompt-telemetry-and-low-credit-switch-query.md).
+- **AC-APP-048 (Comprehensive CLI Verification & Auto-Switcher Invariants):** Implemented in [`48-comprehensive-cli-and-autoswitch-verification.md`](./48-comprehensive-cli-and-autoswitch-verification.md).
