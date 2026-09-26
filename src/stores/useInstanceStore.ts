@@ -462,9 +462,12 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             }
 
             // 6. Pre-activation Live Quota Refresh Verification Loop:
-            // Probe the top candidate with live quota refresh.
-            // If quota degraded or account is invalid, demote and try next best candidate.
+            // Probe candidate accounts with a live quota refresh from Google API.
+            // STRICT REQUIREMENT: Confirm candidate actually has 100% quota for the 4-hour rolling window.
+            // If < 100%, reject and move to the next best candidate until a 100% match is found.
             let verifiedCandidate: Account | null = null;
+            let bestFallbackCandidate: Account | null = null;
+            let bestFallback4h = 0;
             const triedAccountIds = new Set<string>();
 
             while (candidatePool.length > 0) {
@@ -474,57 +477,58 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 }
                 const alreadyTried = triedAccountIds.has(topCandidate.account.id);
                 if (alreadyTried) {
-                    break;
+                    candidatePool = candidatePool.slice(1);
+                    continue;
                 }
                 triedAccountIds.add(topCandidate.account.id);
 
                 try {
-                    // Live quota refresh probe
+                    // Live quota refresh probe directly from Google API
                     const freshQuota = await accountService.fetchAccountQuota(topCandidate.account.id);
                     const updatedAccount: Account = {
                         ...topCandidate.account,
                         quota: freshQuota,
                     };
 
-                    // Re-evaluate score with live quota
-                    const reScored = instanceService.calculateMultiplicativeScore(
-                        updatedAccount,
-                        activeInUseAccountIds,
-                        currentAccountId
-                    );
+                    const fresh4hQuota = instanceService.extract4hWindowQuotaPercent(updatedAccount);
+                    const freshWeeklyQuota = instanceService.extractWeeklyQuotaPercent(updatedAccount);
 
                     const isForbidden = Boolean(freshQuota.is_forbidden);
                     const isBlocked = Boolean(updatedAccount.validation_blocked);
-                    const isDepleted = reScored.weeklyQuotaPercent <= 5;
-                    const isZeroScore = reScored.score <= 0;
+                    const isWeeklyHealthy = freshWeeklyQuota > 15;
 
-                    const isInvalid = isForbidden || isBlocked || isDepleted || isZeroScore;
-                    if (!isInvalid) {
+                    console.log(
+                        `[useInstanceStore] Pre-switch live verification: ${updatedAccount.email} -> 4h quota: ${fresh4hQuota}%, weekly: ${freshWeeklyQuota}%`
+                    );
+
+                    // User invariant: Must confirm 100% for 4-hour window!
+                    if (!isForbidden && !isBlocked && fresh4hQuota >= 100 && isWeeklyHealthy) {
+                        console.log(
+                            `[useInstanceStore] Candidate ${updatedAccount.email} confirmed with 100% 4h window quota. Selected for switch!`
+                        );
                         verifiedCandidate = updatedAccount;
                         break;
                     }
 
-                    // Demote candidate to bottom of pool and re-sort
-                    candidatePool = candidatePool
-                        .filter(c => c.account.id !== topCandidate.account.id)
-                        .concat({
-                            ...topCandidate,
-                            account: updatedAccount,
-                            score: 0,
-                            weeklyQuotaPercent: reScored.weeklyQuotaPercent,
-                        });
+                    console.warn(
+                        `[useInstanceStore] Candidate ${updatedAccount.email} live 4h window quota is ${fresh4hQuota}% (< 100%). Rejecting and moving to next best candidate...`
+                    );
+
+                    // Track highest verified fallback candidate in case no candidate in entire pool has 100%
+                    if (!isForbidden && !isBlocked && fresh4hQuota > bestFallback4h) {
+                        bestFallback4h = fresh4hQuota;
+                        bestFallbackCandidate = updatedAccount;
+                    }
+
+                    // Remove current candidate and advance to next best
+                    candidatePool = candidatePool.slice(1);
                 } catch (probeErr) {
-                    console.warn(`[useInstanceStore] Live quota refresh probe failed for ${topCandidate.account.id}, demoting:`, probeErr);
-                    candidatePool = candidatePool
-                        .filter(c => c.account.id !== topCandidate.account.id)
-                        .concat({
-                            ...topCandidate,
-                            score: 0,
-                        });
+                    console.warn(`[useInstanceStore] Live quota refresh probe failed for ${topCandidate.account.id}, skipping to next:`, probeErr);
+                    candidatePool = candidatePool.slice(1);
                 }
             }
 
-            const targetCandidate = verifiedCandidate || candidatePool[0]?.account || eligibleAccounts[0];
+            const targetCandidate = verifiedCandidate || bestFallbackCandidate || eligibleAccounts[0];
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;

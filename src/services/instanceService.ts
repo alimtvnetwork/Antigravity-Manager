@@ -377,6 +377,7 @@ export interface MultiplicativeCandidateResult {
     activeFactor: number;
     tierMultiplier: number;
     weeklyQuotaPercent: number;
+    fourHourQuotaPercent: number;
     daysUntilRefill: number;
     quotaPercentage: number;
     idleHours: number;
@@ -435,6 +436,54 @@ export function extractWeeklyQuotaPercent(acc: Account): number {
     return Math.round(total / validModels.length);
 }
 
+/**
+ * Specifically extract the 4-hour / 5-hour rolling window quota percentage (0-100).
+ * Accounts MUST have 100% in this window to be prioritized for fast-forward rotation.
+ */
+export function extract4hWindowQuotaPercent(acc: Account, targetModel?: string): number {
+    const quotaGroups = acc.quota?.quota_groups;
+    if (quotaGroups && quotaGroups.length > 0) {
+        const shortWindowValues: number[] = [];
+        for (const group of quotaGroups) {
+            const buckets = group.buckets || [];
+            for (const b of buckets) {
+                const win = (b.window || '').toLowerCase();
+                const id = (b.bucket_id || '').toLowerCase();
+                const isShort =
+                    win.includes('4h') ||
+                    win.includes('5h') ||
+                    id.includes('4h') ||
+                    id.includes('5h') ||
+                    (!win.includes('week') && !win.includes('7d') && !id.includes('week') && !id.includes('7d'));
+                if (isShort && typeof b.remaining_fraction === 'number') {
+                    shortWindowValues.push(Math.round(b.remaining_fraction * 100));
+                }
+            }
+        }
+        if (shortWindowValues.length > 0) {
+            return Math.min(...shortWindowValues);
+        }
+    }
+
+    const models = acc.quota?.models || [];
+    if (models.length > 0) {
+        const target = (targetModel || 'flash').toLowerCase();
+        const matchingModels = models.filter(m => {
+            const name = (m.name || '').toLowerCase();
+            return !name.includes('3.0') && !name.includes('3.1') && (name.includes(target) || name.includes('flash'));
+        });
+        const candidates = matchingModels.length > 0 ? matchingModels : models;
+        const validPercentages = candidates
+            .map(m => m.percentage)
+            .filter((p): p is number => typeof p === 'number');
+        if (validPercentages.length > 0) {
+            return Math.min(...validPercentages);
+        }
+    }
+
+    return 100;
+}
+
 function calculateAccountRefillDays(acc: Account, nowMs: number): number {
     let maxDays = 0;
     const models = acc.quota?.models || [];
@@ -453,15 +502,17 @@ function calculateAccountRefillDays(acc: Account, nowMs: number): number {
 
 /**
  * Multiplicative Candidate Scoring Algorithm:
- * Score = S_active * M_tier * Q_weekly
+ * Score = S_active * M_tier * Q_weekly * Q_4h_factor
  * - S_active: 1 if unused, 0 if in use
  * - M_tier: Ultra=5, Pro=3, Free=1
  * - Q_weekly: 0 to 100
+ * - Q_4h: accounts with 100% 4h quota receive a major boost and strict precedence
  */
 export function calculateMultiplicativeScore(
     acc: Account,
     activeInUseAccountIds: string[] = [],
-    currentAccountId?: string
+    currentAccountId?: string,
+    targetModel?: string
 ): MultiplicativeCandidateResult {
     const isInUse = activeInUseAccountIds.includes(acc.id);
     const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
@@ -469,7 +520,13 @@ export function calculateMultiplicativeScore(
 
     const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier);
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
-    const score = activeFactor * tierMultiplier * weeklyQuotaPercent;
+    const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
+
+    const isFull4h = fourHourQuotaPercent >= 100;
+    const fourHourFactor = isFull4h ? 1.0 : Math.max(0.01, fourHourQuotaPercent / 100.0);
+    const baseScore = activeFactor * tierMultiplier * weeklyQuotaPercent * fourHourFactor;
+    // Add bonus of 100,000 for accounts that have full 100% 4-hour quota so they strictly outrank accounts with < 100%
+    const score = activeFactor > 0 && isFull4h ? baseScore + 100000 : baseScore;
 
     const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
@@ -483,8 +540,9 @@ export function calculateMultiplicativeScore(
         activeFactor,
         tierMultiplier,
         weeklyQuotaPercent,
+        fourHourQuotaPercent,
         daysUntilRefill,
-        quotaPercentage: weeklyQuotaPercent,
+        quotaPercentage: fourHourQuotaPercent,
         idleHours,
     };
 }
@@ -515,18 +573,32 @@ export function rankSmartCandidates(
         );
     });
 
-    const isAscending = Math.random() < 0.5;
-
     scored.sort((a, b) => {
+        // 1. Strict priority for 100% 4-hour window accounts
+        const aFull = (a.fourHourQuotaPercent ?? 100) >= 100;
+        const bFull = (b.fourHourQuotaPercent ?? 100) >= 100;
+        if (aFull && !bFull) return -1;
+        if (!aFull && bFull) return 1;
+
+        // 2. Score comparison (includes tier, weekly quota, and 4h factor)
         if (b.score !== a.score) {
             return b.score - a.score;
         }
+
+        // 3. 4-hour quota comparison
+        if (b.fourHourQuotaPercent !== a.fourHourQuotaPercent) {
+            return b.fourHourQuotaPercent - a.fourHourQuotaPercent;
+        }
+
+        // 4. Weekly quota comparison
+        if (b.weeklyQuotaPercent !== a.weeklyQuotaPercent) {
+            return b.weeklyQuotaPercent - a.weeklyQuotaPercent;
+        }
+
+        // 5. Deterministic tie-breaker
         const emailA = (a.account.email || '').toLowerCase();
         const emailB = (b.account.email || '').toLowerCase();
-        if (isAscending) {
-            return emailA.localeCompare(emailB);
-        }
-        return emailB.localeCompare(emailA);
+        return emailA.localeCompare(emailB);
     });
 
     return scored;

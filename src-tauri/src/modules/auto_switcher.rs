@@ -831,7 +831,8 @@ pub async fn select_and_verify_next_best_profile(
                 candidate.email, fresh_4h_quota
             ));
 
-            if fresh_4h_quota > threshold {
+            let min_threshold = threshold.max(25.0);
+            if fresh_4h_quota >= min_threshold {
                 match verified_fallback {
                     Some(ref cur) if fresh_4h_quota > cur.quota_percent => {
                         verified_fallback = Some(ProfileCandidate {
@@ -1235,10 +1236,14 @@ pub async fn trigger_manual_rotation_for_instance(
         }
     }
 
-    let candidate =
-        select_and_verify_next_best_profile(&inst_id, &switcher_cfg.target_model, 0.0, &excluded)
-            .await?
-            .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
+    let candidate = select_and_verify_next_best_profile(
+        &inst_id,
+        &switcher_cfg.target_model,
+        switcher_cfg.low_quota_threshold_percent,
+        &excluded,
+    )
+    .await?
+    .ok_or_else(|| "No alternative healthy profile found in pool".to_string())?;
 
     let reason = "Manual rotation triggered by user".to_string();
     let email = candidate.email.clone();
