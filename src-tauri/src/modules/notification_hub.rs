@@ -142,7 +142,8 @@ pub fn notify_account_switched(
             &reason_copy,
             is_auto,
         );
-        dispatch_telegram_switch_alert(&email_copy, &inst_name, &reason_copy, is_auto).await;
+        dispatch_telegram_switch_alert(&old_email, &email_copy, &inst_name, &reason_copy, is_auto)
+            .await;
     });
 }
 
@@ -183,6 +184,12 @@ fn dispatch_email_switch_alert(
         return;
     }
 
+    let from_display = if old_email.trim().is_empty() {
+        "(none)"
+    } else {
+        old_email.trim()
+    };
+
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let m_name = email_watcher::detect_machine_name();
     let m_ip = email_watcher::detect_local_ip();
@@ -210,15 +217,91 @@ fn dispatch_email_switch_alert(
 
     let subject = format!(
         "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Account Switched: {} -> {}",
-        pkg_ver, m_name, m_ip, instance_name, account_email
+        pkg_ver, m_name, m_ip, from_display, account_email
     );
+
+    // Extract active running prompt, reinjection status, and image payload for the switched instance
+    let mut running_prompt_id: Option<String> = None;
+    let mut running_prompt_snippet: Option<String> = None;
+    let mut running_prompt_project: Option<String> = None;
+    let mut is_reinjecting: bool = false;
+    let mut has_images: bool = false;
+    let mut images_attached: bool = false;
+
+    if let Ok(prompts) = crate::modules::repo_db::list_all_prompts() {
+        if let Some(p) = prompts.into_iter().find(|p| {
+            p.instance_id.eq_ignore_ascii_case(instance_name)
+                || p.instance_id.eq_ignore_ascii_case(instance_id)
+                || (instance_id == "default"
+                    && (p.instance_id.is_empty() || p.instance_id == "default"))
+        }) {
+            running_prompt_id = Some(p.id.clone());
+            let snippet = if p.prompt_content.len() > 120 {
+                format!("{}...", &p.prompt_content[..120])
+            } else {
+                p.prompt_content.clone()
+            };
+            running_prompt_snippet = Some(snippet);
+            running_prompt_project = Some(p.repo_path.clone());
+            is_reinjecting = true;
+            if p.image_payload.is_some() {
+                has_images = true;
+                images_attached = true;
+            }
+        }
+    }
+
+    if running_prompt_snippet.is_none() {
+        if let Ok(projects) = crate::modules::repo_db::list_running_projects() {
+            if let Some(proj) = projects.into_iter().find(|p| {
+                p.instance_id.eq_ignore_ascii_case(instance_name)
+                    || p.instance_id.eq_ignore_ascii_case(instance_id)
+                    || (instance_id == "default"
+                        && (p.instance_id.is_empty() || p.instance_id == "default"))
+            }) {
+                let resume_file =
+                    std::path::PathBuf::from(&proj.repo_path).join(".antigravity_resume_task.json");
+                if resume_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&resume_file) {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(prompt_text) =
+                                val.get("prompt_content").and_then(|v| v.as_str())
+                            {
+                                let snippet = if prompt_text.len() > 120 {
+                                    format!("{}...", &prompt_text[..120])
+                                } else {
+                                    prompt_text.to_string()
+                                };
+                                running_prompt_snippet = Some(snippet);
+                                running_prompt_id = val
+                                    .get("prompt_id")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                running_prompt_project = Some(proj.repo_path.clone());
+                                is_reinjecting = true;
+                                if val.get("image_payload").and_then(|v| v.as_str()).is_some()
+                                    || val
+                                        .get("has_image")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false)
+                                {
+                                    has_images = true;
+                                    images_attached = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let now_ts = chrono::Utc::now().timestamp();
     let telemetry_data = serde_json::json!({
         "agm_version": pkg_ver,
         "vm_name": m_name,
         "local_ip": m_ip,
-        "old_email": old_email,
+        "old_email": from_display,
         "new_email": account_email,
         "instance_id": instance_id,
         "instance_name": instance_name,
@@ -226,13 +309,28 @@ fn dispatch_email_switch_alert(
         "switch_mode": if is_auto { "auto" } else { "manual" },
         "condition": condition,
         "reason": reason,
+        "running_prompt_id": running_prompt_id,
+        "running_prompt_snippet": running_prompt_snippet,
+        "running_prompt_project": running_prompt_project,
+        "is_reinjecting": is_reinjecting,
+        "has_images": has_images,
+        "images_attached": images_attached,
         "timestamp": now_ts,
     });
     let telemetry_json_pretty = serde_json::to_string_pretty(&telemetry_data).unwrap_or_default();
-    let prev_email_display = if old_email.is_empty() {
-        "N/A"
+
+    let running_prompt_display = running_prompt_snippet
+        .as_deref()
+        .unwrap_or("(none running)");
+    let reinject_display = if is_reinjecting {
+        "<span style=\"color: #059669; font-weight: bold;\">Yes (Auto-Resuming)</span>"
     } else {
-        old_email
+        "<span style=\"color: #64748b;\">No</span>"
+    };
+    let images_display = if has_images {
+        "<span style=\"color: #2563eb; font-weight: bold;\">Yes (Image payload attached)</span>"
+    } else {
+        "<span style=\"color: #64748b;\">None</span>"
     };
 
     let html = format!(
@@ -260,6 +358,9 @@ fn dispatch_email_switch_alert(
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Instance Mode</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Trigger Mode</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Reason</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Running Prompt</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-size: 12px;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Re-injecting Task</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">{}</td></tr>
+        <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Attached Images</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">{}</td></tr>
         <tr><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
       </table>
       <div style="margin-top: 16px;">
@@ -277,12 +378,15 @@ fn dispatch_email_switch_alert(
         m_name,
         m_ip,
         pkg_ver,
-        prev_email_display,
+        from_display,
         account_email,
         instance_name,
         instance_mode,
         trigger_label,
         reason,
+        running_prompt_display,
+        reinject_display,
+        images_display,
         m_name,
         m_ip,
         telemetry_json_pretty,
@@ -294,6 +398,7 @@ fn dispatch_email_switch_alert(
 
 /// Helper to render and dispatch Telegram switch notification
 async fn dispatch_telegram_switch_alert(
+    old_email: &str,
     account_email: &str,
     instance_name: &str,
     reason: &str,
@@ -328,17 +433,31 @@ async fn dispatch_telegram_switch_alert(
         "Manual User Switch"
     };
 
+    let from_display = if old_email.trim().is_empty() {
+        "(none)"
+    } else {
+        old_email.trim()
+    };
+
     let text = format!(
         "🔄 <b>Antigravity Manager: Account Switched</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
         📦 <b>Version:</b> <code>{}</code>\n\
-        👤 <b>Account:</b> <code>{}</code>\n\
+        👤 <b>Account:</b> <code>{} ➔ {}</code>\n\
         💻 <b>Target Instance:</b> <code>{}</code>\n\
         🏷️ <b>Trigger:</b> {}\n\
         📝 <b>Reason:</b> {}\n\
         🖥️ <b>Host:</b> <code>{}</code> ({})\n\
         ⏰ <b>Timestamp:</b> {}",
-        pkg_ver, account_email, instance_name, trigger_label, reason, m_name, m_ip, now_str
+        pkg_ver,
+        from_display,
+        account_email,
+        instance_name,
+        trigger_label,
+        reason,
+        m_name,
+        m_ip,
+        now_str
     );
 
     if let Err(e) = telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await

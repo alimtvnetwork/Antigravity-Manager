@@ -45,6 +45,9 @@ fn main() {
         "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
             cmd_switch_if_low_credit(&cmd_args);
         }
+        "is-low-credit-for-switch" | "is-low-credit" | "ilc" => {
+            cmd_is_low_credit_for_switch(&cmd_args);
+        }
         "which-prompts-running" | "wpr" => cmd_which_prompts_running(&cmd_args),
         "prompts" => cmd_prompts(&cmd_args),
         "prompt" => cmd_prompt_dispatch(&cmd_args),
@@ -120,7 +123,10 @@ fn print_help() {
         "  ff, smart-switch                      Trigger fast-forward rotation to freshest account"
     );
     println!(
-        "  switch-if-low-credit, swlc, sfc [pct] Check live quota and rotate if below threshold"
+        "  switch-if-low-credit, swlc, sfc [--json] [-f [file]] [-t <pct>] Check live quota & rotate; export JSON"
+    );
+    println!(
+        "  is-low-credit-for-switch, ilc [--json] [-f [file]] [-t <pct>]   Check if active quota <= threshold (outputs true/false or JSON)"
     );
     println!("  accounts, acc [--active] [--json]     List registered accounts, tiers, and quotas");
     println!("  switch <email|prefix|id>              Switch active account directly without GUI");
@@ -1811,10 +1817,37 @@ fn cmd_status(args: &[String]) {
     println!("    Queued/Running Prompts: {}", running_prompts);
 }
 
+fn resolve_switch_filename(custom_path: Option<&str>, node_alias: &str) -> String {
+    if let Some(p) = custom_path {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    let raw_alias = if !node_alias.trim().is_empty() {
+        node_alias.trim()
+    } else {
+        "node"
+    };
+    let clean_alias: String = raw_alias
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!("agm-{}-switch.json", clean_alias)
+}
+
 fn cmd_switch_if_low_credit(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json");
-    let force = args.iter().any(|a| a == "--force" || a == "-f");
+    let force = args.iter().any(|a| a == "--force");
     let mut custom_threshold: Option<f64> = None;
+    let mut export_file: Option<String> = None;
+    let mut should_export_file = false;
 
     let mut i = 0;
     while i < args.len() {
@@ -1822,6 +1855,13 @@ fn cmd_switch_if_low_credit(args: &[String]) {
         if arg == "--threshold" || arg == "-t" {
             if i + 1 < args.len() {
                 custom_threshold = args[i + 1].parse::<f64>().ok();
+                i += 2;
+                continue;
+            }
+        } else if arg == "-f" || arg == "--file" {
+            should_export_file = true;
+            if i + 1 < args.len() && !args[i + 1].starts_with('-') {
+                export_file = Some(args[i + 1].clone());
                 i += 2;
                 continue;
             }
@@ -1841,6 +1881,66 @@ fn cmd_switch_if_low_credit(args: &[String]) {
         }
     };
 
+    let machine_name = email_watcher::detect_machine_name();
+    let node_alias = supabase_sync::load_config()
+        .map(|c| c.node_alias)
+        .unwrap_or_else(|_| machine_name.clone());
+    let local_ip = email_watcher::detect_local_ip();
+    let tool_version = format!("v{}", VERSION);
+
+    // Capture running prompt snippet and image status
+    let mut running_prompt_snippet: Option<String> = None;
+    let mut has_images = false;
+    if let Ok(prompts) = repo_db::list_all_prompts() {
+        if let Some(p) = prompts
+            .into_iter()
+            .find(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+        {
+            let snippet = if p.prompt_content.len() > 120 {
+                format!("{}...", &p.prompt_content[..120])
+            } else {
+                p.prompt_content
+            };
+            running_prompt_snippet = Some(snippet);
+            if p.image_payload.is_some() {
+                has_images = true;
+            }
+        }
+    }
+    if running_prompt_snippet.is_none() {
+        if let Ok(projects) = repo_db::list_running_projects() {
+            for proj in projects {
+                let resume_file =
+                    std::path::PathBuf::from(&proj.repo_path).join(".antigravity_resume_task.json");
+                if resume_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&resume_file) {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(prompt_text) =
+                                val.get("prompt_content").and_then(|v| v.as_str())
+                            {
+                                let snippet = if prompt_text.len() > 120 {
+                                    format!("{}...", &prompt_text[..120])
+                                } else {
+                                    prompt_text.to_string()
+                                };
+                                running_prompt_snippet = Some(snippet);
+                                if val.get("image_payload").and_then(|v| v.as_str()).is_some()
+                                    || val
+                                        .get("has_image")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false)
+                                {
+                                    has_images = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let status_before = auto_switcher::get_status();
     let res = rt.block_on(auto_switcher::check_and_rotate_for_threshold(
         custom_threshold,
@@ -1850,15 +1950,30 @@ fn cmd_switch_if_low_credit(args: &[String]) {
 
     match res {
         Ok(Some(reason)) => {
+            let out = serde_json::json!({
+                "rotated": true,
+                "reason": reason,
+                "machine_name": machine_name,
+                "node_alias": node_alias,
+                "local_ip": local_ip,
+                "tool_version": tool_version,
+                "previous_account": status_before.active_account_email,
+                "active_account": status_after.active_account_email,
+                "quota_percent": status_after.current_quota_percent,
+                "running_prompt": running_prompt_snippet,
+                "has_images": has_images,
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            let out_str = serde_json::to_string_pretty(&out).unwrap_or_default();
+            if should_export_file {
+                let file_path = resolve_switch_filename(export_file.as_deref(), &node_alias);
+                let _ = std::fs::write(&file_path, &out_str);
+                if !is_json {
+                    println!("[SUCCESS] Saved switch telemetry to {}", file_path);
+                }
+            }
             if is_json {
-                let out = serde_json::json!({
-                    "rotated": true,
-                    "reason": reason,
-                    "previous_account": status_before.active_account_email,
-                    "active_account": status_after.active_account_email,
-                    "quota_percent": status_after.current_quota_percent,
-                });
-                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                println!("{}", out_str);
             } else {
                 println!("[SUCCESS] Low-credit rotation triggered!");
                 println!("          Reason: {}", reason);
@@ -1872,14 +1987,29 @@ fn cmd_switch_if_low_credit(args: &[String]) {
             }
         }
         Ok(None) => {
+            let out = serde_json::json!({
+                "rotated": false,
+                "reason": "Quota is healthy (above threshold) or no alternative candidate needed",
+                "machine_name": machine_name,
+                "node_alias": node_alias,
+                "local_ip": local_ip,
+                "tool_version": tool_version,
+                "active_account": status_after.active_account_email,
+                "quota_percent": status_after.current_quota_percent,
+                "running_prompt": running_prompt_snippet,
+                "has_images": has_images,
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            let out_str = serde_json::to_string_pretty(&out).unwrap_or_default();
+            if should_export_file {
+                let file_path = resolve_switch_filename(export_file.as_deref(), &node_alias);
+                let _ = std::fs::write(&file_path, &out_str);
+                if !is_json {
+                    println!("[INFO] Saved switch evaluation to {}", file_path);
+                }
+            }
             if is_json {
-                let out = serde_json::json!({
-                    "rotated": false,
-                    "reason": "Quota is healthy (above threshold) or no alternative candidate needed",
-                    "active_account": status_after.active_account_email,
-                    "quota_percent": status_after.current_quota_percent,
-                });
-                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                println!("{}", out_str);
             } else {
                 println!(
                     "[OK] Credits are sufficient ({:.1}% remaining on {}). No switch needed.",
@@ -1892,17 +2022,192 @@ fn cmd_switch_if_low_credit(args: &[String]) {
             }
         }
         Err(e) => {
+            let out = serde_json::json!({
+                "rotated": false,
+                "error": e,
+                "machine_name": machine_name,
+                "node_alias": node_alias,
+                "local_ip": local_ip,
+                "tool_version": tool_version,
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            let out_str = serde_json::to_string_pretty(&out).unwrap_or_default();
+            if should_export_file {
+                let file_path = resolve_switch_filename(export_file.as_deref(), &node_alias);
+                let _ = std::fs::write(&file_path, &out_str);
+            }
             if is_json {
-                let out = serde_json::json!({
-                    "rotated": false,
-                    "error": e,
-                });
-                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                println!("{}", out_str);
             } else {
                 eprintln!("[ERROR] switch-if-low-credit failed: {}", e);
             }
             std::process::exit(1);
         }
+    }
+}
+
+fn cmd_is_low_credit_for_switch(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let mut custom_threshold: Option<f64> = None;
+    let mut export_file: Option<String> = None;
+    let mut should_export_file = false;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--threshold" || arg == "-t" {
+            if i + 1 < args.len() {
+                custom_threshold = args[i + 1].parse::<f64>().ok();
+                i += 2;
+                continue;
+            }
+        } else if arg == "-f" || arg == "--file" {
+            should_export_file = true;
+            if i + 1 < args.len() && !args[i + 1].starts_with('-') {
+                export_file = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if !arg.starts_with('-') {
+            if let Ok(val) = arg.parse::<f64>() {
+                custom_threshold = Some(val);
+            }
+        }
+        i += 1;
+    }
+
+    let app_config = config::load_app_config().unwrap_or_default();
+    let switcher_cfg = app_config.auto_profile_switcher;
+    let threshold_percent = custom_threshold.unwrap_or(switcher_cfg.low_quota_threshold_percent);
+    let target_model = switcher_cfg.target_model.clone();
+
+    let now_sec = chrono::Utc::now().timestamp();
+    let active_acc = account::get_current_account().ok().flatten();
+
+    let current_quota_percent = match active_acc.as_ref() {
+        Some(acc) => {
+            if let Some(ps) = auto_switcher::evaluate_account_period_status(
+                acc,
+                &target_model,
+                threshold_percent,
+                now_sec,
+            ) {
+                ps.quota_percent
+            } else {
+                auto_switcher::calculate_account_quota(acc, &target_model).unwrap_or(100.0)
+            }
+        }
+        None => 0.0,
+    };
+
+    let is_low_credit = active_acc.is_none() || current_quota_percent <= threshold_percent;
+
+    // Find next possible account
+    let accounts = account::load_accounts().unwrap_or_default();
+    let current_id = active_acc.as_ref().map(|a| a.id.as_str()).unwrap_or("");
+    let excluded = auto_switcher::get_active_in_use_account_ids();
+    let best_candidate = auto_switcher::select_next_best_profile(
+        &accounts,
+        current_id,
+        &target_model,
+        threshold_percent,
+        now_sec,
+        &excluded,
+    );
+    let next_possible_account = best_candidate.as_ref().map(|a| a.email.clone());
+    let next_possible_quota_percent = best_candidate
+        .as_ref()
+        .and_then(|a| auto_switcher::calculate_account_quota(a, &target_model));
+
+    // Detect active running prompt and image payload
+    let mut running_prompt: Option<String> = None;
+    let mut has_images = false;
+    if let Ok(prompts) = repo_db::list_all_prompts() {
+        if let Some(p) = prompts
+            .into_iter()
+            .find(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+        {
+            let snippet = if p.prompt_content.len() > 120 {
+                format!("{}...", &p.prompt_content[..120])
+            } else {
+                p.prompt_content
+            };
+            running_prompt = Some(snippet);
+            if p.image_payload.is_some() {
+                has_images = true;
+            }
+        }
+    }
+    if running_prompt.is_none() {
+        if let Ok(projects) = repo_db::list_running_projects() {
+            for proj in projects {
+                let resume_file =
+                    std::path::PathBuf::from(&proj.repo_path).join(".antigravity_resume_task.json");
+                if resume_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&resume_file) {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(prompt_text) =
+                                val.get("prompt_content").and_then(|v| v.as_str())
+                            {
+                                let snippet = if prompt_text.len() > 120 {
+                                    format!("{}...", &prompt_text[..120])
+                                } else {
+                                    prompt_text.to_string()
+                                };
+                                running_prompt = Some(snippet);
+                                if val.get("image_payload").and_then(|v| v.as_str()).is_some()
+                                    || val
+                                        .get("has_image")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false)
+                                {
+                                    has_images = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let machine_name = email_watcher::detect_machine_name();
+    let node_alias = supabase_sync::load_config()
+        .map(|c| c.node_alias)
+        .unwrap_or_else(|_| machine_name.clone());
+    let local_ip = email_watcher::detect_local_ip();
+    let tool_version = format!("v{}", VERSION);
+    let current_account = active_acc.map(|a| a.email);
+
+    let payload = serde_json::json!({
+        "is_low_credit": is_low_credit,
+        "machine_name": machine_name,
+        "node_alias": node_alias,
+        "local_ip": local_ip,
+        "current_account": current_account,
+        "current_quota_percent": current_quota_percent,
+        "threshold_percent": threshold_percent,
+        "target_model": target_model,
+        "tool_version": tool_version,
+        "next_possible_account": next_possible_account,
+        "next_possible_quota_percent": next_possible_quota_percent,
+        "running_prompt": running_prompt,
+        "has_images": has_images,
+        "timestamp": now_sec,
+    });
+
+    let payload_str = serde_json::to_string_pretty(&payload).unwrap_or_default();
+
+    if should_export_file {
+        let file_path = resolve_switch_filename(export_file.as_deref(), &node_alias);
+        let _ = std::fs::write(&file_path, &payload_str);
+    }
+
+    if is_json {
+        println!("{}", payload_str);
+    } else {
+        println!("{}", is_low_credit);
     }
 }
 
