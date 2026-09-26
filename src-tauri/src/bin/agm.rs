@@ -3225,7 +3225,10 @@ fn cmd_email(args: &[String]) {
                         &target_recipients,
                     );
                 }
-                println!("{}", serde_json::to_string_pretty(&status_json).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&status_json).unwrap_or_default()
+                );
                 return;
             }
 
@@ -3298,7 +3301,7 @@ fn cmd_email(args: &[String]) {
                     &node_alias,
                     &m_ip,
                     active_acc.as_ref().map(|a| a.email.as_str()),
-                    tier,
+                    &tier,
                     predicted_next_account.as_deref(),
                     immediate_quota,
                     weekly_quota,

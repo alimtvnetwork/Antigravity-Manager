@@ -541,7 +541,8 @@ pub fn extract_clean_json_body(raw: &str) -> String {
         if end > start {
             let candidate = &trimmed[start..=end];
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(candidate) {
-                return serde_json::to_string_pretty(&val).unwrap_or_else(|_| candidate.to_string());
+                return serde_json::to_string_pretty(&val)
+                    .unwrap_or_else(|_| candidate.to_string());
             }
         }
     }
@@ -549,7 +550,8 @@ pub fn extract_clean_json_body(raw: &str) -> String {
         if end > start {
             let candidate = &trimmed[start..=end];
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(candidate) {
-                return serde_json::to_string_pretty(&val).unwrap_or_else(|_| candidate.to_string());
+                return serde_json::to_string_pretty(&val)
+                    .unwrap_or_else(|_| candidate.to_string());
             }
         }
     }
@@ -573,18 +575,46 @@ fn format_content_as_table_rows(content: &str) -> (bool, String) {
         if let Some(colon_pos) = trimmed.find(':') {
             let key = trimmed[..colon_pos].trim();
             let val = trimmed[colon_pos + 1..].trim();
-            if !key.is_empty() && !val.is_empty() && key.len() <= 45 && !key.contains("://") && !key.starts_with("http") {
+            if !key.is_empty()
+                && !val.is_empty()
+                && key.len() <= 45
+                && !key.contains("://")
+                && !key.starts_with("http")
+            {
                 kv_count += 1;
-                let val_badge = if val.eq_ignore_ascii_case("yes") || val.starts_with("Yes") || val.eq_ignore_ascii_case("true") || val.eq_ignore_ascii_case("success") || val.eq_ignore_ascii_case("pass") {
-                    format!(r#"<span style="background: #ecfdf5; color: #059669; padding: 4px 10px; border-radius: 6px; font-weight: 700; border: 1px solid #a7f3d0; font-size: 14px;">{}</span>"#, escape_html_entities(val))
-                } else if val.eq_ignore_ascii_case("no") || val.starts_with("No") || val.eq_ignore_ascii_case("none") {
-                    format!(r#"<span style="color: #64748b; font-weight: 500;">{}</span>"#, escape_html_entities(val))
+                let val_badge = if val.eq_ignore_ascii_case("yes")
+                    || val.starts_with("Yes")
+                    || val.eq_ignore_ascii_case("true")
+                    || val.eq_ignore_ascii_case("success")
+                    || val.eq_ignore_ascii_case("pass")
+                {
+                    format!(
+                        r#"<span style="background: #ecfdf5; color: #059669; padding: 4px 10px; border-radius: 6px; font-weight: 700; border: 1px solid #a7f3d0; font-size: 14px;">{}</span>"#,
+                        escape_html_entities(val)
+                    )
+                } else if val.eq_ignore_ascii_case("no")
+                    || val.starts_with("No")
+                    || val.eq_ignore_ascii_case("none")
+                {
+                    format!(
+                        r#"<span style="color: #64748b; font-weight: 500;">{}</span>"#,
+                        escape_html_entities(val)
+                    )
                 } else if val.contains('%') {
-                    format!(r#"<span style="color: #0284c7; font-weight: 700; font-family: 'Ubuntu Mono', monospace;">{}</span>"#, escape_html_entities(val))
+                    format!(
+                        r#"<span style="color: #0284c7; font-weight: 700; font-family: 'Ubuntu Mono', monospace;">{}</span>"#,
+                        escape_html_entities(val)
+                    )
                 } else if val.contains('@') {
-                    format!(r#"<span style="color: #0f172a; font-weight: 700; font-family: 'Ubuntu Mono', monospace;">{}</span>"#, escape_html_entities(val))
+                    format!(
+                        r#"<span style="color: #0f172a; font-weight: 700; font-family: 'Ubuntu Mono', monospace;">{}</span>"#,
+                        escape_html_entities(val)
+                    )
                 } else {
-                    format!(r#"<span style="color: #0f172a; font-weight: 600;">{}</span>"#, escape_html_entities(val))
+                    format!(
+                        r#"<span style="color: #0f172a; font-weight: 600;">{}</span>"#,
+                        escape_html_entities(val)
+                    )
                 };
 
                 table_rows.push_str(&format!(
@@ -937,7 +967,8 @@ fn build_mime_message(
         clean_rcpts.join(", ")
     };
 
-    let is_json_email = normalized_subject.contains("[JSON]") || normalized_subject.contains("[json]");
+    let is_json_email =
+        normalized_subject.contains("[JSON]") || normalized_subject.contains("[json]");
 
     if is_json_email {
         let clean_json = extract_clean_json_body(body);
@@ -959,11 +990,12 @@ fn build_mime_message(
         if let Some(reply_id) = in_reply_to {
             let clean_reply_id = reply_id.trim();
             if !clean_reply_id.is_empty() {
-                let formatted_id = if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
-                    clean_reply_id.to_string()
-                } else {
-                    format!("<{}>", clean_reply_id)
-                };
+                let formatted_id =
+                    if clean_reply_id.starts_with('<') && clean_reply_id.ends_with('>') {
+                        clean_reply_id.to_string()
+                    } else {
+                        format!("<{}>", clean_reply_id)
+                    };
                 headers.push_str(&format!(
                     "In-Reply-To: {}\r\nReferences: {}\r\n",
                     formatted_id, formatted_id
@@ -1318,10 +1350,7 @@ mod tests {
 
         // Old tag upgrade
         let s2 = format_subject_with_telemetry("[VM3 | 192.168.1.12] Alert", ver, node, ip);
-        assert_eq!(
-            s2,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Alert"
-        );
+        assert_eq!(s2, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Alert");
 
         // Reply subject with old tag
         let s3 = format_subject_with_telemetry("Re: [VM3 | 192.168.1.12] Result", ver, node, ip);
@@ -1332,10 +1361,7 @@ mod tests {
 
         // Reply subject without tag
         let s4 = format_subject_with_telemetry("Re: help", ver, node, ip);
-        assert_eq!(
-            s4,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Re: help"
-        );
+        assert_eq!(s4, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Re: help");
 
         // Already tagged cleanly
         let s5 = format_subject_with_telemetry(
@@ -1344,10 +1370,7 @@ mod tests {
             node,
             ip,
         );
-        assert_eq!(
-            s5,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Status"
-        );
+        assert_eq!(s5, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Status");
 
         // User request sample upgrade: strips redundant [Antigravity] before [JSON]
         let s6 = format_subject_with_telemetry(
@@ -1422,7 +1445,8 @@ mod tests {
             created_at: 0,
             updated_at: 0,
         };
-        let text_body = "Active Account: default@example.com\nImmediate Credits: 95.0%\nWeekly Credits: 98.0%";
+        let text_body =
+            "Active Account: default@example.com\nImmediate Credits: 95.0%\nWeekly Credits: 98.0%";
         let mime = build_mime_message(
             &account,
             "Node & Credits Status",
