@@ -107,7 +107,7 @@ function Settings() {
         auto_profile_switcher: {
             is_enabled: true,
             check_interval_seconds: 60,
-            low_quota_threshold_percent: 10.0,
+            low_quota_threshold_percent: 25.0,
             target_model: 'gemini-pro',
             has_auto_resume: true,
             cooldown_seconds: 180,

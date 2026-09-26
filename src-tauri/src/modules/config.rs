@@ -197,11 +197,12 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         if switcher
             .get("low_quota_threshold_percent")
             .and_then(|n| n.as_f64())
-            == Some(10.0)
+            .map(|val| val <= 15.0)
+            .unwrap_or(false)
         {
             switcher.insert(
                 "low_quota_threshold_percent".to_string(),
-                serde_json::json!(15.0),
+                serde_json::json!(25.0),
             );
             modified = true;
         }

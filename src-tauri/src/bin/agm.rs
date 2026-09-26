@@ -57,6 +57,9 @@ fn main() {
         "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
             cmd_resend_running_commands(&cmd_args);
         }
+        "backup-running-prompts" | "brp" | "backup-prompts" => {
+            cmd_backup_running_prompts(&cmd_args);
+        }
         "proxy" => cmd_proxy(&cmd_args),
         "sync" => cmd_sync(),
         "pull" => cmd_pull(),
@@ -145,6 +148,9 @@ fn print_help() {
     );
     println!(
         "  resend-running-commands, rrc [N] [--json] [-f [path]] Resend commands before close/switch & sync image paths"
+    );
+    println!(
+        "  backup-running-prompts, brp [--json]  Backup in-flight prompts from Antigravity & workspaces into SQLite"
     );
     println!();
     println!("Instance & Workspace Management Commands:");
@@ -1600,6 +1606,84 @@ fn cmd_resend_running_commands(args: &[String]) {
     );
 }
 
+fn cmd_backup_running_prompts(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json");
+    let active_inst = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+
+    if !is_json {
+        println!(
+            "[*] Inspecting running prompts across Antigravity core state and active workspaces..."
+        );
+    }
+
+    match repo_db::backup_running_prompts(&active_inst) {
+        Ok(count) => {
+            let prompts = repo_db::list_all_prompts().unwrap_or_default();
+            let backed_up: Vec<_> = prompts
+                .into_iter()
+                .filter(|p| {
+                    p.status == "backed_up" || p.status == "running" || p.status == "dispatched"
+                })
+                .collect();
+
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&backed_up).unwrap_or_else(|_| "[]".to_string())
+                );
+                return;
+            }
+
+            println!("\n================================================================================");
+            println!("  AGM BACKUP RUNNING PROMPTS (BRP)");
+            println!(
+                "================================================================================"
+            );
+            println!(
+                "[Successfully backed up {} running prompt(s) into SQLite DB (repo_prompts.db)]\n",
+                count
+            );
+
+            if backed_up.is_empty() {
+                println!("No active or previously running prompts found to back up.");
+                return;
+            }
+
+            println!(
+                "{:<5} {:<10} {:<24} {:<10} {:<18} {}",
+                "SEQ", "ID", "PROJECT", "STATUS", "IMAGES", "PROMPT SNIPPET"
+            );
+            println!("{}", "-".repeat(110));
+
+            for (idx, p) in backed_up.iter().enumerate() {
+                let short_id = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
+                let (snippet, _) = truncate_words(&p.prompt_content, 15);
+                let has_img = p.image_payload.is_some();
+                let img_label = if has_img { "Yes (Base64)" } else { "None" };
+
+                println!(
+                    "#{:<4} {:<10} {:<24} {:<10} {:<18} {}",
+                    idx + 1,
+                    short_id,
+                    p.project_id,
+                    p.status,
+                    img_label,
+                    snippet
+                );
+            }
+            println!();
+            println!(
+                "[SUCCESS] Secured {} in-flight prompt(s) in SQLite database with image preservation.",
+                count
+            );
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to backup running prompts: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn scan_prompt_templates() {
     let prompts_dir = Path::new("01-prompts");
     if prompts_dir.exists() {
@@ -2180,24 +2264,30 @@ fn cmd_switch_if_low_credit(args: &[String]) {
     let effective_threshold =
         custom_threshold.unwrap_or(app_cfg.auto_profile_switcher.low_quota_threshold_percent);
 
+    // Snapshot & backup all running prompts across Antigravity and workspaces before switch
+    let _ = repo_db::backup_running_prompts("default");
+
     let res = rt.block_on(auto_switcher::check_and_rotate_for_threshold(
         custom_threshold,
         force,
     ));
     let status_after = auto_switcher::get_status();
 
-    let running_prompts_count = if running_prompt_snippet.is_some() {
-        repo_db::list_all_prompts()
-            .unwrap_or_default()
-            .iter()
-            .filter(|p| {
-                p.status == "running" || p.status == "dispatched" || p.status == "backed_up"
-            })
-            .count()
-            .max(1)
-    } else {
-        0
-    };
+    if res.as_ref().map(|o| o.is_some()).unwrap_or(false) {
+        // Immediately restore and trigger execution of running prompts
+        let _ = repo_db::resend_all_running_commands(20);
+    }
+
+    let running_prompts_count = repo_db::list_all_prompts()
+        .unwrap_or_default()
+        .iter()
+        .filter(|p| p.status == "running" || p.status == "dispatched" || p.status == "backed_up")
+        .count()
+        .max(if running_prompt_snippet.is_some() {
+            1
+        } else {
+            0
+        });
 
     match res {
         Ok(Some(reason)) => {
@@ -2952,6 +3042,9 @@ fn cmd_fast_forward(args: &[String]) {
         }
     };
 
+    // Snapshot & backup running prompts before rotation
+    let _ = repo_db::backup_running_prompts("default");
+
     let result = if let Some(target) = target_opt {
         let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string());
         if !is_json {
@@ -2969,6 +3062,11 @@ fn cmd_fast_forward(args: &[String]) {
         }
         rt.block_on(auto_switcher::trigger_manual_rotation())
     };
+
+    if result.is_ok() {
+        // Immediately restore and dispatch running prompts
+        let _ = repo_db::resend_all_running_commands(20);
+    }
 
     let status_after = auto_switcher::get_status();
 

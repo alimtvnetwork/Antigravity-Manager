@@ -285,6 +285,9 @@ impl SystemIntegration for DesktopIntegration {
         let active_exe_path = process::get_antigravity_executable_path(effective_target);
         let active_args = process::get_args_from_running_process(effective_target);
 
+        // 0.5. 备份所有运行中提示词与图片附件到 SQLite 数据库，避免关闭进程导致正在运行的任务丢失
+        let _ = crate::modules::repo_db::backup_running_prompts("default");
+
         // 2. 决定切换模式（热切号 / 完整重启）并处理进程与凭据
         //
         //    · 热切号 —— 仅 IDE 目标（issue #3503 方案 A）：只终止 language_server 子进程、保留主窗口，
@@ -375,6 +378,7 @@ impl SystemIntegration for DesktopIntegration {
                     "[Desktop] Hot switch completed for {}: language_server respawned with the new credentials.",
                     account.email
                 ));
+                let _ = crate::modules::repo_db::resend_all_running_commands(20);
                 let _ = crate::modules::tray::update_tray_menus(&self.app_handle);
                 return Ok(());
             }
@@ -391,6 +395,9 @@ impl SystemIntegration for DesktopIntegration {
             active_exe_path.as_deref(),
             active_args.as_deref(),
         )?;
+
+        // 重新发送并恢复正在运行的提示词
+        let _ = crate::modules::repo_db::resend_all_running_commands(20);
 
         // 4. 更新托盘
         let _ = crate::modules::tray::update_tray_menus(&self.app_handle);

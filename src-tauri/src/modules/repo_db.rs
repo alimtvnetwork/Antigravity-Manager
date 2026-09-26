@@ -4,6 +4,8 @@
 
 #![allow(dead_code)]
 
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -317,21 +319,229 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
     (raw_payload, found_paths)
 }
 
+/// Discover in-flight active conversations and running prompts directly from Antigravity core storage
+/// (~/.gemini/antigravity/conversation_summaries.db and brain/<cid>/.system_generated/logs/transcript.jsonl)
+pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<ActivePrompt> {
+    let mut prompts = Vec::new();
+    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    let Some(base_dir) = base_dir else {
+        return prompts;
+    };
+    let summaries_db = base_dir.join("conversation_summaries.db");
+    if !summaries_db.exists() {
+        return prompts;
+    }
+
+    let conn = match Connection::open_with_flags(
+        &summaries_db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    ) {
+        Ok(c) => c,
+        Err(_) => return prompts,
+    };
+
+    let now = Utc::now().timestamp();
+    let mut stmt = match conn.prepare(
+        "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+         FROM conversation_summaries 
+         ORDER BY last_modified_time DESC 
+         LIMIT 25",
+    ) {
+        Ok(s) => s,
+        Err(_) => return prompts,
+    };
+
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, i32>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, String>(6)?,
+        ))
+    });
+
+    let Ok(rows) = rows else {
+        return prompts;
+    };
+
+    for item in rows.flatten() {
+        let (cid, _title, _preview, status, not_fully_idle, ws_uris_opt, _last_time) = item;
+        let is_running_or_recent =
+            not_fully_idle != 0 || status.contains("RUNNING") || prompts.is_empty();
+        if !is_running_or_recent && prompts.len() >= 5 {
+            continue;
+        }
+
+        let Some(ws_uris_raw) = ws_uris_opt else {
+            continue;
+        };
+
+        let ws_uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+        if ws_uris.is_empty() {
+            continue;
+        }
+
+        let repo_path = decode_uri_to_path(&ws_uris[0]);
+        let repo_name = Path::new(&repo_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "antigravity-project".to_string());
+        let project_id = format!(
+            "{}-{}",
+            repo_name.to_lowercase(),
+            cid.chars().take(8).collect::<String>()
+        );
+
+        // Read transcript.jsonl from brain/<cid>/.system_generated/logs/transcript.jsonl
+        let transcript_file = base_dir
+            .join("brain")
+            .join(&cid)
+            .join(".system_generated")
+            .join("logs")
+            .join("transcript.jsonl");
+
+        let mut user_prompt: Option<String> = None;
+        let mut image_payload: Option<String> = None;
+
+        if transcript_file.exists() {
+            if let Ok(content) = fs::read_to_string(&transcript_file) {
+                for line in content.lines().rev() {
+                    if !line.contains("USER_INPUT") {
+                        continue;
+                    }
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                        if val.get("type").and_then(|t| t.as_str()) == Some("USER_INPUT") {
+                            if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
+                                if !txt.trim().is_empty() {
+                                    user_prompt = Some(txt.to_string());
+                                }
+                            }
+                            if let Some(media_arr) = val.get("media").and_then(|m| m.as_array()) {
+                                for m_item in media_arr {
+                                    if let Some(uri) = m_item.get("uri").and_then(|u| u.as_str()) {
+                                        let clean_path = decode_uri_to_path(uri);
+                                        let p = Path::new(&clean_path);
+                                        if p.exists() {
+                                            if let Ok(bytes) = fs::read(p) {
+                                                let mime = m_item
+                                                    .get("mime_type")
+                                                    .and_then(|mt| mt.as_str())
+                                                    .unwrap_or("image/png");
+                                                let b64 = STANDARD.encode(&bytes);
+                                                image_payload =
+                                                    Some(format!("data:{};base64,{}", mime, b64));
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if user_prompt.is_some() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(prompt_text) = user_prompt {
+            let p_id = format!("prompt-{}", cid);
+            prompts.push(ActivePrompt {
+                id: p_id,
+                project_id,
+                instance_id: instance_id.to_string(),
+                repo_path,
+                prompt_content: prompt_text,
+                model: Some("gemini-pro".to_string()),
+                session_id: Some(cid),
+                status: "backed_up".to_string(),
+                created_at: now,
+                updated_at: now,
+                image_payload,
+            });
+        }
+    }
+
+    prompts
+}
+
 /// Backup all currently running prompts across active projects before switching
 pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
-    let projects = detect_running_projects(instance_id)?;
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
     let mut backed_up_count = 0;
 
-    for project in &projects {
-        let is_proj_running = project.is_running;
-        if !is_proj_running {
-            continue;
+    // Layer 1: Core Antigravity Live Conversations Discovery (~/.gemini/antigravity)
+    let ag_prompts = discover_running_prompts_from_antigravity(instance_id);
+    for p in ag_prompts {
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES (?, ?, ?, ?, NULL, 1, ?, ?)",
+            params![&p.project_id, &p.instance_id, &p.project_id, &p.repo_path, now, now],
+        );
+
+        let res = conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?, ?)",
+            params![
+                &p.id,
+                &p.project_id,
+                &p.instance_id,
+                &p.repo_path,
+                &p.prompt_content,
+                &p.model,
+                &p.session_id,
+                now,
+                now,
+                &p.image_payload,
+            ],
+        );
+
+        if res.is_ok() {
+            backed_up_count += 1;
+            let (extracted_img, img_paths) = extract_image_payload_or_path(&p.prompt_content);
+            let final_img = p.image_payload.clone().or(extracted_img);
+            let has_image = final_img.is_some() || !img_paths.is_empty();
+
+            // Write disk resume snapshot file inside project repo directory
+            let task_file = PathBuf::from(&p.repo_path).join(".antigravity_resume_task.json");
+            let payload = serde_json::json!({
+                "prompt_id": p.id,
+                "project_id": p.project_id,
+                "instance_id": p.instance_id,
+                "repo_path": p.repo_path,
+                "prompt_content": p.prompt_content,
+                "model": p.model,
+                "session_id": p.session_id,
+                "image_payload": final_img,
+                "image_paths": img_paths,
+                "has_image": has_image,
+                "auto_boot": true,
+                "status": "backed_up",
+                "backed_up_at": now,
+            });
+            if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+                let _ = fs::write(&task_file, json_str);
+            }
+            if let Ok(mut map) = get_memory_prompts_map().lock() {
+                map.insert(p.id.clone(), p);
+            }
         }
+    }
+
+    // Layer 2: VS Code / Instance Workspace Storage & Active Projects Discovery
+    let projects = detect_running_projects(instance_id).unwrap_or_default();
+    for project in &projects {
+        let mut extracted_prompts: Vec<(String, Option<String>)> = Vec::new();
 
         // Check workspace state.vscdb for active prompts / tasks
-        let mut extracted_prompts: Vec<(String, Option<String>)> = Vec::new();
         if let Some(ref ws_storage) = project.workspace_storage_path {
             let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
             if ws_db_path.exists() {
@@ -404,15 +614,6 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             }
         }
 
-        // Fallback snapshot only if absolutely nothing could be discovered
-        if extracted_prompts.is_empty() {
-            let fallback_snapshot = format!(
-                "Active project snapshot for '{}' [{}] before instance rotation at {}",
-                project.repo_name, project.repo_path, now
-            );
-            extracted_prompts.push((fallback_snapshot, None));
-        }
-
         for (prompt_text, image_payload) in extracted_prompts {
             let prompt_id = Uuid::new_v4().to_string();
             let prompt_model = Some("gemini-pro".to_string());
@@ -457,7 +658,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     }
 
     crate::modules::logger::log_info(&format!(
-        "[RepoDB] Backed up {} running prompts for instance '{}'",
+        "[RepoDB] Backed up {} running prompts for instance '{}' across Antigravity core and workspaces",
         backed_up_count, instance_id
     ));
 
@@ -651,7 +852,7 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             ORDER BY created_at DESC LIMIT ?",
+             ORDER BY updated_at DESC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 
@@ -714,6 +915,42 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
             "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?",
             rusqlite::params![now, now, &prompt.project_id],
         );
+
+        // Actively dispatch/run the prompt via agy CLI if workspace exists
+        let ws_dir = PathBuf::from(&prompt.repo_path);
+        if ws_dir.exists() {
+            if let Some(agy_bin) = crate::modules::process::get_antigravity_cli_executable_path() {
+                let mut cmd = std::process::Command::new(&agy_bin);
+                cmd.current_dir(&ws_dir);
+                cmd.arg("--dangerously-skip-permissions");
+                if let Some(ref cid) = prompt.session_id {
+                    cmd.arg("--conversation").arg(cid);
+                } else {
+                    cmd.arg("-c");
+                }
+                let clean_prompt = prompt.prompt_content.trim();
+                if !clean_prompt.is_empty() {
+                    if clean_prompt.len() <= 24000 {
+                        cmd.arg("-p").arg(clean_prompt);
+                    } else {
+                        cmd.arg("-p").arg(&clean_prompt[..24000]);
+                    }
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                }
+                cmd.stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null());
+                let _ = cmd.spawn();
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Dispatched agy execution for prompt '{}' (session: {:?}) in '{}'",
+                    prompt.id, prompt.session_id, prompt.repo_path
+                ));
+            }
+        }
 
         prompt.status = "running".to_string();
         prompt.updated_at = now;

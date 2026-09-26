@@ -136,7 +136,7 @@ function BackgroundTaskRunner() {
         const switcher = config?.auto_profile_switcher;
         if (!switcher || !switcher.is_enabled) return;
 
-        const threshold = switcher.low_quota_threshold_percent ?? 10;
+        const threshold = switcher.low_quota_threshold_percent ?? 25;
         const targetModel = switcher.target_model || 'gemini-2.5-flash';
         const intervalSecs = Math.max(5, switcher.check_interval_seconds || 15);
 

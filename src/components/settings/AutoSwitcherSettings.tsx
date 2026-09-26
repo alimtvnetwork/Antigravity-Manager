@@ -32,7 +32,7 @@ interface AutoSwitcherSettingsProps {
 const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     is_enabled: true,
     check_interval_seconds: 300,
-    low_quota_threshold_percent: 15.0,
+    low_quota_threshold_percent: 25.0,
     target_model: 'gemini-3.8-flash-high',
     has_auto_resume: true,
     cooldown_seconds: 180,

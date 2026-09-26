@@ -2040,6 +2040,25 @@ pub fn get_antigravity_cli_executable_path() -> Option<std::path::PathBuf> {
         if path.exists() {
             return Some(path);
         }
+
+        // Check Windows standard %LOCALAPPDATA%\agy\bin\agy.exe
+        if let Some(local_app_data) = dirs::data_local_dir() {
+            let win_path = local_app_data.join("agy").join("bin").join("agy.exe");
+            if win_path.exists() {
+                return Some(win_path);
+            }
+        }
+
+        // Check ~/.gemini/antigravity/bin/agy.exe
+        let gemini_bin = home.join(".gemini").join("antigravity").join("bin");
+        let gemini_path = if cfg!(target_os = "windows") {
+            gemini_bin.join("agy.exe")
+        } else {
+            gemini_bin.join("agy")
+        };
+        if gemini_path.exists() {
+            return Some(gemini_path);
+        }
     }
 
     // 3. 在系统环境变量 PATH 中查找

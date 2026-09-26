@@ -1539,13 +1539,13 @@ mod tests {
         assert_eq!(cfg.check_interval_seconds, 300);
         assert_eq!(cfg.caution_interval_seconds, 60);
         assert_eq!(cfg.critical_interval_seconds, 40);
-        assert_eq!(cfg.low_quota_threshold_percent, 15.0);
+        assert_eq!(cfg.low_quota_threshold_percent, 25.0);
         assert_eq!(cfg.critical_threshold_percent, 12.0);
 
         assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(14.9), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 300);
+        assert_eq!(calculate_next_interval_seconds(Some(24.9), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 40);
         assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);
