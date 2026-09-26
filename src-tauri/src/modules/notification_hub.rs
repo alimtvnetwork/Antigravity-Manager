@@ -276,7 +276,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         .unwrap_or_else(|| condition.to_string());
 
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Account Switched: {} -> {}",
+        "[Antigravity | {} | {} | {}] [JSON] Account Switched: {} -> {}",
         pkg_ver, m_name, m_ip, from_display, selected_display
     );
 
@@ -492,7 +492,11 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         pkg_ver
     );
 
-    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &active_recipients);
+    let _ = email_sender::dispatch_email_with_failover(
+        &subject,
+        &telemetry_json_pretty,
+        &active_recipients,
+    );
 }
 
 /// Helper to render and dispatch Telegram switch notification
@@ -627,26 +631,12 @@ fn dispatch_email_config_added_alert(title: &str, details: serde_json::Value) {
     let m_ip = email_watcher::detect_local_ip();
 
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [Antigravity] [JSON] Email Config Added: {}",
+        "[Antigravity | {} | {} | {}] [JSON] Email Config Added: {}",
         pkg_ver, m_name, m_ip, title
     );
 
     let json_pretty = serde_json::to_string_pretty(&details).unwrap_or_default();
-    let card_content = format!(
-        "Email configuration updated successfully.\r\n\r\n\
-         Configuration Payload (JSON State Machine):\r\n\
-         {}\r\n",
-        json_pretty
-    );
-
-    let html = email_sender::wrap_html_email_card(
-        &format!("Configuration Added: {}", title),
-        &card_content,
-        &m_name,
-        &m_ip,
-    );
-
-    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &target_recipients);
+    let _ = email_sender::dispatch_email_with_failover(&subject, &json_pretty, &target_recipients);
 }
 
 #[cfg(test)]

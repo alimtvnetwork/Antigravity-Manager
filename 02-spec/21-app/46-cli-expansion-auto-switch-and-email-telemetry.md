@@ -75,12 +75,12 @@ Okay. So now I wanted to add a little bit more information to the system. It wou
 ### 2.2 Email Subject & Multi-VM Telemetry JSON State Machine
 1. **Subject Formatting:** Standardize email subjects emitted by AGM:
    ```text
-   [Antigravity | v{VERSION} | {VM_NAME} | {LOCAL_IP}] [Antigravity] {Subject}
+   [Antigravity | v{VERSION} | {VM_NAME} | {LOCAL_IP}] {Subject}
    ```
 2. **JSON Switch Telemetry:** For switch events (auto-switch, fast-forward, manual instance switch):
    - Subject line appends `[JSON]`:
      ```text
-     [Antigravity | v{VERSION} | {VM_NAME} | {LOCAL_IP}] [Antigravity] [JSON] Account Switched: {instance_name} -> {target_email}
+     [Antigravity | v{VERSION} | {VM_NAME} | {LOCAL_IP}] [JSON] Account Switched: {instance_name} -> {target_email}
      ```
    - Email body embeds a machine-readable JSON card:
      ```json

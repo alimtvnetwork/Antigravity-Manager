@@ -89,5 +89,4 @@ agm recreate <project alias or path, seq, id>,  <project alias or path, seq, id>
 4. `predicted_next_account`: Predicts best candidate before switch.
 5. `selected_account`: Confirms selected account after switch.
 6. `prompts_running` & `prompts_resent`: Confirms prompt counts and re-injection via `.antigravity_resume_task.json`.
-7. `has_images` / `images_attached`: Verifies preservation of Base64 image payloads.
-8. Email Subject Standard: `[Antigravity | v{VERSION} | {VM} | {IP}] [Antigravity] [JSON] Account Switched: {previous} -> {selected}`
+8. Email Subject Standard: `[Antigravity | v{VERSION} | {VM} | {IP}] [JSON] Account Switched: {previous} -> {selected}` (Non-JSON emails: `[Antigravity | v{VERSION} | {VM} | {IP}] {Subject}`)

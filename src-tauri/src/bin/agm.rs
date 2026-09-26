@@ -3162,38 +3162,70 @@ fn cmd_email(args: &[String]) {
             let predicted_next_account = predicted_candidate.as_ref().map(|c| c.email.clone());
             let predicted_next_quota = predicted_candidate.as_ref().map(|c| c.quota_percent);
 
+            let mut target_recipients: Vec<String> = recipients
+                .iter()
+                .filter(|r| r.is_active)
+                .map(|r| r.email.clone())
+                .collect();
+            if target_recipients.is_empty() {
+                if let Some(def_acc) = accounts
+                    .iter()
+                    .find(|a| a.is_default && a.is_active)
+                    .or_else(|| accounts.iter().find(|a| a.is_active))
+                {
+                    target_recipients.push(def_acc.email.clone());
+                }
+            }
+
+            let status_json = serde_json::json!({
+                "event": "node_and_credits_status",
+                "enabled": settings.is_enabled,
+                "version": VERSION,
+                "machine_name": m_name,
+                "node_alias": node_alias,
+                "vm_alias": node_alias,
+                "local_machine_name": m_name,
+                "local_machine_ip": m_ip,
+                "local_ip": m_ip,
+                "polling_interval_minutes": settings.polling_interval_minutes,
+                "inbox_check_interval_minutes": settings.inbox_check_interval_minutes,
+                "default_sender": default_acc.map(|a| &a.email),
+                "accounts_count": accounts.len(),
+                "recipients_count": recipients.len(),
+                "email_accounts_count": accounts.len(),
+                "email_recipients_count": recipients.len(),
+                "active_account": active_acc.as_ref().map(|a| &a.email),
+                "previous_account": active_acc.as_ref().map(|a| &a.email),
+                "predicted_next_account": predicted_next_account,
+                "predicted_next_quota_percent": predicted_next_quota,
+                "selected_account": active_acc.as_ref().map(|a| &a.email),
+                "tier": tier,
+                "credit_before_switch": immediate_quota,
+                "immediate_quota_percent": immediate_quota,
+                "weekly_quota_percent": weekly_quota,
+                "threshold_percent": threshold_percent,
+                "threshold_activated": threshold_percent,
+                "instances_total": instances_list.len(),
+                "instances_running": running_instances,
+                "prompts_running": running_prompts,
+                "prompts_resent": prompts_resent,
+                "has_images": has_images,
+            });
+
             if is_json {
-                let out = serde_json::json!({
-                    "enabled": settings.is_enabled,
-                    "version": VERSION,
-                    "machine_name": m_name,
-                    "node_alias": node_alias,
-                    "vm_alias": node_alias,
-                    "local_machine_name": m_name,
-                    "local_machine_ip": m_ip,
-                    "local_ip": m_ip,
-                    "polling_interval_minutes": settings.polling_interval_minutes,
-                    "inbox_check_interval_minutes": settings.inbox_check_interval_minutes,
-                    "default_sender": default_acc.map(|a| &a.email),
-                    "accounts_count": accounts.len(),
-                    "recipients_count": recipients.len(),
-                    "active_account": active_acc.as_ref().map(|a| &a.email),
-                    "previous_account": active_acc.as_ref().map(|a| &a.email),
-                    "predicted_next_account": predicted_next_account,
-                    "predicted_next_quota_percent": predicted_next_quota,
-                    "selected_account": active_acc.as_ref().map(|a| &a.email),
-                    "tier": tier,
-                    "credit_before_switch": immediate_quota,
-                    "immediate_quota_percent": immediate_quota,
-                    "weekly_quota_percent": weekly_quota,
-                    "threshold_percent": threshold_percent,
-                    "threshold_activated": threshold_percent,
-                    "instances_running": running_instances,
-                    "prompts_running": running_prompts,
-                    "prompts_resent": prompts_resent,
-                    "has_images": has_images,
-                });
-                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                if !target_recipients.is_empty() {
+                    let subject = format!(
+                        "[Antigravity | v{} | {} | {}] [JSON] Node & Credits Status",
+                        VERSION, node_alias, m_ip
+                    );
+                    let json_body = serde_json::to_string_pretty(&status_json).unwrap_or_default();
+                    let _ = email_sender::dispatch_email_with_failover(
+                        &subject,
+                        &json_body,
+                        &target_recipients,
+                    );
+                }
+                println!("{}", serde_json::to_string_pretty(&status_json).unwrap_or_default());
                 return;
             }
 
@@ -3256,103 +3288,28 @@ fn cmd_email(args: &[String]) {
                 }
             );
 
-            let mut target_recipients: Vec<String> = recipients
-                .iter()
-                .filter(|r| r.is_active)
-                .map(|r| r.email.clone())
-                .collect();
-            if target_recipients.is_empty() {
-                if let Some(def_acc) = accounts
-                    .iter()
-                    .find(|a| a.is_default && a.is_active)
-                    .or_else(|| accounts.iter().find(|a| a.is_active))
-                {
-                    target_recipients.push(def_acc.email.clone());
-                }
-            }
-
             if !target_recipients.is_empty() {
-                let status_json = serde_json::json!({
-                    "event": "node_and_credits_status",
-                    "version": VERSION,
-                    "machine_name": m_name,
-                    "node_alias": node_alias,
-                    "vm_alias": node_alias,
-                    "local_ip": m_ip,
-                    "active_account": active_acc.as_ref().map(|a| a.email.clone()),
-                    "previous_account": active_acc.as_ref().map(|a| a.email.clone()),
-                    "predicted_next_account": predicted_next_account,
-                    "predicted_next_quota_percent": predicted_next_quota,
-                    "selected_account": active_acc.as_ref().map(|a| a.email.clone()),
-                    "tier": tier,
-                    "credit_before_switch": immediate_quota,
-                    "immediate_quota_percent": immediate_quota,
-                    "weekly_quota_percent": weekly_quota,
-                    "threshold_percent": threshold_percent,
-                    "threshold_activated": threshold_percent,
-                    "instances_total": instances_list.len(),
-                    "instances_running": running_instances,
-                    "prompts_running": running_prompts,
-                    "prompts_resent": prompts_resent,
-                    "has_images": has_images,
-                    "email_accounts_count": accounts.len(),
-                    "email_recipients_count": recipients.len(),
-                });
-                let body_text = format!(
-                    "Node & Credits Status Report\r\n\
-                     Version:              v{}\r\n\
-                     Machine Name:         {}\r\n\
-                     Node Alias:           {}\r\n\
-                     Local IP:             {}\r\n\
-                     Active Account:       {} [{}]\r\n\
-                     Predicted Next:       {}\r\n\
-                     Immediate Credits:    {:.1}%\r\n\
-                     Weekly Credits:       {:.1}%\r\n\
-                     Threshold Activated:  {:.1}%\r\n\
-                     Running Instances:    {} / {}\r\n\
-                     Running Prompts:      {}\r\n\
-                     Prompts Resent:       {}\r\n\
-                     Attached Images:      {}\r\n\r\n\
-                     [JSON]\r\n{}",
+                let subject = format!(
+                    "[Antigravity | v{} | {} | {}] Node & Credits Status",
+                    VERSION, node_alias, m_ip
+                );
+                let html = email_sender::render_node_credits_status_table_html(
                     VERSION,
-                    m_name,
-                    node_alias,
-                    m_ip,
-                    active_acc
-                        .as_ref()
-                        .map(|a| a.email.as_str())
-                        .unwrap_or("(None)"),
+                    &node_alias,
+                    &m_ip,
+                    active_acc.as_ref().map(|a| a.email.as_str()),
                     tier,
-                    predicted_next_account
-                        .as_deref()
-                        .unwrap_or("None / Standby"),
+                    predicted_next_account.as_deref(),
                     immediate_quota,
                     weekly_quota,
                     threshold_percent,
                     running_instances,
                     instances_list.len(),
                     running_prompts,
-                    if prompts_resent {
-                        "Yes (Auto-Resumed via .antigravity_resume_task.json)"
-                    } else {
-                        "No"
-                    },
-                    if has_images {
-                        "Yes (Base64 payload preserved)"
-                    } else {
-                        "None"
-                    },
-                    serde_json::to_string_pretty(&status_json).unwrap_or_default()
-                );
-                let subject = format!(
-                    "[Antigravity | v{} | {} | {}] [Antigravity] [JSON] Node & Credits Status",
-                    VERSION, node_alias, m_ip
-                );
-                let html = email_sender::wrap_html_email_card(
-                    "Node & Credits Status",
-                    &body_text,
-                    &node_alias,
-                    &m_ip,
+                    prompts_resent,
+                    has_images,
+                    accounts.len(),
+                    recipients.len(),
                 );
                 match email_sender::dispatch_email_with_failover(
                     &subject,
