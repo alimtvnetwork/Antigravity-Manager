@@ -1054,16 +1054,22 @@ pub async fn trigger_manual_rotation_for_instance(
     let email = candidate.email.clone();
     let effective_inst = candidate.instance_id.clone();
 
-    let prev_email = current_bound
+    let (prev_email, prev_quota) = match current_bound
         .as_ref()
         .and_then(|id| account::load_account(id).ok())
-        .map(|a| a.email);
+    {
+        Some(acc) => {
+            let q = calculate_account_quota(&acc, &switcher_cfg.target_model);
+            (Some(acc.email), q)
+        }
+        None => (None, None),
+    };
 
     let rot_ctx = RotationContext {
         previous_email: prev_email,
         predicted_email: Some(email.clone()),
-        credit_before_switch: None,
-        threshold_activated: Some(0.0),
+        credit_before_switch: prev_quota,
+        threshold_activated: Some(switcher_cfg.low_quota_threshold_percent),
     };
 
     execute_profile_rotation_with_context(
