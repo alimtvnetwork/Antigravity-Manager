@@ -385,41 +385,44 @@ async fn check_quota_drop_sensor(
 
 /// Check idle running projects sensor
 async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_alert: &mut i64) {
-    let projects = match crate::modules::repo_db::list_running_projects() {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-
-    let running_projs: Vec<_> = projects.into_iter().filter(|p| p.is_running).collect();
-    if running_projs.is_empty() {
+    // 1. If ANY prompt or conversation is actively running in Antigravity or repo_db, we are NOT idle!
+    if crate::modules::repo_db::is_any_prompt_actively_running() {
         return;
     }
 
-    // Check active prompts
-    let active_prompts = match crate::modules::repo_db::list_backed_up_prompts() {
-        Ok(p) => p,
+    // 2. Query live execution states
+    let project_infos = crate::modules::repo_db::get_live_project_execution_info();
+    if project_infos.is_empty() {
+        return;
+    }
+
+    // 3. If any project is actively running, suppress idle alert completely
+    let has_any_running = project_infos.iter().any(|p| p.is_running);
+    if has_any_running {
+        return;
+    }
+
+    // 4. Collect genuinely idle projects
+    let idle_projects: Vec<_> = project_infos.into_iter().filter(|p| p.is_idle).collect();
+    if idle_projects.is_empty() {
+        return;
+    }
+
+    let recipients = match email_vault_db::list_notify_recipients() {
+        Ok(r) => r,
         Err(_) => return,
     };
 
-    let has_prompts = !active_prompts.is_empty();
-    if !has_prompts {
-        let recipients = match email_vault_db::list_notify_recipients() {
-            Ok(r) => r,
-            Err(_) => return,
-        };
+    let active_recipients: Vec<String> = recipients
+        .into_iter()
+        .filter(|r| r.is_active)
+        .map(|r| r.email)
+        .collect();
 
-        let active_recipients: Vec<String> = recipients
-            .into_iter()
-            .filter(|r| r.is_active)
-            .map(|r| r.email)
-            .collect();
-
-        if !active_recipients.is_empty() {
-            let names: Vec<String> = running_projs.into_iter().map(|p| p.repo_name).collect();
-            let (subj, html) = email_sender::render_idle_projects_email(&names, m_name, m_ip);
-            let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
-            *last_alert = Utc::now().timestamp();
-        }
+    if !active_recipients.is_empty() {
+        let (subj, html) = email_sender::render_idle_projects_email(&idle_projects, m_name, m_ip);
+        let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
+        *last_alert = Utc::now().timestamp();
     }
 }
 

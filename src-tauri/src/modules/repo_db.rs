@@ -52,6 +52,19 @@ pub struct RunningProject {
     pub last_detected_at: i64,
 }
 
+/// Represents detailed live execution state for a project workspace
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectExecutionInfo {
+    pub project_id: String,
+    pub repo_name: String,
+    pub repo_path: String,
+    pub is_running: bool,
+    pub is_idle: bool,
+    pub status: String,
+    pub active_prompt: Option<String>,
+    pub last_detected_at: i64,
+}
+
 /// Represents a prompt captured from a running project
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivePrompt {
@@ -934,6 +947,174 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
         .collect();
 
     Ok(rows)
+}
+
+/// Retrieve live project execution information by inspecting both Antigravity's
+/// conversation_summaries.db (ground-truth for in-flight requests) and SQLite repo_prompts.db.
+pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
+    let mut results: Vec<ProjectExecutionInfo> = Vec::new();
+    let now = Utc::now().timestamp();
+
+    // Map of normalized repo path -> (is_running, active_prompt_snippet, last_time)
+    let mut live_map: std::collections::HashMap<String, (bool, Option<String>, i64)> =
+        std::collections::HashMap::new();
+
+    // 1. Inspect Antigravity conversation_summaries.db
+    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    if let Some(base_dir) = base_dir {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if summaries_db.exists() {
+            if let Ok(conn) = Connection::open_with_flags(
+                &summaries_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            ) {
+                if let Ok(mut stmt) = conn.prepare(
+                    "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+                     FROM conversation_summaries 
+                     ORDER BY last_modified_time DESC 
+                     LIMIT 25",
+                ) {
+                    let rows = stmt.query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, i32>(4)?,
+                            row.get::<_, Option<String>>(5)?,
+                            row.get::<_, String>(6)?,
+                        ))
+                    });
+                    if let Ok(rows) = rows {
+                        for item in rows.flatten() {
+                            let (_cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
+                            let is_conv_running = not_fully_idle != 0 || status.contains("RUNNING");
+                            let prompt_preview = if !preview.trim().is_empty() {
+                                Some(preview)
+                            } else {
+                                None
+                            };
+
+                            if let Some(ws_uris_raw) = ws_uris_opt {
+                                let ws_uris: Vec<String> =
+                                    serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                                for u in ws_uris {
+                                    let clean_p = decode_uri_to_path(&u).to_lowercase();
+                                    let entry = live_map
+                                        .entry(clean_p)
+                                        .or_insert((false, None, now));
+                                    if is_conv_running {
+                                        entry.0 = true;
+                                        if entry.1.is_none() && prompt_preview.is_some() {
+                                            entry.1 = prompt_preview.clone();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Inspect active_prompts in repo_prompts.db for any in-flight prompts
+    if let Ok(conn) = connect_db() {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT repo_path, prompt_content, status FROM active_prompts WHERE status = 'running' OR status = 'queued'",
+        ) {
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            });
+            if let Ok(rows) = rows {
+                for item in rows.flatten() {
+                    let (p_path, p_content, _st) = item;
+                    let clean_p = p_path.to_lowercase();
+                    let entry = live_map.entry(clean_p).or_insert((false, None, now));
+                    entry.0 = true;
+                    if entry.1.is_none() {
+                        entry.1 = Some(p_content.chars().take(120).collect());
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Merge with discovered projects from running_projects
+    let projects = list_running_projects().unwrap_or_default();
+    for p in projects {
+        let clean_path = p.repo_path.to_lowercase();
+        let (is_running, prompt_snippet, last_time) = live_map
+            .get(&clean_path)
+            .cloned()
+            .unwrap_or((false, None, p.last_detected_at));
+        let is_idle = !is_running;
+        let status_str = if is_running {
+            "RUNNING".to_string()
+        } else {
+            "IDLE".to_string()
+        };
+
+        results.push(ProjectExecutionInfo {
+            project_id: p.id,
+            repo_name: p.repo_name,
+            repo_path: p.repo_path,
+            is_running,
+            is_idle,
+            status: status_str,
+            active_prompt: prompt_snippet,
+            last_detected_at: last_time,
+        });
+    }
+
+    results
+}
+
+/// Returns true if ANY project or conversation is currently actively running
+pub fn is_any_prompt_actively_running() -> bool {
+    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    if let Some(base_dir) = base_dir {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if summaries_db.exists() {
+            if let Ok(conn) = Connection::open_with_flags(
+                &summaries_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            ) {
+                let count: i32 = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM conversation_summaries WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+                if count > 0 {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Check repo_prompts.db active_prompts
+    if let Ok(conn) = connect_db() {
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts WHERE status = 'running' OR status = 'queued'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        if count > 0 {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Save or re-queue an active prompt into active_prompts and running_projects

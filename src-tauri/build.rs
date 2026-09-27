@@ -1,4 +1,9 @@
 fn main() {
+    let (git_hash, git_branch, git_last_release) = get_git_info();
+    println!("cargo:rustc-env=AGM_GIT_HASH={}", git_hash);
+    println!("cargo:rustc-env=AGM_GIT_BRANCH={}", git_branch);
+    println!("cargo:rustc-env=AGM_LAST_RELEASE={}", git_last_release);
+
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
@@ -77,4 +82,35 @@ fn copy_dll_recursive(
         }
     }
     Ok(())
+}
+
+fn get_git_info() -> (String, String, String) {
+    let git_hash = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let git_branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "main".to_string());
+
+    let git_last_release = std::process::Command::new("git")
+        .args(["describe", "--tags", "--abbrev=0"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")));
+
+    (git_hash, git_branch, git_last_release)
 }

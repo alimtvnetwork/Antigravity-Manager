@@ -197,3 +197,4 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 -**AC-APP-049 (CLI & Auto-Switcher Deep Verification & Execution Audit):** Implemented in [`49-cli-and-autoswitch-deep-verification-and-execution-audit.md`](./49-cli-and-autoswitch-deep-verification-and-execution-audit.md).
 - **AC-APP-050 (Running Prompts Backup Restore & Green Watchers):** Implemented in [`50-running-prompts-backup-restore-and-green-watchers.md`](./50-running-prompts-backup-restore-and-green-watchers.md).
 - **AC-APP-051 (Auto-Switch Prompt Backup, Resumption & De-Duplication):** Implemented in [`51-auto-switch-prompt-backup-resumption-and-deduplication.md`](./51-auto-switch-prompt-backup-resumption-and-deduplication.md).
+- **AC-APP-052 (Idle Notification Logic Fix & AGM GitMap Parity):** Implemented in [`52-idle-notification-and-agm-parity.md`](./52-idle-notification-and-agm-parity.md).

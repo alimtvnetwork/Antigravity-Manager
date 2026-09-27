@@ -29,6 +29,8 @@ fn main() {
     if args.len() <= 1 {
         print_banner();
         print_help();
+        print_live_projects_table();
+        print_recent_prompts_table();
         return;
     }
 
@@ -120,11 +122,19 @@ fn main() {
         "update" => cmd_update(),
         "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
-            println!("agm v{}", VERSION);
+            let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
+            let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
+            let last_release = antigravity_tools_lib::modules::git_info::get_last_release();
+            println!(
+                "agm v{} (commit: {}, branch: {}, last release: {})",
+                VERSION, git_hash, git_branch, last_release
+            );
         }
         "help" | "--help" | "-h" => {
             print_banner();
             print_help();
+            print_live_projects_table();
+            print_recent_prompts_table();
         }
         _ => {
             eprintln!("Unknown command: '{}'", args[1]);
@@ -135,11 +145,15 @@ fn main() {
 }
 
 fn print_banner() {
+    let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
+    let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
+    let last_release = antigravity_tools_lib::modules::git_info::get_last_release();
+
     println!("================================================================================");
     println!("             AGM - Antigravity-Manager Native Terminal CLI                      ");
     println!(
-        "             Version: v{}                                                        ",
-        VERSION
+        "  Version: v{} | Commit: {} | Branch: {} | Last Release: {}",
+        VERSION, git_hash, git_branch, last_release
     );
     println!("================================================================================");
 }
@@ -252,6 +266,60 @@ fn print_help() {
     );
     println!("  version, -v                           Print agm CLI version");
     println!("  help, -h                              Display this help manual");
+    println!();
+}
+
+fn print_live_projects_table() {
+    println!("Discovered Workspaces & Project Identifiers:");
+    println!(
+        "  {:<32} {:<28} {:<10} {:<30}",
+        "PROJECT NAME", "REPLY TARGET", "STATUS", "PATH"
+    );
+    println!("  {}", "-".repeat(105));
+    let projects = repo_db::get_live_project_execution_info();
+    if projects.is_empty() {
+        println!("  (No active workspace projects detected)");
+    } else {
+        for p in projects {
+            let reply_target = format!("proj-{}", p.project_id);
+            let path_snippet: String = if p.repo_path.len() > 30 {
+                format!("...{}", &p.repo_path[p.repo_path.len() - 27..])
+            } else {
+                p.repo_path.clone()
+            };
+            println!(
+                "  {:<32} {:<28} {:<10} {:<30}",
+                p.repo_name, reply_target, p.status, path_snippet
+            );
+        }
+    }
+    println!();
+}
+
+fn print_recent_prompts_table() {
+    println!("Recent Prompts Inventory:");
+    println!(
+        "  {:<26} {:<24} {:<12} {:<38}",
+        "PROMPT ID", "PROJECT", "STATUS", "SNIPPET"
+    );
+    println!("  {}", "-".repeat(105));
+    let prompts = repo_db::list_all_prompts().unwrap_or_default();
+    if prompts.is_empty() {
+        println!("  (No prompt records in repo_prompts.db)");
+    } else {
+        for p in prompts.iter().take(6) {
+            let snippet: String = p
+                .prompt_content
+                .replace('\n', " ")
+                .chars()
+                .take(36)
+                .collect();
+            println!(
+                "  {:<26} {:<24} {:<12} {:<38}",
+                p.id, p.project_id, p.status, snippet
+            );
+        }
+    }
     println!();
 }
 
@@ -449,10 +517,8 @@ fn cmd_accounts(args: &[String]) {
     let mut account_rows = Vec::new();
     for (i, summary) in index.accounts.iter().enumerate() {
         let is_current = summary.id == active_id;
-        if show_only_active {
-            if !is_current {
-                continue;
-            }
+        if show_only_active && !is_current {
+            continue;
         }
 
         let full_acc = account::load_account(&summary.id).ok();
@@ -750,8 +816,8 @@ fn cmd_which_prompts_running(args: &[String]) {
         rows.len()
     );
     println!(
-        "{:<5} {:<22} {:<24} {:<16} {:<26} {}",
-        "SEQ", "PROJECT", "ID", "CONV ID", "CONV NAME", "PROMPTS (QUEUE)"
+        "{:<5} {:<22} {:<24} {:<16} {:<26} PROMPTS (QUEUE)",
+        "SEQ", "PROJECT", "ID", "CONV ID", "CONV NAME"
     );
     println!("{}", "-".repeat(110));
 
@@ -899,8 +965,8 @@ fn cmd_prompts(args: &[String]) {
         println!("No active prompt tasks tracked in repo_prompts.db.");
     } else {
         println!(
-            "{:<5} {:<10} {:<22} {:<12} {:<10} {}",
-            "SEQ", "ID", "PROJECT", "STATUS", "WORDS", "PROMPT SNIPPET (ASC STACK)"
+            "{:<5} {:<10} {:<22} {:<12} {:<10} PROMPT SNIPPET (ASC STACK)",
+            "SEQ", "ID", "PROJECT", "STATUS", "WORDS"
         );
         println!("{}", "-".repeat(110));
         for item in &stack_items {
@@ -2462,8 +2528,8 @@ fn cmd_running_projects(args: &[String]) {
     }
 
     println!(
-        "{:<5} {:<24} {:<24} {:<16} {:<12} {}",
-        "SEQ", "PROJECT", "ID", "CONV ID", "STATUS", "PROMPTS (QUEUE)"
+        "{:<5} {:<24} {:<24} {:<16} {:<12} PROMPTS (QUEUE)",
+        "SEQ", "PROJECT", "ID", "CONV ID", "STATUS"
     );
     println!("{}", "-".repeat(95));
     for r in &rows {
@@ -3436,6 +3502,9 @@ fn cmd_status(args: &[String]) {
     if is_json {
         let out = serde_json::json!({
             "version": VERSION,
+            "git_hash": antigravity_tools_lib::modules::git_info::get_git_hash(),
+            "git_branch": antigravity_tools_lib::modules::git_info::get_git_branch(),
+            "last_release": antigravity_tools_lib::modules::git_info::get_last_release(),
             "machine_name": machine_name,
             "node_alias": node_alias,
             "vm_alias": node_alias,
@@ -3466,11 +3535,18 @@ fn cmd_status(args: &[String]) {
         return;
     }
 
+    let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
+    let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
+    let last_release = antigravity_tools_lib::modules::git_info::get_last_release();
+
     println!("[*] Antigravity-Manager Node & Credits Status:");
     println!("    Machine Name:      {}", machine_name);
     println!("    Node / VM Alias:   {}", node_alias);
     println!("    Local IP:          {}", local_ip);
     println!("    CLI Version:       v{}", VERSION);
+    println!("    Git Commit:        {}", git_hash);
+    println!("    Git Branch:        {}", git_branch);
+    println!("    Last Release:      {}", last_release);
 
     if let Some(acc) = active_acc {
         println!("    Active Account:    {} [{}]", acc.email, tier);

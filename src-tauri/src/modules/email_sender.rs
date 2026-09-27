@@ -673,18 +673,25 @@ pub fn wrap_html_email_card(
     machine_ip: &str,
 ) -> String {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let git_hash = crate::modules::git_info::get_git_hash();
+    let git_branch = crate::modules::git_info::get_git_branch();
+    let last_release = crate::modules::git_info::get_last_release();
     let now_str = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
-    let (is_table_format, rendered_table) = format_content_as_table_rows(content);
-    let details_section = if is_table_format {
-        rendered_table
+    let details_section = if content.trim().starts_with('<') {
+        content.to_string()
     } else {
-        let escaped_content = escape_html_entities(content.trim());
-        format!(
-            r#"<div style="font-weight: 700; font-size: 13px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Message Details</div>
-<pre style="background: #0f172a; color: #e2e8f0; padding: 18px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>"#,
-            escaped_content
-        )
+        let (is_table_format, rendered_table) = format_content_as_table_rows(content);
+        if is_table_format {
+            rendered_table
+        } else {
+            let escaped_content = escape_html_entities(content.trim());
+            format!(
+                r#"<div style="font-weight: 800; font-size: 15px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Message Details</div>
+<pre style="background: #0f172a; color: #e2e8f0; padding: 18px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>"#,
+                escaped_content
+            )
+        }
     };
 
     format!(
@@ -698,59 +705,78 @@ pub fn wrap_html_email_card(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
-  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; background: #2563eb; padding: 3px 8px; border-radius: 6px; }}
   a:visited {{ color: #ffffff !important; }}
-  a:hover {{ color: #e0f2fe !important; }}
-  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
+  a:hover {{ color: #ffffff !important; background: #1d4ed8; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 4px 10px; border-radius: 6px; text-decoration: underline; display: inline-block; font-size: 15px; font-weight: bold; }}
   td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
-  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
+  <div style="max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 4px solid #38bdf8; padding: 24px 28px; color: #ffffff;">
       <div style="margin-bottom: 12px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} | {}]</span>
-        <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">AGM TELEMETRY</span>
+        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 6px 14px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 14px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} ({}) | {} | {}]</span>
+        <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">AGM TELEMETRY</span>
       </div>
-      <h2 style="margin: 6px 0 0 0; font-size: 24px; color: #ffffff; font-weight: 700; line-height: 1.3;">{}</h2>
+      <h2 style="margin: 8px 0 0 0; font-size: 28px; color: #ffffff; font-weight: 800; line-height: 1.35;">{}</h2>
     </div>
     <div style="padding: 28px;">
+      <div style="font-weight: 800; font-size: 15px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Node &amp; Git Telemetry</div>
       <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 22px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; width: 170px; background: #f8fafc;">Application Version</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700;">{}</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; width: 180px; background: #f8fafc;">Application Version</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; background: #f8fafc;">VM / Node Alias</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700;">{}</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Commit</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; background: #f8fafc;">Local IPv4</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace;">{}</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Branch</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; color: #475569; font-weight: 600; background: #f8fafc;">Dispatched At</td>
-          <td style="padding: 12px 18px; color: #0f172a; font-family: 'Ubuntu Mono', monospace;">{}</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Last Release</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">VM / Node Alias</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Local IPv4</td>
+          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 16px;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 18px; color: #475569; font-weight: 700; background: #f8fafc;">Dispatched At</td>
+          <td style="padding: 12px 18px; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 16px;">{}</td>
         </tr>
       </table>
       {}
     </div>
-    <div style="background: #f8fafc; padding: 16px 28px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center;">
-      Automated Remote Dispatcher &middot; Antigravity Manager {} &middot; Node {} ({})
+    <div style="background: #f8fafc; padding: 16px 28px; border-top: 1px solid #e2e8f0; font-size: 14px; color: #64748b; text-align: center;">
+      Automated Remote Dispatcher &middot; Antigravity Manager {} ({}) &middot; Node {} ({})
     </div>
   </div>
 </body>
 </html>"#,
         pkg_ver,
+        git_hash,
+        git_branch,
         machine_name,
         machine_ip,
         escape_html_entities(title),
         pkg_ver,
+        git_hash,
+        git_branch,
+        last_release,
         machine_name,
         machine_ip,
         now_str,
         details_section,
         pkg_ver,
+        git_hash,
         machine_name,
         machine_ip
     )
@@ -1187,34 +1213,164 @@ pub fn render_workspace_switch_email(
 
 /// Render HTML email for idle running projects alert
 pub fn render_idle_projects_email(
-    projects: &[String],
+    projects: &[crate::modules::repo_db::ProjectExecutionInfo],
     machine_name: &str,
     machine_ip: &str,
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let git_hash = crate::modules::git_info::get_git_hash();
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
-        pkg_ver, machine_name, machine_ip
+        "[Antigravity | {} | {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
+        pkg_ver, git_hash, machine_name, machine_ip
     );
-    let mut proj_list = String::new();
+
+    let mut proj_rows = String::new();
     for p in projects {
-        proj_list.push_str(&format!("  - {}\r\n", p));
+        proj_rows.push_str(&format!(
+            r#"<tr>
+  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 15px;">{}</td>
+  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-family: 'Ubuntu Mono', monospace; font-size: 14px; font-weight: 700;">sub: {} | proj-{}</code></td>
+  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 13px; color: #475569;">{}</td>
+  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 6px; font-size: 13px; font-weight: 700;">IDLE / READY</span></td>
+</tr>"#,
+            escape_html_entities(&p.repo_name),
+            escape_html_entities(machine_name),
+            escape_html_entities(&p.project_id),
+            escape_html_entities(&p.repo_path),
+        ));
     }
 
-    let content = format!(
-        "[*] IDLE WORKSPACE SENSOR\r\n\r\n\
-         There are no active prompts currently running in the following active projects:\r\n\r\n\
-         {}\r\n\
-         Would you like to send something to these projects? Reply to this email with:\r\n\r\n\
-         Subject: sub: {} | proj-<project-name>\r\n\r\n\
-         <Your prompt instruction here...>\r\n\r\n\
-         Antigravity Manager will read your reply and inject the prompt automatically.",
-        proj_list.trim_end(),
-        machine_name
+    let recent_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
+    let mut prompt_rows = String::new();
+    for p in recent_prompts.iter().take(5) {
+        let preview: String = p.prompt_content.chars().take(80).collect();
+        let preview_clean = escape_html_entities(&preview);
+        prompt_rows.push_str(&format!(
+            r#"<tr>
+  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 13px; color: #0284c7; font-weight: 700;">{}</td>
+  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155; font-weight: 600;">{}</td>
+  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 700;">{}</span></td>
+  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">{}...</td>
+</tr>"#,
+            escape_html_entities(&p.id),
+            escape_html_entities(&p.project_id),
+            escape_html_entities(&p.status),
+            preview_clean,
+        ));
+    }
+
+    let prompts_section = if !prompt_rows.is_empty() {
+        format!(
+            r#"<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
+  Recent Prompt History &amp; Queue
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+  <thead>
+    <tr style="background: #334155; color: #ffffff;">
+      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Prompt ID</th>
+      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Target Project</th>
+      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Status</th>
+      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Snippet</th>
+    </tr>
+  </thead>
+  <tbody>
+    {}
+  </tbody>
+</table>"#,
+            prompt_rows
+        )
+    } else {
+        String::new()
+    };
+
+    let content_html = format!(
+        r#"<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 22px; margin-bottom: 20px;">
+  <div style="font-weight: 800; font-size: 16px; color: #0f172a; margin-bottom: 8px;">
+    [*] IDLE WORKSPACE SENSOR &mdash; All Background Tasks Completed
+  </div>
+  <p style="margin: 0; color: #334155; font-size: 16px; line-height: 1.6;">
+    There are currently no active prompts running across your workspaces on node <strong>{}</strong> (<code>{}</code>).
+    The system is verified completely idle and standing by for instructions.
+  </p>
+</div>
+
+<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
+  Available Commands &amp; Remote Email Formats
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+  <thead>
+    <tr style="background: #0f172a; color: #ffffff;">
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Action / Goal</th>
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Email Reply Subject Format</th>
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">CLI Equivalent</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Send Prompt to Project</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">sub: {} | proj-&lt;project_name&gt;</code><br><span style="color: #64748b; font-size: 13px;">(Body: your prompt instruction)</span></td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm prompt -p "&lt;name&gt;" "&lt;text&gt;"</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Broadcast to All</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">sub: {} | all</code><br><span style="color: #64748b; font-size: 13px;">(Dispatches prompt to every workspace)</span></td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm broadcast-email send-to-all</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Check Quota &amp; Credits</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm status</code></td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm status</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Trigger Auto-Switch</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm switch-if-low-credit</code></td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm swlc</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">List Running Prompts</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm running-prompts ls</code></td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm running-prompts ls</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 16px; font-weight: 700; color: #0f172a;">Inbound Commands Manual</td>
+      <td style="padding: 12px 16px;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">Subject: help</code></td>
+      <td style="padding: 12px 16px;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm help</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
+  Active Workspaces (Ready for Instructions)
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+  <thead>
+    <tr style="background: #1e293b; color: #ffffff;">
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Project Name</th>
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Email Reply Target Identifier</th>
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Repository Path</th>
+      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {}
+  </tbody>
+</table>
+
+{}"#,
+        machine_name,
+        machine_ip,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        proj_rows,
+        prompts_section
     );
-    let body = wrap_plaintext_email(
+
+    let body = wrap_html_email_card(
         "Idle Projects Notification",
-        &content,
+        &content_html,
         machine_name,
         machine_ip,
     );
