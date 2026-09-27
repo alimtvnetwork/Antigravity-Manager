@@ -36,7 +36,7 @@ fn main() {
         return;
     }
 
-    let subcommand = args[1].to_lowercase();
+    let subcommand = args[1].trim_start_matches('/').to_lowercase();
     let cmd_args = if args.len() > 2 {
         args[2..].to_vec()
     } else {
@@ -3136,7 +3136,7 @@ fn cmd_telegram(args: &[String]) {
     };
 
     if let Some(first) = args.first() {
-        let first_lower = first.to_lowercase();
+        let first_lower = first.trim_start_matches('/').to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Telegram Remote & Notification Subsystem:");
             println!("  agm telegram chat <token> [chat_id]     Connect bot & chat, auto-discover chat ID & send welcome ping");
@@ -3782,7 +3782,7 @@ fn cmd_telegram(args: &[String]) {
 fn cmd_agy(args: &[String]) {
     let sub = args
         .first()
-        .map(|s| s.to_lowercase())
+        .map(|s| s.trim_start_matches('/').to_lowercase())
         .unwrap_or_else(|| "help".to_string());
     let rt = tokio::runtime::Runtime::new().unwrap();
     match sub.as_str() {
