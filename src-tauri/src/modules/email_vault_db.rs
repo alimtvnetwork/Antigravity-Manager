@@ -87,6 +87,10 @@ fn default_active_awaiting() -> u32 {
     10
 }
 
+fn default_true() -> bool {
+    true
+}
+
 /// Email watcher & notification settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailNotificationSettings {
@@ -102,6 +106,8 @@ pub struct EmailNotificationSettings {
     pub quota_drop_threshold_percent: u32,
     pub notify_on_workspace_switch: bool,
     pub notify_on_idle_workspace: bool,
+    #[serde(default = "default_true")]
+    pub notify_on_system_update: bool,
     pub allow_remote_prompt_execution: bool,
     pub allow_remote_cli_execution: bool,
     pub allow_remote_instance_rotation: bool,
@@ -123,6 +129,7 @@ impl Default for EmailNotificationSettings {
             quota_drop_threshold_percent: 25,
             notify_on_workspace_switch: true,
             notify_on_idle_workspace: true,
+            notify_on_system_update: true,
             allow_remote_prompt_execution: true,
             allow_remote_cli_execution: true,
             allow_remote_instance_rotation: true,
@@ -244,6 +251,7 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
             quota_drop_threshold_percent INTEGER NOT NULL DEFAULT 25,
             notify_on_workspace_switch INTEGER NOT NULL DEFAULT 1,
             notify_on_idle_workspace INTEGER NOT NULL DEFAULT 1,
+            notify_on_system_update INTEGER NOT NULL DEFAULT 1,
             allow_remote_prompt_execution INTEGER NOT NULL DEFAULT 1,
             allow_remote_cli_execution INTEGER NOT NULL DEFAULT 1,
             allow_remote_instance_rotation INTEGER NOT NULL DEFAULT 1,
@@ -261,6 +269,10 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     );
     let _ = conn.execute(
         "ALTER TABLE email_notification_settings ADD COLUMN active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE email_notification_settings ADD COLUMN notify_on_system_update INTEGER NOT NULL DEFAULT 1",
         [],
     );
 
@@ -663,6 +675,7 @@ fn map_settings_row(r: &rusqlite::Row) -> rusqlite::Result<EmailNotificationSett
     let a_prompt: i32 = r.get(10)?;
     let a_cli: i32 = r.get(11)?;
     let a_inst: i32 = r.get(12)?;
+    let n_update: i32 = r.get(16).unwrap_or(1);
     Ok(EmailNotificationSettings {
         id: r.get(0)?,
         is_enabled: is_en > 0,
@@ -674,6 +687,7 @@ fn map_settings_row(r: &rusqlite::Row) -> rusqlite::Result<EmailNotificationSett
         quota_drop_threshold_percent: q_drop,
         notify_on_workspace_switch: n_ws > 0,
         notify_on_idle_workspace: n_idle > 0,
+        notify_on_system_update: n_update > 0,
         allow_remote_prompt_execution: a_prompt > 0,
         allow_remote_cli_execution: a_cli > 0,
         allow_remote_instance_rotation: a_inst > 0,
@@ -690,7 +704,8 @@ pub fn get_notification_settings() -> Result<EmailNotificationSettings, String> 
                       baseline_polling_interval_minutes, active_awaiting_interval_seconds,
                       notify_on_quota_drop, quota_drop_threshold_percent, notify_on_workspace_switch,
                       notify_on_idle_workspace, allow_remote_prompt_execution, allow_remote_cli_execution,
-                      allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at
+                      allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at,
+                      notify_on_system_update
                FROM email_notification_settings WHERE id = 'global'";
     let mut stmt = conn
         .prepare(sql)
@@ -734,6 +749,11 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
     } else {
         0
     };
+    let n_update = if settings.notify_on_system_update {
+        1
+    } else {
+        0
+    };
 
     conn.execute(
         "INSERT INTO email_notification_settings
@@ -741,8 +761,9 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
           baseline_polling_interval_minutes, active_awaiting_interval_seconds,
           notify_on_quota_drop, quota_drop_threshold_percent, notify_on_workspace_switch,
           notify_on_idle_workspace, allow_remote_prompt_execution, allow_remote_cli_execution,
-          allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at)
-         VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          allow_remote_instance_rotation, local_machine_name, local_machine_ip, updated_at,
+          notify_on_system_update)
+         VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
             is_enabled = excluded.is_enabled,
             polling_interval_minutes = excluded.polling_interval_minutes,
@@ -758,7 +779,8 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
             allow_remote_instance_rotation = excluded.allow_remote_instance_rotation,
             local_machine_name = excluded.local_machine_name,
             local_machine_ip = excluded.local_machine_ip,
-            updated_at = excluded.updated_at",
+            updated_at = excluded.updated_at,
+            notify_on_system_update = excluded.notify_on_system_update",
         params![
             is_en,
             settings.polling_interval_minutes,
@@ -775,6 +797,7 @@ pub fn save_notification_settings(settings: EmailNotificationSettings) -> Result
             &settings.local_machine_name,
             &settings.local_machine_ip,
             now,
+            n_update,
         ],
     )
     .map_err(|e| format!("Failed to save notification settings: {}", e))?;

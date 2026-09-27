@@ -20,6 +20,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 
+fn default_true() -> bool {
+    true
+}
+
 /// Telegram bot integration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramConfig {
@@ -27,6 +31,8 @@ pub struct TelegramConfig {
     pub allowed_chat_id: Option<i64>,
     pub is_enabled: bool,
     pub poll_interval_secs: u64,
+    #[serde(default = "default_true")]
+    pub notify_on_system_update: bool,
 }
 
 impl Default for TelegramConfig {
@@ -36,6 +42,7 @@ impl Default for TelegramConfig {
             allowed_chat_id: None,
             is_enabled: false,
             poll_interval_secs: 5,
+            notify_on_system_update: true,
         }
     }
 }

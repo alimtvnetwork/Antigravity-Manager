@@ -184,6 +184,9 @@ export interface AppConfig {
     auto_launch?: boolean; // 开机自动启动
     auto_check_update?: boolean; // 自动检查更新
     update_check_interval?: number; // 更新检查间隔（小时）
+    notify_on_update?: boolean; // 是否发送系统更新通知 (默认开启)
+    notify_via_email?: boolean; // 是否通过邮件发送系统更新通知 (默认开启)
+    notify_via_telegram?: boolean; // 是否通过Telegram发送系统更新通知 (默认开启)
     accounts_page_size?: number; // 账号列表每页显示数量,默认 0 表示自动计算
     hidden_menu_items?: string[]; // 隐藏的菜单项路径列表
     scheduled_warmup: ScheduledWarmupConfig;

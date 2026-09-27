@@ -2848,7 +2848,11 @@ fn cmd_broadcast_email(args: &[String]) {
                 }
             }
             if let (Some(email), Some(subj), Some(body)) = (args.get(1), args.get(2), args.get(3)) {
-                match email_sender::dispatch_email_with_failover(subj, body, &[email.clone()]) {
+                match email_sender::dispatch_email_with_failover(
+                    subj,
+                    body,
+                    std::slice::from_ref(email),
+                ) {
                     Ok(res) => println!(
                         "[SUCCESS] Dispatched email to '{}' via '{}'",
                         email, res.used_account_email
@@ -2901,7 +2905,11 @@ fn cmd_broadcast_email(args: &[String]) {
             let now = Utc::now().timestamp();
             let (subj, body) =
                 email_sender::render_test_ping_email("Broadcast-Test", &m_name, &m_ip, now);
-            match email_sender::dispatch_email_with_failover(&subj, &body, &[target.clone()]) {
+            match email_sender::dispatch_email_with_failover(
+                &subj,
+                &body,
+                std::slice::from_ref(&target),
+            ) {
                 Ok(res) => println!(
                     "[SUCCESS] Broadcast test ping delivered to '{}' via '{}'",
                     target, res.used_account_email
@@ -3286,12 +3294,10 @@ fn cmd_logs(args: &[String]) {
                 i += 2;
                 continue;
             }
-        } else if args[i] == "--filter" || args[i] == "-f" {
-            if i + 1 < args.len() {
-                filter = Some(args[i + 1].clone());
-                i += 2;
-                continue;
-            }
+        } else if (args[i] == "--filter" || args[i] == "-f") && i + 1 < args.len() {
+            filter = Some(args[i + 1].clone());
+            i += 2;
+            continue;
         }
         i += 1;
     }
@@ -3328,7 +3334,7 @@ fn cmd_logs(args: &[String]) {
     let reader = io::BufReader::new(file);
     let mut matched_lines = Vec::new();
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if let Some(ref kw) = filter {
             if !line.to_lowercase().contains(&kw.to_lowercase()) {
                 continue;

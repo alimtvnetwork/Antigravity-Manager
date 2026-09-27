@@ -726,6 +726,10 @@ pub fn run() {
             modules::agy_cleaner::start_cleanup_daemon();
             info!("Conversation cleanup daemon initialized.");
 
+            // Check if system was updated and notify via configured channels (Email, Telegram)
+            modules::notification_hub::check_and_notify_system_updated();
+            info!("System update notification watcher initialized.");
+
             // [PHASE 1] Integrated into main Axum port (8045), port 19527 no longer started separately
             info!("Management API integrated into main proxy server (port 8045)");
 

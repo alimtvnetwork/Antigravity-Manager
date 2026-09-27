@@ -6,6 +6,7 @@ export interface TelegramConfig {
     allowed_chat_id: number | null;
     is_enabled: boolean;
     poll_interval_secs: number;
+    notify_on_system_update?: boolean;
 }
 
 export interface TelegramWatcherStatus {

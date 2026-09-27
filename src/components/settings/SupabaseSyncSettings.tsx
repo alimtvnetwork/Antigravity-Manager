@@ -748,6 +748,27 @@ Here are my Supabase details:
                             </div>
                         </div>
 
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={telegramConfig.notify_on_system_update ?? true}
+                                    onChange={(e) => {
+                                        const updated = {
+                                            ...telegramConfig,
+                                            notify_on_system_update: e.target.checked,
+                                        };
+                                        setTelegramConfig(updated);
+                                        telegramService.saveConfig(updated).catch(console.error);
+                                    }}
+                                    className="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 border-slate-700 bg-slate-950"
+                                />
+                                <span className="text-xs text-gray-300">
+                                    Notify via Telegram on System Update (default enabled)
+                                </span>
+                            </label>
+                        </div>
+
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                             <div className="flex items-center gap-2">
                                 {telegramBotUsername && (

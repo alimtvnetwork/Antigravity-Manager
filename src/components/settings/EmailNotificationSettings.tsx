@@ -83,6 +83,7 @@ export default function EmailNotificationSettings() {
         quota_drop_threshold_percent: 25,
         notify_on_workspace_switch: true,
         notify_on_idle_workspace: true,
+        notify_on_system_update: true,
         allow_remote_prompt_execution: true,
         allow_remote_cli_execution: true,
         allow_remote_instance_rotation: true,
@@ -224,8 +225,16 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
             ]);
             setAccounts(accs);
             setRecipients(recs);
-            setSettings(sets);
-            if (tgConf) setTelegramConfig(tgConf);
+            setSettings({
+                ...sets,
+                notify_on_system_update: sets.notify_on_system_update ?? true,
+            });
+            if (tgConf) {
+                setTelegramConfig({
+                    ...tgConf,
+                    notify_on_system_update: tgConf.notify_on_system_update ?? true,
+                });
+            }
             if (tgStat) setTelegramStatus(tgStat);
         } catch (e: any) {
             console.error('Failed to load email settings:', e);
@@ -1536,7 +1545,7 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                 <div className="space-y-3 border-t border-gray-100 dark:border-slate-800 pt-4">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Sensor Notification Triggers</h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
@@ -1582,6 +1591,22 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                             <label htmlFor="chk_idle_ws" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
                                 <div className="font-semibold">Idle Workspace Alert</div>
                                 <div className="text-[11px] text-gray-400 dark:text-slate-400">Ask for prompt when queue is empty</div>
+                            </label>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 flex items-start gap-2.5 bg-white/50 dark:bg-slate-800/40">
+                            <input
+                                type="checkbox"
+                                id="chk_system_update"
+                                checked={settings.notify_on_system_update ?? true}
+                                onChange={(e) =>
+                                    setSettings({ ...settings, notify_on_system_update: e.target.checked })
+                                }
+                                className="mt-0.5 rounded text-blue-600"
+                            />
+                            <label htmlFor="chk_system_update" className="text-xs text-gray-700 dark:text-slate-200 cursor-pointer">
+                                <div className="font-semibold">System Update Notice</div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-400">Receipt when application updates</div>
                             </label>
                         </div>
                     </div>
@@ -1996,6 +2021,38 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                             />
                             <span className="text-xs text-gray-500">sec</span>
                         </div>
+                    </div>
+
+                    {/* System Update Telegram Alert Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-750">
+                        <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={telegramConfig?.notify_on_system_update ?? true}
+                                onChange={(e) =>
+                                    setTelegramConfig((prev) =>
+                                        prev
+                                            ? { ...prev, notify_on_system_update: e.target.checked }
+                                            : {
+                                                  bot_token: '',
+                                                  allowed_chat_id: null,
+                                                  is_enabled: false,
+                                                  poll_interval_secs: 5,
+                                                  notify_on_system_update: e.target.checked,
+                                              }
+                                    )
+                                }
+                                className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-gray-300 dark:border-slate-600"
+                            />
+                            <div>
+                                <span className="text-xs font-semibold text-gray-900 dark:text-slate-100">
+                                    Notify via Telegram on System Update
+                                </span>
+                                <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                                    Send update confirmation and release telemetry to Telegram chat upon version upgrades (default enabled).
+                                </p>
+                            </div>
+                        </label>
                     </div>
 
                     {/* Action Buttons */}

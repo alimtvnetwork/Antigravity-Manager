@@ -118,6 +118,9 @@ function Settings() {
             keep_count: 40,
         },
         training_api_enabled: false,
+        notify_on_update: true,
+        notify_via_email: true,
+        notify_via_telegram: true,
     });
 
     // Dialog state
@@ -161,12 +164,22 @@ function Settings() {
             .catch(err => console.error('Failed to get data dir:', err));
 
         // Load update settings
-        invoke<{ auto_check: boolean; last_check_time: number; check_interval_hours: number }>('get_update_settings')
+        invoke<{
+            auto_check: boolean;
+            last_check_time: number;
+            check_interval_hours: number;
+            notify_on_update?: boolean;
+            notify_via_email?: boolean;
+            notify_via_telegram?: boolean;
+        }>('get_update_settings')
             .then(settings => {
                 setFormData(prev => ({
                     ...prev,
                     auto_check_update: settings.auto_check,
-                    update_check_interval: settings.check_interval_hours
+                    update_check_interval: settings.check_interval_hours,
+                    notify_on_update: settings.notify_on_update ?? true,
+                    notify_via_email: settings.notify_via_email ?? true,
+                    notify_via_telegram: settings.notify_via_telegram ?? true,
                 }));
             })
             .catch(err => console.error('Failed to load update settings:', err));
@@ -434,6 +447,25 @@ function Settings() {
         } finally {
             setIsCheckingUpdate(false);
         }
+    };
+
+    const saveUpdateSettingsHelper = async (overrides: {
+        auto_check?: boolean;
+        check_interval_hours?: number;
+        notify_on_update?: boolean;
+        notify_via_email?: boolean;
+        notify_via_telegram?: boolean;
+    }) => {
+        const payload = {
+            auto_check: overrides.auto_check !== undefined ? overrides.auto_check : (formData.auto_check_update ?? true),
+            last_check_time: 0,
+            check_interval_hours: overrides.check_interval_hours !== undefined ? overrides.check_interval_hours : (formData.update_check_interval ?? 24),
+            notify_on_update: overrides.notify_on_update !== undefined ? overrides.notify_on_update : (formData.notify_on_update ?? true),
+            notify_via_email: overrides.notify_via_email !== undefined ? overrides.notify_via_email : (formData.notify_via_email ?? true),
+            notify_via_telegram: overrides.notify_via_telegram !== undefined ? overrides.notify_via_telegram : (formData.notify_via_telegram ?? true),
+            last_known_version: '',
+        };
+        await invoke('save_update_settings', { settings: payload });
     };
 
     const handleRunInstallerUpdate = async () => {
@@ -784,13 +816,7 @@ function Settings() {
                                             onChange={async (e) => {
                                                 const enabled = e.target.checked;
                                                 try {
-                                                    await invoke('save_update_settings', {
-                                                        settings: {
-                                                            auto_check: enabled,
-                                                            last_check_time: 0,
-                                                            check_interval_hours: formData.update_check_interval ?? 24
-                                                        }
-                                                    });
+                                                    await saveUpdateSettingsHelper({ auto_check: enabled });
                                                     setFormData({ ...formData, auto_check_update: enabled });
                                                     showToast(enabled ? t('settings.general.auto_check_update_enabled') : t('settings.general.auto_check_update_disabled'), 'success');
                                                 } catch (error) {
@@ -815,13 +841,7 @@ function Settings() {
                                             onChange={(e) => setFormData({ ...formData, update_check_interval: parseInt(e.target.value) })}
                                             onBlur={async () => {
                                                 try {
-                                                    await invoke('save_update_settings', {
-                                                        settings: {
-                                                            auto_check: formData.auto_check_update ?? true,
-                                                            last_check_time: 0,
-                                                            check_interval_hours: formData.update_check_interval ?? 24
-                                                        }
-                                                    });
+                                                    await saveUpdateSettingsHelper({ check_interval_hours: formData.update_check_interval ?? 24 });
                                                     showToast(t('settings.general.update_check_interval_saved'), 'success');
                                                 } catch (error) {
                                                     showToast(`${t('common.error')}: ${error}`, 'error');
@@ -829,6 +849,85 @@ function Settings() {
                                             }}
                                         />
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{t('settings.general.update_check_interval_desc')}</p>
+                                    </div>
+                                )}
+
+                                {/* System Update Notifications */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                    <div>
+                                        <div className="font-medium text-gray-900 dark:text-base-content">{t('settings.general.notify_on_update')}</div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('settings.general.notify_on_update_desc')}</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={formData.notify_on_update ?? true}
+                                            onChange={async (e) => {
+                                                const enabled = e.target.checked;
+                                                try {
+                                                    await saveUpdateSettingsHelper({ notify_on_update: enabled });
+                                                    setFormData({ ...formData, notify_on_update: enabled });
+                                                    showToast(enabled ? t('settings.general.notify_on_update_enabled') : t('settings.general.notify_on_update_disabled'), 'success');
+                                                } catch (error) {
+                                                    showToast(`${t('common.error')}: ${error}`, 'error');
+                                                }
+                                            }}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+
+                                {/* Channel Sub-toggles when notify_on_update is active */}
+                                {(formData.notify_on_update ?? true) && (
+                                    <div className="ml-4 pl-4 border-l-2 border-blue-500/30 space-y-3">
+                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900 dark:text-base-content">{t('settings.general.notify_via_email')}</div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.general.notify_via_email_desc')}</p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={formData.notify_via_email ?? true}
+                                                    onChange={async (e) => {
+                                                        const enabled = e.target.checked;
+                                                        try {
+                                                            await saveUpdateSettingsHelper({ notify_via_email: enabled });
+                                                            setFormData({ ...formData, notify_via_email: enabled });
+                                                        } catch (error) {
+                                                            showToast(`${t('common.error')}: ${error}`, 'error');
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="w-9 h-5 bg-gray-200 dark:bg-base-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                            </label>
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900 dark:text-base-content">{t('settings.general.notify_via_telegram')}</div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.general.notify_via_telegram_desc')}</p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={formData.notify_via_telegram ?? true}
+                                                    onChange={async (e) => {
+                                                        const enabled = e.target.checked;
+                                                        try {
+                                                            await saveUpdateSettingsHelper({ notify_via_telegram: enabled });
+                                                            setFormData({ ...formData, notify_via_telegram: enabled });
+                                                        } catch (error) {
+                                                            showToast(`${t('common.error')}: ${error}`, 'error');
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="w-9 h-5 bg-gray-200 dark:bg-base-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                            </label>
+                                        </div>
                                     </div>
                                 )}
                             </>

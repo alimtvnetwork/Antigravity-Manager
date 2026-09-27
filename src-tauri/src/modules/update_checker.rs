@@ -27,12 +27,24 @@ pub struct UpdateInfo {
     pub source: Option<String>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSettings {
     pub auto_check: bool,
     pub last_check_time: u64,
     #[serde(default = "default_check_interval")]
     pub check_interval_hours: u64,
+    #[serde(default = "default_true")]
+    pub notify_on_update: bool,
+    #[serde(default = "default_true")]
+    pub notify_via_email: bool,
+    #[serde(default = "default_true")]
+    pub notify_via_telegram: bool,
+    #[serde(default)]
+    pub last_known_version: String,
 }
 
 fn default_check_interval() -> u64 {
@@ -45,6 +57,10 @@ impl Default for UpdateSettings {
             auto_check: true,
             last_check_time: 0,
             check_interval_hours: DEFAULT_CHECK_INTERVAL_HOURS,
+            notify_on_update: true,
+            notify_via_email: true,
+            notify_via_telegram: true,
+            last_known_version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
 }
@@ -620,6 +636,11 @@ pub async fn run_installer_update() -> Result<String, String> {
         match spawn_cmd.spawn() {
             Ok(_) => {
                 logger::log_info("Successfully launched visible detached installer process.");
+                crate::modules::notification_hub::notify_system_updated(
+                    CURRENT_VERSION,
+                    "latest (installer launched)",
+                    Some("Official Windows installer update launched. Package download and binary replacement in progress."),
+                );
                 Ok(
                     "Official installer launched successfully! Check the update console window."
                         .to_string(),
@@ -659,6 +680,11 @@ pub async fn run_installer_update() -> Result<String, String> {
 
         if output.status.success() {
             logger::log_info(&format!("Installer update succeeded: {}", stdout));
+            crate::modules::notification_hub::notify_system_updated(
+                CURRENT_VERSION,
+                "latest",
+                Some("Installer update script executed successfully."),
+            );
             Ok(stdout)
         } else {
             let error_detail = if !stderr.trim().is_empty() {

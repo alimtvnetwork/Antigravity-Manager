@@ -55,6 +55,7 @@ export interface EmailNotificationSettings {
     quota_drop_threshold_percent: number;
     notify_on_workspace_switch: boolean;
     notify_on_idle_workspace: boolean;
+    notify_on_system_update: boolean;
     allow_remote_prompt_execution: boolean;
     allow_remote_cli_execution: boolean;
     allow_remote_instance_rotation: boolean;

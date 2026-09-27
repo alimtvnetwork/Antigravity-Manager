@@ -1221,6 +1221,40 @@ pub fn render_idle_projects_email(
     (subject, body)
 }
 
+/// Render HTML email for system updated notification
+pub fn render_system_update_email(
+    previous_version: &str,
+    current_version: &str,
+    details: Option<&str>,
+    machine_name: &str,
+    machine_ip: &str,
+) -> (String, String) {
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let subject = format!(
+        "[Antigravity | {} | {} | {}] [System Update] Application Updated: v{} -> v{}",
+        pkg_ver, machine_name, machine_ip, previous_version, current_version
+    );
+    let extra_notes = details.unwrap_or("System update successfully applied.");
+    let content = format!(
+        "[+] SYSTEM UPDATE COMPLETED\r\n\r\n\
+         Antigravity Manager has been updated on this node:\r\n\r\n\
+         Previous Version: v{}\r\n\
+         Current Version:  v{}\r\n\
+         Host Machine:     {} ({})\r\n\r\n\
+         Status: {}\r\n\r\n\
+         Documentation & Release Notes:\r\n\
+         https://github.com/alimtvnetwork/Antigravity-Manager/releases",
+        previous_version, current_version, machine_name, machine_ip, extra_notes
+    );
+    let body = wrap_plaintext_email(
+        "System Update Notification",
+        &content,
+        machine_name,
+        machine_ip,
+    );
+    (subject, body)
+}
+
 /// Render HTML email for remote CLI execution results
 pub fn render_exec_result_email(
     cmd: &str,
