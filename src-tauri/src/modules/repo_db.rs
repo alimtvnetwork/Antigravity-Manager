@@ -949,8 +949,14 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     Ok(rows)
 }
 
-/// Retrieve live project execution information by inspecting both Antigravity's
-/// conversation_summaries.db (ground-truth for in-flight requests) and SQLite repo_prompts.db.
+/// Normalize filesystem path for reliable cross-platform comparison
+fn normalize_path_for_compare(p: &str) -> String {
+    p.replace('\\', "/").trim_end_matches('/').to_lowercase()
+}
+
+/// Retrieve live project execution information by inspecting Antigravity's
+/// conversation_summaries.db (ground-truth for in-flight requests), active OS processes,
+/// and SQLite repo_prompts.db.
 pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     let mut results: Vec<ProjectExecutionInfo> = Vec::new();
     let now = Utc::now().timestamp();
@@ -958,6 +964,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     // Map of normalized repo path -> (is_running, active_prompt_snippet, last_time)
     let mut live_map: std::collections::HashMap<String, (bool, Option<String>, i64)> =
         std::collections::HashMap::new();
+    let mut active_conv_prefixes: Vec<(String, Option<String>, i64)> = Vec::new();
 
     // 1. Inspect Antigravity conversation_summaries.db
     let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
@@ -965,15 +972,29 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     if let Some(base_dir) = base_dir {
         let summaries_db = base_dir.join("conversation_summaries.db");
         if summaries_db.exists() {
-            if let Ok(conn) = Connection::open_with_flags(
+            let conn = Connection::open_with_flags(
                 &summaries_db,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-            ) {
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+            .or_else(|_| {
+                let uri = format!(
+                    "file:{}?immutable=1",
+                    summaries_db.to_string_lossy().replace('\\', "/")
+                );
+                Connection::open_with_flags(
+                    &uri,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                )
+            });
+
+            if let Ok(conn) = conn {
+                let _ = conn.pragma_update(None, "busy_timeout", 3000);
                 if let Ok(mut stmt) = conn.prepare(
                     "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
                      FROM conversation_summaries 
                      ORDER BY last_modified_time DESC 
-                     LIMIT 25",
+                     LIMIT 30",
                 ) {
                     let rows = stmt.query_map([], |row| {
                         Ok((
@@ -988,19 +1009,35 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                     });
                     if let Ok(rows) = rows {
                         for item in rows.flatten() {
-                            let (_cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
-                            let is_conv_running = not_fully_idle != 0 || status.contains("RUNNING");
+                            let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, last_time_str) = item;
+                            let is_recency_active = if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(&last_time_str) {
+                                let age = (Utc::now() - parsed.with_timezone(&Utc)).num_seconds();
+                                age >= 0 && age < 600
+                            } else {
+                                false
+                            };
+                            let is_conv_running = not_fully_idle != 0 || status.contains("RUNNING") || is_recency_active;
                             let prompt_preview = if !preview.trim().is_empty() {
                                 Some(preview)
                             } else {
                                 None
                             };
 
+                            let prefix_8 = if cid.len() >= 8 {
+                                cid[..8].to_string()
+                            } else {
+                                cid.clone()
+                            };
+
+                            if is_conv_running {
+                                active_conv_prefixes.push((prefix_8, prompt_preview.clone(), now));
+                            }
+
                             if let Some(ws_uris_raw) = ws_uris_opt {
                                 let ws_uris: Vec<String> =
                                     serde_json::from_str(&ws_uris_raw).unwrap_or_default();
                                 for u in ws_uris {
-                                    let clean_p = decode_uri_to_path(&u).to_lowercase();
+                                    let clean_p = normalize_path_for_compare(&decode_uri_to_path(&u));
                                     let entry = live_map
                                         .entry(clean_p)
                                         .or_insert((false, None, now));
@@ -1034,7 +1071,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
             if let Ok(rows) = rows {
                 for item in rows.flatten() {
                     let (p_path, p_content, _st) = item;
-                    let clean_p = p_path.to_lowercase();
+                    let clean_p = normalize_path_for_compare(&p_path);
                     let entry = live_map.entry(clean_p).or_insert((false, None, now));
                     entry.0 = true;
                     if entry.1.is_none() {
@@ -1048,11 +1085,32 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     // 3. Merge with discovered projects from running_projects
     let projects = list_running_projects().unwrap_or_default();
     for p in projects {
-        let clean_path = p.repo_path.to_lowercase();
-        let (is_running, prompt_snippet, last_time) = live_map
-            .get(&clean_path)
-            .cloned()
-            .unwrap_or((false, None, p.last_detected_at));
+        let clean_path = normalize_path_for_compare(&p.repo_path);
+        let mut is_running = false;
+        let mut prompt_snippet = None;
+        let mut last_time = p.last_detected_at;
+
+        // Check path match in live_map
+        if let Some((run, snippet, l_time)) = live_map.get(&clean_path) {
+            if *run {
+                is_running = true;
+                prompt_snippet = snippet.clone();
+                last_time = *l_time;
+            }
+        }
+
+        // Check if project_id or repo_path matches any active conversation prefix
+        if !is_running {
+            for (pfx, snippet, l_time) in &active_conv_prefixes {
+                if p.id.contains(pfx) || p.repo_path.contains(pfx) {
+                    is_running = true;
+                    prompt_snippet = snippet.clone();
+                    last_time = *l_time;
+                    break;
+                }
+            }
+        }
+
         let is_idle = !is_running;
         let status_str = if is_running {
             "RUNNING".to_string()
@@ -1077,15 +1135,30 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
 
 /// Returns true if ANY project or conversation is currently actively running
 pub fn is_any_prompt_actively_running() -> bool {
+    // 1. Check Antigravity conversation_summaries.db
     let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
         .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
     if let Some(base_dir) = base_dir {
         let summaries_db = base_dir.join("conversation_summaries.db");
         if summaries_db.exists() {
-            if let Ok(conn) = Connection::open_with_flags(
+            let conn = Connection::open_with_flags(
                 &summaries_db,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-            ) {
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+            .or_else(|_| {
+                let uri = format!(
+                    "file:{}?immutable=1",
+                    summaries_db.to_string_lossy().replace('\\', "/")
+                );
+                Connection::open_with_flags(
+                    &uri,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                )
+            });
+
+            if let Ok(conn) = conn {
+                let _ = conn.pragma_update(None, "busy_timeout", 3000);
                 let count: i32 = conn
                     .query_row(
                         "SELECT COUNT(*) FROM conversation_summaries WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
@@ -1096,11 +1169,29 @@ pub fn is_any_prompt_actively_running() -> bool {
                 if count > 0 {
                     return true;
                 }
+
+                // Check recency within 600s
+                if let Ok(mut stmt) = conn.prepare(
+                    "SELECT last_modified_time FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 10",
+                ) {
+                    let now = Utc::now();
+                    let rows = stmt.query_map([], |row| row.get::<_, String>(0));
+                    if let Ok(rows) = rows {
+                        for time_str in rows.flatten() {
+                            if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(&time_str) {
+                                let age = (now - parsed.with_timezone(&Utc)).num_seconds();
+                                if age >= 0 && age < 600 {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Check repo_prompts.db active_prompts
+    // 2. Check repo_prompts.db active_prompts
     if let Ok(conn) = connect_db() {
         let count: i32 = conn
             .query_row(
@@ -1112,6 +1203,14 @@ pub fn is_any_prompt_actively_running() -> bool {
         if count > 0 {
             return true;
         }
+    }
+
+    // 3. Process check: if Antigravity process is running
+    let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
+    let pids =
+        crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true);
+    if !pids.is_empty() {
+        return true;
     }
 
     false

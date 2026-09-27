@@ -175,8 +175,14 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
     // Resolve target dual-window quotas if absent
     if details.target_quota_4h.is_none() || details.target_quota_weekly.is_none() {
         if let Ok(accounts) = crate::modules::account::list_accounts() {
-            if let Some(target_acc) = accounts.iter().find(|a| a.email.eq_ignore_ascii_case(&selected_clean)) {
-                let (q4, qw) = crate::modules::auto_switcher::extract_dual_window_quotas(target_acc, "gemini-2.5-pro");
+            if let Some(target_acc) = accounts
+                .iter()
+                .find(|a| a.email.eq_ignore_ascii_case(&selected_clean))
+            {
+                let (q4, qw) = crate::modules::auto_switcher::extract_dual_window_quotas(
+                    target_acc,
+                    "gemini-2.5-pro",
+                );
                 if details.target_quota_4h.is_none() {
                     details.target_quota_4h = q4;
                 }
@@ -192,8 +198,14 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
         && !final_prev.eq_ignore_ascii_case("(none / standby)")
     {
         if let Ok(accounts) = crate::modules::account::list_accounts() {
-            if let Some(prev_acc) = accounts.iter().find(|a| a.email.eq_ignore_ascii_case(&final_prev)) {
-                let (q4, qw) = crate::modules::auto_switcher::extract_dual_window_quotas(prev_acc, "gemini-2.5-pro");
+            if let Some(prev_acc) = accounts
+                .iter()
+                .find(|a| a.email.eq_ignore_ascii_case(&final_prev))
+            {
+                let (q4, qw) = crate::modules::auto_switcher::extract_dual_window_quotas(
+                    prev_acc,
+                    "gemini-2.5-pro",
+                );
                 if details.previous_quota_4h.is_none() {
                     details.previous_quota_4h = q4;
                 }
@@ -562,11 +574,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         pkg_ver
     );
 
-    let _ = email_sender::dispatch_email_with_failover(
-        &subject,
-        &html,
-        &active_recipients,
-    );
+    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &active_recipients);
 }
 
 /// Dispatch machine-readable pure JSON self-broadcast email to the default account (zero HTML)

@@ -1109,7 +1109,10 @@ pub async fn execute_profile_rotation_with_context(
 
     if (prev_q_4h.is_none() || prev_q_weekly.is_none()) && prev_email.is_some() {
         if let Ok(accounts) = account::list_accounts() {
-            if let Some(p_acc) = accounts.iter().find(|a| Some(&a.email) == prev_email.as_ref()) {
+            if let Some(p_acc) = accounts
+                .iter()
+                .find(|a| Some(&a.email) == prev_email.as_ref())
+            {
                 let (q4, qw) = extract_dual_window_quotas(p_acc, "gemini-2.5-pro");
                 if prev_q_4h.is_none() {
                     prev_q_4h = q4;
@@ -1196,7 +1199,11 @@ pub async fn check_and_rotate_with_options(
     let mut monitored_instances = list_running_or_active_instances().unwrap_or_default();
     if monitored_instances.is_empty() {
         if let Ok(registry) = instance::load_registry() {
-            if let Some(def) = registry.instances.iter().find(|i| i.is_default || i.id == "default") {
+            if let Some(def) = registry
+                .instances
+                .iter()
+                .find(|i| i.is_default || i.id == "default")
+            {
                 let mut def_inst = def.clone();
                 if def_inst.bound_account_id.is_none() {
                     def_inst.bound_account_id = account::get_current_account_id().ok().flatten();
@@ -1209,7 +1216,9 @@ pub async fn check_and_rotate_with_options(
                 monitored_instances.push(crate::models::instance::InstanceConfig {
                     id: "default".to_string(),
                     name: "Default Workspace".to_string(),
-                    data_dir: instance::get_default_antigravity_data_dir().to_string_lossy().to_string(),
+                    data_dir: instance::get_default_antigravity_data_dir()
+                        .to_string_lossy()
+                        .to_string(),
                     executable_path: None,
                     extensions_dir: None,
                     bound_account_id: Some(current_acc_id),
@@ -1320,12 +1329,14 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
-                let (prev_4h, prev_weekly) = extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
-                let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
-                    extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
-                } else {
-                    (None, None)
-                };
+                let (prev_4h, prev_weekly) =
+                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let (target_4h, target_weekly) =
+                    if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+                        extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+                    } else {
+                        (None, None)
+                    };
 
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
@@ -1393,12 +1404,14 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
-                let (prev_4h, prev_weekly) = extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
-                let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
-                    extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
-                } else {
-                    (None, None)
-                };
+                let (prev_4h, prev_weekly) =
+                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let (target_4h, target_weekly) =
+                    if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+                        extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+                    } else {
+                        (None, None)
+                    };
 
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
@@ -1443,7 +1456,9 @@ pub async fn evaluate_and_execute_startup_rotation() -> Result<Option<String>, S
     let app_config = config::load_app_config()?;
     let switcher_cfg = app_config.auto_profile_switcher;
     if !switcher_cfg.is_enabled {
-        logger::log_info("[AutoSwitcher] Auto profile switcher is disabled, skipping startup check.");
+        logger::log_info(
+            "[AutoSwitcher] Auto profile switcher is disabled, skipping startup check.",
+        );
         return Ok(None);
     }
     logger::log_info("[AutoSwitcher] Proactive startup check: evaluating quota for active instances and default workspace...");
@@ -1535,11 +1550,12 @@ pub async fn trigger_manual_rotation_for_instance(
         None => (None, None, None),
     };
 
-    let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
-        extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
-    } else {
-        (None, None)
-    };
+    let (target_4h, target_weekly) =
+        if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+            extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+        } else {
+            (None, None)
+        };
 
     let rot_ctx = RotationContext {
         previous_email: prev_email,

@@ -1213,7 +1213,11 @@ pub async fn switch_account_to_instance(
         .bound_account_id
         .as_ref()
         .and_then(|id| crate::modules::account::load_account(id).ok())
-        .or_else(|| crate::modules::account::get_current_account().ok().flatten());
+        .or_else(|| {
+            crate::modules::account::get_current_account()
+                .ok()
+                .flatten()
+        });
     let prev_email = instance
         .bound_email
         .clone()

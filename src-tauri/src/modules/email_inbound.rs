@@ -3038,7 +3038,8 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let mut excluded = Vec::new();
 
     for msg in messages {
-        let is_json_switch = (msg.subject.contains("[JSON]") && msg.subject.contains("Account Switched"))
+        let is_json_switch = (msg.subject.contains("[JSON]")
+            && msg.subject.contains("Account Switched"))
             || msg.subject.contains("IN-USE");
         if !is_json_switch {
             continue;
@@ -3092,7 +3093,8 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
             .unwrap_or("");
 
         let is_same_machine = vm_name == my_vm && local_ip == my_ip;
-        let is_recent = (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
+        let is_recent =
+            (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
 
         if !is_same_machine && is_recent && !new_email.is_empty() {
             let email_clean = new_email.trim().to_string();

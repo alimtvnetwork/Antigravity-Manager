@@ -29,7 +29,9 @@ fn main() {
     if args.len() <= 1 {
         print_banner();
         print_help();
+        print_commands_table();
         print_live_projects_table();
+        print_prompts_reference_table();
         print_recent_prompts_table();
         return;
     }
@@ -133,7 +135,9 @@ fn main() {
         "help" | "--help" | "-h" => {
             print_banner();
             print_help();
+            print_commands_table();
             print_live_projects_table();
+            print_prompts_reference_table();
             print_recent_prompts_table();
         }
         _ => {
@@ -145,17 +149,40 @@ fn main() {
 }
 
 fn print_banner() {
-    let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
+    let git_hash = antigravity_tools_lib::modules::git_info::get_git_full_hash();
     let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
     let last_release = antigravity_tools_lib::modules::git_info::get_last_release();
+    let repo_url = antigravity_tools_lib::modules::git_info::get_repo_url();
+    let built_time = antigravity_tools_lib::modules::git_info::get_built_timestamp();
+    let db_path = antigravity_tools_lib::modules::repo_db::get_repo_db_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "Unknown".to_string());
+    let exe_path = env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "Unknown".to_string());
+    let (node_alias, local_ip) =
+        antigravity_tools_lib::modules::email_sender::get_local_node_identity();
+    let utc_now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
-    println!("================================================================================");
-    println!("             AGM - Antigravity-Manager Native Terminal CLI                      ");
-    println!(
-        "  Version: v{} | Commit: {} | Branch: {} | Last Release: {}",
-        VERSION, git_hash, git_branch, last_release
-    );
-    println!("================================================================================");
+    println!("  ────────────────────────────────────────────────────────────");
+    println!("  agm binary");
+    println!("  ● Name:           agm (Antigravity-Manager)");
+    println!("  ● Git URL:        {}", repo_url);
+    println!("  ● Version:        v{}", VERSION);
+    println!("  ● Commit SHA:     {}", git_hash);
+    println!("  ● Branch:         {}", git_branch);
+    println!("  ● Last Release:   {}", last_release);
+    println!("  ● Database:       {}", db_path);
+    println!("  ● Installed path: {}", exe_path);
+    println!("  ● Built:          {}", built_time);
+    println!();
+    println!("  ────────────────────────────────────────────────────────────");
+    println!("  current workspace / node");
+    println!("  ● Node Alias:     {}", node_alias);
+    println!("  ● Local IPv4:     {}", local_ip);
+    println!("  ● Dispatched At:  {}", utc_now);
+    println!("  ────────────────────────────────────────────────────────────");
+    println!();
 }
 
 fn print_help() {
@@ -266,6 +293,93 @@ fn print_help() {
     );
     println!("  version, -v                           Print agm CLI version");
     println!("  help, -h                              Display this help manual");
+    println!();
+}
+
+fn print_commands_table() {
+    let (node_alias, _) = antigravity_tools_lib::modules::email_sender::get_local_node_identity();
+    println!("Available Inbound Commands & Email Format Table:");
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "ACTION / GOAL", "EMAIL REPLY SUBJECT", "CLI EQUIVALENT"
+    );
+    println!("  {}", "-".repeat(98));
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Send Prompt to Project",
+        format!("sub: {} | proj-<project_name>", node_alias),
+        "agm prompt -p \"<name>\" \"<text>\""
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Broadcast to All",
+        format!("sub: {} | all", node_alias),
+        "agm broadcast-email send-to-all"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Check Quota & Credits",
+        format!("cmd: {} | agm status", node_alias),
+        "agm status"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Trigger Auto-Switch",
+        format!("cmd: {} | agm switch-if-low-credit", node_alias),
+        "agm swlc"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "List Running Prompts",
+        format!("cmd: {} | agm running-prompts ls", node_alias),
+        "agm running-prompts ls"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Inbound Commands Manual", "Subject: help", "agm help"
+    );
+    println!();
+}
+
+fn print_prompts_reference_table() {
+    println!("Usable Prompts Reference List (01-prompts Library):");
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "PROMPT SLUG", "PURPOSE / ACTION", "EMAIL INVOCATION"
+    );
+    println!("  {}", "-".repeat(104));
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "execute-pending-tasks",
+        "Run queued tasks in .ai-memory/plans/pending/",
+        "Body: execute-pending-tasks"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "execute-parent-task",
+        "Decompose parent plan and run N-step loop",
+        "Body: execute-parent-task <goal>"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "ci-cd-fix", "Grounded 4-part RCA & pipeline self-healing", "Body: ci-cd-fix"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "minor-bump", "Bump version in manifests & tag release", "Body: minor-bump"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "coding-guidelines",
+        "Enforce PascalCase, AppError, booleans & enums",
+        "Body: coding-guidelines"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "smart-test-runner",
+        "Incremental targeted test runs without regressing",
+        "Body: smart-test-runner"
+    );
     println!();
 }
 

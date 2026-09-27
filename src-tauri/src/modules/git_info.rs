@@ -62,6 +62,40 @@ pub fn get_last_release() -> String {
         .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
 }
 
+/// Returns the full 40-character Git commit hash
+pub fn get_git_full_hash() -> String {
+    if let Some(h) = option_env!("AGM_GIT_FULL_HASH") {
+        let trimmed = h.trim();
+        if !trimmed.is_empty() && trimmed != "unknown" {
+            return trimmed.to_string();
+        }
+    }
+    Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(get_git_hash)
+}
+
+/// Returns the official repository Git URL
+pub fn get_repo_url() -> &'static str {
+    "https://github.com/alimtvnetwork/Antigravity-Manager"
+}
+
+/// Returns the build timestamp or current compilation time
+pub fn get_built_timestamp() -> String {
+    if let Some(b) = option_env!("AGM_BUILD_TIME") {
+        let trimmed = b.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    chrono::Utc::now().to_rfc3339()
+}
+
 /// Formatted one-line GitMap-style banner metadata
 pub fn get_gitmap_style_summary() -> String {
     format!(

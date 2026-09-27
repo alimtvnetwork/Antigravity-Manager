@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.81.0 (2026-09-27)**:
+        -   **[Release v4.81.0: 闲置状态感应器假阳性根治、GitMap 双框遥测格式对齐、大字号 Ubuntu 排版升级与可用 Prompt 清单速查] 彻底解决活动任务被误报 IDLE 假阳性问题、对齐 GitMap 二进制与工作区节点双框遥测、邮件正文与表格大幅字号提升、全量集成交互指令与 01-prompts 库速查**:
+            -   **闲置状态感应器假阳性根治与 SQLite URI 并发防锁死 (`src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/email_watcher.rs`)**: 彻底解决 Antigravity 正在执行指令时 AGM 发送邮件误报闲置（IDLE）的缺陷。重构底层检测逻辑：(1) 使用只读 URI 与 `?immutable=1` 模式连接 `conversation_summaries.db`，杜绝 Windows 下 WAL 锁阻塞；(2) 引入 RFC3339 动态时间窗口，检测 600 秒内活跃修改或状态包含 `CASCADE_RUN_STATUS_RUNNING` 即可触发活动判定；(3) 规范化路径比对，对齐反斜杠与大小写差异；(4) 精确匹配会话前缀（如 `antigravity-manager-d58c5517` 与 `d58c5517`），并在 `repo_db::is_any_prompt_actively_running()` 为真时严格拦截闲置邮件发送。
+            -   **GitMap CLI 二进制与当前工作区/节点遥测全量对齐 (`src-tauri/src/modules/git_info.rs`, `src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`)**: 全面复刻 GitMap 终端与邮件遥测展示格式。在 `git_info.rs` 中新增 `get_git_full_hash()`、`get_repo_url()` 与 `get_built_timestamp()`；在 `agm` 终端横幅与 `agm help` 渲染标准的双框遥测面板（名称、Git URL、版本、40位提交哈希、分支、上次发布标签、SQLite 数据库路径、二进制可执行文件路径与构建时间戳，以及节点别名、本地 IPv4 与分发时间）；所有外发邮件头部均嵌入对齐的 GitMap 风格遥测表格。
+            -   **邮件正文与表格字号大幅提升（≥18px 正文 / ≥16px 表格）(`src-tauri/src/modules/email_sender.rs`)**: 响应用户对字体过小的明确反馈，全面提升所有邮件模板的排版字号。基础正文字号提升至 18px（行高 1.7），邮件卡片标题提升至 28-32px，区域标题提升至 20px 大写加粗；表格表头与单元格提升至 16-17px，代码徽标与快捷回复指令提升至 16px 等宽字体并加大内边距（padding: 6px 12px），彻底解决小字号看不清的阅读体验问题。
+            -   **活跃工作区、交互指令与 01-prompts 库速查表格完整呈现 (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`)**: 在邮件与终端输出末尾结构化嵌入三组表格：(1) 活跃工作区表格（清晰呈现项目名、邮件回复目标标识 `sub: <NODE> | proj-<id>`、路径与运行/就绪状态）；(2) 远程交互与 CLI 指令速查表；(3) 01-prompts 常用 Prompt 库参考清单（包含 `execute-pending-tasks`、`execute-parent-task`、`ci-cd-fix`、`minor-bump`、`coding-guidelines`、`smart-test-runner` 及其分发语法）。
+
     *   **v4.80.0 (2026-09-27)**:
         -   **[Release v4.80.0: Telegram Bot 全栈远程指令中心、Chat ID 一键自动探测绑定、AGM 终端全功能控制与 Windows 构建并发内存优化] 支持 UI 与 CLI 一键连接机器人并自动发现 Chat ID、支持 /ping /observe /gitmap /api /backup /email 等全套远程指令、严格本地隔离凭据零泄露**:
             -   **Telegram Chat ID 自动探测与首次消息无感绑定 (`src-tauri/src/modules/telegram_inbound.rs`, `src-tauri/src/commands/telegram.rs`, `EmailNotificationSettings.tsx`, `SupabaseSyncSettings.tsx`)**: 新增 `detect_telegram_chat_id` 与 UI「Auto-Detect Chat ID」按钮，直接通过 Telegram `getUpdates` 队列提取最近发送 `/ping` 或 `/start` 的用户会话 ID，无需借助任何第三方机器人查询；同时支持后台守护进程首次收到消息时自动捕获并锁定 `allowed_chat_id`，并在启动时自动调用 `setMyCommands` 注册交互菜单。
@@ -3351,6 +3358,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.81.0 (2026-09-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.80.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

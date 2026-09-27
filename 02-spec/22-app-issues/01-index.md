@@ -52,7 +52,8 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 14 | [14-low-credit-alert-active-account-filtering-rca.md](14-low-credit-alert-active-account-filtering-rca.md) | Low Credit Alert Active Account Filtering & Quota Drop Deduplication RCA | High | Fixed |
 | 15 | [15-auto-switch-prompt-resumption-stuck-and-reinjection-rca.md](15-auto-switch-prompt-resumption-stuck-and-reinjection-rca.md) | Auto-Switch Prompt Resumption Failure & Prompt Reinjection Loop RCA | High | Fixed |
 | 16 | [16-idle-sensor-false-positive-rca.md](16-idle-sensor-false-positive-rca.md) | False Positive Idle Workspace Sensor Notification RCA | Critical | Fixed |
-| 17 | [17-startup-auto-switch-and-telemetry-gaps.md](17-startup-auto-switch-and-telemetry-gaps.md) | Startup Auto-Switch Delay, Missing Dual-Window Balances & Machine Self-Broadcast RCA | High | In Progress |
+| 17 | [17-startup-auto-switch-and-telemetry-gaps.md](17-startup-auto-switch-and-telemetry-gaps.md) | Startup Auto-Switch Delay, Missing Dual-Window Balances & Machine Self-Broadcast RCA | High | Fixed |
+| 18 | [18-idle-sensor-false-reporting-and-telemetry-parity.md](18-idle-sensor-false-reporting-and-telemetry-parity.md) | False Idle Workspace Sensor Reporting & Telemetry Parity Gaps RCA | Critical | In Progress |
 
 ---
 

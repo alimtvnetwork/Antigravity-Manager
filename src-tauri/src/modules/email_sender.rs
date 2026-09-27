@@ -141,6 +141,13 @@ pub fn clean_recipient_email(raw: &str) -> String {
         .to_string()
 }
 
+/// Returns the current machine's node alias and local IPv4 address
+pub fn get_local_node_identity() -> (String, String) {
+    let name = crate::modules::email_watcher::detect_machine_name();
+    let ip = crate::modules::email_watcher::detect_local_ip();
+    (name, ip)
+}
+
 /// Send an email with automatic failover pool swapping across active accounts
 pub fn dispatch_email_with_failover(
     subject: &str,
@@ -674,8 +681,12 @@ pub fn wrap_html_email_card(
 ) -> String {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let git_hash = crate::modules::git_info::get_git_hash();
+    let git_full_hash = crate::modules::git_info::get_git_full_hash();
     let git_branch = crate::modules::git_info::get_git_branch();
     let last_release = crate::modules::git_info::get_last_release();
+    let db_path = crate::modules::repo_db::get_repo_db_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "~/.antigravity_tools/repo_prompts.db".to_string());
     let now_str = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
     let details_section = if content.trim().starts_with('<') {
@@ -687,8 +698,8 @@ pub fn wrap_html_email_card(
         } else {
             let escaped_content = escape_html_entities(content.trim());
             format!(
-                r#"<div style="font-weight: 800; font-size: 15px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Message Details</div>
-<pre style="background: #0f172a; color: #e2e8f0; padding: 18px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>"#,
+                r#"<div style="font-weight: 800; font-size: 18px; text-transform: uppercase; color: #475569; margin-bottom: 12px; letter-spacing: 0.08em;">Message Details</div>
+<pre style="background: #0f172a; color: #e2e8f0; padding: 22px; border-radius: 12px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 16px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; margin: 0; border: 1px solid #1e293b;">{}</pre>"#,
                 escaped_content
             )
         }
@@ -703,59 +714,63 @@ pub fn wrap_html_email_card(
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,400;0,500;0,700;1,400&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-  code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
-  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; background: #2563eb; padding: 3px 8px; border-radius: 6px; }}
+  body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7; }}
+  code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; font-size: 16px; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; background: #2563eb; padding: 5px 12px; border-radius: 6px; font-size: 16px; }}
   a:visited {{ color: #ffffff !important; }}
   a:hover {{ color: #ffffff !important; background: #1d4ed8; }}
-  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 4px 10px; border-radius: 6px; text-decoration: underline; display: inline-block; font-size: 15px; font-weight: bold; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 5px 12px; border-radius: 6px; text-decoration: underline; display: inline-block; font-size: 16px; font-weight: bold; }}
   td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
 </style>
 </head>
-<body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
-  <div style="max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
-    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 4px solid #38bdf8; padding: 24px 28px; color: #ffffff;">
-      <div style="margin-bottom: 12px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 6px 14px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 14px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} ({}) | {} | {}]</span>
-        <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">AGM TELEMETRY</span>
+<body style="margin: 0; padding: 28px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7; color: #0f172a;">
+  <div style="max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 5px solid #38bdf8; padding: 28px 32px; color: #ffffff;">
+      <div style="margin-bottom: 14px;">
+        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 8px 16px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} ({}) | {} | {}]</span>
+        <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 6px 14px; border-radius: 9999px; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-left: 10px; letter-spacing: 0.06em;">AGM TELEMETRY</span>
       </div>
-      <h2 style="margin: 8px 0 0 0; font-size: 28px; color: #ffffff; font-weight: 800; line-height: 1.35;">{}</h2>
+      <h2 style="margin: 10px 0 0 0; font-size: 32px; color: #ffffff; font-weight: 800; line-height: 1.35;">{}</h2>
     </div>
-    <div style="padding: 28px;">
-      <div style="font-weight: 800; font-size: 15px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Node &amp; Git Telemetry</div>
-      <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 22px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+    <div style="padding: 32px;">
+      <div style="font-weight: 800; font-size: 18px; text-transform: uppercase; color: #475569; margin-bottom: 12px; letter-spacing: 0.08em;">Node &amp; Git Telemetry (GitMap Parity)</div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 26px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; width: 180px; background: #f8fafc;">Application Version</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; width: 220px; background: #f8fafc;">Application Version</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 17px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Commit</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Commit SHA</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 17px;"><span style="color: #0369a1;">{}</span> (<code>{}</code>)</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Branch</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Git Branch</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 17px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Last Release</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Last Release</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 17px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">VM / Node Alias</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Telemetry Database</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 15px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Local IPv4</td>
-          <td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">VM / Node Alias</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700; font-size: 17px;">{}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 18px; color: #475569; font-weight: 700; background: #f8fafc;">Dispatched At</td>
-          <td style="padding: 12px 18px; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 16px;">{}</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 700; background: #f8fafc;">Local IPv4</td>
+          <td style="padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 17px;">{}</td>
+        </tr>
+        <tr>
+          <td style="padding: 14px 20px; color: #475569; font-weight: 700; background: #f8fafc;">Dispatched At</td>
+          <td style="padding: 14px 20px; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 17px;">{}</td>
         </tr>
       </table>
       {}
     </div>
-    <div style="background: #f8fafc; padding: 16px 28px; border-top: 1px solid #e2e8f0; font-size: 14px; color: #64748b; text-align: center;">
+    <div style="background: #f8fafc; padding: 18px 32px; border-top: 1px solid #e2e8f0; font-size: 15px; color: #64748b; text-align: center;">
       Automated Remote Dispatcher &middot; Antigravity Manager {} ({}) &middot; Node {} ({})
     </div>
   </div>
@@ -769,10 +784,12 @@ pub fn wrap_html_email_card(
         escape_html_entities(title),
         pkg_ver,
         git_hash,
+        git_full_hash,
         git_branch,
         last_release,
-        machine_name,
-        machine_ip,
+        escape_html_entities(&db_path),
+        escape_html_entities(machine_name),
+        escape_html_entities(machine_ip),
         now_str,
         details_section,
         pkg_ver,
@@ -1226,18 +1243,32 @@ pub fn render_idle_projects_email(
 
     let mut proj_rows = String::new();
     for p in projects {
+        let is_running = p.status.to_uppercase().contains("RUNNING");
+        let (badge_bg, badge_fg, badge_border, badge_text) = if is_running {
+            ("#ecfdf5", "#047857", "#a7f3d0", "RUNNING")
+        } else {
+            ("#f1f5f9", "#475569", "#cbd5e1", "IDLE / READY")
+        };
         proj_rows.push_str(&format!(
             r#"<tr>
-  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 15px;">{}</td>
-  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-family: 'Ubuntu Mono', monospace; font-size: 14px; font-weight: 700;">sub: {} | proj-{}</code></td>
-  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 13px; color: #475569;">{}</td>
-  <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 6px; font-size: 13px; font-weight: 700;">IDLE / READY</span></td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700;">sub: {} | proj-{}</code></td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 15px; color: #475569;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><span style="background: {}; color: {}; border: 1px solid {}; padding: 6px 14px; border-radius: 6px; font-size: 15px; font-weight: 800;">{}</span></td>
 </tr>"#,
             escape_html_entities(&p.repo_name),
             escape_html_entities(machine_name),
             escape_html_entities(&p.project_id),
             escape_html_entities(&p.repo_path),
+            badge_bg,
+            badge_fg,
+            badge_border,
+            badge_text,
         ));
+    }
+
+    if proj_rows.is_empty() {
+        proj_rows.push_str(r#"<tr><td colspan="4" style="padding: 18px 20px; text-align: center; color: #64748b; font-size: 16px; font-style: italic;">No workspace projects currently registered</td></tr>"#);
     }
 
     let recent_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
@@ -1247,10 +1278,10 @@ pub fn render_idle_projects_email(
         let preview_clean = escape_html_entities(&preview);
         prompt_rows.push_str(&format!(
             r#"<tr>
-  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 13px; color: #0284c7; font-weight: 700;">{}</td>
-  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155; font-weight: 600;">{}</td>
-  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 700;">{}</span></td>
-  <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">{}...</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 15px; color: #0284c7; font-weight: 700;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; font-weight: 600;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: 700;">{}</span></td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; color: #64748b;">{}...</td>
 </tr>"#,
             escape_html_entities(&p.id),
             escape_html_entities(&p.project_id),
@@ -1261,16 +1292,16 @@ pub fn render_idle_projects_email(
 
     let prompts_section = if !prompt_rows.is_empty() {
         format!(
-            r#"<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
+            r#"<div style="font-weight: 800; font-size: 20px; text-transform: uppercase; color: #0f172a; margin-top: 28px; margin-bottom: 14px; letter-spacing: 0.05em;">
   Recent Prompt History &amp; Queue
 </div>
-<table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 28px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
   <thead>
     <tr style="background: #334155; color: #ffffff;">
-      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Prompt ID</th>
-      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Target Project</th>
-      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Status</th>
-      <th style="padding: 10px 14px; text-align: left; font-size: 13px; text-transform: uppercase;">Snippet</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Prompt ID</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Target Project</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Status</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Snippet</th>
     </tr>
   </thead>
   <tbody>
@@ -1284,71 +1315,26 @@ pub fn render_idle_projects_email(
     };
 
     let content_html = format!(
-        r#"<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 22px; margin-bottom: 20px;">
-  <div style="font-weight: 800; font-size: 16px; color: #0f172a; margin-bottom: 8px;">
+        r#"<div style="background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 12px; padding: 22px 26px; margin-bottom: 26px;">
+  <div style="font-weight: 800; font-size: 20px; color: #0f172a; margin-bottom: 10px;">
     [*] IDLE WORKSPACE SENSOR &mdash; All Background Tasks Completed
   </div>
-  <p style="margin: 0; color: #334155; font-size: 16px; line-height: 1.6;">
+  <p style="margin: 0; color: #334155; font-size: 18px; line-height: 1.7;">
     There are currently no active prompts running across your workspaces on node <strong>{}</strong> (<code>{}</code>).
     The system is verified completely idle and standing by for instructions.
   </p>
 </div>
 
-<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
-  Available Commands &amp; Remote Email Formats
+<div style="font-weight: 800; font-size: 20px; text-transform: uppercase; color: #0f172a; margin-top: 28px; margin-bottom: 14px; letter-spacing: 0.05em;">
+  Active Workspaces &amp; Reply Target Identifiers
 </div>
-<table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 28px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
   <thead>
     <tr style="background: #0f172a; color: #ffffff;">
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Action / Goal</th>
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Email Reply Subject Format</th>
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">CLI Equivalent</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Send Prompt to Project</td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">sub: {} | proj-&lt;project_name&gt;</code><br><span style="color: #64748b; font-size: 13px;">(Body: your prompt instruction)</span></td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm prompt -p "&lt;name&gt;" "&lt;text&gt;"</code></td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Broadcast to All</td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">sub: {} | all</code><br><span style="color: #64748b; font-size: 13px;">(Dispatches prompt to every workspace)</span></td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm broadcast-email send-to-all</code></td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Check Quota &amp; Credits</td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm status</code></td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm status</code></td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">Trigger Auto-Switch</td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm switch-if-low-credit</code></td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm swlc</code></td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">List Running Prompts</td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">cmd: {} | agm running-prompts ls</code></td>
-      <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm running-prompts ls</code></td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 16px; font-weight: 700; color: #0f172a;">Inbound Commands Manual</td>
-      <td style="padding: 12px 16px;"><code style="background: #f1f5f9; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 14px;">Subject: help</code></td>
-      <td style="padding: 12px 16px;"><code style="background: #f8fafc; color: #334155; padding: 3px 6px; border-radius: 4px; font-size: 13px;">agm help</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<div style="font-weight: 800; font-size: 16px; text-transform: uppercase; color: #1e293b; margin-top: 24px; margin-bottom: 12px; letter-spacing: 0.06em;">
-  Active Workspaces (Ready for Instructions)
-</div>
-<table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 24px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
-  <thead>
-    <tr style="background: #1e293b; color: #ffffff;">
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Project Name</th>
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Email Reply Target Identifier</th>
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Repository Path</th>
-      <th style="padding: 12px 16px; text-align: left; font-size: 14px;">Status</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Project Name</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Email Reply Target Identifier</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Repository Path</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Status</th>
     </tr>
   </thead>
   <tbody>
@@ -1356,15 +1342,111 @@ pub fn render_idle_projects_email(
   </tbody>
 </table>
 
+<div style="font-weight: 800; font-size: 20px; text-transform: uppercase; color: #0f172a; margin-top: 28px; margin-bottom: 14px; letter-spacing: 0.05em;">
+  Available Commands &amp; Remote Email Formats
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 28px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+  <thead>
+    <tr style="background: #1e293b; color: #ffffff;">
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Action / Goal</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Email Reply Subject Format</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">CLI Equivalent</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Send Prompt to Project</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;project_name&gt;</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Body: your prompt instruction)</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm prompt -p "&lt;name&gt;" "&lt;text&gt;"</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Broadcast to All</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | all</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Dispatches prompt to every workspace)</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm broadcast-email send-to-all</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Check Quota &amp; Credits</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm status</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm status</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Trigger Auto-Switch</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm switch-if-low-credit</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm swlc</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">List Running Prompts</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm running-prompts ls</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm running-prompts ls</code></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; font-weight: 700; color: #0f172a; font-size: 16px;">Inbound Commands Manual</td>
+      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">Subject: help</code></td>
+      <td style="padding: 14px 20px;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm help</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="font-weight: 800; font-size: 20px; text-transform: uppercase; color: #0f172a; margin-top: 28px; margin-bottom: 14px; letter-spacing: 0.05em;">
+  Usable Prompts Reference List (01-prompts Library)
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 28px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+  <thead>
+    <tr style="background: #1e293b; color: #ffffff;">
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Prompt Slug / Name</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Description &amp; Intended Purpose</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">How to Dispatch via Email</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">execute-pending-tasks</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Autonomously executes queued tasks in .ai-memory/plans/pending/ with batched subagents and auto-looping.</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-pending-tasks</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">execute-parent-task</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Decomposes a large parent task into structured subtasks and runs continuous N-step self-loops until completion.</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-parent-task &lt;goal&gt;</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">ci-cd-fix</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Grounded 4-part RCA diagnosis, fixes broken pipeline scripts or linters, and verifies green builds.</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: ci-cd-fix</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">minor-bump</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Synchronizes version across package manifests, updates CHANGELOG.md, and tags release commit.</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: minor-bump</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">coding-guidelines</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Enforces PascalCase database entities, AppError wrapper patterns, positive booleans, and enum standards.</td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: coding-guidelines</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 14px 20px; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">smart-test-runner</td>
+      <td style="padding: 14px 20px; font-size: 16px; color: #334155; line-height: 1.5;">Executes affected targeted test suites incrementally, isolating slow suites and preventing regressions.</td>
+      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: smart-test-runner</span></td>
+    </tr>
+  </tbody>
+</table>
+
 {}"#,
         machine_name,
         machine_ip,
-        machine_name,
-        machine_name,
-        machine_name,
-        machine_name,
-        machine_name,
         proj_rows,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
+        machine_name,
         prompts_section
     );
 
