@@ -214,4 +214,5 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-063 (Fast-Forward Prompt Backup, Post-Switch Re-Injection & 12% Quota Threshold):** Implemented in [`63-fast-forward-prompt-backup.md`](./63-fast-forward-prompt-backup.md).
 - **AC-APP-064 (Account Switch E2E Verification, Parallel Prompt Backup, Multi-VM Collision Prevention & 15% Threshold Release):** Implemented in [`64-account-switch-e2e-prompt-backup-verification.md`](./64-account-switch-e2e-prompt-backup-verification.md).
 - **AC-APP-065 (Update-All JSON & Fleet Sync, CLI/UI Help Polish, and Live Prompt Backup/Restore Verification):** Implemented in [`65-update-all-json-cli-ui-help-prompt-verification.md`](./65-update-all-json-cli-ui-help-prompt-verification.md).
+- **AC-APP-066 (Account Switch 98% Simulation E2E, Running Prompts Parallel Backup/Restore, Multi-VM Collision Shielding & Sandbox Lifecycle Verification):** Implemented in [`66-account-switch-98pct-simulation-e2e-and-instance-verification.md`](./66-account-switch-98pct-simulation-e2e-and-instance-verification.md).
 
