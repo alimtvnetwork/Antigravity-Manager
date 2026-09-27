@@ -96,7 +96,6 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 4
           CMAKE_BUILD_PARALLEL_LEVEL: 4
-          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: |
           cd src-tauri
           cargo clippy --all-targets --all-features
@@ -105,7 +104,6 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 4
           CMAKE_BUILD_PARALLEL_LEVEL: 4
-          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: |
           cd src-tauri
           cargo check
@@ -114,7 +112,6 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 4
           CMAKE_BUILD_PARALLEL_LEVEL: 4
-          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
   # Tauri 构建测试（不打包）
@@ -184,6 +181,5 @@ jobs:
           # CI 环境不需要签名
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
           CARGO_BUILD_JOBS: 4
           CMAKE_BUILD_PARALLEL_LEVEL: 4
