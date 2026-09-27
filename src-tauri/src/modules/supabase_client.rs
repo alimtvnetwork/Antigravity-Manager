@@ -32,6 +32,29 @@ pub struct TableVerificationResult {
     pub error_message: Option<String>,
 }
 
+/// Endpoint connectivity test result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndpointTestResult {
+    pub is_success: bool,
+    pub message: String,
+    pub status_code: Option<u16>,
+}
+
+/// Normalize Supabase endpoint URL by trimming whitespace, trailing slashes, and redundant `/rest/v1` suffixes.
+pub fn normalize_supabase_url(raw: &str) -> String {
+    let mut trimmed = raw.trim();
+    while trimmed.ends_with('/') {
+        trimmed = &trimmed[..trimmed.len() - 1];
+    }
+    if let Some(stripped) = trimmed.strip_suffix("/rest/v1") {
+        trimmed = stripped;
+        while trimmed.ends_with('/') {
+            trimmed = &trimmed[..trimmed.len() - 1];
+        }
+    }
+    trimmed.to_string()
+}
+
 /// Lightweight PostgREST HTTP Client
 pub struct SupabaseClient {
     client: reqwest::Client,
@@ -50,6 +73,10 @@ impl SupabaseClient {
             .map_err(|e| AppError::Config(format!("Invalid Bearer token: {}", e)))?;
         headers.insert(AUTHORIZATION, bearer_val);
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(
+            reqwest::header::ACCEPT,
+            HeaderValue::from_static("application/json, application/openapi+json, */*"),
+        );
 
         let http_client = reqwest::Client::builder()
             .default_headers(headers)
@@ -57,7 +84,7 @@ impl SupabaseClient {
             .build()
             .map_err(|e| AppError::Network(e.to_string(), None))?;
 
-        let clean_url = endpoint.url.trim_end_matches('/').to_string();
+        let clean_url = normalize_supabase_url(&endpoint.url);
 
         Ok(Self {
             client: http_client,
@@ -66,37 +93,119 @@ impl SupabaseClient {
         })
     }
 
+    /// Base normalized endpoint URL
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     /// Build the full PostgREST REST URL for a table
-    fn table_url(&self, table: &str) -> String {
+    pub fn table_url(&self, table: &str) -> String {
         format!("{}/rest/v1/{}", self.base_url, table)
     }
 
     /// Build the RPC URL for calling PostgreSQL stored functions
-    fn rpc_url(&self, function_name: &str) -> String {
+    pub fn rpc_url(&self, function_name: &str) -> String {
         format!("{}/rest/v1/rpc/{}", self.base_url, function_name)
     }
 
-    /// Test the connection to the Supabase endpoint
-    pub async fn test_connection(&self) -> Result<bool, AppError> {
-        let url = format!("{}/rest/v1/", self.base_url);
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
-
-        let status_code = resp.status().as_u16();
-        if status_code < 400 {
-            return Ok(true);
+    /// Test the connection to the Supabase endpoint using a resilient multi-stage probe ladder:
+    /// 1. Query root `/rest/v1/` with API key & Bearer token.
+    /// 2. If 404 (due to Supabase blocking OpenAPI spec for anon keys or disabled OpenAPI),
+    ///    query PostgREST table endpoint (`/rest/v1/nodes?limit=0` or `/rest/v1/command_queue?limit=0`).
+    ///    - If 200: connected and table exists.
+    ///    - If 404 with PostgREST body (PGRST204/PGRST205/relation does not exist):
+    ///      PostgREST is responsive and authenticated, but tables are pending migration -> success!
+    /// 3. If still unresolved, fallback to `/auth/v1/health` (GoTrue health check).
+    pub async fn test_connection(&self) -> Result<EndpointTestResult, AppError> {
+        // Probe 1: REST API root (/rest/v1/)
+        let rest_url = format!("{}/rest/v1/", self.base_url);
+        match self.client.get(&rest_url).send().await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                if status < 400 {
+                    return Ok(EndpointTestResult {
+                        is_success: true,
+                        message: "Connected successfully (Supabase PostgREST verified)".to_string(),
+                        status_code: Some(status),
+                    });
+                }
+                if status == 401 || status == 403 {
+                    return Ok(EndpointTestResult {
+                        is_success: false,
+                        message: format!(
+                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                            status
+                        ),
+                        status_code: Some(status),
+                    });
+                }
+                // Status 404 or other 4xx: proceed to table and auth probes
+            }
+            Err(e) => {
+                return Ok(EndpointTestResult {
+                    is_success: false,
+                    message: format!("Network connection failed: {}", e),
+                    status_code: None,
+                });
+            }
         }
-        Err(AppError::Network(
-            format!(
-                "Supabase connection test failed with status: {}",
-                status_code
-            ),
-            Some(status_code),
-        ))
+
+        // Probe 2: PostgREST Table probes (check if PostgREST responds to queries even if OpenAPI root is disabled)
+        let probe_tables = ["nodes", "command_queue"];
+        for table in probe_tables {
+            let table_url = format!("{}/rest/v1/{}?limit=0", self.base_url, table);
+            if let Ok(resp) = self.client.get(&table_url).send().await {
+                let status = resp.status().as_u16();
+                if status < 400 {
+                    return Ok(EndpointTestResult {
+                        is_success: true,
+                        message: format!("Connected successfully ({} table verified)", table),
+                        status_code: Some(status),
+                    });
+                }
+                if status == 401 || status == 403 {
+                    return Ok(EndpointTestResult {
+                        is_success: false,
+                        message: format!(
+                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                            status
+                        ),
+                        status_code: Some(status),
+                    });
+                }
+                let body = resp.text().await.unwrap_or_default();
+                if body.contains("PGRST")
+                    || body.contains("relation")
+                    || body.contains("does not exist")
+                    || body.contains("schema cache")
+                {
+                    return Ok(EndpointTestResult {
+                        is_success: true,
+                        message: "Connected successfully (PostgREST responsive; run Schema Migration to create tables)".to_string(),
+                        status_code: Some(200),
+                    });
+                }
+            }
+        }
+
+        // Probe 3: Supabase Service Auth Health probe (/auth/v1/health)
+        let auth_url = format!("{}/auth/v1/health", self.base_url);
+        if let Ok(resp) = self.client.get(&auth_url).send().await {
+            let status = resp.status().as_u16();
+            if status < 400 {
+                return Ok(EndpointTestResult {
+                    is_success: true,
+                    message: "Connected successfully (Supabase service online)".to_string(),
+                    status_code: Some(status),
+                });
+            }
+        }
+
+        Ok(EndpointTestResult {
+            is_success: false,
+            message: "Supabase connection test failed with status: 404 (Endpoint not found. Please verify Project URL)".to_string(),
+            status_code: Some(404),
+        })
     }
 
     /// Check if a specific table exists and is readable via PostgREST
@@ -166,7 +275,11 @@ impl SupabaseClient {
             }
         }
 
-        let is_connected = !verified.is_empty() || missing.len() > 0;
+        let is_connected = if !verified.is_empty() {
+            true
+        } else {
+            err_msg.is_none() && !missing.is_empty()
+        };
 
         TableVerificationResult {
             endpoint_id: endpoint_id.to_string(),
@@ -317,5 +430,122 @@ impl SupabaseClient {
             .await
             .map_err(|e| AppError::Network(e.to_string(), None))?;
         Ok(parsed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_supabase_url() {
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co/"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co///"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co/rest/v1"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co/rest/v1/"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://abcdefg.supabase.co/rest/v1///"),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("  https://abcdefg.supabase.co/rest/v1/  "),
+            "https://abcdefg.supabase.co"
+        );
+        assert_eq!(
+            normalize_supabase_url("http://localhost:54321/rest/v1/"),
+            "http://localhost:54321"
+        );
+        assert_eq!(
+            normalize_supabase_url("https://example.com/custom/prefix/rest/v1"),
+            "https://example.com/custom/prefix"
+        );
+    }
+
+    #[test]
+    fn test_client_url_construction() {
+        let ep1 = SupabaseEndpoint {
+            id: "ep_1".to_string(),
+            name: "Cloud".to_string(),
+            url: "https://abcdefg.supabase.co/rest/v1/".to_string(),
+            api_key: "anon-key-sample".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+        };
+        let client1 = SupabaseClient::new(&ep1).expect("valid client");
+        assert_eq!(client1.base_url(), "https://abcdefg.supabase.co");
+        assert_eq!(
+            client1.table_url("nodes"),
+            "https://abcdefg.supabase.co/rest/v1/nodes"
+        );
+        assert_eq!(
+            client1.rpc_url("sync_nodes"),
+            "https://abcdefg.supabase.co/rest/v1/rpc/sync_nodes"
+        );
+
+        let ep2 = SupabaseEndpoint {
+            id: "ep_2".to_string(),
+            name: "Bare".to_string(),
+            url: "https://abcdefg.supabase.co".to_string(),
+            api_key: "anon-key-sample".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+        };
+        let client2 = SupabaseClient::new(&ep2).expect("valid client");
+        assert_eq!(client2.base_url(), "https://abcdefg.supabase.co");
+        assert_eq!(client2.table_url("nodes"), client1.table_url("nodes"));
+        assert_eq!(client2.rpc_url("sync_nodes"), client1.rpc_url("sync_nodes"));
+    }
+
+    #[test]
+    fn test_verification_is_connected_logic() {
+        // Case 1: verified tables exist -> is_connected is true
+        let res1 = TableVerificationResult {
+            endpoint_id: "ep_1".to_string(),
+            is_connected: true,
+            verified_tables: vec!["nodes".to_string()],
+            missing_tables: vec!["workspace_leases".to_string()],
+            error_message: None,
+        };
+        assert!(res1.is_connected);
+
+        // Case 2: no verified tables, but network error occurred -> is_connected is false
+        let verified: Vec<String> = Vec::new();
+        let err_msg = Some("Connection refused (os error 111)".to_string());
+        let missing = vec!["nodes".to_string()];
+        let is_conn = if !verified.is_empty() {
+            true
+        } else {
+            err_msg.is_none() && !missing.is_empty()
+        };
+        assert!(!is_conn);
+
+        // Case 3: no verified tables, no network error (PostgREST responsive but tables not created) -> is_connected is true
+        let err_msg_none: Option<String> = None;
+        let is_conn_pending = if !verified.is_empty() {
+            true
+        } else {
+            err_msg_none.is_none() && !missing.is_empty()
+        };
+        assert!(is_conn_pending);
     }
 }

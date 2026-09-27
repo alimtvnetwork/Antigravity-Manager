@@ -38,6 +38,12 @@ export interface LeaseResult {
     expires_at?: number;
 }
 
+export interface EndpointTestResult {
+    is_success: boolean;
+    message: string;
+    status_code?: number;
+}
+
 export interface TableVerificationResult {
     endpoint_id: string;
     is_connected: boolean;
@@ -81,12 +87,15 @@ export const supabaseService = {
         }
     },
 
-    async testEndpoint(endpoint: SupabaseEndpoint): Promise<boolean> {
+    async testEndpoint(endpoint: SupabaseEndpoint): Promise<EndpointTestResult> {
         try {
-            return await invoke<boolean>('test_supabase_endpoint', { endpoint });
+            return await invoke<EndpointTestResult>('test_supabase_endpoint', { endpoint });
         } catch (error) {
-            useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
-            return false;
+            console.warn('[SupabaseService] Test endpoint failed:', error);
+            return {
+                is_success: false,
+                message: String(error),
+            };
         }
     },
 
@@ -94,7 +103,7 @@ export const supabaseService = {
         try {
             return await invoke<TableVerificationResult>('check_supabase_endpoint_tables', { endpoint });
         } catch (error) {
-            useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
+            console.warn('[SupabaseService] Check endpoint tables failed:', error);
             return {
                 endpoint_id: endpoint.id,
                 is_connected: false,

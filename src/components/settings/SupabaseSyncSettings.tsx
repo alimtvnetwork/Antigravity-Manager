@@ -124,16 +124,35 @@ export default function SupabaseSyncSettings() {
         }
     };
 
+    const normalizeSupabaseUrl = (raw: string): string => {
+        let trimmed = raw.trim();
+        while (trimmed.endsWith('/')) {
+            trimmed = trimmed.slice(0, -1);
+        }
+        if (trimmed.endsWith('/rest/v1')) {
+            trimmed = trimmed.slice(0, -8);
+            while (trimmed.endsWith('/')) {
+                trimmed = trimmed.slice(0, -1);
+            }
+        }
+        return trimmed;
+    };
+
     const handleTestEndpoint = async (endpoint: SupabaseEndpoint) => {
         setTestingEndpointId(endpoint.id);
-        const isOk = await supabaseService.testEndpoint(endpoint);
+        const res = await supabaseService.testEndpoint(endpoint);
         setTestResults((prev) => ({
             ...prev,
             [endpoint.id]: {
-                isSuccess: isOk,
-                msg: isOk ? 'Connected successfully' : 'Connection failed',
+                isSuccess: res.is_success,
+                msg: res.message,
             },
         }));
+        if (res.is_success) {
+            showToast(res.message || 'Connected successfully', 'success');
+        } else {
+            showToast(`${endpoint.name}: ${res.message || 'Connection failed'}`, 'error');
+        }
         setTestingEndpointId(null);
     };
 
@@ -323,11 +342,12 @@ export default function SupabaseSyncSettings() {
             return;
         }
 
+        const cleanUrl = normalizeSupabaseUrl(formEndpoint.url);
         const newEp: SupabaseEndpoint = {
             id: `ep_${Date.now()}`,
-            name: formEndpoint.name,
-            url: formEndpoint.url,
-            api_key: formEndpoint.api_key,
+            name: formEndpoint.name.trim(),
+            url: cleanUrl,
+            api_key: formEndpoint.api_key.trim(),
             role: formEndpoint.role as 'root' | 'secondary',
             is_enabled: formEndpoint.is_enabled ?? true,
             prune_threshold_mb: formEndpoint.prune_threshold_mb ?? (formEndpoint.role === 'root' ? 400 : 200),
@@ -1001,8 +1021,17 @@ Here are my Supabase details:
                             placeholder="https://xyzcompany.supabase.co"
                             value={formEndpoint.url}
                             onChange={(e) => setFormEndpoint({ ...formEndpoint, url: e.target.value })}
+                            onBlur={() =>
+                                setFormEndpoint((prev) => ({
+                                    ...prev,
+                                    url: prev.url ? normalizeSupabaseUrl(prev.url) : '',
+                                }))
+                            }
                             className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-emerald-500 text-xs font-mono"
                         />
+                        <p className="text-[10px] text-gray-500 mt-1">
+                            Enter the base Project URL (e.g. https://xyz.supabase.co). Redundant /rest/v1 paths and trailing slashes are automatically sanitized.
+                        </p>
                     </div>
 
                     <div>

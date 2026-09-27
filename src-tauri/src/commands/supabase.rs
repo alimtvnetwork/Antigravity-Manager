@@ -5,7 +5,9 @@
 
 use crate::error::AppResult;
 use crate::modules::iterative_codec;
-use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint, TableVerificationResult};
+use crate::modules::supabase_client::{
+    EndpointTestResult, SupabaseClient, SupabaseEndpoint, TableVerificationResult,
+};
 use crate::modules::supabase_schema;
 use crate::modules::supabase_sync::{self, DataMigrationSummary, SupabaseConfig};
 use crate::modules::workspace_lease_manager::{self, LeaseResult, WorkspaceLease};
@@ -38,8 +40,17 @@ pub async fn save_supabase_config(config: SupabaseConfig) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn test_supabase_endpoint(endpoint: SupabaseEndpoint) -> AppResult<bool> {
-    let client = SupabaseClient::new(&endpoint)?;
+pub async fn test_supabase_endpoint(endpoint: SupabaseEndpoint) -> AppResult<EndpointTestResult> {
+    let client = match SupabaseClient::new(&endpoint) {
+        Ok(c) => c,
+        Err(e) => {
+            return Ok(EndpointTestResult {
+                is_success: false,
+                message: format!("Configuration error: {}", e),
+                status_code: None,
+            });
+        }
+    };
     client.test_connection().await
 }
 

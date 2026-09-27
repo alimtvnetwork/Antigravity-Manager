@@ -6,7 +6,7 @@
 use crate::error::AppError;
 use crate::modules::account;
 use crate::modules::instance;
-use crate::modules::supabase_client::{SupabaseClient, SupabaseEndpoint};
+use crate::modules::supabase_client::{normalize_supabase_url, SupabaseClient, SupabaseEndpoint};
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -72,15 +72,22 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
         return Ok(def);
     }
     let data = fs::read_to_string(&path).map_err(|e| AppError::Io(e))?;
-    let config: SupabaseConfig = serde_json::from_str(&data)
+    let mut config: SupabaseConfig = serde_json::from_str(&data)
         .map_err(|e| AppError::Config(format!("Failed to parse Supabase config: {}", e)))?;
+    for ep in &mut config.endpoints {
+        ep.url = normalize_supabase_url(&ep.url);
+    }
     Ok(config)
 }
 
 /// Save configuration to disk
 pub fn save_config(config: &SupabaseConfig) -> Result<(), AppError> {
+    let mut clean_config = config.clone();
+    for ep in &mut clean_config.endpoints {
+        ep.url = normalize_supabase_url(&ep.url);
+    }
     let path = get_config_path()?;
-    let data = serde_json::to_string_pretty(config)
+    let data = serde_json::to_string_pretty(&clean_config)
         .map_err(|e| AppError::Config(format!("Failed to serialize Supabase config: {}", e)))?;
     fs::write(&path, data).map_err(|e| AppError::Io(e))?;
     Ok(())
