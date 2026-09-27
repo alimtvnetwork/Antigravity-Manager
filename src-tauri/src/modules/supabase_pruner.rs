@@ -74,7 +74,7 @@ pub fn start_pruner_worker() {
         return;
     }
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         loop {
             // Run pruner check every 5 minutes
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;

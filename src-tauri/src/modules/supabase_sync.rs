@@ -171,7 +171,7 @@ pub fn start_sync_worker() {
         return;
     }
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
 

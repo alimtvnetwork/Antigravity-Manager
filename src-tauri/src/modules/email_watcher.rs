@@ -215,7 +215,7 @@ pub fn start_email_watcher() {
         "[EmailWatcher] Starting background telemetry & mailbox watcher",
     );
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         run_watcher_heartbeat_loop().await;
     });
 }

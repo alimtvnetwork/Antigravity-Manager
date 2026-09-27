@@ -676,6 +676,59 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
     calculate_account_quota(account, target_model)
 }
 
+/// Specifically evaluate the 7-day weekly total allowance window quota (0-100%)
+pub fn calculate_weekly_window_quota(account: &Account, target_model: &str) -> Option<f64> {
+    let quota_data = account.quota.as_ref()?;
+    let mut weekly_values: Vec<f64> = Vec::new();
+
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            for b in &g.buckets {
+                let win = b.window.to_lowercase();
+                let bid = b.bucket_id.to_lowercase();
+                let is_weekly = win.contains("week")
+                    || bid.contains("week")
+                    || win.contains("7d")
+                    || bid.contains("7d");
+                if is_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
+                    weekly_values.push((b.remaining_fraction * 100.0).round());
+                }
+            }
+        }
+    }
+
+    if !weekly_values.is_empty() {
+        return Some(weekly_values.into_iter().fold(100.0, f64::min));
+    }
+
+    // Fallback across non-banned models
+    let valid_models: Vec<_> = quota_data
+        .models
+        .iter()
+        .filter(|m| {
+            let name = m.name.to_lowercase();
+            !name.contains("3.0") && !name.contains("3.1")
+        })
+        .collect();
+
+    if !valid_models.is_empty() {
+        let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
+        return Some((sum as f64 / valid_models.len() as f64).round());
+    }
+
+    calculate_account_quota(account, target_model)
+}
+
+/// Extract dual-window quotas: (4-hour immediate rolling percentage, weekly percentage)
+pub fn extract_dual_window_quotas(
+    account: &Account,
+    target_model: &str,
+) -> (Option<f64>, Option<f64>) {
+    let q_4h = calculate_4h_window_quota(account, target_model);
+    let q_weekly = calculate_weekly_window_quota(account, target_model);
+    (q_4h, q_weekly)
+}
+
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
 pub fn select_candidate_profiles(
     current_instance_id: &str,
@@ -1002,7 +1055,11 @@ pub async fn select_and_verify_next_best_profile(
 #[derive(Debug, Clone, Default)]
 pub struct RotationContext {
     pub previous_email: Option<String>,
+    pub previous_quota_4h: Option<f64>,
+    pub previous_quota_weekly: Option<f64>,
     pub predicted_email: Option<String>,
+    pub target_quota_4h: Option<f64>,
+    pub target_quota_weekly: Option<f64>,
     pub credit_before_switch: Option<f64>,
     pub threshold_activated: Option<f64>,
 }
@@ -1027,18 +1084,52 @@ pub async fn execute_profile_rotation_with_context(
 
     // Step 2: Trigger unified Email and Telegram notifications before switch
     let prev_email = ctx.as_ref().and_then(|c| c.previous_email.clone());
+    let mut prev_q_4h = ctx.as_ref().and_then(|c| c.previous_quota_4h);
+    let mut prev_q_weekly = ctx.as_ref().and_then(|c| c.previous_quota_weekly);
     let predicted = ctx
         .as_ref()
         .and_then(|c| c.predicted_email.clone())
         .unwrap_or_else(|| target.email.clone());
+    let mut target_q_4h = ctx.as_ref().and_then(|c| c.target_quota_4h);
+    let mut target_q_weekly = ctx.as_ref().and_then(|c| c.target_quota_weekly);
     let credit_before = ctx.as_ref().and_then(|c| c.credit_before_switch);
     let thresh = ctx.as_ref().and_then(|c| c.threshold_activated);
+
+    if target_q_4h.is_none() || target_q_weekly.is_none() {
+        if let Ok(t_acc) = account::load_account(&target.account_id) {
+            let (q4, qw) = extract_dual_window_quotas(&t_acc, "gemini-2.5-pro");
+            if target_q_4h.is_none() {
+                target_q_4h = q4;
+            }
+            if target_q_weekly.is_none() {
+                target_q_weekly = qw;
+            }
+        }
+    }
+
+    if (prev_q_4h.is_none() || prev_q_weekly.is_none()) && prev_email.is_some() {
+        if let Ok(accounts) = account::list_accounts() {
+            if let Some(p_acc) = accounts.iter().find(|a| Some(&a.email) == prev_email.as_ref()) {
+                let (q4, qw) = extract_dual_window_quotas(p_acc, "gemini-2.5-pro");
+                if prev_q_4h.is_none() {
+                    prev_q_4h = q4;
+                }
+                if prev_q_weekly.is_none() {
+                    prev_q_weekly = qw;
+                }
+            }
+        }
+    }
 
     crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email,
+            previous_quota_4h: prev_q_4h,
+            previous_quota_weekly: prev_q_weekly,
             predicted_next_email: Some(predicted),
             selected_email: target.email.clone(),
+            target_quota_4h: target_q_4h,
+            target_quota_weekly: target_q_weekly,
             credit_before_switch: credit_before,
             threshold_activated: thresh,
             instance_id: inst_id.clone(),
@@ -1054,7 +1145,7 @@ pub async fn execute_profile_rotation_with_context(
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
     let target_acc_id = target.account_id.clone();
     let target_inst_id = target.instance_id.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let _ = crate::modules::workspace_lease_manager::acquire_lease(
             &target_acc_id,
             &target_inst_id,
@@ -1102,7 +1193,36 @@ pub async fn check_and_rotate_with_options(
         return Ok(None);
     }
 
-    let monitored_instances = list_running_or_active_instances()?;
+    let mut monitored_instances = list_running_or_active_instances().unwrap_or_default();
+    if monitored_instances.is_empty() {
+        if let Ok(registry) = instance::load_registry() {
+            if let Some(def) = registry.instances.iter().find(|i| i.is_default || i.id == "default") {
+                let mut def_inst = def.clone();
+                if def_inst.bound_account_id.is_none() {
+                    def_inst.bound_account_id = account::get_current_account_id().ok().flatten();
+                }
+                monitored_instances.push(def_inst);
+            }
+        }
+        if monitored_instances.is_empty() {
+            if let Ok(Some(current_acc_id)) = account::get_current_account_id() {
+                monitored_instances.push(crate::models::instance::InstanceConfig {
+                    id: "default".to_string(),
+                    name: "Default Workspace".to_string(),
+                    data_dir: instance::get_default_antigravity_data_dir().to_string_lossy().to_string(),
+                    executable_path: None,
+                    extensions_dir: None,
+                    bound_account_id: Some(current_acc_id),
+                    bound_email: None,
+                    created_at: 0,
+                    last_used: 0,
+                    is_default: true,
+                    pid: None,
+                    seq_num: Some(1),
+                });
+            }
+        }
+    }
     if monitored_instances.is_empty() {
         return Ok(None);
     }
@@ -1151,6 +1271,7 @@ pub async fn check_and_rotate_with_options(
         let quota_percent = period_status
             .as_ref()
             .map(|s| s.quota_percent)
+            .or_else(|| calculate_4h_window_quota(&bound_acc, &switcher_cfg.target_model))
             .or_else(|| calculate_account_quota(&bound_acc, &switcher_cfg.target_model))
             .unwrap_or(100.0);
 
@@ -1199,9 +1320,20 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
+                let (prev_4h, prev_weekly) = extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+                    extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+                } else {
+                    (None, None)
+                };
+
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
+                    previous_quota_4h: prev_4h,
+                    previous_quota_weekly: prev_weekly,
                     predicted_email: Some(candidate.email.clone()),
+                    target_quota_4h: target_4h,
+                    target_quota_weekly: target_weekly,
                     credit_before_switch: Some(quota_percent),
                     threshold_activated: Some(switcher_cfg.critical_threshold_percent),
                 };
@@ -1261,9 +1393,20 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
+                let (prev_4h, prev_weekly) = extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+                    extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+                } else {
+                    (None, None)
+                };
+
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
+                    previous_quota_4h: prev_4h,
+                    previous_quota_weekly: prev_weekly,
                     predicted_email: Some(candidate.email.clone()),
+                    target_quota_4h: target_4h,
+                    target_quota_weekly: target_weekly,
                     credit_before_switch: Some(quota_percent),
                     threshold_activated: Some(effective_low_threshold),
                 };
@@ -1292,6 +1435,18 @@ pub async fn check_and_rotate_with_options(
 }
 
 pub async fn check_and_rotate_if_needed() -> Result<Option<String>, String> {
+    check_and_rotate_with_options(None, false).await
+}
+
+/// Proactively inspect active account and running instances on startup, rotating immediately if quota is depleted or below threshold
+pub async fn evaluate_and_execute_startup_rotation() -> Result<Option<String>, String> {
+    let app_config = config::load_app_config()?;
+    let switcher_cfg = app_config.auto_profile_switcher;
+    if !switcher_cfg.is_enabled {
+        logger::log_info("[AutoSwitcher] Auto profile switcher is disabled, skipping startup check.");
+        return Ok(None);
+    }
+    logger::log_info("[AutoSwitcher] Proactive startup check: evaluating quota for active instances and default workspace...");
     check_and_rotate_with_options(None, false).await
 }
 
@@ -1369,21 +1524,31 @@ pub async fn trigger_manual_rotation_for_instance(
     let email = candidate.email.clone();
     let effective_inst = candidate.instance_id.clone();
 
-    let (prev_email, prev_quota) = match current_bound
+    let (prev_email, prev_4h, prev_weekly) = match current_bound
         .as_ref()
         .and_then(|id| account::load_account(id).ok())
     {
         Some(acc) => {
-            let q = calculate_account_quota(&acc, &switcher_cfg.target_model);
-            (Some(acc.email), q)
+            let (q4, qw) = extract_dual_window_quotas(&acc, &switcher_cfg.target_model);
+            (Some(acc.email), q4, qw)
         }
-        None => (None, None),
+        None => (None, None, None),
+    };
+
+    let (target_4h, target_weekly) = if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
+        extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
+    } else {
+        (None, None)
     };
 
     let rot_ctx = RotationContext {
         previous_email: prev_email,
+        previous_quota_4h: prev_4h,
+        previous_quota_weekly: prev_weekly,
         predicted_email: Some(email.clone()),
-        credit_before_switch: prev_quota,
+        target_quota_4h: target_4h,
+        target_quota_weekly: target_weekly,
+        credit_before_switch: prev_4h,
         threshold_activated: Some(switcher_cfg.low_quota_threshold_percent),
     };
 
@@ -1530,9 +1695,9 @@ pub fn start_auto_switcher() {
 
         if last_enabled {
             tokio::time::sleep(Duration::from_secs(3)).await;
-            if let Err(e) = check_and_rotate_if_needed().await {
+            if let Err(e) = evaluate_and_execute_startup_rotation().await {
                 logger::log_warn(&format!(
-                    "[AutoSwitcher] Error during initial check cycle: {}",
+                    "[AutoSwitcher] Error during startup rotation check: {}",
                     e
                 ));
             }

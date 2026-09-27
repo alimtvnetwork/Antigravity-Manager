@@ -1522,6 +1522,14 @@ pub async fn switch_account(
         )?;
     }
 
+    // Capture previous account telemetry before switching
+    let prev_acc_opt = get_current_account().ok().flatten();
+    let prev_email = prev_acc_opt.as_ref().map(|a| a.email.clone());
+    let (prev_4h, prev_weekly) = prev_acc_opt
+        .as_ref()
+        .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+        .unwrap_or((None, None));
+
     // 3. Execute platform-specific system integration (Close proc, Inject DB, Start proc, etc.)
     integration.on_account_switch(&account, target_ide).await?;
 
@@ -1536,11 +1544,26 @@ pub async fn switch_account(
         account.email
     ));
 
-    crate::modules::notification_hub::notify_account_switched(
-        &account.email,
-        target_ide.unwrap_or("default"),
-        "Account switch core logic completed",
-        false,
+    let (target_4h, target_weekly) =
+        crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
+
+    crate::modules::notification_hub::notify_account_switched_details(
+        crate::modules::notification_hub::SwitchNotificationDetails {
+            previous_email: prev_email,
+            previous_quota_4h: prev_4h,
+            previous_quota_weekly: prev_weekly,
+            predicted_next_email: Some(account.email.clone()),
+            selected_email: account.email.clone(),
+            target_quota_4h: target_4h,
+            target_quota_weekly: target_weekly,
+            credit_before_switch: prev_4h,
+            threshold_activated: None,
+            instance_id: target_ide.unwrap_or("default").to_string(),
+            instance_name: target_ide.unwrap_or("default").to_string(),
+            instance_mode: String::new(),
+            reason: "Manual account switch".to_string(),
+            is_auto: false,
+        },
     );
 
     Ok(())

@@ -1209,25 +1209,24 @@ pub async fn switch_account_to_instance(
 
     let is_default_inst = instance.is_default || instance.id == "default";
 
-    if let Some(prev_email) = instance
+    let prev_account_opt = instance
+        .bound_account_id
+        .as_ref()
+        .and_then(|id| crate::modules::account::load_account(id).ok())
+        .or_else(|| crate::modules::account::get_current_account().ok().flatten());
+    let prev_email = instance
         .bound_email
         .clone()
-        .or_else(|| {
-            instance.bound_account_id.as_ref().and_then(|id| {
-                crate::modules::account::load_account(id)
-                    .ok()
-                    .map(|a| a.email)
-            })
-        })
-        .or_else(|| {
-            crate::modules::account::get_current_account()
-                .ok()
-                .flatten()
-                .map(|a| a.email)
-        })
-    {
-        if !prev_email.is_empty() {
-            crate::modules::notification_hub::record_previous_email(&prev_email);
+        .or_else(|| prev_account_opt.as_ref().map(|a| a.email.clone()));
+
+    let (prev_4h, prev_weekly) = prev_account_opt
+        .as_ref()
+        .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+        .unwrap_or((None, None));
+
+    if let Some(ref email) = prev_email {
+        if !email.is_empty() {
+            crate::modules::notification_hub::record_previous_email(email);
         }
     }
 
@@ -1376,11 +1375,26 @@ pub async fn switch_account_to_instance(
     let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
 
     // 6. Dispatch unified Email and Telegram switch notifications
-    crate::modules::notification_hub::notify_account_switched(
-        &account.email,
-        &instance.name,
-        "Smart Rotator / Instance Account Switch",
-        false,
+    let (target_4h, target_weekly) =
+        crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
+
+    crate::modules::notification_hub::notify_account_switched_details(
+        crate::modules::notification_hub::SwitchNotificationDetails {
+            previous_email: prev_email.clone(),
+            previous_quota_4h: prev_4h,
+            previous_quota_weekly: prev_weekly,
+            predicted_next_email: Some(account.email.clone()),
+            selected_email: account.email.clone(),
+            target_quota_4h: target_4h,
+            target_quota_weekly: target_weekly,
+            credit_before_switch: prev_4h,
+            threshold_activated: None,
+            instance_id: instance.id.clone(),
+            instance_name: instance.name.clone(),
+            instance_mode: String::new(),
+            reason: "Smart Rotator / Instance Account Switch".to_string(),
+            is_auto: false,
+        },
     );
 
     Ok(())

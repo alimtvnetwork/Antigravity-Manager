@@ -1089,7 +1089,7 @@ pub fn start_telegram_daemon() {
         return;
     }
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut last_update_id = 0i64;
 
         loop {

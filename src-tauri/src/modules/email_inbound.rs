@@ -3038,8 +3038,8 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let mut excluded = Vec::new();
 
     for msg in messages {
-        let is_json_switch =
-            msg.subject.contains("[JSON]") && msg.subject.contains("Account Switched");
+        let is_json_switch = (msg.subject.contains("[JSON]") && msg.subject.contains("Account Switched"))
+            || msg.subject.contains("IN-USE");
         if !is_json_switch {
             continue;
         }
@@ -3062,18 +3062,37 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
             Err(_) => continue,
         };
 
-        let vm_name = val.get("vm_name").and_then(|v| v.as_str()).unwrap_or("");
-        let local_ip = val.get("local_ip").and_then(|v| v.as_str()).unwrap_or("");
-        let timestamp = val.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
+        let vm_name = val
+            .get("vm_name")
+            .or_else(|| val.get("node_name"))
+            .or_else(|| val.get("hostname"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let local_ip = val
+            .get("local_ip")
+            .or_else(|| val.get("node_ip"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let timestamp = val
+            .get("timestamp")
+            .or_else(|| val.get("claimed_at_unix"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let lease_expires = val
+            .get("lease_expires_at_unix")
+            .or_else(|| val.get("lease_expires_at"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
         let new_email = val
-            .get("new_email")
+            .get("claimed_account")
+            .or_else(|| val.get("new_email"))
             .or_else(|| val.get("selected_email"))
             .or_else(|| val.get("target_account"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
         let is_same_machine = vm_name == my_vm && local_ip == my_ip;
-        let is_recent = timestamp >= cutoff;
+        let is_recent = (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
 
         if !is_same_machine && is_recent && !new_email.is_empty() {
             let email_clean = new_email.trim().to_string();
