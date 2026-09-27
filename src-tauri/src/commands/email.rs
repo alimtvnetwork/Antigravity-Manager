@@ -342,12 +342,11 @@ pub async fn dispatch_custom_email_task(
             || lower_type.contains("cli")
         {
             format!(
-                "{} | ps | {}",
-                m_name,
+                "ps | {}",
                 clean_payload.lines().next().unwrap_or("Get-Process")
             )
         } else {
-            format!("{} | prompt | proj-Antigravity-Manager", m_name)
+            "prompt | proj-Antigravity-Manager".to_string()
         }
     });
 

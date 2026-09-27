@@ -521,6 +521,19 @@ pub fn format_subject_with_telemetry(
         trimmed = trimmed["[antigravity]".len()..].trim();
     }
 
+    // Strip redundant leading node alias or wildcard prefix like "W2 |", "w2 |", or "* |"
+    let m_prefix = format!("{} |", machine_name.to_lowercase());
+    let m_prefix_no_space = format!("{}|", machine_name.to_lowercase());
+    if trimmed.to_lowercase().starts_with(&m_prefix) {
+        trimmed = trimmed[m_prefix.len()..].trim();
+    } else if trimmed.to_lowercase().starts_with(&m_prefix_no_space) {
+        trimmed = trimmed[m_prefix_no_space.len()..].trim();
+    } else if trimmed.starts_with("* |") {
+        trimmed = trimmed[3..].trim();
+    } else if trimmed.starts_with("*|") {
+        trimmed = trimmed[2..].trim();
+    }
+
     if is_reply {
         if trimmed.is_empty() {
             format!("{} Re:", prefix)
@@ -1394,6 +1407,34 @@ mod tests {
         assert_eq!(
             s7,
             "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Write the subject"
+        );
+
+        // Deduplicate node alias when subject has "W2 | prompt | proj-..."
+        let s8 =
+            format_subject_with_telemetry("VM3 | prompt | proj-Antigravity-Manager", ver, node, ip);
+        assert_eq!(
+            s8,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
+        );
+
+        // Deduplicate wildcard prefix "* | prompt | ..."
+        let s9 =
+            format_subject_with_telemetry("* | prompt | proj-Antigravity-Manager", ver, node, ip);
+        assert_eq!(
+            s9,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
+        );
+
+        // Subject with old telemetry tag and duplicate node alias
+        let s10 = format_subject_with_telemetry(
+            "[v4.75.0 | VM3 | 192.168.1.7] VM3 | prompt | proj-Antigravity-Manager",
+            ver,
+            node,
+            ip,
+        );
+        assert_eq!(
+            s10,
+            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
         );
     }
 

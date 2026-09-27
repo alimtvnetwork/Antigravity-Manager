@@ -1147,26 +1147,42 @@ pub fn format_reply_subject(
     local_ip: &str,
 ) -> String {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
-    let node_tag = format!("[{} | {} | {}]", pkg_ver, local_name, local_ip);
+    let node_tag = format!(
+        "[Antigravity | {} | {} | {}]",
+        pkg_ver, local_name, local_ip
+    );
     if let Some(orig) = original_subject {
         let trimmed = orig.trim();
         if !trimmed.is_empty() {
             let clean_orig = strip_email_prefixes(trimmed);
             // If clean_orig starts with an existing bracketed tag with a pipe, strip it
-            let final_orig = if clean_orig.starts_with('[') && clean_orig.contains(']') {
+            let mut final_orig = if clean_orig.starts_with('[') && clean_orig.contains(']') {
                 if let Some(end_idx) = clean_orig.find(']') {
                     let inside = &clean_orig[1..end_idx];
                     if inside.contains('|') {
                         clean_orig[end_idx + 1..].trim()
                     } else {
-                        &clean_orig
+                        clean_orig.as_str()
                     }
                 } else {
-                    &clean_orig
+                    clean_orig.as_str()
                 }
             } else {
-                &clean_orig
+                clean_orig.as_str()
             };
+
+            // Strip redundant leading node alias or wildcard prefix
+            let m_prefix = format!("{} |", local_name.to_lowercase());
+            let m_prefix_no_space = format!("{}|", local_name.to_lowercase());
+            if final_orig.to_lowercase().starts_with(&m_prefix) {
+                final_orig = final_orig[m_prefix.len()..].trim();
+            } else if final_orig.to_lowercase().starts_with(&m_prefix_no_space) {
+                final_orig = final_orig[m_prefix_no_space.len()..].trim();
+            } else if final_orig.starts_with("* |") {
+                final_orig = final_orig[3..].trim();
+            } else if final_orig.starts_with("*|") {
+                final_orig = final_orig[2..].trim();
+            }
 
             if !final_orig.is_empty() {
                 return format!("{} Re: {}", node_tag, final_orig);
@@ -3465,9 +3481,12 @@ mod tests {
         let local_name = "VM3";
         let local_ip = "192.168.1.12";
         let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
-        let node_tag = format!("[{} | {} | {}]", pkg_ver, local_name, local_ip);
+        let node_tag = format!(
+            "[Antigravity | {} | {} | {}]",
+            pkg_ver, local_name, local_ip
+        );
 
-        // Direct subject: should prepend node tag and Re:
+        // Direct subject: should prepend node tag and Re: (with VM3 | stripped to prevent stuttering)
         assert_eq!(
             format_reply_subject(
                 Some("VM3 | 1 | help"),
@@ -3476,10 +3495,10 @@ mod tests {
                 local_name,
                 local_ip
             ),
-            format!("{} Re: VM3 | 1 | help", node_tag)
+            format!("{} Re: 1 | help", node_tag)
         );
 
-        // Subject already has Re: should NOT duplicate Re:
+        // Subject already has Re: should NOT duplicate Re:, and should strip VM3 |
         assert_eq!(
             format_reply_subject(
                 Some("Re: VM3 | 1 | help"),
@@ -3488,7 +3507,19 @@ mod tests {
                 local_name,
                 local_ip
             ),
-            format!("{} Re: VM3 | 1 | help", node_tag)
+            format!("{} Re: 1 | help", node_tag)
+        );
+
+        // Replying to prompt task: should strip VM3 |
+        assert_eq!(
+            format_reply_subject(
+                Some("VM3 | prompt | proj-Antigravity-Manager"),
+                "[AGM ACK]",
+                "prompt",
+                local_name,
+                local_ip
+            ),
+            format!("{} Re: prompt | proj-Antigravity-Manager", node_tag)
         );
 
         // Replying to existing notification:
