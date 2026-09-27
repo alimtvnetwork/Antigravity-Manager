@@ -197,12 +197,11 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         if switcher
             .get("low_quota_threshold_percent")
             .and_then(|n| n.as_f64())
-            .map(|val| val <= 15.0)
-            .unwrap_or(false)
+            == Some(25.0)
         {
             switcher.insert(
                 "low_quota_threshold_percent".to_string(),
-                serde_json::json!(25.0),
+                serde_json::json!(12.0),
             );
             modified = true;
         }
@@ -244,6 +243,16 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
                 "auto_focus_window".to_string(),
                 serde_json::Value::Bool(false),
             );
+            modified = true;
+        }
+    }
+
+    if let Some(quota) = v
+        .get_mut("quota_protection")
+        .and_then(|q| q.as_object_mut())
+    {
+        if quota.get("threshold_percentage").and_then(|n| n.as_u64()) == Some(10) {
+            quota.insert("threshold_percentage".to_string(), serde_json::json!(12));
             modified = true;
         }
     }

@@ -1016,6 +1016,24 @@ pub async fn execute_profile_rotation_with_context(
 ) -> Result<(), String> {
     let inst_id = &target.instance_id;
 
+    // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
+    let backup_res = crate::modules::repo_db::backup_running_prompts(inst_id);
+    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
+    match backup_res {
+        Ok(c) => {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Pre-switch backup created for {} running prompts (instance '{}')",
+                c, inst_id
+            ));
+        }
+        Err(e) => {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Pre-switch prompt backup failed for instance '{}': {}",
+                inst_id, e
+            ));
+        }
+    }
+
     if has_auto_resume {
         let _ = snapshot_task_state(inst_id, &target.account_id, &reason);
     }
@@ -1136,6 +1154,30 @@ pub async fn execute_profile_rotation_with_context(
         )
         .await;
     });
+
+    // Step 3: Automatically re-inject and resend backed-up running prompts across workspaces
+    let resent_count = match crate::modules::repo_db::resend_all_running_commands(20) {
+        Ok(resent) => {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Post-switch re-injected {} backed-up running prompts across workspaces",
+                resent.len()
+            ));
+            resent.len()
+        }
+        Err(e) => {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Failed to resend backed-up running commands after switch: {}",
+                e
+            ));
+            0
+        }
+    };
+
+    let dispatched_count = crate::modules::repo_db::dispatch_running_prompts(inst_id).unwrap_or(0);
+    logger::log_info(&format!(
+        "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched for instance '{}'",
+        resent_count, dispatched_count, inst_id
+    ));
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();
@@ -1825,13 +1867,14 @@ mod tests {
         assert_eq!(cfg.check_interval_seconds, 300);
         assert_eq!(cfg.caution_interval_seconds, 60);
         assert_eq!(cfg.critical_interval_seconds, 40);
-        assert_eq!(cfg.low_quota_threshold_percent, 25.0);
+        assert_eq!(cfg.low_quota_threshold_percent, 12.0);
         assert_eq!(cfg.critical_threshold_percent, 12.0);
 
         assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(24.9), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 300);
+        assert_eq!(calculate_next_interval_seconds(Some(14.9), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 60);
         assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 40);
         assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);

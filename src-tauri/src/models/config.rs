@@ -104,11 +104,16 @@ pub struct QuotaProtectionConfig {
     pub enabled: bool,
 
     /// Reserved quota percentage (1-99)
+    #[serde(default = "default_quota_protection_threshold")]
     pub threshold_percentage: u32,
 
     /// List of monitored models (e.g. gemini-3-flash, gemini-3-pro-high, gemini-3.1-pro-high, claude-sonnet-4-6)
     #[serde(default = "default_monitored_models")]
     pub monitored_models: Vec<String>,
+}
+
+fn default_quota_protection_threshold() -> u32 {
+    12
 }
 
 fn default_monitored_models() -> Vec<String> {
@@ -124,7 +129,7 @@ impl QuotaProtectionConfig {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            threshold_percentage: 10, // Default 10% reserve
+            threshold_percentage: 12, // Default 12% reserve
             monitored_models: default_monitored_models(),
         }
     }
@@ -264,11 +269,16 @@ fn default_recency_threshold() -> u32 {
     3600
 }
 
+fn default_low_quota_threshold() -> f64 {
+    12.0
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
     pub is_enabled: bool,
     pub check_interval_seconds: u32,
+    #[serde(default = "default_low_quota_threshold")]
     pub low_quota_threshold_percent: f64,
     pub target_model: String,
     pub has_auto_resume: bool,
@@ -298,7 +308,7 @@ impl Default for AutoProfileSwitcherConfig {
         Self {
             is_enabled: true,
             check_interval_seconds: 300,
-            low_quota_threshold_percent: 25.0,
+            low_quota_threshold_percent: 12.0,
             target_model: "gemini-3.8-flash-high".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,

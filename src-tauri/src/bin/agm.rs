@@ -65,10 +65,10 @@ fn main() {
         "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
             cmd_resend_running_commands(&cmd_args);
         }
-        "backup-running-prompts" | "brp" | "backup-prompts" => {
+        "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
             cmd_backup_running_prompts(&cmd_args);
         }
-        "restore-running-prompts" | "rrp" | "restore-prompts" => {
+        "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
             cmd_restore_running_prompts(&cmd_args);
         }
         "running-prompts" => {
@@ -234,9 +234,11 @@ fn print_help() {
         "  running-prompts import [-f path] [--wc N] Import prompts and resume active execution"
     );
     println!(
-        "  backup-running-prompts [ls|clean] [-f file] Quick alias for split SQLite prompt backup"
+        "  backup, backpack, backup-running-prompts [ls|clean] [-f file] Snapshot running prompts to split SQLite DB"
     );
-    println!("  restore-running-prompts [--keep] [--json] Quick alias for prompt restoration");
+    println!(
+        "  restore, restore-running-prompts [--keep] [--json] Restore & resend in-flight prompts"
+    );
     println!("  prompts ls [N] [--json] [--words W]   Show N running prompts in ASC stack order");
     println!("  prompts-export, pe [N] [-f <path>]    Export prompts with Base64 images to JSON");
     println!("  prompts-import, pi [-f <path>]        Import and rerun prompts from JSON file(s)");
@@ -250,7 +252,7 @@ fn print_help() {
     println!();
     println!("Auto-Switch & Autonomous Green Watcher Commands:");
     println!(
-        "  auto-switch threshold [N]             Set or query low quota threshold (default: 25.0%)"
+        "  auto-switch threshold [N]             Set or query low quota threshold (default: 12.0%)"
     );
     println!("  running-projects [ls] [--json] [-f path] [--ssh] Inspect active workspace projects with running queues");
     println!("  finish-prompts-until-green, fpug <targets...> [-t 5m] Watch projects until prompt queues drain");
@@ -1519,10 +1521,19 @@ fn cmd_prompt_dispatch(args: &[String]) {
         return;
     }
 
-    // If first arg is "ls" or "--running", delegate to cmd_prompts
+    // If first arg is "ls", "backup", or "restore", delegate accordingly
     if let Some(first) = args.first() {
-        if first == "ls" || first == "list" || first == "--running" {
+        let first_lower = first.to_lowercase();
+        if first_lower == "ls" || first_lower == "list" || first_lower == "--running" {
             cmd_prompts(args);
+            return;
+        }
+        if first_lower == "backup" || first_lower == "backpack" {
+            cmd_backup_running_prompts(&args[1..]);
+            return;
+        }
+        if first_lower == "restore" {
+            cmd_restore_running_prompts(&args[1..]);
             return;
         }
     }
@@ -1949,7 +1960,7 @@ fn cmd_auto_switch(args: &[String]) {
                         std::process::exit(1);
                     }
                     println!(
-                        "[SUCCESS] Auto-switch low quota threshold set to {:.1}% (default: 25.0%).",
+                        "[SUCCESS] Auto-switch low quota threshold set to {:.1}% (default: 12.0%).",
                         clamped
                     );
                     return;
@@ -2086,6 +2097,7 @@ fn cmd_backup_running_prompts(args: &[String]) {
         i += 1;
     }
 
+    let _ = repo_db::backup_running_prompts("default");
     match backup_prompts_db::backup_active_running_prompts(custom_file) {
         Ok((batch, records)) => {
             if is_json {
@@ -2171,6 +2183,8 @@ fn cmd_restore_running_prompts(args: &[String]) {
         i += 1;
     }
 
+    let _ = repo_db::resend_all_running_commands(20);
+    let _ = repo_db::dispatch_running_prompts("default");
     match backup_prompts_db::restore_running_prompts(keep_backup, custom_file) {
         Ok(records) => {
             if is_json {
