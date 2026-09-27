@@ -57,6 +57,8 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 19 | [19-smart-switch-stale-quota-and-in-use-isolation.md](19-smart-switch-stale-quota-and-in-use-isolation.md) | Smart Switch Stale Quota Selection, Disabled Account Re-selection & Multi-Node Lease Isolation RCA | Critical | Fixed |
 | 20 | [20-installer-upstream-fork-inversion-rca.md](20-installer-upstream-fork-inversion-rca.md) | Installer Upstream Fork Inversion & Fallback Binary Injection RCA | Critical | Fixed |
 | 21 | [21-supabase-connection-test-404-rca.md](21-supabase-connection-test-404-rca.md) | Supabase Connection Test 404 & URL Normalization RCA | High | Fixed |
+| 22 | [22-meaningless-workspace-uuid-and-truncated-prompt-preview-rca.md](22-meaningless-workspace-uuid-and-truncated-prompt-preview-rca.md) | Meaningless Workspace UUIDs & Truncated Prompt Preview RCA | High | Fixed |
+| 23 | [23-windows-runner-build-starvation-and-linker-bottleneck-rca.md](23-windows-runner-build-starvation-and-linker-bottleneck-rca.md) | Windows Runner Build Starvation & MSVC Linker Bottleneck RCA | Critical | Fixed |
 
 ---
 

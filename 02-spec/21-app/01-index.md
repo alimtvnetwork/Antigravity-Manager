@@ -210,4 +210,5 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-058 (Telegram & AGM GitMap AGY Parity, VM Fleet Orchestration & Remote Prompt Routing):** Implemented in [`58-telegram-gitmap-fleet-commands-and-prompt-orchestrator.md`](./58-telegram-gitmap-fleet-commands-and-prompt-orchestrator.md).
 - **AC-APP-059 (Auto-Switch Button Delegation, Hot-Switch IDE Preservation & Tool Liveness):** Implemented in [`59-auto-switch-button-delegation-and-ide-alive.md`](./59-auto-switch-button-delegation-and-ide-alive.md).
 - **AC-APP-060 (Supabase Connection Probe, URL Normalization & Resilient Diagnostics):** Implemented in [`60-supabase-connection-probe-and-url-normalization.md`](./60-supabase-connection-probe-and-url-normalization.md).
+- **AC-APP-062 (Windows Runner Build Acceleration & Fast-Forward Toolchain Optimization):** Implemented in [`62-windows-runner-build-acceleration-and-fast-forward.md`](./62-windows-runner-build-acceleration-and-fast-forward.md).
 

@@ -47,17 +47,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-2025, macos-latest]
+        platform: [ubuntu-latest, windows-2022, macos-latest]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Optimize Windows Runner I/O
-        if: matrix.platform == 'windows-2025'
+        if: startsWith(matrix.platform, 'windows')
         shell: pwsh
         run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
-          Set-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Set-MpPreference -ExclusionPath @(
+            "${{ github.workspace }}",
+            "$env:USERPROFILE\.cargo",
+            "$env:USERPROFILE\.rustup",
+            "$env:TEMP",
+            "$env:LOCALAPPDATA\Temp"
+          ) -ErrorAction SilentlyContinue
 
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
@@ -72,6 +78,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri"
+          cache-all-crates: "true"
+          cache-targets: "true"
 
       - name: Ensure frontend dist directory exists
         shell: pwsh
@@ -85,16 +93,28 @@ jobs:
           cargo fmt -- --check
 
       - name: Run Clippy
+        env:
+          CARGO_BUILD_JOBS: 4
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: |
           cd src-tauri
           cargo clippy --all-targets --all-features
 
       - name: Check Rust compilation
+        env:
+          CARGO_BUILD_JOBS: 4
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: |
           cd src-tauri
           cargo check
 
       - name: Run Rust tests
+        env:
+          CARGO_BUILD_JOBS: 4
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
   # Tauri 构建测试（不打包）
@@ -105,17 +125,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-2025, macos-latest]
+        platform: [ubuntu-latest, windows-2022, macos-latest]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Optimize Windows Runner I/O
-        if: matrix.platform == 'windows-2025'
+        if: startsWith(matrix.platform, 'windows')
         shell: pwsh
         run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
-          Set-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Set-MpPreference -ExclusionPath @(
+            "${{ github.workspace }}",
+            "$env:USERPROFILE\.cargo",
+            "$env:USERPROFILE\.rustup",
+            "$env:TEMP",
+            "$env:LOCALAPPDATA\Temp"
+          ) -ErrorAction SilentlyContinue
 
       - name: Install dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
@@ -131,6 +157,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri"
+          cache-all-crates: "true"
+          cache-targets: "true"
 
       - name: Node.js setup
         uses: actions/setup-node@v4
@@ -156,3 +184,6 @@ jobs:
           # CI 环境不需要签名
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          RUSTFLAGS: ${{ startsWith(matrix.platform, 'ubuntu') && '-C linker=clang -C link-arg=-fuse-ld=mold' || '' }}
+          CARGO_BUILD_JOBS: 4
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
