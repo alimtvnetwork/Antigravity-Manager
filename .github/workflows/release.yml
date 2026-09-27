@@ -58,6 +58,10 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || (contains(matrix.args, 'aarch64') && 'aarch64-unknown-linux-gnu' || '') }}
 
+      - name: Setup NASM
+        if: startsWith(matrix.platform, 'windows')
+        uses: ilammy/setup-nasm@v1
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:

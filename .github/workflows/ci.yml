@@ -74,6 +74,10 @@ jobs:
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup NASM
+        if: startsWith(matrix.platform, 'windows')
+        uses: ilammy/setup-nasm@v1
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -149,6 +153,10 @@ jobs:
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup NASM
+        if: startsWith(matrix.platform, 'windows')
+        uses: ilammy/setup-nasm@v1
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
