@@ -1,9 +1,9 @@
 # Codeowners for Antigravity-Manager
-# Maintained by Alim (alimtvnetwork)
+# Maintained by Alim (devorg.bd@gmail.com, @aukgit, @alimtvnetwork)
 
-*                                   @alimtvnetwork
-/src-tauri/                         @alimtvnetwork
-/src/                               @alimtvnetwork
-/scripts/                           @alimtvnetwork
-/docs/                              @alimtvnetwork
-/.github/                           @alimtvnetwork
+*                                   @alimtvnetwork @aukgit
+/src-tauri/                         @alimtvnetwork @aukgit
+/src/                               @alimtvnetwork @aukgit
+/scripts/                           @alimtvnetwork @aukgit
+/docs/                              @alimtvnetwork @aukgit
+/.github/                           @alimtvnetwork @aukgit
