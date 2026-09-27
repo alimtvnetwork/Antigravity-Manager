@@ -3,6 +3,15 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.77.0 (2026-09-27)**:
+        -   **[Release v4.77.0: 运行中 Prompt 独立 Split SQLite 备份与恢复引擎、25% 配额阈值切换、跨平台 FPUG/SUG 守候器、广播邮件与 Telegram 终端运维管理] 彻底实现切号与关机前 Prompt 零丢失、支持自动与手动恢复重入队列、24小时过期自动清理、跨平台系统安全关机与终端机器人指令交互**:
+            -   **Prompt 独立 Split SQLite 备份与恢复引擎 (`src-tauri/src/modules/backup_prompts_db.rs`, `src-tauri/src/bin/agm.rs`, `repo_db.rs`)**: 引入专有轻量级 SQLite 数据库（默认路径 `~/.antigravity_tools/backup-prompts/backup-prompts.db`），深度采集 Antigravity 核心会话与工作区运行状态，全量支持 `agm backup-running-prompts`、`agm restore-running-prompts` 以及 `agm running-prompts backup/restore` 命令，并提供 `--keep`、`--json`、`-file/-f` 与 `clean [--force]` 等操作；恢复记录内置 24 小时自然日保留期自动清理与单行提醒。
+            -   **运行中 Prompt 分页列表与导出导入 (`src-tauri/src/bin/agm.rs`)**: 提供 `agm running-prompts ls [--limit/-l Y] [--wordcount/wc N] [--full] [--json]`，默认单屏 8 项、截断 100 词按 ASC 队列清晰排版；支持 `.db` 与 `.json` 双格式导出导入 (`export/import`)，并在导入时无缝激活重入队列。
+            -   **运行项目状态洞察与 SSH 模式 (`src-tauri/src/bin/agm.rs`)**: 新增 `agm running-projects [ls] [--json] [-file/-f <path>] [--ssh]`，实时扫描多实例运行状态并输出序号、项目名、会话 ID、会话名称、队列 Prompt 计数及集群节点遥测信息。
+            -   **配额 25% 阈值切换与配置指令 (`src-tauri/src/models/config.rs`, `src-tauri/src/bin/agm.rs`)**: 默认低额度自动切换阈值锁定为 `25.0%`，并提供 `agm auto-switch threshold [N]` 动态调优指令（支持容错别名 `auto-swtich thresehold`）。
+            -   **FPUG 与 SUG 跨平台绿色守候器 (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/backup_prompts_db.rs`)**: 实现 `agm finish-prompts-until-green` (`fpug`) 与 `agm shutdown-until-green` (`sug`)，针对 Windows (`shutdown /s /t 60`)、Linux (`systemctl poweroff`) 与 macOS (`osascript`) 原生分发关机指令，待监控项目 Prompts 全量处理完毕（绿灯）后安全关机。
+            -   **广播邮件与 Telegram 终端运维增强 (`src-tauri/src/bin/agm.rs`, `email_vault_db.rs`, `telegram_inbound.rs`)**: 支持 `agm broadcast-email ls/add/edit/rm/send-to-all/send/send help/test` 与 `agm telegram ls/set/ping/cmds`，打通收件人库与 Telegram 机器人配置链路。
+
     *   **v4.76.0 (2026-09-27)**:
         -   **[Release v4.76.0: 隐私截图邮箱高斯模糊遮蔽、14 处版本清单全量原子同步根治、E9001 代理池服务未运行诊断弹窗消除与 4 小时 100% 配额校验闭环] 根除截图敏感信息外泄、全面修复 Cargo/Tauri 编译版本滞后于 package.json 的根本缺陷、代理池离线配置回退与切号运行 Prompt 跨进程恢复**:
             -   **隐私截图邮箱高斯模糊遮蔽与 Assets 资源同步 (`docs/images/dashboard-modern.png`, `assets/screenshots/dashboard-modern.png`)**: 彻底解决 README 中展示的控制台截图包含未遮蔽用户账号邮箱的安全隐患。对邮箱列全量应用专业高斯模糊遮蔽，并在 `docs/images/` 与 `assets/screenshots/` 中同步更新保护隐私。
@@ -3321,6 +3330,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.77.0 (2026-09-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.76.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

@@ -843,6 +843,39 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     Ok(rows)
 }
 
+/// Save or re-queue an active prompt into active_prompts and running_projects
+pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?, ?, ?, ?, NULL, 1, ?, ?)",
+        params![&prompt.project_id, &prompt.instance_id, &prompt.project_id, &prompt.repo_path, now, now],
+    );
+
+    conn.execute(
+        "INSERT OR REPLACE INTO active_prompts 
+         (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        params![
+            &prompt.id,
+            &prompt.project_id,
+            &prompt.instance_id,
+            &prompt.repo_path,
+            &prompt.prompt_content,
+            &prompt.model,
+            &prompt.session_id,
+            &prompt.status,
+            prompt.created_at,
+            now,
+            &prompt.image_payload,
+        ],
+    ).map_err(|e| format!("Failed to insert active prompt: {}", e))?;
+
+    Ok(())
+}
+
 /// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch
 pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
