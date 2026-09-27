@@ -36,6 +36,7 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           enablement: true
@@ -47,4 +48,5 @@ jobs:
           path: './web_site'
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

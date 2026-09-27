@@ -231,20 +231,34 @@ jobs:
           echo "## Quick Install ${VERSION}" > release_notes.md
           echo "" >> release_notes.md
           echo "### Windows (PowerShell 5.1+)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Direct Latest Install (Auto-Updating)" >> release_notes.md
           echo '```powershell' >> release_notes.md
           echo "irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" >> release_notes.md
-          echo "# Or pinned version:" >> release_notes.md
-          echo "irm https://github.com/${REPO}/releases/download/${VERSION}/install.ps1 | iex" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
-          echo "### Linux / macOS (Bash)" >> release_notes.md
-          echo '```bash' >> release_notes.md
-          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
-          echo "# Or pinned version:" >> release_notes.md
-          echo "curl -fsSL https://github.com/${REPO}/releases/download/${VERSION}/install.sh | bash" >> release_notes.md
+          echo "#### Pinned Version Install (${VERSION})" >> release_notes.md
+          echo '```powershell' >> release_notes.md
+          echo "irm https://raw.githubusercontent.com/${REPO}/${VERSION}/install.ps1 | iex" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
           echo "---" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Linux / macOS (Bash)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Direct Latest Install (Auto-Updating)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Pinned Version Install (${VERSION})" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/${VERSION}/install.sh | bash" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "---" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## What's New in ${VERSION}" >> release_notes.md
           echo "" >> release_notes.md
           CHANGELOG_SOURCE="CHANGELOG_EN.md"
           if [ ! -f "$CHANGELOG_SOURCE" ]; then
@@ -387,10 +401,15 @@ jobs:
           fi
           # Provide friendly alias names for direct setup/installer downloads
           cd release-files
-          setup_file=$(find . -maxdepth 1 -name "agm-alim*setup.exe" | head -n 1)
+          setup_file=$(find . -maxdepth 1 \( -name "agm-alim*setup.exe" -o -name "*setup.exe" \) | head -n 1)
           if [ -n "$setup_file" ] && [ -f "$setup_file" ]; then
             cp "$setup_file" agm-alim-setup.exe
           fi
+          cd ..
+          if [ -f releases-manifest.json ]; then
+            cp releases-manifest.json release-files/
+          fi
+          cd release-files
           # Generate SHA-256 checksums
           sha256sum * > checksums.txt 2>/dev/null || shasum -a 256 * > checksums.txt 2>/dev/null || true
           cd ..
