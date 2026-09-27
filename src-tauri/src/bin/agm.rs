@@ -89,6 +89,21 @@ fn main() {
         "telegram" => {
             cmd_telegram(&cmd_args);
         }
+        "nodes" => {
+            cmd_telegram(&["nodes".to_string()]);
+        }
+        "projects" | "workspaces" => {
+            cmd_telegram(&["projects".to_string()]);
+        }
+        "active" | "running" => {
+            cmd_agy(&["active".to_string()]);
+        }
+        "queues" | "queue" => {
+            cmd_agy(&["queues".to_string()]);
+        }
+        "agy" => {
+            cmd_agy(&cmd_args);
+        }
         "proxy" => cmd_proxy(&cmd_args),
         "sync" => cmd_sync(),
         "pull" => cmd_pull(),
@@ -3349,6 +3364,42 @@ fn cmd_telegram(args: &[String]) {
             }
             return;
         }
+        if first_lower == "active" || first_lower == "running" {
+            let report = rt.block_on(telegram_inbound::format_active_prompts_report());
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Active prompts report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "queues" || first_lower == "queue" {
+            let report = rt.block_on(telegram_inbound::format_prompt_queues_report());
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Prompt queues report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
         if first_lower == "projects" || first_lower == "workspaces" {
             let report = telegram_inbound::format_projects_list();
             println!("{}", report);
@@ -3367,9 +3418,11 @@ fn cmd_telegram(args: &[String]) {
             }
             return;
         }
-        if first_lower == "prompts" {
+        if first_lower == "prompts" || first_lower == "templates" {
             let target_sub = args.get(1).map(|s| s.as_str()).unwrap_or("");
             let report = if target_sub.is_empty() || target_sub == "ls" || target_sub == "list" {
+                telegram_inbound::format_prompts_templates_report()
+            } else if target_sub == "all" || target_sub == "db" {
                 telegram_inbound::format_prompts_list()
             } else {
                 rt.block_on(telegram_inbound::format_node_scoped_prompts(target_sub))
@@ -3677,6 +3730,69 @@ fn cmd_telegram(args: &[String]) {
     }
 
     println!("AGM Telegram Subsystem. Run 'agm telegram help' for available commands.");
+}
+
+fn cmd_agy(args: &[String]) {
+    let sub = args
+        .first()
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "help".to_string());
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    match sub.as_str() {
+        "active" | "running" => {
+            println!(
+                "{}",
+                rt.block_on(telegram_inbound::format_active_prompts_report())
+            );
+        }
+        "queues" | "queue" => {
+            println!(
+                "{}",
+                rt.block_on(telegram_inbound::format_prompt_queues_report())
+            );
+        }
+        "projects" | "workspaces" | "ls" => {
+            println!("{}", telegram_inbound::format_projects_list());
+        }
+        "prompts" | "prompt-ls" | "templates" => {
+            println!("{}", telegram_inbound::format_prompts_templates_report());
+        }
+        "prompt" | "p" => {
+            let prompt_args = if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                String::new()
+            };
+            println!(
+                "{}",
+                rt.block_on(telegram_inbound::execute_prompt_injection(&prompt_args))
+            );
+        }
+        "nodes" => {
+            println!(
+                "{}",
+                rt.block_on(telegram_inbound::format_cluster_nodes_report())
+            );
+        }
+        _ => {
+            let gm_res = std::process::Command::new("gitmap")
+                .arg("agy")
+                .args(args)
+                .status();
+            if let Ok(st) = gm_res {
+                if st.success() {
+                    return;
+                }
+            }
+            println!("AGM Antigravity (AGY) Management & GitMap Parity:");
+            println!("  agm agy active          List active running prompts and conversations");
+            println!("  agm agy queues          List workspace prompt queues");
+            println!("  agm agy ls              List registered projects and workspaces");
+            println!("  agm agy prompts         List reusable prompt templates");
+            println!("  agm agy prompt <args>   Inject prompt to workspace or remote VM node");
+            println!("  agm agy nodes           List cluster VM nodes & connectivity status");
+        }
+    }
 }
 
 fn scan_prompt_templates() {

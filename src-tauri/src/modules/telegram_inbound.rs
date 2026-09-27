@@ -169,8 +169,10 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
     let payload = json!({
         "commands": [
             { "command": "nodes", "description": "List all cluster VM nodes & status" },
-            { "command": "projects", "description": "List registered workspaces & project IDs" },
-            { "command": "prompts", "description": "List active & queued running prompts" },
+            { "command": "active", "description": "List active running prompts & conversations" },
+            { "command": "queues", "description": "Inspect workspace prompt queues" },
+            { "command": "projects", "description": "List registered workspaces & prompt syntax" },
+            { "command": "prompts", "description": "List reusable prompt templates" },
             { "command": "prompt", "description": "Inject prompt into node workspace" },
             { "command": "ping", "description": "Verify node connectivity, IP, Git version & uptime" },
             { "command": "status", "description": "Full node, account quota & proxy status" },
@@ -595,13 +597,17 @@ pub fn format_help_manual() -> String {
         • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
         • <code>/snapshot</code> — Multi-node cluster status snapshot\n\n\
         🖥️ <b>Cluster VM Nodes &amp; Prompt Control:</b>\n\
-        • <code>/nodes</code> or <code>/nodes ls</code> — View all cluster VM nodes &amp; connectivity\n\
-        • <code>/nodes &lt;alias&gt; prompts</code> — Inspect running prompts on specific node\n\
-        • <code>/projects</code> — List registered workspaces &amp; project IDs\n\
-        • <code>/prompts</code> — List state database prompt queue\n\
-        • <code>/prompt &lt;node&gt; &lt;proj&gt; &lt;text&gt;</code> — Inject prompt into node workspace\n\n\
+        • <code>/nodes</code> or <code>/node ls</code> — View all cluster VM nodes &amp; connectivity\n\
+        • <code>/nodes &lt;alias&gt; prompts</code> — Inspect running prompts on specific VM node\n\
+        • <code>/active</code> or <code>/running</code> — Compact table of active running prompts\n\
+        • <code>/queues</code> or <code>/queue</code> — Inspect pending workspace prompt queues\n\
+        • <code>/projects</code> — List registered workspaces, IDs &amp; sample syntax\n\
+        • <code>/prompts</code> — List available reusable prompt templates &amp; queue\n\
+        • <code>/prompt &lt;node&gt; &lt;proj&gt; &lt;text&gt;</code> — Inject prompt into VM workspace\n\
+        • <code>/prompt &lt;proj&gt; &lt;text&gt;</code> — Inject prompt locally\n\n\
         🧭 <b>GitMap &amp; AGM CLI Execution:</b>\n\
         • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
+        • <code>/gitmap agy active</code> — Check Antigravity active prompts via GitMap\n\
         • <code>/gitmap version</code> — Check installed GitMap CLI version\n\
         • <code>/agm status</code> — Run AGM status &amp; quota summary\n\
         • <code>/agm accounts</code> — List registered accounts &amp; quotas\n\
@@ -1139,7 +1145,14 @@ pub async fn format_cluster_snapshot() -> String {
 /// Format running prompts scoped to a specific node (e.g. /nodes vm-01 prompts)
 pub async fn format_node_scoped_prompts(args_str: &str) -> String {
     let trimmed = args_str.trim();
-    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    let clean_str = if let Some(stripped) = trimmed.strip_suffix("running prompts") {
+        stripped.trim()
+    } else if let Some(stripped) = trimmed.strip_suffix("prompts") {
+        stripped.trim()
+    } else {
+        trimmed
+    };
+    let parts: Vec<&str> = clean_str.split_whitespace().collect();
     let target_alias = if parts.is_empty() { "local" } else { parts[0] };
 
     let local_config = supabase_sync::load_config().unwrap_or_default();
@@ -1302,11 +1315,157 @@ pub fn format_projects_list() -> String {
     format!(
         "📂 <b>Discovered Workspaces &amp; Projects ({} Total)</b>\n\n\
         {}\
-        💡 <b>How to Run Prompts:</b>\n\
-        • <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code> (Execute locally)\n\
-        • <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code> (Dispatch to VM node)",
+        💡 <b>Sample Prompt Invocations:</b>\n\
+        • <b>Local workspace:</b> <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
+        • <b>Remote VM node:</b> <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
+        • <b>Active conversation:</b> <code>/prompt &lt;conversation-id&gt; &lt;prompt text&gt;</code>\n\
+        • <b>Prompt template:</b> <code>/prompt &lt;project-id&gt; read-all</code>",
         projects.len(),
         rows
+    )
+}
+
+/// Format active running prompts in compact GitMap style
+pub async fn format_active_prompts_report() -> String {
+    if let Ok(out) = Command::new("gitmap").args(["agy", "active"]).output() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if !stdout.trim().is_empty()
+            && (stdout.contains("Active Running Prompts") || stdout.contains("CONVERSATION ID"))
+        {
+            let cleaned = clean_for_telegram_html(stdout.trim(), 2800);
+            return format!(
+                "⚡ <b>Antigravity Active Running Prompts</b>\n\n\
+                <pre>{}</pre>\n\n\
+                💡 <b>How to Inject Prompt:</b>\n\
+                • <code>/prompt &lt;conversation-id&gt; &lt;text&gt;</code>\n\
+                • <code>/prompt &lt;project-id&gt; &lt;text&gt;</code>\n\
+                • <code>/prompt &lt;node&gt; &lt;project-id&gt; &lt;text&gt;</code>",
+                cleaned
+            );
+        }
+    }
+
+    let projects = repo_db::get_live_project_execution_info();
+    let running: Vec<_> = projects.into_iter().filter(|p| p.is_running).collect();
+    if running.is_empty() {
+        return "⚡ <b>Active Running Prompts:</b> No conversations or workspaces are actively running prompts (Node is idle).".to_string();
+    }
+
+    let mut rows = String::new();
+    for (i, p) in running.iter().enumerate() {
+        let clean = p
+            .active_prompt
+            .as_deref()
+            .map(repo_db::extract_clean_user_prompt)
+            .unwrap_or_else(|| "AGM".to_string());
+        rows.push_str(&format!(
+            "{}. 🟢 <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>\n   • <i>Prompt: \"{}\"</i>\n\n",
+            i + 1,
+            clean_for_telegram_html(&p.repo_name, 36),
+            clean_for_telegram_html(&p.project_id, 48),
+            clean_for_telegram_html(&p.repo_path, 60),
+            clean_for_telegram_html(&clean, 100)
+        ));
+    }
+
+    format!(
+        "⚡ <b>Active Running Prompts ({} Running)</b>\n\n\
+        {}\
+        💡 <b>How to Inject Prompt:</b>\n\
+        • <code>/prompt &lt;project-id&gt; &lt;text&gt;</code>\n\
+        • <code>/prompt &lt;node&gt; &lt;project-id&gt; &lt;text&gt;</code>",
+        running.len(),
+        rows
+    )
+}
+
+/// Format workspace prompt queues in GitMap style
+pub async fn format_prompt_queues_report() -> String {
+    if let Ok(out) = Command::new("gitmap").args(["agy", "queues"]).output() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if !stdout.trim().is_empty()
+            && (stdout.contains("Prompt Queues") || stdout.contains("queued"))
+        {
+            let cleaned = clean_for_telegram_html(stdout.trim(), 2800);
+            return format!(
+                "📥 <b>Antigravity Workspace Prompt Queues</b>\n\n\
+                <pre>{}</pre>\n\n\
+                💡 Send <code>/active</code> to view running prompts or <code>/restore</code> to re-queue backed-up prompts.",
+                cleaned
+            );
+        }
+    }
+
+    match repo_db::list_all_prompts() {
+        Ok(prompts) => {
+            let queued: Vec<_> = prompts
+                .into_iter()
+                .filter(|p| p.status == "queued" || p.status == "pending")
+                .collect();
+            if queued.is_empty() {
+                return "📥 <b>Prompt Queues:</b> All workspace queues are currently empty."
+                    .to_string();
+            }
+            let mut rows = String::new();
+            for (i, p) in queued.iter().take(10).enumerate() {
+                let clean = repo_db::extract_clean_user_prompt(&p.prompt_content);
+                rows.push_str(&format!(
+                    "{}. [⏳ QUEUED] <code>{}</code>\n   • <b>Project:</b> <code>{}</code>\n   • <i>\"{}\"</i>\n\n",
+                    i + 1,
+                    if p.id.len() > 12 { &p.id[..12] } else { &p.id },
+                    clean_for_telegram_html(&p.project_id, 32),
+                    clean_for_telegram_html(&clean, 80)
+                ));
+            }
+            format!(
+                "📥 <b>Workspace Prompt Queues ({} Queued)</b>\n\n\
+                {}\
+                💡 Send <code>/restore</code> to resume prompt queue.",
+                queued.len(),
+                rows
+            )
+        }
+        Err(e) => format!(
+            "⚠️ <b>Queue Check Failed:</b> <code>{}</code>",
+            clean_for_telegram_html(&e, 200)
+        ),
+    }
+}
+
+/// Format available prompt templates like `gitmap agy prompt ls`
+pub fn format_prompts_templates_report() -> String {
+    if let Ok(out) = Command::new("gitmap")
+        .args(["agy", "prompt", "ls"])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if !stdout.trim().is_empty()
+            && (stdout.contains("Available Prompt Templates") || stdout.contains("read-all"))
+        {
+            let cleaned = clean_for_telegram_html(stdout.trim(), 2600);
+            return format!(
+                "📋 <b>Available Reusable Prompt Templates</b>\n\n\
+                <pre>{}</pre>\n\n\
+                💡 <b>How to Run Templates:</b>\n\
+                • <code>/prompt &lt;project-id&gt; read-all</code>\n\
+                • <code>/prompt &lt;node&gt; &lt;project-id&gt; read-all</code>\n\
+                • <code>/prompt &lt;project-id&gt; is-done</code>",
+                cleaned
+            );
+        }
+    }
+
+    format!(
+        "📋 <b>Available Reusable Prompt Templates</b>\n\n\
+        1. <code>read-all</code> — Enhanced Read Memory protocol and project context ingestion\n\
+        2. <code>is-done</code> — Standard task completion and quality verification check\n\
+        3. <code>ci-cd-fix</code> — Diagnose, analyze, and fix CI/CD pipeline failures\n\
+        4. <code>minor-bump</code> — Automated version bump and changelog synchronization\n\
+        5. <code>coding-guidelines</code> — Audit and enforce grounded coding guidelines\n\
+        6. <code>smart-test-runner</code> — Smart incremental test execution\n\n\
+        💡 <b>How to Run Templates:</b>\n\
+        • <code>/prompt &lt;project-id&gt; read-all</code>\n\
+        • <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; read-all</code>"
     )
 }
 
@@ -1562,6 +1721,8 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "start" | "help" => Some(format_help_manual()),
         "ping" => Some(format_ping_report()),
         "status" | "observe" => Some(format_observe_report()),
+        "active" | "running" => Some(format_active_prompts_report().await),
+        "queues" | "queue" => Some(format_prompt_queues_report().await),
         "nodes" | "node" => {
             let sub = rest.trim();
             if sub.is_empty() || sub == "ls" || sub == "list" || sub == "status" {
@@ -1571,15 +1732,19 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
         }
         "projects" | "workspaces" | "workspace" => Some(format_projects_list()),
-        "prompts" | "prompt_queue" => {
+        "prompts" | "prompt_queue" | "templates" => {
             let sub = rest.trim();
             if sub.is_empty() || sub == "ls" || sub == "list" {
+                Some(format_prompts_templates_report())
+            } else if sub == "queue" || sub == "queues" {
+                Some(format_prompt_queues_report().await)
+            } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())
             } else {
                 Some(execute_prompt_injection(sub).await)
             }
         }
-        "prompt" | "inject" => Some(execute_prompt_injection(rest).await),
+        "prompt" | "inject" | "p" | "pt" => Some(execute_prompt_injection(rest).await),
         "gitmap" | "gm" => Some(execute_gitmap_subcommand(rest)),
         "agm" => Some(execute_agm_subcommand(rest)),
         "api" | "proxy" => Some(execute_api_status_command().await),
@@ -1595,8 +1760,15 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             if lower_full.contains("how many machines")
                 || lower_full.contains("node ls")
                 || lower_full == "nodes"
+                || lower_full == "nodes ls"
             {
                 return Some(format_cluster_nodes_report().await);
+            }
+            if lower_full.contains("running prompts") || lower_full.contains("active prompts") {
+                if lower_full.starts_with("node") || lower_full.starts_with("nodes") {
+                    return Some(format_node_scoped_prompts(trimmed).await);
+                }
+                return Some(format_active_prompts_report().await);
             }
             if lower_full.starts_with("ff:") {
                 let _ = auto_switcher::check_and_rotate_if_needed();
