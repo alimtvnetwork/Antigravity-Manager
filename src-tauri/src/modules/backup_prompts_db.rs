@@ -62,10 +62,22 @@ pub fn get_backup_prompts_db_path(custom_file: Option<&str>) -> Result<PathBuf, 
         }
     }
 
+    // Check if local data/backup-prompts exists close to the CLI
+    let local_backup_dir = PathBuf::from("data").join("backup-prompts");
+    if local_backup_dir.exists() {
+        if local_backup_dir.join("SQL.db").exists() {
+            return Ok(local_backup_dir.join("SQL.db"));
+        }
+        return Ok(local_backup_dir.join("backup-prompts.db"));
+    }
+
     let data_dir = account::get_data_dir()?;
     let backup_dir = data_dir.join("backup-prompts");
     if let Err(e) = fs::create_dir_all(&backup_dir) {
         return Err(format!("Failed to create backup-prompts folder: {}", e));
+    }
+    if backup_dir.join("SQL.db").exists() {
+        return Ok(backup_dir.join("SQL.db"));
     }
     Ok(backup_dir.join("backup-prompts.db"))
 }
