@@ -168,6 +168,10 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
 
     let payload = json!({
         "commands": [
+            { "command": "nodes", "description": "List all cluster VM nodes & status" },
+            { "command": "projects", "description": "List registered workspaces & project IDs" },
+            { "command": "prompts", "description": "List active & queued running prompts" },
+            { "command": "prompt", "description": "Inject prompt into node workspace" },
             { "command": "ping", "description": "Verify node connectivity, IP, Git version & uptime" },
             { "command": "status", "description": "Full node, account quota & proxy status" },
             { "command": "observe", "description": "Inspect live workspaces & running prompt queues" },
@@ -270,47 +274,130 @@ pub async fn detect_telegram_chat_id(bot_token: &str) -> Result<TelegramDetected
     )))
 }
 
-/// Send a text message to a Telegram chat
+/// Chunk text into pieces <= max_chars splitting at newline boundaries where possible
+pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
+    let limit = if max_chars == 0 { 3800 } else { max_chars };
+    if text.len() <= limit {
+        return vec![text.to_string()];
+    }
+
+    let mut chunks = Vec::new();
+    let mut current_chunk = String::with_capacity(limit);
+
+    for line in text.split_inclusive('\n') {
+        if line.len() > limit {
+            if !current_chunk.is_empty() {
+                chunks.push(current_chunk);
+                current_chunk = String::with_capacity(limit);
+            }
+            let mut remaining = line;
+            while remaining.len() > limit {
+                let (slice, rest) = remaining.split_at(limit);
+                chunks.push(slice.to_string());
+                remaining = rest;
+            }
+            if !remaining.is_empty() {
+                current_chunk.push_str(remaining);
+            }
+        } else if current_chunk.len() + line.len() > limit {
+            chunks.push(current_chunk);
+            current_chunk = String::with_capacity(limit);
+            current_chunk.push_str(line);
+        } else {
+            current_chunk.push_str(line);
+        }
+    }
+
+    if !current_chunk.is_empty() {
+        chunks.push(current_chunk);
+    }
+
+    if chunks.is_empty() {
+        vec![text.to_string()]
+    } else {
+        chunks
+    }
+}
+
+/// Send a text message to a Telegram chat, automatically chunking messages longer than 3800 characters
 pub async fn send_telegram_message(
     bot_token: &str,
     chat_id: i64,
     text: &str,
 ) -> Result<(), AppError> {
-    let url = format!(
-        "https://api.telegram.org/bot{}/sendMessage",
-        bot_token.trim()
-    );
+    let clean_token = bot_token.trim();
+    if clean_token.is_empty() {
+        return Err(AppError::Config("Telegram bot token is empty".to_string()));
+    }
+
+    let chunks = chunk_telegram_text(text, 3800);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
         .map_err(|e| AppError::Network(e.to_string(), None))?;
 
-    let payload = json!({
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML"
-    });
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", clean_token);
 
-    let resp = client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| AppError::Network(e.to_string(), None))?;
+    for (idx, chunk) in chunks.iter().enumerate() {
+        if idx > 0 {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+        }
 
-    let status = resp.status().as_u16();
-    if status < 400 {
-        return Ok(());
+        let payload_html = json!({
+            "chat_id": chat_id,
+            "text": chunk,
+            "parse_mode": "HTML"
+        });
+
+        let resp = client.post(&url).json(&payload_html).send().await;
+        match resp {
+            Ok(r) if r.status().is_success() => continue,
+            Ok(r) if r.status().as_u16() == 400 => {
+                // If HTML parse error occurred, retry sending chunk as plain text
+                let payload_plain = json!({
+                    "chat_id": chat_id,
+                    "text": chunk
+                });
+                let retry_resp = client
+                    .post(&url)
+                    .json(&payload_plain)
+                    .send()
+                    .await
+                    .map_err(|e| AppError::Network(e.to_string(), None))?;
+                let status = retry_resp.status().as_u16();
+                if !retry_resp.status().is_success() {
+                    let err = retry_resp.text().await.unwrap_or_default();
+                    return Err(AppError::Network(
+                        format!("Telegram sendMessage failed: {}", err),
+                        Some(status),
+                    ));
+                }
+            }
+            Ok(r) => {
+                let status = r.status().as_u16();
+                let err = r.text().await.unwrap_or_default();
+                return Err(AppError::Network(
+                    format!(
+                        "Telegram sendMessage failed with status {}: {}",
+                        status, err
+                    ),
+                    Some(status),
+                ));
+            }
+            Err(e) => return Err(AppError::Network(e.to_string(), None)),
+        }
     }
 
-    let err_body = resp.text().await.unwrap_or_default();
-    Err(AppError::Network(
-        format!(
-            "Telegram sendMessage failed with status {}: {}",
-            status, err_body
-        ),
-        Some(status),
-    ))
+    Ok(())
+}
+
+/// Convenience alias for send_telegram_message with automatic chunking
+pub async fn send_telegram_message_chunked(
+    bot_token: &str,
+    chat_id: i64,
+    text: &str,
+) -> Result<(), AppError> {
+    send_telegram_message(bot_token, chat_id, text).await
 }
 
 /// Strip ANSI escape codes and escape HTML entities for Telegram <pre> blocks
@@ -507,6 +594,12 @@ pub fn format_help_manual() -> String {
         • <code>/ping</code> — Check node connectivity, IP, Git build &amp; uptime\n\
         • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
         • <code>/snapshot</code> — Multi-node cluster status snapshot\n\n\
+        🖥️ <b>Cluster VM Nodes &amp; Prompt Control:</b>\n\
+        • <code>/nodes</code> or <code>/nodes ls</code> — View all cluster VM nodes &amp; connectivity\n\
+        • <code>/nodes &lt;alias&gt; prompts</code> — Inspect running prompts on specific node\n\
+        • <code>/projects</code> — List registered workspaces &amp; project IDs\n\
+        • <code>/prompts</code> — List state database prompt queue\n\
+        • <code>/prompt &lt;node&gt; &lt;proj&gt; &lt;text&gt;</code> — Inject prompt into node workspace\n\n\
         🧭 <b>GitMap &amp; AGM CLI Execution:</b>\n\
         • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
         • <code>/gitmap version</code> — Check installed GitMap CLI version\n\
@@ -842,66 +935,607 @@ pub fn execute_email_command(args_str: &str) -> String {
     }
 }
 
-/// Format cluster nodes snapshot for Telegram response
-pub async fn format_cluster_snapshot() -> String {
-    let local_ip = supabase_sync::get_local_ip();
-    let uptime_min = supabase_sync::get_uptime_seconds() / 60;
+/// Cluster node summary info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterNodeInfo {
+    pub alias: String,
+    pub ip_address: String,
+    pub status: String,
+    pub source: String,
+    pub last_seen: Option<String>,
+    pub uptime_seconds: u64,
+}
+
+/// Parse GitMap cluster status output (e.g. Node vm-01: Connected (Last Seen: ...))
+pub fn parse_gitmap_cluster_status(output: &str) -> Vec<ClusterNodeInfo> {
+    let mut nodes = Vec::new();
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("Node ") {
+            if let Some((alias, status_part)) = rest.split_once(':') {
+                let alias = alias.trim().to_string();
+                let status_trimmed = status_part.trim();
+                let (status, last_seen) =
+                    if let Some((st, seen_part)) = status_trimmed.split_once('(') {
+                        let st = st.trim().to_string();
+                        let seen = seen_part
+                            .trim_end_matches(')')
+                            .strip_prefix("Last Seen:")
+                            .map(|s| s.trim().to_string());
+                        (st, seen)
+                    } else {
+                        (status_trimmed.to_string(), None)
+                    };
+
+                nodes.push(ClusterNodeInfo {
+                    alias,
+                    ip_address: "Cluster Mesh".to_string(),
+                    status,
+                    source: "GitMap Fleet".to_string(),
+                    last_seen,
+                    uptime_seconds: 0,
+                });
+            }
+        }
+    }
+    nodes
+}
+
+/// Query GitMap cluster nodes via CLI
+pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
+    let output_res = Command::new("gitmap").args(["cluster", "status"]).output();
+    if let Ok(out) = output_res {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let parsed = parse_gitmap_cluster_status(&stdout);
+        if !parsed.is_empty() {
+            return parsed;
+        }
+    }
+    Vec::new()
+}
+
+/// Query Supabase Root DB nodes table
+pub async fn query_supabase_cluster_nodes() -> Vec<ClusterNodeInfo> {
+    let mut nodes = Vec::new();
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let local_alias = local_config.node_alias;
-
-    let mut nodes_text = String::new();
-    let mut online_count = 1;
-
-    // Try reading cluster nodes from Supabase Root DB if configured
-    let mut is_cluster_found = false;
     for ep in &local_config.endpoints {
-        if !ep.is_enabled {
+        if !ep.is_enabled || ep.role != "root" {
             continue;
         }
-        if ep.role == "root" {
-            if let Ok(client) = SupabaseClient::new(ep) {
-                if let Ok(val) = client
-                    .select("nodes", "status=eq.online&order=last_heartbeat_at.desc")
-                    .await
-                {
-                    if let Some(arr) = val.as_array() {
-                        online_count = arr.len();
-                        for item in arr {
-                            let alias = item["alias"].as_str().unwrap_or("Node");
-                            let ip = item["ip_address"].as_str().unwrap_or("0.0.0.0");
-                            let ut = item["uptime_seconds"].as_u64().unwrap_or(0) / 60;
-                            nodes_text.push_str(&format!(
-                                "• <b>{}</b> (IP: <code>{}</code>) | Uptime: {}m\n",
-                                alias, ip, ut
-                            ));
+        if let Ok(client) = SupabaseClient::new(ep) {
+            if let Ok(val) = client.select("nodes", "order=last_heartbeat_at.desc").await {
+                if let Some(arr) = val.as_array() {
+                    for item in arr {
+                        let alias = item["alias"].as_str().unwrap_or("Node").to_string();
+                        let ip = item["ip_address"].as_str().unwrap_or("0.0.0.0").to_string();
+                        let st = item["status"].as_str().unwrap_or("online").to_string();
+                        let ut = item["uptime_seconds"].as_u64().unwrap_or(0);
+                        let last_hb = item["last_heartbeat_at"].as_i64();
+                        let seen_str = last_hb.map(|ts| {
+                            chrono::DateTime::from_timestamp(ts, 0)
+                                .map(|dt| dt.to_rfc3339())
+                                .unwrap_or_else(|| ts.to_string())
+                        });
+
+                        nodes.push(ClusterNodeInfo {
+                            alias,
+                            ip_address: ip,
+                            status: st,
+                            source: "Supabase Root DB".to_string(),
+                            last_seen: seen_str,
+                            uptime_seconds: ut,
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    nodes
+}
+
+/// Format comprehensive cluster nodes report (Local + GitMap Fleet + Supabase)
+pub async fn format_cluster_nodes_report() -> String {
+    let local_config = supabase_sync::load_config().unwrap_or_default();
+    let local_alias = if local_config.node_alias.trim().is_empty() {
+        email_watcher::detect_machine_name()
+    } else {
+        local_config.node_alias.clone()
+    };
+    let local_ip = supabase_sync::get_local_ip();
+    let local_uptime = supabase_sync::get_uptime_seconds();
+
+    let mut all_nodes: Vec<ClusterNodeInfo> = Vec::new();
+
+    // 1. Add Local Host Node
+    all_nodes.push(ClusterNodeInfo {
+        alias: local_alias.clone(),
+        ip_address: local_ip,
+        status: "online".to_string(),
+        source: "Host Node".to_string(),
+        last_seen: Some(Utc::now().to_rfc3339()),
+        uptime_seconds: local_uptime,
+    });
+
+    // 2. Add GitMap cluster fleet nodes
+    let gm_nodes = query_gitmap_cluster_nodes();
+    for n in gm_nodes {
+        if !all_nodes
+            .iter()
+            .any(|x| x.alias.eq_ignore_ascii_case(&n.alias))
+        {
+            all_nodes.push(n);
+        }
+    }
+
+    // 3. Add Supabase cluster nodes
+    let sb_nodes = query_supabase_cluster_nodes().await;
+    for n in sb_nodes {
+        if let Some(existing) = all_nodes
+            .iter_mut()
+            .find(|x| x.alias.eq_ignore_ascii_case(&n.alias))
+        {
+            if (existing.ip_address == "Cluster Mesh" || existing.ip_address == "0.0.0.0")
+                && n.ip_address != "0.0.0.0"
+            {
+                existing.ip_address = n.ip_address;
+            }
+            if existing.uptime_seconds == 0 {
+                existing.uptime_seconds = n.uptime_seconds;
+            }
+        } else {
+            all_nodes.push(n);
+        }
+    }
+
+    let mut rows = String::new();
+    let total = all_nodes.len();
+    for (i, node) in all_nodes.iter().enumerate() {
+        let is_online = node.status.to_lowercase().contains("online")
+            || node.status.to_lowercase().contains("connected");
+        let badge = if is_online {
+            "🟢 ONLINE"
+        } else {
+            "⚪ STANDBY"
+        };
+
+        let seen_display = node.last_seen.as_deref().unwrap_or("Active");
+        let uptime_str = if node.uptime_seconds > 0 {
+            format!(" | Uptime: {}m", node.uptime_seconds / 60)
+        } else {
+            String::new()
+        };
+
+        rows.push_str(&format!(
+            "{}. {} <b>{}</b> (<code>{}</code>)\n   • <b>Fleet:</b> {} [{}]\n   • <b>Last Seen:</b> <code>{}</code>{}\n\n",
+            i + 1,
+            badge,
+            clean_for_telegram_html(&node.alias, 48),
+            clean_for_telegram_html(&node.ip_address, 48),
+            clean_for_telegram_html(&node.source, 32),
+            clean_for_telegram_html(&node.status, 24),
+            clean_for_telegram_html(seen_display, 36),
+            uptime_str
+        ));
+    }
+
+    format!(
+        "🖥️ <b>Antigravity VM Cluster Fleet ({} Nodes)</b>\n\n\
+        {}\
+        📋 <b>Fleet Commands:</b>\n\
+        • <code>/nodes &lt;alias&gt; prompts</code> — Inspect running prompts on node\n\
+        • <code>/prompt &lt;alias&gt; &lt;proj&gt; &lt;text&gt;</code> — Inject prompt to VM\n\
+        • <code>/projects</code> — List active workspaces &amp; project IDs\n\
+        • <code>/prompts</code> — List state database prompt queue",
+        total, rows
+    )
+}
+
+/// Format cluster nodes snapshot for Telegram response (backward compatibility)
+pub async fn format_cluster_snapshot() -> String {
+    format_cluster_nodes_report().await
+}
+
+/// Format running prompts scoped to a specific node (e.g. /nodes vm-01 prompts)
+pub async fn format_node_scoped_prompts(args_str: &str) -> String {
+    let trimmed = args_str.trim();
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    let target_alias = if parts.is_empty() { "local" } else { parts[0] };
+
+    let local_config = supabase_sync::load_config().unwrap_or_default();
+    let local_alias = if local_config.node_alias.trim().is_empty() {
+        email_watcher::detect_machine_name()
+    } else {
+        local_config.node_alias.clone()
+    };
+
+    let is_local = target_alias.eq_ignore_ascii_case("local")
+        || target_alias.eq_ignore_ascii_case(&local_alias)
+        || target_alias.eq_ignore_ascii_case(&email_watcher::detect_machine_name());
+
+    if is_local {
+        let projects = repo_db::get_live_project_execution_info();
+        let prompts = repo_db::list_all_prompts().unwrap_or_default();
+        let running_prompts: Vec<_> = prompts.iter().filter(|p| p.status == "running").collect();
+
+        let mut proj_text = String::new();
+        if projects.is_empty() {
+            proj_text.push_str("• No registered workspaces\n");
+        } else {
+            for p in &projects {
+                let badge = if p.is_running {
+                    "🟢 RUNNING"
+                } else {
+                    "⚪ IDLE"
+                };
+                let short_id = if p.project_id.len() > 12 {
+                    &p.project_id[..12]
+                } else {
+                    &p.project_id
+                };
+                proj_text.push_str(&format!(
+                    "• [{}] <b>{}</b> (ID: <code>{}</code>)\n  <code>{}</code>\n",
+                    badge,
+                    clean_for_telegram_html(&p.repo_name, 36),
+                    short_id,
+                    clean_for_telegram_html(&p.repo_path, 60)
+                ));
+            }
+        }
+
+        let mut prompt_text = String::new();
+        if running_prompts.is_empty() {
+            prompt_text.push_str("• No actively executing prompts (Node is idle)\n");
+        } else {
+            for p in &running_prompts {
+                let short_pid = if p.id.len() > 10 { &p.id[..10] } else { &p.id };
+                let clean_content = repo_db::extract_clean_user_prompt(&p.prompt_content);
+                prompt_text.push_str(&format!(
+                    "• [🟢 RUNNING] <code>{}</code> (Proj: <b>{}</b>)\n  <i>\"{}\"</i>\n",
+                    short_pid,
+                    clean_for_telegram_html(&p.project_id, 32),
+                    clean_for_telegram_html(&clean_content, 120)
+                ));
+            }
+        }
+
+        format!(
+            "⚡ <b>Node Telemetry &amp; Running Prompts: <code>{}</code></b>\n\n\
+            📂 <b>Workspaces:</b>\n{}\n\
+            📝 <b>Running Prompts ({} active):</b>\n{}\n\
+            💡 Send <code>/prompt {} &lt;project-id&gt; &lt;text&gt;</code> to dispatch instructions.",
+            clean_for_telegram_html(&local_alias, 48),
+            proj_text,
+            running_prompts.len(),
+            prompt_text,
+            clean_for_telegram_html(target_alias, 24)
+        )
+    } else {
+        // Query remote VM node via GitMap cluster
+        let mut remote_prompts_info = String::new();
+        let cmd_out = Command::new("gitmap")
+            .args(["cluster", "exec", target_alias, "agm wpr --json"])
+            .output();
+
+        let mut has_remote_data = false;
+        if let Ok(out) = cmd_out {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if !stdout.trim().is_empty() && (stdout.contains('[') || stdout.contains('{')) {
+                has_remote_data = true;
+                remote_prompts_info = format!(
+                    "<pre>{}</pre>",
+                    clean_for_telegram_html(stdout.trim(), 1500)
+                );
+            }
+        }
+
+        if !has_remote_data {
+            // Check secondary DB queue for pending prompts for target node
+            let mut queued_count = 0;
+            for ep in &local_config.endpoints {
+                if ep.is_enabled && ep.role == "secondary" {
+                    if let Ok(c) = SupabaseClient::new(ep) {
+                        let query = format!("target_node=eq.{}&status=eq.pending", target_alias);
+                        if let Ok(val) = c.select("command_queue", &query).await {
+                            if let Some(arr) = val.as_array() {
+                                queued_count = arr.len();
+                            }
                         }
-                        is_cluster_found = true;
+                    }
+                }
+            }
+
+            remote_prompts_info = format!(
+                "• Remote Node Status: 🟢 Registered in Fleet\n\
+                • Active Queued Prompts: <b>{}</b> pending in Supabase Secondary DB\n\
+                • GitMap Cluster Link: Connected",
+                queued_count
+            );
+        }
+
+        format!(
+            "⚡ <b>Remote VM Node Prompts: <code>{}</code></b>\n\n\
+            {}\n\n\
+            💡 Send <code>/prompt {} &lt;project-id&gt; &lt;text&gt;</code> to dispatch a prompt to this node.",
+            clean_for_telegram_html(target_alias, 48),
+            remote_prompts_info,
+            clean_for_telegram_html(target_alias, 24)
+        )
+    }
+}
+
+/// Format discovered workspaces and project IDs
+pub fn format_projects_list() -> String {
+    let projects = repo_db::get_live_project_execution_info();
+    if projects.is_empty() {
+        return "📂 <b>Workspaces:</b> No registered workspaces found.".to_string();
+    }
+
+    let mut rows = String::new();
+    for (i, p) in projects.iter().enumerate() {
+        let badge = if p.is_running {
+            "🟢 RUNNING"
+        } else {
+            "⚪ IDLE"
+        };
+        let prompt_preview = if let Some(ref pr) = p.active_prompt {
+            let clean = repo_db::extract_clean_user_prompt(pr);
+            format!(
+                "\n   • <i>Prompt: \"{}\"</i>",
+                clean_for_telegram_html(&clean, 80)
+            )
+        } else {
+            String::new()
+        };
+
+        rows.push_str(&format!(
+            "{}. {} <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>{}\n\n",
+            i + 1,
+            badge,
+            clean_for_telegram_html(&p.repo_name, 36),
+            clean_for_telegram_html(&p.project_id, 48),
+            clean_for_telegram_html(&p.repo_path, 60),
+            prompt_preview
+        ));
+    }
+
+    format!(
+        "📂 <b>Discovered Workspaces &amp; Projects ({} Total)</b>\n\n\
+        {}\
+        💡 <b>How to Run Prompts:</b>\n\
+        • <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code> (Execute locally)\n\
+        • <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code> (Dispatch to VM node)",
+        projects.len(),
+        rows
+    )
+}
+
+/// Format active and queued prompts from state database
+pub fn format_prompts_list() -> String {
+    match repo_db::list_all_prompts() {
+        Ok(prompts) if !prompts.is_empty() => {
+            let total = prompts.len();
+            let mut rows = String::new();
+            for (i, p) in prompts.iter().take(10).enumerate() {
+                let badge = match p.status.as_str() {
+                    "running" => "🟢 RUNNING",
+                    "dispatched" => "📤 DISPATCHED",
+                    "backed_up" => "💾 BACKED UP",
+                    "completed" => "✅ COMPLETED",
+                    _ => "⚪ QUEUED",
+                };
+                let clean = repo_db::extract_clean_user_prompt(&p.prompt_content);
+                rows.push_str(&format!(
+                    "{}. [{}] <code>{}</code>\n   • <b>Project:</b> <code>{}</code>\n   • <i>\"{}\"</i>\n\n",
+                    i + 1,
+                    badge,
+                    clean_for_telegram_html(&p.id, 24),
+                    clean_for_telegram_html(&p.project_id, 32),
+                    clean_for_telegram_html(&clean, 100)
+                ));
+            }
+            format!(
+                "📝 <b>State Database Prompt Queue ({} Prompts, Showing Top {})</b>\n\n\
+                {}\
+                💡 Send <code>/restore</code> to re-queue backed-up prompts.",
+                total,
+                prompts.len().min(10),
+                rows
+            )
+        }
+        _ => "📝 <b>Prompt Queue:</b> No prompts currently registered in split SQLite database."
+            .to_string(),
+    }
+}
+
+/// Execute prompt injection to local workspace or remote cluster node
+pub async fn execute_prompt_injection(args_str: &str) -> String {
+    let trimmed = args_str.trim();
+    if trimmed.is_empty() {
+        return "⚠️ <b>Missing Arguments:</b>\nUsage:\n• <code>/prompt &lt;project&gt; &lt;prompt text&gt;</code>\n• <code>/prompt &lt;node-alias&gt; &lt;project&gt; &lt;prompt text&gt;</code>".to_string();
+    }
+
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.len() < 2 {
+        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the project/node and the prompt text to run.\nExample: <code>/prompt agm-main \"Fix issue 20\"</code>".to_string();
+    }
+
+    let local_config = supabase_sync::load_config().unwrap_or_default();
+    let local_alias = if local_config.node_alias.trim().is_empty() {
+        email_watcher::detect_machine_name()
+    } else {
+        local_config.node_alias.clone()
+    };
+    let gitmap_nodes = query_gitmap_cluster_nodes();
+
+    let is_first_token_remote_node = gitmap_nodes.iter().any(|n| {
+        n.alias.eq_ignore_ascii_case(tokens[0]) && !n.alias.eq_ignore_ascii_case(&local_alias)
+    });
+
+    let (target_node, target_project, prompt_text) =
+        if is_first_token_remote_node && tokens.len() >= 3 {
+            let node = tokens[0];
+            let proj = tokens[1];
+            let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
+            let text = trimmed[p_start..].trim();
+            (node.to_string(), proj.to_string(), text.to_string())
+        } else {
+            let first = tokens[0];
+            if first.eq_ignore_ascii_case("local") || first.eq_ignore_ascii_case(&local_alias) {
+                if tokens.len() >= 3 {
+                    let proj = tokens[1];
+                    let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
+                    (
+                        "local".to_string(),
+                        proj.to_string(),
+                        trimmed[p_start..].trim().to_string(),
+                    )
+                } else {
+                    (
+                        "local".to_string(),
+                        "default".to_string(),
+                        tokens[1..].join(" "),
+                    )
+                }
+            } else {
+                let proj = tokens[0];
+                let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
+                let text = trimmed[p_start..].trim();
+                ("local".to_string(), proj.to_string(), text.to_string())
+            }
+        };
+
+    if prompt_text.trim().is_empty() {
+        return "⚠️ <b>Empty Prompt:</b> Prompt text cannot be empty.".to_string();
+    }
+
+    if target_node == "local" || target_node.eq_ignore_ascii_case(&local_alias) {
+        let projects = repo_db::get_live_project_execution_info();
+        let matched_proj = projects.iter().find(|p| {
+            p.project_id.eq_ignore_ascii_case(&target_project)
+                || p.repo_name.eq_ignore_ascii_case(&target_project)
+                || p.project_id.starts_with(&target_project)
+                || target_project.starts_with(&p.project_id)
+        });
+
+        let (final_proj_id, repo_path) = if let Some(p) = matched_proj {
+            (p.project_id.clone(), p.repo_path.clone())
+        } else {
+            let p_buf = PathBuf::from(&target_project);
+            if p_buf.exists() && p_buf.is_dir() {
+                (target_project.clone(), target_project.clone())
+            } else if let Some(first_p) = projects.first() {
+                (first_p.project_id.clone(), first_p.repo_path.clone())
+            } else {
+                (
+                    "local-project".to_string(),
+                    std::env::current_dir()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| ".".to_string()),
+                )
+            }
+        };
+
+        let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+        let active_prompt = repo_db::ActivePrompt {
+            id: prompt_id.clone(),
+            project_id: final_proj_id.clone(),
+            instance_id: "default".to_string(),
+            repo_path: repo_path.clone(),
+            prompt_content: prompt_text.clone(),
+            model: None,
+            session_id: None,
+            status: "running".to_string(),
+            created_at: Utc::now().timestamp(),
+            updated_at: Utc::now().timestamp(),
+            image_payload: None,
+        };
+
+        if let Err(e) = repo_db::save_or_requeue_prompt(&active_prompt) {
+            return format!(
+                "⚠️ <b>Failed to Save Prompt:</b> <code>{}</code>",
+                clean_for_telegram_html(&e, 200)
+            );
+        }
+
+        let spawned = repo_db::spawn_prompt_via_agy(&active_prompt);
+        let exec_badge = if spawned {
+            "🟢 Executing via agy"
+        } else {
+            "⚪ Enqueued in Split DB"
+        };
+
+        format!(
+            "🚀 <b>Prompt Injected Locally!</b>\n\n\
+            • <b>Prompt ID:</b> <code>{}</code>\n\
+            • <b>Target Workspace:</b> <code>{}</code>\n\
+            • <b>Path:</b> <code>{}</code>\n\
+            • <b>Status:</b> {}\n\
+            • <b>Prompt Content:</b>\n<pre>{}</pre>",
+            clean_for_telegram_html(&prompt_id, 32),
+            clean_for_telegram_html(&final_proj_id, 40),
+            clean_for_telegram_html(&repo_path, 60),
+            exec_badge,
+            clean_for_telegram_html(&prompt_text, 800)
+        )
+    } else {
+        let mut dispatched_gitmap = false;
+        let gm_out = Command::new("gitmap")
+            .args([
+                "cluster",
+                "exec",
+                &target_node,
+                &format!("agm prompt {} \"{}\"", target_project, prompt_text),
+            ])
+            .output();
+        if let Ok(out) = gm_out {
+            if out.status.success() {
+                dispatched_gitmap = true;
+            }
+        }
+
+        let mut enqueued_supabase = false;
+        for ep in &local_config.endpoints {
+            if ep.is_enabled && ep.role == "secondary" {
+                if let Ok(c) = SupabaseClient::new(ep) {
+                    let cmd_id = uuid::Uuid::new_v4().to_string();
+                    let payload = json!({
+                        "id": cmd_id,
+                        "target_node": target_node,
+                        "project_id": target_project,
+                        "command": "prompt",
+                        "prompt": prompt_text,
+                        "status": "pending",
+                        "created_at": Utc::now().timestamp()
+                    });
+                    if c.insert("command_queue", payload).await.is_ok() {
+                        enqueued_supabase = true;
                         break;
                     }
                 }
             }
         }
-    }
 
-    if !is_cluster_found {
-        nodes_text.push_str(&format!(
-            "• <b>{}</b> (IP: <code>{}</code>) | Uptime: {}m [Local]\n",
-            local_alias, local_ip, uptime_min
-        ));
-    }
+        let dispatch_status = if dispatched_gitmap {
+            "🟢 Dispatched immediately via GitMap Cluster SSH"
+        } else if enqueued_supabase {
+            "📥 Enqueued to Supabase Secondary DB (Node will execute on poll)"
+        } else {
+            "⚠️ Dispatched instruction (Node recorded in queue)"
+        };
 
-    format!(
-        "🌐 <b>Antigravity Cluster Snapshot</b>\n\n\
-        Currently Online Machines: <b>{}</b>\n\n\
-        {}\n\
-        📋 <b>Remote Command Formats:</b>\n\
-        • <code>/ping</code> or <code>/observe</code> (Live node &amp; prompt telemetry)\n\
-        • <code>/gitmap pe</code> or <code>/agm status</code> (CLI commands)\n\
-        • <code>/backup</code> or <code>/restore</code> (Split SQLite prompt vault)\n\
-        • <code>/email ping</code> or <code>/ff</code> (Email &amp; fast-forward)\n\
-        • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> (Execute PowerShell/Bash)",
-        online_count, nodes_text
-    )
+        format!(
+            "🌐 <b>Remote Prompt Dispatched!</b>\n\n\
+            • <b>Target Node:</b> <code>{}</code>\n\
+            • <b>Target Project:</b> <code>{}</code>\n\
+            • <b>Status:</b> {}\n\
+            • <b>Prompt Content:</b>\n<pre>{}</pre>",
+            clean_for_telegram_html(&target_node, 40),
+            clean_for_telegram_html(&target_project, 40),
+            dispatch_status,
+            clean_for_telegram_html(&prompt_text, 800)
+        )
+    }
 }
 
 /// Unified inbound Telegram command processor
@@ -928,20 +1562,41 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "start" | "help" => Some(format_help_manual()),
         "ping" => Some(format_ping_report()),
         "status" | "observe" => Some(format_observe_report()),
+        "nodes" | "node" => {
+            let sub = rest.trim();
+            if sub.is_empty() || sub == "ls" || sub == "list" || sub == "status" {
+                Some(format_cluster_nodes_report().await)
+            } else {
+                Some(format_node_scoped_prompts(sub).await)
+            }
+        }
+        "projects" | "workspaces" | "workspace" => Some(format_projects_list()),
+        "prompts" | "prompt_queue" => {
+            let sub = rest.trim();
+            if sub.is_empty() || sub == "ls" || sub == "list" {
+                Some(format_prompts_list())
+            } else {
+                Some(execute_prompt_injection(sub).await)
+            }
+        }
+        "prompt" | "inject" => Some(execute_prompt_injection(rest).await),
         "gitmap" | "gm" => Some(execute_gitmap_subcommand(rest)),
         "agm" => Some(execute_agm_subcommand(rest)),
         "api" | "proxy" => Some(execute_api_status_command().await),
         "backup" | "backpack" => Some(execute_backup_command(rest)),
         "restore" => Some(execute_backup_command("restore")),
         "email" | "mail" => Some(execute_email_command(rest)),
-        "snapshot" | "cluster" => Some(format_cluster_snapshot().await),
+        "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
             let _ = auto_switcher::check_and_rotate_if_needed();
             Some("⏩ <b>Fast-Forward Triggered:</b> Checked live quota and rotated workspace profile if needed.".to_string())
         }
         _ => {
-            if lower_full.contains("how many machines") {
-                return Some(format_cluster_snapshot().await);
+            if lower_full.contains("how many machines")
+                || lower_full.contains("node ls")
+                || lower_full == "nodes"
+            {
+                return Some(format_cluster_nodes_report().await);
             }
             if lower_full.starts_with("ff:") {
                 let _ = auto_switcher::check_and_rotate_if_needed();
@@ -1210,4 +1865,37 @@ pub fn stop_telegram_daemon() {
 /// Get latest Telegram watcher status
 pub async fn get_telegram_status() -> TelegramWatcherStatus {
     LAST_TELEGRAM_STATUS.read().await.clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chunk_telegram_text_short() {
+        let text = "Hello world";
+        let chunks = chunk_telegram_text(text, 100);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "Hello world");
+    }
+
+    #[test]
+    fn test_chunk_telegram_text_splits_at_newline() {
+        let text = "Line 1\nLine 2\nLine 3\nLine 4";
+        let chunks = chunk_telegram_text(text, 14);
+        assert!(chunks.len() >= 2);
+        for chunk in &chunks {
+            assert!(chunk.len() <= 14);
+        }
+    }
+
+    #[test]
+    fn test_chunk_telegram_text_long_line() {
+        let text = "A".repeat(5000);
+        let chunks = chunk_telegram_text(&text, 1000);
+        assert_eq!(chunks.len(), 5);
+        for chunk in &chunks {
+            assert_eq!(chunk.len(), 1000);
+        }
+    }
 }

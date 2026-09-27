@@ -1,146 +1,139 @@
-# Antigravity Manager - Telegram Remote Control Guide
+# Antigravity Manager - Telegram Command Center & Remote Control Guide
 
-Antigravity Manager features an autonomous background daemon that connects directly to the official Telegram Bot API via long-polling. It enables cluster health monitoring, remote fast-forward account switching, and distributed command execution across all online instances.
-
----
-
-## 1. Prerequisites: Create a Telegram Bot
-
-1. Open Telegram and search for [@BotFather](https://t.me/BotFather).
-2. Start a chat and send `/newbot`.
-3. Choose a friendly name (e.g., `My Antigravity Manager`).
-4. Choose a unique username ending in `bot` (e.g., `my_agm_fleet_bot`).
-5. Copy the generated **HTTP API Bot Token** (format: `123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ_12345`).
+Antigravity Manager features an autonomous inbound/outbound Telegram subsystem that connects directly to the official Telegram Bot API via long-polling. It enables cluster health monitoring, prompt queue inspection, remote prompt injection across distributed VM nodes, GitMap telemetry forwarding, and mobile remote control.
 
 ---
 
-## 2. Configuration Setup
+## 1. Prerequisites: Create Your Telegram Bot
 
-You can configure the bot either via the automated script, the AGM GUI, or manually via JSON.
-
-### Option A: In-App GUI Setup (Antigravity-Manager)
-
-1. Launch Antigravity-Manager and click **Settings** (or the gear icon).
-2. Navigate to **Supabase Multi-Instance Sync** (or **Cluster & Cloud Sync**).
-3. Scroll down to the **Telegram Inbound Bot Integration** card.
-4. Enter your **Telegram Bot Token** and optional **Allowed Chat ID**.
-5. Click **Test Bot** to verify connectivity with Telegram's servers.
-6. Click **Send Test Message** to verify message delivery to your Telegram app.
-7. Toggle **Enable Telegram Inbound Daemon** to active and click **Save Telegram**.
-
-### Option B: Automated PowerShell Wizard (Recommended)
-
-Run the setup wizard from the project repository:
-
-```powershell
-.\scripts\setup-telegram-bot.ps1 -BotToken "<YOUR_BOT_TOKEN>" -EnableNow
-```
-
-The script performs the following automatically:
-- Validates the token against the official Telegram API (`/getMe`).
-- Queries recent chat updates (`/getUpdates`) or listens live for you to message the bot.
-- Automatically captures and binds your personal Telegram user account (`allowed_chat_id`).
-- Dispatches a live test alert to your Telegram chat to verify end-to-end communication.
-- Writes the formatted configuration into `$HOME/.antigravity_tools/telegram_config.json`.
-
-### Option C: Standalone PowerShell Telegram Agent Daemon
-
-For headless servers or environments running without the Tauri desktop UI:
-
-```powershell
-.\scripts\telegram-agent-daemon.ps1
-```
-
-Or run the wizard directly into agent mode:
-
-```powershell
-.\scripts\setup-telegram-bot.ps1 -RunAgent
-```
-
-### Option D: Manual Configuration
-
-Edit or create `~/.antigravity_tools/telegram_config.json` (or `$env:ABV_DATA_DIR/telegram_config.json`):
-
-```json
-{
-  "bot_token": "123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ_12345",
-  "allowed_chat_id": 987654321,
-  "is_enabled": true,
-  "poll_interval_secs": 5
-}
-```
-
-> [!IMPORTANT]
-> Always configure `allowed_chat_id` to restrict bot commands to your own Telegram account. When left `null`, any user with your bot handle can send commands.
+1. Open Telegram and search for [@BotFather](https://t.me/BotFather) (verified badge with blue checkmark).
+2. Start a conversation with BotFather and send the command:
+   ```text
+   /newbot
+   ```
+3. Enter a friendly display name (for example: `My AGM Bot`).
+4. Enter a unique username ending with `bot` (for example: `my_company_agm_bot`).
+5. BotFather will reply with your **HTTP API Bot Token** in the format:
+   ```text
+   1234567890:ABCDefGhIJKlmNoPQRsTUVwxyZ_1234567
+   ```
+> [!CAUTION]
+> **Keep your bot token strictly confidential.** Never share it publicly, commit it to Git repositories, or post it in public logs. Anyone with your token can control the bot.
 
 ---
 
-## 3. Remote Control Commands
+## 2. Connecting with the User Interface (GUI)
 
-Once active, open your bot chat on Telegram and send any of the following commands:
+You can easily configure and test your Telegram Bot directly from the Antigravity Manager desktop interface:
 
-| Command | Syntax | Description |
-| :--- | :--- | :--- |
-| **Cluster Snapshot** | `/start`, `/status`, or `SNAPSHOT` | Returns a live summary of all online cluster nodes, internal/public IP addresses, and uptime minutes. |
-| **Fast-Forward Workspace** | `FF` | Triggers immediate account rotation and workspace refresh on the local node. |
-| **Targeted Fast-Forward** | `FF:<node-alias>` | Fast-forwards the designated remote node in your multi-machine fleet. |
-| **Remote Command Execution** | `CMD:<node-alias>:<command>` | Dispatches an administrative PowerShell/Bash command to the target node via the Supabase Secondary DB queue. |
-
-### Example Interactions
-
-#### 1. Cluster Status Query
-```text
-User:
-SNAPSHOT
-
-Bot:
-🌐 Antigravity Cluster Snapshot
-
-Currently Online Machines: 2
-
-• Node-Alpha (IP: 192.168.1.50) | Uptime: 245m
-• Node-Beta  (IP: 192.168.1.51) | Uptime: 112m
-
-📋 Remote Command Formats:
-• CMD:<node-alias>:<command> (Execute PowerShell/Bash)
-• FF or FF:<node-alias> (Fast-Forward Workspace)
-• SNAPSHOT (Refresh machine list)
-```
-
-#### 2. Trigger Fast-Forward
-```text
-User:
-FF
-
-Bot:
-🔄 Fast-Forward Initiated: Workspace switched to account 'dev@example.com' (Quota: 95%).
-```
-
-#### 3. Remote Command Execution
-```text
-User:
-CMD:Node-Alpha:agm clean
-
-Bot:
-⚡ Command Enqueued: Saved to Supabase Secondary DB for target node Node-Alpha:
-agm clean
-```
+1. Launch **Antigravity Manager**.
+2. Click **Settings** (gear icon in the navigation bar).
+3. Scroll to the **Telegram Inbound Bot Integration** card (or locate it within **Cluster & Cloud Sync**).
+4. **Enable the Integration**: Toggle the switch in the top-right corner to active (blue).
+5. **Enter Bot Token**: Paste your Telegram Bot Token into the **Telegram Bot Token** password field.
+6. **Detect Chat ID**:
+   - Open Telegram on your phone or desktop.
+   - Search for your newly created bot username (e.g. `@my_company_agm_bot`) and click **Start** (or send `/ping`).
+   - In the Antigravity Manager UI, click the **Auto-Detect Chat ID** button (or click **Test Bot & Detect ID**).
+   - The system queries Telegram's `getUpdates` API and automatically populates your numeric **Allowed Chat ID**!
+7. **Save Configuration**: Click **Save Telegram** to persist your settings securely in your local configuration directory (`telegram_config.json`).
+8. **Verify Delivery**: Click **Send Ping** to transmit an immediate live telemetry card to your Telegram app.
 
 ---
 
-## 4. Architecture & Security Model
+## 3. Finding and Connecting Your Telegram Allowed Chat ID
+
+### What is the Allowed Chat ID?
+The Allowed Chat ID is your personal numeric Telegram account ID (e.g. `8857550071`). Antigravity Manager uses this as an essential security firewall: **only messages from this exact Chat ID will be processed by the bot**, blocking unauthorized third parties from controlling your machine.
+
+### Method 1: Automatic Detection (Recommended)
+1. In Telegram, open the chat with your bot and send `/start` or `/ping`.
+2. Run either of the following:
+   - **GUI**: Click **Auto-Detect Chat ID** in the Settings panel.
+   - **Terminal CLI**:
+     ```bash
+     agm telegram connect <YOUR_BOT_TOKEN>
+     ```
+     or
+     ```bash
+     agm telegram detect-chat-id <YOUR_BOT_TOKEN>
+     ```
+3. The application inspects the latest update from your account and binds the Chat ID automatically.
+
+### Method 2: Using Telegram Info Bots
+1. Search for [@userinfobot](https://t.me/userinfobot) or [@RawDataBot](https://t.me/RawDataBot) in Telegram.
+2. Send `/start`. The bot will respond with your numeric User ID (e.g., `Id: 8857550071`).
+3. Copy this number and enter it into the **Allowed Chat ID** input field in the GUI, or pass it via CLI:
+   ```bash
+   agm telegram set <YOUR_BOT_TOKEN> <YOUR_CHAT_ID>
+   ```
+
+---
+
+## 4. Command Line Terminal Interface (`agm telegram`)
+
+Antigravity Manager provides full headless parity through the `agm telegram` CLI command suite:
+
+| CLI Command | Description |
+| :--- | :--- |
+| `agm telegram connect <token> [chat_id]` | Auto-detects Chat ID, saves credentials, registers bot commands, and sends a welcome ping |
+| `agm telegram set <token> [chat_id]` | Saves bot credentials (auto-detects chat ID if omitted) |
+| `agm telegram detect-chat-id [token]` | Queries Telegram `getUpdates` to auto-discover your numeric Chat ID |
+| `agm telegram ls [--json]` | Displays configured bot status, token prefix, and allowed Chat ID |
+| `agm telegram ping` | Sends a rich telemetry ping card to the configured Telegram chat |
+| `agm telegram observe` (or `status`) | Sends a live workspaces, quota, and prompt queue telemetry report |
+| `agm telegram nodes` | Inspects and reports the entire cluster VM nodes topology and connection mesh |
+| `agm telegram projects` | Lists all discovered workspaces, paths, and project IDs |
+| `agm telegram prompts [node]` | Lists active and recent prompt queues in the state database |
+| `agm telegram prompt <node> <proj> "<txt>"` | Injects a prompt locally or dispatches to a remote cluster VM node |
+| `agm telegram gitmap [args...]` | Runs any GitMap command (e.g. `pe`, `status`) and forwards formatted output to chat |
+| `agm telegram api` | Queries local API proxy status, active port, and bound Google account |
+| `agm telegram backup [ls]` / `backpack` | Inspects split SQLite prompt backups and delivers inventory to chat |
+| `agm telegram restore` | Restores backed-up prompts into the active queue and notifies Telegram |
+| `agm telegram email [status\|ping]` | Checks email alert configuration and dispatches test emails |
+| `agm telegram send "<message>"` | Dispatches any custom notification message directly to Telegram |
+| `agm telegram poll [--once]` | Runs the background polling daemon to execute inbound commands |
+| `agm telegram cmds` | Displays the list of supported slash commands |
+
+---
+
+## 5. Interactive Telegram Inbound Slash Commands
+
+When the daemon is running (either inside the desktop app or via `agm telegram poll`), you can chat directly with your bot using these slash commands:
+
+- `/start` or `/help`: Displays the interactive command manual and shortcuts.
+- `/ping`: Tests bot connectivity and returns host uptime, node alias, and build version.
+- `/observe` or `/status`: Delivers a full telemetry report of running workspaces, prompt queues, and quota.
+- `/nodes` or `/node ls`: Displays the multi-machine VM cluster fleet and mesh connectivity.
+- `/nodes <alias> prompts`: Scopes and inspects prompt queues for a specific cluster node.
+- `/projects`: Lists all discovered local workspaces and execution targets.
+- `/prompts`: Lists recent and active prompts in the split SQLite database.
+- `/prompt <project> <text>`: Injects a prompt into a local project workspace.
+- `/prompt <node> <project> <text>`: Dispatches an injected prompt across cluster nodes via GitMap SSH / Supabase queue.
+- `/gitmap <args>`: Runs GitMap commands (e.g. `/gitmap pe` to monitor CI/CD pipelines).
+- `/api`: Checks API proxy gateway status and bound account.
+- `/backpack`: Inspects split SQLite prompt backups.
+- `/restore`: Re-queues backed-up prompts into the execution stream.
+- `/email status` or `/email ping`: Checks email notification channels.
+- `/ff`: Fast-forwards quota rotation to the next available healthy account.
+
+---
+
+## 6. Architecture & Security Highlights
 
 ```mermaid
 flowchart LR
-    A[Telegram User] -->|Long Polling HTTP API| B[AGM Telegram Daemon]
-    B -->|Filter allowed_chat_id| C{Authorized?}
-    C -->|No| D[Drop & Log Audit]
-    C -->|Yes: SNAPSHOT| E[Query Nodes & Local State]
-    C -->|Yes: FF| F[Auto-Switcher Fast-Forward]
-    C -->|Yes: CMD| G[Supabase Secondary DB Queue]
-    G -->|Heartbeat / Polling| H[Target Remote Node]
+    A[Telegram Mobile / Desktop] -->|Outbound Polling HTTPS| B[AGM Telegram Subsystem]
+    B -->|Check allowed_chat_id| C{Authorized?}
+    C -->|No: Unauthorized ID| D[Drop & Audit Log]
+    C -->|Yes| E[Unified Inbound Command Router]
+    E --> F[Cluster Telemetry & Nodes Mesh]
+    E --> G[Local Workspace Injector]
+    E --> H[GitMap Cluster Delegation SSH]
+    E --> I[Supabase Secondary DB Queue]
 ```
 
-- **Daemon Lifespan**: Runs alongside the AGM proxy daemon and IDE watchdog.
-- **Zero Inbound Ports**: Uses outbound long-polling to Telegram Bot API; does not require public webhooks, domain names, or reverse proxies.
-- **Queue Fail-Safety**: Remote commands dispatched to distributed machines traverse the encrypted Supabase Command Queue (`cluster_commands`) with atomic deduplication.
+- **Zero Inbound Ports**: Uses outbound long-polling to the official Telegram Bot API (`https://api.telegram.org`); no webhooks, public IP addresses, or router port forwards required.
+- **Strict Chat Filtering**: All requests from unidentified chat IDs are immediately discarded before parsing.
+- **Automatic Message Chunking**: Payloads exceeding Telegram's 4096-character limit are automatically chunked into sequential messages at newline boundaries with pacing delays to prevent API drops.
+- **Config Storage Isolation**: Bot tokens and configuration are stored locally in the application user directory (`telegram_config.json`) and excluded from Git commits.

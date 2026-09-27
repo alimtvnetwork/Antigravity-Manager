@@ -19,7 +19,6 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 REPO="alimtvnetwork/Antigravity-Manager"
-UPSTREAM_REPO="lbjlaq/Antigravity-Manager"
 APP_NAME="Antigravity Manager Tools"
 FULL_NAME="Antigravity Manager Tools"
 PUBLISHER="Maintained by Alim, Sponsored by RISEUP ASIA LLC"
@@ -28,7 +27,6 @@ BINARY_NAME="agm-alim"
 DESKTOP_NAME="Antigravity Manager Tools"
 TOOLTIP="Antigravity Manager Tools"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases"
-UPSTREAM_API="https://api.github.com/repos/${UPSTREAM_REPO}/releases"
 FALLBACK_STABLE_VERSION="4.7.6"
 PINNED_VERSION="__PINNED_VERSION__"
 
@@ -514,7 +512,7 @@ discover_api_candidates() {
         fi
     fi
     local api_urls=()
-    api_urls+=("${GITHUB_API}?per_page=30" "${UPSTREAM_API}?per_page=30")
+    api_urls+=("${GITHUB_API}?per_page=30")
     for api_url in "${api_urls[@]}"; do
         fetch_api_release_tags "$api_url"
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
@@ -736,19 +734,7 @@ download_installer() {
 
     local candidate_urls=(
         "$DOWNLOAD_URL"
-        "${DOWNLOAD_URL//$REPO/$UPSTREAM_REPO}"
     )
-
-    # If requested version lacks specific platform package, include known upstream release candidate
-    if [[ "$PLATFORM" == "linux" ]]; then
-        if [[ "$RELEASE_VERSION" != "$FALLBACK_STABLE_VERSION" ]]; then
-            local fallback_file="Antigravity.Tools_${FALLBACK_STABLE_VERSION}_${DEB_ARCH:-amd64}.deb"
-            if [[ "$PKG_EXT" == "rpm" ]]; then
-                fallback_file="Antigravity.Tools-${FALLBACK_STABLE_VERSION}-1.${RPM_ARCH:-x86_64}.rpm"
-            fi
-            candidate_urls+=("https://github.com/${UPSTREAM_REPO}/releases/download/v${FALLBACK_STABLE_VERSION}/${fallback_file}")
-        fi
-    fi
 
     local download_success=0
     for try_url in "${candidate_urls[@]}"; do

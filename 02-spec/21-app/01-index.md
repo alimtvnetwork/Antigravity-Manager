@@ -139,6 +139,8 @@ The complete reverse-engineered architecture is documented across the following 
 | [45-two-bar-installer-and-dwm-blank-ui-fix.md](45-two-bar-installer-and-dwm-blank-ui-fix.md) | Two-Bar Installer & DWM Blank UI Fix | GitHub release two-bar layout (Latest vs Pinned), installer history version recovery without drift, and Win32/WebView2 DWM blank UI elimination |
 | [54-startup-auto-switch-and-rich-telemetry-broadcast.md](54-startup-auto-switch-and-rich-telemetry-broadcast.md) | Startup Auto-Switch Immediate Activation & Quota Telemetry | Startup quota check, dual-window balances (4H and weekly), JSON in-use self-broadcast |
 | [55-idle-sensor-fix-and-gitmap-parity.md](55-idle-sensor-fix-and-gitmap-parity.md) | Idle Sensor Activity Determination, GitMap Telemetry & Typography | Anti-false-idle process sensing, GitMap metadata parity, commands/projects tables, 18px typography |
+| [56-smart-switch-live-refresh-and-cluster-lease.md](56-smart-switch-live-refresh-and-cluster-lease.md) | Smart Switch Live Refresh, Strict 100% Quota Gate & Cluster Leases | Strict 100% 4H quota gate, disabled account filtering, pre-switch live verification, Supabase/Email distributed leases |
+| [57-telegram-fleet-nodes-and-prompt-injection.md](57-telegram-fleet-nodes-and-prompt-injection.md) | Telegram Bot VM Cluster Fleet Nodes, Scoped Prompts & Chunking | Cluster nodes topology, scoped prompts inspection, remote prompt injection, 4000-char message chunking |
 | [telegram-bot-setup-guide.md](telegram-bot-setup-guide.md) | Telegram Bot Setup & Automated PowerShell Guide | Guide and automated script for Telegram Bot creation, chat ID extraction, credential validation, and alert testing |
 
 ---

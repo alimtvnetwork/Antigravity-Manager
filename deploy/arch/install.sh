@@ -6,7 +6,6 @@ set -e
 
 PINNED_VERSION="__PINNED_VERSION__"
 REPO="alimtvnetwork/Antigravity-Manager"
-UPSTREAM_REPO="lbjlaq/Antigravity-Manager"
 
 echo "🚀 Resolving release information..."
 

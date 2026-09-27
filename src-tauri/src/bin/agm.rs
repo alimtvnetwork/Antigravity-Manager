@@ -3128,6 +3128,10 @@ fn cmd_telegram(args: &[String]) {
             println!("  agm telegram set <token> [chat_id]      Save bot credentials (auto-detects chat_id if omitted)");
             println!("  agm telegram detect-chat-id [token]     Auto-discover your numeric Chat ID from getUpdates");
             println!("  agm telegram ls [--json]                Show configured bot token, chat ID, and status");
+            println!("  agm telegram nodes                      List all cluster VM nodes & connectivity status");
+            println!("  agm telegram projects                   List discovered workspaces and project IDs");
+            println!("  agm telegram prompts [node]             List active running prompts (optionally scoped to node)");
+            println!("  agm telegram prompt <node> <proj> <txt> Inject prompt to workspace or cluster VM node");
             println!("  agm telegram ping                       Send rich telemetry ping card to Telegram chat");
             println!("  agm telegram observe, status            Send live workspaces, quota & prompt queue report");
             println!("  agm telegram gitmap [args...]           Run GitMap command (e.g. pe) & forward output to chat");
@@ -3323,6 +3327,179 @@ fn cmd_telegram(args: &[String]) {
                         ),
                         Err(e) => eprintln!("\n[ERROR] Failed to send observation report: {}", e),
                     }
+                }
+            }
+            return;
+        }
+        if first_lower == "nodes" || first_lower == "cluster" {
+            let report = rt.block_on(telegram_inbound::format_cluster_nodes_report());
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Cluster nodes report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "projects" || first_lower == "workspaces" {
+            let report = telegram_inbound::format_projects_list();
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Projects catalog delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "prompts" {
+            let target_sub = args.get(1).map(|s| s.as_str()).unwrap_or("");
+            let report = if target_sub.is_empty() || target_sub == "ls" || target_sub == "list" {
+                telegram_inbound::format_prompts_list()
+            } else {
+                rt.block_on(telegram_inbound::format_node_scoped_prompts(target_sub))
+            };
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Prompts report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "prompt" || first_lower == "inject" {
+            let prompt_args = args[1..].join(" ");
+            let report = rt.block_on(telegram_inbound::execute_prompt_injection(&prompt_args));
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Prompt injection receipt delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "nodes" || first_lower == "node" {
+            let sub = if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                String::new()
+            };
+            let reply = if sub.is_empty() || sub == "ls" || sub == "list" || sub == "status" {
+                rt.block_on(telegram_inbound::format_cluster_nodes_report())
+            } else {
+                rt.block_on(telegram_inbound::format_node_scoped_prompts(&sub))
+            };
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Cluster nodes report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "prompts" || first_lower == "prompt_queue" {
+            let sub = if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                String::new()
+            };
+            let reply = if sub.is_empty() || sub == "ls" || sub == "list" {
+                telegram_inbound::format_prompts_list()
+            } else {
+                rt.block_on(telegram_inbound::execute_prompt_injection(&sub))
+            };
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Prompts report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "projects" || first_lower == "workspaces" || first_lower == "workspace" {
+            let reply = telegram_inbound::format_projects_list();
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Projects catalog delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "prompt" || first_lower == "inject" {
+            if args.len() < 2 {
+                eprintln!("Usage: agm telegram prompt [node] <project> \"<prompt text>\"");
+                return;
+            }
+            let sub_args = args[1..].join(" ");
+            let reply = rt.block_on(telegram_inbound::execute_prompt_injection(&sub_args));
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Prompt injection delivered to Telegram chat {}!",
+                        chat_id
+                    );
                 }
             }
             return;
@@ -5272,8 +5449,8 @@ fn cmd_email(args: &[String]) {
 
             println!("\nConfigured Email Accounts ({} total):", accounts.len());
             println!(
-                "{:<5} {:<20} {:<30} {:<22} {:<22} {:<8} {}",
-                "SEQ", "ID", "EMAIL", "SMTP", "IMAP", "DEFAULT", "ACTIVE"
+                "{:<5} {:<20} {:<30} {:<22} {:<22} {:<8} ACTIVE",
+                "SEQ", "ID", "EMAIL", "SMTP", "IMAP", "DEFAULT"
             );
             println!("{}", "-".repeat(115));
             for (idx, a) in accounts.iter().enumerate() {
@@ -5294,8 +5471,8 @@ fn cmd_email(args: &[String]) {
 
             println!("\nNotification Recipients ({} total):", recipients.len());
             println!(
-                "{:<5} {:<20} {:<32} {:<14} {}",
-                "SEQ", "ID", "EMAIL", "GROUP", "ACTIVE"
+                "{:<5} {:<20} {:<32} {:<14} ACTIVE",
+                "SEQ", "ID", "EMAIL", "GROUP"
             );
             println!("{}", "-".repeat(85));
             for (idx, r) in recipients.iter().enumerate() {

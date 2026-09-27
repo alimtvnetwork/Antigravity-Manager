@@ -56,7 +56,6 @@ $ProgressPreference = 'SilentlyContinue'
 $PinnedVersion = "__PINNED_VERSION__"
 
 $Repo = "alimtvnetwork/Antigravity-Manager"
-$UpstreamRepo = "lbjlaq/Antigravity-Manager"
 $AppName = "Antigravity Manager Tools"
 $FullName = "Antigravity Manager Tools"
 $Publisher = "Maintained by Alim, Sponsored by RISEUP ASIA LLC"
@@ -836,16 +835,18 @@ if ($CheckUpdate) {
         if (-not $TargetVersion) {
             $apiEndpoints = @(
                 "https://api.github.com/repos/$Repo/releases",
-                "https://api.github.com/repos/$Repo/releases/latest",
-                "https://api.github.com/repos/$UpstreamRepo/releases",
-                "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+                "https://api.github.com/repos/$Repo/releases/latest"
             )
             foreach ($endpoint in $apiEndpoints) {
                 try {
                     $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
                     if ($resp -is [System.Array] -and $resp.Count -gt 0) {
-                        $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1
-                        if (-not $candidate) { $candidate = $resp[0] }
+                        $candidate = $resp | Where-Object { 
+                            $_.assets -and ($_.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" }) 
+                        } | Select-Object -First 1
+                        if (-not $candidate) { 
+                            $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1 
+                        }
                         if ($candidate -and $candidate.tag_name) {
                             $TargetVersion = $candidate.tag_name -replace "^v", ""
                             break
@@ -1121,9 +1122,7 @@ if (-not $isPinned -and $manifestLoaded -and $CurrentVersion -and $candidateVers
 if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5 -or $isManifestStale)) {
     $apiEndpoints = @(
         "https://api.github.com/repos/$Repo/releases?per_page=30",
-        "https://api.github.com/repos/$Repo/releases/latest",
-        "https://api.github.com/repos/$UpstreamRepo/releases?per_page=30",
-        "https://api.github.com/repos/$UpstreamRepo/releases/latest"
+        "https://api.github.com/repos/$Repo/releases/latest"
     )
 
     foreach ($endpoint in $apiEndpoints) {
@@ -1132,6 +1131,8 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
             if ($resp -is [System.Array]) {
                 foreach ($rel in $resp) {
                     if ($rel.tag_name) {
+                        $hasWin = $rel.assets -and ($rel.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" })
+                        if (-not $hasWin) { continue }
                         $tagVer = $rel.tag_name -replace "^v", ""
                         if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
                             $releaseMetadataMap[$tagVer] = $rel
@@ -1143,12 +1144,15 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
                 }
             } elseif ($resp) {
                 if ($resp.tag_name) {
-                    $tagVer = $resp.tag_name -replace "^v", ""
-                    if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                        $releaseMetadataMap[$tagVer] = $resp
-                    }
-                    if (-not $candidateVersions.Contains($tagVer)) {
-                        $candidateVersions.Add($tagVer)
+                    $hasWin = $resp.assets -and ($resp.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" })
+                    if ($hasWin) {
+                        $tagVer = $resp.tag_name -replace "^v", ""
+                        if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                            $releaseMetadataMap[$tagVer] = $resp
+                        }
+                        if (-not $candidateVersions.Contains($tagVer)) {
+                            $candidateVersions.Add($tagVer)
+                        }
                     }
                 }
             }
@@ -1159,8 +1163,7 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
     # If pinned, only query the specific release tag endpoint to fetch metadata if not in manifest
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
         $apiEndpoints = @(
-            "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned",
-            "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$cleanPinned"
+            "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
         )
         foreach ($endpoint in $apiEndpoints) {
             try {
@@ -1261,11 +1264,7 @@ foreach ($candVersion in $versionQueue) {
             if (-not $relData) {
                 try {
                     $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                } catch {
-                    try {
-                        $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$UpstreamRepo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                    } catch {}
-                }
+                } catch {}
             }
 
             $matchedAsset = $null
@@ -1281,7 +1280,8 @@ foreach ($candVersion in $versionQueue) {
             if ($matchedAsset) {
                 $DownloadUrl = $matchedAsset.browser_download_url
             } else {
-                $DownloadUrl = "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_${Arch}-setup.exe"
+                Write-Warn "Release v$candVersion does not contain a Windows setup executable (.exe). Skipping to next candidate..."
+                continue
             }
         }
 
@@ -1301,14 +1301,9 @@ foreach ($candVersion in $versionQueue) {
 
         Write-Step "Downloading release package..."
         $downloaded = Invoke-FastDownload -Url $DownloadUrl -DestinationPath $DownloadedFile
-        if (-not $downloaded) {
-            Write-Warn "Primary download failed. Attempting upstream fallback..."
-            $UpstreamDownloadUrl = $DownloadUrl -replace [regex]::Escape($Repo), $UpstreamRepo
-            $downloaded = Invoke-FastDownload -Url $UpstreamDownloadUrl -DestinationPath $DownloadedFile
-        }
 
         if (-not $downloaded) {
-            throw "Failed to download release package for v$candVersion"
+            throw "Failed to download release package for v$candVersion from $DownloadUrl"
         }
 
         if (-not (Test-Path $DownloadedFile)) {
