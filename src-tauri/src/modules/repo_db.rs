@@ -487,6 +487,29 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let now = Utc::now().timestamp();
     let mut backed_up_count = 0;
 
+    // Step 0: Transition all in-flight 'running' prompts in active_prompts to 'backed_up' before switch
+    let transitioned = conn
+        .execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ? WHERE status = 'running'",
+            params![now],
+        )
+        .unwrap_or(0);
+    if transitioned > 0 {
+        backed_up_count += transitioned;
+        if let Ok(mut map) = get_memory_prompts_map().lock() {
+            for p in map.values_mut() {
+                if p.status == "running" {
+                    p.status = "backed_up".to_string();
+                    p.updated_at = now;
+                }
+            }
+        }
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Transitioned {} in-flight prompts from 'running' to 'backed_up' before switch",
+            transitioned
+        ));
+    }
+
     // Layer 1: Core Antigravity Live Conversations Discovery (~/.gemini/antigravity)
     let ag_prompts = discover_running_prompts_from_antigravity(instance_id);
     for p in ag_prompts {
@@ -938,8 +961,25 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
     Ok(())
 }
 
+/// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present
+pub fn extract_clean_user_prompt(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if let (Some(start), Some(end)) = (
+        trimmed.find("<USER_REQUEST>"),
+        trimmed.find("</USER_REQUEST>"),
+    ) {
+        if start < end {
+            let inner = &trimmed[start + "<USER_REQUEST>".len()..end];
+            if !inner.trim().is_empty() {
+                return inner.trim().to_string();
+            }
+        }
+    }
+    trimmed.to_string()
+}
+
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
-/// Sanitizes conversation ID to prevent passing invalid IDs or `-` to `--conversation`.
+/// Strips prompt envelope wrappers and executes cleanly via -p without failing on GUI trajectory IDs.
 pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
     let ws_dir = PathBuf::from(&prompt.repo_path);
     if !ws_dir.exists() {
@@ -950,30 +990,24 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         return false;
     }
 
+    let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
+    if clean_prompt.trim().is_empty() {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] Prompt content for '{}' is empty, skipping agy spawn",
+            prompt.id
+        ));
+        return false;
+    }
+
     if let Some(agy_bin) = crate::modules::process::get_antigravity_cli_executable_path() {
         let mut cmd = std::process::Command::new(&agy_bin);
         cmd.current_dir(&ws_dir);
         cmd.arg("--dangerously-skip-permissions");
 
-        let valid_cid = prompt
-            .session_id
-            .as_ref()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty() && *s != "-" && s.to_lowercase() != "default");
-
-        if let Some(cid) = valid_cid {
-            cmd.arg("--conversation").arg(cid);
+        if clean_prompt.len() <= 24000 {
+            cmd.arg("-p").arg(&clean_prompt);
         } else {
-            cmd.arg("-c");
-        }
-
-        let clean_prompt = prompt.prompt_content.trim();
-        if !clean_prompt.is_empty() {
-            if clean_prompt.len() <= 24000 {
-                cmd.arg("-p").arg(clean_prompt);
-            } else {
-                cmd.arg("-p").arg(&clean_prompt[..24000]);
-            }
+            cmd.arg("-p").arg(&clean_prompt[..24000]);
         }
 
         #[cfg(target_os = "windows")]
@@ -989,8 +1023,8 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         match cmd.spawn() {
             Ok(child) => {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, session: {:?}) in '{}'",
-                    prompt.id, child.id(), valid_cid, prompt.repo_path
+                    "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}) in '{}': {:.60}...",
+                    prompt.id, child.id(), prompt.repo_path, clean_prompt
                 ));
                 true
             }
@@ -1011,7 +1045,8 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
 }
 
 /// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch.
-/// Strictly filters to unrestored/backed-up/queued prompts and deduplicates against already dispatched prompts.
+/// Strictly filters to unrestored/backed-up/queued prompts, prioritizes the latest running prompts,
+/// and deduplicates against already dispatched prompts and workspace repositories.
 pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
@@ -1021,7 +1056,7 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
              WHERE status IN ('backed_up', 'queued', 'pending')
-             ORDER BY created_at ASC LIMIT ?",
+             ORDER BY updated_at DESC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 
@@ -1046,8 +1081,23 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         .collect::<Vec<ActivePrompt>>();
 
     let mut resent = Vec::new();
+    let mut dispatched_repos = HashSet::new();
 
     for mut prompt in prompts {
+        let clean_path = prompt.repo_path.trim().to_lowercase().replace('\\', "/");
+        if dispatched_repos.contains(&clean_path) {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Skipping older prompt '{}' for repo '{}', already dispatched latest prompt for this workspace",
+                prompt.id, prompt.repo_path
+            ));
+            let _ = conn.execute(
+                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                rusqlite::params![now, &prompt.id],
+            );
+            continue;
+        }
+        dispatched_repos.insert(clean_path);
+
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
         let already_dispatched = {
             let mut cache = get_dispatched_prompts_cache().lock().unwrap();
@@ -1560,5 +1610,15 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1, "Must never duplicate records on backup");
+    }
+
+    #[test]
+    fn test_extract_clean_user_prompt() {
+        let raw = "<USER_REQUEST>\nFix the auto-switch prompt resumption bug\n</USER_REQUEST>\n<ADDITIONAL_METADATA>...</ADDITIONAL_METADATA>";
+        let clean = extract_clean_user_prompt(raw);
+        assert_eq!(clean, "Fix the auto-switch prompt resumption bug");
+
+        let simple = "Simple task prompt";
+        assert_eq!(extract_clean_user_prompt(simple), "Simple task prompt");
     }
 }
