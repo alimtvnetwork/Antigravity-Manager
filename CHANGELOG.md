@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.78.0 (2026-09-27)**:
+        -   **[Release v4.78.0: 系统更新全渠道通知（默认开启）、邮件远程指令手册排版升级、切号运行中 Prompt 零丢失无循环恢复与使用中账号配额告警精准化] 支持邮件与 Telegram 自动推送版本升级回执、Ubuntu 大字号与高对比度白色链接、切号前自动备份及恢复执行防重重入闭环、仅在使用中账号触发低额度告警**:
+            -   **系统更新全渠道通知与启动自动感应检测 (`src-tauri/src/modules/notification_hub.rs`, `update_checker.rs`, `email_vault_db.rs`, `telegram_inbound.rs`, `Settings.tsx`)**: 新增版本升级通知体系，通过邮件与 Telegram 自动推送更新成功回执；软件启动时自动比对 `last_known_version` 与当前版本，无论通过安装器、CLI 升级还是覆盖安装均能自动感知并分发升级回执；在通用设置、邮件通知触发器与 Telegram 机器人配置中均提供独立开关，且**默认全部勾选启用**。
+            -   **邮件远程指令默认帮助手册与 Ubuntu 排版升级 (`src-tauri/src/modules/email_sender.rs`, `email_watcher.rs`, `EmailNotificationSettings.tsx`)**: 邮箱无指令或默认任务统一分发完整交互语法手册，排版升级为 Ubuntu 字体与 24px 大字号标题，链接统一调整为高对比度纯白样式；新增 API 代理离线时的服务状态降级提示。
+            -   **切号前 Prompt 自动备份、执行恢复与防循环重入闭环 (`src-tauri/src/proxy/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`, `backup_prompts_db.rs`)**: 彻底解决账号轮换后最近执行中 Prompt 停滞的问题。在实例切换前自动完整备份运行中 Prompt，切换并就绪后无缝恢复重入队列并自动打上 `[Auto-Resumed]` 标记；建立严格去重过滤机制，杜绝同一 Prompt 被反复重复注入执行。
+            -   **仅对当前使用中账号分发低额度告警 (`src-tauri/src/modules/notification_hub.rs`, `email_watcher.rs`)**: 优化低额度告警判定逻辑，只有当前正在被实例或代理调用的活动账号触发额度跌破阈值时才会发送通知，彻底消除闲置备用账号带来的误报打扰。
+
     *   **v4.77.0 (2026-09-27)**:
         -   **[Release v4.77.0: 运行中 Prompt 独立 Split SQLite 备份与恢复引擎、25% 配额阈值切换、跨平台 FPUG/SUG 守候器、广播邮件与 Telegram 终端运维管理] 彻底实现切号与关机前 Prompt 零丢失、支持自动与手动恢复重入队列、24小时过期自动清理、跨平台系统安全关机与终端机器人指令交互**:
             -   **Prompt 独立 Split SQLite 备份与恢复引擎 (`src-tauri/src/modules/backup_prompts_db.rs`, `src-tauri/src/bin/agm.rs`, `repo_db.rs`)**: 引入专有轻量级 SQLite 数据库（默认路径 `~/.antigravity_tools/backup-prompts/backup-prompts.db`），深度采集 Antigravity 核心会话与工作区运行状态，全量支持 `agm backup-running-prompts`、`agm restore-running-prompts` 以及 `agm running-prompts backup/restore` 命令，并提供 `--keep`、`--json`、`-file/-f` 与 `clean [--force]` 等操作；恢复记录内置 24 小时自然日保留期自动清理与单行提醒。
@@ -3330,6 +3337,14 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.78.0 (2026-09-27)**:
+        -   **[Release v4.78.0: Multi-Channel System Update Notifications (Default Enabled), Email Remote Syntax Manual Upgrade, Zero-Loss Prompt Resumption Across Profile Switches, and Active-Only Low Credit Alerts] Automated Update Receipts via Email & Telegram, Ubuntu High-Contrast Typography, Resumption Without Reinjection Loops, and Targeted Quota Alerts**:
+            -   **Configurable Multi-Channel System Update Notifications (`src-tauri/src/modules/notification_hub.rs`, `update_checker.rs`, `email_vault_db.rs`, `telegram_inbound.rs`, `Settings.tsx`)**: Added comprehensive update receipt dispatch across Email and Telegram. Application startup automatically detects version upgrades by comparing `last_known_version` with `CARGO_PKG_VERSION` and issues release telemetry receipts regardless of upgrade method (GUI installer, CLI, or manual). General Settings, Sensor Notification Triggers, and Telegram Bot panels include toggle controls, **all enabled (`true`) by default**.
+            -   **Email Remote Control Default Help Manual & Ubuntu Typography (`src-tauri/src/modules/email_sender.rs`, `email_watcher.rs`, `EmailNotificationSettings.tsx`)**: Set default inbound mailbox response to a rich command syntax manual. Styled with Ubuntu font, enlarged 24px headers, and pure white links for maximum readability, alongside proxy offline status fallbacks.
+            -   **Auto-Switch Prompt Backup, Resumption, and Reinjection Prevention (`src-tauri/src/proxy/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`, `backup_prompts_db.rs`)**: Resolved prompt stall during account rotation by taking atomic snapshots of running prompts prior to switching, resuming execution immediately once the new instance is active, and establishing rigorous prompt hash deduplication to eliminate repeated reinjection loops.
+            -   **Active-Account Low Credit Alert Targeting (`src-tauri/src/modules/notification_hub.rs`, `email_watcher.rs`)**: Refined low credit alert evaluation so notifications only dispatch if the low-quota account is actively in use, suppressing noise from idle standby accounts.
+
+
     *   **v4.77.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
