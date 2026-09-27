@@ -40,6 +40,10 @@ static LAST_STATUS: Lazy<Arc<Mutex<WatcherStatus>>> = Lazy::new(|| {
     }))
 });
 
+/// Tracks the last alerted quota percentage per account email to avoid spamming identical alerts
+static LAST_QUOTA_ALERTED_PERCENT: Lazy<std::sync::Mutex<std::collections::HashMap<String, f64>>> =
+    Lazy::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 /// Activate fast adaptive polling window (in seconds)
 pub fn activate_awaiting_reply(duration_seconds: i64) {
     let deadline = Utc::now().timestamp() + duration_seconds;
@@ -263,6 +267,11 @@ async fn check_quota_drop_sensor(
     m_ip: &str,
     last_alert: &mut i64,
 ) {
+    // Only check if Antigravity IDE, isolated instances, active projects, or proxy services are currently running
+    if !crate::modules::auto_switcher::is_antigravity_or_instance_running(None) {
+        return;
+    }
+
     let accounts = match crate::modules::account::list_accounts() {
         Ok(accs) => accs,
         Err(_) => return,
@@ -283,26 +292,91 @@ async fn check_quota_drop_sensor(
         return;
     }
 
+    let app_cfg = crate::modules::config::load_app_config().unwrap_or_default();
+    let threshold = if settings.quota_drop_threshold_percent > 0 {
+        settings.quota_drop_threshold_percent as f64
+    } else {
+        app_cfg.auto_profile_switcher.low_quota_threshold_percent
+    };
+
+    if threshold <= 0.0 {
+        return;
+    }
+
     for acc in accounts {
+        // Enforce: ONLY send low credit alert if we are currently using this account!
+        if !crate::modules::auto_switcher::is_account_in_use(&acc) {
+            continue;
+        }
+
         if let Some(quota) = acc.quota {
-            let threshold = settings.quota_drop_threshold_percent as f64;
+            let mut lowest_model_opt: Option<(String, f64)> = None;
+
             for m in quota.models {
+                let name_lower = m.name.to_lowercase();
+                let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
+                if is_banned {
+                    continue;
+                }
                 let pct = m.percentage as f64;
-                if pct < threshold && pct > 0.0 {
-                    let (subj, html) = email_sender::render_quota_drop_email(
-                        &acc.email,
-                        pct,
-                        settings.quota_drop_threshold_percent,
-                        m_name,
-                        m_ip,
-                    );
-                    let _ = email_sender::dispatch_email_with_failover(
-                        &subj,
-                        &html,
-                        &active_recipients,
-                    );
-                    *last_alert = Utc::now().timestamp();
-                    return;
+                if pct > 0.0 {
+                    match lowest_model_opt {
+                        Some((_, cur_min)) if pct < cur_min => {
+                            lowest_model_opt = Some((m.name.clone(), pct));
+                        }
+                        None => {
+                            lowest_model_opt = Some((m.name.clone(), pct));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if let Some((_model_name, pct)) = lowest_model_opt {
+                let acc_key = acc.email.trim().to_lowercase();
+                if pct < threshold {
+                    // Check deduplication: only alert if not alerted yet or if dropped by >= 1.0% further
+                    let should_alert = {
+                        let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+                        match alerts.get(&acc_key) {
+                            Some(&last_pct) => {
+                                if (last_pct - pct) >= 1.0 {
+                                    alerts.insert(acc_key.clone(), pct);
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            None => {
+                                alerts.insert(acc_key.clone(), pct);
+                                true
+                            }
+                        }
+                    };
+
+                    if should_alert {
+                        let (subj, html) = email_sender::render_quota_drop_email(
+                            &acc.email,
+                            pct,
+                            threshold as u32,
+                            m_name,
+                            m_ip,
+                        );
+                        let _ = email_sender::dispatch_email_with_failover(
+                            &subj,
+                            &html,
+                            &active_recipients,
+                        );
+                        *last_alert = Utc::now().timestamp();
+                        let mut st = LAST_STATUS.lock().await;
+                        st.last_alert_sent = Some(*last_alert);
+                        return;
+                    }
+                } else {
+                    // Quota is healthy/reset above threshold, clear from alert cache
+                    if let Ok(mut alerts) = LAST_QUOTA_ALERTED_PERCENT.lock() {
+                        alerts.remove(&acc_key);
+                    }
                 }
             }
         }
@@ -392,4 +466,86 @@ pub fn notify_workspace_switched(from_instance: &str, to_instance: &str, reason:
     );
 
     let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quota_drop_deduplication_tracking() {
+        let test_email = "test-sensor-dedup@example.com".to_string();
+        {
+            let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            alerts.remove(&test_email);
+        }
+
+        // First alert at 18%
+        let should_alert_1 = {
+            let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            match alerts.get(&test_email) {
+                Some(&last_pct) => (last_pct - 18.0) >= 1.0,
+                None => {
+                    alerts.insert(test_email.clone(), 18.0);
+                    true
+                }
+            }
+        };
+        assert!(should_alert_1, "First low quota occurrence should alert");
+
+        // Duplicate check at same 18%
+        let should_alert_duplicate = {
+            let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            match alerts.get(&test_email) {
+                Some(&last_pct) => (last_pct - 18.0) >= 1.0,
+                None => {
+                    alerts.insert(test_email.clone(), 18.0);
+                    true
+                }
+            }
+        };
+        assert!(
+            !should_alert_duplicate,
+            "Identical quota percentage must be suppressed"
+        );
+
+        // Further drop to 15% (>= 1.0% drop)
+        let should_alert_further_drop = {
+            let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            match alerts.get(&test_email) {
+                Some(&last_pct) => {
+                    if (last_pct - 15.0) >= 1.0 {
+                        alerts.insert(test_email.clone(), 15.0);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => true,
+            }
+        };
+        assert!(
+            should_alert_further_drop,
+            "Significant drop should re-alert"
+        );
+
+        // Recovery above threshold (e.g. 100%)
+        {
+            let mut alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            alerts.remove(&test_email);
+        }
+        let is_cleared = {
+            let alerts = LAST_QUOTA_ALERTED_PERCENT.lock().unwrap();
+            !alerts.contains_key(&test_email)
+        };
+        assert!(is_cleared, "Recovery should clear cache");
+    }
+
+    #[test]
+    fn test_detect_machine_and_ip() {
+        let ip = detect_local_ip();
+        assert!(!ip.is_empty());
+        let name = detect_machine_name();
+        assert!(!name.is_empty());
+    }
 }

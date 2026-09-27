@@ -80,7 +80,7 @@ export default function EmailNotificationSettings() {
         baseline_polling_interval_minutes: 5,
         active_awaiting_interval_seconds: 10,
         notify_on_quota_drop: true,
-        quota_drop_threshold_percent: 15,
+        quota_drop_threshold_percent: 25,
         notify_on_workspace_switch: true,
         notify_on_idle_workspace: true,
         allow_remote_prompt_execution: true,

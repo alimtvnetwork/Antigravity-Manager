@@ -406,7 +406,111 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
             }
         }
     }
+    if let Ok(Some(current_id)) = account::get_current_account_id() {
+        if !in_use.contains(&current_id) {
+            in_use.push(current_id);
+        }
+    }
     in_use
+}
+
+/// Check if Antigravity IDE, isolated instances, active projects, or proxy services are currently running
+pub fn is_antigravity_or_instance_running(instance_id: Option<&str>) -> bool {
+    // 1. Check running projects in repo_db
+    if let Ok(projects) = crate::modules::repo_db::list_running_projects() {
+        if projects.into_iter().any(|p| p.is_running) {
+            return true;
+        }
+    }
+
+    // 2. Check active running prompts in repo_db
+    if let Ok(prompts) = crate::modules::repo_db::list_backed_up_prompts() {
+        if !prompts.is_empty() {
+            return true;
+        }
+    }
+
+    // 3. Check specific instance if provided
+    if let Some(inst_id) = instance_id {
+        if let Ok(registry) = crate::modules::instance::load_registry() {
+            if let Some(inst) = registry.instances.iter().find(|i| i.id == inst_id) {
+                return crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            }
+        }
+    }
+
+    // 4. Check if any registered instance is currently running
+    if let Ok(registry) = crate::modules::instance::load_registry() {
+        for inst in registry.instances {
+            if crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
+                return true;
+            }
+        }
+    }
+
+    // 5. Fallback check for running Antigravity IDE processes
+    if crate::modules::process::is_process_running_by_name("antigravity")
+        || crate::modules::process::is_process_running_by_name("agy")
+    {
+        return true;
+    }
+
+    // 6. Check if proxy port 8045 is active and responding
+    if std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], 8045)),
+        std::time::Duration::from_millis(50),
+    )
+    .is_ok()
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Check whether a given account is currently in active use
+pub fn is_account_in_use(acc: &Account) -> bool {
+    let acc_id = &acc.id;
+    let acc_email = acc.email.trim().to_lowercase();
+
+    // 1. Check primary active/current account in main profile
+    if let Ok(Some(cur_id)) = account::get_current_account_id() {
+        if acc_id == &cur_id {
+            return true;
+        }
+    }
+    if let Ok(Some(cur_acc)) = account::get_current_account() {
+        if acc_id == &cur_acc.id || acc_email == cur_acc.email.trim().to_lowercase() {
+            return true;
+        }
+    }
+
+    // 2. Check accounts bound to running or active instances
+    let in_use_ids = get_active_in_use_account_ids();
+    if in_use_ids.contains(acc_id) {
+        return true;
+    }
+
+    if let Ok(instances) = list_running_or_active_instances() {
+        for inst in instances {
+            if let Some(ref bid) = inst.bound_account_id {
+                if bid == acc_id {
+                    return true;
+                }
+            }
+            if let Some(ref bemail) = inst.bound_email {
+                if bemail.trim().to_lowercase() == acc_email {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Candidate profile target scored for auto-switch
@@ -1723,5 +1827,29 @@ mod tests {
         assert_eq!(score_a, 300.0);
         assert_eq!(score_b, 63.0);
         assert!(score_a > score_b);
+    }
+
+    #[test]
+    fn test_is_account_in_use_logic() {
+        let orig_id = account::get_current_account_id().ok().flatten();
+
+        let acc_idle = make_test_account(
+            "acc-idle-temp-test",
+            "idle-unused-temp@example.com",
+            "gemini-pro",
+            11,
+            "",
+        );
+        // Non-active, non-bound account must return false
+        assert!(!is_account_in_use(&acc_idle));
+
+        // When current account matches ID, returns true
+        let _ = account::set_current_account_id("acc-idle-temp-test");
+        assert!(is_account_in_use(&acc_idle));
+
+        // Always restore original current account ID to avoid corrupting local test environment
+        if let Some(ref id) = orig_id {
+            let _ = account::set_current_account_id(id);
+        }
     }
 }

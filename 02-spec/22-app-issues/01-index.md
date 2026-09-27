@@ -49,6 +49,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 11 | [11-ci-cd-test-isolation-and-upstream-sync-rca.md](11-ci-cd-test-isolation-and-upstream-sync-rca.md) | CI/CD Unit Test Isolation, Mock Test Coverage & Upstream Sync Resolution RCA | Critical | Fixed |
 | 12 | [12-auto-switcher-quota-and-instance-rotation-rca.md](12-auto-switcher-quota-and-instance-rotation-rca.md) | Auto-Switcher 98% Threshold Evaluation, Candidate Fallback & Switch Telemetry RCA | Critical | Fixed |
 | 13 | [13-proxy-pool-bindings-service-not-running-rca.md](13-proxy-pool-bindings-service-not-running-rca.md) | Proxy Pool Bindings "Service not running" Modal & Configuration Fallback RCA | High | Fixed |
+| 14 | [14-low-credit-alert-active-account-filtering-rca.md](14-low-credit-alert-active-account-filtering-rca.md) | Low Credit Alert Active Account Filtering & Quota Drop Deduplication RCA | High | Fixed |
 
 ---
 
