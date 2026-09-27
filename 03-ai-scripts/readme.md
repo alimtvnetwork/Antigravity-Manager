@@ -65,6 +65,9 @@ Follow this sequence before and during any repository modification task:
 | **37** | `37-bump-version.py` | Repository-aware SemVer version bumper & manifest synchronizer | ~15ms | `version`, `bump`, `semver`, `sync`, `changelog` |
 | **38** | `38-sync-prompts-skills-scripts.py` | Synchronizes prompts, skills, and scripts across connected repositories | ~40ms | `sync`, `prompts`, `skills`, `multi-repo` |
 | **39** | `39-migrate-indexes-to-readme.py` | Autonomous repository-wide index migrator (renames index files to readme.md) | ~150ms | `migrator`, `index`, `readme`, `references` |
+| **40** | `40-run-search-benchmarks.py` | Benchmarks high-speed cached grep against ripgrep | ~20ms | `benchmark`, `search`, `grep` |
+| **41** | `41-audit-all-repos.py` | Multi-repository specification and guideline auditor | ~60ms | `audit`, `multi-repo`, `linter` |
+| **42** | `42-telegram-connect.py` | Standalone zero-dependency Telegram bot connector & Chat ID auto-discovery | ~10ms | `telegram`, `connect`, `chat-id`, `setup`, `bot` |
 
 ---
 
