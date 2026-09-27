@@ -151,7 +151,7 @@ export default function TitleBar() {
                             Agm Tool By Alim
                         </span>
                         <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-gray-200/60 dark:bg-base-200 text-gray-500 font-medium">
-                            v{versionData.version || versionData.Version || '4.31.0'}
+                            v{versionData.version || versionData.Version}
                         </span>
                     </div>
 

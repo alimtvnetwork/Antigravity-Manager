@@ -242,16 +242,16 @@ const TARGET_FILES = [
         name: 'src-tauri/Cargo.toml',
         relPath: 'src-tauri/Cargo.toml',
         replace: (content) => content.replace(
-            `version = "${currentVersion}"`,
-            `version = "${newVersion}"`
+            /(\[package\][\s\S]*?version\s*=\s*)"[^"]+"/,
+            `$1"${newVersion}"`
         ),
     },
     {
         name: 'src-tauri/tauri.conf.json',
         relPath: 'src-tauri/tauri.conf.json',
         replace: (content) => content.replace(
-            `"version": "${currentVersion}"`,
-            `"version": "${newVersion}"`
+            /("version"\s*:\s*)"[^"]+"/,
+            `$1"${newVersion}"`
         ),
     },
     {
@@ -266,8 +266,8 @@ const TARGET_FILES = [
         name: 'Casks/antigravity-tools.rb',
         relPath: 'Casks/antigravity-tools.rb',
         replace: (content) => content.replace(
-            `version "${currentVersion}"`,
-            `version "${newVersion}"`
+            /(version\s+)"[^"]+"/,
+            `$1"${newVersion}"`
         ),
     },
     {
@@ -290,16 +290,16 @@ const TARGET_FILES = [
         name: 'src/components/layout/MiniView.tsx',
         relPath: 'src/components/layout/MiniView.tsx',
         replace: (content) => content.replace(
-            `'${currentVersion}'`,
-            `'${newVersion}'`
+            /(setAppVersion\(versionData\.version\s*\|\|\s*versionData\.Version\s*\|\|\s*')[^']+('\))/,
+            `$1${newVersion}$2`
         ),
     },
     {
         name: 'src/pages/Settings.tsx',
         relPath: 'src/pages/Settings.tsx',
         replace: (content) => content.replace(
-            `'${currentVersion}'`,
-            `'${newVersion}'`
+            /(useState<string>\(versionData\.version\s*\|\|\s*versionData\.Version\s*\|\|\s*')[^']+('\))/,
+            `$1${newVersion}$2`
         ),
     },
     {
@@ -350,8 +350,8 @@ const TARGET_FILES = [
         name: 'src-tauri/hooks.nsh (NSIS installer postinstall hook)',
         relPath: 'src-tauri/hooks.nsh',
         replace: (content) => content.replace(
-            `StrCpy $0 "${currentVersion}"`,
-            `StrCpy $0 "${newVersion}"`
+            /(StrCpy\s+\$0\s+)"[^"]+"/,
+            `$1"${newVersion}"`
         ),
     },
 ];

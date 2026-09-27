@@ -3,7 +3,15 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
-    *   **v4.75.0 (2026-09-25)**:
+    *   **v4.76.0 (2026-09-27)**:
+        -   **[Release v4.76.0: 隐私截图邮箱高斯模糊遮蔽、14 处版本清单全量原子同步根治、E9001 代理池服务未运行诊断弹窗消除与 4 小时 100% 配额校验闭环] 根除截图敏感信息外泄、全面修复 Cargo/Tauri 编译版本滞后于 package.json 的根本缺陷、代理池离线配置回退与切号运行 Prompt 跨进程恢复**:
+            -   **隐私截图邮箱高斯模糊遮蔽与 Assets 资源同步 (`docs/images/dashboard-modern.png`, `assets/screenshots/dashboard-modern.png`)**: 彻底解决 README 中展示的控制台截图包含未遮蔽用户账号邮箱的安全隐患。对邮箱列全量应用专业高斯模糊遮蔽，并在 `docs/images/` 与 `assets/screenshots/` 中同步更新保护隐私。
+            -   **全工程 14 处版本清单全量原子同步修复 (`scripts/bump-version.mjs`, `NavLogo.tsx`, `TitleBar.tsx`, `error-report-generator.ts`, `hooks.nsh`)**: 彻底解决 `Cargo.toml` 与 `tauri.conf.json` 在版本递增时因静态字符串匹配失效导致 Tauri 编译二进制始终烙印旧版本（如 `4.75.0`）、前端 `getVersion()` 获取版本滞后的顽疾。全面升级版本同步脚本为稳健正则表达式匹配，原子联动 `package.json`、`Cargo.toml`、`tauri.conf.json`、`Cargo.lock`、`Casks`、`MiniView`、`Settings` 及 NSIS 安装器脚本等全部 14 处版本锚点，并清理前端硬编码兜底版本号。
+            -   **E9001 代理池「Service not running」错误诊断弹窗消除与持久化回退 (`src-tauri/src/commands/proxy_pool.rs`, `src-tauri/src/commands/proxy.rs`, `src/utils/request.ts`, `ProxyPoolSettings.tsx`)**: 修复用户在未启动 API 代理服务时进入设置中心代理标签页触发 `E9001` 全局诊断弹窗的缺陷。为 `get_all_account_bindings`、`get_proxy_pool_config` 及 `get_preferred_account` 增加持久化配置自动回退，并在 `request.ts` 中清洗 `_suppressGlobalModal` 控制标识，静默被动轮询异常。
+            -   **4 小时窗口 100% 配额实时 API 验真与最佳候选回退 (`src/stores/useInstanceStore.ts`, `src/services/instanceService.ts`, `auto_switcher.rs`)**: 严格落实切号前强制通过实时 Google API 校验目标账号 4 小时窗口配额达到 100%；若低于 100% 则记录警告并自动向下遍历选择下一最佳可用候选账号，杜绝切入欠费或低配额账号。
+            -   **切号与 IDE 重启 Prompt 自动暂存与即时重发恢复 (`src-tauri/src/modules/db.rs`, `src-tauri/src/bin/agm.rs`, `process.rs`)**: 在切号或 IDE 关闭前自动捕获最近 1 小时内处于运行中（RUNNING / QUEUED）的 Prompt 及图片附件路径至 SQLite 数据库，IDE 启动并就绪后自动拉起重发恢复链路。
+            -   **4 部分根因分析文档固化 (`02-spec/22-app-issues/13-proxy-pool-bindings-service-not-running-rca.md`)**: 完整归档 E9001 故障诊断、根因分析、修复方案与预防门禁。
+
         -   **[Release v4.75.0: CI/CD 测试套件全量隔离与 Mock 化、上游 v4.1.33 同步回归根治与 830 单元测试秒级全绿] 解决 40 项单元测试并发竞争与签名校验冲突、本地重型实例切换与磁盘压力测试自动门禁隔离、Rust 全量测试从 94 秒压缩至 2.8 秒 100% 通过**:
             -   **CI/CD 本地环境测试门禁与轻量级 Mock 单元测试 (`src-tauri/src/proxy/config.rs`, `src-tauri/src/modules/instance.rs`, `src-tauri/src/proxy/tests/`)**: 新增 `is_ci_environment()` 环境识别函数，自动在 GitHub Actions (`CI=true` / `GITHUB_ACTIONS=true`) 环境中跳过依赖本地操作系统与磁盘环境的重型实例切换测试 (`test_ubuntu_instance_switching_end_to_end_flow`)，并新增纯内存 Mock 测试 (`test_mock_account_switch_ci`) 验证账号与实例绑定轮换；同时优化安全模块 SQLite 并发写入压力测试迭代次数，使全量 830 项单元测试执行时间从 94 秒缩短至 2.8 秒。
             -   **全局配置锁统一与重入死锁消除 (`src-tauri/src/proxy/config.rs`, `gemini/wrapper.rs`, `openai/request.rs`)**: 统一 `TEST_THINKING_BUDGET_MUTEX` 与 `TEST_CONFIG_LOCK` 为同一全局互斥锁引用，消除多线程并发测试覆写 `GLOBAL_THINKING_BUDGET_CONFIG` 导致的 10 项测试间歇性失败，并清理同一作用域内的重复加锁死锁。
@@ -3313,6 +3321,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.76.0 (2026-09-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.75.0 (2026-09-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
