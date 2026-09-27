@@ -48,14 +48,14 @@ export default function ProxyBindingManager({ isOpen, onClose, proxies }: ProxyB
         try {
             if (proxyId === '') {
                 // Unbind
-                await request('unbind_account_proxy', { accountId });
+                await request('unbind_account_proxy', { accountId, _suppressGlobalModal: true });
                 const newBindings = { ...bindings };
                 delete newBindings[accountId];
                 setBindings(newBindings);
                 showToast(t('settings.proxy_pool.binding.unbind_success', 'Unbound successfully'), 'success');
             } else {
                 // Bind
-                await request('bind_account_proxy', { accountId, proxyId });
+                await request('bind_account_proxy', { accountId, proxyId, _suppressGlobalModal: true });
                 setBindings({ ...bindings, [accountId]: proxyId });
                 showToast(t('settings.proxy_pool.binding.bind_success', 'Bound successfully'), 'success');
             }

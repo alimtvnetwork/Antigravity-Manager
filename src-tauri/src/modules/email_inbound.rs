@@ -1240,7 +1240,7 @@ pub fn render_html_receipt(
 
     let query_row = if !target_or_query.is_empty() && target_or_query != "-" {
         format!(
-            "<tr><td style=\"padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;\">Target / Query</td><td style=\"padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;\">{}</td></tr>",
+            "<tr><td style=\"padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; width: 170px; background: #f8fafc;\">Target / Query</td><td style=\"padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-size: 15px;\">{}</td></tr>",
             target_or_query
         )
     } else {
@@ -1249,9 +1249,9 @@ pub fn render_html_receipt(
 
     let output_block = if !output.trim().is_empty() {
         format!(
-            r#"<div style="margin-top: 20px;">
-  <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; letter-spacing: 0.05em;">Execution Output &amp; Diagnostics</div>
-  <pre style="background: #0f172a; color: #38bdf8; padding: 14px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 500px; overflow-y: auto;">{}</pre>
+            r#"<div style="margin-top: 24px;">
+  <div style="font-weight: 700; font-size: 13px; text-transform: uppercase; color: #475569; margin-bottom: 10px; letter-spacing: 0.08em;">Execution Output &amp; Diagnostics</div>
+  <pre style="background: #0f172a; color: #38bdf8; padding: 18px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 600px; overflow-y: auto; border: 1px solid #1e293b;">{}</pre>
 </div>"#,
             output.trim()
         )
@@ -1264,30 +1264,42 @@ pub fn render_html_receipt(
 <html>
 <head>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,400;0,500;0,700;1,400&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
+  code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #ffffff !important; }}
+  a:hover {{ color: #e0f2fe !important; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
+  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
+</style>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
-    <div style="background: #0f172a; padding: 20px 24px; color: #ffffff;">
-      <div style="margin-bottom: 8px;">
-        <span style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold;">[{} | {} | {}]</span>
-        <span style="background: {}; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-left: 8px;">{}</span>
+<body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
+  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 4px solid #38bdf8; padding: 24px 28px; color: #ffffff;">
+      <div style="margin-bottom: 12px;">
+        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} | {}]</span>
+        <span style="background: {}; color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">{}</span>
       </div>
-      <h2 style="margin: 8px 0 0 0; font-size: 18px; color: #ffffff; font-weight: 700;">{}</h2>
+      <h2 style="margin: 6px 0 0 0; font-size: 24px; color: #ffffff; font-weight: 700; line-height: 1.3;">{}</h2>
     </div>
-    <div style="padding: 24px;">
-      <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;">{}</p>
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Version</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;">{}</td></tr>
-        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600; width: 140px;">Command</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace; font-weight: bold;"><code>{}</code></td></tr>
-        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Origin Node</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{} ({})</td></tr>
-        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Target Instance</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a;">{}</td></tr>
+    <div style="padding: 28px;">
+      <p style="margin: 0 0 18px 0; color: #475569; font-size: 15px; line-height: 1.6;">{}</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 22px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; width: 170px; background: #f8fafc;">Version</td><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700;">{}</td></tr>
+        <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; width: 170px; background: #f8fafc;">Command</td><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 700;"><code>{}</code></td></tr>
+        <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; background: #f8fafc;">Origin Node</td><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace; font-weight: 600;">{} ({})</td></tr>
+        <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; background: #f8fafc;">Target Instance</td><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace;">{}</td></tr>
         {}
-        <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: 600;">Timestamp</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: monospace;">{}</td></tr>
+        <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600; background: #f8fafc;">Timestamp</td><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-family: 'Ubuntu Mono', monospace;">{}</td></tr>
       </table>
       {}
     </div>
-    <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
-      Automated Remote Dispatcher · Antigravity Manager {} · Maintained by Alim, Sponsored by RISEUP ASIA LLC
+    <div style="background: #f8fafc; padding: 16px 28px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center;">
+      Automated Remote Dispatcher &middot; Antigravity Manager {} &middot; Maintained by Alim, Sponsored by RISEUP ASIA LLC
     </div>
   </div>
 </body>
@@ -2496,37 +2508,61 @@ Status:             SUCCESS
                     Some(&msg.subject),
                 );
 
+                let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
                 output_text = format!(
 "================================================================================
-ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL
+ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
 ================================================================================
-Format:
-sub: [worker-name|ip] | [ins-{{instance}}] | <command> [ | proj-{{project name}} ]
+Node: {} ({}) | Version: {}
 
-Available Commands:
-- prompt: Injects prompt into workspace.
-    Body format:
-    prompt-name: <prompt-name>
-    prompt instruction:
-    <multi-line instructions>
-- gitmap: Executes gitmap command (e.g. status, scan).
-- cmd: Runs raw PowerShell or shell script from body.
-- update: Checks for and installs AGM update.
-- ls / agm instances: Lists sandbox profiles and running PIDs.
-- help: Returns this command cheat sheet.
-- gitmap macro: Runs GitMap macros.
-- gitmap update: Runs gitmap CLI self-updater.
-- agm status: Returns current node and account status.
-- agm ff / agm smart-switch: Rotates to freshest account.
-- agm doctor / check: Runs system health diagnostics.
-- agm accounts / acc: Lists registered accounts and active status.
-- agm switch | <email>: Switches the active profile to the given email.
-- agm proxy [status|test]: Checks proxy socket status or runs loopback test.
-- agm clean / purge: Safely prunes build caches and test directories.
-- agm sync: Synchronizes local accounts, instances, and DB vaults.
-- agy prompts ls: Lists backed-up workspace prompts.
-- gitmap prompts ls: Lists GitMap automated prompts.
-================================================================================"
+1. EMAIL SUBJECT FORMAT & TARGET ROUTING:
+   sub: [worker-name|ip] | [ins-{{instance}}] | <command> [ | proj-{{project name}} ]
+
+   Wildcard / Broadcast Target:
+   * | <command> (dispatches to all matching worker nodes/instances)
+
+   Examples:
+   • * | help
+   • * | prompt | proj-Antigravity-Manager
+   • * | ps | Get-Process
+   • * | cmd | dir /b
+   • * | gitmap | status
+   • * | agm | status
+   • * | status
+
+2. AVAILABLE INBOUND COMMANDS:
+   • help
+     Returns this comprehensive command manual & syntax guide.
+   • prompt: Injects prompt into workspace.
+     Email Subject: * | prompt | proj-<ProjectName>
+     Email Body format:
+       prompt-name: <Optional Prompt Name>
+       prompt instruction:
+       <Your Multi-line AI Instructions Here>
+   • powershell / ps: Executes Windows PowerShell commands/scripts from body.
+     Email Subject: * | ps | <Short Command Description>
+   • cmd: Runs Command Prompt script from email body.
+     Email Subject: * | cmd | <Short Command Description>
+   • gitmap: Executes GitMap autonomous CLI commands (e.g. status, scan, sync, macro).
+     Email Subject: * | gitmap | <Arguments>
+   • agm status: Returns node status, active account, and credits remaining.
+   • agm ff / agm smart-switch: Rotates immediately to the freshest available account.
+   • agm switch | <email>: Switches the active account profile to the specified email.
+   • agm accounts / acc: Returns registered accounts and active status.
+   • agm doctor / check: Runs system health diagnostics and reports anomalies.
+   • agm instances / ls: Lists active sandbox profiles and running process IDs.
+   • agm proxy [status|test]: Checks proxy socket status or runs loopback test.
+   • agm clean / purge: Safely prunes build caches and test artifacts.
+   • agm sync: Synchronizes local accounts, instances, and DB vaults.
+   • agy prompts ls: Lists backed-up workspace prompts.
+   • gitmap prompts ls: Lists GitMap automated prompts.
+   • update: Checks for and applies latest Antigravity Manager updates.
+
+3. TWO-PHASE AUTOMATED RECEIPTS:
+   • Phase 1 ACK: Immediate acknowledgement email with IN_PROGRESS badge.
+   • Phase 2 RESULT: Final completion receipt with exit code and stdout/stderr logs.
+================================================================================",
+                    local_machine_name, local_machine_ip, pkg_ver
                 );
                 result_summary = "Help dispatched".to_string();
 

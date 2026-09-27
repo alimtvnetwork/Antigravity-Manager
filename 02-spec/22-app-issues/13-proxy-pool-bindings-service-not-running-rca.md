@@ -38,11 +38,15 @@
 1. **Persistent Configuration Fallbacks for Proxy & Binding Commands (`src-tauri/src/commands/proxy_pool.rs`, `src-tauri/src/commands/proxy.rs`)**:
    - Updated `get_all_account_bindings`, `get_account_proxy_binding`, `bind_account_proxy`, and `unbind_account_proxy` to fall back to `load_app_config()?.proxy.proxy_pool.account_bindings` when the proxy service is offline.
    - Updated `get_proxy_pool_config`, `get_preferred_account`, and `set_preferred_account` to read and persist to `AppConfig` directly when `instance.is_none()`.
+   - Updated `check_proxy_health` to execute standalone health checks on configured proxies using `ProxyPoolManager::new(pool_state)` even when the proxy server is offline, saving the refreshed latency and health status to `AppConfig`.
+   - Updated `get_proxy_scheduling_config` and `update_proxy_scheduling_config` to read and persist sticky session settings to `AppConfig.proxy.sticky_session` without failing when proxy service is stopped.
+   - Made `stop_proxy_service`, `reload_proxy_accounts`, `clear_proxy_session_bindings`, `clear_proxy_rate_limit`, and `clear_all_proxy_rate_limits` idempotent / return safe `Ok` responses when the service is stopped rather than failing with `"服务未运行"`.
 2. **Modal Suppression Flag Sanitization (`src/utils/request.ts`)**:
    - Extracted `suppressGlobalModal` and created sanitized argument objects (`cleanedArgs`, `bodyArgs`), stripping `_suppressGlobalModal` so backend IPC parameters and HTTP endpoints receive clean payloads.
    - Enforced `if (!suppressGlobalModal)` in both Tauri IPC and Web fetch catch handlers before dispatching errors to `useErrorStore.getState().captureError(...)`.
-3. **Suppressed Global Modal on Passive Settings Fetches (`src/components/settings/ProxyPoolSettings.tsx`, `src/components/settings/proxy/ProxyBindingManager.tsx`)**:
-   - Added `{ _suppressGlobalModal: true }` to `get_all_account_bindings` and `get_proxy_pool_config` calls in `ProxyPoolSettings.tsx` and `ProxyBindingManager.tsx`.
+3. **Suppressed Global Modal on Settings Requests (`src/components/settings/ProxyPoolSettings.tsx`, `src/components/settings/proxy/ProxyBindingManager.tsx`)**:
+   - Added `{ _suppressGlobalModal: true }` to `get_all_account_bindings`, `get_proxy_pool_config`, and `check_proxy_health` calls in `ProxyPoolSettings.tsx`.
+   - Added `{ _suppressGlobalModal: true }` to `bind_account_proxy` and `unbind_account_proxy` in `ProxyBindingManager.tsx`.
 
 ---
 
@@ -51,3 +55,4 @@
 - **Offline-First Configuration Access**: Passive configuration read/write commands must always fall back to local disk storage (`AppConfig`) when runtime service daemons are not running.
 - **Background Error Isolation**: Always mark background pollers, passive mount fetches, and non-fatal telemetry checks with modal suppression flags to prevent degrading the user experience with unexpected error popups.
 - **Frontend Utility Sanitization**: Any meta-flags used by frontend utilities (such as `_suppressGlobalModal`) must be stripped before forwarding payloads across IPC or network boundaries.
+

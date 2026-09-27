@@ -698,6 +698,11 @@ pub fn wrap_html_email_card(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #ffffff !important; }}
+  a:hover {{ color: #e0f2fe !important; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
+  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
@@ -812,6 +817,11 @@ pub fn render_node_credits_status_table_html(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #ffffff !important; }}
+  a:hover {{ color: #e0f2fe !important; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
+  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
@@ -1039,6 +1049,11 @@ fn build_mime_message(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
+  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #ffffff !important; }}
+  a:hover {{ color: #e0f2fe !important; }}
+  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
+  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
@@ -1246,26 +1261,59 @@ pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, Strin
         pkg_ver, machine_name, machine_ip
     );
     let content = format!(
-        "You can remotely command this Antigravity Manager instance by sending emails\r\n\
-         matching the following pipe-delimited syntax in the subject (spaces around '|' are optional):\r\n\r\n\
-         Format: [node|ip] | [instance] | <command>\r\n\
-         Examples: {0}|1|help   OR   {0} | 1 | help   OR   {0}   |   1   |   switch\r\n\r\n\
-         Supported Commands & Subject Examples:\r\n\r\n\
-         1. Inject Prompt to Workspace:\r\n\
-            Subject: {0} | 1 | prompt | proj-my-project\r\n\
-            Body:    <Your prompt instruction here...>\r\n\r\n\
-         2. Execute Command on Target Machine:\r\n\
-            Subject: {0} | 1 | gitmap status\r\n\
-            Body:    (Optional command arguments)\r\n\r\n\
-         3. Rotate to Next Highest Quota Account (Smart Rotator):\r\n\
-            Subject: {0} | 1 | rotate\r\n\r\n\
-         4. Switch Account on Instance:\r\n\
-            Subject: {0} | 1 | switch | user@gmail.com\r\n\r\n\
-         5. Query Status Telemetry & Health:\r\n\
-            Subject: {0} | 1 | status\r\n\r\n\
-         6. Help & Cheat Sheet:\r\n\
-            Subject: {0} | 1 | help",
-        machine_name
+        "================================================================================
+ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
+================================================================================
+Node: {} ({}) | Version: {}
+
+1. EMAIL SUBJECT FORMAT & TARGET ROUTING:
+   sub: [worker-name|ip] | [ins-{{instance}}] | <command> [ | proj-{{project name}} ]
+
+   Wildcard / Broadcast Target:
+   * | <command> (dispatches to all matching worker nodes/instances)
+
+   Examples:
+   • * | help
+   • * | prompt | proj-Antigravity-Manager
+   • * | ps | Get-Process
+   • * | cmd | dir /b
+   • * | gitmap | status
+   • * | agm | status
+   • * | status
+
+2. AVAILABLE INBOUND COMMANDS:
+   • help
+     Returns this comprehensive command manual & syntax guide.
+   • prompt: Injects prompt into workspace.
+     Email Subject: * | prompt | proj-<ProjectName>
+     Email Body format:
+       prompt-name: <Optional Prompt Name>
+       prompt instruction:
+       <Your Multi-line AI Instructions Here>
+   • powershell / ps: Executes Windows PowerShell commands/scripts from body.
+     Email Subject: * | ps | <Short Command Description>
+   • cmd: Runs Command Prompt script from email body.
+     Email Subject: * | cmd | <Short Command Description>
+   • gitmap: Executes GitMap autonomous CLI commands (e.g. status, scan, sync, macro).
+     Email Subject: * | gitmap | <Arguments>
+   • agm status: Returns node status, active account, and credits remaining.
+   • agm ff / agm smart-switch: Rotates immediately to the freshest available account.
+   • agm switch | <email>: Switches the active account profile to the specified email.
+   • agm accounts / acc: Returns registered accounts and active status.
+   • agm doctor / check: Runs system health diagnostics and reports anomalies.
+   • agm instances / ls: Lists active sandbox profiles and running process IDs.
+   • agm proxy [status|test]: Checks proxy socket status or runs loopback test.
+   • agm clean / purge: Safely prunes build caches and test artifacts.
+   • agm sync: Synchronizes local accounts, instances, and DB vaults.
+   • agy prompts ls: Lists backed-up workspace prompts.
+   • gitmap prompts ls: Lists GitMap automated prompts.
+   • update: Checks for and applies latest Antigravity Manager updates.
+
+3. TWO-PHASE AUTOMATED RECEIPTS:
+   • Phase 1 ACK: Immediate acknowledgement email with IN_PROGRESS badge.
+   • Phase 2 RESULT: Final completion receipt with exit code and stdout/stderr logs.
+================================================================================",
+        machine_name, machine_ip, pkg_ver
     );
     let body = wrap_plaintext_email(
         "Remote Instructions Cheat Sheet",

@@ -139,7 +139,7 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
     const handleTestAll = async () => {
         setIsTesting(true);
         try {
-            const liveConfig = await request<ProxyPoolConfig>('check_proxy_health');
+            const liveConfig = await request<ProxyPoolConfig>('check_proxy_health', { _suppressGlobalModal: true });
             if (liveConfig && liveConfig.proxies) {
                 // [FIX] Use incremental merge to prevent race condition rollbacks
                 const liveMap = new Map(liveConfig.proxies.map(p => [p.id, p]));

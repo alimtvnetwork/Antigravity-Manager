@@ -337,7 +337,9 @@ pub async fn dispatch_custom_email_task(
 
     let full_subject = subject.unwrap_or_else(|| {
         let lower_type = task_type.trim().to_lowercase();
-        if lower_type.contains("ps")
+        if lower_type.contains("help") {
+            "* | help".to_string()
+        } else if lower_type.contains("ps")
             || lower_type.contains("powershell")
             || lower_type.contains("cli")
         {
@@ -345,6 +347,8 @@ pub async fn dispatch_custom_email_task(
                 "ps | {}",
                 clean_payload.lines().next().unwrap_or("Get-Process")
             )
+        } else if lower_type.contains("status") {
+            "* | status".to_string()
         } else {
             "prompt | proj-Antigravity-Manager".to_string()
         }

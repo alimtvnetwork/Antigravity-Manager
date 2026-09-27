@@ -9,7 +9,14 @@ export default {
     ],
     darkMode: 'class',
     theme: {
-        extend: {},
+        extend: {
+            fontFamily: {
+                sans: ['Ubuntu', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                mono: ['Ubuntu Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+                ubuntu: ['Ubuntu', 'sans-serif'],
+                'ubuntu-mono': ['Ubuntu Mono', 'monospace'],
+            },
+        },
     },
     plugins: [daisyui, containerQueries],
     daisyui: {

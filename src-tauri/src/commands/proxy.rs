@@ -327,7 +327,7 @@ pub async fn stop_proxy_service(state: State<'_, ProxyServiceState>) -> Result<(
     let mut instance_lock = state.instance.write().await;
 
     if instance_lock.is_none() {
-        return Err("服务未运行".to_string());
+        return Ok(());
     }
 
     // 停止 Axum 服务器 (仅逻辑停止，不杀死进程)
@@ -560,7 +560,7 @@ pub async fn reload_proxy_accounts(state: State<'_, ProxyServiceState>) -> Resul
             .map_err(|e| format!("重新加载账号失败: {}", e))?;
         Ok(count)
     } else {
-        Err("服务未运行".to_string())
+        Ok(0)
     }
 }
 
@@ -709,7 +709,8 @@ pub async fn get_proxy_scheduling_config(
     if let Some(instance) = instance_lock.as_ref() {
         Ok(instance.token_manager.get_sticky_config().await)
     } else {
-        Ok(crate::proxy::sticky_config::StickySessionConfig::default())
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        Ok(cfg.proxy.scheduling)
     }
 }
 
@@ -721,11 +722,19 @@ pub async fn update_proxy_scheduling_config(
 ) -> Result<(), String> {
     let instance_lock = state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
-        instance.token_manager.update_sticky_config(config).await;
-        Ok(())
-    } else {
-        Err("服务未运行，无法更新实时配置".to_string())
+        instance
+            .token_manager
+            .update_sticky_config(config.clone())
+            .await;
     }
+
+    let mut app_config =
+        crate::modules::config::load_app_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    app_config.proxy.scheduling = config;
+    crate::modules::config::save_app_config(&app_config)
+        .map_err(|e| format!("保存配置失败: {}", e))?;
+
+    Ok(())
 }
 
 /// 清除所有会话粘性绑定
@@ -736,10 +745,8 @@ pub async fn clear_proxy_session_bindings(
     let instance_lock = state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
         instance.token_manager.clear_all_sessions();
-        Ok(())
-    } else {
-        Err("服务未运行".to_string())
     }
+    Ok(())
 }
 
 // ===== [FIX #820] 固定账号模式命令 =====
@@ -806,7 +813,7 @@ pub async fn clear_proxy_rate_limit(
     if let Some(instance) = instance_lock.as_ref() {
         Ok(instance.token_manager.clear_rate_limit(&account_id))
     } else {
-        Err("服务未运行".to_string())
+        Ok(false)
     }
 }
 
@@ -818,10 +825,8 @@ pub async fn clear_all_proxy_rate_limits(
     let instance_lock = state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
         instance.token_manager.clear_all_rate_limits();
-        Ok(())
-    } else {
-        Err("服务未运行".to_string())
     }
+    Ok(())
 }
 
 /// 触发所有代理的健康检查，并返回更新后的配置
@@ -840,7 +845,20 @@ pub async fn check_proxy_health(
         let config = pool_state.read().await;
         Ok(config.clone())
     } else {
-        Err("服务未运行".to_string())
+        // Offline health check: check configured proxies even when proxy server is stopped
+        let cfg = crate::modules::config::load_app_config().unwrap_or_default();
+        let pool_state =
+            std::sync::Arc::new(tokio::sync::RwLock::new(cfg.proxy.proxy_pool.clone()));
+        let manager = crate::proxy::proxy_pool::ProxyPoolManager::new(pool_state.clone());
+
+        manager.health_check().await?;
+
+        let updated = pool_state.read().await.clone();
+        if let Ok(mut app_cfg) = crate::modules::config::load_app_config() {
+            app_cfg.proxy.proxy_pool = updated.clone();
+            let _ = crate::modules::config::save_app_config(&app_cfg);
+        }
+        Ok(updated)
     }
 }
 

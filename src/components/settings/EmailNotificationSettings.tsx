@@ -93,13 +93,62 @@ export default function EmailNotificationSettings() {
     const [isSaving, setIsSaving] = useState(false);
     const [isPinging, setIsPinging] = useState(false);
 
-    // Developer Task Quick Dispatch state
-    const [developerTaskType, setDeveloperTaskType] = useState<string>('prompt');
+    const HELP_COMMAND_PAYLOAD = `================================================================================
+ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
+================================================================================
+1. EMAIL SUBJECT FORMAT & TARGET ROUTING:
+   sub: [worker-name|ip] | [ins-{instance}] | <command> [ | proj-{project name} ]
+
+   Wildcard / Broadcast Target:
+   * | <command> (dispatches to all matching worker nodes/instances)
+
+   Examples:
+   • * | help
+   • * | prompt | proj-Antigravity-Manager
+   • * | ps | Get-Process
+   • * | cmd | dir /b
+   • * | gitmap | status
+   • * | agm | status
+   • * | status
+
+2. AVAILABLE INBOUND COMMANDS:
+   • help
+     Returns this comprehensive command manual & syntax guide.
+   • prompt: Injects prompt into workspace.
+     Email Subject: * | prompt | proj-<ProjectName>
+     Email Body format:
+       prompt-name: <Optional Prompt Name>
+       prompt instruction:
+       <Your Multi-line AI Instructions Here>
+   • powershell / ps: Executes Windows PowerShell commands/scripts from body.
+     Email Subject: * | ps | <Short Command Description>
+   • cmd: Runs Command Prompt script from email body.
+     Email Subject: * | cmd | <Short Command Description>
+   • gitmap: Executes GitMap autonomous CLI commands (e.g. status, scan, sync, macro).
+     Email Subject: * | gitmap | <Arguments>
+   • agm status: Returns node status, active account, and credits remaining.
+   • agm ff / agm smart-switch: Rotates immediately to the freshest available account.
+   • agm switch | <email>: Switches the active account profile to the specified email.
+   • agm accounts / acc: Returns registered accounts and active status.
+   • agm doctor / check: Runs system health diagnostics and reports anomalies.
+   • agm instances / ls: Lists active sandbox profiles and running process IDs.
+   • agm proxy [status|test]: Checks proxy socket status or runs loopback test.
+   • agm clean / purge: Safely prunes build caches and test artifacts.
+   • agm sync: Synchronizes local accounts, instances, and DB vaults.
+   • agy prompts ls: Lists backed-up workspace prompts.
+   • gitmap prompts ls: Lists GitMap automated prompts.
+   • update: Checks for and applies latest Antigravity Manager updates.
+
+3. TWO-PHASE AUTOMATED RECEIPTS:
+   • Phase 1 ACK: Immediate acknowledgement email with IN_PROGRESS badge.
+   • Phase 2 RESULT: Final completion receipt with exit code and stdout/stderr logs.
+================================================================================`;
+
+    // Developer Task Quick Dispatch state (Defaults to 'help' with comprehensive manual)
+    const [developerTaskType, setDeveloperTaskType] = useState<string>('help');
     const [developerTargetRecipient, setDeveloperTargetRecipient] = useState<string>('');
-    const [developerTaskPayload, setDeveloperTaskPayload] = useState<string>(
-        'Project: Antigravity-Manager\nScan repository health and report open issues'
-    );
-    const [developerCustomSubject, setDeveloperCustomSubject] = useState<string>('');
+    const [developerTaskPayload, setDeveloperTaskPayload] = useState<string>(HELP_COMMAND_PAYLOAD);
+    const [developerCustomSubject, setDeveloperCustomSubject] = useState<string>('* | help');
     const [isDispatchingTask, setIsDispatchingTask] = useState<boolean>(false);
 
     // Telegram Bot Integration State
@@ -746,7 +795,10 @@ export default function EmailNotificationSettings() {
 
     const handleTaskTypeChange = (type: string) => {
         setDeveloperTaskType(type);
-        if (type === 'prompt') {
+        if (type === 'help') {
+            setDeveloperCustomSubject('* | help');
+            setDeveloperTaskPayload(HELP_COMMAND_PAYLOAD);
+        } else if (type === 'prompt') {
             setDeveloperCustomSubject('* | prompt | proj-Antigravity-Manager');
             setDeveloperTaskPayload('Scan repository health and report open issues');
         } else if (type === 'powershell') {
@@ -1160,44 +1212,45 @@ export default function EmailNotificationSettings() {
                 <div className="pt-4 border-t border-gray-100 dark:border-slate-800">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <Terminal className="w-4 h-4 text-blue-500" />
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-slate-300">
+                            <Terminal className="w-5 h-5 text-blue-500" />
+                            <h4 className="text-sm sm:text-base font-bold uppercase tracking-wider text-gray-800 dark:text-slate-200">
                                 Developer Task Quick Dispatch
                             </h4>
                         </div>
-                        <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                        <span className="text-xs px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full font-semibold border border-blue-200 dark:border-blue-800/50">
                             Auto Receipt Active
                         </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+                    <p className="text-sm text-gray-600 dark:text-slate-300 mb-4">
                         Dispatch a structured remote task to worker email addresses with instantaneous receipt acknowledgements.
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label className="text-[11px] font-semibold text-gray-600 dark:text-slate-400 mb-1 block">
+                            <label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 block">
                                 Task Type
                             </label>
                             <select
                                 value={developerTaskType}
                                 onChange={(e) => handleTaskTypeChange(e.target.value)}
-                                className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                             >
+                                <option value="help">help: - System Help &amp; Command Manual</option>
                                 <option value="prompt">prompt: - AI Prompt Injection</option>
                                 <option value="powershell">powershell: - Windows PowerShell Execution</option>
                                 <option value="cmd">cmd: - Windows Command Prompt Execution</option>
                                 <option value="gitmap">gitmap: - GitMap Autonomous CLI</option>
-                                <option value="status">status: - Telemetry & Quota Status Query</option>
+                                <option value="status">status: - Telemetry &amp; Quota Status Query</option>
                             </select>
                         </div>
                         <div>
-                            <label className="text-[11px] font-semibold text-gray-600 dark:text-slate-400 mb-1 block">
+                            <label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 block">
                                 Target Recipient
                             </label>
                             <select
                                 value={developerTargetRecipient}
                                 onChange={(e) => setDeveloperTargetRecipient(e.target.value)}
-                                className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="">All Registered Recipients (Broadcast)</option>
                                 {recipients.map((rec) => (
@@ -1210,12 +1263,12 @@ export default function EmailNotificationSettings() {
                     </div>
 
                     <div className="mb-3">
-                        <label className="text-[11px] font-semibold text-gray-600 dark:text-slate-400 mb-1 block">
+                        <label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 block">
                             Custom Subject (Optional)
                         </label>
                         <input
                             type="text"
-                            placeholder="e.g. [Antigravity-Node-1][192.168.1.100][Instance-1] prompt: Review PR"
+                            placeholder="e.g. * | help  or  [Node-1][192.168.1.100] prompt: Review PR"
                             value={developerCustomSubject}
                             onChange={(e) => setDeveloperCustomSubject(e.target.value)}
                             onKeyDown={(e) => {
@@ -1224,16 +1277,16 @@ export default function EmailNotificationSettings() {
                                     handleDispatchDeveloperTask();
                                 }
                             }}
-                            className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                         />
                     </div>
 
                     <div className="mb-3">
-                        <label className="text-[11px] font-semibold text-gray-600 dark:text-slate-400 mb-1 block">
+                        <label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 block">
                             Command / Prompt Payload (Press Ctrl+Enter to dispatch)
                         </label>
                         <textarea
-                            rows={3}
+                            rows={8}
                             value={developerTaskPayload}
                             onChange={(e) => setDeveloperTaskPayload(e.target.value)}
                             onKeyDown={(e) => {
@@ -1242,7 +1295,7 @@ export default function EmailNotificationSettings() {
                                     handleDispatchDeveloperTask();
                                 }
                             }}
-                            className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono leading-relaxed"
                             placeholder="Enter command or AI prompt payload... (Ctrl+Enter to dispatch)"
                         />
                     </div>
@@ -1251,16 +1304,16 @@ export default function EmailNotificationSettings() {
                         <button
                             onClick={handleDispatchDeveloperTask}
                             disabled={isDispatchingTask}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
                         >
                             {isDispatchingTask ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <Loader2 className="w-4 h-4 animate-spin" />
                                     <span>Dispatching...</span>
                                 </>
                             ) : (
                                 <>
-                                    <Play className="w-3.5 h-3.5" />
+                                    <Play className="w-4 h-4" />
                                     <span>Dispatch Task</span>
                                 </>
                             )}
