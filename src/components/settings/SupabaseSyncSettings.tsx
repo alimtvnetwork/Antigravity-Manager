@@ -217,10 +217,50 @@ export default function SupabaseSyncSettings() {
         try {
             const username = await telegramService.testBot(telegramConfig.bot_token);
             setTelegramBotUsername(username);
+            if (!telegramConfig.allowed_chat_id) {
+                try {
+                    const detected = await telegramService.detectChatId(telegramConfig.bot_token);
+                    const updated = {
+                        ...telegramConfig,
+                        allowed_chat_id: detected.chat_id,
+                        is_enabled: true,
+                    };
+                    setTelegramConfig(updated);
+                    await telegramService.saveConfig(updated);
+                    showToast(`Connected to @${username} & auto-detected Chat ID ${detected.chat_id} (${detected.chat_label})`, 'success');
+                    return;
+                } catch {
+                    // Chat ID not yet available in getUpdates
+                }
+            }
             showToast(`Connected to Telegram bot: @${username}`, 'success');
         } catch (e) {
             setTelegramBotUsername(null);
             showToast(`Telegram connection failed: ${String(e)}`, 'error');
+        } finally {
+            setIsTestingTelegram(false);
+        }
+    };
+
+    const handleDetectTelegramChatId = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim()) {
+            showToast('Please paste your Telegram Bot Token first', 'warning');
+            return;
+        }
+        setIsTestingTelegram(true);
+        try {
+            const detected = await telegramService.detectChatId(telegramConfig.bot_token);
+            setTelegramBotUsername(detected.bot_username);
+            const updated = {
+                ...telegramConfig,
+                allowed_chat_id: detected.chat_id,
+                is_enabled: true,
+            };
+            setTelegramConfig(updated);
+            await telegramService.saveConfig(updated);
+            showToast(`Auto-detected Chat ID: ${detected.chat_id} (${detected.chat_label})`, 'success');
+        } catch (e) {
+            showToast(`Auto-detect Chat ID: ${String(e)}`, 'warning');
         } finally {
             setIsTestingTelegram(false);
         }
@@ -730,12 +770,22 @@ Here are my Supabase details:
                             </div>
 
                             <div className="flex flex-col">
-                                <label className="block text-xs font-medium text-gray-300 mb-1.5 h-4 leading-4 truncate">
-                                    Allowed Chat ID (Optional Security Filter)
-                                </label>
+                                <div className="flex items-center justify-between mb-1.5 h-4">
+                                    <label className="block text-xs font-medium text-gray-300 leading-4 truncate">
+                                        Allowed Chat ID (Auto-Detected from /ping or /start)
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handleDetectTelegramChatId}
+                                        disabled={isTestingTelegram || !telegramConfig.bot_token.trim()}
+                                        className="text-[11px] font-medium text-sky-400 hover:text-sky-300 disabled:opacity-40 cursor-pointer"
+                                    >
+                                        Auto-Detect Chat ID
+                                    </button>
+                                </div>
                                 <input
                                     type="number"
-                                    placeholder="e.g. 987654321"
+                                    placeholder="Send /ping to your bot, then click Auto-Detect"
                                     value={telegramConfig.allowed_chat_id ?? ''}
                                     onChange={(e) =>
                                         setTelegramConfig({
@@ -795,7 +845,7 @@ Here are my Supabase details:
                                     ) : (
                                         <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
                                     )}
-                                    Test Bot
+                                    Test Bot &amp; Detect ID
                                 </button>
                                 <button
                                     onClick={handleSendTelegramPing}
@@ -820,11 +870,14 @@ Here are my Supabase details:
                         </div>
 
                         <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-gray-400 space-y-1">
-                            <span className="font-semibold text-gray-300">Supported Telegram Commands:</span>
+                            <span className="font-semibold text-gray-300">Supported Telegram Commands &amp; CLI:</span>
                             <div className="font-mono text-[11px] text-gray-400 space-y-0.5">
-                                <p>• <code>/snapshot</code> or <code>How many machines are running?</code> — Cluster snapshot</p>
-                                <p>• <code>FF</code> or <code>/ff</code> — Fast-forward workspace profile rotation</p>
-                                <p>• <code>CMD:&lt;node-alias&gt;:&lt;powershell-command&gt;</code> — Execute remote terminal command</p>
+                                <p>• <code>/ping</code>, <code>/status</code>, <code>/observe</code> — Node connectivity, live workspaces &amp; prompt queues</p>
+                                <p>• <code>/gitmap pe</code>, <code>/agm status</code>, <code>/api</code> — Run GitMap, AGM CLI, or API proxy status</p>
+                                <p>• <code>/backup</code> (<code>/backpack</code>), <code>/restore</code> — Snapshot or restore running prompts in split SQLite DB</p>
+                                <p>• <code>/email status</code>, <code>/email ping</code>, <code>/email help</code> — Check or dispatch email telemetry</p>
+                                <p>• <code>/ff</code>, <code>/snapshot</code>, <code>CMD:&lt;node&gt;:&lt;cmd&gt;</code> — Fast-forward switch, cluster snapshot &amp; remote shell</p>
+                                <p>• Terminal CLI: <code>agm telegram connect &lt;token&gt;</code> | <code>agm telegram observe</code> | <code>agm telegram poll</code></p>
                             </div>
                         </div>
                     </div>

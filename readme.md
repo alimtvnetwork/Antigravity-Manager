@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.79.0)**
+**Bar 2: Version-Based Installation (v4.80.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -366,6 +366,38 @@ with open("laboratory.png", "wb") as file:
 
 print("Rendered image saved as laboratory.png")
 ```
+
+### 5. Telegram Bot & Terminal CLI Integration (`agm telegram`)
+
+Connect your own Telegram Bot (created via `@BotFather`) to receive real-time quota alerts, system update notifications, and execute remote node diagnostics from your phone or terminal. Credentials are stored strictly locally in `~/.antigravity_tools/telegram_config.json`.
+
+#### Option A: Connect via Desktop UI (with Auto-Detected Chat ID)
+1. Open **Settings → Email & Alerts** (scroll to **Telegram Bot & Alert Notifications**) or **Settings → Supabase Sync**.
+2. Paste your **Telegram Bot Token** (`<BOT_ID>:<BOT_SECRET>`).
+3. Open your bot in Telegram and send `/ping` (or `/start`).
+4. Click **Auto-Detect Chat ID** — AGM automatically discovers and fills your numeric `Allowed Chat ID` from `getUpdates`.
+5. Click **Save Telegram Settings** and **Send Test Alert**.
+
+#### Option B: One-Command Terminal CLI Setup
+```bash
+# Auto-detects your Chat ID from recent /ping messages, saves config, registers slash commands & sends a test ping:
+agm telegram connect "<YOUR_BOT_TOKEN>"
+
+# Or specify your numeric Chat ID explicitly:
+agm telegram connect "<YOUR_BOT_TOKEN>" <YOUR_CHAT_ID>
+```
+
+#### Supported Terminal CLI & Bot Slash Commands
+```bash
+agm telegram ping                  # Send live node IP, version & Git telemetry to Telegram
+agm telegram observe               # Send active account, model quota & running vs idle workspace report
+agm telegram gitmap pe             # Run gitmap pe and forward CI/CD pipeline status to Telegram
+agm telegram api                   # Send API proxy & account pool status to Telegram
+agm telegram backup                # Trigger split-SQLite prompt backup ("backpack") & notify Telegram
+agm telegram email status          # Send email vault status (or 'ping' / 'help' to dispatch SMTP emails)
+agm telegram send "Hello from AGM" # Send custom alert message to your bound Telegram chat
+```
+Inside your Telegram chat with the bot, send `/ping`, `/observe`, `/status`, `/gitmap pe`, `/agm status`, `/api`, `/backup` (`/backpack`), `/restore`, `/email [status|ping|help]`, `/ff`, `/snapshot`, or `/help`. See the full [Telegram Bot Setup Guide](02-spec/21-app/telegram-bot-setup-guide.md).
 
 ---
 

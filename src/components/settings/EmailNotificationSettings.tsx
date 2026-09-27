@@ -156,6 +156,7 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
     const [telegramConfig, setTelegramConfig] = useState<TelegramConfig | null>(null);
     const [telegramStatus, setTelegramStatus] = useState<TelegramWatcherStatus | null>(null);
     const [isTestingTelegram, setIsTestingTelegram] = useState<boolean>(false);
+    const [isDetectingChatId, setIsDetectingChatId] = useState<boolean>(false);
     const [isSavingTelegram, setIsSavingTelegram] = useState<boolean>(false);
     const [isSendingTelegramPing, setIsSendingTelegramPing] = useState<boolean>(false);
     const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
@@ -276,6 +277,33 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
             showToast(`Telegram connection failed: ${e?.message || e}`, 'error');
         } finally {
             setIsTestingTelegram(false);
+        }
+    };
+
+    const handleDetectTelegramChatId = async () => {
+        if (!telegramConfig || !telegramConfig.bot_token.trim()) {
+            showToast('Please enter a Telegram Bot Token first, then send /ping to your bot in Telegram', 'warning');
+            return;
+        }
+        setIsDetectingChatId(true);
+        try {
+            const res = await telegramService.detectChatId(telegramConfig.bot_token);
+            setTelegramBotUsername(res.bot_username);
+            setTelegramConfig((prev) =>
+                prev
+                    ? { ...prev, allowed_chat_id: res.chat_id, is_enabled: true }
+                    : {
+                          bot_token: telegramConfig.bot_token,
+                          allowed_chat_id: res.chat_id,
+                          is_enabled: true,
+                          poll_interval_secs: 5,
+                      }
+            );
+            showToast(`Detected Chat ID ${res.chat_id} (${res.chat_label}) for @${res.bot_username}!`, 'success');
+        } catch (e: any) {
+            showToast(`${e?.message || e}`, 'error');
+        } finally {
+            setIsDetectingChatId(false);
         }
     };
 
@@ -1893,6 +1921,20 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                         <button
                             type="button"
                             onClick={() => {
+                                const cmd = `agm telegram connect "${telegramConfig?.bot_token || '<BOT_TOKEN>'}"${telegramConfig?.allowed_chat_id ? ` ${telegramConfig.allowed_chat_id}` : ''}`;
+                                navigator.clipboard.writeText(cmd);
+                                showToast('AGM CLI connect command copied', 'info');
+                            }}
+                            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            title="Copy AGM CLI one-command connect string"
+                        >
+                            <Terminal className="w-3.5 h-3.5" />
+                            <span>Copy CLI Connect</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
                                 const cmd = `.\\03-ai-scripts\\telegram-bot-helper.ps1 -BotToken "${telegramConfig?.bot_token || 'TOKEN'}" -ChatId "${telegramConfig?.allowed_chat_id || 'CHAT_ID'}"`;
                                 navigator.clipboard.writeText(cmd);
                                 showToast('PowerShell verification command copied', 'info');
@@ -1949,28 +1991,40 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
 
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-gray-700 dark:text-slate-300 flex items-center justify-between h-5">
-                                <span>Allowed Chat ID (Numeric)</span>
+                                <span>Allowed Chat ID (Numeric — Auto-detectable)</span>
+                                <button
+                                    type="button"
+                                    onClick={handleDetectTelegramChatId}
+                                    disabled={isDetectingChatId}
+                                    className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-60"
+                                    title="Send /ping to your bot in Telegram, then click here to auto-fill Chat ID"
+                                >
+                                    {isDetectingChatId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                    <span>Auto-Detect from /ping</span>
+                                </button>
                             </label>
-                            <input
-                                type="number"
-                                value={telegramConfig?.allowed_chat_id ?? ''}
-                                onChange={(e) => {
-                                    const val = e.target.value.trim();
-                                    const parsed = val ? parseInt(val, 10) : null;
-                                    setTelegramConfig((prev) =>
-                                        prev
-                                            ? { ...prev, allowed_chat_id: isNaN(parsed as any) ? null : parsed }
-                                            : {
-                                                  bot_token: '',
-                                                  allowed_chat_id: isNaN(parsed as any) ? null : parsed,
-                                                  is_enabled: false,
-                                                  poll_interval_secs: 5,
-                                              }
-                                    );
-                                }}
-                                placeholder="987654321"
-                                className="w-full h-9 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
-                            />
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    value={telegramConfig?.allowed_chat_id ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value.trim();
+                                        const parsed = val ? parseInt(val, 10) : null;
+                                        setTelegramConfig((prev) =>
+                                            prev
+                                                ? { ...prev, allowed_chat_id: isNaN(parsed as any) ? null : parsed }
+                                                : {
+                                                      bot_token: '',
+                                                      allowed_chat_id: isNaN(parsed as any) ? null : parsed,
+                                                      is_enabled: false,
+                                                      poll_interval_secs: 5,
+                                                  }
+                                        );
+                                    }}
+                                    placeholder="Leave blank & send /ping to auto-bind, or click Auto-Detect"
+                                    className="w-full h-9 px-3 py-2 text-xs border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -2055,13 +2109,31 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                         </label>
                     </div>
 
+                    {/* Remote Bot & CLI Command Reference */}
+                    <div className="p-3 rounded-lg bg-sky-50/40 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 text-[11px] text-gray-600 dark:text-slate-300 space-y-1.5">
+                        <div className="font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-1.5">
+                            <Terminal className="w-3.5 h-3.5" />
+                            <span>Supported Telegram Chat Commands &amp; AGM Terminal CLI:</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[10px]">
+                            <div><code>/ping</code> — Node IP, version &amp; git telemetry</div>
+                            <div><code>/observe</code> or <code>/status</code> — Active vs Idle workspace report</div>
+                            <div><code>/gitmap pe</code> — Live GitHub CI/CD pipeline matrix</div>
+                            <div><code>/agm status</code> or <code>/api</code> — Proxy &amp; account pool status</div>
+                            <div><code>/backup</code> or <code>/backpack</code> — Trigger encrypted backup</div>
+                            <div><code>/email [status|ping|help]</code> — Email status or dispatch</div>
+                            <div><code>agm telegram connect &lt;TOKEN&gt;</code> — One-step CLI setup</div>
+                            <div><code>agm telegram [ping|observe|gitmap|api|backup|email|send]</code></div>
+                        </div>
+                    </div>
+
                     {/* Action Buttons */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-slate-800">
                         <div className="text-[11px] text-gray-500 dark:text-slate-400">
-                            Create bot with <span className="font-semibold text-sky-600 dark:text-sky-400">@BotFather</span> and get ID from <span className="font-semibold text-sky-600 dark:text-sky-400">@userinfobot</span>.
+                            Send <code className="font-semibold text-sky-600 dark:text-sky-400">/ping</code> to your bot in Telegram, then click <span className="font-semibold text-sky-600 dark:text-sky-400">Auto-Detect Chat ID</span>.
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
                                 onClick={handleTestTelegram}
@@ -2070,6 +2142,15 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                             >
                                 {isTestingTelegram ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                                 Test Bot Token
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDetectTelegramChatId}
+                                disabled={isDetectingChatId}
+                                className="px-3 py-1.5 text-xs font-medium border border-sky-200 dark:border-sky-800 bg-sky-50/60 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                            >
+                                {isDetectingChatId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                Auto-Detect Chat ID
                             </button>
                             <button
                                 type="button"

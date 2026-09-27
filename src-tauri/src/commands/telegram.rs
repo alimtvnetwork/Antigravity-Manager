@@ -3,7 +3,9 @@
 #![allow(dead_code)]
 
 use crate::error::AppResult;
-use crate::modules::telegram_inbound::{self, TelegramConfig, TelegramWatcherStatus};
+use crate::modules::telegram_inbound::{
+    self, TelegramConfig, TelegramDetectedChat, TelegramWatcherStatus,
+};
 
 #[tauri::command]
 pub async fn get_telegram_config() -> AppResult<TelegramConfig> {
@@ -29,12 +31,17 @@ pub async fn test_telegram_bot(bot_token: String) -> AppResult<String> {
 }
 
 #[tauri::command]
+pub async fn detect_telegram_chat_id(bot_token: String) -> AppResult<TelegramDetectedChat> {
+    telegram_inbound::detect_telegram_chat_id(&bot_token).await
+}
+
+#[tauri::command]
 pub async fn get_telegram_status() -> AppResult<TelegramWatcherStatus> {
     Ok(telegram_inbound::get_telegram_status().await)
 }
 
 #[tauri::command]
 pub async fn send_telegram_test_message(bot_token: String, chat_id: i64) -> AppResult<()> {
-    let msg = "🚀 <b>Antigravity Manager:</b> Telegram bot connection test successful!";
-    telegram_inbound::send_telegram_message(&bot_token, chat_id, msg).await
+    let msg = telegram_inbound::format_ping_report();
+    telegram_inbound::send_telegram_message(&bot_token, chat_id, &msg).await
 }

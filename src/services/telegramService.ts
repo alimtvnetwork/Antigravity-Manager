@@ -17,6 +17,12 @@ export interface TelegramWatcherStatus {
     error_message: string | null;
 }
 
+export interface TelegramDetectedChat {
+    chat_id: number;
+    chat_label: string;
+    bot_username: string;
+}
+
 export const telegramService = {
     async getConfig(): Promise<TelegramConfig> {
         try {
@@ -39,6 +45,15 @@ export const telegramService = {
     async testBot(botToken: string): Promise<string> {
         try {
             return await invoke<string>('test_telegram_bot', { botToken });
+        } catch (error) {
+            useErrorStore.getState().captureError(error, { source: 'TelegramService' });
+            throw error;
+        }
+    },
+
+    async detectChatId(botToken: string): Promise<TelegramDetectedChat> {
+        try {
+            return await invoke<TelegramDetectedChat>('detect_telegram_chat_id', { botToken });
         } catch (error) {
             useErrorStore.getState().captureError(error, { source: 'TelegramService' });
             throw error;

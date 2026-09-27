@@ -726,6 +726,10 @@ pub fn run() {
             modules::agy_cleaner::start_cleanup_daemon();
             info!("Conversation cleanup daemon initialized.");
 
+            // Start Telegram inbound remote command daemon
+            modules::telegram_inbound::start_telegram_daemon();
+            info!("Telegram inbound remote command daemon initialized.");
+
             // Check if system was updated and notify via configured channels (Email, Telegram)
             modules::notification_hub::check_and_notify_system_updated();
             info!("System update notification watcher initialized.");
@@ -1024,6 +1028,7 @@ pub fn run() {
             commands::get_telegram_config,
             commands::save_telegram_config,
             commands::test_telegram_bot,
+            commands::detect_telegram_chat_id,
             commands::get_telegram_status,
             commands::send_telegram_test_message,
             // Window Management commands

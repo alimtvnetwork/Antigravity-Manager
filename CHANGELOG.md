@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.80.0 (2026-09-27)**:
+        -   **[Release v4.80.0: Telegram Bot 全栈远程指令中心、Chat ID 一键自动探测绑定、AGM 终端全功能控制与 Windows 构建并发内存优化] 支持 UI 与 CLI 一键连接机器人并自动发现 Chat ID、支持 /ping /observe /gitmap /api /backup /email 等全套远程指令、严格本地隔离凭据零泄露**:
+            -   **Telegram Chat ID 自动探测与首次消息无感绑定 (`src-tauri/src/modules/telegram_inbound.rs`, `src-tauri/src/commands/telegram.rs`, `EmailNotificationSettings.tsx`, `SupabaseSyncSettings.tsx`)**: 新增 `detect_telegram_chat_id` 与 UI「Auto-Detect Chat ID」按钮，直接通过 Telegram `getUpdates` 队列提取最近发送 `/ping` 或 `/start` 的用户会话 ID，无需借助任何第三方机器人查询；同时支持后台守护进程首次收到消息时自动捕获并锁定 `allowed_chat_id`，并在启动时自动调用 `setMyCommands` 注册交互菜单。
+            -   **全套 Telegram 交互指令与 AGM 终端 CLI 闭环 (`src-tauri/src/modules/telegram_inbound.rs`, `src-tauri/src/bin/agm.rs`)**: 全面扩展 Telegram 聊天端指令与 `agm telegram` 终端子命令，完整支持 `connect`（一键验证、自动探测 Chat ID 并发送欢迎遥测）、`ping`（节点 IP、版本、Git 哈希、分支与发布标签）、`observe`/`status`（活跃账号、模型配额、运行中与闲置工作区、Prompt 队列）、`gitmap`（远程执行 `gitmap pe` 等流水线诊断）、`api`/`agm`（API 网关与账号池状态）、`backup`/`backpack` 与 `restore`（Split SQLite 运行中 Prompt 备份与恢复）、`email [status|ping|help]`（邮箱状态查询与远程触发邮件发送）以及 `send`/`notify` 自定义消息推送。
+            -   **脱敏技术规范与 README 完整指南 (`02-spec/21-app/53-telegram-bot-auto-connect-and-remote-commands.md`, `02-spec/21-app/telegram-bot-setup-guide.md`, `readme.md`, `README_EN.md`)**: 编写详尽的 UI 与 CLI 连接指南、Chat ID 获取原理及远程命令速查表；所有真实 Bot Token 与个人 Chat ID 严格仅保存在本地 `~/.antigravity_tools/telegram_config.json`，代码库与文档保持 100% 脱敏零泄露。
+            -   **Windows Release 构建内存并发优化 (`src-tauri/Cargo.toml`, `.github/workflows/release.yml`)**: 将 Release 配置的 `codegen-units` 从 `256` 收敛至 `16` 并在 Windows runner 上限制 `CARGO_BUILD_JOBS=2`，消除双二进制并行编译时的运行器内存峰值中断。
+
     *   **v4.79.0 (2026-09-27)**:
         -   **[Release v4.79.0: 闲置状态检测根因修复、GitMap CLI/邮件全量遥测对齐、大字号 Ubuntu 排版与高对比度白色链接、交互指令与工作区 Prompt 实时清单] 彻底消除活跃任务被误判为闲置假阳性缺陷、对齐 GitMap 编译与运行时遥测元数据、邮件与终端全量集成指令表/项目表/Prompt 队列**:
             -   **闲置状态感应器根因修复与防误判防护 (`src-tauri/src/modules/email_watcher.rs`, `repo_db.rs`)**: 彻底解决工作区存在活跃任务（如 `antigravity-manager-d58c5517`）时邮件仍误报 IDLE 闲置的缺陷。此前 `check_idle_projects_sensor` 错误依赖仅包含显式备份的 `repo_db::list_backed_up_prompts()`，导致正在执行中且未备份的工作区被误判为空闲。全面重构状态监测链路，实时直接查询 `~/.gemini/antigravity/conversation_summaries.db`（`not_fully_idle != 0` 与 `status LIKE '%RUNNING%'`）以及 `repo_prompts.db` 队列，并建立全局互斥拦截锁 `is_any_prompt_actively_running(&conn)`，只要任何会话或项目处于运行中即强制静默闲置告警，彻底根除假阳性。
@@ -3344,6 +3351,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.80.0 (2026-09-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.79.0 (2026-09-27)**:
         -   **[Release v4.79.0: Idle Sensor False-Positive Root Cause Fix, GitMap CLI/Email Telemetry Parity, Enlarged Ubuntu Typography with Pure White Links, and Command/Project/Prompt Cheat Sheet Integration] Eliminated False Idle Alerts During Active Runs, Matched GitMap Git Metadata Across Binaries & Emails, and Integrated Comprehensive Workspaces & Prompts Queue Tables**:
             -   **Idle Sensor Root Cause Fix & Anti-False-Positive Guard (`src-tauri/src/modules/email_watcher.rs`, `repo_db.rs`)**: Fixed the root cause where active workspace runs (such as `antigravity-manager-d58c5517`) were erroneously reported as IDLE in outgoing telemetry emails. `check_idle_projects_sensor` previously relied on `repo_db::list_backed_up_prompts()`, which only queries explicit backups (`status = 'backed_up'`). Rebuilt state detection to directly query live ground-truth state from `~/.gemini/antigravity/conversation_summaries.db` (`not_fully_idle != 0` and `status LIKE '%RUNNING%'`) and `repo_prompts.db`, guarded by `is_any_prompt_actively_running(&conn)` to strictly suppress idle notifications while any prompt is running.

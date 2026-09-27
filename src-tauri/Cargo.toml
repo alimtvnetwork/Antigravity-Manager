@@ -1,6 +1,6 @@
 [package]
 name = "agm-alim"
-version = "4.79.0"
+version = "4.80.0"
 default-run = "agm-alim"
 description = "Antigravity Manager Tools - Maintained by Alim, Sponsored by RISEUP ASIA LLC"
 authors = ["Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)"]
@@ -106,7 +106,7 @@ debug = 0
 
 [profile.release]
 opt-level = 1
-codegen-units = 256
+codegen-units = 16
 lto = false
 incremental = false
 panic = "abort"

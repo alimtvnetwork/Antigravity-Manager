@@ -2998,59 +2998,148 @@ fn cmd_telegram(args: &[String]) {
         }
     };
 
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[ERROR] Tokio runtime error: {}", e);
+            return;
+        }
+    };
+
     if let Some(first) = args.first() {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
-            println!("AGM Telegram Remote Subsystem:");
-            println!("  agm telegram ls [--json]          Show configured bot token, chat ID, and status");
-            println!("  agm telegram set <token> <chat_id> Save bot credentials and enable notifications");
-            println!("  agm telegram set help             Instructions on creating Telegram bot & chat ID");
-            println!(
-                "  agm telegram ping                 Send test ping message via Telegram Bot API"
-            );
-            println!(
-                "  agm telegram cmds, commands       List supported inbound Telegram commands"
-            );
+            println!("AGM Telegram Remote & Notification Subsystem:");
+            println!("  agm telegram connect <token> [chat_id]  Auto-detect chat ID, save token & send welcome ping");
+            println!("  agm telegram set <token> [chat_id]      Save bot credentials (auto-detects chat_id if omitted)");
+            println!("  agm telegram detect-chat-id [token]     Auto-discover your numeric Chat ID from getUpdates");
+            println!("  agm telegram ls [--json]                Show configured bot token, chat ID, and status");
+            println!("  agm telegram ping                       Send rich telemetry ping card to Telegram chat");
+            println!("  agm telegram observe, status            Send live workspaces, quota & prompt queue report");
+            println!("  agm telegram gitmap [args...]           Run GitMap command (e.g. pe) & forward output to chat");
+            println!("  agm telegram api                        Query local API proxy status & forward to chat");
+            println!("  agm telegram backup, backpack [ls]      Backup running prompts to split SQLite DB & notify");
+            println!("  agm telegram restore                    Restore backed-up prompts & notify Telegram chat");
+            println!("  agm telegram email [status|ping|help]   Check or dispatch email & forward receipt to Telegram");
+            println!("  agm telegram send, notify \"<message>\"   Send custom notification message to Telegram chat");
+            println!("  agm telegram poll, watch [--once]       Poll & execute inbound Telegram commands");
+            println!("  agm telegram cmds, commands             List supported inbound Telegram slash commands");
             return;
         }
-        if first_lower == "set" {
+        if first_lower == "set" || first_lower == "connect" {
             if let Some(sub) = args.get(1) {
                 if sub.eq_ignore_ascii_case("help") {
                     println!("\n=== Telegram Bot Setup Guide ===");
-                    println!("1. Open Telegram and search for '@BotFather'");
-                    println!("2. Send '/newbot' and follow instructions to get your BOT TOKEN");
-                    println!("3. Search for '@userinfobot' and send '/start' to get your numeric CHAT ID");
-                    println!("4. Run: agm telegram set <BOT_TOKEN> <CHAT_ID>\n");
+                    println!("1. Open Telegram and message '@BotFather' -> '/newbot' to get your BOT TOKEN");
+                    println!("2. Open your new bot in Telegram and send '/ping' or '/start'");
+                    println!("3. Run: agm telegram connect <BOT_TOKEN>");
+                    println!("   (AGM will automatically detect your Chat ID from getUpdates and connect!)\n");
                     return;
                 }
-                if let Some(chat_id_str) = args.get(2) {
-                    let chat_id: i64 = match chat_id_str.parse() {
-                        Ok(id) => id,
+                let token = sub.trim().to_string();
+                let chat_id_opt: Option<i64> = if let Some(cid_str) = args.get(2) {
+                    match cid_str.parse::<i64>() {
+                        Ok(id) => Some(id),
                         Err(_) => {
                             eprintln!("[ERROR] chat_id must be a numeric integer.");
                             return;
                         }
-                    };
-                    t_cfg.bot_token = sub.clone();
-                    t_cfg.allowed_chat_id = Some(chat_id);
-                    t_cfg.is_enabled = true;
-                    if let Err(e) = telegram_inbound::save_config(&t_cfg) {
-                        eprintln!("[ERROR] Failed to save Telegram settings: {}", e);
-                        std::process::exit(1);
                     }
-                    println!("[SUCCESS] Telegram credentials saved and enabled!");
-                    return;
+                } else {
+                    println!("[*] Auto-detecting Telegram Chat ID via getUpdates...");
+                    match rt.block_on(telegram_inbound::detect_telegram_chat_id(&token)) {
+                        Ok(det) => {
+                            println!(
+                                "[+] Discovered Chat ID: {} ({}) on bot @{}",
+                                det.chat_id, det.chat_label, det.bot_username
+                            );
+                            Some(det.chat_id)
+                        }
+                        Err(e) => {
+                            eprintln!("[WARN] Could not auto-detect Chat ID yet: {}", e);
+                            t_cfg.allowed_chat_id
+                        }
+                    }
+                };
+
+                t_cfg.bot_token = token.clone();
+                if let Some(cid) = chat_id_opt {
+                    t_cfg.allowed_chat_id = Some(cid);
                 }
+                t_cfg.is_enabled = true;
+                if let Err(e) = telegram_inbound::save_config(&t_cfg) {
+                    eprintln!("[ERROR] Failed to save Telegram settings: {}", e);
+                    std::process::exit(1);
+                }
+                let _ = rt.block_on(telegram_inbound::register_telegram_bot_commands(&token));
+                println!(
+                    "[SUCCESS] Telegram credentials saved and enabled! (Chat ID: {:?})",
+                    t_cfg.allowed_chat_id
+                );
+
+                if let Some(cid) = t_cfg.allowed_chat_id {
+                    let welcome = telegram_inbound::format_ping_report();
+                    if rt
+                        .block_on(telegram_inbound::send_telegram_message(
+                            &token, cid, &welcome,
+                        ))
+                        .is_ok()
+                    {
+                        println!(
+                            "[SUCCESS] Delivered welcome telemetry ping to Telegram chat {}!",
+                            cid
+                        );
+                    }
+                }
+                return;
             }
-            eprintln!("Usage: agm telegram set <bot_token> <chat_id>   OR   agm telegram set help");
+            eprintln!("Usage: agm telegram connect <bot_token> [chat_id]");
+            return;
+        }
+        if first_lower == "detect-chat-id" || first_lower == "chat-id" {
+            let token = args
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| t_cfg.bot_token.clone());
+            if token.trim().is_empty() {
+                eprintln!("[ERROR] No bot token provided or configured. Usage: agm telegram detect-chat-id <bot_token>");
+                return;
+            }
+            match rt.block_on(telegram_inbound::detect_telegram_chat_id(&token)) {
+                Ok(det) => {
+                    println!("=== Discovered Telegram Chat ===");
+                    println!("  Bot Username: @{}", det.bot_username);
+                    println!("  Chat ID:      {}", det.chat_id);
+                    println!("  Chat Label:   {}", det.chat_label);
+                    if t_cfg.allowed_chat_id.is_none() {
+                        t_cfg.bot_token = token;
+                        t_cfg.allowed_chat_id = Some(det.chat_id);
+                        t_cfg.is_enabled = true;
+                        let _ = telegram_inbound::save_config(&t_cfg);
+                        println!(
+                            "[SUCCESS] Automatically saved Chat ID {} to telegram_config.json!",
+                            det.chat_id
+                        );
+                    }
+                }
+                Err(e) => eprintln!("[ERROR] {}", e),
+            }
             return;
         }
         if first_lower == "ls" || first_lower == "list" {
             let is_json = args.iter().any(|a| a == "--json");
             if is_json {
+                let mut redacted = t_cfg.clone();
+                if redacted.bot_token.len() > 8 {
+                    redacted.bot_token = format!(
+                        "{}...{}",
+                        &t_cfg.bot_token[..4],
+                        &t_cfg.bot_token[t_cfg.bot_token.len() - 4..]
+                    );
+                }
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&t_cfg).unwrap_or_else(|_| "{}".to_string())
+                    serde_json::to_string_pretty(&redacted).unwrap_or_else(|_| "{}".to_string())
                 );
                 return;
             }
@@ -3066,65 +3155,232 @@ fn cmd_telegram(args: &[String]) {
                 "(not set)".to_string()
             };
             println!("\n=== Telegram Notification Settings ===");
-            println!("  Enabled:    {}", t_cfg.is_enabled);
-            println!("  Bot Token:  {}", masked_token);
+            println!("  Enabled:              {}", t_cfg.is_enabled);
+            println!("  Bot Token:            {}", masked_token);
             println!(
-                "  Chat ID:    {}",
+                "  Allowed Chat ID:      {}",
                 t_cfg
                     .allowed_chat_id
                     .map(|id| id.to_string())
-                    .unwrap_or_else(|| "(not set)".to_string())
+                    .unwrap_or_else(|| "(auto-bind on first message)".to_string())
             );
+            println!("  Poll Interval (secs): {}", t_cfg.poll_interval_secs);
+            println!("  Notify on Update:     {}", t_cfg.notify_on_system_update);
             println!();
             return;
         }
         if first_lower == "ping" {
-            let chat_id = match t_cfg.allowed_chat_id {
-                Some(cid) => cid,
-                None => {
-                    eprintln!(
-                        "[ERROR] Telegram chat ID is not configured. Run 'agm telegram set help'"
-                    );
-                    return;
-                }
+            let Some(chat_id) = t_cfg.allowed_chat_id else {
+                eprintln!("[ERROR] Telegram chat ID is not configured. Run 'agm telegram connect <token>'");
+                return;
             };
             if t_cfg.bot_token.is_empty() {
-                eprintln!(
-                    "[ERROR] Telegram bot token is not configured. Run 'agm telegram set help'"
-                );
+                eprintln!("[ERROR] Telegram bot token is not configured.");
                 return;
             }
-            println!("[*] Sending test ping to Telegram chat '{}'...", chat_id);
-            let m_name = email_watcher::detect_machine_name();
-            let m_ip = email_watcher::detect_local_ip();
-            let msg = format!(
-                "[Antigravity | v{} | {} | {}] Telegram ping verified successfully!",
-                VERSION, m_name, m_ip
+            println!(
+                "[*] Sending telemetry ping to Telegram chat '{}'...",
+                chat_id
             );
-            let rt = match tokio::runtime::Runtime::new() {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!("[ERROR] Tokio runtime error: {}", e);
-                    return;
-                }
-            };
+            let msg = telegram_inbound::format_ping_report();
             match rt.block_on(telegram_inbound::send_telegram_message(
                 &t_cfg.bot_token,
                 chat_id,
                 &msg,
             )) {
-                Ok(_) => println!("[SUCCESS] Telegram test message delivered successfully!"),
+                Ok(_) => println!("[SUCCESS] Telegram telemetry ping delivered!"),
                 Err(e) => eprintln!("[ERROR] Failed to send Telegram message: {}", e),
+            }
+            return;
+        }
+        if first_lower == "observe" || first_lower == "status" {
+            let report = telegram_inbound::format_observe_report();
+            println!("{}", report);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    match rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &report,
+                    )) {
+                        Ok(_) => println!(
+                            "\n[SUCCESS] Observation report delivered to Telegram chat {}!",
+                            chat_id
+                        ),
+                        Err(e) => eprintln!("\n[ERROR] Failed to send observation report: {}", e),
+                    }
+                }
+            }
+            return;
+        }
+        if first_lower == "gitmap" || first_lower == "gm" {
+            let sub_args = if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                "pe".to_string()
+            };
+            let reply = telegram_inbound::execute_gitmap_subcommand(&sub_args);
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] GitMap output delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "api" || first_lower == "proxy" {
+            let reply = rt.block_on(telegram_inbound::execute_api_status_command());
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] API status delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "backup" || first_lower == "backpack" || first_lower == "restore" {
+            let sub_args = if first_lower == "restore" {
+                "restore".to_string()
+            } else if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                String::new()
+            };
+            let reply = telegram_inbound::execute_backup_command(&sub_args);
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Backup/Restore report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "email" || first_lower == "mail" {
+            let sub_args = if args.len() > 1 {
+                args[1..].join(" ")
+            } else {
+                "status".to_string()
+            };
+            let reply = telegram_inbound::execute_email_command(&sub_args);
+            println!("{}", reply);
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &reply,
+                    ));
+                    println!(
+                        "\n[SUCCESS] Email command report delivered to Telegram chat {}!",
+                        chat_id
+                    );
+                }
+            }
+            return;
+        }
+        if first_lower == "send" || first_lower == "notify" {
+            let Some(chat_id) = t_cfg.allowed_chat_id else {
+                eprintln!("[ERROR] Telegram chat ID is not configured.");
+                return;
+            };
+            if args.len() < 2 {
+                eprintln!("Usage: agm telegram send \"<message>\"");
+                return;
+            }
+            let raw_msg = args[1..].join(" ");
+            let formatted = format!(
+                "🔔 <b>AGM Notification</b>\n\n{}",
+                telegram_inbound::clean_for_telegram_html(&raw_msg, 3500)
+            );
+            match rt.block_on(telegram_inbound::send_telegram_message(
+                &t_cfg.bot_token,
+                chat_id,
+                &formatted,
+            )) {
+                Ok(_) => println!(
+                    "[SUCCESS] Notification delivered to Telegram chat {}!",
+                    chat_id
+                ),
+                Err(e) => eprintln!("[ERROR] Failed to send notification: {}", e),
+            }
+            return;
+        }
+        if first_lower == "poll" || first_lower == "watch" {
+            let is_once = args.iter().any(|a| a == "--once" || a == "-1");
+            println!("[*] Polling inbound Telegram updates...");
+            loop {
+                match rt.block_on(telegram_inbound::poll_telegram_updates_once()) {
+                    Ok(items) => {
+                        for (cid, cmd_in, _reply) in &items {
+                            println!("[+] Processed command '{}' from chat {}", cmd_in, cid);
+                        }
+                        if is_once {
+                            println!("[*] Poll complete ({} command(s) processed).", items.len());
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Poll failed: {}", e);
+                        if is_once {
+                            break;
+                        }
+                    }
+                }
+                std::thread::sleep(Duration::from_secs(t_cfg.poll_interval_secs.max(3)));
             }
             return;
         }
         if first_lower == "cmds" || first_lower == "commands" {
             println!("\n=== Supported Inbound Telegram Commands ===");
-            println!("  /status        Check node quota, credits, and active account");
-            println!("  /ff            Fast-forward switch to freshest standby account");
-            println!("  /rotate        Rotate to highest quota account");
-            println!("  /switch <acc>  Switch to specific account email");
-            println!("  /help          Show remote command cheat sheet\n");
+            println!("  /ping                 Verify node connectivity, IP, Git version & uptime");
+            println!("  /status, /observe     Inspect live workspaces, active account quota & prompt queues");
+            println!("  /gitmap <args>        Execute GitMap CLI command (e.g. /gitmap pe, /gitmap version)");
+            println!("  /agm <args>           Execute AGM CLI command (e.g. /agm status, /agm accounts, /agm wpr)");
+            println!(
+                "  /api                  Check local API proxy (port 8045) & account bindings"
+            );
+            println!("  /backup, /backpack    Backup running prompts into split SQLite DB (/backup ls to list)");
+            println!("  /restore              Restore backed-up prompts to resume execution");
+            println!(
+                "  /email [status|ping]  Query email vault status or dispatch test/help email"
+            );
+            println!("  /ff                   Fast-forward switch to freshest highest-quota standby account");
+            println!("  /snapshot             Multi-node cluster status snapshot");
+            println!("  /help                 Show full interactive remote command manual\n");
+            if let Some(chat_id) = t_cfg.allowed_chat_id {
+                if !t_cfg.bot_token.is_empty() {
+                    let help_html = telegram_inbound::format_help_manual();
+                    let _ = rt.block_on(telegram_inbound::send_telegram_message(
+                        &t_cfg.bot_token,
+                        chat_id,
+                        &help_html,
+                    ));
+                }
+            }
             return;
         }
     }

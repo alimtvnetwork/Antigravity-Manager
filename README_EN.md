@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.79.0)
+> Professional AI Account Management & Protocol Proxy System (v4.80.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.79.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.80.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -324,6 +324,19 @@ print(response.choices[0].message.content)
 3.  **Note**:
     - **OpenAI Protocol Limitation**: When using OpenAI mode, Kilo Code's request path will append `/v1/chat/completions/responses`, a non-standard path that will return 404 from Antigravity. Make sure to enter the Base URL and select Gemini mode.
     - **Model Mapping**: Model names in Kilo Code may differ from Antigravity's defaults. If you encounter connection issues, set up custom mappings on the "Model Mapping" page and check the **log files** for debugging.
+
+### How to connect a Telegram Bot & CLI (`agm telegram`)?
+1. **Create a Bot**: Message `@BotFather` on Telegram with `/newbot` to obtain an HTTP API token (`<BOT_ID>:<BOT_SECRET>`), then open your new bot in Telegram and send `/ping`.
+2. **Connect via UI (Auto-Detect Chat ID)**:
+   - Navigate to **Settings → Email & Alerts** (or **Settings → Supabase Sync**).
+   - Paste your **Telegram Bot Token**, click **Auto-Detect Chat ID** to automatically populate your numeric `Allowed Chat ID`, and click **Save Telegram Settings**.
+3. **Connect via Terminal CLI (One Command)**:
+   ```bash
+   agm telegram connect "<YOUR_BOT_TOKEN>"
+   ```
+4. **Remote Commands (Chat & Terminal)**:
+   - **In Telegram Chat**: `/ping`, `/observe`, `/status`, `/gitmap pe`, `/agm status`, `/api`, `/backup` (`/backpack`), `/restore`, `/email [status|ping|help]`, `/ff`, `/snapshot`, `/help`.
+   - **In Terminal**: `agm telegram [ping|observe|gitmap|api|backup|restore|email|send|poll|ls]`.
 
 ### How to use Image Generation (Imagen 3)?
 
