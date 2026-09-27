@@ -474,42 +474,65 @@ pub fn is_antigravity_or_instance_running(instance_id: Option<&str>) -> bool {
 
 /// Check whether a given account is currently in active use
 pub fn is_account_in_use(acc: &Account) -> bool {
-    let acc_id = &acc.id;
-    let acc_email = acc.email.trim().to_lowercase();
-
-    // 1. Check primary active/current account in main profile
-    if let Ok(Some(cur_id)) = account::get_current_account_id() {
-        if acc_id == &cur_id {
-            return true;
-        }
-    }
-    if let Ok(Some(cur_acc)) = account::get_current_account() {
-        if acc_id == &cur_acc.id || acc_email == cur_acc.email.trim().to_lowercase() {
-            return true;
-        }
-    }
-
-    // 2. Check accounts bound to running or active instances
+    let cur_id = account::get_current_account_id().ok().flatten();
+    let cur_acc = account::get_current_account().ok().flatten();
+    let cur_email = cur_acc.as_ref().map(|a| a.email.as_str());
     let in_use_ids = get_active_in_use_account_ids();
-    if in_use_ids.contains(acc_id) {
+    let bound_pairs = list_running_or_active_instances()
+        .map(|list| {
+            list.into_iter()
+                .map(|i| (i.bound_account_id, i.bound_email))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    is_account_in_use_core(
+        &acc.id,
+        &acc.email,
+        cur_id
+            .as_deref()
+            .or(cur_acc.as_ref().map(|a| a.id.as_str())),
+        cur_email,
+        &in_use_ids,
+        &bound_pairs,
+    )
+}
+
+/// Core evaluation helper for account in-use checks, decoupled from disk I/O
+pub fn is_account_in_use_core(
+    acc_id: &str,
+    acc_email: &str,
+    cur_id: Option<&str>,
+    cur_email: Option<&str>,
+    in_use_ids: &[String],
+    bound_pairs: &[(Option<String>, Option<String>)],
+) -> bool {
+    let lower_email = acc_email.trim().to_lowercase();
+    if let Some(cid) = cur_id {
+        if acc_id == cid {
+            return true;
+        }
+    }
+    if let Some(cemail) = cur_email {
+        if lower_email == cemail.trim().to_lowercase() {
+            return true;
+        }
+    }
+    if in_use_ids.iter().any(|id| id == acc_id) {
         return true;
     }
-
-    if let Ok(instances) = list_running_or_active_instances() {
-        for inst in instances {
-            if let Some(ref bid) = inst.bound_account_id {
-                if bid == acc_id {
-                    return true;
-                }
+    for (bid, bemail) in bound_pairs {
+        if let Some(ref b) = bid {
+            if b == acc_id {
+                return true;
             }
-            if let Some(ref bemail) = inst.bound_email {
-                if bemail.trim().to_lowercase() == acc_email {
-                    return true;
-                }
+        }
+        if let Some(ref e) = bemail {
+            if e.trim().to_lowercase() == lower_email {
+                return true;
             }
         }
     }
-
     false
 }
 
@@ -1824,8 +1847,6 @@ mod tests {
 
     #[test]
     fn test_is_account_in_use_logic() {
-        let orig_id = account::get_current_account_id().ok().flatten();
-
         let acc_idle = make_test_account(
             "acc-idle-temp-test",
             "idle-unused-temp@example.com",
@@ -1833,16 +1854,55 @@ mod tests {
             11,
             "",
         );
-        // Non-active, non-bound account must return false
-        assert!(!is_account_in_use(&acc_idle));
 
-        // When current account matches ID, returns true
-        let _ = account::set_current_account_id("acc-idle-temp-test");
-        assert!(is_account_in_use(&acc_idle));
+        // 1. Unbound, non-active account returns false
+        assert!(!is_account_in_use_core(
+            &acc_idle.id,
+            &acc_idle.email,
+            None,
+            None,
+            &[],
+            &[]
+        ));
 
-        // Always restore original current account ID to avoid corrupting local test environment
-        if let Some(ref id) = orig_id {
-            let _ = account::set_current_account_id(id);
-        }
+        // 2. Current active account ID matches -> returns true
+        assert!(is_account_in_use_core(
+            &acc_idle.id,
+            &acc_idle.email,
+            Some("acc-idle-temp-test"),
+            None,
+            &[],
+            &[]
+        ));
+
+        // 3. Current active account email matches -> returns true
+        assert!(is_account_in_use_core(
+            &acc_idle.id,
+            &acc_idle.email,
+            None,
+            Some("idle-unused-temp@example.com"),
+            &[],
+            &[]
+        ));
+
+        // 4. In active in-use IDs list -> returns true
+        assert!(is_account_in_use_core(
+            &acc_idle.id,
+            &acc_idle.email,
+            None,
+            None,
+            &["acc-idle-temp-test".to_string()],
+            &[]
+        ));
+
+        // 5. Bound to running instance -> returns true
+        assert!(is_account_in_use_core(
+            &acc_idle.id,
+            &acc_idle.email,
+            None,
+            None,
+            &[],
+            &[(Some("acc-idle-temp-test".to_string()), None)]
+        ));
     }
 }
