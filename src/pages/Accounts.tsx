@@ -353,6 +353,29 @@ function Accounts() {
     null,
   );
 
+  // Listen for auto-switch events from backend to animate the specific account row and refresh state
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen<{ account_id: string; email: string }>('account://auto-switched', async (event) => {
+        setSwitchingAccountId(event.payload.account_id);
+        try {
+          await fetchAccounts();
+          await fetchCurrentAccount();
+        } finally {
+          setTimeout(() => {
+            setSwitchingAccountId(null);
+          }, 800);
+        }
+      }).then((fn) => {
+        unlisten = fn;
+      });
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [fetchAccounts, fetchCurrentAccount]);
+
   const handleSwitch = async (accountId: string, targetIde?: string) => {
     if (loading || switchingAccountId) return;
 

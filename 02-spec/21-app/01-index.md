@@ -208,4 +208,5 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-056 (Smart Switch Live Refresh, Strict 100% Quota Gate & Multi-Channel Cluster Leasing):** Implemented in [`56-smart-switch-live-refresh-and-cluster-lease.md`](./56-smart-switch-live-refresh-and-cluster-lease.md).
 - **AC-APP-057 (Telegram Bot VM Cluster Fleet Nodes, Scoped Prompts & Long-Message Chunking):** Implemented in [`57-telegram-fleet-nodes-and-prompt-injection.md`](./57-telegram-fleet-nodes-and-prompt-injection.md).
 - **AC-APP-058 (Telegram & AGM GitMap AGY Parity, VM Fleet Orchestration & Remote Prompt Routing):** Implemented in [`58-telegram-gitmap-fleet-commands-and-prompt-orchestrator.md`](./58-telegram-gitmap-fleet-commands-and-prompt-orchestrator.md).
+- **AC-APP-059 (Auto-Switch Button Delegation, Hot-Switch IDE Preservation & Tool Liveness):** Implemented in [`59-auto-switch-button-delegation-and-ide-alive.md`](./59-auto-switch-button-delegation-and-ide-alive.md).
 

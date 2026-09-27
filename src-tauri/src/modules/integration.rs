@@ -256,8 +256,9 @@ impl SystemIntegration for DesktopIntegration {
         }
 
         // 1. 智能决策：判断目标是 Antigravity IDE (VS Code 定制版) 还是 Antigravity 经典版 (原生桌面端)
-        let classic_running = process::is_antigravity_running(None);
-        let ide_running = process::is_antigravity_running(Some("ide"));
+        let ls_running = process::is_process_running_by_name("language_server");
+        let ide_running = process::is_antigravity_running(Some("ide")) || ls_running;
+        let classic_running = process::is_antigravity_running(None) && !ide_running;
         let classic_exe = process::get_antigravity_executable_path(None);
         let ide_exe = process::get_antigravity_executable_path(Some("ide"));
         let ide_exe_str = ide_exe.as_ref().map(|p| p.to_string_lossy().to_string());
@@ -379,6 +380,8 @@ impl SystemIntegration for DesktopIntegration {
                     account.email
                 ));
                 let _ = crate::modules::repo_db::resend_all_running_commands(20);
+                let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
+                let _ = crate::modules::process::focus_antigravity_window(effective_target);
                 let _ = crate::modules::tray::update_tray_menus(&self.app_handle);
                 return Ok(());
             }
@@ -396,8 +399,10 @@ impl SystemIntegration for DesktopIntegration {
             active_args.as_deref(),
         )?;
 
-        // 重新发送并恢复正在运行的提示词
+        // 重新发送并恢复正在运行的提示词与窗口可见性
         let _ = crate::modules::repo_db::resend_all_running_commands(20);
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
+        let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
         // 4. 更新托盘
         let _ = crate::modules::tray::update_tray_menus(&self.app_handle);

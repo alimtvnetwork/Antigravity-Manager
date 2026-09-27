@@ -1086,7 +1086,44 @@ pub async fn execute_profile_rotation_with_context(
         },
     );
 
-    instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
+    // Delegate directly to the exact account switch pipeline (the exact ⇄ button handler)
+    let app_handle_opt = crate::modules::log_bridge::get_app_handle();
+    let integration = match app_handle_opt.as_ref() {
+        Some(h) => crate::modules::integration::SystemManager::Desktop(h.clone()),
+        None => crate::modules::integration::SystemManager::Headless,
+    };
+
+    if inst_id == "default" {
+        let service = crate::modules::account_service::AccountService::new(integration);
+        service.switch_account(&target.account_id, None).await?;
+        let _ = crate::modules::instance::bind_account_to_instance(
+            "default",
+            &target.account_id,
+            &target.email,
+        );
+    } else {
+        instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
+    }
+
+    // Emit event to frontend so UI reflects the button activation and refreshes state
+    if let Some(ref handle) = app_handle_opt {
+        #[derive(serde::Serialize, Clone)]
+        struct AutoSwitchPayload {
+            account_id: String,
+            email: String,
+            instance_id: String,
+        }
+        use tauri::Emitter;
+        let _ = handle.emit(
+            "account://auto-switched",
+            AutoSwitchPayload {
+                account_id: target.account_id.clone(),
+                email: target.email.clone(),
+                instance_id: inst_id.clone(),
+            },
+        );
+        let _ = handle.emit("accounts://refreshed", ());
+    }
 
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
     let target_acc_id = target.account_id.clone();

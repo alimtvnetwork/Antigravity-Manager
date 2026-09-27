@@ -1209,6 +1209,19 @@ pub async fn switch_account_to_instance(
 
     let is_default_inst = instance.is_default || instance.id == "default";
 
+    if is_default_inst {
+        let app_handle_opt = crate::modules::log_bridge::get_app_handle();
+        let integration = match app_handle_opt.as_ref() {
+            Some(h) => crate::modules::integration::SystemManager::Desktop(h.clone()),
+            None => crate::modules::integration::SystemManager::Headless,
+        };
+        let service = crate::modules::account_service::AccountService::new(integration);
+        service.switch_account(account_id, None).await?;
+        bind_account_to_instance("default", &account.id, &account.email)?;
+        let _ = set_active_instance_id("default");
+        return Ok(());
+    }
+
     let prev_account_opt = instance
         .bound_account_id
         .as_ref()

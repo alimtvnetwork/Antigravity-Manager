@@ -43,6 +43,31 @@ fn get_ide_exe_paths(system: &System) -> std::collections::HashSet<String> {
                 immune_exe_paths.insert(exe_path.to_lowercase());
             }
         }
+
+        // Structural signature of Antigravity IDE:
+        // Executable parent folder contains resources/bin/language_server.exe (or language_server on Unix)
+        // or resources/app.asar (Electron-based VS Code IDE distribution).
+        if let Some(exe) = process.exe() {
+            let path_str = exe.to_string_lossy().to_lowercase();
+            if path_str.contains("antigravity") {
+                if let Some(parent) = exe.parent() {
+                    let has_ls = parent
+                        .join("resources")
+                        .join("bin")
+                        .join("language_server.exe")
+                        .exists()
+                        || parent
+                            .join("resources")
+                            .join("bin")
+                            .join("language_server")
+                            .exists();
+                    let has_app_asar = parent.join("resources").join("app.asar").exists();
+                    if has_ls || has_app_asar {
+                        immune_exe_paths.insert(path_str);
+                    }
+                }
+            }
+        }
     }
     immune_exe_paths
 }
@@ -1233,18 +1258,11 @@ pub fn start_antigravity_with_fallback_path(
                     cmd.current_dir(parent);
                 }
 
-                // Add startup arguments
-                let mut has_new_window = false;
+                // Add startup arguments (preserve workspace folders without forcing blank window)
                 if let Some(ref args) = args {
                     for arg in args {
-                        if arg == "--new-window" {
-                            has_new_window = true;
-                        }
                         cmd.arg(arg);
                     }
-                }
-                if !has_new_window {
-                    cmd.arg("--new-window");
                 }
 
                 #[cfg(target_os = "windows")]
@@ -1387,18 +1405,11 @@ pub fn start_antigravity_with_fallback_path(
                     cmd.current_dir(parent);
                 }
 
-                // Add startup arguments
-                let mut has_new_window = false;
+                // Add startup arguments (preserve workspace folders without forcing blank window)
                 if let Some(ref args) = args {
                     for arg in args {
-                        if arg == "--new-window" {
-                            has_new_window = true;
-                        }
                         cmd.arg(arg);
                     }
-                }
-                if !has_new_window {
-                    cmd.arg("--new-window");
                 }
 
                 #[cfg(target_os = "windows")]
@@ -1713,13 +1724,13 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
     let mut checked = Vec::new();
 
     let folder_names: &[&str] = if target_ide == Some("ide") {
-        &["Antigravity IDE"]
+        &["Antigravity IDE", "Antigravity", "antigravity"]
     } else if target_ide == Some("code") || target_ide == Some("cursor") {
-        &["Antigravity"]
+        &["Antigravity", "antigravity"]
     } else if target_ide == Some("classic") {
-        &["Antigravity"]
+        &["Antigravity", "antigravity"]
     } else {
-        &["Antigravity"]
+        &["Antigravity", "antigravity", "Antigravity IDE"]
     };
 
     #[cfg(target_os = "macos")]
@@ -2182,6 +2193,12 @@ pub fn focus_instance_pids(_pids: &[u32]) -> bool {
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub fn focus_instance_process(_pid: u32) -> bool {
     false
+}
+
+/// Bring Antigravity IDE/Classic window to the foreground and ensure it is visible/restored
+pub fn focus_antigravity_window(target_ide: Option<&str>) -> bool {
+    let pids = get_antigravity_pids(target_ide);
+    focus_instance_pids(&pids)
 }
 
 #[cfg(test)]
