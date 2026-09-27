@@ -189,18 +189,23 @@ pub fn backup_active_running_prompts(
     let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
     let running_prompts = repo_db::discover_running_prompts_from_antigravity("default");
     let conversations = agy_cleaner::scan_conversations(100);
+    let now = Utc::now().timestamp();
+    let freshness_cutoff = now - 7200;
 
-    // Consolidate candidate prompts to back up
+    // Consolidate candidate prompts to back up: prioritize live discovered prompts
     let mut candidate_prompts = Vec::new();
-    for p in running_prompts {
+    for p in running_prompts.clone() {
         candidate_prompts.push(p);
     }
     for p in all_prompts {
-        if (p.status == "running"
-            || p.status == "queued"
-            || p.status == "dispatched"
-            || p.status == "backed_up")
-            && !candidate_prompts.iter().any(|c| c.id == p.id)
+        if (p.status == "running" || p.status == "queued" || p.status == "backed_up")
+            && p.updated_at >= freshness_cutoff
+            && !candidate_prompts.iter().any(|c| {
+                c.id == p.id
+                    || (c.repo_path.to_lowercase().replace('\\', "/")
+                        == p.repo_path.to_lowercase().replace('\\', "/")
+                        && c.prompt_content.trim() == p.prompt_content.trim())
+            })
         {
             candidate_prompts.push(p);
         }
@@ -208,7 +213,7 @@ pub fn backup_active_running_prompts(
 
     let conn = connect_backup_db(custom_file)?;
     let batch_id = format!("batch_{}", Uuid::new_v4().simple());
-    let now = Utc::now().timestamp();
+
     let db_path_str = get_backup_prompts_db_path(custom_file)?
         .to_string_lossy()
         .to_string();
@@ -286,7 +291,8 @@ pub fn backup_active_running_prompts(
             restored_at: None,
         };
 
-        // Deduplicate unrestored records to prevent duplicating the same prompt into prompt_backups
+        // Deduplicate records to prevent duplicate reinjections into prompt_backups
+        let is_live_prompt = running_prompts.iter().any(|rp| rp.id == record.prompt_id);
         let existing_unrestored: Option<String> = conn
             .query_row(
                 "SELECT id FROM prompt_backups WHERE (prompt_id = ?1 OR (project_path = ?2 AND prompt_text = ?3)) AND is_restored = 0 LIMIT 1",
@@ -301,6 +307,19 @@ pub fn backup_active_running_prompts(
                 params![record.backup_batch_id, now, existing_rec_id],
             );
             records.push(record);
+            continue;
+        }
+
+        // If already restored recently and not currently actively running in Antigravity, skip re-queuing
+        let already_restored_recently: bool = conn
+            .query_row(
+                "SELECT 1 FROM prompt_backups WHERE project_path = ?1 AND prompt_text = ?2 AND is_restored = 1 AND restored_at >= ?3 LIMIT 1",
+                params![record.project_path, record.prompt_text, freshness_cutoff],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+
+        if already_restored_recently && !is_live_prompt {
             continue;
         }
 
@@ -459,11 +478,10 @@ pub fn restore_running_prompts(
         .flatten()
         .collect();
 
-    if records.is_empty() {
-        return Ok(Vec::new());
-    }
+    // Reset dispatched prompts cache to allow restored prompts to execute post-switch
+    repo_db::reset_dispatched_prompts_cache();
 
-    // Re-inject into repo_db active_prompts table
+    // Re-inject into repo_db active_prompts table if records exist in backup DB
     for rec in &records {
         let active_p = ActivePrompt {
             id: rec.prompt_id.clone(),
@@ -481,7 +499,7 @@ pub fn restore_running_prompts(
         let _ = repo_db::save_or_requeue_prompt(&active_p);
     }
 
-    if !keep_backup {
+    if !keep_backup && !records.is_empty() {
         let _ = conn.execute(
             "UPDATE prompt_backups SET is_restored = 1, restored_at = ? WHERE is_restored = 0",
             params![now],

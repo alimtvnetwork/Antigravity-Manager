@@ -993,10 +993,6 @@ pub async fn execute_profile_rotation_with_context(
 ) -> Result<(), String> {
     let inst_id = &target.instance_id;
 
-    // Step 1: Split Repo DB - Snapshot running prompts for this instance across dedicated split DB and repo_db before switching
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
-    let _ = crate::modules::repo_db::backup_running_prompts(inst_id);
-
     if has_auto_resume {
         let _ = snapshot_task_state(inst_id, &target.account_id, &reason);
     }
@@ -1043,11 +1039,6 @@ pub async fn execute_profile_rotation_with_context(
         )
         .await;
     });
-
-    // Step 3: Split Repo DB - Directly restore and dispatch backed-up prompts to running projects
-    let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
-    let _ = crate::modules::repo_db::dispatch_running_prompts(inst_id);
-    let _ = crate::modules::repo_db::resend_all_running_commands(20);
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();

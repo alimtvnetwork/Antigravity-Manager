@@ -487,7 +487,14 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let now = Utc::now().timestamp();
     let mut backed_up_count = 0;
 
-    // Step 0: Transition all in-flight 'running' prompts in active_prompts to 'backed_up' before switch
+    // Step 0: Retire stale 'running' prompts older than 2 hours to 'dispatched' so they don't shadow active prompts
+    let stale_cutoff = now - 7200;
+    let _ = conn.execute(
+        "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE status = 'running' AND updated_at < ?",
+        params![now, stale_cutoff],
+    );
+
+    // Transition all remaining in-flight 'running' prompts in active_prompts to 'backed_up' before switch
     let transitioned = conn
         .execute(
             "UPDATE active_prompts SET status = 'backed_up', updated_at = ? WHERE status = 'running'",
@@ -504,6 +511,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 }
             }
         }
+
         crate::modules::logger::log_info(&format!(
             "[RepoDB] Transitioned {} in-flight prompts from 'running' to 'backed_up' before switch",
             transitioned
@@ -1055,7 +1063,7 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             WHERE status IN ('backed_up', 'queued', 'pending')
+             WHERE status IN ('backed_up', 'queued', 'pending', 'running')
              ORDER BY updated_at DESC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
@@ -1355,6 +1363,21 @@ pub fn auto_resume_recent_prompts(
                 &image_payload,
             ],
         );
+
+        let prompt_obj = ActivePrompt {
+            id: prompt_id.clone(),
+            project_id: project.id.clone(),
+            instance_id: instance_id.to_string(),
+            repo_path: project.repo_path.clone(),
+            prompt_content: prompt_text.clone(),
+            model: prompt_model.clone(),
+            session_id: Some(project.id.clone()),
+            status: "dispatched".to_string(),
+            created_at: now,
+            updated_at: now,
+            image_payload: image_payload.clone(),
+        };
+        spawn_prompt_via_agy(&prompt_obj);
 
         let preview = if prompt_text.len() > 80 {
             format!("{}...", &prompt_text[..77])
