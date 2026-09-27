@@ -127,6 +127,9 @@ pub struct SwitchNotificationDetails {
     pub instance_mode: String,
     pub reason: String,
     pub is_auto: bool,
+    pub backed_up_projects: Vec<String>,
+    pub backed_up_prompts_count: Option<usize>,
+    pub restored_prompts_count: Option<usize>,
 }
 
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch
@@ -245,6 +248,9 @@ pub fn notify_account_switched(
         instance_mode: String::new(),
         reason: reason.to_string(),
         is_auto,
+        backed_up_projects: Vec::new(),
+        backed_up_prompts_count: None,
+        restored_prompts_count: None,
     });
 }
 
@@ -410,7 +416,14 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
                                     .get("prompt_id")
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string());
-                                running_prompt_project = Some(proj.repo_path.clone());
+                                running_prompt_project = Some(if !proj.repo_name.is_empty() {
+                                    proj.repo_name.clone()
+                                } else {
+                                    std::path::Path::new(&proj.repo_path)
+                                        .file_name()
+                                        .map(|n| n.to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "Antigravity-Manager".to_string())
+                                });
                                 if val.get("image_payload").and_then(|v| v.as_str()).is_some()
                                     || val
                                         .get("has_image")
@@ -431,6 +444,13 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
     let is_reinjecting = running_prompts_count > 0;
     let prompts_resent = is_reinjecting;
     let now_ts = chrono::Utc::now().timestamp();
+
+    let default_projs = Vec::new();
+    let effective_projects = if !details.backed_up_projects.is_empty() {
+        &details.backed_up_projects
+    } else {
+        &default_projs
+    };
 
     let telemetry_data = serde_json::json!({
         "agm_version": pkg_ver,
@@ -456,6 +476,9 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         "running_prompt_id": running_prompt_id,
         "running_prompt_snippet": running_prompt_snippet,
         "running_prompt_project": running_prompt_project,
+        "active_projects": effective_projects,
+        "backed_up_prompts_count": details.backed_up_prompts_count,
+        "restored_prompts_count": details.restored_prompts_count,
         "has_images": has_images,
         "images_attached": images_attached,
         "timestamp": now_ts,
@@ -622,6 +645,9 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
         "previous_quota_weekly": details.previous_quota_weekly,
         "trigger_mode": if details.is_auto { "Auto-Switch" } else { "Manual Switch" },
         "reason": details.reason,
+        "active_projects": &details.backed_up_projects,
+        "prompts_backed_up": details.backed_up_prompts_count,
+        "prompts_restored": details.restored_prompts_count,
     });
 
     let json_text = serde_json::to_string_pretty(&payload).unwrap_or_default();
@@ -690,6 +716,36 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         .map(|t| format!("{:.1}%", t))
         .unwrap_or_else(|| "-".to_string());
 
+    let projects_display = if !details.backed_up_projects.is_empty() {
+        details.backed_up_projects.join(", ")
+    } else {
+        match crate::modules::repo_db::list_running_projects() {
+            Ok(projs) if !projs.is_empty() => {
+                let names: Vec<String> = projs
+                    .into_iter()
+                    .map(|p| p.repo_name)
+                    .filter(|n| !n.is_empty())
+                    .collect();
+                if !names.is_empty() {
+                    names.join(", ")
+                } else {
+                    "Antigravity-Manager".to_string()
+                }
+            }
+            _ => "Antigravity-Manager".to_string(),
+        }
+    };
+
+    let backup_stats = match (
+        details.backed_up_prompts_count,
+        details.restored_prompts_count,
+    ) {
+        (Some(b), Some(r)) => format!("{} captured | {} re-injected", b, r),
+        (Some(b), None) => format!("{} captured", b),
+        (None, Some(r)) => format!("{} re-injected", r),
+        (None, None) => "preserved (SQLite split db)".to_string(),
+    };
+
     let text = format!(
         "🔄 <b>Antigravity Manager: Account Switched</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
@@ -700,6 +756,8 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         📈 <b>Target Balances:</b> <code>4h: {} | Weekly: {}</code>\n\
         ⚙️ <b>Threshold:</b> <code>{}</code>\n\
         💻 <b>Target Instance:</b> <code>{}</code> ({})\n\
+        📁 <b>Projects:</b> <code>{}</code>\n\
+        💾 <b>Prompt Backup:</b> <code>{}</code>\n\
         🏷️ <b>Trigger:</b> {}\n\
         📝 <b>Reason:</b> {}\n\
         🖥️ <b>Host:</b> <code>{}</code> ({})\n\
@@ -714,6 +772,8 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         threshold_display,
         details.instance_name,
         details.instance_id,
+        projects_display,
+        backup_stats,
         trigger_label,
         details.reason,
         m_name,

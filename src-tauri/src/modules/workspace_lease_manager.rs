@@ -214,11 +214,21 @@ pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
 
 /// Synchronously check if an account is currently leased by another active node
 pub fn is_account_leased_by_other(account_id: &str) -> bool {
+    is_account_or_email_leased_by_other(account_id, "")
+}
+
+/// Synchronously check if an account (by ID or profile email) is currently leased by another active node
+pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> bool {
     let local_node = supabase_sync::get_local_node_id();
     let now = Utc::now().timestamp();
+    let email_clean = email.trim().to_lowercase();
     if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
-        if let Some(lease) = cache.get(account_id) {
-            if lease.expires_at > now && lease.node_id != local_node {
+        for (k, lease) in cache.iter() {
+            let is_match = k == account_id
+                || lease.account_id == account_id
+                || (!email_clean.is_empty()
+                    && lease.profile_name.trim().to_lowercase() == email_clean);
+            if is_match && lease.expires_at > now && lease.node_id != local_node {
                 return true;
             }
         }

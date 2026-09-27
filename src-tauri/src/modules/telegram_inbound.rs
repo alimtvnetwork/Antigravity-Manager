@@ -831,14 +831,28 @@ pub fn execute_backup_command(args_str: &str) -> String {
                 clean_for_telegram_html(&e, 200)
             ),
         }
-    } else if sub == "restore" {
+    } else if sub == "restore" || sub == "rrp" || sub == "resend" {
+        let projs = repo_db::list_running_projects().unwrap_or_default();
+        let proj_names: Vec<String> = projs
+            .into_iter()
+            .map(|p| p.repo_name)
+            .filter(|n| !n.is_empty())
+            .collect();
+        let proj_display = if !proj_names.is_empty() {
+            proj_names.join(", ")
+        } else {
+            "Antigravity-Manager".to_string()
+        };
+
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
         let _ = repo_db::dispatch_running_prompts("default");
         match backup_prompts_db::restore_running_prompts(false, None) {
             Ok(records) => format!(
                 "♻️ <b>Prompt Restoration Complete:</b>\n\n\
+                • <b>Projects:</b> <code>{}</code>\n\
                 • Restored and re-queued <b>{}</b> prompt(s) from split SQLite backup.\n\
                 • Re-injected <b>{}</b> in-flight prompt(s) directly into workspaces.",
+                clean_for_telegram_html(&proj_display, 80),
                 records.len(),
                 repo_resent.len()
             ),
@@ -848,14 +862,28 @@ pub fn execute_backup_command(args_str: &str) -> String {
             ),
         }
     } else {
+        let projs = repo_db::list_running_projects().unwrap_or_default();
+        let proj_names: Vec<String> = projs
+            .into_iter()
+            .map(|p| p.repo_name)
+            .filter(|n| !n.is_empty())
+            .collect();
+        let proj_display = if !proj_names.is_empty() {
+            proj_names.join(", ")
+        } else {
+            "Antigravity-Manager".to_string()
+        };
+
         let _ = repo_db::backup_running_prompts("default");
         match backup_prompts_db::backup_active_running_prompts(None) {
             Ok((batch, records)) => format!(
                 "🎒 <b>Running Prompts Backed Up Successfully!</b>\n\n\
+                • <b>Projects:</b> <code>{}</code>\n\
                 • <b>Batch ID:</b> <code>{}</code>\n\
                 • <b>Captured Prompts:</b> <b>{}</b>\n\
                 • <b>Vault Path:</b> <code>{}</code>\n\n\
                 💡 Send <code>/restore</code> anytime to resume backed-up prompts.",
+                clean_for_telegram_html(&proj_display, 80),
                 clean_for_telegram_html(&batch.id, 40),
                 records.len(),
                 clean_for_telegram_html(&batch.file_path, 120)
@@ -1772,6 +1800,18 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "email" | "mail" => Some(execute_email_command(rest)),
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
+            let projs = repo_db::list_running_projects().unwrap_or_default();
+            let proj_names: Vec<String> = projs
+                .into_iter()
+                .map(|p| p.repo_name)
+                .filter(|n| !n.is_empty())
+                .collect();
+            let proj_display = if !proj_names.is_empty() {
+                proj_names.join(", ")
+            } else {
+                "Antigravity-Manager".to_string()
+            };
+
             let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
             let _ = backup_prompts_db::backup_active_running_prompts(None);
             let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
@@ -1780,10 +1820,12 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
 
             Some(format!(
                 "⏩ <b>Fast-Forward &amp; Prompt Preservation:</b>\n\n\
+                • <b>Projects:</b> <code>{}</code>\n\
                 • <b>Pre-Switch Backup:</b> <code>{}</code> running prompt(s) captured\n\
                 • <b>Rotation Evaluation:</b> {}\n\
                 • <b>Post-Switch Re-injection:</b> <code>{}</code> prompt(s) resent ({} dispatched)\n\n\
                 💡 All active prompts are preserved and continue without interruption.",
+                clean_for_telegram_html(&proj_display, 80),
                 backup_count,
                 if rotate_res.is_ok() { "✅ Evaluated successfully" } else { "ℹ️ No switch required" },
                 resent.len(),
@@ -1805,6 +1847,18 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 return Some(format_active_prompts_report().await);
             }
             if lower_full.starts_with("ff:") {
+                let projs = repo_db::list_running_projects().unwrap_or_default();
+                let proj_names: Vec<String> = projs
+                    .into_iter()
+                    .map(|p| p.repo_name)
+                    .filter(|n| !n.is_empty())
+                    .collect();
+                let proj_display = if !proj_names.is_empty() {
+                    proj_names.join(", ")
+                } else {
+                    "Antigravity-Manager".to_string()
+                };
+
                 let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
                 let _ = backup_prompts_db::backup_active_running_prompts(None);
                 let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
@@ -1813,9 +1867,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
 
                 return Some(format!(
                     "⏩ <b>Fast-Forward &amp; Prompt Preservation:</b>\n\n\
+                    • <b>Projects:</b> <code>{}</code>\n\
                     • <b>Pre-Switch Backup:</b> <code>{}</code> prompt(s) captured\n\
                     • <b>Rotation Evaluation:</b> {}\n\
                     • <b>Post-Switch Re-injection:</b> <code>{}</code> prompt(s) resent ({} dispatched)",
+                    clean_for_telegram_html(&proj_display, 80),
                     backup_count,
                     if rotate_res.is_ok() { "✅ Completed" } else { "ℹ️ Evaluated" },
                     resent.len(),

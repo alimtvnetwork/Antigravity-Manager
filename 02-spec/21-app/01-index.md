@@ -212,4 +212,5 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-060 (Supabase Connection Probe, URL Normalization & Resilient Diagnostics):** Implemented in [`60-supabase-connection-probe-and-url-normalization.md`](./60-supabase-connection-probe-and-url-normalization.md).
 - **AC-APP-062 (Windows Runner Build Acceleration & Fast-Forward Toolchain Optimization):** Implemented in [`62-windows-runner-build-acceleration-and-fast-forward.md`](./62-windows-runner-build-acceleration-and-fast-forward.md).
 - **AC-APP-063 (Fast-Forward Prompt Backup, Post-Switch Re-Injection & 12% Quota Threshold):** Implemented in [`63-fast-forward-prompt-backup.md`](./63-fast-forward-prompt-backup.md).
+- **AC-APP-064 (Account Switch E2E Verification, Parallel Prompt Backup, Multi-VM Collision Prevention & 15% Threshold Release):** Implemented in [`64-account-switch-e2e-prompt-backup-verification.md`](./64-account-switch-e2e-prompt-backup-verification.md).
 

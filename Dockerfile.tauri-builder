@@ -1,0 +1,64 @@
+# Multi-stage Dockerfile for fast Linux Tauri compilation with cargo-chef and mold
+# Usage:
+#   docker build -f Dockerfile.tauri-builder -t tauri-builder .
+#   docker run --rm -v $(pwd):/app -w /app tauri-builder cargo clippy --manifest-path src-tauri/Cargo.toml
+
+FROM ubuntu:22.04 AS chef
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install system dependencies (WebKitGTK, GTK3, mold, clang, build tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libsoup-3.0-dev \
+    javascriptcoregtk-4.1 \
+    libjavascriptcoregtk-4.1-dev \
+    libnm-dev \
+    xdg-utils \
+    build-essential \
+    curl \
+    wget \
+    file \
+    libssl-dev \
+    patchelf \
+    pkg-config \
+    mold \
+    clang \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Install Rust stable and cargo-chef
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN cargo install cargo-chef --locked
+
+# 3. Install Node.js 20
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Stage 2: Recipe planner for dependency precompilation
+FROM chef AS planner
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
+WORKDIR /app/src-tauri
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Stage 3: Builder with precompiled crates
+FROM chef AS builder
+COPY --from=planner /app/src-tauri/recipe.json recipe.json
+ENV RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=mold"
+ENV CARGO_BUILD_JOBS=4
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
+
+# Precompile all 300+ third-party crates into /root/.cargo and target cache
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Copy application source and build
+COPY . /app
+WORKDIR /app
+CMD ["cargo", "clippy", "--manifest-path", "src-tauri/Cargo.toml", "--all-targets", "--all-features"]

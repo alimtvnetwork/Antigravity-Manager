@@ -49,6 +49,32 @@ pub struct GreenProjectRecord {
     pub last_checked_at: Option<i64>,
 }
 
+/// Helper to resolve a human-readable friendly project name from path or ID without raw UUIDs
+pub fn resolve_friendly_project_name(project_path: &str, project_id: &str) -> String {
+    let clean_path = project_path.trim().replace('\\', "/");
+    let trimmed_path = clean_path.trim_end_matches('/');
+    if let Some(pos) = trimmed_path.rfind('/') {
+        let name = &trimmed_path[pos + 1..];
+        if !name.is_empty() && name != "." {
+            return name.to_string();
+        }
+    } else if !trimmed_path.is_empty() && trimmed_path != "." {
+        return trimmed_path.to_string();
+    }
+
+    let is_raw_uuid_or_hash = project_id.is_empty()
+        || (project_id.len() >= 32
+            && project_id
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() || c == '-'));
+
+    if !is_raw_uuid_or_hash {
+        return project_id.to_string();
+    }
+
+    "Antigravity-Manager".to_string()
+}
+
 /// Determine target database path for running prompt backups
 pub fn get_backup_prompts_db_path(custom_file: Option<&str>) -> Result<PathBuf, String> {
     if let Some(file_str) = custom_file {
@@ -263,14 +289,7 @@ pub fn backup_active_running_prompts(
             }
         });
 
-        let proj_name = if !p.project_id.is_empty() {
-            p.project_id.clone()
-        } else {
-            Path::new(&p.repo_path)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unnamed_project".to_string())
-        };
+        let proj_name = resolve_friendly_project_name(&p.repo_path, &p.project_id);
 
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),

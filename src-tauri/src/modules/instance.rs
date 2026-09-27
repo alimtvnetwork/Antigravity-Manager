@@ -1411,6 +1411,9 @@ pub async fn switch_account_to_instance(
             instance_mode: String::new(),
             reason: "Smart Rotator / Instance Account Switch".to_string(),
             is_auto: false,
+            backed_up_projects: Vec::new(),
+            backed_up_prompts_count: None,
+            restored_prompts_count: None,
         },
     );
 

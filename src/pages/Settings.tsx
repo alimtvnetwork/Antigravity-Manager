@@ -45,7 +45,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.85.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.86.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -86,7 +86,7 @@ function Settings() {
         },
         quota_protection: {
             enabled: false,
-            threshold_percentage: 12,
+            threshold_percentage: 15,
             monitored_models: []
         },
         pinned_quota_models: {
@@ -107,7 +107,7 @@ function Settings() {
         auto_profile_switcher: {
             is_enabled: true,
             check_interval_seconds: 60,
-            low_quota_threshold_percent: 12.0,
+            low_quota_threshold_percent: 15.0,
             target_model: 'gemini-pro',
             has_auto_resume: true,
             cooldown_seconds: 180,

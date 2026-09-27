@@ -600,62 +600,80 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         }
     }
 
-    // Layer 2: VS Code / Instance Workspace Storage & Active Projects Discovery
+    // Layer 2: VS Code / Instance Workspace Storage & Active Projects Discovery (Parallelized)
     let projects = detect_running_projects(instance_id).unwrap_or_default();
-    for project in &projects {
-        let mut extracted_prompts: Vec<(String, Option<String>)> = Vec::new();
+    let extracted_results: Vec<(&RunningProject, Vec<(String, Option<String>)>)> =
+        std::thread::scope(|s| {
+            let handles: Vec<_> = projects
+                .iter()
+                .map(|project| {
+                    s.spawn(move || {
+                        let mut extracted: Vec<(String, Option<String>)> = Vec::new();
 
-        // Check workspace state.vscdb for active prompts / tasks
-        if let Some(ref ws_storage) = project.workspace_storage_path {
-            let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
-            if ws_db_path.exists() {
-                if let Ok(ws_conn) = Connection::open_with_flags(
-                    &ws_db_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-                ) {
-                    let mut stmt = ws_conn
-                        .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%prompt%' OR key LIKE '%chat%' OR key LIKE '%task%'")
-                        .ok();
+                        // Check workspace state.vscdb for active prompts / tasks
+                        if let Some(ref ws_storage) = project.workspace_storage_path {
+                            let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
+                            if ws_db_path.exists() {
+                                if let Ok(ws_conn) = Connection::open_with_flags(
+                                    &ws_db_path,
+                                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                                ) {
+                                    let mut stmt = ws_conn
+                                        .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%prompt%' OR key LIKE '%chat%' OR key LIKE '%task%'")
+                                        .ok();
 
-                    if let Some(ref mut prepared) = stmt {
-                        if let Ok(rows) = prepared.query_map([], |row| {
-                            let key: String = row.get(0)?;
-                            let val: String = row.get(1)?;
-                            Ok((key, val))
-                        }) {
-                            for item in rows.flatten() {
-                                let content = item.1;
-                                if !content.trim().is_empty() && content.len() > 10 {
-                                    let (img_payload, _) = extract_image_payload_or_path(&content);
-                                    extracted_prompts.push((content, img_payload));
+                                    if let Some(ref mut prepared) = stmt {
+                                        if let Ok(rows) = prepared.query_map([], |row| {
+                                            let key: String = row.get(0)?;
+                                            let val: String = row.get(1)?;
+                                            Ok((key, val))
+                                        }) {
+                                            for item in rows.flatten() {
+                                                let content = item.1;
+                                                if !content.trim().is_empty() && content.len() > 10 {
+                                                    let (img_payload, _) = extract_image_payload_or_path(&content);
+                                                    extracted.push((content, img_payload));
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
 
-        // Check if project has an existing .antigravity_resume_task.json on disk
-        if extracted_prompts.is_empty() {
-            let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
-            if task_file.exists() {
-                if let Ok(c) = fs::read_to_string(&task_file) {
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
-                        if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
-                            if !txt.trim().is_empty() {
-                                let img = v
-                                    .get("image_payload")
-                                    .and_then(|i| i.as_str())
-                                    .map(|s| s.to_string());
-                                extracted_prompts.push((txt.to_string(), img));
+                        // Check if project has an existing .antigravity_resume_task.json on disk
+                        if extracted.is_empty() {
+                            let task_file = PathBuf::from(&project.repo_path)
+                                .join(".antigravity_resume_task.json");
+                            if task_file.exists() {
+                                if let Ok(c) = fs::read_to_string(&task_file) {
+                                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
+                                        if let Some(txt) =
+                                            v.get("prompt_content").and_then(|t| t.as_str())
+                                        {
+                                            if !txt.trim().is_empty() {
+                                                let img = v
+                                                    .get("image_payload")
+                                                    .and_then(|i| i.as_str())
+                                                    .map(|s| s.to_string());
+                                                extracted.push((txt.to_string(), img));
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-        }
 
+                        (project, extracted)
+                    })
+                })
+                .collect();
+
+            handles.into_iter().filter_map(|h| h.join().ok()).collect()
+        });
+
+    for (project, mut extracted_prompts) in extracted_results {
         // Check if SQLite active_prompts already has an existing prompt for this repo_path or project
         if extracted_prompts.is_empty() {
             let proj_like = format!("%{}%", project.repo_name.to_lowercase());
@@ -720,6 +738,32 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
             if result.is_ok() {
                 backed_up_count += 1;
+                let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
+                let final_img = image_payload.clone().or(extracted_img);
+                let has_image = final_img.is_some() || !img_paths.is_empty();
+
+                // Write disk resume snapshot file inside project repo directory
+                let task_file =
+                    PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
+                let payload = serde_json::json!({
+                    "prompt_id": prompt_id,
+                    "project_id": project.id,
+                    "instance_id": instance_id,
+                    "repo_path": project.repo_path,
+                    "prompt_content": prompt_text,
+                    "model": prompt_model,
+                    "session_id": project.id,
+                    "image_payload": final_img,
+                    "image_paths": img_paths,
+                    "has_image": has_image,
+                    "auto_boot": true,
+                    "status": "backed_up",
+                    "backed_up_at": now,
+                });
+                if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+                    let _ = fs::write(&task_file, json_str);
+                }
+
                 let active_prompt = ActivePrompt {
                     id: prompt_id.clone(),
                     project_id: project.id.clone(),
@@ -731,7 +775,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     status: "backed_up".to_string(),
                     created_at: now,
                     updated_at: now,
-                    image_payload,
+                    image_payload: final_img,
                 };
                 if let Ok(mut map) = get_memory_prompts_map().lock() {
                     map.insert(prompt_id, active_prompt);
@@ -746,6 +790,59 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     ));
 
     Ok(backed_up_count)
+}
+
+/// Verified count of active prompts or running processes across workspaces
+pub fn verify_prompts_running() -> usize {
+    let mut count = 0;
+
+    // 1. Check SQLite active_prompts for 'running' or recently 'dispatched' (within 5 minutes)
+    if let Ok(conn) = connect_db() {
+        let now = Utc::now().timestamp();
+        let db_count: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts WHERE status = 'running' OR (status = 'dispatched' AND updated_at >= ?1)",
+                params![now - 300],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        count = db_count;
+    }
+
+    // 2. Check Antigravity conversation_summaries.db
+    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    if let Some(base_dir) = base_dir {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if summaries_db.exists() {
+            if let Ok(conn) = Connection::open_with_flags(
+                &summaries_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            ) {
+                let ag_count: usize = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM conversation_summaries WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+                if ag_count > count {
+                    count = ag_count;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback to live project execution info
+    if count == 0 {
+        let live = get_live_project_execution_info();
+        count = live
+            .iter()
+            .filter(|p| p.is_running || (!p.is_idle && p.active_prompt.is_some()))
+            .count();
+    }
+
+    count
 }
 
 /// Directly dispatch/send backed-up prompts to the running projects without queuing

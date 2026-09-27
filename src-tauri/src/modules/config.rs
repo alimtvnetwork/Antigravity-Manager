@@ -197,11 +197,12 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         if switcher
             .get("low_quota_threshold_percent")
             .and_then(|n| n.as_f64())
-            == Some(25.0)
+            .map(|f| f == 25.0 || f == 12.0)
+            .unwrap_or(false)
         {
             switcher.insert(
                 "low_quota_threshold_percent".to_string(),
-                serde_json::json!(12.0),
+                serde_json::json!(15.0),
             );
             modified = true;
         }
@@ -230,11 +231,12 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         if switcher
             .get("critical_threshold_percent")
             .and_then(|n| n.as_f64())
-            == Some(10.0)
+            .map(|f| f == 10.0 || f == 12.0)
+            .unwrap_or(false)
         {
             switcher.insert(
                 "critical_threshold_percent".to_string(),
-                serde_json::json!(12.0),
+                serde_json::json!(15.0),
             );
             modified = true;
         }
@@ -251,8 +253,9 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
         .get_mut("quota_protection")
         .and_then(|q| q.as_object_mut())
     {
-        if quota.get("threshold_percentage").and_then(|n| n.as_u64()) == Some(10) {
-            quota.insert("threshold_percentage".to_string(), serde_json::json!(12));
+        let thresh = quota.get("threshold_percentage").and_then(|n| n.as_u64());
+        if thresh == Some(10) || thresh == Some(12) {
+            quota.insert("threshold_percentage".to_string(), serde_json::json!(15));
             modified = true;
         }
     }

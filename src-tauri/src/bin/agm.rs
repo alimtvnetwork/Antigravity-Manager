@@ -252,7 +252,7 @@ fn print_help() {
     println!();
     println!("Auto-Switch & Autonomous Green Watcher Commands:");
     println!(
-        "  auto-switch threshold [N]             Set or query low quota threshold (default: 12.0%)"
+        "  auto-switch threshold [N]             Set or query low quota threshold (default: 15.0%)"
     );
     println!("  running-projects [ls] [--json] [-f path] [--ssh] Inspect active workspace projects with running queues");
     println!("  finish-prompts-until-green, fpug <targets...> [-t 5m] Watch projects until prompt queues drain");
@@ -310,6 +310,25 @@ fn print_help() {
     );
     println!("  version, -v                           Print agm CLI version");
     println!("  help, -h                              Display this help manual");
+    println!();
+    println!("Examples:");
+    println!("  # Fast-forward switch to freshest account:");
+    println!("  agm ff");
+    println!("  agm instances 2 ff");
+    println!();
+    println!("  # Snapshot running prompts to split SQLite DB before switch:");
+    println!("  agm backup");
+    println!("  agm backup ls");
+    println!("  agm restore");
+    println!();
+    println!("  # Low quota threshold check & automated switch:");
+    println!("  agm switch-if-low-credit -t 15 --json");
+    println!("  agm auto-switch threshold 15");
+    println!();
+    println!("  # Inject prompt into workspace project:");
+    println!("  agm prompt \"Fix issue 64\" --prefix code");
+    println!("  agm prompt backup");
+    println!("  agm prompt restore");
     println!();
 }
 
@@ -1960,7 +1979,7 @@ fn cmd_auto_switch(args: &[String]) {
                         std::process::exit(1);
                     }
                     println!(
-                        "[SUCCESS] Auto-switch low quota threshold set to {:.1}% (default: 12.0%).",
+                        "[SUCCESS] Auto-switch low quota threshold set to {:.1}% (default: 15.0%).",
                         clamped
                     );
                     return;
@@ -1977,8 +1996,14 @@ fn cmd_auto_switch(args: &[String]) {
             }
         } else if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Auto-Switch Management:");
-            println!("  agm auto-switch threshold [N]    Set or query auto-switch low quota threshold (default: 25%)");
+            println!("  agm auto-switch threshold [N]    Set or query auto-switch low quota threshold (default: 15%)");
             println!("  agm auto-switch [threshold]      Run manual auto-switcher test check with optional threshold");
+            println!("\nExamples:");
+            println!("  agm auto-switch threshold        # Query current threshold");
+            println!("  agm auto-switch threshold 15     # Set threshold to 15%");
+            println!(
+                "  agm auto-switch 15               # Evaluate auto-switch now with 15% threshold"
+            );
             return;
         }
     }
@@ -1990,10 +2015,17 @@ fn cmd_backup_running_prompts(args: &[String]) {
     if let Some(first) = args.first() {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
-            println!("AGM Backup Running Prompts:");
-            println!("  agm backup-running-prompts [-file/-f <path.db>] [--json]   Create split SQLite snapshot of active/queued prompts");
-            println!("  agm backup-running-prompts ls [--json]                     List all backup batches and prompt counts");
-            println!("  agm backup-running-prompts clean [--force]                 Clean expired (1-day) restored backups, or force clean all");
+            println!("AGM Backup Running Prompts (Split SQLite):");
+            println!("  agm backup [-file/-f <path.db>] [--json]   Create split SQLite snapshot of active/queued prompts");
+            println!("  agm backup ls [--json]                     List all backup batches and prompt counts");
+            println!("  agm backup clean [--force]                 Clean expired (1-day) restored backups, or force clean all");
+            println!("\nAliases: agm backup, agm backpack, agm backup-running-prompts, agm brp");
+            println!("\nExamples:");
+            println!(
+                "  agm backup                       # Snapshot all running prompts before rotation"
+            );
+            println!("  agm backup ls                    # List captured backup batches");
+            println!("  agm backup clean --force         # Purge all stored prompt backups");
             return;
         }
         if first_lower == "ls" || first_lower == "list" {
@@ -2159,13 +2191,22 @@ fn cmd_backup_running_prompts(args: &[String]) {
 fn cmd_restore_running_prompts(args: &[String]) {
     if let Some(first) = args.first() {
         if first.eq_ignore_ascii_case("help") || first == "--help" || first == "-h" {
-            println!("AGM Restore Running Prompts:");
-            println!("  agm restore-running-prompts [--keep/-k] [--json] [-file/-f <path>]");
-            println!("  Restores unrestored prompts into active execution queue.");
-            println!("  Options:");
+            println!("AGM Restore Running Prompts (Split SQLite):");
+            println!("  agm restore [--keep/-k] [--json] [-file/-f <path>]");
+            println!("  Restores unrestored prompts into active execution queue and re-injects to workspaces.");
+            println!(
+                "\nAliases: agm restore, agm restore-running-prompts, agm rrp, agm resend-running"
+            );
+            println!("\nOptions:");
             println!("    --keep, -k      Preserve backup records as unrestored without starting 1-day retention timer");
             println!("    --json          Output pure JSON restored records payload");
             println!("    -f, --file      Target custom SQLite database file");
+            println!("\nExamples:");
+            println!(
+                "  agm restore                      # Restore & re-inject all backed-up prompts"
+            );
+            println!("  agm restore --keep               # Restore prompts without clearing backup state");
+            println!("  agm restore --json               # Restore and print JSON payload");
             return;
         }
     }
@@ -4341,6 +4382,28 @@ fn resolve_switch_filename(custom_path: Option<&str>, node_alias: &str) -> Strin
 }
 
 fn cmd_switch_if_low_credit(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Switch If Low Credit:");
+        println!("  agm switch-if-low-credit [-t <pct>] [--json] [-f [path]] [--force]");
+        println!("  Checks current active profile quota. If <= threshold, triggers rotation to highest quota account.");
+        println!("\nAliases: agm switch-if-low-credit, agm swlc, agm sfc");
+        println!("\nOptions:");
+        println!("    -t, --threshold <N>   Threshold percentage to evaluate (default: 15.0%)");
+        println!("    --json                Output evaluation result in JSON format");
+        println!("    -f, --file [path]     Export JSON status to file");
+        println!("    --force               Force rotation evaluation ignoring cooldown");
+        println!("\nExamples:");
+        println!("  agm switch-if-low-credit                  # Switch if active quota <= 15%");
+        println!(
+            "  agm switch-if-low-credit -t 98            # Simulation test: switch if quota <= 98%"
+        );
+        println!("  agm switch-if-low-credit -t 15 --json     # Query with JSON output");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let force = args.iter().any(|a| a == "--force");
     let mut custom_threshold: Option<f64> = None;
@@ -6965,7 +7028,7 @@ fn cmd_test_training(_args: &[String]) {
         instance_id: None,
         target_model: None,
         low_quota_threshold: Some(85.0),
-        critical_quota_threshold: Some(12.0),
+        critical_quota_threshold: Some(15.0),
     };
     match rt.block_on(training_api::execute_machine_modify(mod_req)) {
         Ok(res) => {

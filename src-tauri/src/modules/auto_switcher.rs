@@ -769,7 +769,9 @@ pub fn select_candidate_profiles(
             if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
                 continue;
             }
-            if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
+            if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+                &acc.id, &acc.email,
+            ) {
                 continue;
             }
 
@@ -811,7 +813,9 @@ pub fn select_candidate_profiles(
         if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
             continue;
         }
-        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
+        if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+            &acc.id, &acc.email,
+        ) {
             continue;
         }
         if candidates.iter().any(|c| c.account_id == acc.id) {
@@ -936,7 +940,10 @@ pub async fn select_and_verify_next_best_profile(
         }
 
         // Distributed lease check
-        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&cand_acc.id) {
+        if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+            &cand_acc.id,
+            &candidate.email,
+        ) {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is currently leased by another active node. Skipping...",
                 candidate.email
@@ -1019,7 +1026,7 @@ pub async fn execute_profile_rotation_with_context(
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
     let backup_res = crate::modules::repo_db::backup_running_prompts(inst_id);
     let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
-    match backup_res {
+    match &backup_res {
         Ok(c) => {
             logger::log_info(&format!(
                 "[AutoSwitcher] Pre-switch backup created for {} running prompts (instance '{}')",
@@ -1085,6 +1092,14 @@ pub async fn execute_profile_rotation_with_context(
         }
     }
 
+    let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+    let proj_names: Vec<String> = running_projs
+        .into_iter()
+        .map(|p| p.repo_name)
+        .filter(|n| !n.is_empty())
+        .collect();
+    let backup_count_opt = backup_res.ok();
+
     crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email,
@@ -1101,6 +1116,9 @@ pub async fn execute_profile_rotation_with_context(
             instance_mode: String::new(),
             reason: reason.clone(),
             is_auto: true,
+            backed_up_projects: proj_names,
+            backed_up_prompts_count: backup_count_opt,
+            restored_prompts_count: None,
         },
     );
 
@@ -1174,9 +1192,10 @@ pub async fn execute_profile_rotation_with_context(
     };
 
     let dispatched_count = crate::modules::repo_db::dispatch_running_prompts(inst_id).unwrap_or(0);
+    let verified_running = crate::modules::repo_db::verify_prompts_running();
     logger::log_info(&format!(
-        "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched for instance '{}'",
-        resent_count, dispatched_count, inst_id
+        "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched, {} verified active running for instance '{}'",
+        resent_count, dispatched_count, verified_running, inst_id
     ));
 
     // Auto-resume recent active prompts (<1h) if configured
@@ -1495,9 +1514,9 @@ pub async fn check_and_rotate_for_threshold(
 }
 
 /// Calculate dynamic polling interval based on credit quota ladder:
-/// - >= 15%: check_interval_seconds (default 300s / 5m)
-/// - < 15%: caution_interval_seconds (default 60s / 1m)
-/// - <= 12%: critical_interval_seconds (default 40s)
+/// - >= 18%: check_interval_seconds (default 300s / 5m)
+/// - < 18%: caution_interval_seconds (default 60s / 1m)
+/// - <= 15%: critical_interval_seconds (default 40s)
 pub fn calculate_next_interval_seconds(
     quota_percent: Option<f64>,
     cfg: &AutoProfileSwitcherConfig,
@@ -1509,7 +1528,7 @@ pub fn calculate_next_interval_seconds(
     let caution_threshold = if cfg.low_quota_threshold_percent > cfg.critical_threshold_percent {
         cfg.low_quota_threshold_percent
     } else {
-        15.0
+        18.0
     };
 
     if quota <= cfg.critical_threshold_percent {
@@ -1867,16 +1886,16 @@ mod tests {
         assert_eq!(cfg.check_interval_seconds, 300);
         assert_eq!(cfg.caution_interval_seconds, 60);
         assert_eq!(cfg.critical_interval_seconds, 40);
-        assert_eq!(cfg.low_quota_threshold_percent, 12.0);
-        assert_eq!(cfg.critical_threshold_percent, 12.0);
+        assert_eq!(cfg.low_quota_threshold_percent, 15.0);
+        assert_eq!(cfg.critical_threshold_percent, 15.0);
 
         assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
         assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(14.9), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(13.0), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(12.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(Some(19.0), &cfg), 300);
+        assert_eq!(calculate_next_interval_seconds(Some(17.9), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(16.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 40);
         assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);
         assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 40);
     }

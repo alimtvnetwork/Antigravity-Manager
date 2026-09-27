@@ -129,7 +129,7 @@ impl QuotaProtectionConfig {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            threshold_percentage: 12, // Default 12% reserve
+            threshold_percentage: 15, // Default 15% reserve
             monitored_models: default_monitored_models(),
         }
     }
@@ -254,7 +254,7 @@ fn default_critical_interval() -> u32 {
 }
 
 fn default_critical_threshold() -> f64 {
-    12.0
+    15.0
 }
 
 fn default_true() -> bool {
@@ -270,7 +270,7 @@ fn default_recency_threshold() -> u32 {
 }
 
 fn default_low_quota_threshold() -> f64 {
-    12.0
+    15.0
 }
 
 /// Auto profile switcher configuration
@@ -308,13 +308,13 @@ impl Default for AutoProfileSwitcherConfig {
         Self {
             is_enabled: true,
             check_interval_seconds: 300,
-            low_quota_threshold_percent: 12.0,
+            low_quota_threshold_percent: 15.0,
             target_model: "gemini-3.8-flash-high".to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
             caution_interval_seconds: 60,
             critical_interval_seconds: 40,
-            critical_threshold_percent: 12.0,
+            critical_threshold_percent: 15.0,
             auto_fast_forward_on_critical: true,
             auto_resume_recent_prompts: true,
             auto_focus_window: false,
