@@ -213,8 +213,8 @@ export async function updateAutoSwitcherConfig(config: AutoProfileSwitcherConfig
     return await invoke('update_auto_switcher_config', { config });
 }
 
-export async function triggerManualProfileRotation(): Promise<string> {
-    return await invoke('trigger_manual_profile_rotation');
+export async function triggerManualProfileRotation(instanceId?: string): Promise<string> {
+    return await invoke('trigger_manual_profile_rotation', { instanceId: instanceId || null });
 }
 
 export interface RunningProject {

@@ -201,3 +201,7 @@ All development, maintenance, and refactoring across the Antigravity-Manager cod
 - **AC-APP-051 (Auto-Switch Prompt Backup, Resumption & De-Duplication):** Implemented in [`51-auto-switch-prompt-backup-resumption-and-deduplication.md`](./51-auto-switch-prompt-backup-resumption-and-deduplication.md).
 - **AC-APP-052 (Idle Notification Logic Fix & AGM GitMap Parity):** Implemented in [`52-idle-notification-and-agm-parity.md`](./52-idle-notification-and-agm-parity.md).
 - **AC-APP-053 (Telegram Bot Auto-Connect, Chat ID Discovery & Remote Command Suite):** Implemented in [`53-telegram-bot-auto-connect-and-remote-commands.md`](./53-telegram-bot-auto-connect-and-remote-commands.md).
+- **AC-APP-054 (Startup Auto-Switch & Rich Telemetry Broadcast):** Implemented in [`54-startup-auto-switch-and-rich-telemetry-broadcast.md`](./54-startup-auto-switch-and-rich-telemetry-broadcast.md).
+- **AC-APP-055 (Idle Sensor Fix & GitMap Parity):** Implemented in [`55-idle-sensor-fix-and-gitmap-parity.md`](./55-idle-sensor-fix-and-gitmap-parity.md).
+- **AC-APP-056 (Smart Switch Live Refresh, Strict 100% Quota Gate & Multi-Channel Cluster Leasing):** Implemented in [`56-smart-switch-live-refresh-and-cluster-lease.md`](./56-smart-switch-live-refresh-and-cluster-lease.md).
+

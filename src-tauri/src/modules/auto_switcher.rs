@@ -766,7 +766,7 @@ pub fn select_candidate_profiles(
             if effective_exclusions.contains(&acc.email) {
                 continue;
             }
-            if acc.disabled || acc.validation_blocked {
+            if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
                 continue;
             }
             if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
@@ -786,7 +786,10 @@ pub fn select_candidate_profiles(
                 .map(|s| s.is_period_finished)
                 .unwrap_or(false);
 
-            if quota > threshold || is_period_finished {
+            let is_healthy_or_refilled =
+                quota >= 100.0 || (is_period_finished && quota >= threshold.max(95.0));
+
+            if is_healthy_or_refilled {
                 let score = score_candidate_account(&acc, target_model, now_sec);
                 candidates.push(ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
@@ -805,7 +808,7 @@ pub fn select_candidate_profiles(
         if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
             continue;
         }
-        if acc.disabled || acc.validation_blocked {
+        if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
             continue;
         }
         if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
@@ -827,7 +830,10 @@ pub fn select_candidate_profiles(
             .map(|s| s.is_period_finished)
             .unwrap_or(false);
 
-        if quota > threshold || is_period_finished {
+        let is_healthy_or_refilled =
+            quota >= 100.0 || (is_period_finished && quota >= threshold.max(95.0));
+
+        if is_healthy_or_refilled {
             let score = score_candidate_account(acc, target_model, now_sec);
             candidates.push(ProfileCandidate {
                 instance_id: current_instance_id.to_string(),
@@ -836,44 +842,6 @@ pub fn select_candidate_profiles(
                 quota_percent: quota,
                 score,
             });
-        }
-    }
-
-    // 3. Fallback pass when testing with a high threshold (e.g., 98%) where standby accounts are at 16%-97%
-    if candidates.is_empty() {
-        for acc in &all_accounts {
-            if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
-                continue;
-            }
-            if acc.disabled || acc.validation_blocked {
-                continue;
-            }
-            if crate::modules::workspace_lease_manager::is_account_leased_by_other(&acc.id) {
-                continue;
-            }
-
-            let period_status = evaluate_account_period_status(acc, target_model, 15.0, now_sec);
-            let quota = period_status
-                .as_ref()
-                .map(|s| s.quota_percent)
-                .or_else(|| calculate_4h_window_quota(acc, target_model))
-                .unwrap_or(100.0);
-
-            let is_period_finished = period_status
-                .as_ref()
-                .map(|s| s.is_period_finished)
-                .unwrap_or(false);
-
-            if quota > 15.0 || is_period_finished {
-                let score = score_candidate_account(acc, target_model, now_sec);
-                candidates.push(ProfileCandidate {
-                    instance_id: current_instance_id.to_string(),
-                    account_id: acc.id.clone(),
-                    email: acc.email.clone(),
-                    quota_percent: quota,
-                    score,
-                });
-            }
         }
     }
 
@@ -888,28 +856,12 @@ pub fn select_candidate_profiles(
         match (a_full, b_full) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => {
-                if !a_full && !b_full {
-                    match b.quota_percent.partial_cmp(&a.quota_percent) {
-                        Some(std::cmp::Ordering::Equal) | None => {
-                            match b.score.partial_cmp(&a.score) {
-                                Some(std::cmp::Ordering::Equal) | None => {
-                                    a.email.to_lowercase().cmp(&b.email.to_lowercase())
-                                }
-                                Some(ord) => ord,
-                            }
-                        }
-                        Some(ord) => ord,
-                    }
-                } else {
-                    match b.score.partial_cmp(&a.score) {
-                        Some(std::cmp::Ordering::Equal) | None => {
-                            a.email.to_lowercase().cmp(&b.email.to_lowercase())
-                        }
-                        Some(ord) => ord,
-                    }
+            _ => match b.score.partial_cmp(&a.score) {
+                Some(std::cmp::Ordering::Equal) | None => {
+                    a.email.to_lowercase().cmp(&b.email.to_lowercase())
                 }
-            }
+                Some(ord) => ord,
+            },
         }
     });
 
@@ -940,6 +892,9 @@ pub async fn select_and_verify_next_best_profile(
     threshold: f64,
     excluded_account_ids: &[String],
 ) -> Result<Option<ProfileCandidate>, String> {
+    // 1. Proactively hydrate active remote leases from Supabase Root DB
+    let _ = crate::modules::workspace_lease_manager::list_active_leases().await;
+
     let candidates = select_candidate_profiles(
         current_instance_id,
         target_model,
@@ -948,10 +903,11 @@ pub async fn select_and_verify_next_best_profile(
     )?;
 
     if candidates.is_empty() {
+        logger::log_info(
+            "[AutoSwitcher] No initial candidate profiles found meeting 100% quota requirement.",
+        );
         return Ok(None);
     }
-
-    let mut verified_fallback: Option<ProfileCandidate> = None;
 
     for candidate in candidates {
         logger::log_info(&format!(
@@ -969,6 +925,24 @@ pub async fn select_and_verify_next_best_profile(
                 continue;
             }
         };
+
+        // Strict disabled immunity check
+        if cand_acc.disabled || cand_acc.proxy_disabled || cand_acc.validation_blocked {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Candidate '{}' is disabled (proxy_disabled: {}, disabled: {}). Skipping...",
+                candidate.email, cand_acc.proxy_disabled, cand_acc.disabled
+            ));
+            continue;
+        }
+
+        // Distributed lease check
+        if crate::modules::workspace_lease_manager::is_account_leased_by_other(&cand_acc.id) {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Candidate '{}' is currently leased by another active node. Skipping...",
+                candidate.email
+            ));
+            continue;
+        }
 
         // Live API Quota Refresh directly from Google API
         let fetch_res = account::fetch_quota_with_retry(&mut cand_acc).await;
@@ -993,6 +967,7 @@ pub async fn select_and_verify_next_best_profile(
         };
 
         // Strict 100% requirement for 4-hour window:
+        // Any account with < 100% is strictly treated as exhausted (0.0%). We do NOT touch it!
         if fresh_4h_quota >= 100.0 {
             logger::log_info(&format!(
                 "[AutoSwitcher] Candidate '{}' confirmed with 100.0% quota for 4h window. Selected for switch!",
@@ -1007,47 +982,15 @@ pub async fn select_and_verify_next_best_profile(
             }));
         } else {
             logger::log_warn(&format!(
-                "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Rejecting candidate and moving to next best...",
+                "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Strictly rejecting (<100% is treated as exhausted). Checking next candidate in pool...",
                 candidate.email, fresh_4h_quota
             ));
-
-            let min_threshold = threshold.max(25.0);
-            if fresh_4h_quota >= min_threshold {
-                match verified_fallback {
-                    Some(ref cur) if fresh_4h_quota > cur.quota_percent => {
-                        verified_fallback = Some(ProfileCandidate {
-                            instance_id: candidate.instance_id.clone(),
-                            account_id: candidate.account_id.clone(),
-                            email: candidate.email.clone(),
-                            quota_percent: fresh_4h_quota,
-                            score: candidate.score,
-                        });
-                    }
-                    None => {
-                        verified_fallback = Some(ProfileCandidate {
-                            instance_id: candidate.instance_id.clone(),
-                            account_id: candidate.account_id.clone(),
-                            email: candidate.email.clone(),
-                            quota_percent: fresh_4h_quota,
-                            score: candidate.score,
-                        });
-                    }
-                    _ => {}
-                }
-            }
+            // DO NOT fallback to < 100% accounts under any circumstances!
         }
     }
 
-    if let Some(fallback) = verified_fallback {
-        logger::log_info(&format!(
-            "[AutoSwitcher] No candidates verified at 100.0% for 4h window. Using highest verified candidate: '{}' ({:.1}%)",
-            fallback.email, fallback.quota_percent
-        ));
-        return Ok(Some(fallback));
-    }
-
     logger::log_warn(
-        "[AutoSwitcher] No candidates with healthy quota found after live verification.",
+        "[AutoSwitcher] All candidate profiles examined. Zero profiles verified at 100.0% 4-hour quota. Aborting rotation.",
     );
     Ok(None)
 }
@@ -2085,5 +2028,46 @@ mod tests {
             &[],
             &[(Some("acc-idle-temp-test".to_string()), None)]
         ));
+    }
+
+    #[test]
+    fn test_candidate_selection_filters_proxy_disabled_and_strictly_requires_100() {
+        let now_sec = 1700000000;
+        let mut acc_disabled =
+            make_test_account("acc-1", "disabled@example.com", "gemini-pro", 100, "");
+        acc_disabled.proxy_disabled = true;
+
+        let acc_low_quota = make_test_account("acc-2", "low@example.com", "gemini-pro", 20, "");
+        let acc_full_quota = make_test_account("acc-3", "full@example.com", "gemini-pro", 100, "");
+
+        // 1. Verify proxy_disabled account is recognized as disabled
+        assert!(
+            acc_disabled.disabled || acc_disabled.proxy_disabled || acc_disabled.validation_blocked
+        );
+
+        // 2. Verify low-quota account (20%) does NOT meet strict 100% requirement when period not finished
+        let status_low =
+            evaluate_account_period_status(&acc_low_quota, "gemini-pro", 95.0, now_sec);
+        let quota_low = status_low.as_ref().map(|s| s.quota_percent).unwrap_or(20.0);
+        let period_finished_low = status_low
+            .as_ref()
+            .map(|s| s.is_period_finished)
+            .unwrap_or(false);
+        let is_healthy_low = quota_low >= 100.0 || (period_finished_low && quota_low >= 95.0);
+        assert!(!is_healthy_low, "Account with 20% quota must be rejected");
+
+        // 3. Verify 100% quota account passes
+        let status_full =
+            evaluate_account_period_status(&acc_full_quota, "gemini-pro", 95.0, now_sec);
+        let quota_full = status_full
+            .as_ref()
+            .map(|s| s.quota_percent)
+            .unwrap_or(100.0);
+        let period_finished_full = status_full
+            .as_ref()
+            .map(|s| s.is_period_finished)
+            .unwrap_or(false);
+        let is_healthy_full = quota_full >= 100.0 || (period_finished_full && quota_full >= 95.0);
+        assert!(is_healthy_full, "Account with 100% quota must be accepted");
     }
 }

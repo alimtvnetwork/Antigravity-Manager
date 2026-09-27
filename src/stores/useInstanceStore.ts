@@ -421,18 +421,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 .map(i => i.config.bound_account_id as string)
                 .filter(id => id !== currentAccountId);
 
-            // 3. Discover accounts
+            // 3. Discover accounts (always fetch fresh from backend to prevent stale state)
             const { useAccountStore } = await import('./useAccountStore');
-            let accounts = useAccountStore.getState().accounts;
-            const hasAccounts = accounts.length > 0;
-            if (!hasAccounts) {
-                await useAccountStore.getState().fetchAccounts();
-                accounts = useAccountStore.getState().accounts;
-            }
+            await useAccountStore.getState().fetchAccounts();
+            const accounts = useAccountStore.getState().accounts;
 
-            // 4. Filter eligible accounts (not disabled, not forbidden, not blocked)
+            // 4. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
             const eligibleAccounts = accounts.filter(acc => {
-                const isDisabled = Boolean(acc.disabled);
+                const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
                 if (isDisabled) return false;
                 const isForbidden = Boolean(acc.quota?.is_forbidden);
                 if (isForbidden) return false;
@@ -444,7 +440,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const hasEligible = eligibleAccounts.length > 0;
             if (!hasEligible) {
                 set({ isLoading: false });
-                throw new Error('No eligible accounts available for transfer');
+                throw new Error('No eligible active accounts available for transfer');
             }
 
             // 5. Rank candidate accounts based on Multiplicative Scoring:
@@ -464,10 +460,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 6. Pre-activation Live Quota Refresh Verification Loop:
             // Probe candidate accounts with a live quota refresh from Google API.
             // STRICT REQUIREMENT: Confirm candidate actually has 100% quota for the 4-hour rolling window.
-            // If < 100%, reject and move to the next best candidate until a 100% match is found.
+            // Any account with < 100% is strictly treated as zero credit.
             let verifiedCandidate: Account | null = null;
-            let bestFallbackCandidate: Account | null = null;
-            let bestFallback4h = 0;
             const triedAccountIds = new Set<string>();
 
             while (candidatePool.length > 0) {
@@ -511,14 +505,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                     }
 
                     console.warn(
-                        `[useInstanceStore] Candidate ${updatedAccount.email} live 4h window quota is ${fresh4hQuota}% (< 100%). Rejecting and moving to next best candidate...`
+                        `[useInstanceStore] Candidate ${updatedAccount.email} live 4h window quota is ${fresh4hQuota}% (< 100%). Strictly rejecting (<100% treated as zero). Checking next candidate...`
                     );
-
-                    // Track highest verified fallback candidate in case no candidate in entire pool has 100%
-                    if (!isForbidden && !isBlocked && fresh4hQuota > bestFallback4h) {
-                        bestFallback4h = fresh4hQuota;
-                        bestFallbackCandidate = updatedAccount;
-                    }
 
                     // Remove current candidate and advance to next best
                     candidatePool = candidatePool.slice(1);
@@ -528,7 +516,12 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 }
             }
 
-            const targetCandidate = verifiedCandidate || bestFallbackCandidate || eligibleAccounts[0];
+            if (!verifiedCandidate) {
+                set({ isLoading: false });
+                throw new Error('No accounts verified with 100% 4-hour quota in pool. All available accounts are below 100%.');
+            }
+
+            const targetCandidate = verifiedCandidate;
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;

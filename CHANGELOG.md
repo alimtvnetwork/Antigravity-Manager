@@ -3,6 +3,14 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.82.0 (2026-09-27)**:
+        -   **[Release v4.82.0: 智能切号严格 100% 配额门禁、禁用账号绝对隔离、实时预检直连 Google API 与 Supabase 跨节点分布式租约隔离] 彻底根除切号选择 20% 低额度账号与已禁用账号死循环缺陷、引入 4 小时滚动窗口 100% 刚性配额准入、切换前候选人全量实时 API 校验、打通 Supabase 与邮件跨节点活跃租约感知 (Thanks to @jeikl)**:
+            -   **严格 100% 4小时滚动配额准入门禁 (`src-tauri/src/modules/auto_switcher.rs`, `src/stores/useInstanceStore.ts`)**: 彻底解决点击智能切号（Smart Switch / Fast-Forward）时系统错误切换到仅剩 11%~20% 额度账号的缺陷。确立刚性铁律：4小时滚动窗口配额只要低于 100.0%，即严格等同于 0% 额度枯竭，禁止纳入候选或作为降级目标！彻底移除 `auto_switcher.rs` 中降级至 15% 的兜底检查段，并在 `select_and_verify_next_best_profile` 与前端 `smartRotateProfileAccount` 中彻底移除 `verified_fallback` 与 `bestFallbackCandidate`；若全池中无任何通过 100% 实时校验的账号，系统安全终止切号并返回明确提示，绝不降级切换到低额度账号。
+            -   **UI 禁用账号（`proxy_disabled`）全链路绝对隔离 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/commands/mod.rs`, `src/stores/useInstanceStore.ts`)**: 深入定位并修复用户在界面上禁用低额度账号（如 James）后、系统依然循环二次切回该账号的严重 Bug。根因在于界面禁用操作写入的是 `account.proxy_disabled = true`，而原候选筛选逻辑只判定了 `acc.disabled`。全面重构准入校验，前后端全链路严格强制校验 `acc.disabled || acc.proxy_disabled || acc.validation_blocked || !acc.is_active`；重构 `commands/mod.rs` 中的 `toggle_proxy_status`，确保原子同步更新单个账号 JSON 与 `index.json` 索引摘要，杜绝禁用状态漏查。
+            -   **候选账号全量实时 API 探针循环校验 (`src-tauri/src/modules/auto_switcher.rs`, `src/stores/useInstanceStore.ts`)**: 在执行切号动作前，依次按优先级对候选池账号直接调用 Google API（`account::fetch_quota_with_retry`）实施实时配额探针探测。若实时 4 小时配额低于 100.0%，立即记录拒绝日志并快速步进校验下一位候选账号，直至命中真正拥有 100% 额度的最佳账号。
+            -   **Supabase Root DB 跨节点租约与邮件集群多通道感知 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/modules/workspace_lease_manager.rs`)**: 在候选账号评估阶段，主动触发 `workspace_lease_manager::list_active_leases().await` 刷新 Supabase Root DB 中的 `workspace_leases` 活跃租约，严格排除其他集群节点正在占用的账号；联动 Email Inbound 3600 秒跨虚拟机切号广播事件，彻底杜绝跨机器抢占与并发冲突。
+            -   **截图资产隐私全量高斯模糊脱敏 (`assets/screenshots/smart-switch-refactor-01.png`, `02-spec/22-app-issues/19-smart-switch-stale-quota-and-in-use-isolation.md`)**: 采纳用户提供的截图并应用 Radius 25 高斯模糊覆盖所有邮箱字段，确保凭据隐私 100% 绝对保护。
+
     *   **v4.81.0 (2026-09-27)**:
         -   **[Release v4.81.0: 闲置状态感应器假阳性根治、GitMap 双框遥测格式对齐、大字号 Ubuntu 排版升级与可用 Prompt 清单速查] 彻底解决活动任务被误报 IDLE 假阳性问题、对齐 GitMap 二进制与工作区节点双框遥测、邮件正文与表格大幅字号提升、全量集成交互指令与 01-prompts 库速查**:
             -   **闲置状态感应器假阳性根治与 SQLite URI 并发防锁死 (`src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/email_watcher.rs`)**: 彻底解决 Antigravity 正在执行指令时 AGM 发送邮件误报闲置（IDLE）的缺陷。重构底层检测逻辑：(1) 使用只读 URI 与 `?immutable=1` 模式连接 `conversation_summaries.db`，杜绝 Windows 下 WAL 锁阻塞；(2) 引入 RFC3339 动态时间窗口，检测 600 秒内活跃修改或状态包含 `CASCADE_RUN_STATUS_RUNNING` 即可触发活动判定；(3) 规范化路径比对，对齐反斜杠与大小写差异；(4) 精确匹配会话前缀（如 `antigravity-manager-d58c5517` 与 `d58c5517`），并在 `repo_db::is_any_prompt_actively_running()` 为真时严格拦截闲置邮件发送。
@@ -3358,6 +3366,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.82.0 (2026-09-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.81.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

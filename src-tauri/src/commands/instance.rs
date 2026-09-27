@@ -114,8 +114,11 @@ pub fn update_auto_switcher_config(
 }
 
 #[tauri::command]
-pub async fn trigger_manual_profile_rotation() -> Result<String, String> {
-    crate::modules::auto_switcher::trigger_manual_rotation().await
+pub async fn trigger_manual_profile_rotation(
+    instance_id: Option<String>,
+) -> Result<String, String> {
+    crate::modules::auto_switcher::trigger_manual_rotation_for_instance(instance_id.as_deref())
+        .await
 }
 
 #[tauri::command]

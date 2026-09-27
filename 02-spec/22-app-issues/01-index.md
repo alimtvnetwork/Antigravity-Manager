@@ -53,7 +53,8 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 15 | [15-auto-switch-prompt-resumption-stuck-and-reinjection-rca.md](15-auto-switch-prompt-resumption-stuck-and-reinjection-rca.md) | Auto-Switch Prompt Resumption Failure & Prompt Reinjection Loop RCA | High | Fixed |
 | 16 | [16-idle-sensor-false-positive-rca.md](16-idle-sensor-false-positive-rca.md) | False Positive Idle Workspace Sensor Notification RCA | Critical | Fixed |
 | 17 | [17-startup-auto-switch-and-telemetry-gaps.md](17-startup-auto-switch-and-telemetry-gaps.md) | Startup Auto-Switch Delay, Missing Dual-Window Balances & Machine Self-Broadcast RCA | High | Fixed |
-| 18 | [18-idle-sensor-false-reporting-and-telemetry-parity.md](18-idle-sensor-false-reporting-and-telemetry-parity.md) | False Idle Workspace Sensor Reporting & Telemetry Parity Gaps RCA | Critical | In Progress |
+| 18 | [18-idle-sensor-false-reporting-and-telemetry-parity.md](18-idle-sensor-false-reporting-and-telemetry-parity.md) | False Idle Workspace Sensor Reporting & Telemetry Parity Gaps RCA | Critical | Fixed |
+| 19 | [19-smart-switch-stale-quota-and-in-use-isolation.md](19-smart-switch-stale-quota-and-in-use-isolation.md) | Smart Switch Stale Quota Selection, Disabled Account Re-selection & Multi-Node Lease Isolation RCA | Critical | Fixed |
 
 ---
 
