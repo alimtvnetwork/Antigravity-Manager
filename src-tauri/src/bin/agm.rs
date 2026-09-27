@@ -136,7 +136,7 @@ fn main() {
         "test-email" | "email-test" | "check-email" => cmd_test_email(&cmd_args),
         "test-training" | "training" | "train" => cmd_test_training(&cmd_args),
         "install" => cmd_install(),
-        "update" => cmd_update(),
+        "update" | "update-all" | "ua" => cmd_update(&cmd_args),
         "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
@@ -148,12 +148,16 @@ fn main() {
             );
         }
         "help" | "--help" | "-h" => {
-            print_banner();
-            print_help();
-            print_commands_table();
-            print_live_projects_table();
-            print_prompts_reference_table();
-            print_recent_prompts_table();
+            if cmd_args.iter().any(|a| a == "--json" || a == "-j") {
+                print_help_json();
+            } else {
+                print_banner();
+                print_help();
+                print_commands_table();
+                print_live_projects_table();
+                print_prompts_reference_table();
+                print_recent_prompts_table();
+            }
         }
         _ => {
             eprintln!("Unknown command: '{}'", args[1]);
@@ -200,135 +204,174 @@ fn print_banner() {
     println!();
 }
 
+fn print_help_json() {
+    let help_obj = serde_json::json!({
+        "name": "agm",
+        "version": VERSION,
+        "description": "Antigravity Manager CLI & Reverse Proxy Gateway",
+        "commands": [
+            {
+                "group": "Account Rotation & Quota Governance",
+                "items": [
+                    { "name": "status", "aliases": ["credits"], "flags": ["--json"], "description": "Show node status, immediate & weekly credits" },
+                    { "name": "ff", "aliases": ["smart-switch", "fast-forward"], "flags": [], "description": "Trigger fast-forward rotation to freshest 100% quota account" },
+                    { "name": "switch-if-low-credit", "aliases": ["swlc", "sfc"], "flags": ["-t <pct>", "--json", "-f [file]", "--force"], "description": "Check live quota & rotate if quota <= threshold" },
+                    { "name": "is-low-credit-for-switch", "aliases": ["ilc"], "flags": ["-t <pct>", "--json", "-f [file]"], "description": "Check if active quota <= threshold" },
+                    { "name": "accounts", "aliases": ["acc"], "flags": ["--active", "--json"], "description": "List registered accounts, tiers, and quotas" },
+                    { "name": "switch", "aliases": [], "flags": ["<email|prefix|id>"], "description": "Switch active profile directly without GUI" }
+                ]
+            },
+            {
+                "group": "Update, Repo Sync & Fleet Orchestration",
+                "items": [
+                    { "name": "update", "aliases": ["update-all", "ua"], "flags": ["all", "--json", "--check", "--force"], "description": "Check and update AGM binary, pull latest git repo, and sync fleet" },
+                    { "name": "sync", "aliases": [], "flags": [], "description": "Synchronize local accounts, instances, and DB vaults" },
+                    { "name": "pull", "aliases": [], "flags": [], "description": "Execute git pull origin main in repository root" },
+                    { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" }
+                ]
+            },
+            {
+                "group": "Parallel Prompt Backup & Workspace Restoration",
+                "items": [
+                    { "name": "backup", "aliases": ["backpack", "brp", "backup-running-prompts"], "flags": ["ls", "clean", "-f <file>", "--json"], "description": "Parallel snapshot of active prompts across all workspaces to split SQLite DB" },
+                    { "name": "restore", "aliases": ["rrp", "restore-running-prompts", "resend-running"], "flags": ["--keep", "--json", "-f <file>"], "description": "Restore and re-enqueue in-flight prompts into active workspaces" },
+                    { "name": "which-prompts-running", "aliases": ["wpr"], "flags": ["--json"], "description": "List running projects, conv IDs, and prompt queues" },
+                    { "name": "prompts ls", "aliases": ["running-prompts ls"], "flags": ["[N]", "--json", "--words <W>"], "description": "Show N running prompts in ASC stack order (with friendly project names)" },
+                    { "name": "prompt", "aliases": [], "flags": ["\"<text>\"", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt with git pull & 01-prompts templates" },
+                    { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" }
+                ]
+            },
+            {
+                "group": "Sandbox Instance & Profile Isolation",
+                "items": [
+                    { "name": "instances", "aliases": ["instances ls"], "flags": ["--json"], "description": "List all sandbox profiles and running PIDs" },
+                    { "name": "instances <target> ff", "aliases": [], "flags": [], "description": "Fast-forward rotate account for specific sandbox instance" },
+                    { "name": "instances-all ff", "aliases": [], "flags": [], "description": "Fast-forward rotate accounts across ALL sandbox instances" },
+                    { "name": "instances create", "aliases": [], "flags": ["\"<name>\"", "--data-only"], "description": "Create an isolated sandbox instance profile" },
+                    { "name": "instances rm", "aliases": [], "flags": ["<seq|id|alias>", "--force"], "description": "Remove a specific sandbox instance profile" }
+                ]
+            },
+            {
+                "group": "Email & Telegram Telemetry",
+                "items": [
+                    { "name": "email", "aliases": [], "flags": ["status", "help", "ls", "add", "rm", "mv", "export", "--json"], "description": "Manage email alerts, sender accounts, and recipients" },
+                    { "name": "telegram", "aliases": [], "flags": ["ls", "set", "ping", "cmds", "chat", "setup", "help"], "description": "Manage Telegram bot token, chat ID, automated setup, and alerts" },
+                    { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" }
+                ]
+            }
+        ]
+    });
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&help_obj).unwrap_or_default()
+    );
+}
+
 fn print_help() {
-    println!("Usage:");
-    println!("  agm <command> [arguments] [options]");
+    println!("  ┌────────────────────────────────────────────────────────────────────────────┐");
+    println!("  │ Antigravity-Manager (AGM) CLI Usage & Operational Guide                    │");
+    println!("  └────────────────────────────────────────────────────────────────────────────┘");
+    println!("  Syntax:");
+    println!("    agm <command> [arguments] [flags]");
     println!();
-    println!("Core Status & Account Rotation Commands:");
-    println!(
-        "  status, credits [--json]              Show node status, immediate & weekly credits"
-    );
-    println!(
-        "  ff, smart-switch                      Trigger fast-forward rotation to freshest account"
-    );
-    println!(
-        "  switch-if-low-credit, swlc, sfc [--json] [-f [file]] [-t <pct>] Check live quota & rotate; export JSON"
-    );
-    println!(
-        "  is-low-credit-for-switch, ilc [--json] [-f [file]] [-t <pct>]   Check if active quota <= threshold (outputs true/false or JSON)"
-    );
-    println!("  accounts, acc [--active] [--json]     List registered accounts, tiers, and quotas");
-    println!("  switch <email|prefix|id>              Switch active account directly without GUI");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  ACCOUNT ROTATION & QUOTA GOVERNANCE");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    status, credits [--json]");
+    println!("        Show node status, immediate & weekly credits, active account");
+    println!("    ff, smart-switch, fast-forward");
+    println!("        Trigger fast-forward rotation to freshest 100% quota account");
+    println!("    switch-if-low-credit, swlc, sfc [-t <pct>] [--json] [-f [file]] [--force]");
+    println!("        Check live quota; rotate if quota <= threshold (default: 15.0%)");
+    println!("    is-low-credit-for-switch, ilc [-t <pct>] [--json]");
+    println!("        Check if active quota <= threshold (outputs true/false or JSON)");
+    println!("    accounts, acc [--active] [--json]");
+    println!("        List registered accounts, tiers, and remaining quotas");
+    println!("    switch <email|prefix|id>");
+    println!("        Switch active profile directly without GUI");
     println!();
-    println!("Prompt Inspection, Export/Import & Rerun Commands:");
-    println!("  which-prompts-running, wpr [--json]   List running projects, conv IDs, and prompt queues");
-    println!("  running-prompts ls [--limit Y] [--wc N] [--full] [--json] List active/queued prompts (default Y=8, N=100)");
-    println!(
-        "  running-prompts backup [ls|clean] [-f file] [--json] Manage split SQLite prompt backups"
-    );
-    println!(
-        "  running-prompts restore [--keep] [--json] Restore and re-enqueue in-flight prompts"
-    );
-    println!("  running-prompts export [-f path] [--wc N] Export prompts to .db or .json file");
-    println!(
-        "  running-prompts import [-f path] [--wc N] Import prompts and resume active execution"
-    );
-    println!(
-        "  backup, backpack, backup-running-prompts [ls|clean] [-f file] Snapshot running prompts to split SQLite DB"
-    );
-    println!(
-        "  restore, restore-running-prompts [--keep] [--json] Restore & resend in-flight prompts"
-    );
-    println!("  prompts ls [N] [--json] [--words W]   Show N running prompts in ASC stack order");
-    println!("  prompts-export, pe [N] [-f <path>]    Export prompts with Base64 images to JSON");
-    println!("  prompts-import, pi [-f <path>]        Import and rerun prompts from JSON file(s)");
-    println!("  prompt \"<text>\" [--prefix C] [--suffix C] Dispatch prompt with git pull & 01-prompts templates");
-    println!(
-        "  rerun [prompts [N]] [-prefix <cat>]   Git pull and rerun last N prompts with template"
-    );
-    println!(
-        "  resend-running-commands, rrc [N] [--json] [-f [path]] Resend commands before close/switch & sync image paths"
-    );
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  UPDATE, REPO SYNC & FLEET ORCHESTRATION");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    update, update-all, ua [all] [--json] [--check] [--force]");
+    println!("        Check GitHub releases, update binary, pull git repo, and sync fleet");
+    println!("        Pass --json for clean, zero-noise stdout machine automation");
+    println!("    sync");
+    println!("        Synchronize local accounts, instances, and DB vaults");
+    println!("    pull");
+    println!("        Execute git pull origin main in repository root");
+    println!("    ssh <target> [options]");
+    println!("        Connect to remote VM via SSH or run remote command");
     println!();
-    println!("Auto-Switch & Autonomous Green Watcher Commands:");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  PARALLEL PROMPT BACKUP & WORKSPACE RESTORATION");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    backup, backpack, backup-running-prompts [ls|clean] [-f file] [--json]");
     println!(
-        "  auto-switch threshold [N]             Set or query low quota threshold (default: 15.0%)"
+        "        Parallel snapshot of active prompts across all workspaces to split SQLite DB"
     );
-    println!("  running-projects [ls] [--json] [-f path] [--ssh] Inspect active workspace projects with running queues");
-    println!("  finish-prompts-until-green, fpug <targets...> [-t 5m] Watch projects until prompt queues drain");
-    println!("  shutdown-until-green, sug <subcommand> [-t 5m] Watch projects and shutdown OS when all green");
+    println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
+    println!("        Restore and re-enqueue in-flight prompts into active workspaces");
+    println!("    which-prompts-running, wpr [--json]");
+    println!("        List running projects, conversation IDs, and prompt queues");
+    println!("    prompts ls [N] [--json] [--words W]");
+    println!("        Show N running prompts in ASC stack order (with friendly project names)");
+    println!("    prompt \"<text>\" [--prefix C] [--suffix C]");
+    println!("        Dispatch prompt with git pull & 01-prompts templates");
+    println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
+    println!("        Resend commands before close/switch & sync image paths to resume file");
     println!();
-    println!("Broadcast Email & Telegram Remote Commands:");
-    println!("  broadcast-email [ls|add|rm|send-to-all|send|send-help|test] Manage multi-recipient broadcasts");
-    println!(
-        "  telegram [ls|set|ping|cmds|help]      Manage Telegram bot token, chat ID, and alerts"
-    );
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SANDBOX INSTANCES & PROFILE ISOLATION");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    instances [ls] [--json]");
+    println!("        List all sandbox profiles, bound accounts, and running PIDs");
+    println!("    instances <seq|id|alias> ff");
+    println!("        Fast-forward rotate account for specific sandbox instance");
+    println!("    instances-all ff");
+    println!("        Fast-forward rotate accounts across ALL sandbox instances");
+    println!("    instances create \"<name>\" [--data-only]");
+    println!("        Create an isolated sandbox instance profile directory");
+    println!("    instances rm <seq|id|alias> [--force]");
+    println!("        Remove a specific sandbox instance profile");
+    println!("    instances rm-all");
+    println!("        Remove all non-default instances (preserves default)");
     println!();
-    println!("Instance & Workspace Management Commands:");
-    println!("  instances [ls] [--json]               List all sandbox profiles and running PIDs");
-    println!(
-        "  instances <seq|id|alias> [switch] ff  Fast-forward rotate account for specific instance"
-    );
-    println!(
-        "  instances-all ff                      Fast-forward rotate accounts across ALL instances"
-    );
-    println!("  instances create \"<name>\" [--data-only] Create a new isolated sandbox instance profile");
-    println!("  instances rm <seq|id|alias>           Remove a specific sandbox instance profile");
-    println!("  instances rm-all                      Remove all non-default instances (preserves default)");
-    println!("  recreate-project [path]               Purge workspace cache & conversations and reopen in agy");
-    println!("  recreate [project-or-path...]         Purge & recreate one or more projects in fresh session");
-    println!("  clear-cache, cache-clear [-k N]       Prune old conversations (keep N=10) & clean caches");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  EMAIL & TELEGRAM MULTI-VM TELEMETRY");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    email [status|help|ls|add|rm|mv|export] [--json]");
+    println!("        Show email notification status or manage IMAP/SMTP accounts");
+    println!("    telegram [ls|set|ping|cmds|chat|setup|help]");
+    println!("        Manage Telegram bot token, chat ID, automated setup, and alerts");
+    println!("    broadcast-email [ls|add|rm|send-to-all|send|send-help|test]");
+    println!("        Manage multi-recipient email broadcasts");
     println!();
-    println!("Email Telemetry & Vault Commands:");
-    println!("  email [status] [--json]               Show email notification & IMAP/SMTP status");
-    println!("  email help                            Show detailed email command & subject syntax guide");
-    println!(
-        "  email ls [--json]                     List configured email accounts and recipients"
-    );
-    println!("  email add <email> [pwd] [options]     Add sender account or recipient (sends JSON self-email)");
-    println!("  email rm <seq|id|email>               Remove email account or recipient");
-    println!("  email mv <seq|id|email> --default     Promote an email account to default sender");
-    println!("  email export [-f <path>]              Export email configuration bundle to JSON");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  REAL-WORLD EXAMPLES");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    # 1. Check node status and credits:");
+    println!("    agm status");
     println!();
-    println!("System & Maintenance Commands:");
-    println!(
-        "  doctor, check                         Run comprehensive pre-flight system health checks"
-    );
-    println!(
-        "  proxy [status|test]                   Check local proxy service status or test loopback"
-    );
-    println!("  sync                                  Synchronize local accounts, instances, and DB vaults");
-    println!(
-        "  pull                                  Execute git pull origin main in repository root"
-    );
-    println!("  clean, purge                          Safely clean temp caches while protecting DB vaults");
-    println!("  logs [--tail N] [-f text]             View recent application and proxy log lines");
-    println!("  install                               Install 'agm' executable into system PATH");
-    println!("  update                                Check GitHub releases and update AGM binary");
-    println!(
-        "  ssh <target> [options]                Connect to remote VM via SSH or run auto-update"
-    );
-    println!("  version, -v                           Print agm CLI version");
-    println!("  help, -h                              Display this help manual");
+    println!("    # 2. Fast-forward switch to freshest account:");
+    println!("    agm ff");
+    println!("    agm instances 2 ff");
     println!();
-    println!("Examples:");
-    println!("  # Fast-forward switch to freshest account:");
-    println!("  agm ff");
-    println!("  agm instances 2 ff");
+    println!("    # 3. Snapshot running prompts to split SQLite DB before switch:");
+    println!("    agm backup");
+    println!("    agm backup ls");
+    println!("    agm restore");
     println!();
-    println!("  # Snapshot running prompts to split SQLite DB before switch:");
-    println!("  agm backup");
-    println!("  agm backup ls");
-    println!("  agm restore");
+    println!("    # 4. Low quota threshold check & automated switch (15% standard):");
+    println!("    agm switch-if-low-credit -t 15 --json");
+    println!("    agm auto-switch threshold 15");
     println!();
-    println!("  # Low quota threshold check & automated switch:");
-    println!("  agm switch-if-low-credit -t 15 --json");
-    println!("  agm auto-switch threshold 15");
+    println!("    # 5. Full fleet update with clean JSON output for automation:");
+    println!("    agm update all --json");
+    println!("    agm ua");
     println!();
-    println!("  # Inject prompt into workspace project:");
-    println!("  agm prompt \"Fix issue 64\" --prefix code");
-    println!("  agm prompt backup");
-    println!("  agm prompt restore");
+    println!("    # 6. Inject prompt into workspace project:");
+    println!("    agm prompt \"Fix issue 65\" --prefix code");
     println!();
 }
 
@@ -6706,15 +6749,82 @@ fn register_powershell_profile_function(exe_path: &Path) {
         .output();
 }
 
-fn cmd_update() {
-    println!("[*] Checking GitHub for AGM updates...");
+fn cmd_update(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let is_help = args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help");
+    let is_all = args.iter().any(|a| a == "all" || a == "--all" || a == "-a")
+        || env::args().any(|a| a == "update-all" || a == "ua");
+    let is_check = args.iter().any(|a| a == "--check" || a == "-c");
+    let is_force = args.iter().any(|a| a == "--force" || a == "-f");
+
+    if is_help {
+        if is_json {
+            let help_obj = serde_json::json!({
+                "command": "update",
+                "aliases": ["update-all", "ua"],
+                "syntax": "agm update [all] [--json] [--check] [--force]",
+                "options": {
+                    "--json, -j": "Output pure machine-readable JSON payload (zero banners)",
+                    "all, --all, -a": "Update AGM binary, pull latest repo code, and sync fleet",
+                    "--check, -c": "Query and compare releases without installing updates",
+                    "--force, -f": "Force re-installation even if already at latest version"
+                }
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&help_obj).unwrap_or_default()
+            );
+        } else {
+            println!("AGM Update & Fleet Synchronization:");
+            println!("  agm update [--json] [--check] [--force]    Check and update AGM binary from GitHub");
+            println!("  agm update all [--json] [--check]          Update AGM binary, pull latest repo code, and sync fleet");
+            println!("  agm update-all, agm ua                     Aliases for 'agm update all'");
+            println!();
+            println!("Options:");
+            println!("  --json, -j      Output pure machine-readable JSON payload (zero banners)");
+            println!("  --check, -c     Query and compare releases without installing updates");
+            println!("  --force, -f     Force re-installation even if already at latest version");
+            println!();
+            println!("Examples:");
+            println!("  agm update                       # Update AGM binary interactively");
+            println!(
+                "  agm update all                   # Update AGM binary and sync local repository"
+            );
+            println!("  agm update all --json            # Remote machine automation via JSON");
+            println!(
+                "  agm update --check               # Check latest version without modifying files"
+            );
+        }
+        return;
+    }
+
+    if !is_json {
+        println!("[*] Checking GitHub for AGM updates...");
+    }
+
     let client = match reqwest::blocking::Client::builder()
         .user_agent("AGM-CLI-Updater")
+        .timeout(std::time::Duration::from_secs(15))
         .build()
     {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Failed to initialize HTTP client: {}", e);
+            if is_json {
+                let err_obj = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to initialize HTTP client: {}", e),
+                    "current_version": VERSION,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+                );
+            } else {
+                eprintln!("Failed to initialize HTTP client: {}", e);
+            }
             return;
         }
     };
@@ -6723,20 +6833,59 @@ fn cmd_update() {
     let resp = match client.get(url).send() {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Failed to connect to GitHub releases API: {}", e);
+            if is_json {
+                let err_obj = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to connect to GitHub releases API: {}", e),
+                    "current_version": VERSION,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+                );
+            } else {
+                eprintln!("Failed to connect to GitHub releases API: {}", e);
+            }
             return;
         }
     };
 
     if !resp.status().is_success() {
-        eprintln!("GitHub API returned HTTP status: {}", resp.status());
+        if is_json {
+            let err_obj = serde_json::json!({
+                "success": false,
+                "error": format!("GitHub API returned HTTP status: {}", resp.status()),
+                "current_version": VERSION,
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+            );
+        } else {
+            eprintln!("GitHub API returned HTTP status: {}", resp.status());
+        }
         return;
     }
 
     let json: serde_json::Value = match resp.json() {
         Ok(j) => j,
         Err(e) => {
-            eprintln!("Failed to parse release response: {}", e);
+            if is_json {
+                let err_obj = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to parse release response: {}", e),
+                    "current_version": VERSION,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+                );
+            } else {
+                eprintln!("Failed to parse release response: {}", e);
+            }
             return;
         }
     };
@@ -6744,52 +6893,190 @@ fn cmd_update() {
     let tag_name = json["tag_name"]
         .as_str()
         .unwrap_or("")
-        .trim_start_matches('v');
-    println!("    Current Version: v{}", VERSION);
-    println!("    Latest Release:  v{}", tag_name);
+        .trim_start_matches('v')
+        .to_string();
+    let release_html_url = json["html_url"]
+        .as_str()
+        .unwrap_or("https://github.com/alimtvnetwork/Antigravity-Manager/releases")
+        .to_string();
+    let release_name = json["name"].as_str().unwrap_or("").to_string();
 
-    if tag_name == VERSION {
-        println!("[OK] AGM is already at the latest release (v{}).", VERSION);
-        return;
+    let is_up_to_date = tag_name == VERSION;
+    let mut updated = false;
+
+    // Repo check if in workspace
+    let is_git_repo = Path::new(".git").exists();
+    let git_branch = if is_git_repo {
+        antigravity_tools_lib::modules::git_info::get_git_branch()
+    } else {
+        "N/A".to_string()
+    };
+    let git_hash = if is_git_repo {
+        antigravity_tools_lib::modules::git_info::get_git_hash()
+    } else {
+        "N/A".to_string()
+    };
+    let mut repo_pulled = false;
+
+    if is_all && is_git_repo && !is_check {
+        if !is_json {
+            println!(
+                "[*] Pulling latest repository commits (git pull origin {})...",
+                git_branch
+            );
+        }
+        let pull_res = Command::new("git")
+            .args(["pull", "origin", &git_branch])
+            .output();
+        if let Ok(out) = pull_res {
+            repo_pulled = out.status.success();
+        }
     }
 
-    println!(
-        "[*] A new version is available: v{} -> v{}",
-        VERSION, tag_name
-    );
-    println!("[*] Triggering automatic update installation...");
+    // Binary update if needed
+    if (!is_up_to_date || is_force) && !is_check {
+        if !is_json {
+            println!(
+                "[*] A new version is available: v{} -> v{}",
+                VERSION, tag_name
+            );
+            println!("[*] Triggering automatic update installation...");
+        }
 
-    #[cfg(target_os = "windows")]
-    {
-        let ps_cmd = "irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex";
-        let status = Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                ps_cmd,
-            ])
-            .status();
-        match status {
-            Ok(s) => {
-                let code = s.code().unwrap_or(1);
-                if code == 0 {
-                    println!("[OK] Update completed successfully!");
-                } else {
-                    eprintln!("[ERROR] Update script exited with code {}", code);
+        #[cfg(target_os = "windows")]
+        {
+            let ps_cmd = "irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex";
+            let status = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    ps_cmd,
+                ])
+                .status();
+            match status {
+                Ok(s) => {
+                    let code = s.code().unwrap_or(1);
+                    if code == 0 {
+                        updated = true;
+                        if !is_json {
+                            println!("[OK] Update completed successfully!");
+                        }
+                    } else if !is_json {
+                        eprintln!("[ERROR] Update script exited with code {}", code);
+                    }
+                }
+                Err(e) => {
+                    if !is_json {
+                        eprintln!("[ERROR] Failed to run update script: {}", e);
+                    }
                 }
             }
-            Err(e) => {
-                eprintln!("[ERROR] Failed to run update script: {}", e);
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let sh_cmd = "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash";
+            let status = Command::new("sh").args(["-c", sh_cmd]).status();
+            if let Ok(s) = status {
+                if s.success() {
+                    updated = true;
+                }
             }
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let sh_cmd = "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash";
-        let _ = Command::new("sh").args(["-c", sh_cmd]).status();
+    let (node_alias, local_ip) =
+        antigravity_tools_lib::modules::email_sender::get_local_node_identity();
+    let instance_count = antigravity_tools_lib::modules::instance::list_instances()
+        .map(|i| i.len())
+        .unwrap_or(1);
+
+    if is_json {
+        let payload = serde_json::json!({
+            "success": true,
+            "command": if is_all { "update-all" } else { "update" },
+            "current_version": format!("v{}", VERSION),
+            "latest_release": format!("v{}", tag_name),
+            "release_name": release_name,
+            "release_url": release_html_url,
+            "is_up_to_date": is_up_to_date,
+            "updated": updated,
+            "scope": if is_all { "fleet_and_repo" } else { "binary_only" },
+            "repo": {
+                "is_git_repo": is_git_repo,
+                "branch": git_branch,
+                "commit": git_hash,
+                "pulled": repo_pulled
+            },
+            "fleet": {
+                "node_alias": node_alias,
+                "local_ip": local_ip,
+                "instance_count": instance_count,
+                "status": "synchronized"
+            },
+            "timestamp": chrono::Utc::now().timestamp()
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&payload).unwrap_or_default()
+        );
+    } else {
+        println!(
+            "  ================================================================================"
+        );
+        println!("    AGM SYSTEM UPDATE & FLEET SYNCHRONIZATION");
+        println!(
+            "  ================================================================================"
+        );
+        println!("    ● Binary Target:     agm (Antigravity-Manager)");
+        println!("    ● Current Version:   v{}", VERSION);
+        println!("    ● Latest Release:    v{}", tag_name);
+        println!(
+            "    ● Update Status:     {}",
+            if is_up_to_date {
+                "[UP TO DATE] (System is currently running the latest release)".to_string()
+            } else if updated {
+                format!("[UPDATED] (Successfully updated to v{})", tag_name)
+            } else {
+                format!("[AVAILABLE] (v{} is available for installation)", tag_name)
+            }
+        );
+        println!("    ● Release URL:       {}", release_html_url);
+        if is_all {
+            println!(
+                "    ────────────────────────────────────────────────────────────────────────────"
+            );
+            println!(
+                "    ● Scope:             Full Fleet Synchronization (Binary + Repo + Instances)"
+            );
+            if is_git_repo {
+                println!(
+                    "    ● Local Workspace:   {} (Branch: {}, Commit: {})",
+                    env::current_dir()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| ".".to_string()),
+                    git_branch,
+                    git_hash
+                );
+                println!(
+                    "    ● Repo Git Pull:     {}",
+                    if repo_pulled {
+                        "Updated (git pull successful)"
+                    } else {
+                        "Up to date / skipped"
+                    }
+                );
+            }
+            println!(
+                "    ● Fleet Node:        {} / {} (Instances: {})",
+                node_alias, local_ip, instance_count
+            );
+        }
+        println!(
+            "  ================================================================================"
+        );
     }
 }
 

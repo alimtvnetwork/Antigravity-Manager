@@ -3,6 +3,14 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.87.0 (2026-09-28)**:
+        -   **[Release v4.87.0: 全局 Update-All 纯净 JSON 模式、CLI/UI 帮助体系重构与 Prompt 全链路验证] 支持 `agm update all` / `ua` 纯净机器交互 JSON、重构终端 Part 2 双线双框帮助排版、界面新增 15% 生产基准与 98% 模拟预设及 CLI 指令速查面板、验证实时 Prompt 注入与多工作区备份恢复 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **`agm update all` / `ua` 纯净 JSON 交互与终端可视化仪表盘 (`src-tauri/src/bin/agm.rs`)**: 新增 `update all`、`update-all` 与 `ua` 指令。支持 `--json` 模式，输出 100% 纯净、无任何 ANSI 终端控制符或 ASCII 横幅噪音的标准 JSON 对象，完美对接跨机 SSH 调度与自动化流水线；在交互终端模式下渲染专业级控制卡片，实时汇报二进制更新、代码仓库分支与 Commit 拉取结果及集群节点同步状态。
+            -   **终端 CLI Part 2 帮助体系与机器可读 JSON 全面重构 (`src-tauri/src/bin/agm.rs`)**: 彻底重构 `print_help()`，采用清晰对齐的双线双框布局，按配额治理、代码库同步、Prompt 快照、沙盒隔离与告警遥测五大业务领域进行模块化收敛；新增 `agm help --json` 与 `agm --help --json`，输出结构化命令与参数定义 JSON 字典。
+            -   **前端 UI 阈值预设与 CLI 快速参考面板 (`src/components/settings/AutoSwitcherSettings.tsx`, `src/pages/Settings.tsx`)**: 在自动切号配置中增加 `[🛡️ 15% (Production Standard)]` 与 `[🧪 98% (Simulation / Testing)]` 一键预设按钮与动态场景释义；在“高级设置”中新增“AGM CLI & Fleet Automation Quick Reference”面板，提供关键终端指令与简明用途指引。
+            -   **实时 Prompt 注入与工作区跟踪闭环验证 (`src-tauri/src/bin/agm.rs`)**: 通过 `agm prompt` 向本地工作区投递测试指令，验证 SQLite 数据库实时记录并正确关联项目目录，并在 `agm prompts ls` / `prompts ls --json` 中以升序调用栈完整展示。
+            -   **多工作区 Prompt 跨库并行快照恢复全链路检验 (`src-tauri/src/bin/agm.rs`)**: 运行 `agm backup`、`agm backup ls` 与 `agm restore`，验证多项目运行中 Prompt 成功秒级持久化至独立的 `backup-prompts.db` Split SQLite 数据库，并能在切号或重载后无损重新排队注入工作区。
+
     *   **v4.86.0 (2026-09-28)**:
         -   **[Release v4.86.0: 账号轮换全链路 E2E 验证、工作区 Prompt 并行快照恢复、多虚拟机防抢占租约锁与 15% 默认额度对齐] 支持高阈值 98% 模拟切号与沙盒实例验证、多项目并行 Prompt 备份与人类友好工程命名、Supabase 与邮件跨节点冲突防御、对齐生产默认额度为 15.0% (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **高阈值 98% 模拟切号与沙盒实例隔离验证 (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/models/config.rs`)**: 完整跑通 98% 阈值模拟轮换（`agm switch-if-low-credit -t 98`），验证高阈值下触发切号前 API 实时探针校验，成功命中 100% 满额候选账号；通过 `agm instances create test-sandbox` 在完全隔离的实例中验证切号与 Prompt 恢复，测试完成后安全清理沙盒实例。
@@ -3396,6 +3404,15 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.87.0 (2026-09-28)**:
+        -   **[Release v4.87.0: Fleet-Wide Update-All Pure JSON Mode, CLI/UI Help Polish, and Full Prompt Tracking E2E Verification] Introduced zero-noise `agm update all` / `ua` JSON automation, overhauled CLI Part 2 double-box help layout, added 15% production standard and 98% simulation presets with CLI quick reference in UI, verified live prompt injection and parallel backup/restore (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **`agm update all` / `ua` Zero-Noise JSON Mode & Interactive Visual Dashboard (`src-tauri/src/bin/agm.rs`)**: Added `update all`, `update-all`, and `ua` command routes. Implemented strict `--json` mode emitting pure, unpolluted JSON without ANSI escapes or ASCII banners for reliable remote machine automation over SSH and clusters; interactive terminals render a structured system update card reporting binary target, version comparison, release links, git repository pull status, and node identity.
+            -   **CLI Part 2 Double-Box Layout Overhaul & Structured JSON Help (`src-tauri/src/bin/agm.rs`)**: Completely overhauled `print_help()` with double-line headers, grouped command categories (Quota Governance, Fleet Orchestration, Prompt Backup, Sandboxes, Telemetry), and aligned syntax flags; added `agm help --json` / `agm --help --json` emitting machine-readable command schemas.
+            -   **Frontend UI Threshold 1-Click Presets & CLI Quick Reference Panel (`src/components/settings/AutoSwitcherSettings.tsx`, `src/pages/Settings.tsx`)**: Added `[🛡️ 15% (Production Standard)]` and `[🧪 98% (Simulation / Testing)]` 1-click preset buttons with dynamic context explaining why 15% is standard production and how 98% is used for fast-failover simulation; added an "AGM CLI & Fleet Automation Quick Reference" panel in Advanced settings.
+            -   **Live Prompt Injection & Workspace Tracking Verification (`src-tauri/src/bin/agm.rs`)**: Dispatched test prompts via `agm prompt` and verified immediate registration in SQLite and detection in `agm prompts ls` / `agm prompts ls --json` under the project directory.
+            -   **Multi-Project Parallel Prompt Backup & Restoration E2E (`src-tauri/src/bin/agm.rs`)**: Verified `agm backup`, `agm backup ls`, and `agm restore`, confirming running prompts across workspaces are safely snapshotted to split SQLite (`backup-prompts.db`) and restored back into active execution queues.
+
+
     *   **v4.86.0 (2026-09-28)**:
         -   **[Release v4.86.0: End-to-End Account Switch Verification, Multi-Project Parallel Prompt Backup & Restoration, Multi-VM Collision Prevention, and 15% Default Threshold Alignment] Simulated 98% High Quota Rotation, Parallel Workspace Prompt Snapshots with Human-Friendly Project Naming, Supabase Distributed Leases & IMAP Telemetry Collision Shielding, and Production-Standard 15.0% Low Quota Threshold (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **High-Threshold 98% Quota Simulation & Sandbox Instance Isolation (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/models/config.rs`)**: Conducted end-to-end simulation of quota rotation under high threshold (`agm switch-if-low-credit -t 98 --json`), proving candidate evaluation probes against Google API and successfully switching to a 100% full-credit profile. Created and verified an isolated sandbox instance (`test-sandbox-6237`) executing rotation and prompt re-injection, followed by clean sandbox removal.

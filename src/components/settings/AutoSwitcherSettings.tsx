@@ -281,6 +281,35 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 <span>50%</span>
                                 <span>98% (Test)</span>
                             </div>
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => handleThresholdChange(15)}
+                                    className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer ${
+                                        Math.round(currentConfig.low_quota_threshold_percent) === 15
+                                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800 shadow-xs'
+                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                    }`}
+                                >
+                                    🛡️ 15% (Production Standard)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleThresholdChange(98)}
+                                    className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer ${
+                                        Math.round(currentConfig.low_quota_threshold_percent) === 98
+                                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 shadow-xs'
+                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                    }`}
+                                >
+                                    🧪 98% (Simulation / Testing)
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-0.5">
+                                {Math.round(currentConfig.low_quota_threshold_percent) >= 90
+                                    ? '🧪 Simulation mode active: Failover triggers immediately as soon as an account uses any quota, allowing rapid verification of backup, rotation, and prompt resumption.'
+                                    : '🛡️ Production standard (15%): Seamlessly rotates accounts before exhaustion without premature switching.'}
+                            </p>
                         </div>
 
                         {/* Caution Polling Interval (< 15% Credits) */}

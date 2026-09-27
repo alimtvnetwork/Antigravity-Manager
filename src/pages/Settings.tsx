@@ -1,5 +1,5 @@
 import { useState, useEffect, startTransition } from 'react';
-import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Bug, Menu, ChevronDown, Sliders, Info } from 'lucide-react';
+import { Save, Github, User, Sparkles, ExternalLink, RefreshCw, Heart, Coffee, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Globe, Send, ShieldCheck, Bug, Menu, ChevronDown, Sliders, Info, Terminal } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -45,7 +45,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.86.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.87.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -1807,6 +1807,49 @@ function Settings() {
                                         >
                                             {isEnabled ? 'Close Debug Overlay' : 'Open Debug Console'}
                                         </button>
+                                    </div>
+                                </div>
+
+                                {/* CLI & Fleet Automation Quick Reference */}
+                                <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                                    <div className="p-4 bg-slate-50 dark:bg-base-200/50 rounded-xl border border-slate-200 dark:border-base-300 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-600 dark:text-blue-400 font-mono font-bold text-xs">
+                                                    <Terminal className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-base-content">
+                                                        AGM CLI & Fleet Automation Quick Reference
+                                                    </h4>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Run agm commands from your terminal or remote SSH workflows for headless operations.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="px-2.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                                                agm v{versionData.version}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-xs">
+                                            <div className="p-2.5 bg-white dark:bg-base-100 rounded-lg border border-gray-100 dark:border-base-200 font-mono">
+                                                <div className="text-blue-600 dark:text-blue-400 font-semibold mb-0.5">agm status [--json]</div>
+                                                <div className="text-[11px] text-gray-500 dark:text-gray-400 font-sans">Fleet health, active account & live prompt status</div>
+                                            </div>
+                                            <div className="p-2.5 bg-white dark:bg-base-100 rounded-lg border border-gray-100 dark:border-base-200 font-mono">
+                                                <div className="text-emerald-600 dark:text-emerald-400 font-semibold mb-0.5">agm update all [--json]</div>
+                                                <div className="text-[11px] text-gray-500 dark:text-gray-400 font-sans">Fleet-wide update check & diagnostic probe (alias: agm ua)</div>
+                                            </div>
+                                            <div className="p-2.5 bg-white dark:bg-base-100 rounded-lg border border-gray-100 dark:border-base-200 font-mono">
+                                                <div className="text-indigo-600 dark:text-indigo-400 font-semibold mb-0.5">agm prompt "&lt;task&gt;"</div>
+                                                <div className="text-[11px] text-gray-500 dark:text-gray-400 font-sans">Inject & track workspace prompt in SQLite DB</div>
+                                            </div>
+                                            <div className="p-2.5 bg-white dark:bg-base-100 rounded-lg border border-gray-100 dark:border-base-200 font-mono">
+                                                <div className="text-purple-600 dark:text-purple-400 font-semibold mb-0.5">agm backup / agm restore</div>
+                                                <div className="text-[11px] text-gray-500 dark:text-gray-400 font-sans">Snapshot & re-inject running prompts across all projects</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
