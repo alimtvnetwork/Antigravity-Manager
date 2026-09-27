@@ -1327,6 +1327,7 @@ pub async fn switch_account_to_instance(
     };
 
     // 1.5. Snapshot and backup all running prompts across active workspaces into SQLite BEFORE closing IDE
+    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
     let _ = crate::modules::repo_db::backup_running_prompts(&instance.id);
 
     // 2. Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
@@ -1371,7 +1372,8 @@ pub async fn switch_account_to_instance(
         launch_instance(&instance.id).map_err(|e| e.to_string())?;
     }
 
-    // 5.5. Immediately restore and dispatch running prompts to workspaces so they run as soon as switch happens
+    // 5.5. Immediately restore from backup DB and dispatch running prompts to workspaces so they run as soon as switch happens
+    let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
     let _ = crate::modules::repo_db::resend_all_running_commands(20);
 
     // 6. Dispatch unified Email and Telegram switch notifications

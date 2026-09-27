@@ -196,7 +196,10 @@ pub fn backup_active_running_prompts(
         candidate_prompts.push(p);
     }
     for p in all_prompts {
-        if (p.status == "running" || p.status == "queued" || p.status == "dispatched")
+        if (p.status == "running"
+            || p.status == "queued"
+            || p.status == "dispatched"
+            || p.status == "backed_up")
             && !candidate_prompts.iter().any(|c| c.id == p.id)
         {
             candidate_prompts.push(p);
@@ -282,6 +285,24 @@ pub fn backup_active_running_prompts(
             is_restored: false,
             restored_at: None,
         };
+
+        // Deduplicate unrestored records to prevent duplicating the same prompt into prompt_backups
+        let existing_unrestored: Option<String> = conn
+            .query_row(
+                "SELECT id FROM prompt_backups WHERE (prompt_id = ?1 OR (project_path = ?2 AND prompt_text = ?3)) AND is_restored = 0 LIMIT 1",
+                params![record.prompt_id, record.project_path, record.prompt_text],
+                |r| r.get(0),
+            )
+            .ok();
+
+        if let Some(existing_rec_id) = existing_unrestored {
+            let _ = conn.execute(
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2 WHERE id = ?3",
+                params![record.backup_batch_id, now, existing_rec_id],
+            );
+            records.push(record);
+            continue;
+        }
 
         conn.execute(
             "INSERT INTO prompt_backups (
@@ -452,7 +473,7 @@ pub fn restore_running_prompts(
             prompt_content: rec.prompt_text.clone(),
             model: Some("gemini-3.8-flash-high".to_string()),
             session_id: Some(rec.conversation_id.clone()),
-            status: "running".to_string(),
+            status: "backed_up".to_string(),
             created_at: now,
             updated_at: now,
             image_payload: rec.images_payload.clone(),
@@ -472,6 +493,9 @@ pub fn restore_running_prompts(
             [],
         );
     }
+
+    // Automatically trigger resend and execute restored prompts via CLI
+    let _ = repo_db::resend_all_running_commands(20);
 
     Ok(records)
 }
@@ -614,6 +638,14 @@ mod tests {
         // Test restore
         let restored = restore_running_prompts(false, Some(custom_file)).unwrap();
         assert_eq!(restored.len(), 1);
+
+        // Verify second restore does not re-restore already restored prompts
+        let restored_second = restore_running_prompts(false, Some(custom_file)).unwrap();
+        assert_eq!(
+            restored_second.len(),
+            0,
+            "Already restored prompts must not be restored again"
+        );
 
         // Test auto cleanup (with future cutoff)
         let removed = auto_cleanup_expired(Some(custom_file), -10).unwrap();

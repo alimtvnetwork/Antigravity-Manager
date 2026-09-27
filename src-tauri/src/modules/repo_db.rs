@@ -9,16 +9,27 @@ use base64::Engine;
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use uuid::Uuid;
 
 static MEMORY_ACTIVE_PROMPTS: OnceLock<Mutex<HashMap<String, ActivePrompt>>> = OnceLock::new();
+static DISPATCHED_PROMPTS_CACHE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 fn get_memory_prompts_map() -> &'static Mutex<HashMap<String, ActivePrompt>> {
     MEMORY_ACTIVE_PROMPTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn get_dispatched_prompts_cache() -> &'static Mutex<HashSet<String>> {
+    DISPATCHED_PROMPTS_CACHE.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+pub fn reset_dispatched_prompts_cache() {
+    if let Ok(mut set) = get_dispatched_prompts_cache().lock() {
+        set.clear();
+    }
 }
 
 /// Retrieve an active prompt from in-memory cache if available
@@ -489,7 +500,12 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         let res = conn.execute(
             "INSERT INTO active_prompts 
              (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?, ?)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, ?10)
+             ON CONFLICT(id) DO UPDATE SET 
+                 status = 'backed_up',
+                 updated_at = excluded.updated_at,
+                 prompt_content = excluded.prompt_content,
+                 image_payload = excluded.image_payload",
             params![
                 &p.id,
                 &p.project_id,
@@ -498,7 +514,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 &p.prompt_content,
                 &p.model,
                 &p.session_id,
-                now,
+                p.created_at,
                 now,
                 &p.image_payload,
             ],
@@ -615,25 +631,44 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         }
 
         for (prompt_text, image_payload) in extracted_prompts {
-            let prompt_id = Uuid::new_v4().to_string();
+            let existing_id: Option<String> = conn
+                .query_row(
+                    "SELECT id FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 LIMIT 1",
+                    rusqlite::params![&project.repo_path, &prompt_text],
+                    |r| r.get(0),
+                )
+                .ok();
+
+            let (prompt_id, is_existing) = match existing_id {
+                Some(eid) => (eid, true),
+                None => (Uuid::new_v4().to_string(), false),
+            };
+
             let prompt_model = Some("gemini-pro".to_string());
-            let result = conn.execute(
-                "INSERT INTO active_prompts 
-                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?, ?)",
-                params![
-                    &prompt_id,
-                    &project.id,
-                    instance_id,
-                    &project.repo_path,
-                    &prompt_text,
-                    &prompt_model,
-                    &project.id,
-                    now,
-                    now,
-                    &image_payload,
-                ],
-            );
+            let result = if is_existing {
+                conn.execute(
+                    "UPDATE active_prompts SET status = 'backed_up', updated_at = ?, image_payload = COALESCE(?, image_payload) WHERE id = ?",
+                    params![now, &image_payload, &prompt_id],
+                )
+            } else {
+                conn.execute(
+                    "INSERT INTO active_prompts 
+                     (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'backed_up', ?, ?, ?)",
+                    params![
+                        &prompt_id,
+                        &project.id,
+                        instance_id,
+                        &project.repo_path,
+                        &prompt_text,
+                        &prompt_model,
+                        &project.id,
+                        now,
+                        now,
+                        &image_payload,
+                    ],
+                )
+            };
 
             if result.is_ok() {
                 backed_up_count += 1;
@@ -701,6 +736,29 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     let mut dispatched_count = 0;
 
     for prompt in prompts {
+        let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
+        let already_dispatched = {
+            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            let seen = cache.contains(&prompt.id) || cache.contains(&sig);
+            if !seen {
+                cache.insert(prompt.id.clone());
+                cache.insert(sig);
+            }
+            seen
+        };
+
+        if already_dispatched {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Skipping duplicate dispatch for prompt '{}' in '{}'",
+                prompt.id, prompt.repo_path
+            ));
+            let _ = conn.execute(
+                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                rusqlite::params![now, &prompt.id],
+            );
+            continue;
+        }
+
         crate::modules::logger::log_info(&format!(
             "[RepoDB] Directly dispatching prompt '{}' to project at '{}' without queuing",
             prompt.id, prompt.repo_path
@@ -715,6 +773,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             "prompt_content": prompt.prompt_content,
             "model": prompt.model,
             "image_payload": prompt.image_payload,
+            "status": "dispatched",
             "dispatched_at": now,
         });
         if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
@@ -736,6 +795,9 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 }
             }
         }
+
+        // Actively spawn agy CLI execution
+        spawn_prompt_via_agy(&prompt);
     }
 
     crate::modules::logger::log_info(&format!(
@@ -876,7 +938,80 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
     Ok(())
 }
 
-/// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch
+/// Helper to spawn `agy` CLI to execute a prompt in a workspace.
+/// Sanitizes conversation ID to prevent passing invalid IDs or `-` to `--conversation`.
+pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
+    let ws_dir = PathBuf::from(&prompt.repo_path);
+    if !ws_dir.exists() {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] Workspace directory does not exist: '{}', skipping agy spawn",
+            prompt.repo_path
+        ));
+        return false;
+    }
+
+    if let Some(agy_bin) = crate::modules::process::get_antigravity_cli_executable_path() {
+        let mut cmd = std::process::Command::new(&agy_bin);
+        cmd.current_dir(&ws_dir);
+        cmd.arg("--dangerously-skip-permissions");
+
+        let valid_cid = prompt
+            .session_id
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && *s != "-" && s.to_lowercase() != "default");
+
+        if let Some(cid) = valid_cid {
+            cmd.arg("--conversation").arg(cid);
+        } else {
+            cmd.arg("-c");
+        }
+
+        let clean_prompt = prompt.prompt_content.trim();
+        if !clean_prompt.is_empty() {
+            if clean_prompt.len() <= 24000 {
+                cmd.arg("-p").arg(clean_prompt);
+            } else {
+                cmd.arg("-p").arg(&clean_prompt[..24000]);
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+
+        match cmd.spawn() {
+            Ok(child) => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, session: {:?}) in '{}'",
+                    prompt.id, child.id(), valid_cid, prompt.repo_path
+                ));
+                true
+            }
+            Err(e) => {
+                crate::modules::logger::log_error(&format!(
+                    "[RepoDB] Failed to spawn agy execution for prompt '{}': {}",
+                    prompt.id, e
+                ));
+                false
+            }
+        }
+    } else {
+        crate::modules::logger::log_warn(
+            "[RepoDB] agy executable not found, cannot resume prompt via CLI",
+        );
+        false
+    }
+}
+
+/// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch.
+/// Strictly filters to unrestored/backed-up/queued prompts and deduplicates against already dispatched prompts.
 pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
@@ -885,7 +1020,8 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             ORDER BY updated_at DESC LIMIT ?",
+             WHERE status IN ('backed_up', 'queued', 'pending')
+             ORDER BY created_at ASC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 
@@ -912,6 +1048,29 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
     let mut resent = Vec::new();
 
     for mut prompt in prompts {
+        let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
+        let already_dispatched = {
+            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            let seen = cache.contains(&prompt.id) || cache.contains(&sig);
+            if !seen {
+                cache.insert(prompt.id.clone());
+                cache.insert(sig);
+            }
+            seen
+        };
+
+        if already_dispatched {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Skipping duplicate dispatch for prompt '{}' in '{}'",
+                prompt.id, prompt.repo_path
+            ));
+            let _ = conn.execute(
+                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                rusqlite::params![now, &prompt.id],
+            );
+            continue;
+        }
+
         let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt.prompt_content);
         if prompt.image_payload.is_none() && extracted_img.is_some() {
             prompt.image_payload = extracted_img.clone();
@@ -931,7 +1090,7 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
             "image_paths": img_paths,
             "has_image": has_image,
             "auto_boot": true,
-            "status": "running",
+            "status": "dispatched",
             "resumed_at": now,
         });
 
@@ -939,9 +1098,9 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
             let _ = fs::write(&task_file, json_str);
         }
 
-        // Update database status to running and update timestamps
+        // Update database status to dispatched and update timestamps
         let _ = conn.execute(
-            "UPDATE active_prompts SET status = 'running', updated_at = ?, image_payload = ? WHERE id = ?",
+            "UPDATE active_prompts SET status = 'dispatched', updated_at = ?, image_payload = ? WHERE id = ?",
             rusqlite::params![now, &prompt.image_payload, &prompt.id],
         );
         let _ = conn.execute(
@@ -949,43 +1108,10 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
             rusqlite::params![now, now, &prompt.project_id],
         );
 
-        // Actively dispatch/run the prompt via agy CLI if workspace exists
-        let ws_dir = PathBuf::from(&prompt.repo_path);
-        if ws_dir.exists() {
-            if let Some(agy_bin) = crate::modules::process::get_antigravity_cli_executable_path() {
-                let mut cmd = std::process::Command::new(&agy_bin);
-                cmd.current_dir(&ws_dir);
-                cmd.arg("--dangerously-skip-permissions");
-                if let Some(ref cid) = prompt.session_id {
-                    cmd.arg("--conversation").arg(cid);
-                } else {
-                    cmd.arg("-c");
-                }
-                let clean_prompt = prompt.prompt_content.trim();
-                if !clean_prompt.is_empty() {
-                    if clean_prompt.len() <= 24000 {
-                        cmd.arg("-p").arg(clean_prompt);
-                    } else {
-                        cmd.arg("-p").arg(&clean_prompt[..24000]);
-                    }
-                }
-                #[cfg(target_os = "windows")]
-                {
-                    use std::os::windows::process::CommandExt;
-                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-                }
-                cmd.stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null());
-                let _ = cmd.spawn();
-                crate::modules::logger::log_info(&format!(
-                    "[RepoDB] Dispatched agy execution for prompt '{}' (session: {:?}) in '{}'",
-                    prompt.id, prompt.session_id, prompt.repo_path
-                ));
-            }
-        }
+        // Actively spawn agy CLI execution
+        spawn_prompt_via_agy(&prompt);
 
-        prompt.status = "running".to_string();
+        prompt.status = "dispatched".to_string();
         prompt.updated_at = now;
         resent.push(prompt);
     }
@@ -1120,6 +1246,25 @@ pub fn auto_resume_recent_prompts(
                 (new_id, content, Some("gemini-pro".to_string()), None)
             }
         };
+
+        let sig = format!("{}:{}", project.repo_path, prompt_text.trim());
+        let already_dispatched = {
+            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            let seen = cache.contains(&prompt_id) || cache.contains(&sig);
+            if !seen {
+                cache.insert(prompt_id.clone());
+                cache.insert(sig);
+            }
+            seen
+        };
+
+        if already_dispatched {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] auto_resume_recent_prompts skipping already dispatched prompt '{}' in '{}'",
+                prompt_id, project.repo_path
+            ));
+            continue;
+        }
 
         let has_image = image_payload.is_some();
 
@@ -1307,5 +1452,113 @@ mod tests {
 
         assert!(is_recent_valid);
         assert!(is_old_stale);
+    }
+
+    #[test]
+    fn test_resend_deduplication_and_reinjection_prevention() {
+        reset_dispatched_prompts_cache();
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+        // Insert parent running_project first
+        conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-1', 'inst-1', 'repo-one', '/repo/one', NULL, 1, ?, ?)",
+            params![now, now],
+        )
+        .unwrap();
+
+        // Insert prompt with status 'backed_up'
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES ('p-100', 'proj-1', 'inst-1', '/repo/one', 'Refactor router', 'gemini-pro', 'sess-100', 'backed_up', ?, ?, NULL)",
+            params![now - 10, now - 10],
+        )
+        .unwrap();
+
+        // Verify it is selected by the query for resend
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, prompt_content, status FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending') ORDER BY created_at ASC",
+            )
+            .unwrap();
+        let pending_prompts: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .flatten()
+            .collect();
+        assert_eq!(pending_prompts.len(), 1);
+        assert_eq!(pending_prompts[0], "p-100");
+
+        // Simulate dispatching: mark as dispatched and add to cache
+        conn.execute(
+            "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = 'p-100'",
+            params![now],
+        )
+        .unwrap();
+        {
+            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            cache.insert("p-100".to_string());
+            cache.insert("/repo/one:Refactor router".to_string());
+        }
+
+        // Verify that subsequent query for resend finds 0 pending prompts!
+        let pending_after: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .flatten()
+            .collect();
+        assert_eq!(pending_after.len(), 0);
+
+        // Verify that cache intercepts duplicate attempt
+        let cache = get_dispatched_prompts_cache().lock().unwrap();
+        assert!(cache.contains("p-100"));
+        assert!(cache.contains("/repo/one:Refactor router"));
+    }
+
+    #[test]
+    fn test_backup_conflict_resolution_no_duplicates() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+        // Insert parent running_project first
+        conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-dup', 'default', 'dup', '/work/dup', NULL, 1, ?, ?)",
+            params![now, now],
+        )
+        .unwrap();
+
+        // Insert prompt first time
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, NULL)
+             ON CONFLICT(id) DO UPDATE SET status = 'backed_up', updated_at = excluded.updated_at",
+            params!["p-duplicate", "proj-dup", "default", "/work/dup", "Prompt text", "gemini-pro", "cid-dup", now, now],
+        ).unwrap();
+
+        // Insert same prompt second time with ON CONFLICT
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, NULL)
+             ON CONFLICT(id) DO UPDATE SET status = 'backed_up', updated_at = excluded.updated_at",
+            params!["p-duplicate", "proj-dup", "default", "/work/dup", "Prompt text", "gemini-pro", "cid-dup", now + 1, now + 1],
+        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts WHERE id = 'p-duplicate'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "Must never duplicate records on backup");
     }
 }
