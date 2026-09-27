@@ -99,7 +99,8 @@ pub fn load_config() -> Result<TelegramConfig, AppError> {
         return Ok(def);
     }
     let data = fs::read_to_string(&path).map_err(AppError::Io)?;
-    let config: TelegramConfig = serde_json::from_str(&data)
+    let clean_data = data.trim_start_matches('\u{FEFF}');
+    let config: TelegramConfig = serde_json::from_str(clean_data)
         .map_err(|e| AppError::Config(format!("Failed to parse Telegram config: {}", e)))?;
     Ok(config)
 }
@@ -529,9 +530,11 @@ pub fn format_observe_report() -> String {
             } else {
                 "⚪ IDLE"
             };
+            let friendly_label =
+                repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
             ws_section.push_str(&format!(
                 "• <b>{}</b> [{}] (<code>{}</code>)\n",
-                clean_for_telegram_html(&p.repo_name, 40),
+                clean_for_telegram_html(&friendly_label, 48),
                 badge,
                 clean_for_telegram_html(&p.status, 20)
             ));
@@ -541,11 +544,14 @@ pub fn format_observe_report() -> String {
     match repo_db::list_all_prompts() {
         Ok(recent_prompts) if !recent_prompts.is_empty() => {
             for p in recent_prompts.iter().take(5) {
+                let friendly_ws =
+                    repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
+                let smart_summary = repo_db::extract_smart_prompt_summary(&p.prompt_content, 70);
                 prompts_section.push_str(&format!(
-                    "• [<code>{}</code>] <b>{}</b>: <code>{}</code>\n",
+                    "• [<code>{}</code>] <b>{}</b>: <code>\"{}\"</code>\n",
                     clean_for_telegram_html(&p.status, 16),
-                    clean_for_telegram_html(&p.project_id, 28),
-                    clean_for_telegram_html(&p.prompt_content, 48)
+                    clean_for_telegram_html(&friendly_ws, 36),
+                    clean_for_telegram_html(&smart_summary, 70)
                 ));
             }
         }
@@ -1291,11 +1297,13 @@ pub fn format_projects_list() -> String {
         } else {
             "⚪ IDLE"
         };
+        let friendly_label =
+            repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
         let prompt_preview = if let Some(ref pr) = p.active_prompt {
-            let clean = repo_db::extract_clean_user_prompt(pr);
+            let clean = repo_db::extract_smart_prompt_summary(pr, 90);
             format!(
                 "\n   • <i>Prompt: \"{}\"</i>",
-                clean_for_telegram_html(&clean, 80)
+                clean_for_telegram_html(&clean, 90)
             )
         } else {
             String::new()
@@ -1305,7 +1313,7 @@ pub fn format_projects_list() -> String {
             "{}. {} <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>{}\n\n",
             i + 1,
             badge,
-            clean_for_telegram_html(&p.repo_name, 36),
+            clean_for_telegram_html(&friendly_label, 48),
             clean_for_telegram_html(&p.project_id, 48),
             clean_for_telegram_html(&p.repo_path, 60),
             prompt_preview
@@ -1353,15 +1361,17 @@ pub async fn format_active_prompts_report() -> String {
 
     let mut rows = String::new();
     for (i, p) in running.iter().enumerate() {
+        let friendly_label =
+            repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
         let clean = p
             .active_prompt
             .as_deref()
-            .map(repo_db::extract_clean_user_prompt)
+            .map(|s| repo_db::extract_smart_prompt_summary(s, 100))
             .unwrap_or_else(|| "AGM".to_string());
         rows.push_str(&format!(
             "{}. 🟢 <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>\n   • <i>Prompt: \"{}\"</i>\n\n",
             i + 1,
-            clean_for_telegram_html(&p.repo_name, 36),
+            clean_for_telegram_html(&friendly_label, 48),
             clean_for_telegram_html(&p.project_id, 48),
             clean_for_telegram_html(&p.repo_path, 60),
             clean_for_telegram_html(&clean, 100)
@@ -1408,11 +1418,14 @@ pub async fn format_prompt_queues_report() -> String {
             }
             let mut rows = String::new();
             for (i, p) in queued.iter().take(10).enumerate() {
-                let clean = repo_db::extract_clean_user_prompt(&p.prompt_content);
+                let friendly_ws =
+                    repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
+                let clean = repo_db::extract_smart_prompt_summary(&p.prompt_content, 80);
                 rows.push_str(&format!(
-                    "{}. [⏳ QUEUED] <code>{}</code>\n   • <b>Project:</b> <code>{}</code>\n   • <i>\"{}\"</i>\n\n",
+                    "{}. [⏳ QUEUED] <code>{}</code>\n   • <b>Project:</b> <b>{}</b> (<code>{}</code>)\n   • <i>\"{}\"</i>\n\n",
                     i + 1,
                     if p.id.len() > 12 { &p.id[..12] } else { &p.id },
+                    clean_for_telegram_html(&friendly_ws, 36),
                     clean_for_telegram_html(&p.project_id, 32),
                     clean_for_telegram_html(&clean, 80)
                 ));

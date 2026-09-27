@@ -3139,6 +3139,8 @@ fn cmd_telegram(args: &[String]) {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Telegram Remote & Notification Subsystem:");
+            println!("  agm telegram chat <token> [chat_id]     Connect bot & chat, auto-discover chat ID & send welcome ping");
+            println!("  agm telegram setup <token> [chat_id]    Setup Telegram credentials, register bot commands & enable");
             println!("  agm telegram connect <token> [chat_id]  Auto-detect chat ID, save token & send welcome ping");
             println!("  agm telegram set <token> [chat_id]      Save bot credentials (auto-detects chat_id if omitted)");
             println!("  agm telegram detect-chat-id [token]     Auto-discover your numeric Chat ID from getUpdates");
@@ -3159,74 +3161,119 @@ fn cmd_telegram(args: &[String]) {
             println!("  agm telegram cmds, commands             List supported inbound Telegram slash commands");
             return;
         }
-        if first_lower == "set" || first_lower == "connect" {
-            if let Some(sub) = args.get(1) {
-                if sub.eq_ignore_ascii_case("help") {
-                    println!("\n=== Telegram Bot Setup Guide ===");
-                    println!("1. Open Telegram and message '@BotFather' -> '/newbot' to get your BOT TOKEN");
-                    println!("2. Open your new bot in Telegram and send '/ping' or '/start'");
-                    println!("3. Run: agm telegram connect <BOT_TOKEN>");
-                    println!("   (AGM will automatically detect your Chat ID from getUpdates and connect!)\n");
-                    return;
-                }
-                let token = sub.trim().to_string();
-                let chat_id_opt: Option<i64> = if let Some(cid_str) = args.get(2) {
-                    match cid_str.parse::<i64>() {
-                        Ok(id) => Some(id),
-                        Err(_) => {
-                            eprintln!("[ERROR] chat_id must be a numeric integer.");
-                            return;
-                        }
-                    }
-                } else {
-                    println!("[*] Auto-detecting Telegram Chat ID via getUpdates...");
-                    match rt.block_on(telegram_inbound::detect_telegram_chat_id(&token)) {
-                        Ok(det) => {
-                            println!(
-                                "[+] Discovered Chat ID: {} ({}) on bot @{}",
-                                det.chat_id, det.chat_label, det.bot_username
-                            );
-                            Some(det.chat_id)
-                        }
-                        Err(e) => {
-                            eprintln!("[WARN] Could not auto-detect Chat ID yet: {}", e);
-                            t_cfg.allowed_chat_id
-                        }
-                    }
-                };
+        if first_lower == "set"
+            || first_lower == "connect"
+            || first_lower == "chat"
+            || first_lower == "setup"
+        {
+            let help_requested = args
+                .get(1)
+                .map(|s| s.eq_ignore_ascii_case("help") || s == "--help" || s == "-h")
+                .unwrap_or(args.len() <= 1);
 
-                t_cfg.bot_token = token.clone();
-                if let Some(cid) = chat_id_opt {
-                    t_cfg.allowed_chat_id = Some(cid);
-                }
-                t_cfg.is_enabled = true;
-                if let Err(e) = telegram_inbound::save_config(&t_cfg) {
-                    eprintln!("[ERROR] Failed to save Telegram settings: {}", e);
-                    std::process::exit(1);
-                }
-                let _ = rt.block_on(telegram_inbound::register_telegram_bot_commands(&token));
+            if help_requested {
+                println!("\n=== Telegram Bot & Chat Setup Guide ===");
+                println!("Usage:");
+                println!("  agm telegram chat <BOT_TOKEN> [CHAT_ID]");
+                println!("  agm telegram setup <BOT_TOKEN> [CHAT_ID]");
+                println!("\nArguments:");
                 println!(
-                    "[SUCCESS] Telegram credentials saved and enabled! (Chat ID: {:?})",
-                    t_cfg.allowed_chat_id
+                    "  <BOT_TOKEN>     The API token from @BotFather (e.g. 123456789:ABCdefGHI...)"
                 );
-
-                if let Some(cid) = t_cfg.allowed_chat_id {
-                    let welcome = telegram_inbound::format_ping_report();
-                    if rt
-                        .block_on(telegram_inbound::send_telegram_message(
-                            &token, cid, &welcome,
-                        ))
-                        .is_ok()
-                    {
-                        println!(
-                            "[SUCCESS] Delivered welcome telemetry ping to Telegram chat {}!",
-                            cid
-                        );
-                    }
-                }
+                println!(
+                    "  [CHAT_ID]       Optional numeric ID of your chat or group. If omitted, AGM"
+                );
+                println!(
+                    "                  automatically queries getUpdates to discover your Chat ID!"
+                );
+                println!("\nWhere do I get the Chat ID?");
+                println!("  Option 1 (Automatic Discovery - Recommended):");
+                println!("    1. Open your bot in Telegram and send '/start' or '/ping'");
+                println!("    2. Run: agm telegram chat <BOT_TOKEN>");
+                println!("    3. AGM will discover your Chat ID from the incoming message automatically!");
+                println!("  Option 2 (Direct Query via Bot):");
+                println!("    1. In Telegram search for '@userinfobot' or '@RawDataBot'");
+                println!("    2. Send '/start' -> it will immediately show your numeric 'Id' (e.g. 987654321)");
+                println!("    3. Run: agm telegram chat <BOT_TOKEN> 987654321");
+                println!("  Option 3 (Group or Channel):");
+                println!("    1. Add your bot to the group or channel and post any message");
+                println!("    2. Run: agm telegram chat <BOT_TOKEN>");
+                println!(
+                    "    3. AGM will discover the group's negative Chat ID (e.g. -100123456789)\n"
+                );
                 return;
             }
-            eprintln!("Usage: agm telegram connect <bot_token> [chat_id]");
+
+            // Extract token and optional chat_id (handling --auto-detect flag if present)
+            let mut remaining_args: Vec<String> = args[1..].to_vec();
+            remaining_args.retain(|a| a != "--auto-detect" && a != "-a");
+
+            let token = match remaining_args.first() {
+                Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+                _ => {
+                    eprintln!("[ERROR] Missing bot token. Run 'agm telegram chat --help' for instructions.");
+                    return;
+                }
+            };
+
+            let chat_id_opt: Option<i64> = if let Some(cid_str) = remaining_args.get(1) {
+                match cid_str.parse::<i64>() {
+                    Ok(id) => Some(id),
+                    Err(_) => {
+                        eprintln!(
+                            "[ERROR] chat_id must be a numeric integer. Found: '{}'",
+                            cid_str
+                        );
+                        return;
+                    }
+                }
+            } else {
+                println!("[*] Auto-detecting Telegram Chat ID via getUpdates...");
+                match rt.block_on(telegram_inbound::detect_telegram_chat_id(&token)) {
+                    Ok(det) => {
+                        println!(
+                            "[+] Discovered Chat ID: {} ({}) on bot @{}",
+                            det.chat_id, det.chat_label, det.bot_username
+                        );
+                        Some(det.chat_id)
+                    }
+                    Err(e) => {
+                        eprintln!("[WARN] Could not auto-detect Chat ID yet: {}", e);
+                        println!("💡 Hint: Open Telegram, search for your bot, send '/start', then run this command again!");
+                        t_cfg.allowed_chat_id
+                    }
+                }
+            };
+
+            t_cfg.bot_token = token.clone();
+            if let Some(cid) = chat_id_opt {
+                t_cfg.allowed_chat_id = Some(cid);
+            }
+            t_cfg.is_enabled = true;
+            if let Err(e) = telegram_inbound::save_config(&t_cfg) {
+                eprintln!("[ERROR] Failed to save Telegram settings: {}", e);
+                std::process::exit(1);
+            }
+            let _ = rt.block_on(telegram_inbound::register_telegram_bot_commands(&token));
+            println!(
+                "[SUCCESS] Telegram credentials saved and enabled! (Chat ID: {:?})",
+                t_cfg.allowed_chat_id
+            );
+
+            if let Some(cid) = t_cfg.allowed_chat_id {
+                let welcome = telegram_inbound::format_ping_report();
+                if rt
+                    .block_on(telegram_inbound::send_telegram_message(
+                        &token, cid, &welcome,
+                    ))
+                    .is_ok()
+                {
+                    println!(
+                        "[SUCCESS] Delivered welcome telemetry ping to Telegram chat {}!",
+                        cid
+                    );
+                }
+            }
             return;
         }
         if first_lower == "detect-chat-id" || first_lower == "chat-id" {
