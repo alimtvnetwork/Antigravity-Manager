@@ -67,10 +67,23 @@ pub fn decode_iterative(encoded: &str) -> Result<String, AppError> {
 }
 
 fn format_yaml_endpoint(ep: &SupabaseEndpoint) -> String {
-    format!(
+    let mut s = format!(
         "  - id: \"{}\"\n    name: \"{}\"\n    url: \"{}\"\n    api_key: \"{}\"\n    role: \"{}\"\n    is_enabled: {}\n    prune_threshold_mb: {}\n    priority: {}\n",
         ep.id, ep.name, ep.url, ep.api_key, ep.role, ep.is_enabled, ep.prune_threshold_mb, ep.priority
-    )
+    );
+    if let Some(ref notes) = ep.notes {
+        s.push_str(&format!("    notes: \"{}\"\n", notes));
+    }
+    if !ep.tags.is_empty() {
+        let tag_strs = ep
+            .tags
+            .iter()
+            .map(|t| format!("\"{}\"", t))
+            .collect::<Vec<_>>()
+            .join(", ");
+        s.push_str(&format!("    tags: [{}]\n", tag_strs));
+    }
+    s
 }
 
 fn format_yaml_bundle(bundle: &SupabaseExportBundle) -> String {
@@ -117,6 +130,8 @@ fn parse_yaml_bundle(content: &str) -> Result<SupabaseExportBundle, AppError> {
                     is_enabled: true,
                     prune_threshold_mb: 200,
                     priority: 1,
+                    notes: None,
+                    tags: Vec::new(),
                 });
             }
 
@@ -130,6 +145,15 @@ fn parse_yaml_bundle(content: &str) -> Result<SupabaseExportBundle, AppError> {
                     "is_enabled" => ep.is_enabled = val.parse().unwrap_or(true),
                     "prune_threshold_mb" => ep.prune_threshold_mb = val.parse().unwrap_or(200),
                     "priority" => ep.priority = val.parse().unwrap_or(1),
+                    "notes" => ep.notes = Some(val.to_string()),
+                    "tags" => {
+                        ep.tags = val
+                            .trim_matches(|c| c == '[' || c == ']')
+                            .split(',')
+                            .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                    }
                     _ => {}
                 }
             } else {

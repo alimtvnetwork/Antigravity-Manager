@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::time::Duration;
 
 /// Supabase endpoint configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SupabaseEndpoint {
     pub id: String,
     pub name: String,
@@ -496,6 +496,8 @@ mod tests {
             is_enabled: true,
             prune_threshold_mb: 400,
             priority: 1,
+            notes: None,
+            tags: Vec::new(),
         };
         let client1 = SupabaseClient::new(&ep1).expect("valid client");
         assert_eq!(client1.base_url(), "https://abcdefg.supabase.co");
@@ -517,6 +519,8 @@ mod tests {
             is_enabled: true,
             prune_threshold_mb: 400,
             priority: 1,
+            notes: None,
+            tags: Vec::new(),
         };
         let client2 = SupabaseClient::new(&ep2).expect("valid client");
         assert_eq!(client2.base_url(), "https://abcdefg.supabase.co");

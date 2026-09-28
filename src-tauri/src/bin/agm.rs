@@ -4504,7 +4504,8 @@ fn print_supabase_help() {
     println!("   Local IPv4:       {}", local_ip);
     println!();
     println!("📄 CONFIGURATION JSON STRUCTURE & EXAMPLE:");
-    println!(r#"   {{
+    println!(
+        r#"   {{
      "endpoints": [
        {{
          "id": "ep-root-lovable-01",
@@ -4536,7 +4537,8 @@ fn print_supabase_help() {
      "auto_prune_root_mb": 400,
      "auto_prune_secondary_mb": 200,
      "heartbeat_interval_secs": 30
-   }}"#);
+   }}"#
+    );
     println!();
     println!("🗄️ DATABASE ROLES & PARENT-CHILD RELATIONSHIPS:");
     println!("   • Root Role ('root'):");
@@ -4608,10 +4610,10 @@ fn cmd_supabase_status(rt: &tokio::runtime::Runtime) {
         );
         println!("  {}", "-".repeat(105));
         for ep in &cfg.endpoints {
-            let notes_str = ep
-                .notes
-                .as_deref()
-                .unwrap_or(if ep.tags.is_empty() { "-" } else { "" });
+            let notes_str =
+                ep.notes
+                    .as_deref()
+                    .unwrap_or(if ep.tags.is_empty() { "-" } else { "" });
             let tags_str = if !ep.tags.is_empty() {
                 format!("[{}] {}", ep.tags.join(", "), notes_str)
             } else {
@@ -4699,12 +4701,7 @@ fn cmd_supabase_list_leases(rt: &tokio::runtime::Runtime) {
             let now = Utc::now().timestamp();
             println!(
                 "\n{:<32} {:<24} {:<18} {:<16} {:<16} {:<10}",
-                "ACCOUNT EMAIL",
-                "ACCOUNT ID",
-                "NODE ALIAS",
-                "IP ADDRESS",
-                "INSTANCE",
-                "EXPIRES IN"
+                "ACCOUNT EMAIL", "ACCOUNT ID", "NODE ALIAS", "IP ADDRESS", "INSTANCE", "EXPIRES IN"
             );
             println!("{}", "-".repeat(120));
             for l in &leases {
@@ -4816,10 +4813,7 @@ fn cmd_supabase_set_endpoint(args: &[String]) {
     let role = args[4].trim().to_lowercase();
 
     if role != "root" && role != "secondary" {
-        eprintln!(
-            "[ERROR] Role must be 'root' or 'secondary', got '{}'",
-            role
-        );
+        eprintln!("[ERROR] Role must be 'root' or 'secondary', got '{}'", role);
         return;
     }
 
