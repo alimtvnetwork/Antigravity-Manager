@@ -47,7 +47,7 @@ fn main() {
         "status" | "credits" | "credit" | "status/credits" => cmd_status(&cmd_args),
         "instances" | "instance" | "ls" => cmd_instances(&cmd_args),
         "instances-all" => cmd_instances_all(&cmd_args),
-        "doctor" | "check" => cmd_doctor(),
+        "doctor" | "check" => cmd_doctor(&cmd_args),
         "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
         "switch" => cmd_switch(&cmd_args),
         "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
@@ -105,9 +105,9 @@ fn main() {
             cmd_agy(&cmd_args);
         }
         "proxy" => cmd_proxy(&cmd_args),
-        "sync" => cmd_sync(),
-        "pull" => cmd_pull(),
-        "clean" | "purge" => cmd_clean(),
+        "sync" => cmd_sync(&cmd_args),
+        "pull" => cmd_pull(&cmd_args),
+        "clean" | "purge" => cmd_clean(&cmd_args),
         "clear-cache" | "cache-clear" => cmd_clear_cache(&cmd_args),
         "clear" => {
             if cmd_args
@@ -135,7 +135,7 @@ fn main() {
         }
         "test-email" | "email-test" | "check-email" => cmd_test_email(&cmd_args),
         "test-training" | "training" | "train" => cmd_test_training(&cmd_args),
-        "install" => cmd_install(),
+        "install" => cmd_install(&cmd_args),
         "update" | "update-all" | "ua" => cmd_update(&cmd_args),
         "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
@@ -524,7 +524,29 @@ fn print_doctor_probe(name: &str, detail: &str, is_pass: bool) {
     }
 }
 
-fn cmd_doctor() {
+fn cmd_doctor(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM System Doctor Diagnostic:");
+        println!("  agm doctor [--help]");
+        println!("\nDescription:");
+        println!(
+            "  Performs comprehensive end-to-end health checks across all Antigravity subsystems:"
+        );
+        println!("  - Account credential vault and active token validity");
+        println!("  - Multi-instance directory structures and config integrity");
+        println!("  - SQLite split databases (prompts.db, repo.db, email_vault.db, proxy.db)");
+        println!("  - Reverse proxy server loopback connectivity");
+        println!("  - Telegram bot token and chat ID integration");
+        println!("  - Outbound SMTP / Inbound IMAP email watchers");
+        println!("\nAliases: agm doctor, agm check");
+        println!("\nExamples:");
+        println!("  agm doctor                          # Run full system diagnostics");
+        return;
+    }
+
     println!("================================================================================");
     println!("             AGM System Health Diagnostic (Doctor)                              ");
     println!("================================================================================");
@@ -694,6 +716,30 @@ fn check_is_in_path() -> bool {
 }
 
 fn cmd_accounts(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Accounts Listing:");
+        println!("  agm accounts [--active] [--json]");
+        println!("\nDescription:");
+        println!("  Lists all authenticated Google Gemini profiles in the credential vault,");
+        println!("  their bound email, tier, 4-hour window quota, weekly quota, and active state.");
+        println!("\nAliases: agm accounts, agm account, agm acc");
+        println!("\nOptions:");
+        println!("    --active            Show only the currently active account profile");
+        println!("    --json, -j          Output account list in structured JSON format");
+        println!("\nExamples:");
+        println!(
+            "  agm accounts                        # Display table of all configured accounts"
+        );
+        println!("  agm accounts --active               # Show currently selected active account");
+        println!(
+            "  agm accounts --json                 # Export accounts and quota matrix as JSON"
+        );
+        return;
+    }
+
     let show_only_active = args.iter().any(|a| a == "--active");
     let is_json = args.iter().any(|a| a == "--json");
 
@@ -786,8 +832,8 @@ fn cmd_accounts(args: &[String]) {
 
     println!("\nRegistered Accounts ({} total):", account_rows.len());
     println!(
-        "{:<5} {:<32} {:<10} {:<10} {:<14} {}",
-        "INDEX", "EMAIL", "TIER", "STATUS", "QUOTA", "LAST USED"
+        "{:<5} {:<32} {:<10} {:<10} {:<14} LAST USED",
+        "INDEX", "EMAIL", "TIER", "STATUS", "QUOTA"
     );
     println!("{}", "-".repeat(85));
 
@@ -801,10 +847,24 @@ fn cmd_accounts(args: &[String]) {
 }
 
 fn cmd_switch(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: agm switch <email|prefix|id>");
-        eprintln!("Example: agm switch abidul.rasia@gmail.com");
-        std::process::exit(1);
+    if args.is_empty()
+        || args
+            .iter()
+            .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Profile Switch:");
+        println!("  agm switch <email|prefix|id>");
+        println!("\nDescription:");
+        println!("  Directly switches the active Google Gemini profile to the specified account.");
+        println!("  Searches by email address, email prefix, or internal account ID without GUI intervention.");
+        println!("\nExamples:");
+        println!("  agm switch dev.user@gmail.com       # Switch using full email address");
+        println!("  agm switch dev.user                 # Switch using email prefix");
+        println!("  agm switch acc_01j7x8a              # Switch using exact account ID");
+        if args.is_empty() {
+            std::process::exit(1);
+        }
+        return;
     }
 
     let query = args[0].trim().to_lowercase();
@@ -891,6 +951,28 @@ fn truncate_words(text: &str, max_words: usize) -> (String, usize) {
 }
 
 fn cmd_which_prompts_running(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Which Prompts Running:");
+        println!("  agm which-prompts-running [--json]");
+        println!("\nDescription:");
+        println!(
+            "  Inspects all registered workspaces and Antigravity conversation queues to detect"
+        );
+        println!("  actively executing, queued, and in-flight prompts with associated friendly project names.");
+        println!("\nAliases: agm which-prompts-running, agm wpr");
+        println!("\nOptions:");
+        println!("    --json, -j          Output running prompts and project metadata as JSON");
+        println!("\nExamples:");
+        println!(
+            "  agm which-prompts-running           # Display formatted table of running prompts"
+        );
+        println!("  agm wpr --json                      # Output active prompt queues as JSON");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
 
     // Refresh live projects across registered instances
@@ -1046,11 +1128,64 @@ fn cmd_which_prompts_running(args: &[String]) {
 
 fn cmd_prompts(args: &[String]) {
     if let Some(first) = args.first() {
-        if first.eq_ignore_ascii_case("export") || first.eq_ignore_ascii_case("pe") {
+        let first_lower = first.to_lowercase();
+        if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
+            println!("AGM Prompts Management:");
+            println!("  agm prompts [ls] [N] [--words <W>] [--running] [--json]");
+            println!("  agm prompts backup [ls|clean] [-f <path.db>] [--json]");
+            println!("  agm prompts restore [--keep] [--json] [-f <path.db>]");
+            println!("  agm prompts status [--json]");
+            println!("  agm prompts export [-f <file.db>] [--wc <N>]");
+            println!("  agm prompts import [-f <file.db>]");
+            println!("\nDescription:");
+            println!(
+                "  Inspects, snapshots, exports, imports, and restores active and queued prompts"
+            );
+            println!("  across all running Antigravity workspace projects.");
+            println!("\nAliases: agm prompts, agm running-prompts");
+            println!("\nSubcommands:");
+            println!(
+                "  ls, list            List running prompts in ASC stack order (oldest to newest)"
+            );
+            println!(
+                "  backup, brp         Parallel snapshot of active prompts to split SQLite DB"
+            );
+            println!(
+                "  restore, rrp        Restore and re-inject saved prompts into workspace queue"
+            );
+            println!(
+                "  status, wpr         Display which projects and prompts are actively executing"
+            );
+            println!("  export, pe          Export prompts database to file or JSON");
+            println!("  import, pi          Import prompts from file into local execution queue");
+            println!("\nExamples:");
+            println!("  agm prompts                         # List latest 10 running prompts");
+            println!("  agm prompts ls 5                    # Show latest 5 running prompts in ASC stack");
+            println!("  agm prompts backup                  # Snapshot all running prompts before rotation");
+            println!("  agm prompts restore                 # Re-inject backed-up prompts into workspaces");
+            println!("  agm prompts status                  # View active project prompts execution status");
+            println!(
+                "  agm prompts export -f backup.db     # Export prompts to specific SQLite file"
+            );
+            return;
+        }
+        if first_lower == "backup" || first_lower == "brp" {
+            cmd_backup_running_prompts(&args[1..]);
+            return;
+        }
+        if first_lower == "restore" || first_lower == "rrp" {
+            cmd_restore_running_prompts(&args[1..]);
+            return;
+        }
+        if first_lower == "status" || first_lower == "wpr" || first_lower == "running" {
+            cmd_which_prompts_running(&args[1..]);
+            return;
+        }
+        if first_lower == "export" || first_lower == "pe" {
             cmd_prompts_export(&args[1..]);
             return;
         }
-        if first.eq_ignore_ascii_case("import") || first.eq_ignore_ascii_case("pi") {
+        if first_lower == "import" || first_lower == "pi" {
             cmd_prompts_import(&args[1..]);
             return;
         }
@@ -1188,6 +1323,35 @@ fn cmd_prompts(args: &[String]) {
 }
 
 fn cmd_prompts_export(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Prompts Export:");
+        println!("  agm prompts-export [N] [-f <file.json>] [--wc <W>]");
+        println!("\nDescription:");
+        println!(
+            "  Exports stored and in-flight prompts from the split SQLite database into JSON,"
+        );
+        println!(
+            "  preserving full prompt text, attached image payloads/paths, models, and timestamps."
+        );
+        println!("\nAliases: agm prompts-export, agm pe");
+        println!("\nOptions:");
+        println!(
+            "    [N]                 Maximum number of recent prompts to export (default: 50)"
+        );
+        println!("    -f, --file <path>   Target JSON export file path (default: agm-<repo>-prompts.json)");
+        println!("    --wc <W>            Maximum word count for prompt previews");
+        println!("\nExamples:");
+        println!(
+            "  agm prompts-export                  # Export up to 50 prompts to default JSON file"
+        );
+        println!("  agm pe 100 -f my-prompts.json       # Export last 100 prompts to custom file");
+        println!("  agm pe 10                           # Export last 10 prompts");
+        return;
+    }
+
     use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
 
@@ -1296,6 +1460,29 @@ fn cmd_prompts_export(args: &[String]) {
 }
 
 fn cmd_prompts_import(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Prompts Import:");
+        println!("  agm prompts-import [-f <file.json>] [-y]");
+        println!("\nDescription:");
+        println!(
+            "  Imports previously exported prompts from JSON back into the local SQLite database"
+        );
+        println!("  and re-enqueues them for execution.");
+        println!("\nAliases: agm prompts-import, agm pi");
+        println!("\nOptions:");
+        println!("    -f, --file <path>   Source JSON file to import from (default: agm-<repo>-prompts.json)");
+        println!("    -y, --yes           Bypass interactive confirmation prompt");
+        println!("\nExamples:");
+        println!("  agm prompts-import                  # Import from default JSON file");
+        println!(
+            "  agm pi -f backup.json -y            # Import from specific file without prompting"
+        );
+        return;
+    }
+
     let mut explicit_file: Option<String> = None;
     let auto_yes = args.iter().any(|a| a == "--yes" || a == "-y");
 
@@ -1583,9 +1770,25 @@ fn cmd_prompt_dispatch(args: &[String]) {
         return;
     }
 
-    // If first arg is "ls", "backup", or "restore", delegate accordingly
     if let Some(first) = args.first() {
         let first_lower = first.to_lowercase();
+        if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
+            println!("AGM Prompt Dispatch:");
+            println!("  agm prompt <text> [--prefix <category>] [--suffix <category>]");
+            println!("\nDescription:");
+            println!("  Dispatches a new prompt into the active workspace queue with automatic git pull sync");
+            println!("  and optional canonical prompt template framing from 01-prompts/.");
+            println!("\nAliases: agm prompt");
+            println!("\nOptions:");
+            println!(
+                "    --prefix <cat>      Prepend template from 01-prompts/<cat> to the prompt"
+            );
+            println!("    --suffix <cat>      Append template from 01-prompts/<cat> to the prompt");
+            println!("\nExamples:");
+            println!("  agm prompt \"Run unit tests\"                 # Dispatch prompt to active workspace");
+            println!("  agm prompt \"Audit DB\" --prefix coding-standards # Frame prompt with coding standards template");
+            return;
+        }
         if first_lower == "ls" || first_lower == "list" || first_lower == "--running" {
             cmd_prompts(args);
             return;
@@ -1687,6 +1890,22 @@ fn cmd_prompt_dispatch(args: &[String]) {
 }
 
 fn cmd_rerun(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Rerun Prompts:");
+        println!("  agm rerun [N] [--prefix <category>] [--suffix <category>]");
+        println!("\nDescription:");
+        println!("  Re-queues and dispatches the last N executed prompts from the database into");
+        println!("  the active workspace with optional template prefix/suffix wrappers.");
+        println!("\nExamples:");
+        println!("  agm rerun                           # Rerun the most recent prompt");
+        println!("  agm rerun 3                         # Rerun the last 3 prompts in sequence");
+        println!("  agm rerun 1 --prefix coding-standards # Wrap prompt with prefix template");
+        return;
+    }
+
     let mut count_n: usize = 1;
     let mut prefix_cat: Option<String> = None;
     let mut suffix_cat: Option<String> = None;
@@ -1792,6 +2011,29 @@ fn cmd_rerun(args: &[String]) {
 }
 
 fn cmd_resend_running_commands(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Resend Running Commands:");
+        println!("  agm resend-running-commands [N] [--json] [-f <file.json>]");
+        println!("\nDescription:");
+        println!("  Captures active in-flight running commands across workspaces into SQLite");
+        println!("  and re-dispatches them with image paths and task state synchronized into .antigravity_resume_task.json.");
+        println!("\nAliases: agm resend-running-commands, agm rrc, agm resend-running, agm resend");
+        println!("\nOptions:");
+        println!(
+            "    [N]                 Maximum number of active prompts to process (default: 20)"
+        );
+        println!("    --json              Output pure JSON array of resent commands");
+        println!("    -f, --file <path>   Export resent commands JSON payload to disk");
+        println!("\nExamples:");
+        println!("  agm resend-running-commands         # Resend up to 20 active commands");
+        println!("  agm rrc 5                           # Resend top 5 active commands");
+        println!("  agm rrc --json                      # Output structured JSON of resent items");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let mut limit_n = 20usize;
     let mut file_out: Option<String> = None;
@@ -1891,8 +2133,8 @@ fn cmd_resend_running_commands(args: &[String]) {
     }
 
     println!(
-        "{:<5} {:<10} {:<24} {:<10} {:<18} {}",
-        "SEQ", "ID", "PROJECT", "STATUS", "IMAGES", "PROMPT SNIPPET"
+        "{:<5} {:<10} {:<24} {:<10} {:<18} PROMPT SNIPPET",
+        "SEQ", "ID", "PROJECT", "STATUS", "IMAGES"
     );
     println!("{}", "-".repeat(110));
 
@@ -2121,8 +2363,8 @@ fn cmd_backup_running_prompts(args: &[String]) {
                         println!("No prompt backup batches recorded yet.");
                     } else {
                         println!(
-                            "{:<5} {:<24} {:<12} {:<22} {}",
-                            "#", "BATCH ID", "PROMPTS", "RESTORED", "CREATED AT"
+                            "{:<5} {:<24} {:<12} {:<22} CREATED AT",
+                            "#", "BATCH ID", "PROMPTS", "RESTORED"
                         );
                         println!("{}", "-".repeat(80));
                         for (idx, b) in batches.iter().enumerate() {
@@ -2204,8 +2446,8 @@ fn cmd_backup_running_prompts(args: &[String]) {
                 return;
             }
             println!(
-                "{:<5} {:<10} {:<24} {:<10} {:<16} {}",
-                "SEQ", "ID", "PROJECT", "STATUS", "IMAGES", "PROMPT SNIPPET"
+                "{:<5} {:<10} {:<24} {:<10} {:<16} PROMPT SNIPPET",
+                "SEQ", "ID", "PROJECT", "STATUS", "IMAGES"
             );
             println!("{}", "-".repeat(110));
             for (idx, r) in records.iter().enumerate() {
@@ -2297,8 +2539,8 @@ fn cmd_restore_running_prompts(args: &[String]) {
                 records.len()
             );
             println!(
-                "{:<5} {:<10} {:<24} {:<10} {:<16} {}",
-                "SEQ", "ID", "PROJECT", "STATUS", "IMAGES", "PROMPT SNIPPET"
+                "{:<5} {:<10} {:<24} {:<10} {:<16} PROMPT SNIPPET",
+                "SEQ", "ID", "PROJECT", "STATUS", "IMAGES"
             );
             println!("{}", "-".repeat(110));
             for (idx, r) in records.iter().enumerate() {
@@ -2334,13 +2576,43 @@ fn cmd_running_prompts(args: &[String]) {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Running Prompts Management:");
+            println!("  agm running-prompts [ls] [--limit <Y>] [--words <N>] [--full] [--json]");
+            println!("  agm running-prompts backup [ls|clean] [-f <path.db>] [--json]");
+            println!("  agm running-prompts restore [--keep] [--json] [-f <path.db>]");
+            println!("  agm running-prompts export [-f <path>] [--wc <N>]");
+            println!("  agm running-prompts import [-f <path>] [--wc <N>]");
+            println!("\nDescription:");
             println!(
-                "  agm running-prompts ls [--limit/-l Y] [--wordcount/wc N] [--full] [--json]"
+                "  Parallel inspection, snapshotting, and restoration of active running prompts"
             );
-            println!("  agm running-prompts backup [ls|clean|help] [-file/-f <path.db>] [--json]");
-            println!("  agm running-prompts restore [--keep/-k] [--json] [-file/-f <path.db>]");
-            println!("  agm running-prompts export [-file/-f <path>] [--wc N]");
-            println!("  agm running-prompts import [-file/-f <path>] [--wc N]");
+            println!("  across all Antigravity workspace projects.");
+            println!("\nAliases: agm running-prompts, agm prompts, agm wpr");
+            println!("\nSubcommands:");
+            println!(
+                "  ls, list            List running prompts across active workspaces (default)"
+            );
+            println!(
+                "  backup, brp         Snapshot all active running prompts to split SQLite DB"
+            );
+            println!(
+                "  restore, rrp        Restore and re-inject saved prompts into workspace queue"
+            );
+            println!("  export, pe          Export prompts database to file or JSON");
+            println!("  import, pi          Import prompts from file into local execution queue");
+            println!("\nOptions:");
+            println!("    --limit, -l <Y>     Limit number of prompts displayed (default: 8)");
+            println!("    --words, --wc <N>   Maximum words to display per prompt snippet (default: 100)");
+            println!("    --full              Display full prompt text without truncation");
+            println!("    --json              Format output as structured JSON");
+            println!("    --keep, -k          Preserve unrestored state during restore");
+            println!("    -f, --file <path>   Specify custom SQLite storage file path");
+            println!("\nExamples:");
+            println!("  agm running-prompts                 # List active running prompts");
+            println!("  agm running-prompts backup          # Parallel snapshot running prompts before switch");
+            println!(
+                "  agm running-prompts restore         # Re-inject backed-up prompts post-switch"
+            );
+            println!("  agm running-prompts export -f b.db  # Export running prompts to file");
             return;
         }
         if first_lower == "backup" {
@@ -2459,8 +2731,8 @@ fn cmd_running_prompts(args: &[String]) {
     }
 
     println!(
-        "{:<5} {:<10} {:<22} {:<12} {:<10} {}",
-        "SEQ", "ID", "PROJECT", "STATUS", "WORDS", "PROMPT SNIPPET (ASC STACK)"
+        "{:<5} {:<10} {:<22} {:<12} {:<10} PROMPT SNIPPET (ASC STACK)",
+        "SEQ", "ID", "PROJECT", "STATUS", "WORDS"
     );
     println!("{}", "-".repeat(110));
     for it in &items {
@@ -2636,12 +2908,20 @@ fn cmd_running_projects(args: &[String]) {
     if let Some(first) = args.first() {
         if first.eq_ignore_ascii_case("help") || first == "--help" || first == "-h" {
             println!("AGM Running Projects Management:");
-            println!("  agm running-projects [ls] [--json] [-file/-f <path.json>] [--ssh]");
+            println!("  agm running-projects [ls] [--json] [-f <path.json>] [--ssh]");
+            println!("\nDescription:");
             println!("  Lists active workspace projects having running or queued prompts.");
-            println!("  Options:");
-            println!("    --json          Output pure JSON array");
-            println!("    -f, --file      Write output to specified file path (default: agm-running-projects.json)");
-            println!("    --ssh           Include multi-node cluster fleet projects");
+            println!("\nAliases: agm running-projects, agm projects");
+            println!("\nOptions:");
+            println!("    --json              Output pure JSON array");
+            println!("    -f, --file <path>   Write output to specified file path (default: agm-running-projects.json)");
+            println!("    --ssh               Include multi-node cluster fleet projects");
+            println!("\nExamples:");
+            println!("  agm running-projects                # Display table of active projects");
+            println!(
+                "  agm running-projects --json         # Output active projects in JSON format"
+            );
+            println!("  agm running-projects -f proj.json   # Export project inventory to file");
             return;
         }
     }
@@ -2784,10 +3064,20 @@ fn cmd_finish_prompts_until_green(args: &[String]) {
         if first.eq_ignore_ascii_case("help") || first == "--help" || first == "-h" {
             println!("AGM Finish Prompts Until Green (fpug):");
             println!("  agm finish-prompts-until-green [targets...] [-t <5m|30s>]");
-            println!("  agm fpug running-projects [-t 5m]");
+            println!("  agm fpug running-projects [-t <duration>]");
+            println!("\nDescription:");
+            println!("  Monitors targeted workspaces and blocks until all in-flight prompts reach completion ('green').");
+            println!("\nAliases: agm finish-prompts-until-green, agm fpug");
+            println!("\nOptions:");
             println!(
-                "  Blocks until all prompts for targeted projects reach completion ('green')."
+                "    -t, --time <dur>    Polling interval or timeout (e.g. 5m, 30s; default: 5m)"
             );
+            println!("    running-projects    Target all currently active running projects automatically");
+            println!("\nExamples:");
+            println!(
+                "  agm fpug running-projects           # Wait until all active projects finish"
+            );
+            println!("  agm fpug my-project -t 30s          # Check specific project every 30s");
             return;
         }
     }
@@ -2867,13 +3157,27 @@ fn cmd_shutdown_until_green(args: &[String]) {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Shutdown Until Green (SUG):");
-            println!("  agm shutdown-until-green ls                     List configured green target projects");
-            println!("  agm shutdown-until-green add-projects <p1, p2>  Add projects to green watch list");
+            println!("  agm shutdown-until-green ls");
+            println!("  agm shutdown-until-green add-projects <p1, p2>");
+            println!("  agm shutdown-until-green rm <p1>");
+            println!("  agm shutdown-until-green agy-running-projects");
+            println!("  agm shutdown-until-green run [-t 5m]");
+            println!("\nDescription:");
             println!(
-                "  agm shutdown-until-green rm <p1>                Remove project from watch list"
+                "  Monitors registered green targets and automatically executes safe host shutdown"
             );
-            println!("  agm shutdown-until-green agy-running-projects   Auto-add all currently active projects");
-            println!("  agm shutdown-until-green run [-t 5m]            Start watcher: shuts down OS once green");
+            println!("  once all prompts and CI tasks conclude successfully.");
+            println!("\nAliases: agm shutdown-until-green, agm sug");
+            println!("\nSubcommands:");
+            println!("  ls, list            List configured green target projects");
+            println!("  add-projects <p..>  Add projects to green watch list");
+            println!("  rm <project>        Remove project from watch list");
+            println!("  agy-running-projects Auto-add all currently active projects");
+            println!("  run [-t <dur>]      Start watcher: shuts down OS once green");
+            println!("\nExamples:");
+            println!("  agm sug ls                          # View current green watch targets");
+            println!("  agm sug agy-running-projects        # Watch all active projects");
+            println!("  agm sug run -t 2m                   # Start watcher polling every 2m");
             return;
         }
         if first_lower == "ls" || first_lower == "list" {
@@ -2981,18 +3285,32 @@ fn cmd_broadcast_email(args: &[String]) {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
             println!("AGM Broadcast Email Management:");
-            println!("  agm broadcast-email ls [--json]                  List configured broadcast recipients");
+            println!("  agm broadcast-email ls [--json]");
+            println!("  agm broadcast-email add <email> [alias]");
+            println!("  agm broadcast-email edit <id|email> <new_email>");
+            println!("  agm broadcast-email rm <id|email>");
+            println!("  agm broadcast-email send-to-all <subj> <body>");
+            println!("  agm broadcast-email send <email> <subj> <body>");
+            println!("  agm broadcast-email send-help, sh");
+            println!("  agm broadcast-email test");
+            println!("\nDescription:");
+            println!("  Manages authorized email broadcast notification lists and dispatches status alerts.");
+            println!("\nAliases: agm broadcast-email");
+            println!("\nSubcommands:");
+            println!("  ls                  List configured broadcast recipients");
+            println!("  add <email> [alias] Add a new recipient to the notification list");
+            println!("  edit <id> <email>   Update recipient address");
+            println!("  rm <id|email>       Remove recipient");
+            println!("  send-to-all <s > <b> Dispatch message to all active recipients");
+            println!("  send <email> <s > <b> Dispatch message to single recipient");
+            println!("  send-help, sh       Dispatch help cheat sheet to all recipients");
+            println!("  test                Send test connectivity ping email");
+            println!("\nExamples:");
+            println!("  agm broadcast-email ls              # List notification recipients");
             println!(
-                "  agm broadcast-email add <email> [alias]          Add a new broadcast recipient"
+                "  agm broadcast-email test            # Verify email delivery with test ping"
             );
-            println!("  agm broadcast-email edit <id|email> <new_email>  Update recipient email");
-            println!("  agm broadcast-email rm <id|email>                Remove a recipient");
-            println!("  agm broadcast-email send-to-all <subj> <body>    Dispatch custom message to all active recipients");
-            println!("  agm broadcast-email send <email> <subj> <body>   Dispatch message to specific recipient");
-            println!("  agm broadcast-email send help, send-help, sh     Dispatch help cheat sheet to all recipients");
-            println!(
-                "  agm broadcast-email test                         Send verification test ping"
-            );
+            println!("  agm broadcast-email send-help       # Email cheat sheet to all recipients");
             return;
         }
         if first_lower == "ls" || first_lower == "list" {
@@ -3012,8 +3330,8 @@ fn cmd_broadcast_email(args: &[String]) {
                         recipients.len()
                     );
                     println!(
-                        "{:<5} {:<24} {:<32} {:<10} {}",
-                        "SEQ", "ID", "EMAIL", "ACTIVE", "GROUP"
+                        "{:<5} {:<24} {:<32} {:<10} GROUP",
+                        "SEQ", "ID", "EMAIL", "ACTIVE"
                     );
                     println!("{}", "-".repeat(85));
                     for (idx, r) in recipients.iter().enumerate() {
@@ -3936,6 +4254,15 @@ fn cmd_agy(args: &[String]) {
             println!("  agm agy prompts         List reusable prompt templates");
             println!("  agm agy prompt <args>   Inject prompt to workspace or remote VM node");
             println!("  agm agy nodes           List cluster VM nodes & connectivity status");
+            println!("\nDescription:");
+            println!("  Subsystem bridging Antigravity CLI and GitMap workspace orchestration.");
+            println!("\nAliases: agm agy, agm active, agm queues");
+            println!("\nExamples:");
+            println!("  agm agy active                      # List active running prompts");
+            println!(
+                "  agm agy queues                      # View prompt queues across workspaces"
+            );
+            println!("  agm agy nodes                       # Display status of cluster VM nodes");
         }
     }
 }
@@ -3968,6 +4295,28 @@ fn scan_prompt_templates() {
 }
 
 fn cmd_proxy(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Reverse Proxy Gateway:");
+        println!("  agm proxy [test] [--json]");
+        println!("\nDescription:");
+        println!("  Checks status and tests connectivity of the Antigravity local reverse proxy gateway.");
+        println!("\nSubcommands:");
+        println!(
+            "  test                Perform loopback ping and latency test against the proxy port"
+        );
+        println!("\nExamples:");
+        println!(
+            "  agm proxy                           # Show proxy gateway status and listening port"
+        );
+        println!(
+            "  agm proxy test                      # Test loopback proxy latency and connectivity"
+        );
+        return;
+    }
+
     let is_test = args.iter().any(|a| a == "test");
 
     if is_test {
@@ -4030,7 +4379,22 @@ fn cmd_proxy(args: &[String]) {
     println!("Run 'agm proxy test' to verify loopback latency.");
 }
 
-fn cmd_sync() {
+fn cmd_sync(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Synchronization:");
+        println!("  agm sync");
+        println!("\nDescription:");
+        println!(
+            "  Synchronizes registered accounts, sandbox instances, and split SQLite databases."
+        );
+        println!("\nExamples:");
+        println!("  agm sync                            # Verify and synchronize local vaults");
+        return;
+    }
+
     println!("[*] Synchronizing Antigravity-Manager state & split vaults...");
 
     // Validate accounts
@@ -4070,7 +4434,20 @@ fn cmd_sync() {
     println!("[SUCCESS] AGM state synchronization complete.");
 }
 
-fn cmd_pull() {
+fn cmd_pull(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Git Pull:");
+        println!("  agm pull");
+        println!("\nDescription:");
+        println!("  Executes 'git pull origin main' in the Antigravity-Manager repository root.");
+        println!("\nExamples:");
+        println!("  agm pull                            # Fetch and merge latest code from origin");
+        return;
+    }
+
     println!("[*] Executing git pull in Antigravity-Manager repository...");
 
     let res = Command::new("git")
@@ -4119,7 +4496,22 @@ fn is_safe_to_delete(path: &Path) -> bool {
     true
 }
 
-fn cmd_clean() {
+fn cmd_clean(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Storage & Build Artifact Hygiene:");
+        println!("  agm clean [--help]");
+        println!("\nDescription:");
+        println!("  Performs safe cleanup of temporary test directories, build artifacts,");
+        println!("  and stale lock files while strictly protecting all database vaults.");
+        println!("\nAliases: agm clean, agm purge");
+        println!("\nExamples:");
+        println!("  agm clean                           # Run safe artifact cleanup");
+        return;
+    }
+
     println!("[*] Performing safe AGM storage and build cache hygiene...");
 
     let mut removed_dirs = 0;
@@ -4157,6 +4549,25 @@ fn cmd_clean() {
 }
 
 fn cmd_logs(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM System Logs Viewer:");
+        println!("  agm logs [-n <lines>] [-f <filter>]");
+        println!("\nDescription:");
+        println!("  Streams and filters runtime diagnostic logs from the AGM background service.");
+        println!("\nAliases: agm logs, agm log");
+        println!("\nOptions:");
+        println!("    -n, --tail <N>      Number of log lines to show (default: 25)");
+        println!("    -f, --filter <str>  Filter log output by substring");
+        println!("\nExamples:");
+        println!("  agm logs                            # Display the last 25 log lines");
+        println!("  agm logs -n 50                      # View last 50 lines");
+        println!("  agm logs -f \"AutoSwitcher\"          # Filter logs matching 'AutoSwitcher'");
+        return;
+    }
+
     let mut tail = 25;
     let mut filter: Option<String> = None;
 
@@ -4265,6 +4676,32 @@ fn extract_immediate_and_weekly_credits(
 }
 
 fn cmd_status(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Node Status & Credits:");
+        println!("  agm status [--json]");
+        println!("  agm credits [--json]");
+        println!("\nDescription:");
+        println!(
+            "  Displays current node runtime health, active profile details, immediate (4-hour)"
+        );
+        println!(
+            "  and weekly credit percentages, active instance name, and threshold configuration."
+        );
+        println!("\nAliases: agm status, agm credits, agm credit");
+        println!("\nOptions:");
+        println!("    --json, -j          Output pure JSON payload for programmatic evaluation");
+        println!("\nExamples:");
+        println!("  agm status                          # Human-readable status card");
+        println!(
+            "  agm credits                         # View current active model quota balances"
+        );
+        println!("  agm status --json                   # Structured JSON output for scripts");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let machine_name = email_watcher::detect_machine_name();
     let node_alias = supabase_sync::load_config()
@@ -4746,6 +5183,29 @@ fn cmd_switch_if_low_credit(args: &[String]) {
 }
 
 fn cmd_is_low_credit_for_switch(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Is Low Credit Check:");
+        println!("  agm is-low-credit-for-switch [-t <pct>] [--json] [-f [file]]");
+        println!("\nDescription:");
+        println!("  Evaluates active profile credits against a specified threshold.");
+        println!("  Outputs true/false or JSON to indicate whether quota is below threshold.");
+        println!("\nAliases: agm is-low-credit-for-switch, agm is-low-credit, agm ilc");
+        println!("\nOptions:");
+        println!("    -t, --threshold <N>   Threshold percentage to evaluate (default: 15.0%)");
+        println!("    --json, -j            Output evaluation result in pure JSON format");
+        println!("    -f, --file [path]     Export evaluation JSON payload to disk");
+        println!("\nExamples:");
+        println!("  agm ilc                             # Returns true/false based on 15% default");
+        println!(
+            "  agm ilc -t 98.0                     # Evaluate against 98% simulation threshold"
+        );
+        println!("  agm ilc -t 20.0 --json              # Output JSON evaluation");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let mut custom_threshold: Option<f64> = None;
     let mut export_file: Option<String> = None;
@@ -4918,6 +5378,36 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
 }
 
 fn cmd_clear_cache(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Cache & Conversation Pruner:");
+        println!("  agm clean [--keep <N>] [--preflight] [-y]");
+        println!("  agm clear-cache [--keep <N>] [--preflight] [-y]");
+        println!("\nDescription:");
+        println!("  Safely prunes older conversation steps, developer logs, and build artifacts,");
+        println!("  staging conversations into OS temp storage for undo recovery.");
+        println!("\nAliases: agm clean, agm clear-cache, agm cache-clear, agm purge");
+        println!("\nOptions:");
+        println!(
+            "    --keep, -k <N>      Number of recent conversations to preserve (default: 10)"
+        );
+        println!("    --preflight, -p     Preview space reclamation without deleting files");
+        println!("    -y, --yes           Bypass interactive confirmation prompt");
+        println!("\nExamples:");
+        println!(
+            "  agm clean                           # Prune cache keeping 10 latest conversations"
+        );
+        println!(
+            "  agm clean --keep 5                  # Prune cache keeping 5 latest conversations"
+        );
+        println!(
+            "  agm clean --preflight               # Dry-run preview of space to be reclaimed"
+        );
+        return;
+    }
+
     let mut keep_count: usize = 10;
     let is_json = args.iter().any(|a| a == "--json");
 
@@ -4973,7 +5463,7 @@ fn cmd_clear_cache(args: &[String]) {
                     res.total_freed_bytes as f64 / 1024.0 / 1024.0,
                     res.staging_dir
                 );
-                cmd_clean();
+                cmd_clean(&[]);
             }
         }
         Err(e) => {
@@ -4985,13 +5475,58 @@ fn cmd_clear_cache(args: &[String]) {
                 );
             } else {
                 eprintln!("[WARN] Conversation prune warning: {}", e);
-                cmd_clean();
+                cmd_clean(&[]);
             }
         }
     }
 }
 
 fn cmd_instances(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Instances Management:");
+        println!("  agm instances [ls] [--json]");
+        println!("  agm instances create <name> [--data-only]");
+        println!("  agm instances rm <id|name> [--force]");
+        println!("  agm instances <id> ff");
+        println!("  agm instances all ff");
+        println!("  agm instances rm-all");
+        println!("\nDescription:");
+        println!(
+            "  Creates, lists, manages, rotates, and destroys isolated Antigravity multi-instance"
+        );
+        println!(
+            "  sandbox profiles with dedicated configuration, keychain, and state directories."
+        );
+        println!("\nAliases: agm instances, agm instance, agm ls");
+        println!("\nSubcommands:");
+        println!("  ls, list            List all registered profiles, statuses, and bound emails (default)");
+        println!("  create, add <name>  Create a new isolated sandbox instance profile");
+        println!(
+            "  rm, delete <id>     Remove a specific instance profile and its local configuration"
+        );
+        println!(
+            "  <id> ff             Trigger fast-forward account rotation for a specific instance"
+        );
+        println!(
+            "  all ff              Trigger fast-forward account rotation across ALL instances"
+        );
+        println!("  rm-all              Remove all non-default sandbox instances");
+        println!("\nOptions:");
+        println!("  --json, -j          Output instance list in JSON format");
+        println!("  --data-only, --do   Create instance directory structure without launching UI");
+        println!("  --force, -f         Bypass confirmation prompt for destructive actions");
+        println!("\nExamples:");
+        println!("  agm instances                       # List all instances");
+        println!("  agm instances create \"test-sandbox\" # Create new sandbox instance profile");
+        println!("  agm instances test-sandbox ff       # Rotate account for test-sandbox");
+        println!("  agm instances rm test-sandbox       # Delete test-sandbox profile");
+        println!("  agm instances rm-all                # Clean up all sandbox instances");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
 
@@ -5217,8 +5752,8 @@ fn cmd_instances(args: &[String]) {
                 local_ip
             );
             println!(
-                "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} {}",
-                "#", "ID", "NAME", "STATUS", "BOUND ACCOUNT", "NODE / IP", "DATA DIR"
+                "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} DATA DIR",
+                "#", "ID", "NAME", "STATUS", "BOUND ACCOUNT", "NODE / IP"
             );
             println!("{}", "-".repeat(115));
 
@@ -5268,7 +5803,22 @@ fn cmd_instances(args: &[String]) {
     }
 }
 
-fn cmd_instances_all(_args: &[String]) {
+fn cmd_instances_all(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Rotate All Instances:");
+        println!("  agm instances-all [ff] [--help]");
+        println!("\nDescription:");
+        println!("  Triggers fast-forward account rotation across all registered multi-instance sandboxes.");
+        println!("\nAliases: agm instances-all, agm instances all ff");
+        println!("\nExamples:");
+        println!("  agm instances-all                   # Rotate accounts across all instances");
+        println!("  agm instances all ff                # Equivalent invocation");
+        return;
+    }
+
     let instances = match instance::list_instances() {
         Ok(list) => list,
         Err(e) => {
@@ -5299,6 +5849,35 @@ fn cmd_instances_all(_args: &[String]) {
 }
 
 fn cmd_fast_forward(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Fast-Forward Smart Switch:");
+        println!("  agm ff [target_instance] [--json]");
+        println!("\nDescription:");
+        println!(
+            "  Instantly selects and rotates to the freshest account in the pool with 100% quota."
+        );
+        println!(
+            "  Pre-verifies quota with Google API, checks Supabase and Email collision locks,"
+        );
+        println!("  snapshots running prompts across active workspaces, executes rotation via the Fast-Forward");
+        println!("  bridge, restores and re-injects prompts, and broadcasts telemetry to Telegram & Email.");
+        println!("\nAliases: agm ff, agm fast-forward, agm smart-switch");
+        println!("\nArguments:");
+        println!(
+            "  [target_instance]   Optional target sandbox instance ID (defaults to 'default')"
+        );
+        println!("\nOptions:");
+        println!("  --json, -j          Output switch results in structured JSON format");
+        println!("\nExamples:");
+        println!("  agm ff                              # Fast-forward switch default instance to highest quota");
+        println!("  agm ff test-sandbox                 # Fast-forward switch a specific sandbox instance");
+        println!("  agm ff --json                       # Fast-forward with JSON response");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
     let target_opt = non_flag_args.first().map(|s| s.as_str());
@@ -6328,6 +6907,21 @@ fn recreate_single_workspace(target_spec: &str) {
 }
 
 fn cmd_recreate_project(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Recreate Project Workspace:");
+        println!("  agm recreate-project [repo_paths...]");
+        println!("\nDescription:");
+        println!("  Re-scans, unbinds stale locks, and recreates workspace configuration for target repos.");
+        println!("\nAliases: agm recreate-project, agm recreate");
+        println!("\nExamples:");
+        println!("  agm recreate-project                # Recreate current repository workspace");
+        println!("  agm recreate d:\\work\\my-project      # Recreate specific project workspace");
+        return;
+    }
+
     let explicit: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with('-'))
@@ -6360,6 +6954,14 @@ fn cmd_recreate_project(args: &[String]) {
 }
 
 fn cmd_recreate(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        cmd_recreate_project(args);
+        return;
+    }
+
     let targets: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with('-'))
@@ -6466,6 +7068,21 @@ fn cmd_test_auto_switch(args: &[String]) {
 }
 
 fn cmd_test_email(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Inbound Email & SMTP Diagnostic:");
+        println!("  agm test-email [--help]");
+        println!("\nDescription:");
+        println!("  Performs full diagnostic checks of SMTP dispatch, IMAP inbound watchers,");
+        println!("  credentials validity, and recipient notification queues.");
+        println!("\nAliases: agm test-email, agm email-test, agm check-email");
+        println!("\nExamples:");
+        println!("  agm test-email                      # Run full email subsystem diagnostics");
+        return;
+    }
+
     println!("============================================================");
     println!("  AGM INBOUND EMAIL & SMTP DIAGNOSTIC SUITE");
     println!("============================================================");
@@ -6656,7 +7273,23 @@ fn cmd_test_email(args: &[String]) {
     }
 }
 
-fn cmd_install() {
+fn cmd_install(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM CLI System Installation:");
+        println!("  agm install");
+        println!("\nDescription:");
+        println!(
+            "  Installs the agm executable into the user system PATH (%LOCALAPPDATA%\\agm-cli on Windows,"
+        );
+        println!("  ~/.local/bin on Linux/macOS) and configures the 'agm' global command.");
+        println!("\nExamples:");
+        println!("  agm install                         # Install agm to system PATH");
+        return;
+    }
+
     println!("[*] Installing AGM CLI into system PATH...");
 
     let current_exe = match env::current_exe() {
@@ -7081,9 +7714,28 @@ fn cmd_update(args: &[String]) {
 }
 
 fn cmd_ssh(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: agm ssh <[user@]host> [-p port] [--password <pwd>] [--update] [cmd...]");
-        std::process::exit(1);
+    if args.is_empty()
+        || args
+            .iter()
+            .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Remote SSH Fleet Management:");
+        println!("  agm ssh <[user@]host> [-p <port>] [--password <pwd>] [--update] [cmd...]");
+        println!("\nDescription:");
+        println!("  Connects to a remote Linux or Windows VM via SSH to run management commands,");
+        println!("  execute remote binary updates, or monitor remote node health.");
+        println!("\nOptions:");
+        println!("    -p, --port <port>   Custom SSH port (default: 22)");
+        println!("    --password <pwd>    Password for SSH authentication");
+        println!("    --update            Trigger remote update on target host");
+        println!("\nExamples:");
+        println!("  agm ssh root@192.168.1.50           # Open SSH connection to remote VM");
+        println!("  agm ssh root@192.168.1.50 --update  # Remotely update AGM binary on target");
+        println!("  agm ssh root@192.168.1.50 agm status # Execute remote agm status");
+        if args.is_empty() {
+            std::process::exit(1);
+        }
+        return;
     }
 
     let mut target = String::new();
@@ -7245,7 +7897,21 @@ fn read_password_masked() -> String {
     input.trim().to_string()
 }
 
-fn cmd_test_training(_args: &[String]) {
+fn cmd_test_training(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Machine Training & Telemetry REST API Test:");
+        println!("  agm test-training [--help]");
+        println!("\nDescription:");
+        println!("  Runs diagnostic checks against the machine telemetry and REST training API endpoints.");
+        println!("\nAliases: agm test-training, agm training, agm train");
+        println!("\nExamples:");
+        println!("  agm test-training                   # Verify telemetry and training API");
+        return;
+    }
+
     println!("============================================================");
     println!("  AGM MACHINE TRAINING & TELEMETRY REST API TEST SUITE");
     println!("============================================================");

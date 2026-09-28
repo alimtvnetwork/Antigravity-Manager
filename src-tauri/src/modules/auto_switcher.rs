@@ -939,13 +939,27 @@ pub async fn select_and_verify_next_best_profile(
             continue;
         }
 
-        // Distributed lease check
+        // Distributed lease check in Supabase Root DB
         if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
             &cand_acc.id,
             &candidate.email,
         ) {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is currently leased by another active node. Skipping...",
+                candidate.email
+            ));
+            continue;
+        }
+
+        // Cross-VM email status broadcast check
+        if crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
+            .iter()
+            .any(|x| {
+                x.eq_ignore_ascii_case(&cand_acc.id) || x.eq_ignore_ascii_case(&candidate.email)
+            })
+        {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Candidate '{}' is held by another VM node via inbound email broadcast. Skipping...",
                 candidate.email
             ));
             continue;
@@ -1025,6 +1039,7 @@ pub async fn execute_profile_rotation_with_context(
 
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
     let backup_res = crate::modules::repo_db::backup_running_prompts(inst_id);
+    let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
     let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
     match &backup_res {
         Ok(c) => {
@@ -1098,7 +1113,7 @@ pub async fn execute_profile_rotation_with_context(
         .map(|p| p.repo_name)
         .filter(|n| !n.is_empty())
         .collect();
-    let backup_count_opt = backup_res.ok();
+    let backup_count_opt = backup_res.as_ref().ok().copied();
 
     crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
@@ -1116,7 +1131,7 @@ pub async fn execute_profile_rotation_with_context(
             instance_mode: String::new(),
             reason: reason.clone(),
             is_auto: true,
-            backed_up_projects: proj_names,
+            backed_up_projects: proj_names.clone(),
             backed_up_prompts_count: backup_count_opt,
             restored_prompts_count: None,
         },
@@ -1197,6 +1212,14 @@ pub async fn execute_profile_rotation_with_context(
         "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched, {} verified active running for instance '{}'",
         resent_count, dispatched_count, verified_running, inst_id
     ));
+
+    crate::modules::notification_hub::notify_post_switch_prompt_status(
+        inst_id,
+        backed_up_count,
+        resent_count + dispatched_count,
+        verified_running,
+        proj_names,
+    );
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();
