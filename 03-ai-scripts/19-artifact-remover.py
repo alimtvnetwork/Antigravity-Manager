@@ -192,6 +192,7 @@ def collect_matching_artifacts(
     is_clean_pycache: bool = False,
     is_clean_binaries: bool = False,
     is_clean_temp: bool = False,
+    is_clean_cargo: bool = False,
     root_dir: str = CURRENT_DIR
 ) -> list[Path]:
     """Discovers and aggregates all artifact candidates matching filter criteria."""
@@ -260,6 +261,20 @@ def collect_matching_artifacts(
                 if is_binary_file(p_file):
                     candidates.append(p_file)
 
+    # 5.5. Rust/Cargo Incremental Compiler Cache & Bloat Preset (--clean-cargo / --clean-rust)
+    if is_clean_cargo:
+        for r, dirs, files in os.walk(root_dir, topdown=False):
+            dirs[:] = [d for d in dirs if not is_ignored_directory(d)]
+            for d in list(dirs):
+                p_dir = Path(r) / d
+                if d in {"incremental", ".fingerprint", "build-demo", "target-demo"}:
+                    candidates.append(p_dir)
+            for f in files:
+                p_file = Path(r) / f
+                ext = os.path.splitext(f)[1].lower()
+                if ext in {".pdb", ".d", ".o"} and ("target" in p_file.parts):
+                    candidates.append(p_file)
+
     # 6. Extensible Custom Extension Filter (--add-ext)
     if add_exts:
         for r, dirs, files in os.walk(root_dir, topdown=False):
@@ -317,6 +332,7 @@ def run_artifact_remover(
     is_clean_pycache: bool = False,
     is_clean_binaries: bool = False,
     is_clean_temp: bool = False,
+    is_clean_cargo: bool = False,
     is_force_mode: bool = False,
     is_dry_run_mode: bool = False,
     is_use_trash: bool = True,
@@ -340,6 +356,7 @@ def run_artifact_remover(
         is_clean_pycache=is_clean_pycache,
         is_clean_binaries=is_clean_binaries,
         is_clean_temp=is_clean_temp,
+        is_clean_cargo=is_clean_cargo,
         root_dir=root_dir
     )
 
@@ -423,7 +440,8 @@ Examples:
     parser.add_argument("--clean-pycache", action="store_true", help="Remove __pycache__, .pytest_cache, and .pyc/.pyo files")
     parser.add_argument("--clean-temp", action="store_true", help="Remove temporary files (.tmp, .log, .swp, .bak, .DS_Store)")
     parser.add_argument("--clean-binaries", action="store_true", help="Remove unapproved binary blobs and image artifacts")
-    parser.add_argument("--clean-all", action="store_true", help="Enable pycache, temp files, and binary cleanup presets")
+    parser.add_argument("--clean-cargo", "--clean-rust", action="store_true", help="Remove Rust/Cargo compiler cache and build artifacts (target/debug/incremental, *.rlib, *.rmeta)")
+    parser.add_argument("--clean-all", action="store_true", help="Enable pycache, temp files, cargo incremental, and binary cleanup presets")
     parser.add_argument("--force", "-f", "-y", "--yes", action="store_true", help="Bypass interactive confirmation prompt")
     parser.add_argument("--plan", "--dry-run", "-d", action="store_true", help="Plan Mode: preview matching items without deleting")
     parser.add_argument("--permanent", action="store_true", help="Permanently unlink files without moving to Trash Bin")
@@ -447,11 +465,12 @@ Examples:
     is_clean_pycache = args.clean_pycache or args.clean_all
     is_clean_temp = args.clean_temp or args.clean_all
     is_clean_binaries = args.clean_binaries or args.clean_all
+    is_clean_cargo = args.clean_cargo or args.clean_all
     is_use_trash = not args.permanent
 
     has_work = bool(
         args.targets or custom_paths or custom_exts or custom_patterns or
-        is_clean_pycache or is_clean_temp or is_clean_binaries
+        is_clean_pycache or is_clean_temp or is_clean_binaries or is_clean_cargo
     )
     if not has_work:
         parser.print_help()
@@ -466,6 +485,7 @@ Examples:
         is_clean_pycache=is_clean_pycache,
         is_clean_binaries=is_clean_binaries,
         is_clean_temp=is_clean_temp,
+        is_clean_cargo=is_clean_cargo,
         is_force_mode=args.force,
         is_dry_run_mode=args.plan,
         is_use_trash=is_use_trash,

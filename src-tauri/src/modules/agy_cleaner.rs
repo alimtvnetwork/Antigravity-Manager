@@ -91,6 +91,25 @@ pub fn get_gemini_base_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".gemini").join("antigravity"))
 }
 
+/// Get all existing candidate Gemini Antigravity base directories (antigravity, antigravity-cli, antigravity-ide)
+pub fn get_gemini_candidate_dirs() -> Vec<PathBuf> {
+    let mut dirs_list = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+            let p = home.join(".gemini").join(sub);
+            if p.exists() && !dirs_list.contains(&p) {
+                dirs_list.push(p);
+            }
+        }
+    }
+    if dirs_list.is_empty() {
+        if let Some(def) = get_gemini_base_dir() {
+            dirs_list.push(def);
+        }
+    }
+    dirs_list
+}
+
 /// Get the temporary staging directory for recoverable backups
 pub fn get_temp_staging_dir() -> PathBuf {
     std::env::temp_dir().join("antigravity-cleaner-backup")
@@ -155,104 +174,108 @@ pub fn get_dir_size_bytes(path: &Path) -> u64 {
     total
 }
 
-/// Scan all conversations and sort by recency (newest first)
+/// Scan all conversations across all candidate base directories and sort by recency (newest first)
 pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
-    let base_dir = match get_gemini_base_dir() {
-        Some(dir) => dir,
-        None => return Vec::new(),
-    };
+    let candidate_dirs = get_gemini_candidate_dirs();
+    let mut conversations = Vec::new();
+    let mut seen_cids = std::collections::HashSet::new();
 
-    let conv_dir = base_dir.join("conversations");
-    if !conv_dir.is_dir() {
-        return Vec::new();
-    }
+    for base_dir in &candidate_dirs {
+        let conv_dir = base_dir.join("conversations");
+        if !conv_dir.is_dir() {
+            continue;
+        }
 
-    // Load indexed metadata from conversation_summaries.db if present
-    let summaries_db_path = base_dir.join("conversation_summaries.db");
-    let mut summaries_map: std::collections::HashMap<
-        String,
-        (String, String, i64, String, String),
-    > = std::collections::HashMap::new();
+        // Load indexed metadata from conversation_summaries.db if present in this base_dir
+        let summaries_db_path = base_dir.join("conversation_summaries.db");
+        let mut summaries_map: std::collections::HashMap<
+            String,
+            (String, String, i64, String, String),
+        > = std::collections::HashMap::new();
 
-    if summaries_db_path.is_file() {
-        if let Ok(conn) = Connection::open_with_flags(
-            &summaries_db_path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        ) {
-            let query = "SELECT conversation_id, title, preview, step_count, workspace_uris, last_modified_time FROM conversation_summaries";
-            if let Ok(mut stmt) = conn.prepare(query) {
-                let rows = stmt.query_map([], |row| {
-                    let cid: String = row.get(0)?;
-                    let title: String = row.get(1).unwrap_or_default();
-                    let preview: String = row.get(2).unwrap_or_default();
-                    let step_count: i64 = row.get(3).unwrap_or(0);
-                    let uris: String = row.get(4).unwrap_or_default();
-                    let last_mod: String = row.get(5).unwrap_or_default();
-                    Ok((cid, title, preview, step_count, uris, last_mod))
-                });
+        if summaries_db_path.is_file() {
+            if let Ok(conn) = Connection::open_with_flags(
+                &summaries_db_path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            ) {
+                let query = "SELECT conversation_id, title, preview, step_count, workspace_uris, last_modified_time FROM conversation_summaries";
+                if let Ok(mut stmt) = conn.prepare(query) {
+                    let rows = stmt.query_map([], |row| {
+                        let cid: String = row.get(0)?;
+                        let title: String = row.get(1).unwrap_or_default();
+                        let preview: String = row.get(2).unwrap_or_default();
+                        let step_count: i64 = row.get(3).unwrap_or(0);
+                        let uris: String = row.get(4).unwrap_or_default();
+                        let last_mod: String = row.get(5).unwrap_or_default();
+                        Ok((cid, title, preview, step_count, uris, last_mod))
+                    });
 
-                if let Ok(items) = rows {
-                    for item in items.flatten() {
-                        summaries_map.insert(item.0, (item.1, item.2, item.3, item.4, item.5));
+                    if let Ok(items) = rows {
+                        for item in items.flatten() {
+                            summaries_map.insert(item.0, (item.1, item.2, item.3, item.4, item.5));
+                        }
                     }
                 }
             }
         }
-    }
 
-    let mut conversations = Vec::new();
-    if let Ok(entries) = fs::read_dir(&conv_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let is_db = path.extension().and_then(|s| s.to_str()) == Some("db");
-            if !is_db {
-                continue;
-            }
+        if let Ok(entries) = fs::read_dir(&conv_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_db = path.extension().and_then(|s| s.to_str()) == Some("db");
+                if !is_db {
+                    continue;
+                }
 
-            let cid = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(stem) => stem.to_string(),
-                None => continue,
-            };
-
-            let metadata = fs::metadata(&path).ok();
-            let file_size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
-            let mtime_secs = metadata
-                .as_ref()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-
-            let (title, preview, step_count, workspace_uris, last_mod) =
-                if let Some(entry_meta) = summaries_map.get(&cid) {
-                    (
-                        entry_meta.0.clone(),
-                        entry_meta.1.clone(),
-                        entry_meta.2,
-                        entry_meta.3.clone(),
-                        entry_meta.4.clone(),
-                    )
-                } else {
-                    (
-                        String::new(),
-                        String::new(),
-                        0,
-                        String::new(),
-                        mtime_secs.to_string(),
-                    )
+                let cid = match path.file_stem().and_then(|s| s.to_str()) {
+                    Some(stem) => stem.to_string(),
+                    None => continue,
                 };
 
-            conversations.push(ConversationItem {
-                conversation_id: cid,
-                title,
-                preview,
-                step_count,
-                workspace_uris,
-                last_modified_time: last_mod,
-                db_path: path.to_string_lossy().to_string(),
-                file_size,
-                is_preserved: false,
-            });
+                if !seen_cids.insert(cid.clone()) {
+                    continue;
+                }
+
+                let metadata = fs::metadata(&path).ok();
+                let file_size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                let mtime_secs = metadata
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+
+                let (title, preview, step_count, workspace_uris, last_mod) =
+                    if let Some(entry_meta) = summaries_map.get(&cid) {
+                        (
+                            entry_meta.0.clone(),
+                            entry_meta.1.clone(),
+                            entry_meta.2,
+                            entry_meta.3.clone(),
+                            entry_meta.4.clone(),
+                        )
+                    } else {
+                        (
+                            String::new(),
+                            String::new(),
+                            0,
+                            String::new(),
+                            mtime_secs.to_string(),
+                        )
+                    };
+
+                conversations.push(ConversationItem {
+                    conversation_id: cid,
+                    title,
+                    preview,
+                    step_count,
+                    workspace_uris,
+                    last_modified_time: last_mod,
+                    db_path: path.to_string_lossy().to_string(),
+                    file_size,
+                    is_preserved: false,
+                });
+            }
         }
     }
 
@@ -337,9 +360,6 @@ pub fn prune_conversations_only(keep_count: usize) -> Result<PruneResult, String
 }
 
 fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, String> {
-    let base_dir = get_gemini_base_dir()
-        .ok_or_else(|| "Failed to determine Antigravity base directory".to_string())?;
-
     let staging_root = get_temp_staging_dir();
     let tx_id = format!("tx_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
     let tx_dir = staging_root.join(&tx_id);
@@ -355,8 +375,6 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
     let mut staged_items = Vec::new();
     let mut pruned_bytes = 0u64;
     let mut errors = Vec::new();
-
-    let brain_root = base_dir.join("brain");
 
     for conv in &convs {
         if conv.is_preserved {
@@ -374,17 +392,33 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
         match safe_move_path(&db_src, &db_dest) {
             Ok(_) => {
                 pruned_bytes += sz;
-                let brain_src = brain_root.join(&conv.conversation_id);
-                let brain_dest = tx_brain_dir.join(&conv.conversation_id);
+                let conv_base_opt = db_src.parent().and_then(|p| p.parent());
+                let brain_src_opt = conv_base_opt.map(|b| b.join("brain").join(&conv.conversation_id));
                 let mut brain_staged_str = None;
                 let mut brain_orig_str = None;
 
-                if brain_src.is_dir() {
-                    let bsz = get_dir_size_bytes(&brain_src);
-                    if let Ok(_) = safe_move_path(&brain_src, &brain_dest) {
-                        pruned_bytes += bsz;
-                        brain_staged_str = Some(brain_dest.to_string_lossy().to_string());
-                        brain_orig_str = Some(brain_src.to_string_lossy().to_string());
+                if let Some(brain_src) = brain_src_opt {
+                    if brain_src.is_dir() {
+                        let brain_dest = tx_brain_dir.join(&conv.conversation_id);
+                        let bsz = get_dir_size_bytes(&brain_src);
+                        if safe_move_path(&brain_src, &brain_dest).is_ok() {
+                            pruned_bytes += bsz;
+                            brain_staged_str = Some(brain_dest.to_string_lossy().to_string());
+                            brain_orig_str = Some(brain_src.to_string_lossy().to_string());
+                        }
+                    }
+                }
+
+                // Also clean from conversation_summaries.db if present
+                if let Some(conv_base) = conv_base_opt {
+                    let summaries_db = conv_base.join("conversation_summaries.db");
+                    if summaries_db.is_file() {
+                        if let Ok(conn) = Connection::open(&summaries_db) {
+                            let _ = conn.execute(
+                                "DELETE FROM conversation_summaries WHERE conversation_id = ?",
+                                [&conv.conversation_id],
+                            );
+                        }
                     }
                 }
 
@@ -414,24 +448,26 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
             }
         };
 
-        // Clean ephemeral brain subfolders (crashes, logs, tempmediaStorage)
-        let static_ephemeral = [
-            base_dir.join("crashes"),
-            base_dir.join("log"),
-            base_dir.join("brain").join("tempmediaStorage"),
-            base_dir.join("brain").join("cache"),
-        ];
+        // Clean ephemeral brain subfolders across all candidate directories
+        for base_dir in &get_gemini_candidate_dirs() {
+            let static_ephemeral = [
+                base_dir.join("crashes"),
+                base_dir.join("log"),
+                base_dir.join("brain").join("tempmediaStorage"),
+                base_dir.join("brain").join("cache"),
+            ];
 
-        for eph in &static_ephemeral {
-            if eph.is_dir() {
-                if let Ok(entries) = fs::read_dir(eph) {
-                    for item in entries.flatten() {
-                        let path = item.path();
-                        let _ = if path.is_dir() {
-                            fs::remove_dir_all(&path)
-                        } else {
-                            fs::remove_file(&path)
-                        };
+            for eph in &static_ephemeral {
+                if eph.is_dir() {
+                    if let Ok(entries) = fs::read_dir(eph) {
+                        for item in entries.flatten() {
+                            let path = item.path();
+                            let _ = if path.is_dir() {
+                                fs::remove_dir_all(&path)
+                            } else {
+                                fs::remove_file(&path)
+                            };
+                        }
                     }
                 }
             }

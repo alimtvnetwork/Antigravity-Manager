@@ -383,147 +383,156 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
 /// (~/.gemini/antigravity/conversation_summaries.db and brain/<cid>/.system_generated/logs/transcript.jsonl)
 pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<ActivePrompt> {
     let mut prompts = Vec::new();
-    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
-    let Some(base_dir) = base_dir else {
-        return prompts;
-    };
-    let summaries_db = base_dir.join("conversation_summaries.db");
-    if !summaries_db.exists() {
-        return prompts;
-    }
+    let mut seen_cids = std::collections::HashSet::new();
+    let candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
 
-    let conn = match Connection::open_with_flags(
-        &summaries_db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) {
-        Ok(c) => c,
-        Err(_) => return prompts,
-    };
-
-    let now = Utc::now().timestamp();
-    let mut stmt = match conn.prepare(
-        "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
-         FROM conversation_summaries 
-         ORDER BY last_modified_time DESC 
-         LIMIT 25",
-    ) {
-        Ok(s) => s,
-        Err(_) => return prompts,
-    };
-
-    let rows = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, String>(3)?,
-            row.get::<_, i32>(4)?,
-            row.get::<_, Option<String>>(5)?,
-            row.get::<_, String>(6)?,
-        ))
-    });
-
-    let Ok(rows) = rows else {
-        return prompts;
-    };
-
-    for item in rows.flatten() {
-        let (cid, _title, _preview, status, not_fully_idle, ws_uris_opt, _last_time) = item;
-        let is_running_or_recent =
-            not_fully_idle != 0 || status.contains("RUNNING") || prompts.is_empty();
-        if !is_running_or_recent && prompts.len() >= 5 {
+    for base_dir in candidate_dirs {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if !summaries_db.exists() {
             continue;
         }
 
-        let Some(ws_uris_raw) = ws_uris_opt else {
+        let conn = match Connection::open_with_flags(
+            &summaries_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        ) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let now = Utc::now().timestamp();
+        let mut stmt = match conn.prepare(
+            "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+             FROM conversation_summaries 
+             ORDER BY last_modified_time DESC 
+             LIMIT 25",
+        ) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i32>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+            ))
+        });
+
+        let Ok(rows) = rows else {
             continue;
         };
 
-        let ws_uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
-        if ws_uris.is_empty() {
-            continue;
-        }
+        for item in rows.flatten() {
+            let (cid, _title, _preview, status, not_fully_idle, ws_uris_opt, _last_time) = item;
+            if !seen_cids.insert(cid.clone()) {
+                continue;
+            }
 
-        let repo_path = decode_uri_to_path(&ws_uris[0]);
-        let repo_name = Path::new(&repo_path)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "antigravity-project".to_string());
-        let project_id = format!(
-            "{}-{}",
-            repo_name.to_lowercase(),
-            cid.chars().take(8).collect::<String>()
-        );
+            let is_running_or_recent =
+                not_fully_idle != 0 || status.contains("RUNNING") || prompts.is_empty();
+            if !is_running_or_recent && prompts.len() >= 5 {
+                continue;
+            }
 
-        // Read transcript.jsonl from brain/<cid>/.system_generated/logs/transcript.jsonl
-        let transcript_file = base_dir
-            .join("brain")
-            .join(&cid)
-            .join(".system_generated")
-            .join("logs")
-            .join("transcript.jsonl");
+            let Some(ws_uris_raw) = ws_uris_opt else {
+                continue;
+            };
 
-        let mut user_prompt: Option<String> = None;
-        let mut image_payload: Option<String> = None;
+            let ws_uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+            if ws_uris.is_empty() {
+                continue;
+            }
 
-        if transcript_file.exists() {
-            if let Ok(content) = fs::read_to_string(&transcript_file) {
-                for line in content.lines().rev() {
-                    if !line.contains("USER_INPUT") {
-                        continue;
-                    }
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                        if val.get("type").and_then(|t| t.as_str()) == Some("USER_INPUT") {
-                            if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
-                                if !txt.trim().is_empty() {
-                                    user_prompt = Some(txt.to_string());
+            let repo_path = decode_uri_to_path(&ws_uris[0]);
+            let repo_name = Path::new(&repo_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "antigravity-project".to_string());
+            let project_id = format!(
+                "{}-{}",
+                repo_name.to_lowercase(),
+                cid.chars().take(8).collect::<String>()
+            );
+
+            // Read transcript.jsonl from brain/<cid>/.system_generated/logs/transcript.jsonl
+            let transcript_file = base_dir
+                .join("brain")
+                .join(&cid)
+                .join(".system_generated")
+                .join("logs")
+                .join("transcript.jsonl");
+
+            let mut user_prompt: Option<String> = None;
+            let mut image_payload: Option<String> = None;
+
+            if transcript_file.exists() {
+                if let Ok(content) = fs::read_to_string(&transcript_file) {
+                    for line in content.lines().rev() {
+                        if !line.contains("USER_INPUT") {
+                            continue;
+                        }
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                            if val.get("type").and_then(|t| t.as_str()) == Some("USER_INPUT") {
+                                if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
+                                    if !txt.trim().is_empty() {
+                                        user_prompt = Some(txt.to_string());
+                                    }
                                 }
-                            }
-                            if let Some(media_arr) = val.get("media").and_then(|m| m.as_array()) {
-                                for m_item in media_arr {
-                                    if let Some(uri) = m_item.get("uri").and_then(|u| u.as_str()) {
-                                        let clean_path = decode_uri_to_path(uri);
-                                        let p = Path::new(&clean_path);
-                                        if p.exists() {
-                                            if let Ok(bytes) = fs::read(p) {
-                                                let mime = m_item
-                                                    .get("mime_type")
-                                                    .and_then(|mt| mt.as_str())
-                                                    .unwrap_or("image/png");
-                                                let b64 = STANDARD.encode(&bytes);
-                                                image_payload =
-                                                    Some(format!("data:{};base64,{}", mime, b64));
-                                                break;
+                                if let Some(media_arr) = val.get("media").and_then(|m| m.as_array())
+                                {
+                                    for m_item in media_arr {
+                                        if let Some(uri) =
+                                            m_item.get("uri").and_then(|u| u.as_str())
+                                        {
+                                            let clean_path = decode_uri_to_path(uri);
+                                            let p = Path::new(&clean_path);
+                                            if p.exists() {
+                                                if let Ok(bytes) = fs::read(p) {
+                                                    let mime = m_item
+                                                        .get("mime_type")
+                                                        .and_then(|mt| mt.as_str())
+                                                        .unwrap_or("image/png");
+                                                    let b64 = STANDARD.encode(&bytes);
+                                                    image_payload = Some(format!(
+                                                        "data:{};base64,{}",
+                                                        mime, b64
+                                                    ));
+                                                    break;
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                            if user_prompt.is_some() {
-                                break;
+                                if user_prompt.is_some() {
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        if let Some(prompt_text) = user_prompt {
-            let p_id = format!("prompt-{}", cid);
-            prompts.push(ActivePrompt {
-                id: p_id,
-                project_id,
-                instance_id: instance_id.to_string(),
-                repo_path,
-                prompt_content: prompt_text,
-                model: Some("gemini-pro".to_string()),
-                session_id: Some(cid),
-                status: "backed_up".to_string(),
-                created_at: now,
-                updated_at: now,
-                image_payload,
-            });
+            if let Some(prompt_text) = user_prompt {
+                let p_id = format!("prompt-{}", cid);
+                prompts.push(ActivePrompt {
+                    id: p_id,
+                    project_id,
+                    instance_id: instance_id.to_string(),
+                    repo_path,
+                    prompt_content: prompt_text,
+                    model: Some("gemini-pro".to_string()),
+                    session_id: Some(cid),
+                    status: "backed_up".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                    image_payload,
+                });
+            }
         }
     }
 
@@ -1679,23 +1688,6 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         cmd.current_dir(&ws_dir);
         cmd.arg("--dangerously-skip-permissions");
 
-        if !prompt.instance_id.is_empty()
-            && prompt.instance_id != "default"
-            && prompt.instance_id != "__default__"
-        {
-            if let Ok(registry) = crate::modules::instance::load_registry() {
-                if let Some(inst) = registry
-                    .instances
-                    .iter()
-                    .find(|i| i.id == prompt.instance_id || i.name == prompt.instance_id)
-                {
-                    if !inst.data_dir.trim().is_empty() {
-                        cmd.arg(format!("--user-data-dir={}", inst.data_dir));
-                    }
-                }
-            }
-        }
-
         if clean_prompt.len() <= 24000 {
             cmd.arg("-p").arg(&clean_prompt);
         } else {
@@ -2369,10 +2361,10 @@ pub fn get_project_conversation_tree(
         }
     }
 
-    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    let candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
+    let mut seen_tree_cids = std::collections::HashSet::new();
 
-    if let Some(ref base) = base_dir {
+    for base in &candidate_dirs {
         let summaries_db = base.join("conversation_summaries.db");
         if summaries_db.exists() {
             let s_conn = Connection::open_with_flags(
@@ -2412,6 +2404,9 @@ pub fn get_project_conversation_tree(
                     }) {
                         for item in rows.flatten() {
                             let (cid, title, preview, status, not_fully_idle, ws_uris_opt, last_time_str) = item;
+                            if !seen_tree_cids.insert(cid.clone()) {
+                                continue;
+                            }
                             let is_recency_active = if let Ok(parsed) =
                                 chrono::DateTime::parse_from_rfc3339(&last_time_str)
                             {

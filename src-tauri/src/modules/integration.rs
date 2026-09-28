@@ -319,7 +319,10 @@ impl SystemIntegration for DesktopIntegration {
             "[Desktop] [Step 1/5] Backing up running prompts via AGM before closing Antigravity IDE...",
         );
         let _ = crate::modules::repo_db::backup_running_prompts("default");
-        let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
+        let _ = crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(
+            Some("default"),
+            None,
+        );
 
         // =========================================================================
         // STEP 2: Close the Antigravity IDE
@@ -379,7 +382,11 @@ impl SystemIntegration for DesktopIntegration {
             "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
         );
         let _ = crate::modules::repo_db::resend_all_running_commands(20);
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+            Some("default"),
+            false,
+            None,
+        );
         let _ = crate::modules::repo_db::dispatch_running_prompts("default");
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
@@ -674,9 +681,9 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
     Ok(())
 }
 
-/// 辅助方法：同步写入本地文件凭据 (~/.gemini/oauth_creds.json 以及 ~/.gemini/google_accounts.json)
-/// 用于在 SSH 会话、容器环境或无系统 Keyring / D-Bus 的场景下保障 CLI/工具的凭据兼容性
-fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), String> {
+/// 辅助方法：同步写入本地文件凭据 (~/.gemini/oauth_creds.json, ~/.gemini/google_accounts.json, 以及 ~/.gemini/jetski-standalone-oauth-token)
+/// 用于在 SSH 会话、容器环境或无系统 Keyring / D-Bus 的场景下保障 CLI/工具/Worker 的凭据兼容性
+pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), String> {
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => return Err("Failed to resolve user home directory".to_string()),
@@ -698,6 +705,10 @@ fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), Str
     } else {
         account.token.expiry_timestamp * 1000
     };
+
+    let expiry_datetime = chrono::DateTime::from_timestamp(account.token.expiry_timestamp, 0)
+        .unwrap_or_else(chrono::Utc::now);
+    let expiry_rfc3339 = expiry_datetime.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
 
     #[derive(serde::Serialize)]
     struct OAuthCredsFile {
@@ -759,8 +770,28 @@ fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), Str
         }
     }
 
+    // Sync jetski-standalone-oauth-token in ~/.gemini for Go language_server worker fallback
+    let jetski_payload = serde_json::json!({
+        "token": {
+            "access_token": account.token.access_token,
+            "token_type": "Bearer",
+            "refresh_token": account.token.refresh_token,
+            "expiry": expiry_rfc3339,
+        },
+        "auth_method": "consumer"
+    });
+    let jetski_path = gemini_dir.join("jetski-standalone-oauth-token");
+    if let Ok(jetski_json) = serde_json::to_string(&jetski_payload) {
+        let _ = std::fs::write(&jetski_path, jetski_json);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&jetski_path, std::fs::Permissions::from_mode(0o600));
+        }
+    }
+
     crate::modules::logger::log_info(&format!(
-        "[Desktop] Successfully synced file-based credentials to ~/.gemini/oauth_creds.json for: {}",
+        "[Desktop] Successfully synced file-based credentials to ~/.gemini/ for: {}",
         account.email
     ));
 

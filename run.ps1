@@ -66,9 +66,15 @@ function Write-Err {
 
 $ScriptDir = $PSScriptRoot
 
-# Intercept CLI subcommands (agy, ccko, cckf, undo, cache-clear, help)
-if ($args.Count -gt 0 -and ($args[0] -in @("agy", "agi", "ccko", "cckf", "undo", "cache-clear", "--help", "-h", "help"))) {
-    $cargoArgs = @("run", "--bin", "agm-alim", "--manifest-path", (Join-Path $ScriptDir "src-tauri\Cargo.toml"), "--") + $args
+# Intercept CLI subcommands (dev-tool-clear, agy, agi, ccko, cckf, undo, cache-clear, clear, clean, instances, switch, prompt, ff, accounts, backup, restore, help)
+if ($args.Count -gt 0 -and $args[0] -eq "dev-tool-clear") {
+    $script = Join-Path $ScriptDir "scripts\dev-tool-clear.ps1"
+    & powershell -ExecutionPolicy Bypass -File $script @($args | Select-Object -Skip 1)
+    exit $LASTEXITCODE
+}
+
+if ($args.Count -gt 0 -and ($args[0] -in @("agy", "agi", "ccko", "cckf", "undo", "cache-clear", "clear-cache", "clear", "clean", "instances", "instance", "switch", "prompt", "ff", "accounts", "account", "backup", "restore", "backup-running-prompts", "restore-running-prompts", "running-prompts", "running-projects", "--help", "-h", "help"))) {
+    $cargoArgs = @("run", "--bin", "agm", "--manifest-path", (Join-Path $ScriptDir "src-tauri\Cargo.toml"), "--") + $args
     & cargo @cargoArgs
     exit $LASTEXITCODE
 }

@@ -985,23 +985,29 @@ fn cmd_switch(args: &[String]) {
         _ => "(None / Standby)".to_string(),
     };
 
-    if let Err(e) = account::set_current_account_id(&target.id) {
+    let target_instance_opt = args
+        .iter()
+        .position(|a| a == "--instance" || a == "-i")
+        .and_then(|pos| args.get(pos + 1).map(|s| s.as_str()));
+
+    println!(
+        "[*] Switching account to '{}' (ID: {})...",
+        target.email, target.id
+    );
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to initialize async runtime: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(e) = rt.block_on(instance::switch_account_to_instance(
+        &target.id,
+        target_instance_opt,
+    )) {
         eprintln!("[ERROR] Failed to switch active account: {}", e);
         std::process::exit(1);
-    }
-
-    let _ = account::apply_device_profile(&target.id);
-    let _ = instance::bind_account_to_instance("default", &target.id, &target.email);
-
-    // Acquire distributed lease in Supabase Root DB and sync local node state
-    if let Ok(rt) = tokio::runtime::Runtime::new() {
-        let _ = rt.block_on(workspace_lease_manager::acquire_lease_with_details(
-            &target.id,
-            &target.email,
-            "default",
-            90,
-        ));
-        let _ = rt.block_on(supabase_sync::sync_local_node_now());
     }
 
     println!("[SUCCESS] Active account switched:");
@@ -2644,18 +2650,32 @@ fn cmd_backup_running_prompts(args: &[String]) {
 
     let is_json = args.iter().any(|a| a == "--json");
     let mut custom_file: Option<&str> = None;
+    let mut target_instance =
+        instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
     let mut i = 0;
     while i < args.len() {
         if (args[i] == "-f" || args[i] == "--file" || args[i] == "-file") && i + 1 < args.len() {
             custom_file = Some(&args[i + 1]);
             i += 2;
             continue;
+        } else if (args[i] == "-i" || args[i] == "--instance" || args[i] == "-instance")
+            && i + 1 < args.len()
+        {
+            let spec = &args[i + 1];
+            target_instance = instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.clone());
+            i += 2;
+            continue;
+        } else if args[i].starts_with("--instance=") || args[i].starts_with("-i=") {
+            if let Some(spec) = args[i].split('=').nth(1) {
+                target_instance =
+                    instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.to_string());
+            }
         }
         i += 1;
     }
 
-    let _ = repo_db::backup_running_prompts("default");
-    match backup_prompts_db::backup_active_running_prompts(custom_file) {
+    let _ = repo_db::backup_running_prompts(&target_instance);
+    match backup_prompts_db::backup_active_running_prompts(Some(&target_instance), custom_file) {
         Ok((batch, records)) => {
             if is_json {
                 let payload = serde_json::json!({
@@ -2739,19 +2759,37 @@ fn cmd_restore_running_prompts(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json");
     let keep_backup = args.iter().any(|a| a == "--keep" || a == "-k");
     let mut custom_file: Option<&str> = None;
+    let mut target_instance =
+        instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
     let mut i = 0;
     while i < args.len() {
         if (args[i] == "-f" || args[i] == "--file" || args[i] == "-file") && i + 1 < args.len() {
             custom_file = Some(&args[i + 1]);
             i += 2;
             continue;
+        } else if (args[i] == "-i" || args[i] == "--instance" || args[i] == "-instance")
+            && i + 1 < args.len()
+        {
+            let spec = &args[i + 1];
+            target_instance = instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.clone());
+            i += 2;
+            continue;
+        } else if args[i].starts_with("--instance=") || args[i].starts_with("-i=") {
+            if let Some(spec) = args[i].split('=').nth(1) {
+                target_instance =
+                    instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.to_string());
+            }
         }
         i += 1;
     }
 
-    let _ = repo_db::resend_all_running_commands(20);
-    let _ = repo_db::dispatch_running_prompts("default");
-    match backup_prompts_db::restore_running_prompts(keep_backup, custom_file) {
+    let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
+    let _ = repo_db::dispatch_running_prompts(&target_instance);
+    match backup_prompts_db::restore_running_prompts(
+        Some(&target_instance),
+        keep_backup,
+        custom_file,
+    ) {
         Ok(records) => {
             if is_json {
                 let payload = serde_json::json!({
@@ -3049,7 +3087,7 @@ fn cmd_running_prompts_export(args: &[String]) {
             file_path
         );
     } else {
-        match backup_prompts_db::backup_active_running_prompts(Some(&file_path)) {
+        match backup_prompts_db::backup_active_running_prompts(Some("default"), Some(&file_path)) {
             Ok((batch, records)) => {
                 println!(
                     "[SUCCESS] Exported {} prompts to SQLite DB: {}",
@@ -3128,7 +3166,7 @@ fn cmd_running_prompts_import(args: &[String]) {
             file_path
         );
     } else {
-        match backup_prompts_db::restore_running_prompts(true, Some(&file_path)) {
+        match backup_prompts_db::restore_running_prompts(Some("default"), true, Some(&file_path)) {
             Ok(records) => {
                 println!(
                     "[SUCCESS] Imported and enqueued {} prompt(s) from SQLite DB: {}",
@@ -5392,8 +5430,21 @@ fn cmd_clean(args: &[String]) {
         }
     }
 
+    // 2. Clean build-demo and target-demo directories if present
+    for demo_name in &["build-demo", "target-demo", "src-tauri/build-demo", "src-tauri/target-demo"] {
+        let demo_p = PathBuf::from(demo_name);
+        if demo_p.is_dir() {
+            if let Ok(meta) = fs::metadata(&demo_p) {
+                reclaimed_bytes += meta.len();
+            }
+            if fs::remove_dir_all(&demo_p).is_ok() {
+                removed_dirs += 1;
+            }
+        }
+    }
+
     println!(
-        "    [✓] Temporary test artifacts removed: {} folder(s)",
+        "    [✓] Temporary test and build-demo artifacts removed: {} folder(s)",
         removed_dirs
     );
     println!("    [✓] Safety invariant verified: all database vaults strictly protected.");
@@ -6355,25 +6406,36 @@ fn cmd_clear_cache(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg = &args[i];
-        if arg == "--keep"
-            || arg == "-k"
-            || arg == "--keep/k"
-            || arg == "-keep/k"
-            || arg == "keep/k"
-            || arg == "-keep"
+        let arg_lower = arg.to_lowercase();
+        if arg_lower == "--keep"
+            || arg_lower == "-k"
+            || arg_lower == "k"
+            || arg_lower == "-keep"
+            || arg_lower == "keep"
+            || arg_lower == "--keep/k"
+            || arg_lower == "-keep/k"
+            || arg_lower == "keep/k"
         {
             if i + 1 < args.len() {
                 keep_count = args[i + 1].parse::<usize>().unwrap_or(10);
                 i += 2;
                 continue;
             }
-        } else if arg.starts_with("--keep=")
-            || arg.starts_with("-k=")
-            || arg.starts_with("--keep/k=")
-            || arg.starts_with("-keep/k=")
+        } else if arg_lower.starts_with("--keep=")
+            || arg_lower.starts_with("-k=")
+            || arg_lower.starts_with("k=")
+            || arg_lower.starts_with("--keep/k=")
+            || arg_lower.starts_with("-keep/k=")
         {
             if let Some(val) = arg.split('=').nth(1) {
                 keep_count = val.parse::<usize>().unwrap_or(10);
+            }
+        } else if (arg_lower.starts_with("-k") && arg_lower.len() > 2)
+            || (arg_lower.starts_with('k') && arg_lower.len() > 1 && arg_lower[1..].chars().all(|c| c.is_ascii_digit()))
+        {
+            let num_str = arg_lower.trim_start_matches("-k").trim_start_matches('k');
+            if let Ok(n) = num_str.parse::<usize>() {
+                keep_count = n;
             }
         } else if !arg.starts_with('-') {
             if let Ok(n) = arg.parse::<usize>() {
@@ -6622,6 +6684,75 @@ fn cmd_instances(args: &[String]) {
             Ok(_) => println!("[SUCCESS] Deleted instance '{}'.", resolved_id),
             Err(e) => {
                 eprintln!("[ERROR] Failed to delete instance '{}': {}", resolved_id, e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // Subcommand: agm instances <seq|id|alias> switch <account_query>
+    if non_flag_args.len() >= 3 && non_flag_args[1].eq_ignore_ascii_case("switch") {
+        let target_spec = non_flag_args[0];
+        let acc_query = non_flag_args[2].trim().to_lowercase();
+        let resolved_id = match instance::resolve_instance_id(target_spec) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Could not resolve instance '{}': {}",
+                    target_spec, e
+                );
+                std::process::exit(1);
+            }
+        };
+        let index = match account::load_account_index() {
+            Ok(idx) => idx,
+            Err(e) => {
+                eprintln!("[ERROR] Failed to load accounts: {}", e);
+                std::process::exit(1);
+            }
+        };
+        let matches: Vec<_> = index
+            .accounts
+            .iter()
+            .filter(|a| {
+                let email_l = a.email.to_lowercase();
+                let id_l = a.id.to_lowercase();
+                email_l.contains(&acc_query) || id_l.contains(&acc_query)
+            })
+            .collect();
+        if matches.is_empty() {
+            eprintln!("[ERROR] No account found matching '{}'.", acc_query);
+            std::process::exit(1);
+        }
+        let target_acc = if matches.len() == 1 {
+            matches[0]
+        } else if let Some(exact) = matches.iter().find(|a| a.email.to_lowercase() == acc_query) {
+            *exact
+        } else {
+            eprintln!("[ERROR] Query '{}' matched multiple accounts:", acc_query);
+            for m in &matches {
+                eprintln!("  - {} (ID: {})", m.email, m.id);
+            }
+            std::process::exit(1);
+        };
+
+        println!(
+            "[*] Switching instance '{}' to account '{}' (ID: {})...",
+            resolved_id, target_acc.email, target_acc.id
+        );
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        match rt.block_on(instance::switch_account_to_instance(
+            &target_acc.id,
+            Some(&resolved_id),
+        )) {
+            Ok(_) => {
+                println!(
+                    "[SUCCESS] Instance '{}' successfully switched to '{}'.",
+                    resolved_id, target_acc.email
+                );
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Instance switch failed: {}", e);
                 std::process::exit(1);
             }
         }

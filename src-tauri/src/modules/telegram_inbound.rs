@@ -1096,7 +1096,7 @@ pub fn execute_backup_command(args_str: &str) -> String {
 
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
         let _ = repo_db::dispatch_running_prompts("default");
-        match backup_prompts_db::restore_running_prompts(false, None) {
+        match backup_prompts_db::restore_running_prompts(Some("default"), false, None) {
             Ok(records) => format!(
                 "♻️ <b>Prompt Restoration Complete:</b>\n\n\
                 • <b>Projects:</b> <code>{}</code>\n\
@@ -1125,7 +1125,7 @@ pub fn execute_backup_command(args_str: &str) -> String {
         };
 
         let _ = repo_db::backup_running_prompts("default");
-        match backup_prompts_db::backup_active_running_prompts(None) {
+        match backup_prompts_db::backup_active_running_prompts(Some("default"), None) {
             Ok((batch, records)) => format!(
                 "🎒 <b>Running Prompts Backed Up Successfully!</b>\n\n\
                 • <b>Projects:</b> <code>{}</code>\n\
@@ -2430,7 +2430,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             };
 
             let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-            let _ = backup_prompts_db::backup_active_running_prompts(None);
+            let _ = backup_prompts_db::backup_active_running_prompts(Some("default"), None);
             let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
             let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
             let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
@@ -2488,7 +2488,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 };
 
                 let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-                let _ = backup_prompts_db::backup_active_running_prompts(None);
+                let _ = backup_prompts_db::backup_active_running_prompts(Some("default"), None);
                 let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
                 let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
                 let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);

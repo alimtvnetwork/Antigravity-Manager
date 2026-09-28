@@ -95,6 +95,24 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. Row Level Security (RLS) & Permissions for Anon/Authenticated Client Roles
+ALTER TABLE public.nodes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on nodes" ON public.nodes;
+CREATE POLICY "Allow anon and auth all access on nodes" ON public.nodes FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.nodes TO anon, authenticated;
+
+ALTER TABLE public.instance_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on instance_profiles" ON public.instance_profiles;
+CREATE POLICY "Allow anon and auth all access on instance_profiles" ON public.instance_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.instance_profiles TO anon, authenticated;
+
+ALTER TABLE public.workspace_leases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on workspace_leases" ON public.workspace_leases;
+CREATE POLICY "Allow anon and auth all access on workspace_leases" ON public.workspace_leases FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.workspace_leases TO anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.acquire_workspace_lease TO anon, authenticated;
 "#;
 
 /// SQL schema statements for Secondary Database (Command Queue & Telemetry)
@@ -178,6 +196,25 @@ BEGIN
     RETURN v_deleted_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 6. Row Level Security (RLS) & Permissions for Anon/Authenticated Client Roles
+ALTER TABLE public.command_queue ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on command_queue" ON public.command_queue;
+CREATE POLICY "Allow anon and auth all access on command_queue" ON public.command_queue FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.command_queue TO anon, authenticated;
+
+ALTER TABLE public.command_telemetry ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on command_telemetry" ON public.command_telemetry;
+CREATE POLICY "Allow anon and auth all access on command_telemetry" ON public.command_telemetry FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.command_telemetry TO anon, authenticated;
+
+ALTER TABLE public.endpoint_health ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon and auth all access on endpoint_health" ON public.endpoint_health;
+CREATE POLICY "Allow anon and auth all access on endpoint_health" ON public.endpoint_health FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON TABLE public.endpoint_health TO anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.claim_next_command TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.prune_old_commands TO anon, authenticated;
 "#;
 
 /// Returns complete schema SQL for a specific database role

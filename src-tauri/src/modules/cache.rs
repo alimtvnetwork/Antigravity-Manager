@@ -78,6 +78,22 @@ pub fn get_antigravity_cache_paths() -> Vec<PathBuf> {
         }
     }
 
+    // Workspace Rust incremental compilation cache (prevents multi-gigabyte build disk exhaustion)
+    if let Ok(cwd) = std::env::current_dir() {
+        let candidate_incrementals = [
+            cwd.join("src-tauri")
+                .join("target")
+                .join("debug")
+                .join("incremental"),
+            cwd.join("target").join("debug").join("incremental"),
+        ];
+        for inc in candidate_incrementals {
+            if inc.exists() && !paths.contains(&inc) {
+                paths.push(inc);
+            }
+        }
+    }
+
     paths
 }
 

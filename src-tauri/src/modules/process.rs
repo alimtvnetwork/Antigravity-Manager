@@ -103,6 +103,13 @@ pub(crate) fn is_helper_process(name: &str, args_str: &str, exe_path: &str) -> b
         || args_lower.contains("--standalone")
         || args_lower.contains("--subclient_type")
         || args_lower.contains("--override_ide_name")
+        || args_lower.contains("embedded-browser-webview")
+        || args_lower.contains("webview")
+        || name_lower.contains("webview")
+        || exe_lower.contains("webview")
+        || name_lower.starts_with("agm")
+        || exe_lower.contains("agm-alim")
+        || exe_lower.ends_with("agm.exe")
         || name_lower.contains("helper")
         || name_lower.contains("plugin")
         || name_lower.contains("renderer")
@@ -245,6 +252,17 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
         }
         if ide_manual_path.is_some() && target_ide == Some("ide") {
             continue;
+        }
+
+        // If checking default (target_ide != Some("ide") and not starting with instance:),
+        // we MUST ignore any process whose command line points to an isolated sandbox instance
+        if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
+            let is_instance_sandbox = args_str.contains(".antigravity_tools")
+                || args_str.contains("/instances/")
+                || args_str.contains("\\instances\\");
+            if is_instance_sandbox {
+                continue;
+            }
         }
 
         // Check if the process matches target_ide
@@ -469,6 +487,17 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             .join(" ");
 
         let is_helper = is_helper_process(&name, &args_str, &exe_path);
+
+        // If checking default (target_ide != Some("ide") and not starting with instance:),
+        // NEVER match isolated sandbox instances so we don't kill running instances
+        if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
+            let is_instance_sandbox = args_str.contains(".antigravity_tools")
+                || args_str.contains("/instances/")
+                || args_str.contains("\\instances\\");
+            if is_instance_sandbox {
+                continue;
+            }
+        }
 
         // Check if the process matches target_ide
         let is_ide_match = if target_ide == Some("ide") {
@@ -1532,6 +1561,15 @@ fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Op
             let args = Some(clean_args);
 
             // Is the process a match for target_ide?
+            if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
+                let is_instance_sandbox = args_str.contains(".antigravity_tools")
+                    || args_str.contains("/instances/")
+                    || args_str.contains("\\instances\\");
+                if is_instance_sandbox {
+                    continue;
+                }
+            }
+
             let is_ide_match = if target_ide == Some("ide") {
                 exe_path.contains("antigravity ide")
                     || exe_path.contains("antigravity-ide")
@@ -1589,6 +1627,8 @@ pub fn get_args_from_running_process(target_ide: Option<&str>) -> Option<Vec<Str
 
 /// Get --user-data-dir argument value (if exists)
 pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::path::PathBuf> {
+    let is_instance_target = target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false);
+
     // Prefer getting startup arguments from config
     if let Ok(config) = crate::modules::config::load_app_config() {
         if let Some(args) = config.antigravity_args {
@@ -1598,7 +1638,13 @@ pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::p
                     // Next argument is the path
                     let path = std::path::PathBuf::from(&args[i + 1]);
                     if path.exists() {
-                        return Some(path);
+                        let path_str = path.to_string_lossy().to_lowercase();
+                        let is_instance_path = path_str.contains(".antigravity_tools")
+                            || path_str.contains("/instances/")
+                            || path_str.contains("\\instances\\");
+                        if !is_instance_path || is_instance_target {
+                            return Some(path);
+                        }
                     }
                 } else if args[i].starts_with("--user-data-dir=") {
                     // Argument and value in same string, e.g. --user-data-dir=/path/to/data
@@ -1607,7 +1653,13 @@ pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::p
                         let path_str = parts[1];
                         let path = std::path::PathBuf::from(path_str);
                         if path.exists() {
-                            return Some(path);
+                            let path_str = path.to_string_lossy().to_lowercase();
+                            let is_instance_path = path_str.contains(".antigravity_tools")
+                                || path_str.contains("/instances/")
+                                || path_str.contains("\\instances\\");
+                            if !is_instance_path || is_instance_target {
+                                return Some(path);
+                            }
                         }
                     }
                 }
@@ -1622,7 +1674,13 @@ pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::p
                 // Next argument is the path
                 let path = std::path::PathBuf::from(&args[i + 1]);
                 if path.exists() {
-                    return Some(path);
+                    let path_str = path.to_string_lossy().to_lowercase();
+                    let is_instance_path = path_str.contains(".antigravity_tools")
+                        || path_str.contains("/instances/")
+                        || path_str.contains("\\instances\\");
+                    if !is_instance_path || is_instance_target {
+                        return Some(path);
+                    }
                 }
             } else if args[i].starts_with("--user-data-dir=") {
                 // Argument and value in same string, e.g. --user-data-dir=/path/to/data
@@ -1631,7 +1689,13 @@ pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::p
                     let path_str = parts[1];
                     let path = std::path::PathBuf::from(path_str);
                     if path.exists() {
-                        return Some(path);
+                        let path_str = path.to_string_lossy().to_lowercase();
+                        let is_instance_path = path_str.contains(".antigravity_tools")
+                            || path_str.contains("/instances/")
+                            || path_str.contains("\\instances\\");
+                        if !is_instance_path || is_instance_target {
+                            return Some(path);
+                        }
                     }
                 }
             }

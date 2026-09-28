@@ -11,7 +11,16 @@
     "preview": "vite preview",
     "bump": "node scripts/bump-version.mjs",
     "tauri": "tauri",
-    "tauri:debug": "RUST_LOG=debug npm run tauri dev"
+    "tauri:debug": "RUST_LOG=debug npm run tauri dev",
+    "clean": "python 03-ai-scripts/19-artifact-remover.py --clean-all --force",
+    "clean:cargo": "python 03-ai-scripts/19-artifact-remover.py --clean-cargo --force",
+    "clean:rust": "python 03-ai-scripts/19-artifact-remover.py --clean-rust --force",
+    "clean:temp": "python 03-ai-scripts/19-artifact-remover.py --clean-temp --force",
+    "clean:pycache": "python 03-ai-scripts/19-artifact-remover.py --clean-pycache --force",
+    "clean:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "dev:clean": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "dev-tool-clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

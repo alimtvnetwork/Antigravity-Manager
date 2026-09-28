@@ -264,14 +264,29 @@ pub fn save_registry(registry: &InstanceRegistry) -> Result<(), String> {
 
 /// Inspect running Antigravity processes matching an instance data_dir
 pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
-    let mut system = System::new();
-    system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+    let mut system = System::new_with_specifics(
+        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::everything()),
+    );
+    system.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::All,
+        sysinfo::ProcessRefreshKind::everything(),
+    );
 
     let normalized_target = data_dir.to_lowercase().replace('\\', "/");
     let clean_target = normalized_target.trim_end_matches('/');
     let mut matched_pids = Vec::new();
 
+    // Map child PID -> parent PID to trace process lineage
+    let mut parent_map: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+    let mut instance_root_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut default_candidate_pids: Vec<u32> = Vec::new();
+
     for (pid, process) in system.processes() {
+        let pid_u32 = pid.as_u32();
+        if let Some(parent) = process.parent() {
+            parent_map.insert(pid_u32, parent.as_u32());
+        }
+
         let name = process.name().to_string_lossy().to_lowercase();
         let exe = process
             .exe()
@@ -286,30 +301,82 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             .collect::<Vec<String>>()
             .join(" ");
 
-        let is_antigravity = name.contains("antigravity")
+        let is_antigravity = (name.contains("antigravity")
             || exe.contains("antigravity")
-            || args_str.contains("antigravity")
             || exe.contains("/tmp/.mount_")
-            || name == "apprun"
-            || args_str.contains(clean_target);
+            || name == "apprun")
+            && !name.contains("agm")
+            && !exe.contains("agm")
+            && !name.contains("webview")
+            && !exe.contains("webview")
+            && !args_str.contains("embedded-browser-webview");
 
         if !is_antigravity {
             continue;
         }
 
-        let is_helper =
-            args_str.contains("--type=") || name.contains("helper") || name.contains("crashpad");
-        if is_helper {
-            continue;
-        }
+        let is_helper = args_str.contains("--type=")
+            || name.contains("helper")
+            || name.contains("crashpad")
+            || exe.contains("crashpad")
+            || name.contains("utility")
+            || args_str.contains("utility");
 
         let has_user_data_arg = args_str.contains("--user-data-dir");
-        if has_user_data_arg {
+        let has_instance_marker = args_str.contains(".antigravity_tools")
+            || args_str.contains("/instances/")
+            || args_str.contains("\\instances\\");
+
+        if has_user_data_arg && has_instance_marker && !is_helper {
+            instance_root_pids.insert(pid_u32);
             if args_str.contains(clean_target) {
-                matched_pids.push(pid.as_u32());
+                matched_pids.push(pid_u32);
             }
-        } else if is_default {
-            matched_pids.push(pid.as_u32());
+        } else if is_default && !has_instance_marker && !is_helper {
+            default_candidate_pids.push(pid_u32);
+        }
+    }
+
+    if is_default {
+        // Only accept processes whose ancestors do NOT belong to any instance process
+        for cand_pid in default_candidate_pids {
+            let mut curr = cand_pid;
+            let mut is_instance_descendant = false;
+            for _ in 0..10 {
+                if instance_root_pids.contains(&curr) {
+                    is_instance_descendant = true;
+                    break;
+                }
+                if let Some(&p) = parent_map.get(&curr) {
+                    curr = p;
+                } else {
+                    break;
+                }
+            }
+            if !is_instance_descendant {
+                matched_pids.push(cand_pid);
+            }
+        }
+    } else {
+        // For instances, also include any child processes that descend from matched root PIDs
+        let matched_set: std::collections::HashSet<u32> = matched_pids.iter().cloned().collect();
+        for (pid, _) in system.processes() {
+            let pid_u32 = pid.as_u32();
+            if matched_set.contains(&pid_u32) {
+                continue;
+            }
+            let mut curr = pid_u32;
+            for _ in 0..10 {
+                if let Some(&p) = parent_map.get(&curr) {
+                    if matched_set.contains(&p) {
+                        matched_pids.push(pid_u32);
+                        break;
+                    }
+                    curr = p;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -325,12 +392,18 @@ pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
     system.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     for config in registry.instances {
-        let mut pids = find_pids_for_data_dir(&config.data_dir, false);
+        let is_default_inst = config.is_default || config.id == "default";
+        let mut pids = find_pids_for_data_dir(&config.data_dir, is_default_inst);
         if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(&config.id)) {
-            let pid_alive = system.process(sysinfo::Pid::from_u32(saved_pid)).is_some();
-            let not_in_list = !pids.contains(&saved_pid);
-            if pid_alive {
-                if not_in_list {
+            if let Some(proc) = system.process(sysinfo::Pid::from_u32(saved_pid)) {
+                let proc_name = proc.name().to_string_lossy().to_lowercase();
+                let proc_exe = proc
+                    .exe()
+                    .map(|p| p.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                let is_antigravity =
+                    proc_name.contains("antigravity") || proc_exe.contains("antigravity");
+                if is_antigravity && !pids.contains(&saved_pid) {
                     pids.push(saved_pid);
                 }
             }
@@ -396,14 +469,58 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
         .unwrap_or(0)
         + 1;
 
+    let mut bound_acc_id = None;
+    let mut bound_acc_email = None;
+    if let Ok(accounts) = crate::modules::account::list_accounts() {
+        let bound_ids: std::collections::HashSet<String> = registry
+            .instances
+            .iter()
+            .filter_map(|i| i.bound_account_id.clone())
+            .collect();
+        let candidate = accounts
+            .iter()
+            .find(|a| !bound_ids.contains(&a.id))
+            .or_else(|| accounts.first());
+
+        if let Some(acc) = candidate {
+            bound_acc_id = Some(acc.id.clone());
+            bound_acc_email = Some(acc.email.clone());
+
+            let db_dir = instance_data_dir.join("User").join("globalStorage");
+            let _ = fs::create_dir_all(&db_dir);
+            let db_path = db_dir.join("state.vscdb");
+            let _ = crate::modules::db::inject_token(
+                &db_path,
+                &acc.token.access_token,
+                &acc.token.refresh_token,
+                acc.token.expiry_timestamp,
+                &acc.email,
+                acc.token.is_gcp_tos,
+                acc.token.project_id.as_deref(),
+                acc.token.id_token.as_deref(),
+                acc.token.oauth_client_key.as_deref(),
+                None,
+            );
+
+            let profile = acc
+                .device_profile
+                .clone()
+                .unwrap_or_else(crate::modules::device::generate_profile);
+            let storage_path = db_dir.join("storage.json");
+            let _ = crate::modules::device::write_profile(&storage_path, &profile);
+            let _ =
+                crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+        }
+    }
+
     let config = InstanceConfig {
         id: instance_id,
         name: trimmed_name.to_string(),
         data_dir: instance_data_dir.to_string_lossy().to_string(),
         executable_path: None,
         extensions_dir: None,
-        bound_account_id: None,
-        bound_email: None,
+        bound_account_id: bound_acc_id,
+        bound_email: bound_acc_email,
         created_at: now,
         last_used: now,
         is_default: false,
@@ -454,7 +571,7 @@ pub fn copy_instance(
             let _ = copy_dir_recursive(&src_path, &dst_path);
         }
 
-        // Sanitize cloned session so the new profile starts with clean authentication state
+        // Sanitize cloned session and reseed with newly bound account credentials
         let cloned_db = dst_path
             .join("User")
             .join("globalStorage")
@@ -462,6 +579,35 @@ pub fn copy_instance(
         let has_cloned_db = cloned_db.exists();
         if has_cloned_db {
             let _ = crate::modules::db::sanitize_session(&cloned_db);
+            if let Some(ref acc_id) = new_instance.bound_account_id {
+                if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                    let _ = crate::modules::db::inject_token(
+                        &cloned_db,
+                        &acc.token.access_token,
+                        &acc.token.refresh_token,
+                        acc.token.expiry_timestamp,
+                        &acc.email,
+                        acc.token.is_gcp_tos,
+                        acc.token.project_id.as_deref(),
+                        acc.token.id_token.as_deref(),
+                        acc.token.oauth_client_key.as_deref(),
+                        None,
+                    );
+                    let profile = acc
+                        .device_profile
+                        .clone()
+                        .unwrap_or_else(crate::modules::device::generate_profile);
+                    let storage_path = dst_path
+                        .join("User")
+                        .join("globalStorage")
+                        .join("storage.json");
+                    let _ = crate::modules::device::write_profile(&storage_path, &profile);
+                    let _ = crate::modules::db::write_service_machine_id(
+                        &cloned_db,
+                        &profile.mac_machine_id,
+                    );
+                }
+            }
         }
     }
 
@@ -534,8 +680,15 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
     if let Some(saved_pid) = config_pid.or_else(|| get_instance_saved_pid(instance_id)) {
         let mut sys = System::new();
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-        if sys.process(sysinfo::Pid::from_u32(saved_pid)).is_some() {
-            return true;
+        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(saved_pid)) {
+            let proc_name = proc.name().to_string_lossy().to_lowercase();
+            let proc_exe = proc
+                .exe()
+                .map(|p| p.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            if proc_name.contains("antigravity") || proc_exe.contains("antigravity") {
+                return true;
+            }
         }
     }
     false
@@ -782,42 +935,32 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
     let target_data_path = PathBuf::from(&data_dir);
 
-    // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb.
-    // Only touch the global OS Keyring when launching the default instance so secondary instances never overwrite default's keyring!
-    if let Some(ref account_id) = bound_acc {
-        if let Ok(account) = crate::modules::account::load_account(account_id) {
-            if is_default {
-                let _ = crate::modules::integration::write_to_system_keyring(&account);
-            }
-
-            let db_dir = target_data_path.join("User").join("globalStorage");
-            let has_db_dir = db_dir.exists();
-            if !has_db_dir {
-                let _ = fs::create_dir_all(&db_dir);
-            }
-            let db_path = db_dir.join("state.vscdb");
-            let _ = crate::modules::db::inject_token(
-                &db_path,
-                &account.token.access_token,
-                &account.token.refresh_token,
-                account.token.expiry_timestamp,
-                &account.email,
-                account.token.is_gcp_tos,
-                account.token.project_id.as_deref(),
-                account.token.id_token.as_deref(),
-                account.token.oauth_client_key.as_deref(),
-                None,
-            );
-
-            if let Some(ref profile) = account.device_profile {
-                let _ =
-                    crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
-            }
-        }
-    }
-
     // Snapshot bound workspace folders BEFORE closing existing instance processes
     let workspace_folders = get_instance_workspace_folders(instance_id, &data_dir);
+
+    // Determine executable FIRST while running processes are alive for discovery
+    let exe_path = if !is_default {
+        if let Some(ref p) = custom_exe {
+            let pb = PathBuf::from(p);
+            if pb.exists() {
+                pb
+            } else if let Ok(cloned) = clone_instance_executable(instance_id) {
+                PathBuf::from(cloned)
+            } else {
+                crate::modules::process::detect_antigravity_with_diagnostics(None)?
+            }
+        } else if let Ok(cloned) = clone_instance_executable(instance_id) {
+            PathBuf::from(cloned)
+        } else {
+            crate::modules::process::detect_antigravity_with_diagnostics(None)?
+        }
+    } else {
+        crate::modules::process::detect_antigravity_with_diagnostics(None)?
+    };
+
+    // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
+    let _ = close_instance(instance_id);
+    std::thread::sleep(std::time::Duration::from_millis(300));
 
     // Clean any orphaned lock files in the target instance data directory
     let has_target_dir = target_data_path.exists();
@@ -845,22 +988,50 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         }
     }
 
-    // Determine executable FIRST while running processes are alive for discovery
-    let exe_path = if let Some(ref p) = custom_exe {
-        let pb = PathBuf::from(p);
-        let has_pb = pb.exists() && !p.contains("Antigravity-inst-");
-        if has_pb {
-            pb
-        } else {
-            crate::modules::process::detect_antigravity_with_diagnostics(None)?
-        }
-    } else {
-        crate::modules::process::detect_antigravity_with_diagnostics(None)?
-    };
+    // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb and system keyring AFTER process exit.
+    if let Some(ref account_id) = bound_acc {
+        if let Ok(account) = crate::modules::account::load_account(account_id) {
+            let _ = crate::modules::integration::write_to_system_keyring(&account);
+            let _ = crate::modules::integration::write_to_file_credentials(&account);
+            let _ = crate::modules::account::set_current_account_id(&account.id);
 
-    // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-    let _ = close_instance(instance_id);
-    std::thread::sleep(std::time::Duration::from_millis(300));
+            let db_dir = target_data_path.join("User").join("globalStorage");
+            let has_db_dir = db_dir.exists();
+            if !has_db_dir {
+                let _ = fs::create_dir_all(&db_dir);
+            }
+            let db_path = db_dir.join("state.vscdb");
+            let _ = crate::modules::db::inject_token(
+                &db_path,
+                &account.token.access_token,
+                &account.token.refresh_token,
+                account.token.expiry_timestamp,
+                &account.email,
+                account.token.is_gcp_tos,
+                account.token.project_id.as_deref(),
+                account.token.id_token.as_deref(),
+                account.token.oauth_client_key.as_deref(),
+                None,
+            );
+
+            if let Some(ref profile) = account.device_profile {
+                let _ =
+                    crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+                let storage_path = db_dir.join("storage.json");
+                let _ = crate::modules::device::write_profile(&storage_path, profile);
+            }
+
+            // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
+            let local_storage = target_data_path.join("Local Storage");
+            if local_storage.exists() {
+                let _ = fs::remove_dir_all(&local_storage);
+            }
+            let session_storage = target_data_path.join("Session Storage");
+            if session_storage.exists() {
+                let _ = fs::remove_dir_all(&session_storage);
+            }
+        }
+    }
 
     let exe_str = exe_path.to_string_lossy().to_string();
 
@@ -1107,10 +1278,15 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let is_default_inst = config.is_default || instance_id == "default";
     let mut pids = find_pids_for_data_dir(&config.data_dir, is_default_inst);
     if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
-        let is_alive = system.process(sysinfo::Pid::from_u32(saved_pid)).is_some();
-        let not_contains = !pids.contains(&saved_pid);
-        if is_alive {
-            if not_contains {
+        if let Some(proc) = system.process(sysinfo::Pid::from_u32(saved_pid)) {
+            let proc_name = proc.name().to_string_lossy().to_lowercase();
+            let proc_exe = proc
+                .exe()
+                .map(|p| p.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            let is_antigravity =
+                proc_name.contains("antigravity") || proc_exe.contains("antigravity");
+            if is_antigravity && !pids.contains(&saved_pid) {
                 pids.push(saved_pid);
             }
         }
@@ -1432,9 +1608,8 @@ pub async fn switch_account_to_instance(
 
     // Helper closure to inject credentials into all relevant state.vscdb & storage.json & OS keyring locations
     let inject_all_credentials = |acc: &crate::models::Account| -> Result<(), String> {
-        if is_default_inst {
-            let _ = crate::modules::integration::write_to_system_keyring(acc);
-        }
+        let _ = crate::modules::integration::write_to_system_keyring(acc);
+        let _ = crate::modules::integration::write_to_file_credentials(acc);
 
         crate::modules::db::inject_token(
             &db_path,
@@ -1453,6 +1628,22 @@ pub async fn switch_account_to_instance(
             let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
         }
 
+        let instance_storage_path = db_dir.join("storage.json");
+        if let Some(ref profile) = acc.device_profile {
+            let _ = crate::modules::device::write_profile(&instance_storage_path, profile);
+        }
+
+        // Clean any stale Session Storage / Local Storage in the instance data directory
+        let local_storage = PathBuf::from(&instance.data_dir).join("Local Storage");
+        if local_storage.exists() {
+            let _ = fs::remove_dir_all(&local_storage);
+        }
+        let session_storage = PathBuf::from(&instance.data_dir).join("Session Storage");
+        if session_storage.exists() {
+            let _ = fs::remove_dir_all(&session_storage);
+        }
+
+        // Only sync profile & token to global IDE storage when switching the default instance!
         if is_default_inst {
             for target_hint in [None, Some("ide")] {
                 if let Ok(storage_path) = crate::modules::device::get_storage_path(target_hint) {
@@ -1485,11 +1676,6 @@ pub async fn switch_account_to_instance(
                     }
                 }
             }
-        } else {
-            let instance_storage_path = db_dir.join("storage.json");
-            if let Some(ref profile) = acc.device_profile {
-                let _ = crate::modules::device::write_profile(&instance_storage_path, profile);
-            }
         }
         Ok(())
     };
@@ -1511,13 +1697,13 @@ pub async fn switch_account_to_instance(
     // 1.5. [Step 1/5] Snapshot and backup running prompts scoped to THIS target instance BEFORE closing IDE
     let backed_up_count =
         crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
-    if is_default_inst {
-        let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
-    }
+    let _ =
+        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None);
 
     // 2. [Step 2/5] Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
+    let _ = close_instance(&instance.id);
     if is_default_inst {
         if crate::modules::process::is_antigravity_running(None) {
             let _ = crate::modules::process::close_antigravity(20, None);
@@ -1526,18 +1712,15 @@ pub async fn switch_account_to_instance(
             let _ = crate::modules::process::close_antigravity(20, Some("ide"));
         }
     }
-    let _ = close_instance(&instance.id);
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring if default) AFTER process exit
+    // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
     inject_all_credentials(&account)?;
 
-    // 4. Bind account in registry; only update global `current_account_id` if switching the default instance
+    // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let _ = set_active_instance_id(&instance.id);
-    if is_default_inst {
-        let _ = crate::modules::account::set_current_account_id(&account.id);
-    }
+    let _ = crate::modules::account::set_current_account_id(&account.id);
 
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);
@@ -1578,9 +1761,8 @@ pub async fn switch_account_to_instance(
     let resent =
         crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
             .unwrap_or_default();
-    if is_default_inst {
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
-    }
+    let _ =
+        crate::modules::backup_prompts_db::restore_running_prompts(Some(&instance.id), false, None);
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
 
     // 6. Dispatch unified Email and Telegram switch notifications

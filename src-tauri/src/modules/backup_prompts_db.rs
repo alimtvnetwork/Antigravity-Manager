@@ -27,6 +27,7 @@ pub struct PromptBackupRecord {
     pub created_at: i64,
     pub is_restored: bool,
     pub restored_at: Option<i64>,
+    pub instance_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,10 +154,12 @@ pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String
              created_at INTEGER NOT NULL,
              is_restored BOOLEAN NOT NULL DEFAULT 0,
              restored_at INTEGER,
+             instance_id TEXT DEFAULT 'default',
              FOREIGN KEY(backup_batch_id) REFERENCES backup_batches(id) ON DELETE CASCADE
          );
          CREATE INDEX IF NOT EXISTS idx_prompt_backups_batch ON prompt_backups(backup_batch_id);
          CREATE INDEX IF NOT EXISTS idx_prompt_backups_restored ON prompt_backups(is_restored, restored_at);
+         CREATE INDEX IF NOT EXISTS idx_prompt_backups_instance ON prompt_backups(instance_id);
 
          CREATE TABLE IF NOT EXISTS green_projects (
              id TEXT PRIMARY KEY,
@@ -168,6 +171,12 @@ pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String
          );",
     )
     .map_err(|e| format!("Failed to initialize backup prompts tables: {}", e))?;
+
+    // Migrate existing DB if instance_id is missing
+    let _ = conn.execute(
+        "ALTER TABLE prompt_backups ADD COLUMN instance_id TEXT DEFAULT 'default'",
+        [],
+    );
 
     Ok(conn)
 }
@@ -206,14 +215,24 @@ pub fn force_clean_all(custom_file: Option<&str>) -> Result<usize, String> {
     Ok(count)
 }
 
-/// Backup all currently active and queued running prompts into the split SQLite database
+/// Backward compatible wrapper with instance support
 pub fn backup_active_running_prompts(
+    instance_id: Option<&str>,
     custom_file: Option<&str>,
 ) -> Result<(BackupBatchInfo, Vec<PromptBackupRecord>), String> {
+    backup_active_running_prompts_for_instance(instance_id, custom_file)
+}
+
+/// Backup all currently active and queued running prompts into the split SQLite database scoped to an instance
+pub fn backup_active_running_prompts_for_instance(
+    instance_id: Option<&str>,
+    custom_file: Option<&str>,
+) -> Result<(BackupBatchInfo, Vec<PromptBackupRecord>), String> {
+    let target_inst = instance_id.unwrap_or("default");
     let _ = auto_cleanup_expired(custom_file, 86400);
 
     let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
-    let running_prompts = repo_db::discover_running_prompts_from_antigravity("default");
+    let running_prompts = repo_db::discover_running_prompts_from_antigravity(target_inst);
     let conversations = agy_cleaner::scan_conversations(100);
     let now = Utc::now().timestamp();
     let freshness_cutoff = now - 7200;
@@ -224,7 +243,12 @@ pub fn backup_active_running_prompts(
         candidate_prompts.push(p);
     }
     for p in all_prompts {
-        if (p.status == "running" || p.status == "queued" || p.status == "backed_up")
+        let is_inst_match = p.instance_id.is_empty()
+            || p.instance_id == target_inst
+            || (target_inst == "default"
+                && (p.instance_id == "default" || p.instance_id.is_empty()));
+        if is_inst_match
+            && (p.status == "running" || p.status == "queued" || p.status == "backed_up")
             && p.updated_at >= freshness_cutoff
             && !candidate_prompts.iter().any(|c| {
                 c.id == p.id
@@ -308,6 +332,7 @@ pub fn backup_active_running_prompts(
             created_at: now,
             is_restored: false,
             restored_at: None,
+            instance_id: Some(target_inst.to_string()),
         };
 
         // Deduplicate records to prevent duplicate reinjections into prompt_backups
@@ -322,8 +347,8 @@ pub fn backup_active_running_prompts(
 
         if let Some(existing_rec_id) = existing_unrestored {
             let _ = conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2 WHERE id = ?3",
-                params![record.backup_batch_id, now, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3 WHERE id = ?4",
+                params![record.backup_batch_id, now, target_inst, existing_rec_id],
             );
             records.push(record);
             continue;
@@ -346,8 +371,8 @@ pub fn backup_active_running_prompts(
             "INSERT INTO prompt_backups (
                 id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                 conversation_id, conversation_name, sequence_id, prompt_text, has_images,
-                images_payload, status, created_at, is_restored, restored_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                images_payload, status, created_at, is_restored, restored_at, instance_id
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 record.id,
                 record.backup_batch_id,
@@ -365,6 +390,7 @@ pub fn backup_active_running_prompts(
                 record.created_at,
                 record.is_restored,
                 record.restored_at,
+                record.instance_id.as_deref().unwrap_or(target_inst),
             ],
         )
         .map_err(|e| format!("Failed to insert prompt backup record: {}", e))?;
@@ -417,7 +443,7 @@ pub fn list_prompt_backups(
         (
             "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                     conversation_id, conversation_name, sequence_id, prompt_text, has_images,
-                    images_payload, status, created_at, is_restored, restored_at
+                    images_payload, status, created_at, is_restored, restored_at, instance_id
              FROM prompt_backups WHERE backup_batch_id = ? ORDER BY sequence_id ASC",
             true,
         )
@@ -425,7 +451,7 @@ pub fn list_prompt_backups(
         (
             "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                     conversation_id, conversation_name, sequence_id, prompt_text, has_images,
-                    images_payload, status, created_at, is_restored, restored_at
+                    images_payload, status, created_at, is_restored, restored_at, instance_id
              FROM prompt_backups ORDER BY created_at DESC, sequence_id ASC",
             false,
         )
@@ -468,31 +494,44 @@ fn parse_prompt_record(row: &rusqlite::Row) -> rusqlite::Result<PromptBackupReco
         created_at: row.get(13)?,
         is_restored: row.get(14)?,
         restored_at: row.get(15)?,
+        instance_id: row.get(16).ok(),
     })
 }
 
-/// Restore running prompts: re-inserts them into repo_db and updates restoration flags
+/// Backward compatible wrapper with instance support
 pub fn restore_running_prompts(
+    instance_id: Option<&str>,
     keep_backup: bool,
     custom_file: Option<&str>,
 ) -> Result<Vec<PromptBackupRecord>, String> {
+    restore_running_prompts_for_instance(instance_id, keep_backup, custom_file)
+}
+
+/// Restore running prompts: re-inserts them into repo_db and updates restoration flags scoped to an instance
+pub fn restore_running_prompts_for_instance(
+    instance_id: Option<&str>,
+    keep_backup: bool,
+    custom_file: Option<&str>,
+) -> Result<Vec<PromptBackupRecord>, String> {
+    let target_inst = instance_id.unwrap_or("default");
     let conn = connect_backup_db(custom_file)?;
     let now = Utc::now().timestamp();
 
-    // Query unrestored prompts
+    // Query unrestored prompts scoped to target instance
     let mut stmt = conn
         .prepare(
             "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                     conversation_id, conversation_name, sequence_id, prompt_text, has_images,
-                    images_payload, status, created_at, is_restored, restored_at
+                    images_payload, status, created_at, is_restored, restored_at, instance_id
              FROM prompt_backups 
              WHERE is_restored = 0
+               AND (instance_id = ?1 OR instance_id IS NULL OR instance_id = '' OR (?1 = 'default' AND instance_id = 'default'))
              ORDER BY created_at ASC, sequence_id ASC",
         )
         .map_err(|e| format!("Failed to prepare restore query: {}", e))?;
 
     let records: Vec<PromptBackupRecord> = stmt
-        .query_map([], |row| parse_prompt_record(row))
+        .query_map(params![target_inst], |row| parse_prompt_record(row))
         .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
         .flatten()
         .collect();
@@ -502,10 +541,11 @@ pub fn restore_running_prompts(
 
     // Re-inject into repo_db active_prompts table if records exist in backup DB
     for rec in &records {
+        let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
         let active_p = ActivePrompt {
             id: rec.prompt_id.clone(),
             project_id: rec.project_id.clone(),
-            instance_id: "default".to_string(),
+            instance_id: eff_inst.to_string(),
             repo_path: rec.project_path.clone(),
             prompt_content: rec.prompt_text.clone(),
             model: Some("gemini-3.8-flash-high".to_string()),
@@ -520,8 +560,8 @@ pub fn restore_running_prompts(
 
     if !keep_backup && !records.is_empty() {
         let _ = conn.execute(
-            "UPDATE prompt_backups SET is_restored = 1, restored_at = ? WHERE is_restored = 0",
-            params![now],
+            "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND (instance_id = ?2 OR instance_id IS NULL OR instance_id = '' OR (?2 = 'default' AND instance_id = 'default'))",
+            params![now, target_inst],
         );
         let _ = conn.execute(
             "UPDATE backup_batches SET is_fully_restored = 1 WHERE id IN (
@@ -531,8 +571,8 @@ pub fn restore_running_prompts(
         );
     }
 
-    // Automatically trigger resend and execute restored prompts via CLI
-    let _ = repo_db::resend_all_running_commands(20);
+    // Automatically trigger resend and execute restored prompts via CLI scoped to this instance
+    let _ = repo_db::resend_running_commands_for_instance(Some(target_inst), 20);
 
     Ok(records)
 }
@@ -673,11 +713,11 @@ mod tests {
         assert_eq!(prompts[0].prompt_text, "Fix tests");
 
         // Test restore
-        let restored = restore_running_prompts(false, Some(custom_file)).unwrap();
+        let restored = restore_running_prompts(None, false, Some(custom_file)).unwrap();
         assert_eq!(restored.len(), 1);
 
         // Verify second restore does not re-restore already restored prompts
-        let restored_second = restore_running_prompts(false, Some(custom_file)).unwrap();
+        let restored_second = restore_running_prompts(None, false, Some(custom_file)).unwrap();
         assert_eq!(
             restored_second.len(),
             0,

@@ -1110,7 +1110,7 @@ pub async fn execute_profile_rotation_with_context(
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
     let backup_res = crate::modules::repo_db::backup_running_prompts(inst_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
+    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(Some(inst_id), None);
     match &backup_res {
         Ok(c) => {
             logger::log_info(&format!(
@@ -1757,6 +1757,7 @@ pub async fn trigger_manual_rotation_for_instance(
 
     // Step 0: Ensure running prompts are snapshotted and backed up before rotation starts
     let _ = crate::modules::repo_db::backup_running_prompts(&inst_id);
+    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&inst_id), None);
     let in_use_account_ids = get_active_in_use_account_ids();
 
     let registry = instance::load_registry()?;
