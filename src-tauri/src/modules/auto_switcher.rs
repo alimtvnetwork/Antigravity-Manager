@@ -1314,10 +1314,16 @@ pub async fn check_and_rotate_with_options(
     let mut rotated_reasons = Vec::new();
 
     for inst in monitored_instances {
-        let bound_acc_id_opt = inst
-            .bound_account_id
-            .clone()
-            .or_else(|| account::get_current_account_id().ok().flatten());
+        let bound_acc_id_opt = if inst.id == "default" || inst.is_default {
+            account::get_current_account_id()
+                .ok()
+                .flatten()
+                .or_else(|| inst.bound_account_id.clone())
+        } else {
+            inst.bound_account_id
+                .clone()
+                .or_else(|| account::get_current_account_id().ok().flatten())
+        };
 
         let Some(bound_acc_id) = bound_acc_id_opt else {
             continue;

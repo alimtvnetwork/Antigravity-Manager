@@ -918,6 +918,7 @@ fn cmd_switch(args: &[String]) {
     }
 
     let _ = account::apply_device_profile(&target.id);
+    let _ = instance::bind_account_to_instance("default", &target.id, &target.email);
 
     println!("[SUCCESS] Active account switched:");
     println!("          Previous: {}", prev_email);
