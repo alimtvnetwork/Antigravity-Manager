@@ -601,54 +601,62 @@ pub fn format_observe_report() -> String {
     let mut running_items: Vec<String> = Vec::new();
     let mut idle_names: Vec<String> = Vec::new();
     let mut seen_prompt_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut running_workspace_names: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
 
     for p in &projects {
         let short_name = shorten_project_name(&p.repo_name);
         if p.is_running {
             let matched_prompt = all_prompts.iter().find(|ap| {
                 (ap.status == "running" || ap.status == "dispatched" || ap.status == "executing")
+                    && !seen_prompt_ids.contains(&ap.id)
                     && (ap.project_id == p.project_id
                         || ap.repo_path == p.repo_path
                         || (!p.repo_name.is_empty() && ap.project_id.contains(&p.repo_name)))
             });
 
-            let duration_str = if let Some(ap) = matched_prompt {
+            if let Some(ap) = matched_prompt {
                 seen_prompt_ids.insert(ap.id.clone());
-                format_running_duration(ap.created_at)
-            } else if p.last_detected_at > 0 {
-                format_running_duration(p.last_detected_at)
-            } else {
-                String::new()
-            };
-
-            let duration_display = if !duration_str.is_empty() {
-                format!(" {}", duration_str)
-            } else {
-                String::new()
-            };
-
-            let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-
-            let prompt_text = matched_prompt
-                .map(|ap| ap.prompt_content.clone())
-                .or_else(|| p.active_prompt.clone());
-
-            if let Some(txt) = prompt_text {
-                let clean = repo_db::extract_smart_prompt_summary(&txt, 90);
+                running_workspace_names.insert(short_name.clone());
+                let duration_str = format_running_duration(ap.created_at);
+                let duration_display = if !duration_str.is_empty() {
+                    format!(" {}", duration_str)
+                } else {
+                    String::new()
+                };
+                let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
+                let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
                 if !clean.is_empty() {
                     block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
                 }
-            }
-
-            if let Some(ap) = matched_prompt {
                 let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
                     "   <i>Expand: <code>/expand {}</code></i>\n",
                     prompt_id_short
                 ));
+                running_items.push(block);
+            } else if let Some(ref txt) = p.active_prompt {
+                running_workspace_names.insert(short_name.clone());
+                let duration_str = if p.last_detected_at > 0 {
+                    format_running_duration(p.last_detected_at)
+                } else {
+                    String::new()
+                };
+                let duration_display = if !duration_str.is_empty() {
+                    format!(" {}", duration_str)
+                } else {
+                    String::new()
+                };
+                let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
+                let clean = repo_db::extract_smart_prompt_summary(txt, 90);
+                if !clean.is_empty() {
+                    block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
+                }
+                running_items.push(block);
+            } else if !running_workspace_names.contains(&short_name) {
+                running_workspace_names.insert(short_name.clone());
+                running_items.push(format!("• <b>{}</b> 🟢\n", short_name));
             }
-
-            running_items.push(block);
         } else {
             idle_names.push(short_name);
         }
@@ -663,6 +671,9 @@ pub fn format_observe_report() -> String {
         let friendly_ws =
             repo_db::format_friendly_workspace_label(&ap.project_id, "", &ap.repo_path);
         let short_name = shorten_project_name(&friendly_ws);
+        seen_prompt_ids.insert(ap.id.clone());
+        running_workspace_names.insert(short_name.clone());
+
         let duration_str = format_running_duration(ap.created_at);
         let duration_display = if !duration_str.is_empty() {
             format!(" {}", duration_str)
@@ -682,6 +693,7 @@ pub fn format_observe_report() -> String {
         running_items.push(block);
     }
 
+    idle_names.retain(|name| !running_workspace_names.contains(name));
     idle_names.sort();
     idle_names.dedup();
 
