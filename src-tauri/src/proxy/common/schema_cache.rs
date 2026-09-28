@@ -190,6 +190,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_compute_schema_hash() {
         let schema1 = json!({"type": "string"});
@@ -208,6 +210,7 @@ mod tests {
 
     #[test]
     fn test_cache_hit() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         clear_cache();
 
         let mut schema = json!({"type": "string", "minLength": 5});
@@ -232,6 +235,7 @@ mod tests {
 
     #[test]
     fn test_cache_eviction() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         clear_cache();
 
         // 插入大量条目触发淘汰
