@@ -67,16 +67,12 @@ fn resolve_switch_context(
                 if let Some(ref b_email) = inst.bound_email {
                     if !b_email.is_empty() && !b_email.eq_ignore_ascii_case(new_email) {
                         old_email = b_email.clone();
-                    } else if old_email.is_empty() && !b_email.is_empty() {
-                        old_email = b_email.clone();
                     }
                 }
                 if old_email.is_empty() || old_email.eq_ignore_ascii_case(new_email) {
                     if let Some(ref b_id) = inst.bound_account_id {
                         if let Ok(acc) = crate::modules::account::load_account(b_id) {
                             if !acc.email.is_empty() && !acc.email.eq_ignore_ascii_case(new_email) {
-                                old_email = acc.email;
-                            } else if old_email.is_empty() && !acc.email.is_empty() {
                                 old_email = acc.email;
                             }
                         }
@@ -90,10 +86,12 @@ fn resolve_switch_context(
         if let Ok(Some(cur_acc)) = crate::modules::account::get_current_account() {
             if !cur_acc.email.is_empty() && !cur_acc.email.eq_ignore_ascii_case(new_email) {
                 old_email = cur_acc.email;
-            } else if old_email.is_empty() && !cur_acc.email.is_empty() {
-                old_email = cur_acc.email;
             }
         }
+    }
+
+    if old_email.trim().eq_ignore_ascii_case(new_email.trim()) {
+        old_email.clear();
     }
 
     if !new_email.trim().is_empty() {
@@ -164,7 +162,10 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
         .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
         .unwrap_or(context_old_email.trim());
 
-    let final_prev = if resolved_prev.is_empty() || resolved_prev.eq_ignore_ascii_case("default") {
+    let final_prev = if resolved_prev.is_empty()
+        || resolved_prev.eq_ignore_ascii_case("default")
+        || resolved_prev.eq_ignore_ascii_case(&selected_clean)
+    {
         "(none / standby)".to_string()
     } else {
         resolved_prev.to_string()
@@ -198,7 +199,12 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
             &pred_exclusions,
         )
         .ok()
-        .and_then(|v| v.into_iter().next());
+        .and_then(|v| v.into_iter().next())
+        .filter(|c| {
+            !c.email.trim().eq_ignore_ascii_case(&selected_clean)
+                && (final_prev.eq_ignore_ascii_case("(none / standby)")
+                    || !c.email.trim().eq_ignore_ascii_case(&final_prev))
+        });
         details.predicted_next_email = predicted_candidate.map(|c| c.email);
     }
 
@@ -310,20 +316,29 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         return;
     }
 
+    let selected_display = details.selected_email.trim();
+
     let from_display = details
         .previous_email
         .as_deref()
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
+        .filter(|s| {
+            !s.is_empty()
+                && !s.eq_ignore_ascii_case("default")
+                && !s.eq_ignore_ascii_case(selected_display)
+        })
         .unwrap_or("(none / standby)");
-
-    let selected_display = details.selected_email.trim();
 
     let predicted_display = details
         .predicted_next_email
         .as_deref()
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case(selected_display))
+        .filter(|s| {
+            !s.is_empty()
+                && !s.eq_ignore_ascii_case(selected_display)
+                && (from_display.eq_ignore_ascii_case("(none / standby)")
+                    || !s.eq_ignore_ascii_case(from_display))
+        })
         .unwrap_or("(none / pool exhausted)");
 
     let credit_before_display = details
@@ -653,6 +668,12 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
     let prev_email = details
         .previous_email
         .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| {
+            !s.is_empty()
+                && !s.eq_ignore_ascii_case("default")
+                && !s.eq_ignore_ascii_case(target_email)
+        })
         .unwrap_or("(none / standby)");
 
     let subject = format!(
@@ -720,11 +741,16 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         "Manual User Switch"
     };
 
+    let selected_clean = details.selected_email.trim();
     let from_display = details
         .previous_email
         .as_deref()
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
+        .filter(|s| {
+            !s.is_empty()
+                && !s.eq_ignore_ascii_case("default")
+                && !s.eq_ignore_ascii_case(selected_clean)
+        })
         .unwrap_or("(none / standby)");
 
     let prev_4h_str = details
@@ -1224,5 +1250,72 @@ mod tests {
         let manual_label = "Manual User Switch";
         assert!(auto_label.contains("Auto"));
         assert!(manual_label.contains("Manual"));
+    }
+
+    #[test]
+    fn test_resolve_switch_context_never_returns_same_as_new_email() {
+        let same_email = "test.same@example.com";
+        record_previous_email(same_email);
+
+        // When switching to the same email, old_email must never equal new_email
+        let (old, _, _, _) = resolve_switch_context(same_email, "default");
+        assert_ne!(
+            old.trim().to_lowercase(),
+            same_email.trim().to_lowercase(),
+            "old_email must not equal new_email"
+        );
+
+        // If new_email matches whatever current account is on disk, old_email must be empty
+        if let Ok(Some(cur)) = crate::modules::account::get_current_account() {
+            if !cur.email.is_empty() {
+                record_previous_email(&cur.email);
+                let (old_cur, _, _, _) = resolve_switch_context(&cur.email, "default");
+                assert!(
+                    old_cur.is_empty(),
+                    "old_email must be empty when switching to current account"
+                );
+            }
+        }
+
+        // When switching to a different email with isolated test state
+        let rec_email = "prior.recorded@example.com";
+        record_previous_email(rec_email);
+        let diff_email = "brand.new.target@example.com";
+        let (old2, _, _, _) = resolve_switch_context(diff_email, "default");
+        assert_ne!(
+            old2.trim().to_lowercase(),
+            diff_email.trim().to_lowercase(),
+            "old_email must not equal new_email"
+        );
+    }
+
+    #[test]
+    fn test_email_switch_alert_distinctness_invariants() {
+        let selected = "user1@example.com";
+        let prev_identical = "user1@example.com";
+        let pred_identical = "user1@example.com";
+
+        let from_display = Some(prev_identical)
+            .map(|s| s.trim())
+            .filter(|s| {
+                !s.is_empty()
+                    && !s.eq_ignore_ascii_case("default")
+                    && !s.eq_ignore_ascii_case(selected)
+            })
+            .unwrap_or("(none / standby)");
+
+        assert_eq!(from_display, "(none / standby)");
+
+        let predicted_display = Some(pred_identical)
+            .map(|s| s.trim())
+            .filter(|s| {
+                !s.is_empty()
+                    && !s.eq_ignore_ascii_case(selected)
+                    && (from_display.eq_ignore_ascii_case("(none / standby)")
+                        || !s.eq_ignore_ascii_case(from_display))
+            })
+            .unwrap_or("(none / pool exhausted)");
+
+        assert_eq!(predicted_display, "(none / pool exhausted)");
     }
 }

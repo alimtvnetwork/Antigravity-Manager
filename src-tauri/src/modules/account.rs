@@ -1537,11 +1537,18 @@ pub async fn switch_account(
 
     // Capture previous account telemetry before switching
     let prev_acc_opt = get_current_account().ok().flatten();
-    let prev_email = prev_acc_opt.as_ref().map(|a| a.email.clone());
-    let (prev_4h, prev_weekly) = prev_acc_opt
+    let prev_email = prev_acc_opt
         .as_ref()
-        .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
-        .unwrap_or((None, None));
+        .map(|a| a.email.clone())
+        .filter(|e| !e.trim().eq_ignore_ascii_case(account.email.trim()));
+    let (prev_4h, prev_weekly) = if prev_email.is_some() {
+        prev_acc_opt
+            .as_ref()
+            .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+            .unwrap_or((None, None))
+    } else {
+        (None, None)
+    };
 
     // 3. Execute platform-specific system integration (Close proc, Inject DB, Start proc, etc.)
     integration.on_account_switch(&account, target_ide).await?;
@@ -1586,7 +1593,14 @@ pub async fn switch_account(
         &pred_exclusions,
     )
     .ok()
-    .and_then(|v| v.into_iter().next());
+    .and_then(|v| v.into_iter().next())
+    .filter(|c| {
+        !c.email.trim().eq_ignore_ascii_case(account.email.trim())
+            && prev_email
+                .as_deref()
+                .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                .unwrap_or(true)
+    });
     let predicted_next_email = predicted_candidate.map(|c| c.email);
 
     crate::modules::notification_hub::notify_account_switched_details(

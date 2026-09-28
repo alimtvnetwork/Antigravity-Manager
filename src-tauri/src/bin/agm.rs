@@ -5587,7 +5587,15 @@ fn cmd_status(args: &[String]) {
     });
     let prompts_resent = running_prompts > 0;
 
-    let excluded = auto_switcher::get_active_in_use_account_ids();
+    let mut excluded = auto_switcher::get_active_in_use_account_ids();
+    if let Some(ref acc) = active_acc {
+        if !excluded.contains(&acc.id) {
+            excluded.push(acc.id.clone());
+        }
+        if !excluded.contains(&acc.email) {
+            excluded.push(acc.email.clone());
+        }
+    }
     let predicted_candidate = auto_switcher::select_next_best_profile(
         "default",
         &target_model,
@@ -5596,7 +5604,15 @@ fn cmd_status(args: &[String]) {
     )
     .ok()
     .flatten();
-    let predicted_next_account = predicted_candidate.as_ref().map(|c| c.email.clone());
+    let predicted_next_account = predicted_candidate
+        .as_ref()
+        .map(|c| c.email.clone())
+        .filter(|em| {
+            active_acc
+                .as_ref()
+                .map(|a| !em.trim().eq_ignore_ascii_case(a.email.trim()))
+                .unwrap_or(true)
+        });
     let predicted_next_quota = predicted_candidate.as_ref().map(|c| c.quota_percent);
 
     if is_json {
@@ -5611,10 +5627,10 @@ fn cmd_status(args: &[String]) {
             "local_ip": local_ip,
             "active_account": active_acc.as_ref().map(|a| a.email.clone()),
             "active_account_id": active_acc.as_ref().map(|a| a.id.clone()),
-            "previous_account": active_acc.as_ref().map(|a| a.email.clone()),
+            "previous_account": serde_json::Value::Null,
             "predicted_next_account": predicted_next_account,
             "predicted_next_quota_percent": predicted_next_quota,
-            "selected_account": active_acc.as_ref().map(|a| a.email.clone()),
+            "selected_account": serde_json::Value::Null,
             "tier": tier,
             "credit_before_switch": immediate_quota,
             "immediate_quota_percent": immediate_quota,
@@ -5870,8 +5886,13 @@ fn cmd_switch_if_low_credit(args: &[String]) {
     match res {
         Ok(Some(reason)) => {
             let prompts_resent = running_prompts_count > 0;
-            let prev_email = status_before.active_account_email.clone();
+            let mut prev_email = status_before.active_account_email.clone();
             let selected_email = status_after.active_account_email.clone();
+            if let (Some(ref p), Some(ref s)) = (&prev_email, &selected_email) {
+                if p.trim().eq_ignore_ascii_case(s.trim()) {
+                    prev_email = None;
+                }
+            }
             let mut pred_exclusions = Vec::new();
             if let Some(ref p) = prev_email {
                 pred_exclusions.push(p.clone());
@@ -5886,7 +5907,17 @@ fn cmd_switch_if_low_credit(args: &[String]) {
                 &pred_exclusions,
             )
             .ok()
-            .and_then(|v| v.into_iter().next());
+            .and_then(|v| v.into_iter().next())
+            .filter(|c| {
+                selected_email
+                    .as_deref()
+                    .map(|s| !c.email.trim().eq_ignore_ascii_case(s.trim()))
+                    .unwrap_or(true)
+                    && prev_email
+                        .as_deref()
+                        .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                        .unwrap_or(true)
+            });
             let predicted_email = predicted_candidate.map(|c| c.email);
             let credit_before = status_before.current_quota_percent;
 
@@ -5980,7 +6011,13 @@ fn cmd_switch_if_low_credit(args: &[String]) {
                 &pred_exclusions,
             )
             .ok()
-            .and_then(|v| v.into_iter().next());
+            .and_then(|v| v.into_iter().next())
+            .filter(|c| {
+                current_email
+                    .as_deref()
+                    .map(|curr| !c.email.trim().eq_ignore_ascii_case(curr.trim()))
+                    .unwrap_or(true)
+            });
             let predicted_email = predicted_candidate.map(|c| c.email);
 
             let out = serde_json::json!({
@@ -6146,7 +6183,15 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
     let is_low_credit = active_acc.is_none() || current_quota_percent <= threshold_percent;
 
     // Find next possible account
-    let excluded = auto_switcher::get_active_in_use_account_ids();
+    let mut excluded = auto_switcher::get_active_in_use_account_ids();
+    if let Some(ref acc) = active_acc {
+        if !excluded.contains(&acc.id) {
+            excluded.push(acc.id.clone());
+        }
+        if !excluded.contains(&acc.email) {
+            excluded.push(acc.email.clone());
+        }
+    }
     let best_candidate = auto_switcher::select_next_best_profile(
         "default",
         &target_model,
@@ -6155,7 +6200,15 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
     )
     .ok()
     .flatten();
-    let next_possible_account = best_candidate.as_ref().map(|a| a.email.clone());
+    let next_possible_account = best_candidate
+        .as_ref()
+        .map(|a| a.email.clone())
+        .filter(|em| {
+            active_acc
+                .as_ref()
+                .map(|a| !em.trim().eq_ignore_ascii_case(a.email.trim()))
+                .unwrap_or(true)
+        });
     let next_possible_quota_percent = best_candidate.as_ref().map(|a| a.quota_percent);
 
     // Detect active running prompt and image payload
@@ -6227,7 +6280,11 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
         "vm_alias": node_alias,
         "local_ip": local_ip,
         "current_account": current_account,
-        "previous_account": if is_low_credit { current_account.clone() } else { None },
+        "previous_account": if is_low_credit && next_possible_account.is_some() {
+            current_account.clone()
+        } else {
+            None
+        },
         "predicted_next_account": next_possible_account,
         "selected_account": if is_low_credit { next_possible_account.clone() } else { None },
         "credit_before_switch": current_quota_percent,
@@ -6853,8 +6910,13 @@ fn cmd_fast_forward(args: &[String]) {
     match result {
         Ok(res_msg) => {
             let prompts_resent = running_prompts_count > 0;
-            let prev_email = status_before.active_account_email.clone();
+            let mut prev_email = status_before.active_account_email.clone();
             let selected_email = status_after.active_account_email.clone();
+            if let (Some(ref p), Some(ref s)) = (&prev_email, &selected_email) {
+                if p.trim().eq_ignore_ascii_case(s.trim()) {
+                    prev_email = None;
+                }
+            }
             let mut pred_exclusions = Vec::new();
             if let Some(ref p) = prev_email {
                 pred_exclusions.push(p.clone());
@@ -6870,7 +6932,17 @@ fn cmd_fast_forward(args: &[String]) {
                 &pred_exclusions,
             )
             .ok()
-            .and_then(|v| v.into_iter().next());
+            .and_then(|v| v.into_iter().next())
+            .filter(|c| {
+                selected_email
+                    .as_deref()
+                    .map(|s| !c.email.trim().eq_ignore_ascii_case(s.trim()))
+                    .unwrap_or(true)
+                    && prev_email
+                        .as_deref()
+                        .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                        .unwrap_or(true)
+            });
             let predicted_email = predicted_candidate.map(|c| c.email);
 
             if is_json {
@@ -7054,7 +7126,15 @@ fn cmd_email(args: &[String]) {
             });
             let prompts_resent = running_prompts > 0;
 
-            let excluded = auto_switcher::get_active_in_use_account_ids();
+            let mut excluded = auto_switcher::get_active_in_use_account_ids();
+            if let Some(ref acc) = active_acc {
+                if !excluded.contains(&acc.id) {
+                    excluded.push(acc.id.clone());
+                }
+                if !excluded.contains(&acc.email) {
+                    excluded.push(acc.email.clone());
+                }
+            }
             let predicted_candidate = auto_switcher::select_next_best_profile(
                 "default",
                 &target_model,
@@ -7063,7 +7143,15 @@ fn cmd_email(args: &[String]) {
             )
             .ok()
             .flatten();
-            let predicted_next_account = predicted_candidate.as_ref().map(|c| c.email.clone());
+            let predicted_next_account = predicted_candidate
+                .as_ref()
+                .map(|c| c.email.clone())
+                .filter(|em| {
+                    active_acc
+                        .as_ref()
+                        .map(|a| !em.trim().eq_ignore_ascii_case(a.email.trim()))
+                        .unwrap_or(true)
+                });
             let predicted_next_quota = predicted_candidate.as_ref().map(|c| c.quota_percent);
 
             let mut target_recipients: Vec<String> = recipients
@@ -7099,10 +7187,10 @@ fn cmd_email(args: &[String]) {
                 "email_accounts_count": accounts.len(),
                 "email_recipients_count": recipients.len(),
                 "active_account": active_acc.as_ref().map(|a| &a.email),
-                "previous_account": active_acc.as_ref().map(|a| &a.email),
+                "previous_account": serde_json::Value::Null,
                 "predicted_next_account": predicted_next_account,
                 "predicted_next_quota_percent": predicted_next_quota,
-                "selected_account": active_acc.as_ref().map(|a| &a.email),
+                "selected_account": serde_json::Value::Null,
                 "tier": tier,
                 "credit_before_switch": immediate_quota,
                 "immediate_quota_percent": immediate_quota,

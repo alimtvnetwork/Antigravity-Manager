@@ -1393,12 +1393,17 @@ pub async fn switch_account_to_instance(
     let prev_email = instance
         .bound_email
         .clone()
-        .or_else(|| prev_account_opt.as_ref().map(|a| a.email.clone()));
+        .or_else(|| prev_account_opt.as_ref().map(|a| a.email.clone()))
+        .filter(|e| !e.trim().eq_ignore_ascii_case(account.email.trim()));
 
-    let (prev_4h, prev_weekly) = prev_account_opt
-        .as_ref()
-        .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
-        .unwrap_or((None, None));
+    let (prev_4h, prev_weekly) = if prev_email.is_some() {
+        prev_account_opt
+            .as_ref()
+            .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+            .unwrap_or((None, None))
+    } else {
+        (None, None)
+    };
 
     if let Some(ref email) = prev_email {
         if !email.is_empty() {
@@ -1593,7 +1598,14 @@ pub async fn switch_account_to_instance(
         &pred_exclusions,
     )
     .ok()
-    .and_then(|v| v.into_iter().next());
+    .and_then(|v| v.into_iter().next())
+    .filter(|c| {
+        !c.email.trim().eq_ignore_ascii_case(account.email.trim())
+            && prev_email
+                .as_deref()
+                .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                .unwrap_or(true)
+    });
     let predicted_next_email = predicted_candidate.map(|c| c.email);
 
     crate::modules::notification_hub::notify_account_switched_details(

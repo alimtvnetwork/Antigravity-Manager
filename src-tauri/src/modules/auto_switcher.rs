@@ -798,6 +798,17 @@ pub fn extract_dual_window_quotas(
     (q_4h, q_weekly)
 }
 
+/// Helper to robustly check if an account ID or email matches an exclusion list case-insensitively
+pub fn is_account_excluded(exclusions: &[String], id: &str, email: &str) -> bool {
+    let clean_id = id.trim();
+    let clean_email = email.trim();
+    exclusions.iter().any(|ex| {
+        let clean_ex = ex.trim();
+        (!clean_id.is_empty() && clean_ex.eq_ignore_ascii_case(clean_id))
+            || (!clean_email.is_empty() && clean_ex.eq_ignore_ascii_case(clean_email))
+    })
+}
+
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
 pub fn select_candidate_profiles(
     current_instance_id: &str,
@@ -827,12 +838,16 @@ pub fn select_candidate_profiles(
             continue;
         };
 
-        if effective_exclusions.contains(acc_id) {
+        if is_account_excluded(
+            &effective_exclusions,
+            acc_id,
+            inst.bound_email.as_deref().unwrap_or(""),
+        ) {
             continue;
         }
 
         if let Ok(acc) = account::load_account(acc_id) {
-            if effective_exclusions.contains(&acc.email) {
+            if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
             if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
@@ -875,7 +890,7 @@ pub fn select_candidate_profiles(
     // 2. Check unbound accounts in pool
     let all_accounts = account::list_accounts().unwrap_or_default();
     for acc in &all_accounts {
-        if effective_exclusions.contains(&acc.id) || effective_exclusions.contains(&acc.email) {
+        if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
             continue;
         }
         if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
@@ -1121,13 +1136,22 @@ pub async fn execute_profile_rotation_with_context(
     ));
 
     // Step 2: Trigger unified Email and Telegram notifications before switch
-    let prev_email = ctx.as_ref().and_then(|c| c.previous_email.clone());
+    let prev_email = ctx
+        .as_ref()
+        .and_then(|c| c.previous_email.clone())
+        .filter(|pe| !pe.trim().eq_ignore_ascii_case(target.email.trim()));
     let mut prev_q_4h = ctx.as_ref().and_then(|c| c.previous_quota_4h);
     let mut prev_q_weekly = ctx.as_ref().and_then(|c| c.previous_quota_weekly);
     let predicted_opt = ctx
         .as_ref()
         .and_then(|c| c.predicted_email.clone())
-        .filter(|em| !em.eq_ignore_ascii_case(&target.email))
+        .filter(|em| {
+            !em.trim().eq_ignore_ascii_case(target.email.trim())
+                && prev_email
+                    .as_deref()
+                    .map(|pe| !em.trim().eq_ignore_ascii_case(pe.trim()))
+                    .unwrap_or(true)
+        })
         .or_else(|| {
             let mut pred_exclusions = vec![target.account_id.clone(), target.email.clone()];
             if let Some(ref pe) = prev_email {
@@ -1136,6 +1160,13 @@ pub async fn execute_profile_rotation_with_context(
             select_candidate_profiles(&inst_id, "gemini-2.5-pro", 15.0, &pred_exclusions)
                 .ok()
                 .and_then(|v| v.into_iter().next())
+                .filter(|c| {
+                    !c.email.trim().eq_ignore_ascii_case(target.email.trim())
+                        && prev_email
+                            .as_deref()
+                            .map(|pe| !c.email.trim().eq_ignore_ascii_case(pe.trim()))
+                            .unwrap_or(true)
+                })
                 .map(|c| c.email)
         });
     let mut target_q_4h = ctx.as_ref().and_then(|c| c.target_quota_4h);
@@ -1464,8 +1495,21 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
-                let (prev_4h, prev_weekly) =
-                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let previous_email_opt = if bound_acc
+                    .email
+                    .trim()
+                    .eq_ignore_ascii_case(candidate.email.trim())
+                {
+                    None
+                } else {
+                    Some(bound_acc.email.clone())
+                };
+
+                let (prev_4h, prev_weekly) = if previous_email_opt.is_some() {
+                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model)
+                } else {
+                    (None, None)
+                };
                 let (target_4h, target_weekly) =
                     if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
                         extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
@@ -1476,6 +1520,9 @@ pub async fn check_and_rotate_with_options(
                 let mut pred_exclusions = excluded_accounts.clone();
                 pred_exclusions.push(candidate.account_id.clone());
                 pred_exclusions.push(candidate.email.clone());
+                if let Some(ref pe) = previous_email_opt {
+                    pred_exclusions.push(pe.clone());
+                }
                 let predicted_candidate = select_candidate_profiles(
                     &inst.id,
                     &switcher_cfg.target_model,
@@ -1483,11 +1530,18 @@ pub async fn check_and_rotate_with_options(
                     &pred_exclusions,
                 )
                 .ok()
-                .and_then(|v| v.into_iter().next());
+                .and_then(|v| v.into_iter().next())
+                .filter(|c| {
+                    !c.email.trim().eq_ignore_ascii_case(candidate.email.trim())
+                        && previous_email_opt
+                            .as_deref()
+                            .map(|pe| !c.email.trim().eq_ignore_ascii_case(pe.trim()))
+                            .unwrap_or(true)
+                });
                 let predicted_email = predicted_candidate.map(|c| c.email);
 
                 let rot_ctx = RotationContext {
-                    previous_email: Some(bound_acc.email.clone()),
+                    previous_email: previous_email_opt,
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
                     predicted_email,
@@ -1552,8 +1606,21 @@ pub async fn check_and_rotate_with_options(
             )
             .await?
             {
-                let (prev_4h, prev_weekly) =
-                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model);
+                let previous_email_opt = if bound_acc
+                    .email
+                    .trim()
+                    .eq_ignore_ascii_case(candidate.email.trim())
+                {
+                    None
+                } else {
+                    Some(bound_acc.email.clone())
+                };
+
+                let (prev_4h, prev_weekly) = if previous_email_opt.is_some() {
+                    extract_dual_window_quotas(&bound_acc, &switcher_cfg.target_model)
+                } else {
+                    (None, None)
+                };
                 let (target_4h, target_weekly) =
                     if let Ok(cand_acc) = account::load_account(&candidate.account_id) {
                         extract_dual_window_quotas(&cand_acc, &switcher_cfg.target_model)
@@ -1564,6 +1631,9 @@ pub async fn check_and_rotate_with_options(
                 let mut pred_exclusions = excluded_accounts.clone();
                 pred_exclusions.push(candidate.account_id.clone());
                 pred_exclusions.push(candidate.email.clone());
+                if let Some(ref pe) = previous_email_opt {
+                    pred_exclusions.push(pe.clone());
+                }
                 let predicted_candidate = select_candidate_profiles(
                     &inst.id,
                     &switcher_cfg.target_model,
@@ -1571,11 +1641,18 @@ pub async fn check_and_rotate_with_options(
                     &pred_exclusions,
                 )
                 .ok()
-                .and_then(|v| v.into_iter().next());
+                .and_then(|v| v.into_iter().next())
+                .filter(|c| {
+                    !c.email.trim().eq_ignore_ascii_case(candidate.email.trim())
+                        && previous_email_opt
+                            .as_deref()
+                            .map(|pe| !c.email.trim().eq_ignore_ascii_case(pe.trim()))
+                            .unwrap_or(true)
+                });
                 let predicted_email = predicted_candidate.map(|c| c.email);
 
                 let rot_ctx = RotationContext {
-                    previous_email: Some(bound_acc.email.clone()),
+                    previous_email: previous_email_opt,
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
                     predicted_email,
@@ -1685,6 +1762,19 @@ pub async fn trigger_manual_rotation_for_instance(
         if !excluded.contains(curr) {
             excluded.push(curr.clone());
         }
+        if let Ok(acc) = account::load_account(curr) {
+            if !excluded.contains(&acc.email) {
+                excluded.push(acc.email.clone());
+            }
+        }
+    }
+    if let Ok(Some(curr_acc)) = account::get_current_account() {
+        if !excluded.contains(&curr_acc.id) {
+            excluded.push(curr_acc.id.clone());
+        }
+        if !excluded.contains(&curr_acc.email) {
+            excluded.push(curr_acc.email.clone());
+        }
     }
 
     let candidate = select_and_verify_next_best_profile(
@@ -1706,7 +1796,15 @@ pub async fn trigger_manual_rotation_for_instance(
     {
         Some(acc) => {
             let (q4, qw) = extract_dual_window_quotas(&acc, &switcher_cfg.target_model);
-            (Some(acc.email), q4, qw)
+            if acc
+                .email
+                .trim()
+                .eq_ignore_ascii_case(candidate.email.trim())
+            {
+                (None, q4, qw)
+            } else {
+                (Some(acc.email), q4, qw)
+            }
         }
         None => (None, None, None),
     };
@@ -1721,6 +1819,9 @@ pub async fn trigger_manual_rotation_for_instance(
     let mut pred_exclusions = excluded.clone();
     pred_exclusions.push(candidate.account_id.clone());
     pred_exclusions.push(candidate.email.clone());
+    if let Some(ref pe) = prev_email {
+        pred_exclusions.push(pe.clone());
+    }
     let predicted_candidate = select_candidate_profiles(
         &inst_id,
         &switcher_cfg.target_model,
@@ -1728,7 +1829,14 @@ pub async fn trigger_manual_rotation_for_instance(
         &pred_exclusions,
     )
     .ok()
-    .and_then(|v| v.into_iter().next());
+    .and_then(|v| v.into_iter().next())
+    .filter(|c| {
+        !c.email.trim().eq_ignore_ascii_case(candidate.email.trim())
+            && prev_email
+                .as_deref()
+                .map(|pe| !c.email.trim().eq_ignore_ascii_case(pe.trim()))
+                .unwrap_or(true)
+    });
     let predicted_email = predicted_candidate.map(|c| c.email);
 
     let rot_ctx = RotationContext {
@@ -2334,5 +2442,55 @@ mod tests {
             .unwrap_or(false);
         let is_healthy_full = quota_full >= 100.0 || (period_finished_full && quota_full >= 95.0);
         assert!(is_healthy_full, "Account with 100% quota must be accepted");
+    }
+
+    #[test]
+    fn test_is_account_excluded_case_insensitive() {
+        let exclusions = vec![
+            "acc-123".to_string(),
+            "USER@EXAMPLE.COM".to_string(),
+            "  spaced@test.com  ".to_string(),
+        ];
+
+        // Match by ID
+        assert!(is_account_excluded(
+            &exclusions,
+            "acc-123",
+            "other@domain.com"
+        ));
+        assert!(is_account_excluded(
+            &exclusions,
+            "ACC-123",
+            "other@domain.com"
+        ));
+        assert!(is_account_excluded(
+            &exclusions,
+            " acc-123 ",
+            "other@domain.com"
+        ));
+
+        // Match by Email
+        assert!(is_account_excluded(
+            &exclusions,
+            "acc-999",
+            "user@example.com"
+        ));
+        assert!(is_account_excluded(
+            &exclusions,
+            "acc-999",
+            "USER@EXAMPLE.COM"
+        ));
+        assert!(is_account_excluded(
+            &exclusions,
+            "acc-999",
+            "spaced@test.com"
+        ));
+
+        // Non-matches
+        assert!(!is_account_excluded(
+            &exclusions,
+            "acc-456",
+            "fresh@example.com"
+        ));
     }
 }
