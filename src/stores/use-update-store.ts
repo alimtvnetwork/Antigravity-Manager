@@ -49,6 +49,20 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
     try {
       const res = await invoke<string>('run_installer_update');
       set({ isInstalling: false });
+      if (res) {
+        setTimeout(async () => {
+          try {
+            const { exit } = await import('@tauri-apps/plugin-process');
+            await exit(0);
+          } catch {
+            try {
+              window.close();
+            } catch {
+              // ignore
+            }
+          }
+        }, 600);
+      }
       return res;
     } catch (e) {
       console.error('[useUpdateStore] installer execution notice:', e);

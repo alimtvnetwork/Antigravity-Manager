@@ -607,7 +607,7 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
 
 /// Run official installer to update the tool to the latest version
 pub async fn run_installer_update() -> Result<String, String> {
-    logger::log_info("Starting delegated updater for application update...");
+    logger::log_info("Starting 3-stage delegated CLI updater for application update...");
 
     let current_exe = std::env::current_exe()
         .map_err(|e| format!("Cannot locate current executable path: {}", e))?;
@@ -616,131 +616,57 @@ pub async fn run_installer_update() -> Result<String, String> {
         .map(|d| d.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-    let bin_name = if cfg!(target_os = "windows") {
-        "agm.exe"
-    } else {
-        "agm"
-    };
-
-    // 1. Resolve candidate updater binary:
-    // Priority A: Sibling agm binary adjacent to current_exe
-    // Priority B: Installed agm in standard Programs directory
-    // Priority C: Current executable itself (agm-alim) as self-delegating updater
-    let candidate_sibling = current_dir.join(bin_name);
-    let candidate_installed = if cfg!(target_os = "windows") {
-        std::env::var("LOCALAPPDATA").ok().map(|l| {
-            std::path::PathBuf::from(l)
-                .join("Programs")
-                .join("agm-alim")
-                .join("agm.exe")
-        })
-    } else {
-        None
-    };
-
-    let updater_src = if candidate_sibling.exists() {
-        candidate_sibling
-    } else if let Some(ref p) = candidate_installed.filter(|p| p.exists()) {
-        p.clone()
-    } else {
-        current_exe.clone()
-    };
-
-    logger::log_info(&format!("Using updater source binary: {:?}", updater_src));
-
-    // 2. Make an isolated copy in %TEMP%\agm-updater to avoid in-use file lock during update
-    let temp_dir = std::env::temp_dir().join("agm-updater");
-    if let Err(e) = std::fs::create_dir_all(&temp_dir) {
-        logger::log_warn(&format!("Failed to create temp updater directory: {}", e));
-    }
-
     let my_pid = std::process::id();
-    let my_exe = current_exe.to_string_lossy().to_string();
     let my_dir = current_dir.to_string_lossy().to_string();
 
-    let temp_updater_name = if cfg!(target_os = "windows") {
-        format!("agm-updater-{}.exe", my_pid)
-    } else {
-        format!("agm-updater-{}", my_pid)
-    };
-    let temp_agm = temp_dir.join(&temp_updater_name);
-
-    match std::fs::copy(&updater_src, &temp_agm) {
-        Ok(_) => {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&temp_agm, std::fs::Permissions::from_mode(0o755));
-            }
-
+    match crate::modules::delegate_updater::prepare_isolated_update_cli(my_pid) {
+        Ok(temp_agm) => {
             logger::log_info(&format!(
-                "Copied updater to isolated temp path: {:?}",
+                "Prepared isolated Update CLI copy at: {:?}",
                 temp_agm
             ));
 
-            #[cfg(target_os = "windows")]
-            {
-                let mut spawn_cmd = std::process::Command::new("cmd.exe");
-                spawn_cmd.args([
-                    "/c",
-                    "start",
-                    "Antigravity Manager Delegated Updater",
-                    &temp_agm.to_string_lossy(),
-                    "delegate-update",
-                    "--wait-pid",
-                    &my_pid.to_string(),
-                    "--install-dir",
-                    &my_dir,
-                    "--target-exe",
-                    &my_exe,
-                    "--relaunch",
-                ]);
+            match crate::modules::delegate_updater::spawn_delegated_update_cli(
+                &temp_agm,
+                my_pid,
+                &current_dir,
+                &current_exe,
+                true,
+                None,
+            ) {
+                Ok(child_pid) => {
+                    logger::log_info(&format!(
+                        "Launched delegated Update CLI process (PID: {}). Scheduling UI exit in 600ms...",
+                        child_pid
+                    ));
+                    crate::modules::notification_hub::notify_system_updated(
+                        CURRENT_VERSION,
+                        "latest (delegated update CLI launched)",
+                        Some("Delegated Update CLI (`agm-update-cli`) launched in isolated temp folder. It will run `agm update` and then `agm open-ui` to reopen the UI automatically."),
+                    );
 
-                match spawn_cmd.spawn() {
-                    Ok(_) => {
-                        logger::log_info(
-                            "Successfully launched visible delegated updater process.",
-                        );
-                        crate::modules::notification_hub::notify_system_updated(
-                            CURRENT_VERSION,
-                            "latest (delegated updater launched)",
-                            Some("Delegated CLI updater launched in isolated temp folder. Application will restart automatically upon completion."),
-                        );
-                        return Ok("Delegated updater started. Application will restart automatically upon completion.".to_string());
-                    }
-                    Err(e) => {
-                        logger::log_error(&format!("Failed to spawn delegated updater: {}", e));
-                    }
+                    // Schedule unconditional clean exit after returning IPC response so tray_enabled prevent_exit() cannot hold file locks
+                    std::thread::spawn(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(650));
+                        std::process::exit(0);
+                    });
+
+                    return Ok(
+                        "Delegated Update CLI started (`agm-update-cli` -> `agm update` -> `agm open-ui`). Closing UI to apply update and reopen automatically."
+                            .to_string(),
+                    );
                 }
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let mut spawn_cmd = std::process::Command::new(&temp_agm);
-                spawn_cmd.args([
-                    "delegate-update",
-                    "--wait-pid",
-                    &my_pid.to_string(),
-                    "--install-dir",
-                    &my_dir,
-                    "--target-exe",
-                    &my_exe,
-                    "--relaunch",
-                ]);
-
-                match spawn_cmd.spawn() {
-                    Ok(_) => {
-                        return Ok("Delegated updater started. Application will restart automatically upon completion.".to_string());
-                    }
-                    Err(e) => {
-                        logger::log_error(&format!("Failed to spawn delegated updater: {}", e));
-                    }
+                Err(e) => {
+                    logger::log_error(&format!(
+                        "Failed to spawn delegated Update CLI ({}), falling back to direct installer",
+                        e
+                    ));
                 }
             }
         }
         Err(e) => {
             logger::log_warn(&format!(
-                "Failed to copy updater binary to temp directory ({}), falling back to direct installer",
+                "Failed to prepare isolated Update CLI ({}), falling back to direct installer",
                 e
             ));
         }

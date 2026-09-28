@@ -147,6 +147,9 @@ fn main() {
         "delegate-update" | "update-ui" | "ui-update-runner" => {
             cmd_delegate_update(&cmd_args);
         }
+        "open-ui" | "ui" | "launch-ui" | "start-ui" => {
+            antigravity_tools_lib::modules::delegate_updater::open_ui(&cmd_args);
+        }
         "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
@@ -7935,12 +7938,44 @@ fn cmd_update(args: &[String]) {
 
         #[cfg(target_os = "windows")]
         {
-            let install_dir = env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-                .unwrap_or_else(|| PathBuf::from("."));
+            let mut explicit_dir: Option<PathBuf> = None;
+            let mut i = 0;
+            while i < args.len() {
+                if args[i] == "--install-dir" && i + 1 < args.len() {
+                    explicit_dir = Some(PathBuf::from(&args[i + 1]));
+                    break;
+                }
+                i += 1;
+            }
+            let is_no_launch = args
+                .iter()
+                .any(|a| a == "--no-launch" || a == "--no-relaunch");
+            let install_dir = explicit_dir
+                .or_else(|| {
+                    env::current_exe()
+                        .ok()
+                        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                        .filter(|d| {
+                            !d.to_string_lossy().to_lowercase().contains("agm-updater")
+                                && !d.to_string_lossy().to_lowercase().contains("agm-cli")
+                        })
+                })
+                .unwrap_or_else(|| {
+                    antigravity_tools_lib::modules::delegate_updater::resolve_default_install_dir(
+                        None, None,
+                    )
+                });
+
+            let mut extra_flags = String::from("-Update");
+            if is_force {
+                extra_flags.push_str(" -Force");
+            }
+            if is_no_launch {
+                extra_flags.push_str(" -NoLaunch");
+            }
             let ps_cmd = format!(
-                "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Update -InstallDir \"{}\"",
+                "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) {} -InstallDir \"{}\"",
+                extra_flags,
                 install_dir.to_string_lossy()
             );
             let status = Command::new("powershell")

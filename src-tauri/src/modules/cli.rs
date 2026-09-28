@@ -203,6 +203,21 @@ pub fn handle_cli_arguments() -> bool {
             true
         }
 
+        "delegate-update" | "--delegate-update" | "update-ui" | "ui-update-runner" => {
+            crate::modules::delegate_updater::run(&args[2..]);
+            std::process::exit(0);
+        }
+
+        "update" | "--update" | "update-all" | "ua" => {
+            crate::modules::delegate_updater::run_cli_update(&args[2..]);
+            std::process::exit(0);
+        }
+
+        "open-ui" | "--open-ui" | "ui" | "launch-ui" | "start-ui" => {
+            crate::modules::delegate_updater::open_ui(&args[2..]);
+            std::process::exit(0);
+        }
+
         _ => false,
     }
 }
