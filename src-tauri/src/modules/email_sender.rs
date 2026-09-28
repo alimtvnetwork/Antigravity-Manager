@@ -527,10 +527,7 @@ pub fn format_subject_with_telemetry(
     } else {
         format!("v{}", pkg_ver)
     };
-    let prefix = format!(
-        "[AGM {} | {} | {}]",
-        ver_tag, machine_name, machine_ip
-    );
+    let prefix = format!("[AGM {} | {} | {}]", ver_tag, machine_name, machine_ip);
     let mut trimmed = subject.trim();
 
     // Strip any leading telemetry tag like [AGM v... | ...], [Antigravity | ...], [v4.75.0 | ...], or [VM | IP]
@@ -1728,10 +1725,7 @@ mod tests {
         let (subj, text) =
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
-        assert!(subj.starts_with(&format!(
-            "[AGM {} | my-pc | 192.168.1.50]",
-            pkg_ver
-        )));
+        assert!(subj.starts_with(&format!("[AGM {} | my-pc | 192.168.1.50]", pkg_ver)));
         assert!(!subj.contains("] [AGM]"));
         assert!(!subj.contains("] [Antigravity]"));
         assert!(text.contains("192.168.1.50"));
@@ -1748,10 +1742,7 @@ mod tests {
 
         // Plain subject without duplicate [Antigravity]
         let s1 = format_subject_with_telemetry("[Antigravity] Account Switched", ver, node, ip);
-        assert_eq!(
-            s1,
-            "[AGM v4.71.4 | VM3 | 192.168.1.12] Account Switched"
-        );
+        assert_eq!(s1, "[AGM v4.71.4 | VM3 | 192.168.1.12] Account Switched");
 
         // Old tag upgrade
         let s2 = format_subject_with_telemetry("[VM3 | 192.168.1.12] Alert", ver, node, ip);
@@ -1759,10 +1750,7 @@ mod tests {
 
         // Reply subject with old tag
         let s3 = format_subject_with_telemetry("Re: [VM3 | 192.168.1.12] Result", ver, node, ip);
-        assert_eq!(
-            s3,
-            "[AGM v4.71.4 | VM3 | 192.168.1.12] Re: Result"
-        );
+        assert_eq!(s3, "[AGM v4.71.4 | VM3 | 192.168.1.12] Re: Result");
 
         // Reply subject without tag
         let s4 = format_subject_with_telemetry("Re: help", ver, node, ip);
@@ -1796,10 +1784,7 @@ mod tests {
             node,
             ip,
         );
-        assert_eq!(
-            s7,
-            "[AGM v4.71.4 | VM3 | 192.168.1.12] Write the subject"
-        );
+        assert_eq!(s7, "[AGM v4.71.4 | VM3 | 192.168.1.12] Write the subject");
 
         // Deduplicate node alias when subject has "W2 | prompt | proj-..."
         let s8 =

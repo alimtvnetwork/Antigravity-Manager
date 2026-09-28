@@ -1147,10 +1147,7 @@ pub fn format_reply_subject(
     local_ip: &str,
 ) -> String {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
-    let node_tag = format!(
-        "[AGM {} | {} | {}]",
-        pkg_ver, local_name, local_ip
-    );
+    let node_tag = format!("[AGM {} | {} | {}]", pkg_ver, local_name, local_ip);
     if let Some(orig) = original_subject {
         let trimmed = orig.trim();
         if !trimmed.is_empty() {
@@ -3538,10 +3535,7 @@ mod tests {
         let local_name = "VM3";
         let local_ip = "192.168.1.12";
         let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
-        let node_tag = format!(
-            "[AGM {} | {} | {}]",
-            pkg_ver, local_name, local_ip
-        );
+        let node_tag = format!("[AGM {} | {} | {}]", pkg_ver, local_name, local_ip);
 
         // Direct subject: should prepend node tag and Re: (with VM3 | stripped to prevent stuttering)
         assert_eq!(
