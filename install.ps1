@@ -1143,8 +1143,24 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
                 }
             }
         } catch {}
-        if ($candidateVersions.Count -ge 10) { break }
+        if (-not $isManifestStale -and $candidateVersions.Count -ge 10) { break }
     }
+
+    # Tier 3: Rate-limit-free GitHub Releases CDN updater.json probe
+    try {
+        $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
+        if ($updater -and $updater.version) {
+            $uVer = ($updater.version -replace "^v", "").Trim()
+            if ($uVer) {
+                if (-not $candidateVersions.Contains($uVer)) {
+                    $candidateVersions.Insert(0, $uVer)
+                }
+                if (-not $manifestAssetUrlMap.ContainsKey($uVer) -and -not $releaseMetadataMap.ContainsKey($uVer)) {
+                    $manifestAssetUrlMap[$uVer] = "https://github.com/$Repo/releases/download/v$uVer/agm-alim_${uVer}_x64-setup.exe"
+                }
+            }
+        }
+    } catch {}
 } elseif ($isPinned) {
     # If pinned, only query the specific release tag endpoint to fetch metadata if not in manifest
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
@@ -1202,9 +1218,16 @@ $TargetVersion = $versionQueue[0]
 if ($Update -and -not $Force) {
     $curr = Get-InstalledVersion
     if ($curr) {
-        if ($curr -eq $TargetVersion) {
-            Write-Success "Already on the latest version ($curr)."
-            return
+        try {
+            if ((Convert-ToSemVer $TargetVersion) -le (Convert-ToSemVer $curr)) {
+                Write-Success "Already on the latest version ($curr)."
+                return
+            }
+        } catch {
+            if ($curr -eq $TargetVersion) {
+                Write-Success "Already on the latest version ($curr)."
+                return
+            }
         }
     }
 }

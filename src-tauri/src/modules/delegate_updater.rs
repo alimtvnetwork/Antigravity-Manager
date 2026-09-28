@@ -173,24 +173,38 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     #[cfg(target_os = "windows")]
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let local_path = PathBuf::from(&local);
-        candidates.push(local_path.join("agm-cli").join("agm.exe"));
         candidates.push(local_path.join("agm-cli").join("agm-update-cli.exe"));
         candidates.push(local_path.join("Programs").join("agm-alim").join("agm.exe"));
+        candidates.push(local_path.join("agm-cli").join("agm.exe"));
     }
 
     #[cfg(not(target_os = "windows"))]
     if let Ok(home) = env::var("HOME") {
         let home_path = PathBuf::from(&home);
-        candidates.push(home_path.join(".local").join("bin").join("agm"));
         candidates.push(home_path.join(".local").join("bin").join("agm-update-cli"));
+        candidates.push(home_path.join(".local").join("bin").join("agm"));
     }
+
+    let current_mtime = fs::metadata(&current_exe).and_then(|m| m.modified()).ok();
 
     let updater_src = candidates
         .into_iter()
-        .find(|p| p.exists())
+        .find(|p| {
+            if !p.exists() {
+                return false;
+            }
+            if let (Some(cur_t), Ok(cand_meta)) = (current_mtime, fs::metadata(p)) {
+                if let Ok(cand_t) = cand_meta.modified() {
+                    if cur_t.duration_since(cand_t).unwrap_or_default() > Duration::from_secs(300) {
+                        return false;
+                    }
+                }
+            }
+            true
+        })
         .unwrap_or_else(|| current_exe.clone());
 
-    // Also maintain persistent dedicated `agm-update-cli` binary in agm-cli folder
+    // Maintain persistent dedicated `agm-update-cli` (and `agm.exe` if source is `agm.exe`) in agm-cli folder
     #[cfg(target_os = "windows")]
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let cli_dir = PathBuf::from(local).join("agm-cli");
@@ -198,6 +212,11 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
         let dedicated_cli = cli_dir.join("agm-update-cli.exe");
         if updater_src != dedicated_cli {
             let _ = fs::copy(&updater_src, &dedicated_cli);
+        }
+        let sibling_agm = current_dir.join("agm.exe");
+        let global_agm = cli_dir.join("agm.exe");
+        if sibling_agm.exists() && sibling_agm != global_agm {
+            let _ = fs::copy(&sibling_agm, &global_agm);
         }
     }
 

@@ -209,8 +209,8 @@ pub fn handle_cli_arguments() -> bool {
         }
 
         "update" | "--update" | "update-all" | "ua" => {
-            crate::modules::delegate_updater::run_cli_update(&args[2..]);
-            std::process::exit(0);
+            let ok = crate::modules::delegate_updater::run_cli_update(&args[2..]);
+            std::process::exit(if ok { 0 } else { 1 });
         }
 
         "open-ui" | "--open-ui" | "ui" | "launch-ui" | "start-ui" => {

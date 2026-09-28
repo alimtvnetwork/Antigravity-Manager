@@ -7822,33 +7822,70 @@ fn cmd_update(args: &[String]) {
         }
     };
 
-    let url = "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
-    let resp = match client.get(url).send() {
-        Ok(r) => r,
-        Err(e) => {
-            if is_json {
-                let err_obj = serde_json::json!({
-                    "success": false,
-                    "error": format!("Failed to connect to GitHub releases API: {}", e),
-                    "current_version": VERSION,
-                    "timestamp": chrono::Utc::now().timestamp(),
-                });
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
-                );
-            } else {
-                eprintln!("Failed to connect to GitHub releases API: {}", e);
-            }
-            return;
-        }
-    };
+    let is_delegated_stage2 = args.iter().any(|a| {
+        a == "--no-launch"
+            || a == "--no-relaunch"
+            || a == "--delegated-worker"
+            || a == "--install-dir"
+    });
+    if is_delegated_stage2 && !is_json && !is_check && !is_help && !is_gitmap && !is_ssh_fleet {
+        let ok = antigravity_tools_lib::modules::delegate_updater::run_cli_update(args);
+        std::process::exit(if ok { 0 } else { 1 });
+    }
 
-    if !resp.status().is_success() {
+    let api_url = "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
+    let updater_cdn_url =
+        "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json";
+
+    let mut tag_name = String::new();
+    let mut release_html_url =
+        "https://github.com/alimtvnetwork/Antigravity-Manager/releases".to_string();
+    let mut release_name = String::new();
+
+    if let Ok(resp) = client.get(api_url).send() {
+        if resp.status().is_success() {
+            if let Ok(json) = resp.json::<serde_json::Value>() {
+                tag_name = json["tag_name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_start_matches('v')
+                    .to_string();
+                if let Some(u) = json["html_url"].as_str() {
+                    release_html_url = u.to_string();
+                }
+                if let Some(n) = json["name"].as_str() {
+                    release_name = n.to_string();
+                }
+            }
+        }
+    }
+
+    if tag_name.is_empty() {
+        if let Ok(resp) = client.get(updater_cdn_url).send() {
+            if resp.status().is_success() {
+                if let Ok(json) = resp.json::<serde_json::Value>() {
+                    tag_name = json["version"]
+                        .as_str()
+                        .unwrap_or("")
+                        .trim_start_matches('v')
+                        .to_string();
+                    if !tag_name.is_empty() {
+                        release_html_url = format!(
+                            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
+                            tag_name
+                        );
+                        release_name = format!("v{}", tag_name);
+                    }
+                }
+            }
+        }
+    }
+
+    if tag_name.is_empty() {
         if is_json {
             let err_obj = serde_json::json!({
                 "success": false,
-                "error": format!("GitHub API returned HTTP status: {}", resp.status()),
+                "error": "Failed to fetch latest release metadata from GitHub API and CDN updater.json",
                 "current_version": VERSION,
                 "timestamp": chrono::Utc::now().timestamp(),
             });
@@ -7857,42 +7894,10 @@ fn cmd_update(args: &[String]) {
                 serde_json::to_string_pretty(&err_obj).unwrap_or_default()
             );
         } else {
-            eprintln!("GitHub API returned HTTP status: {}", resp.status());
+            eprintln!("Failed to fetch latest release metadata from GitHub API and CDN.");
         }
         return;
     }
-
-    let json: serde_json::Value = match resp.json() {
-        Ok(j) => j,
-        Err(e) => {
-            if is_json {
-                let err_obj = serde_json::json!({
-                    "success": false,
-                    "error": format!("Failed to parse release response: {}", e),
-                    "current_version": VERSION,
-                    "timestamp": chrono::Utc::now().timestamp(),
-                });
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
-                );
-            } else {
-                eprintln!("Failed to parse release response: {}", e);
-            }
-            return;
-        }
-    };
-
-    let tag_name = json["tag_name"]
-        .as_str()
-        .unwrap_or("")
-        .trim_start_matches('v')
-        .to_string();
-    let release_html_url = json["html_url"]
-        .as_str()
-        .unwrap_or("https://github.com/alimtvnetwork/Antigravity-Manager/releases")
-        .to_string();
-    let release_name = json["name"].as_str().unwrap_or("").to_string();
 
     let is_up_to_date = tag_name == VERSION;
     let mut updated = false;
@@ -7936,87 +7941,39 @@ fn cmd_update(args: &[String]) {
             println!("[*] Triggering automatic update installation...");
         }
 
-        #[cfg(target_os = "windows")]
-        {
-            let mut explicit_dir: Option<PathBuf> = None;
-            let mut i = 0;
-            while i < args.len() {
-                if args[i] == "--install-dir" && i + 1 < args.len() {
-                    explicit_dir = Some(PathBuf::from(&args[i + 1]));
-                    break;
-                }
-                i += 1;
-            }
-            let is_no_launch = args
-                .iter()
-                .any(|a| a == "--no-launch" || a == "--no-relaunch");
-            let install_dir = explicit_dir
-                .or_else(|| {
-                    env::current_exe()
-                        .ok()
-                        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-                        .filter(|d| {
-                            !d.to_string_lossy().to_lowercase().contains("agm-updater")
-                                && !d.to_string_lossy().to_lowercase().contains("agm-cli")
-                        })
-                })
-                .unwrap_or_else(|| {
-                    antigravity_tools_lib::modules::delegate_updater::resolve_default_install_dir(
-                        None, None,
-                    )
-                });
-
-            let mut extra_flags = String::from("-Update");
-            if is_force {
-                extra_flags.push_str(" -Force");
-            }
-            if is_no_launch {
-                extra_flags.push_str(" -NoLaunch");
-            }
-            let ps_cmd = format!(
-                "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) {} -InstallDir \"{}\"",
-                extra_flags,
-                install_dir.to_string_lossy()
+        let ui_running =
+            antigravity_tools_lib::modules::delegate_updater::is_ui_process_running_excluding(
+                std::process::id(),
             );
-            let status = Command::new("powershell")
-                .args([
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    &ps_cmd,
-                ])
-                .status();
-            match status {
-                Ok(s) => {
-                    let code = s.code().unwrap_or(1);
-                    if code == 0 {
-                        updated = true;
-                        if !is_json {
-                            println!("[OK] Update completed successfully!");
-                        }
-                    } else if !is_json {
-                        eprintln!("[ERROR] Update script exited with code {}", code);
-                    }
-                }
-                Err(e) => {
-                    if !is_json {
-                        eprintln!("[ERROR] Failed to run update script: {}", e);
-                    }
-                }
-            }
+
+        if ui_running && !is_json {
+            println!(
+                "[*] Antigravity Manager UI is currently running. Delegating to 3-stage Update CLI (agm-update-cli -> agm update -> agm open-ui)..."
+            );
+            let delegate_args = vec![
+                "--relaunch".to_string(),
+                "--version".to_string(),
+                tag_name.clone(),
+            ];
+            antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
+            return;
         }
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            let sh_cmd = "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash";
-            let status = Command::new("sh").args(["-c", sh_cmd]).status();
-            if let Ok(s) = status {
-                if s.success() {
-                    updated = true;
-                }
+        let mut cli_update_args = vec![
+            "--force".to_string(),
+            "--no-launch".to_string(),
+            "--version".to_string(),
+            tag_name.clone(),
+        ];
+        for i in 0..args.len() {
+            if args[i] == "--install-dir" && i + 1 < args.len() {
+                cli_update_args.push("--install-dir".to_string());
+                cli_update_args.push(args[i + 1].clone());
+                break;
             }
         }
+        updated =
+            antigravity_tools_lib::modules::delegate_updater::run_cli_update(&cli_update_args);
     }
 
     let (node_alias, local_ip) =
