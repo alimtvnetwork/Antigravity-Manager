@@ -105,3 +105,5 @@ Master directory of architectural and execution plans.
 - [79-auto-switch-button-delegation-and-ide-alive.md](completed/79-auto-switch-button-delegation-and-ide-alive.md): Auto-Switch Button Delegation, Hot-Switch IDE Preservation & Tool Liveness.
 - [68-account-switch-98pct-e2e-parallel-prompt-backup-and-instance-verification.md](completed/68-account-switch-98pct-e2e-parallel-prompt-backup-and-instance-verification.md): Account Switch 98% Simulation E2E, Parallel Prompt Backup/Restore, Multi-VM Collision Shielding & Sandbox Lifecycle Verification.
 - [69-smart-switch-quota-probe-json-email-telegram-projects-and-installer-fix.md](subtasks/69-smart-switch-quota-probe-json-email-telegram-projects-and-installer-fix/01-json-email-body-and-field-normalization.md): Smart Switch Quota Probe, Pure JSON Email Telemetry, Telegram Fleet Project Deduplication & Installer Resilience.
+- [02-completed-gitmap-agm-tree-instance-swap.md](completed/02-completed-gitmap-agm-tree-instance-swap.md): GitMap AGY Parity, Dual Bracketed Tree View (`[AGM:P001 | GM:#1]` / `[AGM:C001 | GM:<cid>]`), Instance/Node Prompting & Multi-Instance Swap Isolation.
+

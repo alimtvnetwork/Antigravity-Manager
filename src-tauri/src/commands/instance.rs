@@ -147,3 +147,32 @@ pub fn resume_recent_project_prompts(
     let max_age = max_age_seconds.unwrap_or(3600);
     crate::modules::repo_db::auto_resume_recent_prompts(&inst_id, max_age)
 }
+
+#[tauri::command]
+pub fn assign_project_to_instance(
+    instance_id: String,
+    repo_paths: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let mut assigned = Vec::new();
+    for path in &repo_paths {
+        let res = instance::assign_project_to_instance(&instance_id, path)?;
+        assigned.push(res);
+    }
+    Ok(assigned)
+}
+
+#[tauri::command]
+pub fn get_instance_workspace_folders(instance_id: String) -> Result<Vec<String>, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id)?;
+    let registry = instance::load_registry()?;
+    let data_dir = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id)
+        .map(|i| i.data_dir.clone())
+        .unwrap_or_default();
+    Ok(instance::get_instance_workspace_folders(
+        &resolved_id,
+        &data_dir,
+    ))
+}

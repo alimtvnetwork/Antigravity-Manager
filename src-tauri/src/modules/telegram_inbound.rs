@@ -2206,6 +2206,17 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             ))
         }
         _ => {
+            let is_direct_seq_code = !rest.is_empty()
+                && (cmd_base.starts_with("agm:c")
+                    || cmd_base.starts_with("agm:p")
+                    || cmd_base.starts_with("gm:#")
+                    || cmd_base.starts_with("gm:")
+                    || ((cmd_base.starts_with('c') || cmd_base.starts_with('p'))
+                        && cmd_base.len() >= 2
+                        && cmd_base[1..].chars().all(|ch| ch.is_ascii_digit())));
+            if is_direct_seq_code {
+                return Some(execute_prompt_injection(&format!("{} {}", cmd_no_slash, rest)).await);
+            }
             if lower_full.contains("how many machines")
                 || lower_full.contains("node ls")
                 || lower_full == "nodes"

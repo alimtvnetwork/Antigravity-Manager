@@ -1620,11 +1620,20 @@ Node: {} ({}) | Version: {}
      Email Subject: * | ps | <Short Command Description>
    • cmd: Runs Command Prompt script from email body.
      Email Subject: * | cmd | <Short Command Description>
+   • agm tree [all]: Displays bracketed Project -> Conversation -> 200w Prompt Tree
+     with dual Sequence IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>]).
+   • agm prompt <C001|P001|GM:#1> [--instance <id>] [--node <node>] \"<Prompt>\":
+     Injects prompt into exact conversation, project, instance, or remote machine.
+   • agm instances assign <inst> <repo_paths...>:
+     Binds multiple project workspaces to an isolated instance.
+   • gitmap agy: Executes GitMap AGY commands (active, running-prompts ls|backup|restore,
+     prompt -n <slug> -t <text>, prompt-project P001 -n <slug>, fpug, sug, rerun).
+   • gitmap ssh: Executes GitMap SSH commands (nodes, exec \"<cmd>\" --node <n>, update agm).
    • gitmap: Executes GitMap autonomous CLI commands (e.g. status, scan, sync, macro).
      Email Subject: * | gitmap | <Arguments>
    • agm status: Returns node status, active account, and credits remaining.
    • agm ff / agm smart-switch: Rotates immediately to the freshest available account.
-   • agm switch | <email>: Switches the active account profile to the specified email.
+   • agm switch | <email> [--instance <id>]: Switches account profile (isolated per instance).
    • agm accounts / acc: Returns registered accounts and active status.
    • agm doctor / check: Runs system health diagnostics and reports anomalies.
    • agm instances / ls: Lists active sandbox profiles and running process IDs.
@@ -1633,7 +1642,7 @@ Node: {} ({}) | Version: {}
    • agm sync: Synchronizes local accounts, instances, and DB vaults.
    • agy prompts ls: Lists backed-up workspace prompts.
    • gitmap prompts ls: Lists GitMap automated prompts.
-   • update: Checks for and applies latest Antigravity Manager updates.
+   • update: Checks for and applies latest Antigravity Manager / GitMap updates.
 
 3. TWO-PHASE AUTOMATED RECEIPTS:
    • Phase 1 ACK: Immediate acknowledgement email with IN_PROGRESS badge.
