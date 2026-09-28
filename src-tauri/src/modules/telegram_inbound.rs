@@ -494,10 +494,7 @@ pub fn format_ping_report() -> String {
     } else {
         String::new()
     };
-    let display_alias = if (raw_alias.starts_with("Node-")
-        && raw_alias[5..].chars().all(|c| c.is_ascii_hexdigit()))
-        || raw_alias.is_empty()
-    {
+    let display_alias = if raw_alias.starts_with("Node-") || raw_alias.is_empty() {
         "None".to_string()
     } else {
         raw_alias
@@ -554,10 +551,7 @@ pub fn format_observe_report() -> String {
     } else {
         String::new()
     };
-    let display_alias = if (raw_alias.starts_with("Node-")
-        && raw_alias[5..].chars().all(|c| c.is_ascii_hexdigit()))
-        || raw_alias.is_empty()
-    {
+    let display_alias = if raw_alias.starts_with("Node-") || raw_alias.is_empty() {
         "None".to_string()
     } else {
         raw_alias
@@ -774,9 +768,9 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             let short_ws = shorten_project_name(&friendly_ws);
             let duration = format_running_duration(p.created_at);
             let badge = if p.status == "running" || p.status == "dispatched" {
-                "🟢 RUNNING"
+                "🟢"
             } else {
-                "⚪ IDLE"
+                "⚪"
             };
 
             format!(
@@ -1460,11 +1454,7 @@ pub async fn format_node_scoped_prompts(args_str: &str) -> String {
             proj_text.push_str("• No registered workspaces\n");
         } else {
             for p in &projects {
-                let badge = if p.is_running {
-                    "🟢 RUNNING"
-                } else {
-                    "⚪ IDLE"
-                };
+                let badge = if p.is_running { "🟢" } else { "⚪" };
                 let short_id = if p.project_id.len() > 12 {
                     &p.project_id[..12]
                 } else {
@@ -1488,7 +1478,7 @@ pub async fn format_node_scoped_prompts(args_str: &str) -> String {
                 let short_pid = if p.id.len() > 10 { &p.id[..10] } else { &p.id };
                 let clean_content = repo_db::extract_clean_user_prompt(&p.prompt_content);
                 prompt_text.push_str(&format!(
-                    "• [🟢 RUNNING] <code>{}</code> (Proj: <b>{}</b>)\n  <i>\"{}\"</i>\n",
+                    "• [🟢] <code>{}</code> (Proj: <b>{}</b>)\n  <i>\"{}\"</i>\n",
                     short_pid,
                     clean_for_telegram_html(&p.project_id, 32),
                     clean_for_telegram_html(&clean_content, 120)
@@ -1596,11 +1586,7 @@ pub fn format_projects_list() -> String {
         };
 
         let is_any_running = entries.iter().any(|p| p.is_running);
-        let badge = if is_any_running {
-            "🟢 RUNNING"
-        } else {
-            "⚪ IDLE"
-        };
+        let badge = if is_any_running { "🟢" } else { "⚪" };
 
         // Pick best representative entry (running one preferred, else latest)
         let rep = entries
@@ -1822,11 +1808,11 @@ pub fn format_prompts_list() -> String {
             let mut rows = String::new();
             for (i, p) in prompts.iter().take(10).enumerate() {
                 let badge = match p.status.as_str() {
-                    "running" => "🟢 RUNNING",
-                    "dispatched" => "📤 DISPATCHED",
-                    "backed_up" => "💾 BACKED UP",
-                    "completed" => "✅ COMPLETED",
-                    _ => "⚪ QUEUED",
+                    "running" => "🟢",
+                    "dispatched" => "📤",
+                    "backed_up" => "💾",
+                    "completed" => "✅",
+                    _ => "⚪",
                 };
                 let clean = repo_db::extract_clean_user_prompt(&p.prompt_content);
                 rows.push_str(&format!(

@@ -10,13 +10,14 @@ Initiated from user feedback on Telegram `/status` telemetry UX degradation, unr
 ## Delivered Architectural Changes
 
 ### 1. Header & Node Telemetry Refinement
-- Telegram `/status` (observe) report header rebranded to `🔭 AGM v<version> Observation & Telemetry Report`.
-- Generic `Node-XXXXXX` replaced with real Windows Machine Name (`COMPUTERNAME` / hostname) and configured operator Alias.
+- Telegram `/status` (observe) report header rebranded to `🤖 AGM v<version> Status`.
+- Generic `Node-XXXXXX` suppressed, displaying `None` if unconfigured while highlighting the true Windows Machine Name (`COMPUTERNAME` / hostname) and configured operator Alias.
 - Removed noisy `Backup Batches: ...` line.
 - Added auto-switch threshold percentage to the Quota / Tier bullet (`switch threshold: 15%`).
 
 ### 2. Workspaces & Prompts Visualization
 - Unified running workspaces and active prompts into a single consolidated `🟢 Running:` block, eliminating redundant dispatch and duplicate prompt queue headers.
+- Replaced wordy `🟢 RUNNING` and `⚪ IDLE` text badges with compact `🟢` and `⚪` symbols across Telegram status, tree views, project lists, and prompt queues to save vertical space.
 - Abbreviated project names (`Antigravity-Manager` -> `AGM`).
 - Eliminated Telegram `<code>` monospace wrapping on prompt bodies that rendered as unreadable dark-blue-on-dark-blue on mobile/desktop clients; now rendered in clean indented white text.
 - Formatted running status with compact green indicator: `• <b>AGM</b> 🟢 (running Xm Ys)`.

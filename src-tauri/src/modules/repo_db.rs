@@ -2903,11 +2903,7 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
     }
 
     for proj in &tree {
-        let proj_badge = if proj.is_running {
-            "🟢 RUNNING"
-        } else {
-            "⚪ IDLE"
-        };
+        let proj_badge = if proj.is_running { "🟢" } else { "⚪" };
         let label =
             format_friendly_workspace_label(&proj.repo_name, &proj.project_id, &proj.repo_path);
         let inst_seq_str = proj
