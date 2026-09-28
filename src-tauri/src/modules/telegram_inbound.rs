@@ -642,19 +642,12 @@ pub fn format_observe_report() -> String {
             if let Some(txt) = prompt_text {
                 let clean = repo_db::extract_smart_prompt_summary(&txt, 90);
                 if !clean.is_empty() {
-                    block.push_str(&format!(
-                        "   \"{}\"\n",
-                        clean_for_telegram_html(&clean, 90)
-                    ));
+                    block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
                 }
             }
 
             if let Some(ap) = matched_prompt {
-                let prompt_id_short = if ap.id.len() > 8 {
-                    &ap.id[..8]
-                } else {
-                    &ap.id
-                };
+                let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
                     "   <i>Expand: <code>/expand {}</code></i>\n",
                     prompt_id_short
@@ -685,16 +678,9 @@ pub fn format_observe_report() -> String {
         let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
         let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
         if !clean.is_empty() {
-            block.push_str(&format!(
-                "   \"{}\"\n",
-                clean_for_telegram_html(&clean, 90)
-            ));
+            block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
         }
-        let prompt_id_short = if ap.id.len() > 8 {
-            &ap.id[..8]
-        } else {
-            &ap.id
-        };
+        let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
         block.push_str(&format!(
             "   <i>Expand: <code>/expand {}</code></i>\n",
             prompt_id_short
