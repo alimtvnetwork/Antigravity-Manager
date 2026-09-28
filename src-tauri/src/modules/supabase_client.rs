@@ -560,4 +560,314 @@ mod tests {
         };
         assert!(is_conn_pending);
     }
+
+    #[tokio::test]
+    async fn test_mock_connection_probe1_success() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new().route(
+            "/rest/v1/",
+            axum::routing::get(|| async {
+                (
+                    axum::http::StatusCode::OK,
+                    [("content-type", "application/json")],
+                    "{\"swagger\":\"2.0\",\"info\":{\"title\":\"PostgREST API\"}}",
+                )
+            }),
+        );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_probe1".to_string(),
+            name: "Mock Probe 1".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "anon-mock-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.test_connection().await.unwrap();
+        assert!(res.is_success);
+        assert!(res.message.contains("Supabase PostgREST verified"));
+        assert_eq!(res.status_code, Some(200));
+    }
+
+    #[tokio::test]
+    async fn test_mock_connection_probe1_auth_error() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new().route(
+            "/rest/v1/",
+            axum::routing::get(|| async {
+                (
+                    axum::http::StatusCode::UNAUTHORIZED,
+                    [("content-type", "application/json")],
+                    "{\"message\":\"Invalid API key\"}",
+                )
+            }),
+        );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_auth_err".to_string(),
+            name: "Mock Auth Err".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "bad-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.test_connection().await.unwrap();
+        assert!(!res.is_success);
+        assert!(res.message.contains("Authentication failed"));
+        assert_eq!(res.status_code, Some(401));
+    }
+
+    #[tokio::test]
+    async fn test_mock_connection_probe2_table_found() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new()
+            .route(
+                "/rest/v1/",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "application/json")],
+                        "{\"message\":\"OpenAPI disabled\"}",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/nodes",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::OK,
+                        [("content-type", "application/json")],
+                        "[]",
+                    )
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_probe2_table".to_string(),
+            name: "Mock Probe 2 Table".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "anon-mock-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.test_connection().await.unwrap();
+        assert!(res.is_success);
+        assert!(res.message.contains("nodes table verified"));
+        assert_eq!(res.status_code, Some(200));
+    }
+
+    #[tokio::test]
+    async fn test_mock_connection_probe2_pgrst_relation_missing() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new()
+            .route(
+                "/rest/v1/",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "application/json")],
+                        "{\"message\":\"Not found\"}",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/nodes",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "application/json")],
+                        "{\"code\":\"PGRST205\",\"message\":\"relation \\\"public.nodes\\\" does not exist\"}",
+                    )
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_pgrst".to_string(),
+            name: "Mock PGRST".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "anon-mock-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.test_connection().await.unwrap();
+        assert!(res.is_success);
+        assert!(res
+            .message
+            .contains("PostgREST responsive; run Schema Migration"));
+        assert_eq!(res.status_code, Some(200));
+    }
+
+    #[tokio::test]
+    async fn test_mock_connection_probe3_health_fallback() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new()
+            .route(
+                "/rest/v1/",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "text/plain")],
+                        "Not Found",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/nodes",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "text/plain")],
+                        "404 page",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/command_queue",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "text/plain")],
+                        "404 page",
+                    )
+                }),
+            )
+            .route(
+                "/auth/v1/health",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::OK,
+                        [("content-type", "application/json")],
+                        "{\"version\":\"v2.0\",\"name\":\"GoTrue\"}",
+                    )
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_probe3".to_string(),
+            name: "Mock Probe 3".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "anon-mock-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.test_connection().await.unwrap();
+        assert!(res.is_success);
+        assert!(res.message.contains("Supabase service online"));
+        assert_eq!(res.status_code, Some(200));
+    }
+
+    #[tokio::test]
+    async fn test_mock_verify_expected_tables() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = axum::Router::new()
+            .route(
+                "/rest/v1/nodes",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::OK,
+                        [("content-type", "application/json")],
+                        "[]",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/instance_profiles",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "application/json")],
+                        "{\"code\":\"PGRST205\",\"message\":\"relation does not exist\"}",
+                    )
+                }),
+            )
+            .route(
+                "/rest/v1/workspace_leases",
+                axum::routing::get(|| async {
+                    (
+                        axum::http::StatusCode::NOT_FOUND,
+                        [("content-type", "application/json")],
+                        "{\"code\":\"PGRST205\",\"message\":\"relation does not exist\"}",
+                    )
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let ep = SupabaseEndpoint {
+            id: "ep_verify".to_string(),
+            name: "Mock Verify Tables".to_string(),
+            url: format!("http://127.0.0.1:{}", port),
+            api_key: "anon-mock-key".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: None,
+            tags: Vec::new(),
+        };
+
+        let client = SupabaseClient::new(&ep).unwrap();
+        let res = client.verify_expected_tables("ep_verify", "root").await;
+        assert!(res.is_connected);
+        assert_eq!(res.verified_tables, vec!["nodes".to_string()]);
+        assert_eq!(
+            res.missing_tables,
+            vec![
+                "instance_profiles".to_string(),
+                "workspace_leases".to_string()
+            ]
+        );
+    }
 }

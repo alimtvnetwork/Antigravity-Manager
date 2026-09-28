@@ -348,3 +348,61 @@ pub async fn migrate_database_data(
         message: msg,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_supabase_config() {
+        let def = SupabaseConfig::default();
+        assert!(!def.is_sync_enabled);
+        assert_eq!(def.heartbeat_interval_secs, 30);
+        assert_eq!(def.auto_prune_root_mb, 400);
+        assert_eq!(def.auto_prune_secondary_mb, 200);
+        assert!(def.node_alias.starts_with("Node-"));
+        assert!(def.endpoints.is_empty());
+    }
+
+    #[test]
+    fn test_supabase_config_serde_and_url_normalization() {
+        let json_data = r#"{
+            "endpoints": [
+                {
+                    "id": "ep1",
+                    "name": "Endpoint 1",
+                    "url": "https://sample.supabase.co/rest/v1/",
+                    "api_key": "sample-key",
+                    "role": "root",
+                    "is_enabled": true,
+                    "prune_threshold_mb": 400,
+                    "priority": 1,
+                    "notes": null,
+                    "tags": []
+                }
+            ],
+            "node_alias": "Node-Test",
+            "is_sync_enabled": true,
+            "auto_prune_root_mb": 400,
+            "auto_prune_secondary_mb": 200,
+            "heartbeat_interval_secs": 30
+        }"#;
+
+        let mut config: SupabaseConfig = serde_json::from_str(json_data).expect("valid json");
+        assert_eq!(
+            config.endpoints[0].url,
+            "https://sample.supabase.co/rest/v1/"
+        );
+
+        // Normalize endpoints as done in load_config
+        for ep in &mut config.endpoints {
+            ep.url = normalize_supabase_url(&ep.url);
+        }
+        assert_eq!(config.endpoints[0].url, "https://sample.supabase.co");
+
+        // Verify re-serialization maintains normalized URL
+        let serialized = serde_json::to_string(&config).expect("serialization works");
+        assert!(serialized.contains("\"https://sample.supabase.co\""));
+        assert!(!serialized.contains("/rest/v1/\""));
+    }
+}

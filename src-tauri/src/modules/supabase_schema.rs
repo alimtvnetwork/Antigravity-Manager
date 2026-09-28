@@ -166,3 +166,24 @@ pub fn get_schema_sql(role: &str) -> &'static str {
         SECONDARY_DB_SCHEMA_SQL
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_schema_sql_declarations() {
+        let root_sql = get_schema_sql("root");
+        assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.nodes"));
+        assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.instance_profiles"));
+        assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.workspace_leases"));
+        assert!(root_sql.contains("CREATE OR REPLACE FUNCTION public.acquire_workspace_lease"));
+
+        let sec_sql = get_schema_sql("secondary");
+        assert!(sec_sql.contains("CREATE TABLE IF NOT EXISTS public.command_queue"));
+        assert!(sec_sql.contains("CREATE TABLE IF NOT EXISTS public.command_telemetry"));
+        assert!(sec_sql.contains("CREATE TABLE IF NOT EXISTS public.endpoint_health"));
+        assert!(sec_sql.contains("CREATE OR REPLACE FUNCTION public.claim_next_command"));
+        assert!(sec_sql.contains("CREATE OR REPLACE FUNCTION public.prune_old_commands"));
+    }
+}

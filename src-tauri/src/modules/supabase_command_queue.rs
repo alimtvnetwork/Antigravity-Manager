@@ -137,3 +137,96 @@ pub async fn execute_and_report_command(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_secondary_endpoints_filtering_and_priority() {
+        let config = SupabaseConfig {
+            endpoints: vec![
+                SupabaseEndpoint {
+                    id: "sec_p2".to_string(),
+                    name: "Secondary P2".to_string(),
+                    url: "https://sec2.supabase.co".to_string(),
+                    api_key: "k2".to_string(),
+                    role: "secondary".to_string(),
+                    is_enabled: true,
+                    prune_threshold_mb: 200,
+                    priority: 2,
+                    notes: None,
+                    tags: vec![],
+                },
+                SupabaseEndpoint {
+                    id: "root_p1".to_string(),
+                    name: "Root DB".to_string(),
+                    url: "https://root.supabase.co".to_string(),
+                    api_key: "kr".to_string(),
+                    role: "root".to_string(),
+                    is_enabled: true,
+                    prune_threshold_mb: 400,
+                    priority: 1,
+                    notes: None,
+                    tags: vec![],
+                },
+                SupabaseEndpoint {
+                    id: "sec_disabled".to_string(),
+                    name: "Disabled Secondary".to_string(),
+                    url: "https://dis.supabase.co".to_string(),
+                    api_key: "kd".to_string(),
+                    role: "secondary".to_string(),
+                    is_enabled: false,
+                    prune_threshold_mb: 200,
+                    priority: 0,
+                    notes: None,
+                    tags: vec![],
+                },
+                SupabaseEndpoint {
+                    id: "sec_p1".to_string(),
+                    name: "Secondary P1".to_string(),
+                    url: "https://sec1.supabase.co".to_string(),
+                    api_key: "k1".to_string(),
+                    role: "secondary".to_string(),
+                    is_enabled: true,
+                    prune_threshold_mb: 200,
+                    priority: 1,
+                    notes: None,
+                    tags: vec![],
+                },
+            ],
+            node_alias: "Node-Test".to_string(),
+            is_sync_enabled: true,
+            auto_prune_root_mb: 400,
+            auto_prune_secondary_mb: 200,
+            heartbeat_interval_secs: 30,
+        };
+
+        let secondary = get_secondary_endpoints(&config);
+        assert_eq!(secondary.len(), 2);
+        assert_eq!(secondary[0].id, "sec_p1");
+        assert_eq!(secondary[1].id, "sec_p2");
+    }
+
+    #[test]
+    fn test_inbound_db_command_deserialization() {
+        let json_data = r#"{
+            "id": "cmd-123",
+            "target_node_id": "node-alpha",
+            "source": "telegram",
+            "command_text": "git status",
+            "status": "pending",
+            "created_at": 1700000000,
+            "started_at": 0,
+            "completed_at": 0
+        }"#;
+
+        let cmd: InboundDbCommand = serde_json::from_str(json_data).expect("valid json command");
+        assert_eq!(cmd.id, "cmd-123");
+        assert_eq!(cmd.target_node_id, "node-alpha");
+        assert_eq!(cmd.source, "telegram");
+        assert_eq!(cmd.command_text, "git status");
+        assert_eq!(cmd.status, "pending");
+        assert_eq!(cmd.created_at, 1700000000);
+    }
+}
