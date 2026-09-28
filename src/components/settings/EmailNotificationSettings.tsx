@@ -2113,23 +2113,23 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                     <div className="p-3 rounded-lg bg-sky-50/40 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 text-[11px] text-gray-600 dark:text-slate-300 space-y-1.5">
                         <div className="font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-1.5">
                             <Terminal className="w-3.5 h-3.5" />
-                            <span>Supported Telegram Chat Commands &amp; AGM Terminal CLI:</span>
+                            <span>Supported Telegram Chat Commands &amp; AGM / GitMap Terminal CLI:</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[10px]">
                             <div><code>/ping</code> — Node IP, version &amp; git telemetry</div>
-                            <div><code>/tree</code> — Project (<code>P001</code>) &amp; Conversation (<code>C001</code>) tree (200w)</div>
-                            <div><code>/prompt C001 &lt;msg&gt;</code> — Inject prompt into conversation/project</div>
+                            <div><code>/tree [all]</code> — Dual <code>[AGM:P001 | GM:#1]</code> &amp; <code>[AGM:C001 | GM:&lt;cid&gt;]</code> 200w tree</div>
+                            <div><code>/prompt C001 &lt;msg&gt;</code> — Inject prompt by AGM or GitMap (<code>GM:#1</code>) seq ID</div>
+                            <div><code>/prompt C001 --instance #2 --node vm-1 &lt;msg&gt;</code> — Scoped to instance &amp; SSH node</div>
+                            <div><code>/agy [active|running-prompts|fpug|sug|rerun]</code> — GitMap AGY suite</div>
+                            <div><code>/gitmap agy prompt -n is-done -t &quot;...&quot;</code> — GitMap named template prompt</div>
                             <div><code>/observe</code> or <code>/status</code> — Active vs Idle workspace report</div>
-                            <div><code>/gitmap pe</code> — Live GitHub CI/CD pipeline matrix</div>
-                            <div><code>/ssh [nodes|exec|prompt]</code> — Remote SSH fleet delegation</div>
+                            <div><code>/ssh [nodes|exec|prompt|update]</code> — Remote SSH fleet delegation</div>
                             <div><code>/update [agm|gitmap|ssh|all]</code> — Self-update AGM &amp; GitMap</div>
-                            <div><code>/agm status</code> or <code>/api</code> — Proxy &amp; account pool status</div>
-                            <div><code>/backup</code> or <code>/backpack</code> — Trigger encrypted backup</div>
-                            <div><code>/email [status|ping|help]</code> — Email status or dispatch</div>
-                            <div><code>agm tree [--all]</code> — Terminal project &amp; conversation tree</div>
-                            <div><code>agm prompt C001 &quot;&lt;text&gt;&quot; [--instance 1]</code> — CLI prompt inject</div>
-                            <div><code>agm agy [projects|prompts|backup|restore]</code> — GitMap AGY parity</div>
-                            <div><code>agm update [agm|gitmap|ssh|all]</code> — Unified CLI updater</div>
+                            <div><code>/backup</code> &amp; <code>/restore</code> — Snapshot &amp; restore running storage prompts</div>
+                            <div><code>agm tree [--all]</code> — Terminal bracketed project &amp; conversation tree</div>
+                            <div><code>agm prompt C001 &quot;&lt;text&gt;&quot; [--instance #2] [--node vm-1]</code> — CLI prompt inject</div>
+                            <div><code>agm instances assign #2 &lt;repo_path&gt;</code> — Bind project workspace to instance</div>
+                            <div><code>agm agy [tree|active|backup|restore|fpug|sug]</code> — GitMap AGY parity</div>
                         </div>
                     </div>
 

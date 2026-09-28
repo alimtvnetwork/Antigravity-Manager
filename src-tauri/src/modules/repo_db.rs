@@ -202,6 +202,10 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
 }
 
 /// Decode file URI (e.g., file:///path/to/folder or file:///c%3A/path) to local path
+pub fn decode_uri_to_path_pub(uri: &str) -> String {
+    decode_uri_to_path(uri)
+}
+
 fn decode_uri_to_path(uri: &str) -> String {
     let stripped = uri
         .strip_prefix("file:///")
@@ -229,11 +233,16 @@ fn decode_uri_to_path(uri: &str) -> String {
 
 /// Scan active workspace storage for an instance and discover projects
 pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>, String> {
+    let target_id = if instance_id == "__default__" || instance_id.is_empty() {
+        "default"
+    } else {
+        instance_id
+    };
     let registry = crate::modules::instance::load_registry()?;
     let instance = registry
         .instances
         .iter()
-        .find(|i| i.id == instance_id)
+        .find(|i| i.id == target_id || (target_id == "default" && i.is_default))
         .ok_or_else(|| format!("Instance '{}' not found", instance_id))?;
 
     let pids =
@@ -534,18 +543,38 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         params![now, stale_cutoff],
     );
 
-    // Transition all remaining in-flight 'running' prompts in active_prompts to 'backed_up' before switch
-    let transitioned = conn
-        .execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ? WHERE status = 'running'",
+    let is_all_or_default =
+        instance_id == "all" || instance_id == "__default__" || instance_id == "default";
+
+    // Transition in-flight 'running' prompts in active_prompts to 'backed_up' before switch (scoped to target instance)
+    let transitioned = if instance_id == "all" {
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running'",
             params![now],
         )
-        .unwrap_or(0);
+        .unwrap_or(0)
+    } else if is_all_or_default {
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running' AND instance_id IN ('default', '__default__')",
+            params![now],
+        )
+        .unwrap_or(0)
+    } else {
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running' AND instance_id = ?2",
+            params![now, instance_id],
+        )
+        .unwrap_or(0)
+    };
     if transitioned > 0 {
         backed_up_count += transitioned;
         if let Ok(mut map) = get_memory_prompts_map().lock() {
             for p in map.values_mut() {
-                if p.status == "running" {
+                let matches_inst = instance_id == "all"
+                    || (is_all_or_default
+                        && (p.instance_id == "default" || p.instance_id == "__default__"))
+                    || p.instance_id == instance_id;
+                if p.status == "running" && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
                 }
@@ -553,14 +582,26 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         }
 
         crate::modules::logger::log_info(&format!(
-            "[RepoDB] Transitioned {} in-flight prompts from 'running' to 'backed_up' before switch",
-            transitioned
+            "[RepoDB] Transitioned {} in-flight prompts from 'running' to 'backed_up' for instance '{}' before switch",
+            transitioned, instance_id
         ));
     }
+
+    let instance_projects = detect_running_projects(instance_id).unwrap_or_default();
+    let instance_repo_paths: HashSet<String> = instance_projects
+        .iter()
+        .map(|proj| normalize_path_for_compare(&proj.repo_path))
+        .collect();
 
     // Layer 1: Core Antigravity Live Conversations Discovery (~/.gemini/antigravity)
     let ag_prompts = discover_running_prompts_from_antigravity(instance_id);
     for p in ag_prompts {
+        if !is_all_or_default
+            && !instance_repo_paths.is_empty()
+            && !instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
+        {
+            continue;
+        }
         let clean_repo_name = Path::new(&p.repo_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -1633,6 +1674,23 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         cmd.current_dir(&ws_dir);
         cmd.arg("--dangerously-skip-permissions");
 
+        if !prompt.instance_id.is_empty()
+            && prompt.instance_id != "default"
+            && prompt.instance_id != "__default__"
+        {
+            if let Ok(registry) = crate::modules::instance::load_registry() {
+                if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == prompt.instance_id || i.name == prompt.instance_id)
+                {
+                    if !inst.data_dir.trim().is_empty() {
+                        cmd.arg(format!("--user-data-dir={}", inst.data_dir));
+                    }
+                }
+            }
+        }
+
         if clean_prompt.len() <= 24000 {
             cmd.arg("-p").arg(&clean_prompt);
         } else {
@@ -1652,8 +1710,8 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         match cmd.spawn() {
             Ok(child) => {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}) in '{}': {:.60}...",
-                    prompt.id, child.id(), prompt.repo_path, clean_prompt
+                    "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
+                    prompt.id, child.id(), prompt.instance_id, prompt.repo_path, clean_prompt
                 ));
                 true
             }
@@ -1673,10 +1731,18 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
     }
 }
 
-/// Resend and restore all previous running/backed-up/dispatched commands before IDE close or switch.
+/// Resend and restore all previous running/backed-up/dispatched commands across all instances.
+pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
+    resend_running_commands_for_instance(None, limit)
+}
+
+/// Resend and restore previous running/backed-up/queued commands scoped to an optional `instance_id`.
 /// Strictly filters to unrestored/backed-up/queued prompts, prioritizes the latest running prompts,
 /// and deduplicates against already dispatched prompts and workspace repositories.
-pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
+pub fn resend_running_commands_for_instance(
+    instance_id: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
 
@@ -1689,8 +1755,8 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 
-    let prompts = stmt
-        .query_map([limit], |row| {
+    let all_prompts = stmt
+        .query_map([limit.saturating_mul(2).max(20)], |row| {
             Ok(ActivePrompt {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
@@ -1708,6 +1774,20 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
         .map_err(|e| format!("Failed to query prompts for resend: {}", e))?
         .flatten()
         .collect::<Vec<ActivePrompt>>();
+
+    let prompts: Vec<ActivePrompt> = all_prompts
+        .into_iter()
+        .filter(|p| match instance_id {
+            None | Some("all") => true,
+            Some("default") | Some("__default__") => {
+                p.instance_id == "default"
+                    || p.instance_id == "__default__"
+                    || p.instance_id.is_empty()
+            }
+            Some(inst) => p.instance_id == inst,
+        })
+        .take(limit)
+        .collect();
 
     let mut resent = Vec::new();
     let mut dispatched_repos = HashSet::new();
@@ -2029,11 +2109,12 @@ pub fn auto_resume_recent_prompts(
     })
 }
 
-/// Conversation node inside an AGM Project Tree
+/// Conversation node inside an AGM Project Tree (with dual AGM `C001` & GitMap `GM:<short_id>` sequence codes)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgmConversationNode {
     pub seq_id: i64,
     pub seq_code: String,
+    pub gitmap_seq_code: String,
     pub conversation_id: String,
     pub short_id: String,
     pub title: String,
@@ -2051,18 +2132,23 @@ pub struct AgmConversationNode {
 pub struct AgmProjectTreeNode {
     pub seq_id: i64,
     pub seq_code: String,
+    pub gitmap_seq_code: String,
     pub project_id: String,
     pub repo_name: String,
     pub repo_path: String,
     pub instance_id: String,
+    pub instance_seq_num: Option<u32>,
+    pub instance_name: String,
+    pub bound_email: Option<String>,
     pub is_running: bool,
     pub conversations: Vec<AgmConversationNode>,
 }
 
-/// Resolved target from an AGM Sequence ID (e.g., `P001`, `#C001`, `C1`, or conversation UUID prefix)
+/// Resolved target from an AGM or GitMap Sequence ID (`P001`, `AGM:P001`, `GM:#1`, `C001`, `AGM:C001`, `GM:<cid>`, or conversation UUID prefix)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgmSequenceResolution {
     pub seq_code: String,
+    pub gitmap_seq_code: String,
     pub project_id: String,
     pub repo_name: String,
     pub repo_path: String,
@@ -2240,12 +2326,25 @@ fn inspect_conversation_transcript(
     (step_count, latest_prompt)
 }
 
-/// Build the AGM Project -> Conversation -> 200-Word Prompt Tree and persist AGM Sequence IDs in `repo_prompts.db`.
+/// Build the AGM Project -> Conversation -> 200-Word Prompt Tree across ALL registered instances
+/// and persist Dual AGM (`P001`/`C001`) + GitMap (`GM:#1`/`GM:<short_id>`) Sequence IDs in `repo_prompts.db`.
 pub fn get_project_conversation_tree(
     max_words: usize,
     only_running: bool,
 ) -> Vec<AgmProjectTreeNode> {
     let _ = discover_running_prompts_from_antigravity("__default__");
+    let _ = detect_running_projects("__default__");
+
+    let registry = crate::modules::instance::load_registry().unwrap_or_default();
+    for inst in &registry.instances {
+        let _ = detect_running_projects(&inst.id);
+    }
+
+    let default_email = crate::modules::account::get_current_account()
+        .ok()
+        .flatten()
+        .map(|a| a.email);
+
     let projects = list_running_projects().unwrap_or_default();
     let conn_opt = connect_db().ok();
 
@@ -2398,6 +2497,7 @@ pub fn get_project_conversation_tree(
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
+                    gitmap_seq_code: format!("GM:{}", short_id),
                     conversation_id: cid.clone(),
                     short_id,
                     title: if title.trim().is_empty() {
@@ -2455,6 +2555,7 @@ pub fn get_project_conversation_tree(
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
+                    gitmap_seq_code: format!("GM:{}", short_id),
                     conversation_id: cid,
                     short_id,
                     title,
@@ -2474,13 +2575,32 @@ pub fn get_project_conversation_tree(
             continue;
         }
 
+        let (instance_seq_num, instance_name, bound_email) = if proj.instance_id == "default"
+            || proj.instance_id == "__default__"
+            || proj.instance_id.is_empty()
+        {
+            (Some(1), "default".to_string(), default_email.clone())
+        } else if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
+        {
+            (inst.seq_num, inst.name.clone(), inst.bound_email.clone())
+        } else {
+            (None, proj.instance_id.clone(), None)
+        };
+
         tree_nodes.push(AgmProjectTreeNode {
             seq_id: p_seq,
             seq_code: format!("P{:03}", p_seq),
+            gitmap_seq_code: format!("GM:#{}", p_seq),
             project_id: proj.id.clone(),
             repo_name: proj.repo_name.clone(),
             repo_path: proj.repo_path.clone(),
             instance_id: proj.instance_id.clone(),
+            instance_seq_num,
+            instance_name,
+            bound_email,
             is_running: proj_is_running,
             conversations: conv_nodes,
         });
@@ -2490,11 +2610,24 @@ pub fn get_project_conversation_tree(
     tree_nodes
 }
 
-/// Resolve an AGM Sequence ID (`P001`, `#P1`, `C001`, `#C1`, `#1`, or conversation UUID prefix)
+/// Resolve an AGM or GitMap Sequence ID (`P001`, `AGM:P001`, `GM:#1`, `C001`, `AGM:C001`, `GM:<cid>`, or conversation UUID prefix)
 /// to its target project, instance, and optional conversation.
 pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceResolution> {
     let tree = get_project_conversation_tree(200, false);
-    let clean = target_token.trim().trim_start_matches('#');
+    let mut clean = target_token
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim();
+    if let Some(stripped) = clean
+        .strip_prefix("AGM:")
+        .or_else(|| clean.strip_prefix("agm:"))
+        .or_else(|| clean.strip_prefix("GM:"))
+        .or_else(|| clean.strip_prefix("gm:"))
+    {
+        clean = stripped.trim();
+    }
+    let clean = clean.trim_start_matches('#');
     if clean.is_empty() {
         return None;
     }
@@ -2507,6 +2640,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
                 let first_conv = proj.conversations.first();
                 return Some(AgmSequenceResolution {
                     seq_code: proj.seq_code.clone(),
+                    gitmap_seq_code: proj.gitmap_seq_code.clone(),
                     project_id: proj.project_id.clone(),
                     repo_name: proj.repo_name.clone(),
                     repo_path: proj.repo_path.clone(),
@@ -2524,6 +2658,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
                 if let Some(conv) = proj.conversations.iter().find(|c| c.seq_id == seq_num) {
                     return Some(AgmSequenceResolution {
                         seq_code: conv.seq_code.clone(),
+                        gitmap_seq_code: conv.gitmap_seq_code.clone(),
                         project_id: proj.project_id.clone(),
                         repo_name: proj.repo_name.clone(),
                         repo_path: proj.repo_path.clone(),
@@ -2541,6 +2676,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
             let first_conv = proj.conversations.first();
             return Some(AgmSequenceResolution {
                 seq_code: proj.seq_code.clone(),
+                gitmap_seq_code: proj.gitmap_seq_code.clone(),
                 project_id: proj.project_id.clone(),
                 repo_name: proj.repo_name.clone(),
                 repo_path: proj.repo_path.clone(),
@@ -2553,6 +2689,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
             if let Some(conv) = proj.conversations.iter().find(|c| c.seq_id == seq_num) {
                 return Some(AgmSequenceResolution {
                     seq_code: conv.seq_code.clone(),
+                    gitmap_seq_code: conv.gitmap_seq_code.clone(),
                     project_id: proj.project_id.clone(),
                     repo_name: proj.repo_name.clone(),
                     repo_path: proj.repo_path.clone(),
@@ -2565,7 +2702,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
     }
 
     let lower = clean.to_lowercase();
-    if lower.len() >= 6 {
+    if lower.len() >= 4 {
         for proj in &tree {
             if let Some(conv) = proj
                 .conversations
@@ -2574,6 +2711,7 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
             {
                 return Some(AgmSequenceResolution {
                     seq_code: conv.seq_code.clone(),
+                    gitmap_seq_code: conv.gitmap_seq_code.clone(),
                     project_id: proj.project_id.clone(),
                     repo_name: proj.repo_name.clone(),
                     repo_path: proj.repo_path.clone(),
@@ -2583,9 +2721,156 @@ pub fn resolve_agm_sequence_target(target_token: &str) -> Option<AgmSequenceReso
                 });
             }
         }
+        if let Some(proj) = tree.iter().find(|p| {
+            p.project_id.to_lowercase().contains(&lower)
+                || p.repo_name.to_lowercase().contains(&lower)
+        }) {
+            let first_conv = proj.conversations.first();
+            return Some(AgmSequenceResolution {
+                seq_code: proj.seq_code.clone(),
+                gitmap_seq_code: proj.gitmap_seq_code.clone(),
+                project_id: proj.project_id.clone(),
+                repo_name: proj.repo_name.clone(),
+                repo_path: proj.repo_path.clone(),
+                instance_id: proj.instance_id.clone(),
+                conversation_id: first_conv.map(|c| c.conversation_id.clone()),
+                conversation_title: first_conv.map(|c| c.title.clone()),
+            });
+        }
     }
 
     None
+}
+
+/// Inject a prompt into a specific project or conversation by AGM/GitMap Sequence ID (`C001`, `P001`, `AGM:C001`, `GM:#1`),
+/// with optional `--instance <id|#seq|name>` and remote machine `--node <node>` scoping.
+pub fn prompt_target_by_sequence_scoped(
+    target_token: &str,
+    prompt_text: &str,
+    instance_override: Option<&str>,
+    node_override: Option<&str>,
+) -> Result<String, String> {
+    let clean_prompt = prompt_text.trim();
+    if clean_prompt.is_empty() {
+        return Err("Prompt text cannot be empty.".to_string());
+    }
+
+    // Remote SSH Node Delegation if `node_override` is provided and not "local"
+    if let Some(node) = node_override
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty() && *s != "local")
+    {
+        let inst_flag = instance_override
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|i| format!(" --instance {}", i))
+            .unwrap_or_default();
+        let escaped_prompt = clean_prompt.replace('"', "\\\"");
+        let remote_cmd = format!(
+            "agm prompt {}{} \"{}\"",
+            target_token.trim(),
+            inst_flag,
+            escaped_prompt
+        );
+        let output = std::process::Command::new("gitmap")
+            .args(["ssh", "exec", &remote_cmd, "--node", node])
+            .output()
+            .or_else(|_| {
+                std::process::Command::new("gitmap")
+                    .args(["ssh", "exec", &remote_cmd])
+                    .output()
+            })
+            .map_err(|e| format!("Failed to delegate prompt to SSH node '{}': {}", node, e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if output.status.success() {
+            return Ok(format!(
+                "🌐 Delegated prompt to remote node '{}' for target [{}]:\n{}",
+                node,
+                target_token.trim(),
+                if stdout.is_empty() { "OK" } else { &stdout }
+            ));
+        } else {
+            return Err(format!(
+                "Remote SSH node '{}' returned error: {} {}",
+                node, stdout, stderr
+            ));
+        }
+    }
+
+    let resolved = resolve_agm_sequence_target(target_token).ok_or_else(|| {
+        format!(
+            "Target '{}' not found in AGM/GitMap Tree. Run `agm tree` or `/tree` to view valid [AGM:P001 | GM:#1] and [AGM:C001 | GM:<cid>] sequence codes.",
+            target_token
+        )
+    })?;
+
+    // Resolve optional instance override (#1, #2, instance name, or UUID)
+    let effective_instance_id = if let Some(inst_raw) = instance_override
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        if inst_raw.eq_ignore_ascii_case("default") || inst_raw == "#1" || inst_raw == "1" {
+            "default".to_string()
+        } else if let Ok(reg) = crate::modules::instance::load_registry() {
+            let clean_seq = inst_raw.trim_start_matches('#').parse::<u32>().ok();
+            if let Some(found) = reg.instances.iter().find(|i| {
+                i.id.eq_ignore_ascii_case(inst_raw)
+                    || i.name.eq_ignore_ascii_case(inst_raw)
+                    || (clean_seq.is_some() && i.seq_num == clean_seq)
+            }) {
+                found.id.clone()
+            } else {
+                inst_raw.to_string()
+            }
+        } else {
+            inst_raw.to_string()
+        }
+    } else {
+        resolved.instance_id.clone()
+    };
+
+    let now = Utc::now().timestamp();
+    let prompt_id = Uuid::new_v4().to_string();
+    let active_prompt = ActivePrompt {
+        id: prompt_id.clone(),
+        project_id: resolved.project_id.clone(),
+        instance_id: effective_instance_id.clone(),
+        repo_path: resolved.repo_path.clone(),
+        prompt_content: clean_prompt.to_string(),
+        model: Some("gemini-pro".to_string()),
+        session_id: resolved
+            .conversation_id
+            .clone()
+            .or_else(|| Some(resolved.project_id.clone())),
+        status: "running".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+
+    let _ = save_or_requeue_prompt(&active_prompt);
+    let spawned = spawn_prompt_via_agy(&active_prompt);
+
+    let conv_label = resolved
+        .conversation_id
+        .as_deref()
+        .map(|cid| {
+            let short = if cid.len() >= 8 { &cid[..8] } else { cid };
+            format!("conv:{}", short)
+        })
+        .unwrap_or_else(|| "new/latest conv".to_string());
+
+    Ok(format!(
+        "✅ Dispatched prompt to [AGM:{} | {}] ({}) on instance '{}' (spawned={}): \"{}\"",
+        resolved.seq_code,
+        resolved.gitmap_seq_code,
+        conv_label,
+        effective_instance_id,
+        spawned,
+        extract_smart_prompt_summary(clean_prompt, 80)
+    ))
 }
 
 /// Format the Project -> Conversation -> 200-Word Prompt Tree View for AGM CLI output
@@ -2600,10 +2885,10 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
         "ALL PROJECTS & CONVERSATIONS"
     };
     out.push_str(&format!(
-        "🌳 AGM PROJECT → CONVERSATION → PROMPT TREE ({} | ≤{} words)\n",
-        mode_label, word_cap
+        "🌳 AGM + GITMAP PROJECT → CONVERSATION → [≤{}w PROMPT] TREE ({})\n",
+        word_cap, mode_label
     ));
-    out.push_str(&"━".repeat(78));
+    out.push_str(&"━".repeat(86));
     out.push('\n');
 
     if tree.is_empty() {
@@ -2619,9 +2904,28 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
         };
         let label =
             format_friendly_workspace_label(&proj.repo_name, &proj.project_id, &proj.repo_path);
+        let inst_seq_str = proj
+            .instance_seq_num
+            .map(|n| format!("#{} ", n))
+            .unwrap_or_default();
+        let email_str = proj
+            .bound_email
+            .as_deref()
+            .filter(|e| !e.is_empty())
+            .map(|e| format!(" ({})", e))
+            .unwrap_or_default();
+
         out.push_str(&format!(
-            "📁 [{}] {} ({}) — {} [Instance: {}]\n",
-            proj.seq_code, label, proj_badge, proj.repo_path, proj.instance_id
+            "📁 [AGM:{} | {}] [ProjID: {}] {} ({}) — {} [Instance: {}{}{}]\n",
+            proj.seq_code,
+            proj.gitmap_seq_code,
+            proj.project_id,
+            label,
+            proj_badge,
+            proj.repo_path,
+            inst_seq_str,
+            proj.instance_name,
+            email_str
         ));
 
         if proj.conversations.is_empty() {
@@ -2642,22 +2946,32 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
             };
 
             out.push_str(&format!(
-                "   {} 💬 [{} | {}] \"{}\" ({} {}{})\n",
-                branch, conv.seq_code, conv.short_id, conv.title, c_badge, conv.status, steps_str
+                "   {} 💬 [AGM:{} | {}] \"{}\" ({} {}{})\n",
+                branch,
+                conv.seq_code,
+                conv.gitmap_seq_code,
+                conv.title,
+                c_badge,
+                conv.status,
+                steps_str
             ));
 
             if !conv.prompt_preview_200w.is_empty() {
                 out.push_str(&format!(
-                    "   {} └─ 📝 Prompt ({} words): \"{}\"\n",
-                    sub_pipe, conv.prompt_word_count, conv.prompt_preview_200w
+                    "   {} └─ 📝 [Prompt ≤{}w ({} words)]: \"{}\"\n",
+                    sub_pipe, word_cap, conv.prompt_word_count, conv.prompt_preview_200w
                 ));
             }
         }
     }
 
-    out.push_str(&"━".repeat(78));
+    out.push_str(&"━".repeat(86));
     out.push_str(
-        "\n💡 Target by AGM Seq ID: `agm prompt C001 \"is it done?\"` or `agm prompt P001 --instance default \"status\"`\n",
+        "\n💡 Target by Dual AGM/GitMap Sequence, Instance, & Machine:\n\
+         • AGM Conv:    `agm prompt C001 \"is it done?\"`\n\
+         • AGM Inst:    `agm prompt P001 \"run tests\" --instance #2`\n\
+         • Remote Node: `agm prompt C001 \"check status\" --instance default --node worker-1`\n\
+         • GitMap CLI:  `gitmap agy prompt-project P001 -n is-done -t \"verify all\"`\n",
     );
     out
 }
@@ -2675,9 +2989,9 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
     let mut out = String::new();
 
     let title = if only_running {
-        "🌳 <b>AGM Running Tree (Project → Conv → 200w Prompt)</b>"
+        "🌳 <b>AGM + GitMap Running Tree (Project → Conv → [≤200w Prompt])</b>"
     } else {
-        "🌳 <b>AGM Full Workspace Tree (Project → Conv → 200w Prompt)</b>"
+        "🌳 <b>AGM + GitMap Full Workspace Tree (Project → Conv → [≤200w Prompt])</b>"
     };
     out.push_str(title);
     out.push_str("\n━━━━━━━━━━━━━━━━━━━━\n");
@@ -2692,16 +3006,28 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
         let p_icon = if proj.is_running { "🟢" } else { "⚪" };
         let label =
             format_friendly_workspace_label(&proj.repo_name, &proj.project_id, &proj.repo_path);
+        let inst_seq_str = proj
+            .instance_seq_num
+            .map(|n| format!("#{} ", n))
+            .unwrap_or_default();
+        let email_str = proj
+            .bound_email
+            .as_deref()
+            .filter(|e| !e.is_empty())
+            .map(|e| format!(" · {}", e))
+            .unwrap_or_default();
+
         out.push_str(&format!(
-            "\n📁 <code>[{}]</code> {} <b>{}</b> <i>(ins: {})</i>\n",
+            "\n📁 <code>[AGM:{} | {}]</code> <code>[ProjID: {}]</code> {} <b>{}</b>\n   🖥️ <i>Instance: {}{}{}</i> · 📂 <code>{}</code>\n",
             escape_tg_html_local(&proj.seq_code),
+            escape_tg_html_local(&proj.gitmap_seq_code),
+            escape_tg_html_local(&proj.project_id),
             p_icon,
             escape_tg_html_local(&label),
-            escape_tg_html_local(&proj.instance_id),
-        ));
-        out.push_str(&format!(
-            "   📂 <code>{}</code>\n",
-            escape_tg_html_local(&proj.repo_path)
+            escape_tg_html_local(&inst_seq_str),
+            escape_tg_html_local(&proj.instance_name),
+            escape_tg_html_local(&email_str),
+            escape_tg_html_local(&proj.repo_path),
         ));
 
         if proj.conversations.is_empty() {
@@ -2722,10 +3048,10 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
             };
 
             out.push_str(&format!(
-                "   {} 💬 <code>[{} | {}]</code> <b>{}</b> ({} {}{})\n",
+                "   {} 💬 <code>[AGM:{} | {}]</code> <b>{}</b> ({} {}{})\n",
                 branch,
                 escape_tg_html_local(&conv.seq_code),
-                escape_tg_html_local(&conv.short_id),
+                escape_tg_html_local(&conv.gitmap_seq_code),
                 escape_tg_html_local(&conv.title),
                 c_icon,
                 escape_tg_html_local(&conv.status),
@@ -2734,8 +3060,9 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
 
             if !conv.prompt_preview_200w.is_empty() {
                 out.push_str(&format!(
-                    "   {} └─ 📝 <b>Prompt ({}w):</b> <i>\"{}\"</i>\n",
+                    "   {} └─ 📝 <b>[Prompt ≤{}w ({}w)]:</b> <i>\"[{}]\"</i>\n",
                     sub_pipe,
+                    word_cap,
                     conv.prompt_word_count,
                     escape_tg_html_local(&conv.prompt_preview_200w),
                 ));
@@ -2744,10 +3071,11 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
     }
 
     out.push_str("\n━━━━━━━━━━━━━━━━━━━━\n");
-    out.push_str("💡 <b>Prompt by Seq / Instance / Node:</b>\n");
+    out.push_str("💡 <b>Prompt by Dual Seq / Instance / Node:</b>\n");
     out.push_str("• <code>/prompt C001 Is it done?</code>\n");
-    out.push_str("• <code>/prompt P001 --instance default Run pre-flight checks</code>\n");
-    out.push_str("• <code>/prompt node1 C001 Check build status</code>");
+    out.push_str("• <code>/prompt P001 --instance #2 Run pre-flight checks</code>\n");
+    out.push_str("• <code>/prompt C001 --instance default --node worker-1 Check build</code>\n");
+    out.push_str("• <code>/agy prompt-project P001 -n is-done -t \"verify\"</code>");
     out
 }
 

@@ -324,13 +324,13 @@ fn print_help() {
     println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
     println!("        Restore and re-enqueue in-flight prompts into active workspaces");
     println!("    tree [all] [--words <W>] [--json]");
-    println!("        Render Project → Conversation → 200-Word Prompt tree with AGM Sequence IDs (P001, C001)");
+    println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
     println!("    prompts ls [N] [--json] [--words W]");
     println!("        Show N running prompts in ASC stack order (with friendly project names)");
-    println!("    prompt [C001|P001|proj] \"<text>\" [--instance <id>] [--node <alias>] [--prefix C] [--suffix C]");
-    println!("        Dispatch prompt by AGM Sequence ID, project, instance, or remote SSH node");
+    println!("    prompt [C001|P001|GM:#1|proj] \"<text>\" [--instance <id|#seq>] [--node <alias>] [--prefix C] [--suffix C]");
+    println!("        Dispatch prompt by Dual AGM/GitMap Sequence ID, project, instance, or remote SSH node");
     println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
     println!("        Resend commands before close/switch & sync image paths to resume file");
     println!();
@@ -339,6 +339,8 @@ fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("    instances [ls] [--json]");
     println!("        List all sandbox profiles, bound accounts, and running PIDs");
+    println!("    instances assign <seq|id|alias> <repo_path...>");
+    println!("        Bind/assign one or more project workspaces to a specific sandbox instance");
     println!("    instances <seq|id|alias> ff");
     println!("        Fast-forward rotate account for specific sandbox instance");
     println!("    instances-all ff");
@@ -363,33 +365,43 @@ fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");
     println!("  ────────────────────────────────────────────────────────────────────────────");
-    println!("    # 1. Inspect Project → Conversation → 200-Word Prompt Tree (AGM Seq IDs):");
-    println!("    agm tree");
+    println!(
+        "    # 1. Inspect Bracketed Project → Conversation → 200-Word Prompt Tree (Dual Seq IDs):"
+    );
+    println!("    agm tree                            # Shows [AGM:P001 | GM:#1] & [AGM:C001 | GM:<cid>]");
     println!("    agm tree all --words 200");
     println!("    gitmap agy active");
     println!();
-    println!("    # 2. Inject prompt by AGM Sequence ID, Instance, or Remote SSH Node:");
+    println!("    # 2. Inject Prompt by AGM or GitMap Sequence ID, Instance, or Remote SSH Node:");
     println!("    agm prompt C001 \"Is it done?\"");
-    println!("    agm prompt P001 --instance default \"Run cargo clippy\"");
-    println!("    agm prompt C001 --node vm-01 \"Check build status\"");
+    println!("    agm prompt GM:#1 --instance #2 \"Run cargo clippy\"");
+    println!("    agm prompt C001 --instance default --node vm-01 \"Check build status\"");
     println!("    gitmap agy prompt -n read-all -t \"Read memory and continue\"");
     println!("    gitmap agy prompt -n is-done -t \"Verify all tasks\"");
+    println!("    gitmap agy prompt-project P001 -n is-done -t \"Check build\"");
     println!();
-    println!("    # 3. Backup & Restore Running Storage Prompts (AGM & GitMap):");
+    println!("    # 3. Backup & Restore Running Storage Prompts + FPUG / SUG (AGM & GitMap):");
     println!("    agm backup && agm backup ls && agm restore");
+    println!("    gitmap agy running-prompts ls | backup | restore");
     println!("    gitmap backup-running-prompts && gitmap restore-running-prompts");
+    println!("    agm agy fpug ls && agm agy sug ls");
     println!();
-    println!("    # 4. Update AGM & GitMap Locally or Across SSH Fleet:");
+    println!("    # 4. Multi-Instance Creation, Multi-Project Binding & Account Swapping:");
+    println!("    agm instances create \"Worker-2\"");
+    println!("    agm instances assign #2 d:\\work\\Antigravity-Manager d:\\work\\gitmap-v28");
+    println!("    agm instances #2 ff");
+    println!();
+    println!("    # 5. Update AGM & GitMap Locally or Across SSH Fleet:");
     println!("    agm update                  # Update AGM binary");
     println!("    agm update gitmap           # Update GitMap CLI");
     println!("    agm update all --json       # Full fleet + repo + GitMap update");
     println!("    gitmap agm update -y        # Update AGM via GitMap installer");
     println!("    gitmap ssh update agm       # Update AGM across SSH fleet");
     println!();
-    println!("    # 5. Multi-Node SSH Execution:");
+    println!("    # 6. Multi-Node SSH Execution:");
     println!("    agm ssh nodes               # List registered SSH cluster nodes");
     println!("    agm ssh exec \"agm status\"   # Run command across SSH cluster");
-    println!("    gitmap ssh nodes");
+    println!("    gitmap ssh nodes && gitmap agy ssh <node> agm tree");
     println!();
 }
 
@@ -1884,16 +1896,18 @@ fn cmd_prompt_dispatch(args: &[String]) {
         i += 1;
     }
 
-    // Check if the first positional token is an AGM Sequence ID (e.g. C001, P001, #C1) when >= 2 tokens exist
+    // Check if the first positional token is an AGM or GitMap Sequence ID (e.g. C001, P001, AGM:C001, GM:#1, GM:<cid>) when >= 2 tokens exist
     let mut resolved_seq: Option<repo_db::AgmSequenceResolution> = None;
     if let Some(ref seq_tok) = explicit_seq_or_target {
         resolved_seq = repo_db::resolve_agm_sequence_target(seq_tok);
     } else if text_parts.len() >= 2 {
         let first_tok = text_parts[0].trim();
         let upper = first_tok.trim_start_matches('#').to_uppercase();
-        let looks_like_seq = (upper.starts_with('C') || upper.starts_with('P'))
-            && upper[1..].chars().all(|c| c.is_ascii_digit())
-            && !upper[1..].is_empty();
+        let looks_like_seq = upper.starts_with("AGM:")
+            || upper.starts_with("GM:")
+            || ((upper.starts_with('C') || upper.starts_with('P'))
+                && upper[1..].chars().all(|c| c.is_ascii_digit())
+                && !upper[1..].is_empty());
         if looks_like_seq {
             if let Some(res) = repo_db::resolve_agm_sequence_target(first_tok) {
                 resolved_seq = Some(res);
@@ -1964,8 +1978,12 @@ fn cmd_prompt_dispatch(args: &[String]) {
         let _ = Command::new("git").args(["pull"]).status();
     }
 
+    let resolved_explicit_inst = explicit_instance
+        .as_deref()
+        .map(|s| instance::resolve_instance_id(s).unwrap_or_else(|_| s.to_string()));
+
     let (slug, cwd_str, inst_id, session_id, seq_label) = if let Some(seq) = resolved_seq {
-        let inst = explicit_instance.unwrap_or(seq.instance_id);
+        let inst = resolved_explicit_inst.unwrap_or(seq.instance_id);
         let sess = seq
             .conversation_id
             .unwrap_or_else(|| seq.project_id.clone());
@@ -1981,7 +1999,7 @@ fn cmd_prompt_dispatch(args: &[String]) {
         let c = env::current_dir()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| ".".to_string());
-        let i = explicit_instance.unwrap_or_else(|| {
+        let i = resolved_explicit_inst.unwrap_or_else(|| {
             instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
         });
         let sess = s.clone();
@@ -4453,6 +4471,22 @@ fn cmd_agy(args: &[String]) {
             let rest = if args.len() > 1 { &args[1..] } else { &[] };
             cmd_restore_running_prompts(rest);
         }
+        "running-prompts" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_running_prompts(rest);
+        }
+        "fpug" | "finish-prompts-until-green" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_finish_prompts_until_green(rest);
+        }
+        "sug" | "shutdown-until-green" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_shutdown_until_green(rest);
+        }
+        "rerun" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_rerun(rest);
+        }
         "queues" | "queue" => {
             println!(
                 "{}",
@@ -4465,7 +4499,7 @@ fn cmd_agy(args: &[String]) {
         "prompts" | "prompt-ls" | "templates" => {
             println!("{}", telegram_inbound::format_prompts_templates_report());
         }
-        "prompt" | "p" => {
+        "prompt" | "p" | "prompt-project" => {
             let rest = if args.len() > 1 { &args[1..] } else { &[] };
             cmd_prompt_dispatch(rest);
         }
@@ -4487,27 +4521,38 @@ fn cmd_agy(args: &[String]) {
             }
             println!("AGM Antigravity (AGY) Management & GitMap Parity:");
             println!(
-                "  agm agy tree [all]      Project → Conversation → 200w Prompt Tree (AGM Seq IDs)"
+                "  agm agy tree [all]              Project → Conversation → 200w Prompt Tree ([AGM:P001 | GM:#1])"
             );
-            println!("  agm agy active          List active running prompts & AGM tree view");
             println!(
-                "  agm agy backup          Snapshot active running storage prompts (AGM + GitMap)"
+                "  agm agy active                  List active running prompts & AGM tree view"
             );
-            println!("  agm agy restore         Restore backed-up running prompts");
-            println!("  agm agy queues          List workspace prompt queues");
-            println!("  agm agy ls              List registered projects and workspaces");
-            println!("  agm agy prompts         List reusable prompt templates");
             println!(
-                "  agm agy prompt <args>   Inject prompt by Seq ID (C001/P001), instance, or node"
+                "  agm agy running-prompts [ls|backup|restore] Manage running storage prompts"
             );
-            println!("  agm agy nodes           List cluster VM nodes & connectivity status");
+            println!(
+                "  agm agy backup                  Snapshot active running storage prompts (AGM + GitMap)"
+            );
+            println!("  agm agy restore                 Restore backed-up running prompts");
+            println!("  agm agy fpug [ls|add-projects|run] Finish Prompts Until Green loop");
+            println!("  agm agy sug [ls|add-projects|run]  Shutdown Until Green loop");
+            println!("  agm agy rerun [N]               Rerun last N prompts from repo_prompts.db");
+            println!("  agm agy queues                  List workspace prompt queues");
+            println!("  agm agy ls                      List registered projects and workspaces");
+            println!("  agm agy prompts                 List reusable prompt templates");
+            println!(
+                "  agm agy prompt <args>           Inject prompt by Seq ID (C001/P001/GM:#1), instance, or node"
+            );
+            println!(
+                "  agm agy nodes                   List cluster VM nodes & connectivity status"
+            );
             println!("\nGitMap AGY Direct Equivalents:");
             println!("  gitmap agy active");
             println!("  gitmap agy running-prompts ls | backup | restore");
             println!("  gitmap backup-running-prompts && gitmap restore-running-prompts");
             println!("  gitmap agy prompt -n read-all -t \"Read memory and continue\"");
             println!("  gitmap agy prompt -n is-done -t \"Verify if all tasks are complete\"");
-            println!("  gitmap agy prompt-project <proj> -n is-done -t \"Check build\"");
+            println!("  gitmap agy prompt-project P001 -n is-done -t \"Check build\"");
+            println!("  gitmap agy fpug ls && gitmap agy sug ls");
         }
     }
 }
@@ -5734,13 +5779,14 @@ fn cmd_instances(args: &[String]) {
         println!("AGM Instances Management:");
         println!("  agm instances [ls] [--json]");
         println!("  agm instances create <name> [--data-only]");
+        println!("  agm instances assign <id|#seq|name> <repo_paths...>");
         println!("  agm instances rm <id|name> [--force]");
         println!("  agm instances <id> ff");
         println!("  agm instances all ff");
         println!("  agm instances rm-all");
         println!("\nDescription:");
         println!(
-            "  Creates, lists, manages, rotates, and destroys isolated Antigravity multi-instance"
+            "  Creates, lists, assigns projects, rotates, and destroys isolated Antigravity multi-instance"
         );
         println!(
             "  sandbox profiles with dedicated configuration, keychain, and state directories."
@@ -5749,6 +5795,9 @@ fn cmd_instances(args: &[String]) {
         println!("\nSubcommands:");
         println!("  ls, list            List all registered profiles, statuses, and bound emails (default)");
         println!("  create, add <name>  Create a new isolated sandbox instance profile");
+        println!(
+            "  assign, bind <i> <p> Bind one or more project workspace folders to an instance"
+        );
         println!(
             "  rm, delete <id>     Remove a specific instance profile and its local configuration"
         );
@@ -5766,6 +5815,7 @@ fn cmd_instances(args: &[String]) {
         println!("\nExamples:");
         println!("  agm instances                       # List all instances");
         println!("  agm instances create \"test-sandbox\" # Create new sandbox instance profile");
+        println!("  agm instances assign #2 d:\\work\\repo # Bind workspace folder to instance #2");
         println!("  agm instances test-sandbox ff       # Rotate account for test-sandbox");
         println!("  agm instances rm test-sandbox       # Delete test-sandbox profile");
         println!("  agm instances rm-all                # Clean up all sandbox instances");
@@ -5774,6 +5824,32 @@ fn cmd_instances(args: &[String]) {
 
     let is_json = args.iter().any(|a| a == "--json");
     let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+
+    // Subcommand: agm instances assign <target_inst> <repo_path...>
+    if non_flag_args.len() >= 3
+        && (non_flag_args[0].eq_ignore_ascii_case("assign")
+            || non_flag_args[0].eq_ignore_ascii_case("bind")
+            || non_flag_args[1].eq_ignore_ascii_case("assign")
+            || non_flag_args[1].eq_ignore_ascii_case("bind"))
+    {
+        let (inst_spec, paths_slice) = if non_flag_args[0].eq_ignore_ascii_case("assign")
+            || non_flag_args[0].eq_ignore_ascii_case("bind")
+        {
+            (non_flag_args[1].as_str(), &non_flag_args[2..])
+        } else {
+            (non_flag_args[0].as_str(), &non_flag_args[2..])
+        };
+        for repo_path in paths_slice {
+            match instance::assign_project_to_instance(inst_spec, repo_path) {
+                Ok(msg) => println!("[SUCCESS] {}", msg),
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to assign project '{}': {}", repo_path, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        return;
+    }
 
     // Subcommand: agm instances all ff
     if non_flag_args.len() >= 2

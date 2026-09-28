@@ -619,7 +619,148 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Launch a specific instance with multi-window isolation and custom/cloned executable support
+/// Collect all existing workspace folder paths bound to `instance_id` from `repo_db` and `User/workspaceStorage/*/workspace.json`.
+pub fn get_instance_workspace_folders(instance_id: &str, data_dir: &str) -> Vec<String> {
+    let mut folders: Vec<String> = Vec::new();
+    let mut seen_norm: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let mut push_folder = |raw_path: &str| {
+        let trimmed = raw_path.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let p = Path::new(trimmed);
+        if !p.exists() {
+            return;
+        }
+        let norm = trimmed
+            .replace('\\', "/")
+            .trim_end_matches('/')
+            .to_lowercase();
+        if seen_norm.insert(norm) {
+            folders.push(trimmed.to_string());
+        }
+    };
+
+    // 1. Live workspace discovery for this instance
+    if let Ok(detected) = crate::modules::repo_db::detect_running_projects(instance_id) {
+        for proj in detected {
+            push_folder(&proj.repo_path);
+        }
+    }
+
+    // 2. Persisted running_projects in repo_db for this instance
+    if let Ok(all_projs) = crate::modules::repo_db::list_running_projects() {
+        for proj in all_projs {
+            let matches_inst = proj.instance_id == instance_id
+                || ((instance_id == "default" || instance_id == "__default__")
+                    && (proj.instance_id == "default" || proj.instance_id == "__default__"));
+            if matches_inst {
+                push_folder(&proj.repo_path);
+            }
+        }
+    }
+
+    // 3. Direct scan of `<data_dir>/User/workspaceStorage/*/workspace.json`
+    if !data_dir.trim().is_empty() {
+        let ws_root = PathBuf::from(data_dir)
+            .join("User")
+            .join("workspaceStorage");
+        if ws_root.exists() {
+            if let Ok(entries) = fs::read_dir(&ws_root) {
+                for entry in entries.flatten() {
+                    let ws_json = entry.path().join("workspace.json");
+                    if ws_json.exists() {
+                        if let Ok(content) = fs::read_to_string(&ws_json) {
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                                if let Some(uri) = val.get("folder").and_then(|v| v.as_str()) {
+                                    let decoded =
+                                        crate::modules::repo_db::decode_uri_to_path_pub(uri);
+                                    push_folder(&decoded);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    folders.truncate(8);
+    folders
+}
+
+/// Explicitly bind/assign one or more project workspace directories to a specific instance (`instance_id`, `#seq`, or name).
+/// Seeds `<instance.data_dir>/User/workspaceStorage/<id>/workspace.json` and registers the project in `repo_db`.
+pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Result<String, String> {
+    let resolved_id = resolve_instance_id(instance_spec)?;
+    let registry = load_registry()?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id)
+        .ok_or_else(|| format!("Instance '{}' not found", instance_spec))?;
+
+    let clean_path = PathBuf::from(repo_path.trim());
+    if !clean_path.exists() {
+        return Err(format!(
+            "Project directory '{}' does not exist on disk",
+            repo_path.trim()
+        ));
+    }
+    let canonical_str = clean_path.to_string_lossy().to_string();
+    let repo_name = clean_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "workspace".to_string());
+
+    // 1. Seed workspaceStorage/<workspace_id>/workspace.json inside the target instance's data_dir
+    let mut hash: u64 = 14695981039346656037;
+    for b in canonical_str.to_lowercase().replace('\\', "/").bytes() {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    let ws_id = format!(
+        "{}-{:08x}",
+        repo_name.to_lowercase(),
+        (hash & 0xFFFF_FFFF) as u32
+    );
+    let ws_dir = PathBuf::from(&inst.data_dir)
+        .join("User")
+        .join("workspaceStorage")
+        .join(&ws_id);
+    fs::create_dir_all(&ws_dir)
+        .map_err(|e| format!("Failed to create instance workspaceStorage dir: {}", e))?;
+
+    let normalized_slash = canonical_str.replace('\\', "/");
+    let folder_uri = if normalized_slash.starts_with('/') {
+        format!("file://{}", normalized_slash)
+    } else {
+        format!("file:///{}", normalized_slash)
+    };
+    let ws_json_payload = serde_json::json!({
+        "folder": folder_uri
+    });
+    fs::write(
+        ws_dir.join("workspace.json"),
+        serde_json::to_string_pretty(&ws_json_payload).unwrap_or_default(),
+    )
+    .map_err(|e| format!("Failed to write workspace.json: {}", e))?;
+
+    // 2. Register in repo_db running_projects & sequence table
+    let _ = crate::modules::repo_db::detect_running_projects(&inst.id);
+
+    Ok(format!(
+        "✅ Assigned project '{}' ({}) to instance '{}' (#{} {})",
+        repo_name,
+        canonical_str,
+        inst.id,
+        inst.seq_num.unwrap_or(1),
+        inst.name
+    ))
+}
+
+/// Launch a specific instance with multi-window isolation, bound workspace folder restoration, and custom/cloned executable support
 pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> {
     let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
     let pos = registry
@@ -641,10 +782,13 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
     let target_data_path = PathBuf::from(&data_dir);
 
-    // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb
+    // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb.
+    // Only touch the global OS Keyring when launching the default instance so secondary instances never overwrite default's keyring!
     if let Some(ref account_id) = bound_acc {
         if let Ok(account) = crate::modules::account::load_account(account_id) {
-            let _ = crate::modules::integration::write_to_system_keyring(&account);
+            if is_default {
+                let _ = crate::modules::integration::write_to_system_keyring(&account);
+            }
 
             let db_dir = target_data_path.join("User").join("globalStorage");
             let has_db_dir = db_dir.exists();
@@ -671,6 +815,9 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             }
         }
     }
+
+    // Snapshot bound workspace folders BEFORE closing existing instance processes
+    let workspace_folders = get_instance_workspace_folders(instance_id, &data_dir);
 
     // Clean any orphaned lock files in the target instance data directory
     let has_target_dir = target_data_path.exists();
@@ -733,7 +880,13 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
         }
-        cmd.arg("--new-window");
+        if !workspace_folders.is_empty() {
+            for folder in &workspace_folders {
+                cmd.arg(folder);
+            }
+        } else {
+            cmd.arg("--new-window");
+        }
 
         let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!(
@@ -757,7 +910,13 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
         }
-        cmd.arg("--new-window");
+        if !workspace_folders.is_empty() {
+            for folder in &workspace_folders {
+                cmd.arg(folder);
+            }
+        } else {
+            cmd.arg("--new-window");
+        }
 
         #[cfg(target_os = "windows")]
         {
@@ -1268,7 +1427,9 @@ pub async fn switch_account_to_instance(
 
     // Helper closure to inject credentials into all relevant state.vscdb & storage.json & OS keyring locations
     let inject_all_credentials = |acc: &crate::models::Account| -> Result<(), String> {
-        let _ = crate::modules::integration::write_to_system_keyring(acc);
+        if is_default_inst {
+            let _ = crate::modules::integration::write_to_system_keyring(acc);
+        }
 
         crate::modules::db::inject_token(
             &db_path,
@@ -1342,11 +1503,14 @@ pub async fn switch_account_to_instance(
         None
     };
 
-    // 1.5. Snapshot and backup all running prompts across active workspaces into SQLite BEFORE closing IDE
-    let _ = crate::modules::repo_db::backup_running_prompts(&instance.id);
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
+    // 1.5. [Step 1/5] Snapshot and backup running prompts scoped to THIS target instance BEFORE closing IDE
+    let backed_up_count =
+        crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
+    if is_default_inst {
+        let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(None);
+    }
 
-    // 2. Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
+    // 2. [Step 2/5] Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
     if is_default_inst {
@@ -1360,18 +1524,20 @@ pub async fn switch_account_to_instance(
     let _ = close_instance(&instance.id);
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    // 3. Inject credentials into all relevant state.vscdb, storage.json, and OS keyring locations AFTER process exit
+    // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring if default) AFTER process exit
     inject_all_credentials(&account)?;
 
-    // 4. Bind account in registry and set as active
+    // 4. Bind account in registry; only update global `current_account_id` if switching the default instance
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let _ = set_active_instance_id(&instance.id);
-    let _ = crate::modules::account::set_current_account_id(&account.id);
+    if is_default_inst {
+        let _ = crate::modules::account::set_current_account_id(&account.id);
+    }
 
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);
 
-    // 5. Relaunch Antigravity preserving exact executable path and workspace arguments (same as highlighted ⇄ switch button)
+    // 5. [Step 4/5] Relaunch Antigravity preserving exact executable path and bound workspace folders
     if is_default_inst {
         if let Err(e) = crate::modules::process::start_antigravity_with_fallback_path(
             None,
@@ -1388,10 +1554,14 @@ pub async fn switch_account_to_instance(
         launch_instance(&instance.id).map_err(|e| e.to_string())?;
     }
 
-    // 5.5. [Step 5/5] Immediately restore from backup DB and re-inject running prompts into workspaces
-    let _ = crate::modules::repo_db::resend_all_running_commands(20);
-    let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
-    let _ = crate::modules::repo_db::dispatch_running_prompts(&instance.id);
+    // 5.5. [Step 5/5] Restore from backup DB and re-inject running prompts strictly for THIS instance
+    let resent =
+        crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
+            .unwrap_or_default();
+    if is_default_inst {
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
+    }
+    let dispatched = crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
 
     // 6. Dispatch unified Email and Telegram switch notifications
     let (target_4h, target_weekly) =
@@ -1414,8 +1584,8 @@ pub async fn switch_account_to_instance(
             reason: "Smart Rotator / Instance Account Switch".to_string(),
             is_auto: false,
             backed_up_projects: Vec::new(),
-            backed_up_prompts_count: None,
-            restored_prompts_count: None,
+            backed_up_prompts_count: Some(backed_up_count),
+            restored_prompts_count: Some(resent.len() + dispatched),
         },
     );
 
@@ -1673,5 +1843,72 @@ mod tests {
         assert_eq!(resolve_mock("default"), "inst-default");
         assert_eq!(resolve_mock("active"), "inst-default");
         assert_eq!(resolve_mock("inst-custom-2"), "inst-custom-2");
+    }
+
+    #[test]
+    fn test_multi_instance_multi_project_account_swap_isolation() {
+        let temp_root = std::env::temp_dir().join(format!(
+            "agm_multi_inst_proj_test_{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let inst1_data = temp_root.join("inst-1").join("data");
+        let inst2_data = temp_root.join("inst-2").join("data");
+        let proj_a = temp_root.join("project-alpha");
+        let proj_b = temp_root.join("project-beta");
+        let proj_c = temp_root.join("project-gamma");
+        let _ = std::fs::create_dir_all(&proj_a);
+        let _ = std::fs::create_dir_all(&proj_b);
+        let _ = std::fs::create_dir_all(&proj_c);
+
+        // Assign Project Alpha + Project Beta to Instance 1, and Project Gamma to Instance 2
+        let ws1_a = inst1_data
+            .join("User")
+            .join("workspaceStorage")
+            .join("ws-alpha");
+        let ws1_b = inst1_data
+            .join("User")
+            .join("workspaceStorage")
+            .join("ws-beta");
+        let ws2_c = inst2_data
+            .join("User")
+            .join("workspaceStorage")
+            .join("ws-gamma");
+        let _ = std::fs::create_dir_all(&ws1_a);
+        let _ = std::fs::create_dir_all(&ws1_b);
+        let _ = std::fs::create_dir_all(&ws2_c);
+
+        let uri_a = format!("file:///{}", proj_a.to_string_lossy().replace('\\', "/"));
+        let uri_b = format!("file:///{}", proj_b.to_string_lossy().replace('\\', "/"));
+        let uri_c = format!("file:///{}", proj_c.to_string_lossy().replace('\\', "/"));
+        let _ = std::fs::write(
+            ws1_a.join("workspace.json"),
+            serde_json::json!({ "folder": uri_a }).to_string(),
+        );
+        let _ = std::fs::write(
+            ws1_b.join("workspace.json"),
+            serde_json::json!({ "folder": uri_b }).to_string(),
+        );
+        let _ = std::fs::write(
+            ws2_c.join("workspace.json"),
+            serde_json::json!({ "folder": uri_c }).to_string(),
+        );
+
+        let inst1_folders =
+            get_instance_workspace_folders("inst-1-isolated", &inst1_data.to_string_lossy());
+        let inst2_folders =
+            get_instance_workspace_folders("inst-2-isolated", &inst2_data.to_string_lossy());
+
+        assert_eq!(
+            inst1_folders.len(),
+            2,
+            "Instance 1 must restore both bound project workspaces (alpha & beta)"
+        );
+        assert_eq!(
+            inst2_folders.len(),
+            1,
+            "Instance 2 must restore only its bound project workspace (gamma)"
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_root);
     }
 }
