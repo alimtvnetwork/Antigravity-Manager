@@ -168,14 +168,20 @@ jobs:
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
           $exePath = "src-tauri/target/release/agm-alim.exe"
           if (-not (Test-Path $exePath)) {
-            $found = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*setup*" -and $_.Name -notlike "*build*" } | Select-Object -First 1
+            $found = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*setup*" -and $_.Name -notlike "*build*" -and $_.Name -notlike "*agm.exe*" } | Select-Object -First 1
             if ($found) { $exePath = $found.FullName }
           }
           if (Test-Path $exePath) {
             $zipName = "agm-alim_${ver}_windows_x64.zip"
-            Compress-Archive -Path $exePath -DestinationPath "$outDir/$zipName" -Force
+            $filesToZip = @($exePath)
+            $cliPath = "src-tauri/target/release/agm.exe"
+            if (Test-Path $cliPath) {
+              $filesToZip += $cliPath
+              Copy-Item -Path $cliPath -Destination "$outDir/agm.exe" -Force
+            }
+            Compress-Archive -Path $filesToZip -DestinationPath "$outDir/$zipName" -Force
             Copy-Item -Path $exePath -Destination "$outDir/agm-alim.exe" -Force
-            Write-Host "Successfully packaged portable ZIP: $outDir/$zipName and standalone agm-alim.exe"
+            Write-Host "Successfully packaged portable ZIP: $outDir/$zipName and standalone binaries"
           } else {
             Write-Warning "Executable not found for portable zip at $exePath"
           }

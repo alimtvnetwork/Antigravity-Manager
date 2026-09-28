@@ -8,6 +8,7 @@ pub mod cli;
 pub mod cloudflared;
 pub mod config;
 pub mod db;
+pub mod delegate_updater;
 pub mod device;
 pub mod email_inbound;
 pub mod email_io;

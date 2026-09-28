@@ -273,6 +273,10 @@ fn default_low_quota_threshold() -> f64 {
     15.0
 }
 
+fn default_stale_binding_timeout_hours() -> u32 {
+    6
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -301,6 +305,8 @@ pub struct AutoProfileSwitcherConfig {
     pub prompt_recency_threshold_seconds: u32,
     #[serde(default = "default_fast_forward_shortcut")]
     pub fast_forward_shortcut: String,
+    #[serde(default = "default_stale_binding_timeout_hours")]
+    pub stale_binding_timeout_hours: u32,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -321,6 +327,7 @@ impl Default for AutoProfileSwitcherConfig {
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
             fast_forward_shortcut: "Ctrl+Shift+F".to_string(),
+            stale_binding_timeout_hours: 6,
         }
     }
 }

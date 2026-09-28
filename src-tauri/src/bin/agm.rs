@@ -95,8 +95,15 @@ fn main() {
         "projects" | "workspaces" => {
             cmd_telegram(&["projects".to_string()]);
         }
+        "tree" => {
+            cmd_tree(&cmd_args);
+        }
         "active" | "running" => {
-            cmd_agy(&["active".to_string()]);
+            if cmd_args.is_empty() {
+                cmd_tree(&[]);
+            } else {
+                cmd_agy(&cmd_args);
+            }
         }
         "queues" | "queue" => {
             cmd_agy(&["queues".to_string()]);
@@ -137,6 +144,9 @@ fn main() {
         "test-training" | "training" | "train" => cmd_test_training(&cmd_args),
         "install" => cmd_install(&cmd_args),
         "update" | "update-all" | "ua" => cmd_update(&cmd_args),
+        "delegate-update" | "update-ui" | "ui-update-runner" => {
+            cmd_delegate_update(&cmd_args);
+        }
         "ssh" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
@@ -225,6 +235,7 @@ fn print_help_json() {
                 "group": "Update, Repo Sync & Fleet Orchestration",
                 "items": [
                     { "name": "update", "aliases": ["update-all", "ua"], "flags": ["all", "--json", "--check", "--force"], "description": "Check and update AGM binary, pull latest git repo, and sync fleet" },
+                    { "name": "delegate-update", "aliases": ["ui-update-runner"], "flags": ["--wait-pid <PID>", "--relaunch", "--target-exe <EXE>"], "description": "Delegated out-of-process updater for AGM UI & CLI (zero file-locks & auto-relaunch)" },
                     { "name": "sync", "aliases": [], "flags": [], "description": "Synchronize local accounts, instances, and DB vaults" },
                     { "name": "pull", "aliases": [], "flags": [], "description": "Execute git pull origin main in repository root" },
                     { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" }
@@ -312,12 +323,14 @@ fn print_help() {
     );
     println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
     println!("        Restore and re-enqueue in-flight prompts into active workspaces");
+    println!("    tree [all] [--words <W>] [--json]");
+    println!("        Render Project → Conversation → 200-Word Prompt tree with AGM Sequence IDs (P001, C001)");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
     println!("    prompts ls [N] [--json] [--words W]");
     println!("        Show N running prompts in ASC stack order (with friendly project names)");
-    println!("    prompt \"<text>\" [--prefix C] [--suffix C]");
-    println!("        Dispatch prompt with git pull & 01-prompts templates");
+    println!("    prompt [C001|P001|proj] \"<text>\" [--instance <id>] [--node <alias>] [--prefix C] [--suffix C]");
+    println!("        Dispatch prompt by AGM Sequence ID, project, instance, or remote SSH node");
     println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
     println!("        Resend commands before close/switch & sync image paths to resume file");
     println!();
@@ -348,30 +361,35 @@ fn print_help() {
     println!("        Manage multi-recipient email broadcasts");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
-    println!("  REAL-WORLD EXAMPLES");
+    println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");
     println!("  ────────────────────────────────────────────────────────────────────────────");
-    println!("    # 1. Check node status and credits:");
-    println!("    agm status");
+    println!("    # 1. Inspect Project → Conversation → 200-Word Prompt Tree (AGM Seq IDs):");
+    println!("    agm tree");
+    println!("    agm tree all --words 200");
+    println!("    gitmap agy active");
     println!();
-    println!("    # 2. Fast-forward switch to freshest account:");
-    println!("    agm ff");
-    println!("    agm instances 2 ff");
+    println!("    # 2. Inject prompt by AGM Sequence ID, Instance, or Remote SSH Node:");
+    println!("    agm prompt C001 \"Is it done?\"");
+    println!("    agm prompt P001 --instance default \"Run cargo clippy\"");
+    println!("    agm prompt C001 --node vm-01 \"Check build status\"");
+    println!("    gitmap agy prompt -n read-all -t \"Read memory and continue\"");
+    println!("    gitmap agy prompt -n is-done -t \"Verify all tasks\"");
     println!();
-    println!("    # 3. Snapshot running prompts to split SQLite DB before switch:");
-    println!("    agm backup");
-    println!("    agm backup ls");
-    println!("    agm restore");
+    println!("    # 3. Backup & Restore Running Storage Prompts (AGM & GitMap):");
+    println!("    agm backup && agm backup ls && agm restore");
+    println!("    gitmap backup-running-prompts && gitmap restore-running-prompts");
     println!();
-    println!("    # 4. Low quota threshold check & automated switch (15% standard):");
-    println!("    agm switch-if-low-credit -t 15 --json");
-    println!("    agm auto-switch threshold 15");
+    println!("    # 4. Update AGM & GitMap Locally or Across SSH Fleet:");
+    println!("    agm update                  # Update AGM binary");
+    println!("    agm update gitmap           # Update GitMap CLI");
+    println!("    agm update all --json       # Full fleet + repo + GitMap update");
+    println!("    gitmap agm update -y        # Update AGM via GitMap installer");
+    println!("    gitmap ssh update agm       # Update AGM across SSH fleet");
     println!();
-    println!("    # 5. Full fleet update with clean JSON output for automation:");
-    println!("    agm update all --json");
-    println!("    agm ua");
-    println!();
-    println!("    # 6. Inject prompt into workspace project:");
-    println!("    agm prompt \"Fix issue 65\" --prefix code");
+    println!("    # 5. Multi-Node SSH Execution:");
+    println!("    agm ssh nodes               # List registered SSH cluster nodes");
+    println!("    agm ssh exec \"agm status\"   # Run command across SSH cluster");
+    println!("    gitmap ssh nodes");
     println!();
 }
 
@@ -1774,24 +1792,33 @@ fn cmd_prompt_dispatch(args: &[String]) {
     if let Some(first) = args.first() {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
-            println!("AGM Prompt Dispatch:");
-            println!("  agm prompt <text> [--prefix <category>] [--suffix <category>]");
+            println!("AGM Prompt Dispatch (By AGM Seq ID, Instance, Project, or Node):");
+            println!("  agm prompt [C001|P001|project] <text> [--instance <id>] [--node <alias>] [--prefix <cat>] [--suffix <cat>]");
             println!("\nDescription:");
-            println!("  Dispatches a new prompt into the active workspace queue with automatic git pull sync");
+            println!("  Dispatches a prompt to a specific conversation sequence (C001), project sequence (P001),");
+            println!("  instance (--instance <id>), or remote SSH node (--node <alias>), with automatic git pull");
             println!("  and optional canonical prompt template framing from 01-prompts/.");
             println!("\nAliases: agm prompt");
             println!("\nOptions:");
+            println!("    --instance, -i <id> Target a specific sandbox instance (default: active/default)");
+            println!("    --node, -n <alias>  Dispatch prompt to a remote cluster machine via GitMap SSH");
             println!(
                 "    --prefix <cat>      Prepend template from 01-prompts/<cat> to the prompt"
             );
             println!("    --suffix <cat>      Append template from 01-prompts/<cat> to the prompt");
             println!("\nExamples:");
-            println!("  agm prompt \"Run unit tests\"                 # Dispatch prompt to active workspace");
-            println!("  agm prompt \"Audit DB\" --prefix coding-standards # Frame prompt with coding standards template");
+            println!("  agm prompt C001 \"Is it done?\"                      # Target conversation sequence C001");
+            println!("  agm prompt P001 --instance default \"Run tests\"     # Target project sequence P001 on instance");
+            println!("  agm prompt C001 --node vm-01 \"Check status\"        # Target C001 on remote SSH node");
+            println!("  agm prompt \"Audit DB\" --prefix coding-standards    # Frame prompt with template");
             return;
         }
         if first_lower == "ls" || first_lower == "list" || first_lower == "--running" {
             cmd_prompts(args);
+            return;
+        }
+        if first_lower == "tree" {
+            cmd_tree(&args[1..]);
             return;
         }
         if first_lower == "backup" || first_lower == "backpack" {
@@ -1806,6 +1833,9 @@ fn cmd_prompt_dispatch(args: &[String]) {
 
     let mut prefix_cat: Option<String> = None;
     let mut suffix_cat: Option<String> = None;
+    let mut explicit_instance: Option<String> = None;
+    let mut explicit_node: Option<String> = None;
+    let mut explicit_seq_or_target: Option<String> = None;
     let mut text_parts: Vec<String> = Vec::new();
 
     let mut i = 0;
@@ -1823,16 +1853,53 @@ fn cmd_prompt_dispatch(args: &[String]) {
                 i += 2;
                 continue;
             }
+        } else if arg == "--instance" || arg == "-i" {
+            if i + 1 < args.len() {
+                explicit_instance = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if let Some(ins) = arg
+            .strip_prefix("instance:")
+            .or_else(|| arg.strip_prefix("ins:"))
+        {
+            explicit_instance = Some(ins.to_string());
+            i += 1;
+            continue;
+        } else if arg == "--node" || arg == "-n" {
+            if i + 1 < args.len() {
+                explicit_node = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if arg == "--seq" || arg == "--conv" || arg == "-c" {
+            if i + 1 < args.len() {
+                explicit_seq_or_target = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
         } else {
             text_parts.push(arg.clone());
         }
         i += 1;
     }
 
-    // Pull latest changes before dispatching prompt
-    if Path::new(".git").exists() {
-        println!("[*] Synchronizing repository via git pull before prompt dispatch...");
-        let _ = Command::new("git").args(["pull"]).status();
+    // Check if the first positional token is an AGM Sequence ID (e.g. C001, P001, #C1) when >= 2 tokens exist
+    let mut resolved_seq: Option<repo_db::AgmSequenceResolution> = None;
+    if let Some(ref seq_tok) = explicit_seq_or_target {
+        resolved_seq = repo_db::resolve_agm_sequence_target(seq_tok);
+    } else if text_parts.len() >= 2 {
+        let first_tok = text_parts[0].trim();
+        let upper = first_tok.trim_start_matches('#').to_uppercase();
+        let looks_like_seq = (upper.starts_with('C') || upper.starts_with('P'))
+            && upper[1..].chars().all(|c| c.is_ascii_digit())
+            && !upper[1..].is_empty();
+        if looks_like_seq {
+            if let Some(res) = repo_db::resolve_agm_sequence_target(first_tok) {
+                resolved_seq = Some(res);
+                text_parts.remove(0);
+            }
+        }
     }
 
     let raw_text = text_parts.join(" ");
@@ -1844,13 +1911,85 @@ fn cmd_prompt_dispatch(args: &[String]) {
         std::process::exit(1);
     }
 
-    let slug = derive_current_repo_slug();
-    let cwd_str = env::current_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| ".".to_string());
+    // Remote SSH Node Delegation if `--node <alias>` was specified
+    if let Some(node_alias) = explicit_node {
+        let target_arg = resolved_seq
+            .as_ref()
+            .map(|s| s.seq_code.clone())
+            .or(explicit_seq_or_target)
+            .unwrap_or_else(|| "default".to_string());
+        let inst_arg = explicit_instance
+            .as_deref()
+            .map(|ins| format!(" --instance {}", ins))
+            .unwrap_or_default();
+        let remote_cmd = format!(
+            "agm prompt {}{} \"{}\"",
+            target_arg,
+            inst_arg,
+            final_prompt.replace('"', "\\\"")
+        );
+        println!(
+            "[*] Dispatching prompt to remote node '{}' via GitMap cluster SSH...",
+            node_alias
+        );
+        let status = Command::new("gitmap")
+            .args(["cluster", "exec", &node_alias, &remote_cmd])
+            .status();
+        match status {
+            Ok(s) if s.success() => {
+                println!(
+                    "[SUCCESS] Remote prompt dispatched to node '{}' (target: {}).",
+                    node_alias, target_arg
+                );
+                return;
+            }
+            _ => {
+                eprintln!(
+                    "[WARN] gitmap cluster exec did not succeed; falling back to Telegram/Supabase queue dispatch..."
+                );
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                let reply = rt.block_on(telegram_inbound::execute_prompt_injection(&format!(
+                    "{} {} {}",
+                    node_alias, target_arg, final_prompt
+                )));
+                println!("{}", reply);
+                return;
+            }
+        }
+    }
+
+    // Pull latest changes before dispatching prompt locally
+    if Path::new(".git").exists() {
+        println!("[*] Synchronizing repository via git pull before prompt dispatch...");
+        let _ = Command::new("git").args(["pull"]).status();
+    }
+
+    let (slug, cwd_str, inst_id, session_id, seq_label) = if let Some(seq) = resolved_seq {
+        let inst = explicit_instance.unwrap_or(seq.instance_id);
+        let sess = seq
+            .conversation_id
+            .unwrap_or_else(|| seq.project_id.clone());
+        (
+            seq.project_id,
+            seq.repo_path,
+            inst,
+            sess,
+            Some(seq.seq_code),
+        )
+    } else {
+        let s = derive_current_repo_slug();
+        let c = env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string());
+        let i = explicit_instance.unwrap_or_else(|| {
+            instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
+        });
+        let sess = s.clone();
+        (s, c, i, sess, None)
+    };
+
     let now = chrono::Utc::now().timestamp();
     let prompt_id = uuid::Uuid::new_v4().to_string();
-    let inst_id = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
 
     if let Ok(conn) = repo_db::connect_db() {
         let _ = conn.execute(
@@ -1862,15 +2001,17 @@ fn cmd_prompt_dispatch(args: &[String]) {
         let _ = conn.execute(
             "INSERT INTO active_prompts \
              (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?2, 'dispatched', ?6, ?6)",
-            rusqlite::params![&prompt_id, &slug, &inst_id, &cwd_str, &final_prompt, now],
+             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?6, 'dispatched', ?7, ?7)",
+            rusqlite::params![&prompt_id, &slug, &inst_id, &cwd_str, &final_prompt, &session_id, now],
         );
     }
 
     let task_file = PathBuf::from(&cwd_str).join(".antigravity_resume_task.json");
     let payload = serde_json::json!({
         "prompt_id": prompt_id,
+        "agm_seq_id": seq_label,
         "project_id": slug,
+        "conversation_id": session_id,
         "instance_id": inst_id,
         "repo_path": cwd_str,
         "prompt_content": final_prompt,
@@ -1882,12 +2023,38 @@ fn cmd_prompt_dispatch(args: &[String]) {
         let _ = fs::write(&task_file, js);
     }
 
-    println!(
-        "[SUCCESS] Dispatched prompt ({} chars) to workspace '{}' [Instance: {}].",
-        final_prompt.len(),
-        slug,
-        inst_id
-    );
+    let active_p = repo_db::ActivePrompt {
+        id: prompt_id,
+        project_id: slug.clone(),
+        instance_id: inst_id.clone(),
+        repo_path: cwd_str.clone(),
+        prompt_content: final_prompt.clone(),
+        model: Some("gemini-3.8-flash-high".to_string()),
+        session_id: Some(session_id.clone()),
+        status: "running".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+    let _ = repo_db::spawn_prompt_via_agy(&active_p);
+
+    if let Some(seq_code) = seq_label {
+        println!(
+            "[SUCCESS] Dispatched prompt ({} chars) to AGM Seq [{}] -> workspace '{}' (conv: {}, instance: {}).",
+            final_prompt.len(),
+            seq_code,
+            slug,
+            session_id,
+            inst_id
+        );
+    } else {
+        println!(
+            "[SUCCESS] Dispatched prompt ({} chars) to workspace '{}' [Instance: {}].",
+            final_prompt.len(),
+            slug,
+            inst_id
+        );
+    }
 }
 
 fn cmd_rerun(args: &[String]) {
@@ -4196,6 +4363,62 @@ fn cmd_telegram(args: &[String]) {
     println!("AGM Telegram Subsystem. Run 'agm telegram help' for available commands.");
 }
 
+fn cmd_tree(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Project → Conversation → 200-Word Prompt Tree View:");
+        println!("  agm tree [all] [--words <N>] [--json]");
+        println!("\nDescription:");
+        println!("  Renders a hierarchical tree of Projects ([P001]), Conversations ([C001]),");
+        println!("  and their latest user prompt (up to 200 words by default), persisting");
+        println!("  independent AGM Sequence IDs in repo_prompts.db.");
+        println!("\nOptions:");
+        println!(
+            "  all, --all          Include idle projects and conversations (default: running only)"
+        );
+        println!(
+            "  --words, -w <N>     Maximum words to preview per conversation prompt (default: 200)"
+        );
+        println!("  --json, -j          Output full tree structure as JSON");
+        println!("\nExamples:");
+        println!("  agm tree                            # Show running projects, conversations & 200w prompts");
+        println!("  agm tree all                        # Show all workspaces & conversations");
+        println!(
+            "  agm prompt C001 \"Is it done?\"       # Target conversation C001 directly from tree"
+        );
+        return;
+    }
+
+    let only_running = !args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("all") || a == "--all" || a == "-a");
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let mut max_words = 200usize;
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "--words" || args[i] == "-w") && i + 1 < args.len() {
+            if let Ok(w) = args[i + 1].parse::<usize>() {
+                max_words = w.max(1);
+            }
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    if is_json {
+        let tree = repo_db::get_project_conversation_tree(max_words, only_running);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&tree).unwrap_or_else(|_| "[]".to_string())
+        );
+    } else {
+        println!("{}", repo_db::format_tree_view_cli(max_words, only_running));
+    }
+}
+
 fn cmd_agy(args: &[String]) {
     let sub = args
         .first()
@@ -4203,11 +4426,32 @@ fn cmd_agy(args: &[String]) {
         .unwrap_or_else(|| "help".to_string());
     let rt = tokio::runtime::Runtime::new().unwrap();
     match sub.as_str() {
+        "tree" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_tree(rest);
+        }
         "active" | "running" => {
-            println!(
-                "{}",
-                rt.block_on(telegram_inbound::format_active_prompts_report())
-            );
+            println!("{}", repo_db::format_tree_view_cli(200, true));
+            if let Ok(out) = std::process::Command::new("gitmap")
+                .args(["agy", "active"])
+                .output()
+            {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if !stdout.trim().is_empty() {
+                    println!("\n[GitMap AGY Active Output]\n{}", stdout.trim());
+                }
+            }
+        }
+        "backup" | "backup-running-prompts" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_backup_running_prompts(rest);
+            let _ = std::process::Command::new("gitmap")
+                .arg("backup-running-prompts")
+                .status();
+        }
+        "restore" | "restore-running-prompts" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_restore_running_prompts(rest);
         }
         "queues" | "queue" => {
             println!(
@@ -4222,15 +4466,8 @@ fn cmd_agy(args: &[String]) {
             println!("{}", telegram_inbound::format_prompts_templates_report());
         }
         "prompt" | "p" => {
-            let prompt_args = if args.len() > 1 {
-                args[1..].join(" ")
-            } else {
-                String::new()
-            };
-            println!(
-                "{}",
-                rt.block_on(telegram_inbound::execute_prompt_injection(&prompt_args))
-            );
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            cmd_prompt_dispatch(rest);
         }
         "nodes" => {
             println!(
@@ -4249,21 +4486,28 @@ fn cmd_agy(args: &[String]) {
                 }
             }
             println!("AGM Antigravity (AGY) Management & GitMap Parity:");
-            println!("  agm agy active          List active running prompts and conversations");
+            println!(
+                "  agm agy tree [all]      Project → Conversation → 200w Prompt Tree (AGM Seq IDs)"
+            );
+            println!("  agm agy active          List active running prompts & AGM tree view");
+            println!(
+                "  agm agy backup          Snapshot active running storage prompts (AGM + GitMap)"
+            );
+            println!("  agm agy restore         Restore backed-up running prompts");
             println!("  agm agy queues          List workspace prompt queues");
             println!("  agm agy ls              List registered projects and workspaces");
             println!("  agm agy prompts         List reusable prompt templates");
-            println!("  agm agy prompt <args>   Inject prompt to workspace or remote VM node");
-            println!("  agm agy nodes           List cluster VM nodes & connectivity status");
-            println!("\nDescription:");
-            println!("  Subsystem bridging Antigravity CLI and GitMap workspace orchestration.");
-            println!("\nAliases: agm agy, agm active, agm queues");
-            println!("\nExamples:");
-            println!("  agm agy active                      # List active running prompts");
             println!(
-                "  agm agy queues                      # View prompt queues across workspaces"
+                "  agm agy prompt <args>   Inject prompt by Seq ID (C001/P001), instance, or node"
             );
-            println!("  agm agy nodes                       # Display status of cluster VM nodes");
+            println!("  agm agy nodes           List cluster VM nodes & connectivity status");
+            println!("\nGitMap AGY Direct Equivalents:");
+            println!("  gitmap agy active");
+            println!("  gitmap agy running-prompts ls | backup | restore");
+            println!("  gitmap backup-running-prompts && gitmap restore-running-prompts");
+            println!("  gitmap agy prompt -n read-all -t \"Read memory and continue\"");
+            println!("  gitmap agy prompt -n is-done -t \"Verify if all tasks are complete\"");
+            println!("  gitmap agy prompt-project <proj> -n is-done -t \"Check build\"");
         }
     }
 }
@@ -7390,6 +7634,10 @@ fn cmd_update(args: &[String]) {
         .any(|a| a == "--help" || a == "-h" || a == "help");
     let is_all = args.iter().any(|a| a == "all" || a == "--all" || a == "-a")
         || env::args().any(|a| a == "update-all" || a == "ua");
+    let is_gitmap = args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("gitmap") || a.eq_ignore_ascii_case("gm"));
+    let is_ssh_fleet = args.iter().any(|a| a.eq_ignore_ascii_case("ssh"));
     let is_check = args.iter().any(|a| a == "--check" || a == "-c");
     let is_force = args.iter().any(|a| a == "--force" || a == "-f");
 
@@ -7398,10 +7646,12 @@ fn cmd_update(args: &[String]) {
             let help_obj = serde_json::json!({
                 "command": "update",
                 "aliases": ["update-all", "ua"],
-                "syntax": "agm update [all] [--json] [--check] [--force]",
+                "syntax": "agm update [all|gitmap|ssh] [--json] [--check] [--force]",
                 "options": {
                     "--json, -j": "Output pure machine-readable JSON payload (zero banners)",
-                    "all, --all, -a": "Update AGM binary, pull latest repo code, and sync fleet",
+                    "all, --all, -a": "Update AGM binary, GitMap CLI, pull latest repo code, and sync fleet",
+                    "gitmap, gm": "Update GitMap CLI via gitmap self-update",
+                    "ssh": "Update AGM across all registered SSH cluster nodes (gitmap ssh update agm)",
                     "--check, -c": "Query and compare releases without installing updates",
                     "--force, -f": "Force re-installation even if already at latest version"
                 }
@@ -7413,7 +7663,11 @@ fn cmd_update(args: &[String]) {
         } else {
             println!("AGM Update & Fleet Synchronization:");
             println!("  agm update [--json] [--check] [--force]    Check and update AGM binary from GitHub");
-            println!("  agm update all [--json] [--check]          Update AGM binary, pull latest repo code, and sync fleet");
+            println!(
+                "  agm update gitmap                          Update GitMap CLI to latest release"
+            );
+            println!("  agm update ssh                             Update AGM across all SSH cluster machines");
+            println!("  agm update all [--json] [--check]          Update AGM binary, GitMap, pull repo, and sync fleet");
             println!("  agm update-all, agm ua                     Aliases for 'agm update all'");
             println!();
             println!("Options:");
@@ -7423,15 +7677,41 @@ fn cmd_update(args: &[String]) {
             println!();
             println!("Examples:");
             println!("  agm update                       # Update AGM binary interactively");
-            println!(
-                "  agm update all                   # Update AGM binary and sync local repository"
-            );
+            println!("  agm update gitmap                # Update GitMap CLI (gitmap self-update)");
+            println!("  agm update ssh                   # Update AGM across SSH fleet (gitmap ssh update agm)");
+            println!("  agm update all                   # Update AGM binary, GitMap, and sync local repository");
             println!("  agm update all --json            # Remote machine automation via JSON");
-            println!(
-                "  agm update --check               # Check latest version without modifying files"
-            );
         }
         return;
+    }
+
+    if is_gitmap && !is_all {
+        println!("[*] Updating GitMap CLI via 'gitmap self-update'...");
+        let _ = Command::new("gitmap")
+            .arg("self-update")
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status();
+        return;
+    }
+
+    if is_ssh_fleet {
+        println!("[*] Updating AGM across SSH cluster machines via 'gitmap ssh update agm'...");
+        let _ = Command::new("gitmap")
+            .args(["ssh", "update", "agm"])
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status();
+        return;
+    }
+
+    if is_all && !is_check {
+        if !is_json {
+            println!("[*] Checking GitMap CLI for updates (gitmap self-update)...");
+        }
+        let _ = Command::new("gitmap").arg("self-update").output();
     }
 
     if !is_json {
@@ -7579,14 +7859,21 @@ fn cmd_update(args: &[String]) {
 
         #[cfg(target_os = "windows")]
         {
-            let ps_cmd = "irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex";
+            let install_dir = env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                .unwrap_or_else(|| PathBuf::from("."));
+            let ps_cmd = format!(
+                "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1))) -Update -InstallDir \"{}\"",
+                install_dir.to_string_lossy()
+            );
             let status = Command::new("powershell")
                 .args([
                     "-NoProfile",
                     "-ExecutionPolicy",
                     "Bypass",
                     "-Command",
-                    ps_cmd,
+                    &ps_cmd,
                 ])
                 .status();
             match status {
@@ -7712,6 +7999,9 @@ fn cmd_update(args: &[String]) {
             "  ================================================================================"
         );
     }
+}
+fn cmd_delegate_update(args: &[String]) {
+    antigravity_tools_lib::modules::delegate_updater::run(args);
 }
 
 fn cmd_ssh(args: &[String]) {

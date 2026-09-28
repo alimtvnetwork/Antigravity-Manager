@@ -1388,8 +1388,10 @@ pub async fn switch_account_to_instance(
         launch_instance(&instance.id).map_err(|e| e.to_string())?;
     }
 
-    // 5.5. Immediately restore from backup DB and dispatch running prompts to workspaces so they run as soon as switch happens
+    // 5.5. [Step 5/5] Immediately restore from backup DB and re-inject running prompts into workspaces
+    let _ = crate::modules::repo_db::resend_all_running_commands(20);
     let _ = crate::modules::backup_prompts_db::restore_running_prompts(false, None);
+    let _ = crate::modules::repo_db::dispatch_running_prompts(&instance.id);
 
     // 6. Dispatch unified Email and Telegram switch notifications
     let (target_4h, target_weekly) =

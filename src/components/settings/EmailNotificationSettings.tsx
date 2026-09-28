@@ -2117,13 +2117,19 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[10px]">
                             <div><code>/ping</code> — Node IP, version &amp; git telemetry</div>
+                            <div><code>/tree</code> — Project (<code>P001</code>) &amp; Conversation (<code>C001</code>) tree (200w)</div>
+                            <div><code>/prompt C001 &lt;msg&gt;</code> — Inject prompt into conversation/project</div>
                             <div><code>/observe</code> or <code>/status</code> — Active vs Idle workspace report</div>
                             <div><code>/gitmap pe</code> — Live GitHub CI/CD pipeline matrix</div>
+                            <div><code>/ssh [nodes|exec|prompt]</code> — Remote SSH fleet delegation</div>
+                            <div><code>/update [agm|gitmap|ssh|all]</code> — Self-update AGM &amp; GitMap</div>
                             <div><code>/agm status</code> or <code>/api</code> — Proxy &amp; account pool status</div>
                             <div><code>/backup</code> or <code>/backpack</code> — Trigger encrypted backup</div>
                             <div><code>/email [status|ping|help]</code> — Email status or dispatch</div>
-                            <div><code>agm telegram connect &lt;TOKEN&gt;</code> — One-step CLI setup</div>
-                            <div><code>agm telegram [ping|observe|gitmap|api|backup|email|send]</code></div>
+                            <div><code>agm tree [--all]</code> — Terminal project &amp; conversation tree</div>
+                            <div><code>agm prompt C001 &quot;&lt;text&gt;&quot; [--instance 1]</code> — CLI prompt inject</div>
+                            <div><code>agm agy [projects|prompts|backup|restore]</code> — GitMap AGY parity</div>
+                            <div><code>agm update [agm|gitmap|ssh|all]</code> — Unified CLI updater</div>
                         </div>
                     </div>
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Sparkles, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { relaunch as tauriRelaunch } from '@tauri-apps/plugin-process';
+import { relaunch as tauriRelaunch, exit as tauriExit } from '@tauri-apps/plugin-process';
 import { useUpdateStore } from '../stores/use-update-store';
 
 interface UpdateInfo {
@@ -65,6 +65,17 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
       const res = await installUpdate();
       if (res) {
         setUpdateState('ready');
+        setTimeout(async () => {
+          try {
+            await tauriExit(0);
+          } catch {
+            try {
+              window.close();
+            } catch {
+              // ignore
+            }
+          }
+        }, 1200);
       } else {
         setUpdateState('manual');
       }
@@ -78,9 +89,13 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
   const handleRestart = async () => {
     try {
-      await tauriRelaunch();
-    } catch (error) {
-      console.error('Relaunch failed:', error);
+      await tauriExit(0);
+    } catch {
+      try {
+        await tauriRelaunch();
+      } catch (error) {
+        console.error('Relaunch failed:', error);
+      }
     }
   };
 

@@ -155,6 +155,19 @@ export interface AutoProfileSwitcherConfig {
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
     fast_forward_shortcut?: string;
+    stale_binding_timeout_hours?: number;
+}
+
+export function isInstanceBindingStale(
+    inst: InstanceStatus,
+    staleTimeoutHours: number = 6,
+    nowSec: number = Math.floor(Date.now() / 1000)
+): boolean {
+    if (inst.is_running) return false;
+    const lastUsed = inst.config.last_used || 0;
+    if (lastUsed <= 0) return false;
+    const timeoutSecs = Math.max(1, staleTimeoutHours) * 3600;
+    return nowSec - lastUsed > timeoutSecs;
 }
 
 export interface AutoResumePromptInfo {
@@ -271,47 +284,9 @@ export function findBestSmartPlayAccount(
     const hasAvailable = available.length > 0;
     if (!hasAvailable) return null;
 
-    const nowSec = Math.floor(Date.now() / 1000);
-
     const scored = available.map(acc => {
-        let score = 0;
-
-        // 1. Idle time factor (Longest time not used, or never used)
-        const hasNeverUsed = !acc.last_used || acc.last_used === 0;
-        if (hasNeverUsed) {
-            score += 100000;
-        } else {
-            const idleHours = Math.max(0, (nowSec - acc.last_used) / 3600);
-            score += Math.min(50000, idleHours * 1000);
-        }
-
-        // 2. 4-Hour quota remaining (lowest credit used = highest percentage remaining)
-        const models = acc.quota?.models || [];
-        let lowestRemaining = 100;
-        for (const m of models) {
-            if (typeof m.percentage === 'number') {
-                if (m.percentage < lowestRemaining) {
-                    lowestRemaining = m.percentage;
-                }
-            }
-        }
-        score += lowestRemaining * 200;
-
-        // 3. Target model bonus
-        const target = models.find(m => m.name.toLowerCase().includes(targetModel.toLowerCase()));
-        if (target && typeof target.percentage === 'number') {
-            score += target.percentage * 100;
-        }
-
-        // 4. Tier bonus
-        const tier = (acc.quota?.subscription_tier || '').toLowerCase();
-        if (tier.includes('ultra')) {
-            score += 3000;
-        } else if (tier.includes('pro')) {
-            score += 2000;
-        }
-
-        return { account: acc, score };
+        const res = calculateMultiplicativeScore(acc, [], undefined, targetModel);
+        return { account: acc, score: res.score };
     });
 
     scored.sort((a, b) => b.score - a.score);
@@ -504,12 +479,11 @@ function calculateAccountRefillDays(acc: Account, nowMs: number): number {
 }
 
 /**
- * Multiplicative Candidate Scoring Algorithm:
- * Score = S_active * M_tier * Q_weekly * Q_4h_factor
- * - S_active: 1 if unused, 0 if in use
- * - M_tier: Ultra=5, Pro=3, Free=1
- * - Q_weekly: 0 to 100
- * - Q_4h: accounts with 100% 4h quota receive a major boost and strict precedence
+ * Normalized Multiplicative Candidate Scoring Algorithm (divided by 1000 for minimal compact numbers):
+ * - Anyone with < 100% 4h quota gets a score of `0`.
+ * - Otherwise: Score = (S_active * M_tier * Q_weekly) / 1000
+ *   where S_active = 1 if unused (0 if in use), M_tier = {Ultra: 5, Pro: 3, Free: 1}, Q_weekly = 0..100.
+ *   Example scores: Ultra 100% = 0.5, Pro 100% = 0.3, Free 100% = 0.1, < 100% 4h quota = 0.
  */
 export function calculateMultiplicativeScore(
     acc: Account,
@@ -526,7 +500,7 @@ export function calculateMultiplicativeScore(
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
     const isFull4h = fourHourQuotaPercent >= 100;
-    if (!isFull4h) {
+    if (!isFull4h || activeFactor === 0) {
         return {
             account: acc,
             score: 0,
@@ -540,8 +514,8 @@ export function calculateMultiplicativeScore(
         };
     }
 
-    const baseScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
-    const score = activeFactor > 0 ? baseScore + 100000 : 0;
+    const rawScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
+    const score = Number((rawScore / 1000).toFixed(4));
 
     const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);

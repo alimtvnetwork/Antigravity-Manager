@@ -607,17 +607,153 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
 
 /// Run official installer to update the tool to the latest version
 pub async fn run_installer_update() -> Result<String, String> {
-    logger::log_info("Starting official installer to update application...");
+    logger::log_info("Starting delegated updater for application update...");
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("Cannot locate current executable path: {}", e))?;
+    let current_dir = current_exe
+        .parent()
+        .map(|d| d.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let bin_name = if cfg!(target_os = "windows") {
+        "agm.exe"
+    } else {
+        "agm"
+    };
+
+    // 1. Resolve candidate updater binary:
+    // Priority A: Sibling agm binary adjacent to current_exe
+    // Priority B: Installed agm in standard Programs directory
+    // Priority C: Current executable itself (agm-alim) as self-delegating updater
+    let candidate_sibling = current_dir.join(bin_name);
+    let candidate_installed = if cfg!(target_os = "windows") {
+        std::env::var("LOCALAPPDATA").ok().map(|l| {
+            std::path::PathBuf::from(l)
+                .join("Programs")
+                .join("agm-alim")
+                .join("agm.exe")
+        })
+    } else {
+        None
+    };
+
+    let updater_src = if candidate_sibling.exists() {
+        candidate_sibling
+    } else if let Some(ref p) = candidate_installed.filter(|p| p.exists()) {
+        p.clone()
+    } else {
+        current_exe.clone()
+    };
+
+    logger::log_info(&format!("Using updater source binary: {:?}", updater_src));
+
+    // 2. Make an isolated copy in %TEMP%\agm-updater to avoid in-use file lock during update
+    let temp_dir = std::env::temp_dir().join("agm-updater");
+    if let Err(e) = std::fs::create_dir_all(&temp_dir) {
+        logger::log_warn(&format!("Failed to create temp updater directory: {}", e));
+    }
+
+    let my_pid = std::process::id();
+    let my_exe = current_exe.to_string_lossy().to_string();
+    let my_dir = current_dir.to_string_lossy().to_string();
+
+    let temp_updater_name = if cfg!(target_os = "windows") {
+        format!("agm-updater-{}.exe", my_pid)
+    } else {
+        format!("agm-updater-{}", my_pid)
+    };
+    let temp_agm = temp_dir.join(&temp_updater_name);
+
+    match std::fs::copy(&updater_src, &temp_agm) {
+        Ok(_) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&temp_agm, std::fs::Permissions::from_mode(0o755));
+            }
+
+            logger::log_info(&format!(
+                "Copied updater to isolated temp path: {:?}",
+                temp_agm
+            ));
+
+            #[cfg(target_os = "windows")]
+            {
+                let mut spawn_cmd = std::process::Command::new("cmd.exe");
+                spawn_cmd.args([
+                    "/c",
+                    "start",
+                    "Antigravity Manager Delegated Updater",
+                    &temp_agm.to_string_lossy(),
+                    "delegate-update",
+                    "--wait-pid",
+                    &my_pid.to_string(),
+                    "--install-dir",
+                    &my_dir,
+                    "--target-exe",
+                    &my_exe,
+                    "--relaunch",
+                ]);
+
+                match spawn_cmd.spawn() {
+                    Ok(_) => {
+                        logger::log_info(
+                            "Successfully launched visible delegated updater process.",
+                        );
+                        crate::modules::notification_hub::notify_system_updated(
+                            CURRENT_VERSION,
+                            "latest (delegated updater launched)",
+                            Some("Delegated CLI updater launched in isolated temp folder. Application will restart automatically upon completion."),
+                        );
+                        return Ok("Delegated updater started. Application will restart automatically upon completion.".to_string());
+                    }
+                    Err(e) => {
+                        logger::log_error(&format!("Failed to spawn delegated updater: {}", e));
+                    }
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let mut spawn_cmd = std::process::Command::new(&temp_agm);
+                spawn_cmd.args([
+                    "delegate-update",
+                    "--wait-pid",
+                    &my_pid.to_string(),
+                    "--install-dir",
+                    &my_dir,
+                    "--target-exe",
+                    &my_exe,
+                    "--relaunch",
+                ]);
+
+                match spawn_cmd.spawn() {
+                    Ok(_) => {
+                        return Ok("Delegated updater started. Application will restart automatically upon completion.".to_string());
+                    }
+                    Err(e) => {
+                        logger::log_error(&format!("Failed to spawn delegated updater: {}", e));
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            logger::log_warn(&format!(
+                "Failed to copy updater binary to temp directory ({}), falling back to direct installer",
+                e
+            ));
+        }
+    }
 
     #[cfg(target_os = "windows")]
     {
-        // On Windows, launch the installer in a visible, detached PowerShell process
-        // so the user sees live download/update progress in a dedicated window,
-        // and when the installer updates or restarts agm-alim.exe, it is not blocked or killed by parent process termination.
-        let ps_body = if std::path::Path::new("install.ps1").exists() {
-            "Write-Host 'Updating Antigravity Tools...' -ForegroundColor Cyan; .\\install.ps1 -Update"
+        // Fallback: On Windows, launch the installer in a visible, detached PowerShell process
+        let dir_arg = format!("-InstallDir \"{}\"", my_dir);
+        let ps_body = if current_dir.join("install.ps1").exists() {
+            format!("Write-Host 'Updating Antigravity Tools...' -ForegroundColor Cyan; .\\install.ps1 -Update -NoLaunch {}", dir_arg)
         } else {
-            "Write-Host 'Updating Antigravity Tools from official release...' -ForegroundColor Cyan; $s = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($s)) -Update"
+            format!("Write-Host 'Updating Antigravity Tools from official release...' -ForegroundColor Cyan; $s = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($s)) -Update -NoLaunch {}", dir_arg)
         };
 
         let mut spawn_cmd = std::process::Command::new("cmd.exe");
@@ -630,7 +766,7 @@ pub async fn run_installer_update() -> Result<String, String> {
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            ps_body,
+            &ps_body,
         ]);
 
         match spawn_cmd.spawn() {

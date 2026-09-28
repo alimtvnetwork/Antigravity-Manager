@@ -391,11 +391,55 @@ pub fn list_running_or_active_instances() -> Result<Vec<crate::models::InstanceC
     Ok(result)
 }
 
-/// Get account IDs currently bound to any running or active instance
+/// Check whether an instance binding is stale (no ping/activity for > `stale_binding_timeout_hours`, default 6h)
+/// or has 0% credits remaining (not working / exhausted).
+pub fn is_instance_binding_stale_or_exhausted(
+    inst: &crate::models::InstanceConfig,
+    is_running: bool,
+    stale_timeout_hours: u32,
+    target_model: &str,
+    now_sec: i64,
+) -> bool {
+    let stale_timeout_secs = (stale_timeout_hours.clamp(1, 24) as i64) * 3600;
+    let is_stale_time = inst.last_used > 0 && (now_sec - inst.last_used) > stale_timeout_secs;
+
+    // If not actively running and last activity exceeded stale_binding_timeout_hours (6h-10h), mark inactive
+    if !is_running && is_stale_time {
+        return true;
+    }
+
+    // If bound account has 0% credits remaining (no credits), mark as not working / exhausted
+    if let Some(ref acc_id) = inst.bound_account_id {
+        if let Ok(acc) = account::load_account(acc_id) {
+            let q_4h = calculate_4h_window_quota(&acc, target_model).unwrap_or(100.0);
+            if q_4h <= 0.0 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Get account IDs currently bound to any running or active non-stale instance
 pub fn get_active_in_use_account_ids() -> Vec<String> {
     let instances = list_running_or_active_instances().unwrap_or_default();
+    let switcher_cfg = config::load_app_config()
+        .map(|c| c.auto_profile_switcher)
+        .unwrap_or_default();
+    let now_sec = chrono::Utc::now().timestamp();
     let mut in_use = Vec::new();
     for inst in instances {
+        let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if is_instance_binding_stale_or_exhausted(
+            &inst,
+            is_running,
+            switcher_cfg.stale_binding_timeout_hours,
+            &switcher_cfg.target_model,
+            now_sec,
+        ) {
+            continue;
+        }
         let acc_id_opt = inst
             .bound_account_id
             .clone()
@@ -407,7 +451,16 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
         }
     }
     if let Ok(Some(current_id)) = account::get_current_account_id() {
-        if !in_use.contains(&current_id) {
+        if let Ok(cur_acc) = account::load_account(&current_id) {
+            let cur_q =
+                calculate_4h_window_quota(&cur_acc, &switcher_cfg.target_model).unwrap_or(100.0);
+            let is_cur_stale = cur_acc.last_used > 0
+                && (now_sec - cur_acc.last_used)
+                    > (switcher_cfg.stale_binding_timeout_hours.clamp(1, 24) as i64) * 3600;
+            if cur_q > 0.0 && !is_cur_stale && !in_use.contains(&current_id) {
+                in_use.push(current_id);
+            }
+        } else if !in_use.contains(&current_id) {
             in_use.push(current_id);
         }
     }
@@ -545,12 +598,27 @@ pub struct ProfileCandidate {
     pub score: f64,
 }
 
-/// Multiplicative candidate scoring algorithm:
-/// Score = S_active * M_tier * Q_weekly
-/// - S_active: 1.0 if unused, 0.0 if in active use
-/// - M_tier: Ultra=5.0, Pro=3.0, Free=1.0
-/// - Q_weekly: 0.0 to 100.0 percentage
+/// Normalized candidate scoring algorithm (divided by 1000.0 for compact 0.000..0.500 range):
+/// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
+/// - Otherwise: `Score = (S_active * M_tier * Q_weekly) / 1000.0`
+///   where S_active = 1.0, M_tier = {Ultra: 5.0, Pro: 3.0, Free: 1.0}, Q_weekly = 0.0..100.0.
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
+    let is_period_finished = period_stat
+        .as_ref()
+        .map(|s| s.is_period_finished)
+        .unwrap_or(false);
+    let q_4h = period_stat
+        .as_ref()
+        .map(|s| s.quota_percent)
+        .or_else(|| calculate_4h_window_quota(acc, target_model))
+        .unwrap_or(0.0);
+
+    // Anyone who has less than 100% 4h quota (and reset period not finished) gets 0.0
+    if q_4h < 100.0 && !is_period_finished {
+        return 0.0;
+    }
+
     // 1. Subscription tier multiplier
     let tier = acc
         .quota
@@ -606,14 +674,12 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
     }
 
     // 3. Reset boundary check: if period has finished, provider will refresh credits to 100%
-    if let Some(period_stat) = evaluate_account_period_status(acc, target_model, 20.0, now_sec) {
-        if period_stat.is_period_finished {
-            weekly_quota_percent = 100.0;
-        }
+    if is_period_finished {
+        weekly_quota_percent = 100.0;
     }
 
     let active_factor = 1.0;
-    active_factor * tier_multiplier * weekly_quota_percent
+    (active_factor * tier_multiplier * weekly_quota_percent) / 1000.0
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
@@ -1969,8 +2035,8 @@ mod tests {
     #[test]
     fn test_score_candidate_account_reset_time_priority() {
         let now_sec = 1790090000;
-        let past_time = "2026-09-22T14:30:00Z"; // Period finished (+15000 bonus)
-        let future_time = "2026-09-22T20:00:00Z"; // 1790107200, runway bonus
+        let past_time = "2026-09-22T14:30:00Z"; // Period finished (resets to 100%)
+        let future_time = "2026-09-22T20:00:00Z"; // Un-refilled 10% (< 100% -> 0.0)
 
         let mut acc_a = make_test_account("acc-a", "a@domain.com", "gemini-pro", 10, past_time);
         acc_a.last_used = now_sec - 3600;
@@ -1981,7 +2047,10 @@ mod tests {
         let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
-        // Account A period finished resets to 100% (score: 1.0 * 1.0 * 100.0 = 100.0), higher than un-refilled 10% (score: 10.0)
+        // Account A period finished resets to 100% (normalized score: (1.0 * 3.0 * 100.0) / 1000.0 = 0.3)
+        // Account B has < 100% quota and period not finished -> strictly 0.0
+        assert!((score_a - 0.3).abs() < 1e-6);
+        assert_eq!(score_b, 0.0);
         assert!(score_a > score_b);
     }
 
@@ -2079,11 +2148,41 @@ mod tests {
         let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
-        // Account A: 1.0 * 3.0 * 100 = 300.0
-        // Account B: 1.0 * 3.0 * 21 = 63.0
-        assert_eq!(score_a, 300.0);
-        assert_eq!(score_b, 63.0);
+        // Account A normalized: (1.0 * 3.0 * 100.0) / 1000.0 = 0.300
+        // Account B normalized: (1.0 * 3.0 * 21.0) / 1000.0 = 0.063
+        assert!((score_a - 0.3).abs() < 1e-6);
+        assert!((score_b - 0.063).abs() < 1e-6);
         assert!(score_a > score_b);
+
+        // Stale binding timeout verification (default 6h, configurable 6-10h)
+        let stale_inst = crate::models::InstanceConfig {
+            id: "inst-stale".to_string(),
+            name: "Stale Instance".to_string(),
+            data_dir: "/tmp/stale".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: now_sec - 50000,
+            last_used: now_sec - (7 * 3600), // 7 hours ago (> 6h default)
+            is_default: false,
+            pid: None,
+            seq_num: Some(2),
+        };
+        assert!(is_instance_binding_stale_or_exhausted(
+            &stale_inst,
+            false,
+            6,
+            "gemini-pro",
+            now_sec
+        ));
+        assert!(!is_instance_binding_stale_or_exhausted(
+            &stale_inst,
+            false,
+            10,
+            "gemini-pro",
+            now_sec
+        ));
     }
 
     #[test]

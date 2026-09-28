@@ -15,7 +15,7 @@ import { useDebugConsole } from '../stores/useDebugConsole';
 
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../utils/env';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { relaunch, exit } from '@tauri-apps/plugin-process';
 
 import DebugConsole from '../components/debug/DebugConsole';
 import ProxyPoolSettings from '../components/settings/ProxyPoolSettings';
@@ -472,14 +472,18 @@ function Settings() {
         setIsInstallerUpdating(true);
         try {
             await invoke<string>('run_installer_update');
-            showToast(t('settings.about.installer_success', 'Official installer executed successfully! Restarting application...'), 'success');
+            showToast(t('settings.about.installer_success', 'Delegated updater started! Closing application so the update can complete cleanly...'), 'success');
             setTimeout(async () => {
                 try {
-                    await relaunch();
+                    await exit(0);
                 } catch {
-                    // ignore
+                    try {
+                        window.close();
+                    } catch {
+                        // ignore
+                    }
                 }
-            }, 1500);
+            }, 1200);
         } catch (error) {
             showToast(`${t('settings.about.installer_failed', 'Installer update failed')}: ${error}`, 'error');
         } finally {

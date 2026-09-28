@@ -45,7 +45,8 @@ param(
     [switch]$Uninstall,
     [switch]$CheckUpdate,
     [switch]$Update,
-    [switch]$NoLaunch
+    [switch]$NoLaunch,
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -1198,7 +1199,7 @@ if ($isPinned -and $cleanPinned) {
 
 $TargetVersion = $versionQueue[0]
 
-if ($Update) {
+if ($Update -and -not $Force) {
     $curr = Get-InstalledVersion
     if ($curr) {
         if ($curr -eq $TargetVersion) {

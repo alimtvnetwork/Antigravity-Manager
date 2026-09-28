@@ -169,17 +169,20 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
 
     let payload = json!({
         "commands": [
+            { "command": "tree", "description": "Project → Conversation → 200-word Prompt tree with AGM Seq IDs" },
+            { "command": "active", "description": "List active running prompts & AGM tree view" },
             { "command": "nodes", "description": "List all cluster VM nodes & status" },
-            { "command": "active", "description": "List active running prompts & conversations" },
             { "command": "queues", "description": "Inspect workspace prompt queues" },
             { "command": "projects", "description": "List registered workspaces & prompt syntax" },
             { "command": "prompts", "description": "List reusable prompt templates" },
-            { "command": "prompt", "description": "Inject prompt into node workspace" },
+            { "command": "prompt", "description": "Inject prompt by Seq ID (C001/P001), instance, or node" },
+            { "command": "ssh", "description": "List SSH nodes or run command on remote machine" },
+            { "command": "update", "description": "Update AGM or GitMap CLI (e.g. /update agm, /update gitmap)" },
             { "command": "ping", "description": "Verify node connectivity, IP, Git version & uptime" },
             { "command": "status", "description": "Full node, account quota & proxy status" },
             { "command": "observe", "description": "Inspect live workspaces & running prompt queues" },
-            { "command": "gitmap", "description": "Run GitMap CLI command (e.g. /gitmap pe)" },
-            { "command": "agm", "description": "Run AGM CLI command (e.g. /agm accounts)" },
+            { "command": "gitmap", "description": "Run GitMap CLI command (e.g. /gitmap agy active)" },
+            { "command": "agm", "description": "Run AGM CLI command (e.g. /agm tree, /agm update)" },
             { "command": "api", "description": "Query local API proxy status & account bindings" },
             { "command": "backup", "description": "Backup running prompts to split SQLite DB" },
             { "command": "restore", "description": "Restore backed-up prompts to resume execution" },
@@ -598,38 +601,53 @@ pub fn format_help_manual() -> String {
     format!(
         "🤖 <b>Antigravity-Manager Telegram Remote Manual</b>\n\
         <code>v{} | commit {} | branch {} | release {}</code>\n\n\
-        📌 <b>Core Telemetry &amp; Observation:</b>\n\
+        📌 <b>Core Telemetry &amp; Tree View (AGM Seq IDs):</b>\n\
         • <code>/help</code> or <code>/start</code> — Display this full interactive command manual\n\
         • <code>/ping</code> — Check node connectivity, IP, Git build &amp; uptime\n\
+        • <code>/tree</code> — Running Project → Conversation → 200-word Prompt tree (<code>[P001]</code>, <code>[C001]</code>)\n\
+        • <code>/tree all</code> — Full tree of all workspaces &amp; conversations (running + idle)\n\
+        • <code>/active</code> or <code>/running</code> — Active running prompts + AGM Tree View\n\
         • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
-        • <code>/snapshot</code> — Multi-node cluster status snapshot\n\n\
-        🖥️ <b>Cluster VM Nodes &amp; Prompt Control:</b>\n\
-        • <code>/nodes</code> or <code>/node ls</code> — View all cluster VM nodes &amp; connectivity\n\
-        • <code>/nodes &lt;alias&gt; prompts</code> — Inspect running prompts on specific VM node\n\
-        • <code>/active</code> or <code>/running</code> — Compact table of active running prompts\n\
-        • <code>/queues</code> or <code>/queue</code> — Inspect pending workspace prompt queues\n\
-        • <code>/projects</code> — List registered workspaces, IDs &amp; sample syntax\n\
-        • <code>/prompts</code> — List available reusable prompt templates &amp; queue\n\
-        • <code>/prompt &lt;node&gt; &lt;proj&gt; &lt;text&gt;</code> — Inject prompt into VM workspace\n\
-        • <code>/prompt &lt;proj&gt; &lt;text&gt;</code> — Inject prompt locally\n\n\
-        🧭 <b>GitMap &amp; AGM CLI Execution:</b>\n\
+        • <code>/projects</code> — List registered workspaces, AGM Seq IDs &amp; sample syntax\n\
+        • <code>/queues</code> — Inspect pending workspace prompt queues\n\n\
+        🎯 <b>Prompt Injection (By Node, Instance, Project or Conv Seq ID):</b>\n\
+        • <code>/prompt C001 Is it done?</code> — Target specific conversation sequence <code>C001</code>\n\
+        • <code>/prompt P001 Run cargo clippy</code> — Target project sequence <code>P001</code>\n\
+        • <code>/prompt P001 --instance default Check status</code> — Target specific instance &amp; project\n\
+        • <code>/prompt &lt;node&gt; C001 Fix failing test</code> — Inject prompt on remote VM node\n\
+        • <code>/prompts</code> — List reusable prompt templates (<code>read-all</code>, <code>is-done</code>, <code>fix-rca</code>)\n\
+        • <code>/gitmap agy prompt -n read-all -t \"Read memory and continue\"</code>\n\
+        • <code>/gitmap agy prompt -n is-done -t \"Verify if all tasks are complete\"</code>\n\
+        • <code>/gitmap agy prompt-project &lt;proj&gt; -n is-done -t \"Check build\"</code>\n\n\
+        🎒 <b>AGY Running Storage Backup &amp; Restore:</b>\n\
+        • <code>/backup</code> or <code>/backpack</code> — Snapshot running prompts to AGM split SQLite DB\n\
+        • <code>/backup ls</code> — List saved AGM prompt backup batches\n\
+        • <code>/restore</code> — Restore &amp; resume backed-up AGM prompts\n\
+        • <code>/gitmap backup-running-prompts</code> — GitMap snapshot of active AGY storage prompts\n\
+        • <code>/gitmap restore-running-prompts</code> — GitMap restore &amp; re-inject backed-up prompts\n\
+        • <code>/gitmap agy running-prompts ls</code> — List live AGY running prompts via GitMap\n\
+        • <code>/gitmap agy running-prompts backup</code> / <code>restore</code> — GitMap AGY storage backup/restore\n\n\
+        🔄 <b>AGM &amp; GitMap Update Commands:</b>\n\
+        • <code>/update</code> or <code>/update agm</code> — Self-update Antigravity-Manager (delegated updater)\n\
+        • <code>/update gitmap</code> — Update GitMap CLI to latest release\n\
+        • <code>/update all</code> — Update both AGM and GitMap CLI\n\
+        • <code>/agm update</code> — Run AGM CLI update checker &amp; installer\n\
+        • <code>/gitmap agm update -y</code> — Update AGM via GitMap installer pipeline\n\
+        • <code>/gitmap ssh update agm</code> — Update AGM across all SSH cluster machines\n\n\
+        🖥️ <b>SSH &amp; Multi-Node Fleet Execution:</b>\n\
+        • <code>/nodes</code> or <code>/ssh nodes</code> — List all registered SSH / cluster VM nodes\n\
+        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Execute command on a specific remote machine via GitMap SSH\n\
+        • <code>/gitmap ssh nodes</code> — Inspect GitMap SSH node inventory &amp; reachability\n\
+        • <code>/gitmap ssh exec \"agm status\"</code> — Run command across SSH fleet\n\
+        • <code>/gitmap agy ssh \"gitmap agy active\"</code> — Check active AGY prompts over SSH\n\
+        • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> — Direct node command routing\n\n\
+        🧭 <b>GitMap, AGM &amp; Account Rotation:</b>\n\
         • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
         • <code>/gitmap agy active</code> — Check Antigravity active prompts via GitMap\n\
-        • <code>/gitmap version</code> — Check installed GitMap CLI version\n\
-        • <code>/agm status</code> — Run AGM status &amp; quota summary\n\
-        • <code>/agm accounts</code> — List registered accounts &amp; quotas\n\
-        • <code>/agm wpr</code> — List projects with running prompts\n\
-        • <code>/api</code> — Inspect local API proxy (port 8045) &amp; account bindings\n\n\
-        🎒 <b>Prompt Backup (Backpack) &amp; Recovery:</b>\n\
-        • <code>/backup</code> or <code>/backpack</code> — Snapshot running prompts to split SQLite DB\n\
-        • <code>/backup ls</code> — List saved prompt backup batches\n\
-        • <code>/restore</code> — Restore &amp; resume backed-up prompts\n\n\
-        📧 <b>Email &amp; Account Rotation:</b>\n\
-        • <code>/email status</code> — Show configured email accounts &amp; recipients\n\
-        • <code>/email ping</code> — Dispatch a test ping email to recipients\n\
-        • <code>/email help</code> — Send full HTML command manual via email\n\
+        • <code>/agm tree</code> / <code>/agm wpr</code> / <code>/agm accounts</code> — Run AGM CLI views\n\
+        • <code>/api</code> — Inspect local API proxy (port 8045) &amp; account bindings\n\
         • <code>/ff</code> — Fast-forward switch to freshest highest-quota account\n\
-        • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> — Run shell command on node",
+        • <code>/email status</code> | <code>/email ping</code> | <code>/email help</code> — Email notifications",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
         clean_for_telegram_html(&branch, 24),
@@ -1423,60 +1441,26 @@ pub fn format_projects_list() -> String {
     )
 }
 
-/// Format active running prompts in compact GitMap style
+/// Format active running prompts in compact GitMap style + AGM Tree View (Project → Conv → 200w Prompt)
 pub async fn format_active_prompts_report() -> String {
+    let agm_tree = repo_db::format_tree_view_telegram_html(200, true);
+
     if let Ok(out) = Command::new("gitmap").args(["agy", "active"]).output() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !stdout.trim().is_empty()
             && (stdout.contains("Active Running Prompts") || stdout.contains("CONVERSATION ID"))
         {
-            let cleaned = clean_for_telegram_html(stdout.trim(), 2800);
+            let cleaned = clean_for_telegram_html(stdout.trim(), 1800);
             return format!(
-                "⚡ <b>Antigravity Active Running Prompts</b>\n\n\
+                "⚡ <b>Antigravity Active Running Prompts (GitMap)</b>\n\
                 <pre>{}</pre>\n\n\
-                💡 <b>How to Inject Prompt:</b>\n\
-                • <code>/prompt &lt;conversation-id&gt; &lt;text&gt;</code>\n\
-                • <code>/prompt &lt;project-id&gt; &lt;text&gt;</code>\n\
-                • <code>/prompt &lt;node&gt; &lt;project-id&gt; &lt;text&gt;</code>",
-                cleaned
+                {}",
+                cleaned, agm_tree
             );
         }
     }
 
-    let projects = repo_db::get_live_project_execution_info();
-    let running: Vec<_> = projects.into_iter().filter(|p| p.is_running).collect();
-    if running.is_empty() {
-        return "⚡ <b>Active Running Prompts:</b> No conversations or workspaces are actively running prompts (Node is idle).".to_string();
-    }
-
-    let mut rows = String::new();
-    for (i, p) in running.iter().enumerate() {
-        let friendly_label =
-            repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
-        let clean = p
-            .active_prompt
-            .as_deref()
-            .map(|s| repo_db::extract_smart_prompt_summary(s, 100))
-            .unwrap_or_else(|| "AGM".to_string());
-        rows.push_str(&format!(
-            "{}. 🟢 <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>\n   • <i>Prompt: \"{}\"</i>\n\n",
-            i + 1,
-            clean_for_telegram_html(&friendly_label, 48),
-            clean_for_telegram_html(&p.project_id, 48),
-            clean_for_telegram_html(&p.repo_path, 60),
-            clean_for_telegram_html(&clean, 100)
-        ));
-    }
-
-    format!(
-        "⚡ <b>Active Running Prompts ({} Running)</b>\n\n\
-        {}\
-        💡 <b>How to Inject Prompt:</b>\n\
-        • <code>/prompt &lt;project-id&gt; &lt;text&gt;</code>\n\
-        • <code>/prompt &lt;node&gt; &lt;project-id&gt; &lt;text&gt;</code>",
-        running.len(),
-        rows
-    )
+    agm_tree
 }
 
 /// Format workspace prompt queues in GitMap style
@@ -1793,16 +1777,42 @@ pub fn wrap_telegram_prompt(raw: &str) -> String {
     }
 }
 
-/// Execute prompt injection to local workspace or remote cluster node
+/// Execute prompt injection to local workspace or remote cluster node (supports AGM Seq IDs P001/C001 and --instance)
 pub async fn execute_prompt_injection(args_str: &str) -> String {
     let trimmed = args_str.trim();
     if trimmed.is_empty() {
-        return "⚠️ <b>Missing Arguments:</b>\nUsage:\n• <code>/prompt &lt;project&gt; &lt;prompt text&gt;</code>\n• <code>/prompt &lt;node-alias&gt; &lt;project&gt; &lt;prompt text&gt;</code>".to_string();
+        return "⚠️ <b>Missing Arguments:</b>\nUsage:\n• <code>/prompt C001 &lt;prompt text&gt;</code>\n• <code>/prompt P001 --instance default &lt;prompt text&gt;</code>\n• <code>/prompt &lt;node-alias&gt; C001 &lt;prompt text&gt;</code>".to_string();
     }
 
-    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
-    if tokens.len() < 2 {
-        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the project/node and the prompt text to run.\nExample: <code>/prompt agm-main \"Fix issue 20\"</code>".to_string();
+    // Extract optional `--instance <id>` or `ins:<id>` / `instance:<id>` anywhere in the command
+    let mut explicit_instance: Option<String> = None;
+    let mut filtered_tokens: Vec<&str> = Vec::new();
+    let raw_tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    let mut idx = 0;
+    while idx < raw_tokens.len() {
+        let tok = raw_tokens[idx];
+        if tok.eq_ignore_ascii_case("--instance") || tok.eq_ignore_ascii_case("-i") {
+            if idx + 1 < raw_tokens.len() {
+                explicit_instance = Some(raw_tokens[idx + 1].to_string());
+                idx += 2;
+                continue;
+            }
+        } else if let Some(rest_ins) = tok
+            .strip_prefix("instance:")
+            .or_else(|| tok.strip_prefix("ins:"))
+        {
+            if !rest_ins.is_empty() {
+                explicit_instance = Some(rest_ins.to_string());
+                idx += 1;
+                continue;
+            }
+        }
+        filtered_tokens.push(tok);
+        idx += 1;
+    }
+
+    if filtered_tokens.len() < 2 {
+        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (Seq ID <code>C001</code> / <code>P001</code>, project, or node) and the prompt text.\nExample: <code>/prompt C001 Is it done?</code>".to_string();
     }
 
     let local_config = supabase_sync::load_config().unwrap_or_default();
@@ -1814,39 +1824,37 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     let gitmap_nodes = query_gitmap_cluster_nodes();
 
     let is_first_token_remote_node = gitmap_nodes.iter().any(|n| {
-        n.alias.eq_ignore_ascii_case(tokens[0]) && !n.alias.eq_ignore_ascii_case(&local_alias)
+        n.alias.eq_ignore_ascii_case(filtered_tokens[0])
+            && !n.alias.eq_ignore_ascii_case(&local_alias)
     });
 
     let (target_node, target_project, prompt_text) =
-        if is_first_token_remote_node && tokens.len() >= 3 {
-            let node = tokens[0];
-            let proj = tokens[1];
-            let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
-            let text = trimmed[p_start..].trim();
-            (node.to_string(), proj.to_string(), text.to_string())
+        if is_first_token_remote_node && filtered_tokens.len() >= 3 {
+            let node = filtered_tokens[0];
+            let proj = filtered_tokens[1];
+            let text = filtered_tokens[2..].join(" ");
+            (node.to_string(), proj.to_string(), text)
         } else {
-            let first = tokens[0];
+            let first = filtered_tokens[0];
             if first.eq_ignore_ascii_case("local") || first.eq_ignore_ascii_case(&local_alias) {
-                if tokens.len() >= 3 {
-                    let proj = tokens[1];
-                    let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
+                if filtered_tokens.len() >= 3 {
+                    let proj = filtered_tokens[1];
                     (
                         "local".to_string(),
                         proj.to_string(),
-                        trimmed[p_start..].trim().to_string(),
+                        filtered_tokens[2..].join(" "),
                     )
                 } else {
                     (
                         "local".to_string(),
                         "default".to_string(),
-                        tokens[1..].join(" "),
+                        filtered_tokens[1..].join(" "),
                     )
                 }
             } else {
-                let proj = tokens[0];
-                let p_start = trimmed.find(proj).map(|idx| idx + proj.len()).unwrap_or(0);
-                let text = trimmed[p_start..].trim();
-                ("local".to_string(), proj.to_string(), text.to_string())
+                let proj = filtered_tokens[0];
+                let text = filtered_tokens[1..].join(" ");
+                ("local".to_string(), proj.to_string(), text)
             }
         };
 
@@ -1855,6 +1863,9 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     }
 
     if target_node == "local" || target_node.eq_ignore_ascii_case(&local_alias) {
+        // 1. First attempt resolution via AGM Sequence ID (`P001`, `C001`, `#C1`, or conv UUID prefix)
+        let seq_resolved = repo_db::resolve_agm_sequence_target(&target_project);
+
         let projects = repo_db::get_live_project_execution_info();
         let matched_proj = projects.iter().find(|p| {
             p.project_id.eq_ignore_ascii_case(&target_project)
@@ -1863,34 +1874,60 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                 || target_project.starts_with(&p.project_id)
         });
 
-        let (final_proj_id, repo_path) = if let Some(p) = matched_proj {
-            (p.project_id.clone(), p.repo_path.clone())
-        } else {
-            let p_buf = PathBuf::from(&target_project);
-            if p_buf.exists() && p_buf.is_dir() {
-                (target_project.clone(), target_project.clone())
-            } else if let Some(first_p) = projects.first() {
-                (first_p.project_id.clone(), first_p.repo_path.clone())
-            } else {
+        let (final_proj_id, repo_path, resolved_instance, resolved_conv_id, seq_badge) =
+            if let Some(seq) = seq_resolved {
                 (
-                    "local-project".to_string(),
-                    std::env::current_dir()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|_| ".".to_string()),
+                    seq.project_id,
+                    seq.repo_path,
+                    explicit_instance.clone().unwrap_or(seq.instance_id),
+                    seq.conversation_id,
+                    Some(seq.seq_code),
                 )
-            }
-        };
+            } else if let Some(p) = matched_proj {
+                (
+                    p.project_id.clone(),
+                    p.repo_path.clone(),
+                    explicit_instance
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string()),
+                    None,
+                    None,
+                )
+            } else {
+                let p_buf = PathBuf::from(&target_project);
+                let (pid, rpath) = if p_buf.exists() && p_buf.is_dir() {
+                    (target_project.clone(), target_project.clone())
+                } else if let Some(first_p) = projects.first() {
+                    (first_p.project_id.clone(), first_p.repo_path.clone())
+                } else {
+                    (
+                        "local-project".to_string(),
+                        std::env::current_dir()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|_| ".".to_string()),
+                    )
+                };
+                (
+                    pid,
+                    rpath,
+                    explicit_instance
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string()),
+                    None,
+                    None,
+                )
+            };
 
         let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
         let resolved_prompt = wrap_telegram_prompt(&prompt_text);
         let active_prompt = repo_db::ActivePrompt {
             id: prompt_id.clone(),
             project_id: final_proj_id.clone(),
-            instance_id: "default".to_string(),
+            instance_id: resolved_instance.clone(),
             repo_path: repo_path.clone(),
             prompt_content: resolved_prompt.clone(),
             model: None,
-            session_id: None,
+            session_id: resolved_conv_id.clone(),
             status: "running".to_string(),
             created_at: Utc::now().timestamp(),
             updated_at: Utc::now().timestamp(),
@@ -1910,29 +1947,53 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         } else {
             "⚪ Enqueued in Split DB"
         };
+        let seq_line = seq_badge
+            .map(|s| {
+                format!(
+                    "• <b>AGM Seq ID:</b> <code>{}</code>\n",
+                    clean_for_telegram_html(&s, 16)
+                )
+            })
+            .unwrap_or_default();
+        let conv_line = resolved_conv_id
+            .map(|c| {
+                format!(
+                    "• <b>Conversation ID:</b> <code>{}</code>\n",
+                    clean_for_telegram_html(&c, 40)
+                )
+            })
+            .unwrap_or_default();
 
         format!(
             "🚀 <b>Prompt Injected Locally!</b>\n\n\
             • <b>Prompt ID:</b> <code>{}</code>\n\
+            {}{}\
+            • <b>Instance:</b> <code>{}</code>\n\
             • <b>Target Workspace:</b> <code>{}</code>\n\
             • <b>Path:</b> <code>{}</code>\n\
             • <b>Status:</b> {}\n\
             • <b>Prompt Content:</b>\n<pre>{}</pre>",
             clean_for_telegram_html(&prompt_id, 32),
+            seq_line,
+            conv_line,
+            clean_for_telegram_html(&resolved_instance, 32),
             clean_for_telegram_html(&final_proj_id, 40),
             clean_for_telegram_html(&repo_path, 60),
             exec_badge,
             clean_for_telegram_html(&prompt_text, 800)
         )
     } else {
+        let inst_flag = explicit_instance
+            .as_deref()
+            .map(|i| format!(" --instance {}", i))
+            .unwrap_or_default();
+        let remote_cmd = format!(
+            "agm prompt {}{} \"{}\"",
+            target_project, inst_flag, prompt_text
+        );
         let mut dispatched_gitmap = false;
         let gm_out = Command::new("gitmap")
-            .args([
-                "cluster",
-                "exec",
-                &target_node,
-                &format!("agm prompt {} \"{}\"", target_project, prompt_text),
-            ])
+            .args(["cluster", "exec", &target_node, &remote_cmd])
             .output();
         if let Ok(out) = gm_out {
             if out.status.success() {
@@ -1949,6 +2010,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                         "id": cmd_id,
                         "target_node": target_node,
                         "project_id": target_project,
+                        "instance_id": explicit_instance.clone().unwrap_or_else(|| "default".to_string()),
                         "command": "prompt",
                         "prompt": prompt_text,
                         "status": "pending",
@@ -1973,11 +2035,13 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         format!(
             "🌐 <b>Remote Prompt Dispatched!</b>\n\n\
             • <b>Target Node:</b> <code>{}</code>\n\
-            • <b>Target Project:</b> <code>{}</code>\n\
+            • <b>Target Seq / Project:</b> <code>{}</code>\n\
+            • <b>Instance:</b> <code>{}</code>\n\
             • <b>Status:</b> {}\n\
             • <b>Prompt Content:</b>\n<pre>{}</pre>",
             clean_for_telegram_html(&target_node, 40),
             clean_for_telegram_html(&target_project, 40),
+            clean_for_telegram_html(explicit_instance.as_deref().unwrap_or("default"), 32),
             dispatch_status,
             clean_for_telegram_html(&prompt_text, 800)
         )
@@ -2008,6 +2072,10 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "start" | "help" => Some(format_help_manual()),
         "ping" => Some(format_ping_report()),
         "status" | "observe" => Some(format_observe_report()),
+        "tree" => {
+            let only_running = !rest.eq_ignore_ascii_case("all");
+            Some(repo_db::format_tree_view_telegram_html(200, only_running))
+        }
         "active" | "running" => Some(format_active_prompts_report().await),
         "queues" | "queue" => Some(format_prompt_queues_report().await),
         "nodes" | "node" => {
@@ -2016,6 +2084,33 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 Some(format_cluster_nodes_report().await)
             } else {
                 Some(format_node_scoped_prompts(sub).await)
+            }
+        }
+        "ssh" => {
+            let sub = rest.trim();
+            if sub.is_empty() || sub.eq_ignore_ascii_case("nodes") || sub.eq_ignore_ascii_case("ls")
+            {
+                Some(execute_gitmap_subcommand("ssh nodes"))
+            } else if let Some((node, cmd)) = sub.split_once(char::is_whitespace) {
+                Some(execute_gitmap_subcommand(&format!(
+                    "cluster exec {} {}",
+                    node.trim(),
+                    cmd.trim()
+                )))
+            } else {
+                Some(execute_gitmap_subcommand(&format!("ssh {}", sub)))
+            }
+        }
+        "update" => {
+            let sub = rest.trim().to_lowercase();
+            if sub == "gitmap" || sub == "gm" {
+                Some(execute_gitmap_subcommand("self-update"))
+            } else if sub == "all" {
+                let gm_res = execute_gitmap_subcommand("self-update");
+                let agm_res = execute_agm_subcommand("update");
+                Some(format!("{}\n\n{}", gm_res, agm_res))
+            } else {
+                Some(execute_agm_subcommand("update"))
             }
         }
         "projects" | "workspaces" | "workspace" => Some(format_projects_list()),

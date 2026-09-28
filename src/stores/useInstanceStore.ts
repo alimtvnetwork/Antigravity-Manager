@@ -407,25 +407,25 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const accounts = useAccountStore.getState().accounts;
             const currentAccountId = cur?.config.bound_account_id || useAccountStore.getState().currentAccount?.id;
 
-            // 2. Close running processes from target profile directory first (for isolated sandboxes)
-            if (instId !== 'default') {
-                try {
-                    await instanceService.closeInstance(instId);
-                } catch (closeErr) {
-                    console.warn('[useInstanceStore] Non-fatal close instance notice:', closeErr);
-                }
-            }
-
-            // 3. Discover active running instances and exclude both in-use and current bound account
-            const runningInstances = get().instances.filter(i => i.is_running && i.config.bound_account_id);
-            const activeInUseAccountIds = runningInstances
+            // 2. Discover active non-stale instances and exclude in-use accounts with >0% credits
+            //    Bindings older than stale_binding_timeout_hours (default 6h) with no running process or 0% credits are treated as inactive
+            const activeInUseAccountIds = get()
+                .instances.filter(i => {
+                    if (!i.config.bound_account_id) return false;
+                    if (instanceService.isInstanceBindingStale(i, 6)) return false;
+                    const boundAcc = accounts.find(a => a.id === i.config.bound_account_id);
+                    if (boundAcc && instanceService.extract4hWindowQuotaPercent(boundAcc) <= 0) {
+                        return false;
+                    }
+                    return i.is_running;
+                })
                 .map(i => i.config.bound_account_id as string)
                 .filter(id => id !== currentAccountId);
             if (currentAccountId && !activeInUseAccountIds.includes(currentAccountId)) {
                 activeInUseAccountIds.push(currentAccountId);
             }
 
-            // 4. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
+            // 3. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
             const eligibleAccounts = accounts.filter(acc => {
                 const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
                 if (isDisabled) return false;
@@ -442,8 +442,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('No eligible active accounts available for transfer');
             }
 
-            // 5. Rank candidate accounts based on Multiplicative Scoring:
-            // Score = S_active * M_tier * Q_weekly
+            // 4. Rank candidate accounts based on Normalized Multiplicative Scoring (÷ 1000):
+            //    < 100% 4h quota = 0; 100% 4h quota = (S_active * M_tier * Q_weekly) / 1000
             let candidatePool = instanceService.rankSmartCandidates(
                 eligibleAccounts,
                 activeInUseAccountIds,
@@ -456,10 +456,9 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('No eligible candidates available for rotation');
             }
 
-            // 6. Pre-activation Live Quota Refresh Verification Loop:
-            // Probe candidate accounts with a live quota refresh from Google API.
-            // STRICT REQUIREMENT: Confirm candidate actually has 100% quota for the 4-hour rolling window.
-            // Any account with < 100% is strictly treated as zero credit.
+            // 5. Pre-activation Live Quota Refresh Verification Loop:
+            //    Confirm candidate actually has 100% quota for the 4-hour rolling window,
+            //    then pass the verified candidate directly to the unified 5-Step Switch Button handler!
             let verifiedCandidate: Account | null = null;
             const triedAccountIds = new Set<string>();
 

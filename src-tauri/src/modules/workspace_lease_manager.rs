@@ -217,10 +217,20 @@ pub fn is_account_leased_by_other(account_id: &str) -> bool {
     is_account_or_email_leased_by_other(account_id, "")
 }
 
-/// Synchronously check if an account (by ID or profile email) is currently leased by another active node
+/// Synchronously check if an account (by ID or profile email) is currently leased by another active node.
+/// Automatically marks remote leases as inactive if more than `stale_binding_timeout_hours` (default 6h, configurable 6h-10h)
+/// have elapsed since `leased_at` with no ping or lease refresh.
 pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> bool {
     let local_node = supabase_sync::get_local_node_id();
     let now = Utc::now().timestamp();
+    let stale_hours = crate::modules::config::load_app_config()
+        .map(|c| {
+            c.auto_profile_switcher
+                .stale_binding_timeout_hours
+                .clamp(1, 24)
+        })
+        .unwrap_or(6);
+    let stale_timeout_secs = (stale_hours as i64) * 3600;
     let email_clean = email.trim().to_lowercase();
     if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
         for (k, lease) in cache.iter() {
@@ -228,7 +238,13 @@ pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> boo
                 || lease.account_id == account_id
                 || (!email_clean.is_empty()
                     && lease.profile_name.trim().to_lowercase() == email_clean);
-            if is_match && lease.expires_at > now && lease.node_id != local_node {
+            let is_stale_without_ping =
+                lease.leased_at > 0 && (now - lease.leased_at) > stale_timeout_secs;
+            if is_match
+                && lease.expires_at > now
+                && !is_stale_without_ping
+                && lease.node_id != local_node
+            {
                 return true;
             }
         }
