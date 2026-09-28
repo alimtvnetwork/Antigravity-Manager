@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.93.0)
+> Professional AI Account Management & Protocol Proxy System (v4.94.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.93.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.94.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.93.0**: Split SQLite database architecture, Supabase node synchronization and distributed leasing, 5-step seamless account switching with running prompt snapshot and restoration, tri-field distinct account notification telemetry, universal tool call ID canonicalization across pipeline, cache, and DB.
+> Latest version **v4.94.0**: End-to-end verified 5-step non-destructive account switching and prompt recovery lifecycle, dual Supabase endpoints (Lovable root + secondary) integration with distributed multi-node sync, upstream v4.8.4 merge with Tool Call ID canonicalization, Protobuf signature in-place self-healing, and concise status indicators with distinct tri-field account telemetry.
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

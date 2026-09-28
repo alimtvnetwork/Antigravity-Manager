@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.65.0-3B82F6?style=flat-square" alt="Version 4.65.0">
+    <img src="https://img.shields.io/badge/Version-4.94.0-3B82F6?style=flat-square" alt="Version 4.94.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -455,6 +455,11 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.94.0** (2026-09-28):
+  - **5-Step Non-Destructive Account Switching**: Seamless prompt snapshot, IDE graceful restart, and automatic prompt restoration across instances.
+  - **Dual Supabase Endpoints Integration**: Full root (Lovable) and secondary Supabase integration with real-time multi-node synchronization.
+  - **Upstream v4.8.4 Merged**: Synchronized upstream protocol updates, Tool Call ID canonicalization, and in-place Protobuf signature self-healing.
+  - **Distinct Tri-Field Account Telemetry**: Clear terminal indicators with mutual exclusivity across previous, selected, and predicted accounts.
 - **v4.29.0** (2026-09-18):
   - **Test Suite Resilience & SQLite Persistence**: Dual-tier tool signature persistence (`clear_tool_signatures`) in `proxy_db` and nanosecond-precision test isolation.
   - **Canonical Model Resolution**: Preserved canonical `gemini-3.7-flash` model identifier across dynamic variant mappings.
