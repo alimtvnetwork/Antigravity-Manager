@@ -162,23 +162,8 @@ function Get-InvocationHistoryCandidates {
         }
     } catch {}
     try {
-        (Get-History -Count 15 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CommandLine) | ForEach-Object {
-            if ($_) { $candidates.Add($_) }
-        }
-    } catch {}
-    try {
-        if ([System.Management.Automation.Language.Parser]) {
-            [Microsoft.PowerShell.PSConsoleReadLine]::GetHistoryItems() | Select-Object -Last 15 | ForEach-Object {
-                if ($_.CommandLine) { $candidates.Add($_.CommandLine) }
-            }
-        }
-    } catch {}
-    try {
-        $historyPath = (Get-PSReadLineOption -ErrorAction SilentlyContinue).HistorySavePath
-        if ($historyPath -and (Test-Path $historyPath)) {
-            Get-Content -Path $historyPath -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object {
-                if ($_) { $candidates.Add($_) }
-            }
+        (Get-History -Count 3 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CommandLine) | ForEach-Object {
+            if ($_ -and ($_ -match '(?i)(Antigravity-Manager|agm-alim)')) { $candidates.Add($_) }
         }
     } catch {}
     return $candidates
@@ -192,8 +177,6 @@ function Resolve-PinnedVersion {
     if (-not $ExplicitVersion) {
         if ($env:AGM_VERSION) {
             $ExplicitVersion = $env:AGM_VERSION
-        } elseif ($env:VERSION) {
-            $ExplicitVersion = $env:VERSION
         } elseif ($env:INSTALLER_VERSION) {
             $ExplicitVersion = $env:INSTALLER_VERSION
         } elseif ($args -and $args.Count -gt 0) {
@@ -202,7 +185,7 @@ function Resolve-PinnedVersion {
             }
         }
     }
-    if ($ExplicitVersion) {
+    if ($ExplicitVersion -and $ExplicitVersion -ne "latest") {
         $clean = ($ExplicitVersion -replace "^v", "").Trim()
         $parts = $clean.Split("-")[0].Split(".")
         if ($parts.Length -eq 2) {
@@ -222,13 +205,15 @@ function Resolve-PinnedVersion {
         }
     }
     $entries = Get-InvocationHistoryCandidates
-    # Strictly scope to Antigravity-Manager or agm-alim URLs or explicit -Version arguments so unrelated command lines never pollute version
     $regexes = @(
-        '(?i)(?:releases/download/|raw\.githubusercontent\.com/[^/]+/(?:Antigravity-Manager|agm-alim|antigravity)/|raw\.githubusercontent\.com/[^/]+/[^/]+/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/',
-        '(?i)-(?:Version|-version)\s+["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
+        '(?i)(?:Antigravity-Manager/releases/download/|raw\.githubusercontent\.com/[^/]+/Antigravity-Manager/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/',
+        '(?i)Antigravity-Manager.*-(?:Version|-version)\s+["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
         '(?i)AGM_VERSION\s*=\s*["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?'
     )
     foreach ($entry in $entries) {
+        if ($entry -notmatch '(?i)(Antigravity-Manager|AGM_VERSION)') {
+            continue
+        }
         foreach ($regex in $regexes) {
             if ($entry -match $regex) {
                 $detected = $Matches[1]
