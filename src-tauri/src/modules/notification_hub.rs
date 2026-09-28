@@ -452,21 +452,22 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         &default_projs
     };
 
+    let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+    let quota_percent = details.target_quota_4h.unwrap_or(100.0);
+
     let telemetry_data = serde_json::json!({
         "agm_version": pkg_ver,
-        "vm_name": m_name,
+        "machine_name": m_name,
+        "node_alias": node_alias,
         "local_ip": m_ip,
         "previous_email": from_display,
-        "predicted_next_email": predicted_display,
+        "predicted_email": predicted_display,
         "selected_email": selected_display,
+        "quota_percent": quota_percent,
         "credit_before_switch": details.credit_before_switch,
         "threshold_activated": details.threshold_activated,
-        "target_account": selected_display,
-        "old_email": from_display,
-        "new_email": selected_display,
         "instance_id": details.instance_id,
         "instance_name": details.instance_name,
-        "instance_mode": details.instance_mode,
         "switch_mode": if details.is_auto { "auto" } else { "manual" },
         "condition": condition,
         "reason": details.reason,
@@ -597,7 +598,13 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         pkg_ver
     );
 
-    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &active_recipients);
+    let email_body = if subject.contains("[JSON]") || subject.contains("[json]") {
+        &telemetry_json_pretty
+    } else {
+        &html
+    };
+
+    let _ = email_sender::dispatch_email_with_failover(&subject, email_body, &active_recipients);
 }
 
 /// Dispatch machine-readable pure JSON self-broadcast email to the default account (zero HTML)

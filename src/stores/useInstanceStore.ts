@@ -336,12 +336,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             );
 
             if (!candidate) {
-                candidate = accounts.find(a => !activeInUseAccountIds.includes(a.id)) || accounts[0];
-            }
-
-            if (!candidate) {
                 set({ isLoading: false });
-                throw new Error('No available account found to play this instance');
+                throw new Error('No accounts verified with 100% 4-hour quota available to play this profile.');
             }
 
             let targetIdeParam: string | undefined;
@@ -404,9 +400,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const instId = targetInstanceId || get().activeInstanceId || 'default';
             const cur = get().instances.find(i => i.config.id === instId);
             const instanceName = cur?.config.name || instId;
-            const currentAccountId = cur?.config.bound_account_id;
 
-            // 1. Close running processes from target profile directory first (for isolated sandboxes)
+            // 1. Discover accounts (always fetch fresh from backend to prevent stale state)
+            const { useAccountStore } = await import('./useAccountStore');
+            await useAccountStore.getState().fetchAccounts();
+            const accounts = useAccountStore.getState().accounts;
+            const currentAccountId = cur?.config.bound_account_id || useAccountStore.getState().currentAccount?.id;
+
+            // 2. Close running processes from target profile directory first (for isolated sandboxes)
             if (instId !== 'default') {
                 try {
                     await instanceService.closeInstance(instId);
@@ -415,16 +416,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 }
             }
 
-            // 2. Discover active running instances
+            // 3. Discover active running instances and exclude both in-use and current bound account
             const runningInstances = get().instances.filter(i => i.is_running && i.config.bound_account_id);
             const activeInUseAccountIds = runningInstances
                 .map(i => i.config.bound_account_id as string)
                 .filter(id => id !== currentAccountId);
-
-            // 3. Discover accounts (always fetch fresh from backend to prevent stale state)
-            const { useAccountStore } = await import('./useAccountStore');
-            await useAccountStore.getState().fetchAccounts();
-            const accounts = useAccountStore.getState().accounts;
+            if (currentAccountId && !activeInUseAccountIds.includes(currentAccountId)) {
+                activeInUseAccountIds.push(currentAccountId);
+            }
 
             // 4. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
             const eligibleAccounts = accounts.filter(acc => {

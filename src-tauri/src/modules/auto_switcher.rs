@@ -619,6 +619,9 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
 pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Option<f64> {
     let quota_data = account.quota.as_ref()?;
+    if quota_data.is_forbidden {
+        return Some(0.0);
+    }
     let target = target_model.to_lowercase();
     let is_flash_target = target.contains("flash");
 
@@ -777,21 +780,20 @@ pub fn select_candidate_profiles(
 
             let period_status =
                 evaluate_account_period_status(&acc, target_model, threshold, now_sec);
-            let quota = period_status
-                .as_ref()
-                .map(|s| s.quota_percent)
-                .or_else(|| calculate_4h_window_quota(&acc, target_model))
-                .unwrap_or(100.0);
-
             let is_period_finished = period_status
                 .as_ref()
                 .map(|s| s.is_period_finished)
                 .unwrap_or(false);
+            let quota = period_status
+                .as_ref()
+                .map(|s| s.quota_percent)
+                .or_else(|| calculate_4h_window_quota(&acc, target_model))
+                .unwrap_or(0.0);
 
-            let is_healthy_or_refilled =
-                quota >= 100.0 || (is_period_finished && quota >= threshold.max(95.0));
-
-            if is_healthy_or_refilled {
+            // Strict 100% 4-Hour Quota Gate:
+            // Candidate accounts must have 100% quota, OR their reset period has elapsed (eligible for live refresh).
+            // Under no circumstances can a known < 100% account without elapsed reset period be selected.
+            if quota >= 100.0 || is_period_finished {
                 let score = score_candidate_account(&acc, target_model, now_sec);
                 candidates.push(ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
@@ -823,21 +825,18 @@ pub fn select_candidate_profiles(
         }
 
         let period_status = evaluate_account_period_status(acc, target_model, threshold, now_sec);
-        let quota = period_status
-            .as_ref()
-            .map(|s| s.quota_percent)
-            .or_else(|| calculate_4h_window_quota(acc, target_model))
-            .unwrap_or(100.0);
-
         let is_period_finished = period_status
             .as_ref()
             .map(|s| s.is_period_finished)
             .unwrap_or(false);
+        let quota = period_status
+            .as_ref()
+            .map(|s| s.quota_percent)
+            .or_else(|| calculate_4h_window_quota(acc, target_model))
+            .unwrap_or(0.0);
 
-        let is_healthy_or_refilled =
-            quota >= 100.0 || (is_period_finished && quota >= threshold.max(95.0));
-
-        if is_healthy_or_refilled {
+        // Strict 100% 4-Hour Quota Gate
+        if quota >= 100.0 || is_period_finished {
             let score = score_candidate_account(acc, target_model, now_sec);
             candidates.push(ProfileCandidate {
                 instance_id: current_instance_id.to_string(),
@@ -850,23 +849,13 @@ pub fn select_candidate_profiles(
     }
 
     // Priority Sorting:
-    // 1. Accounts with quota_percent >= 100.0 strictly precede accounts with < 100.0.
-    // 2. Among >= 100.0 accounts: sort by subscription tier score descending (Ultra > Pro > Free).
-    // 3. Among < 100.0 accounts: sort by quota_percent descending, then score descending.
-    // 4. Tie-breaker: deterministic email ordering.
-    candidates.sort_by(|a, b| {
-        let a_full = a.quota_percent >= 100.0;
-        let b_full = b.quota_percent >= 100.0;
-        match (a_full, b_full) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => match b.score.partial_cmp(&a.score) {
-                Some(std::cmp::Ordering::Equal) | None => {
-                    a.email.to_lowercase().cmp(&b.email.to_lowercase())
-                }
-                Some(ord) => ord,
-            },
+    // Sort all verified candidates by subscription tier score descending (Ultra > Pro > Free).
+    // Tie-breaker: deterministic email ordering.
+    candidates.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
+        Some(std::cmp::Ordering::Equal) | None => {
+            a.email.to_lowercase().cmp(&b.email.to_lowercase())
         }
+        Some(ord) => ord,
     });
 
     Ok(candidates)
@@ -971,7 +960,7 @@ pub async fn select_and_verify_next_best_profile(
             Ok(fresh_q) => {
                 cand_acc.quota = Some(fresh_q);
                 let _ = account::save_account(&cand_acc);
-                let q_val = calculate_4h_window_quota(&cand_acc, target_model).unwrap_or(100.0);
+                let q_val = calculate_4h_window_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_info(&format!(
                     "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (4-hour window)",
                     candidate.email, q_val

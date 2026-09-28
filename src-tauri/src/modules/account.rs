@@ -1483,6 +1483,13 @@ pub async fn switch_account(
     }
 
     let mut account = load_account(account_id)?;
+    if account.disabled || account.proxy_disabled || account.validation_blocked {
+        return Err(format!(
+            "Cannot switch to account '{}': Account is disabled or blocked (disabled: {}, proxy_disabled: {}, validation_blocked: {})",
+            account.email, account.disabled, account.proxy_disabled, account.validation_blocked
+        ));
+    }
+
     crate::modules::logger::log_info(&format!(
         "Switching to account: {} (ID: {}) (target_ide: {:?})",
         account.email, account.id, target_ide
@@ -1506,6 +1513,12 @@ pub async fn switch_account(
     }
 
     ensure_enterprise_project_ready(&mut account).await?;
+
+    // Live Quota Refresh from Google API during account switch to keep local DB in sync
+    if let Ok(fresh_quota) = fetch_quota_with_retry(&mut account).await {
+        account.quota = Some(fresh_quota);
+        let _ = save_account(&account);
+    }
 
     // [FIX] Ensure account has a device profile for isolation
     if account.device_profile.is_none() {

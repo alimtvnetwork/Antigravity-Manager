@@ -1401,8 +1401,20 @@ foreach ($candVersion in $versionQueue) {
 }
 
 if (-not $installedOk) {
-    Write-Err "All $maxAttempts attempts failed. I fail, so I cannot do anything."
-    exit 1
+    # Resilient fallback: Check if an existing working executable exists in the install dir
+    $existingExe = Join-Path $InstallDir $BinaryName
+    if (-not (Test-Path $existingExe)) {
+        $existingExe = Join-Path $InstallDir "agm-alim.exe"
+    }
+    if (Test-Path $existingExe) {
+        Write-Warn "All $maxAttempts download attempts failed, but existing installation verified at $existingExe. Retaining current installation."
+        $ExePath = $existingExe
+        $installedOk = $true
+    } else {
+        Write-Err "All $maxAttempts attempts failed and no existing installation found. Installation cannot continue."
+        $global:LASTEXITCODE = 1
+        exit 1
+    }
 }
 
 # Step 4: Configure User PATH
@@ -1517,3 +1529,6 @@ if (-not $NoLaunch) {
 Write-Host "${LeftPadding}You can now launch '$ShortcutName' directly or run '$BinaryName' from any terminal." -ForegroundColor Green
 Write-Host ""
 Write-Host ""
+
+$global:LASTEXITCODE = 0
+exit 0

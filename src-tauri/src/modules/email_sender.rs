@@ -443,11 +443,40 @@ fn is_html_content(content: &str) -> bool {
         || lower.contains("<span style=")
 }
 
-/// Strip HTML tags for clean RFC 2046 plaintext fallback
+/// Strip HTML tags and <style>/<script> contents for clean RFC 2046 plaintext fallback
 fn strip_html_tags(html: &str) -> String {
-    let mut out = String::with_capacity(html.len());
+    // 1. Strip entire <style>...</style> and <script>...</script> blocks
+    let mut cleaned = String::with_capacity(html.len());
+    let mut remaining = html;
+    while let Some(style_start) = remaining.to_lowercase().find("<style") {
+        cleaned.push_str(&remaining[..style_start]);
+        let after_start = &remaining[style_start..];
+        if let Some(style_end) = after_start.to_lowercase().find("</style>") {
+            remaining = &after_start[style_end + "</style>".len()..];
+        } else {
+            remaining = "";
+            break;
+        }
+    }
+    cleaned.push_str(remaining);
+
+    let mut no_script = String::with_capacity(cleaned.len());
+    let mut remaining_script = cleaned.as_str();
+    while let Some(sc_start) = remaining_script.to_lowercase().find("<script") {
+        no_script.push_str(&remaining_script[..sc_start]);
+        let after_start = &remaining_script[sc_start..];
+        if let Some(sc_end) = after_start.to_lowercase().find("</script>") {
+            remaining_script = &after_start[sc_end + "</script>".len()..];
+        } else {
+            remaining_script = "";
+            break;
+        }
+    }
+    no_script.push_str(remaining_script);
+
+    let mut out = String::with_capacity(no_script.len());
     let mut in_tag = false;
-    for c in html.chars() {
+    for c in no_script.chars() {
         if c == '<' {
             in_tag = true;
         } else if c == '>' {
@@ -557,6 +586,23 @@ pub fn format_subject_with_telemetry(
 /// Helper to extract clean pretty-printed JSON from raw text or strip HTML wrappers
 pub fn extract_clean_json_body(raw: &str) -> String {
     let trimmed = raw.trim();
+
+    // 1. Check if the string directly parses as a JSON Value
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        return serde_json::to_string_pretty(&val).unwrap_or_else(|_| trimmed.to_string());
+    }
+
+    // 2. Check if there is a JSON block inside <pre>...</pre> or <code>...</code>
+    if let (Some(pre_start), Some(pre_end)) = (trimmed.find("<pre"), trimmed.rfind("</pre>")) {
+        if let Some(tag_end) = trimmed[pre_start..].find('>') {
+            let inner = &trimmed[pre_start + tag_end + 1..pre_end];
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(inner.trim()) {
+                return serde_json::to_string_pretty(&val).unwrap_or_else(|_| inner.to_string());
+            }
+        }
+    }
+
+    // 3. Search for balanced JSON object `{ ... }`
     if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
         if end > start {
             let candidate = &trimmed[start..=end];
@@ -566,6 +612,8 @@ pub fn extract_clean_json_body(raw: &str) -> String {
             }
         }
     }
+
+    // 4. Search for balanced JSON array `[ ... ]`
     if let (Some(start), Some(end)) = (trimmed.find('['), trimmed.rfind(']')) {
         if end > start {
             let candidate = &trimmed[start..=end];
@@ -575,7 +623,13 @@ pub fn extract_clean_json_body(raw: &str) -> String {
             }
         }
     }
-    strip_html_tags(trimmed)
+
+    // 5. Fallback: sanitize plain text into a valid JSON envelope so email with [JSON] header NEVER has HTML/CSS
+    let clean_text = strip_html_tags(trimmed);
+    let fallback_json = serde_json::json!({
+        "message": clean_text
+    });
+    serde_json::to_string_pretty(&fallback_json).unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Helper to convert key-value lines into rich table rows with Ubuntu styling and better coloring

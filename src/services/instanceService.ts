@@ -440,10 +440,16 @@ export function extractWeeklyQuotaPercent(acc: Account): number {
  * Specifically extract the 4-hour / 5-hour rolling window quota percentage (0-100).
  * Accounts MUST have 100% in this window to be prioritized for fast-forward rotation.
  */
-export function extract4hWindowQuotaPercent(acc: Account, targetModel?: string): number {
-    const quotaGroups = acc.quota?.quota_groups;
+export function extract4hWindowQuotaPercent(acc: Account, _targetModel?: string): number {
+    if (!acc.quota) return 0;
+    if (acc.quota.is_forbidden) return 0;
+    if (acc.disabled || acc.proxy_disabled || acc.validation_blocked) return 0;
+
+    const minValues: number[] = [];
+
+    // 1. Check all short-window buckets from quota_groups
+    const quotaGroups = acc.quota.quota_groups;
     if (quotaGroups && quotaGroups.length > 0) {
-        const shortWindowValues: number[] = [];
         for (const group of quotaGroups) {
             const buckets = group.buckets || [];
             for (const b of buckets) {
@@ -456,32 +462,29 @@ export function extract4hWindowQuotaPercent(acc: Account, targetModel?: string):
                     id.includes('5h') ||
                     (!win.includes('week') && !win.includes('7d') && !id.includes('week') && !id.includes('7d'));
                 if (isShort && typeof b.remaining_fraction === 'number') {
-                    shortWindowValues.push(Math.round(b.remaining_fraction * 100));
+                    minValues.push(Math.round(b.remaining_fraction * 100));
                 }
             }
         }
-        if (shortWindowValues.length > 0) {
-            return Math.min(...shortWindowValues);
-        }
     }
 
-    const models = acc.quota?.models || [];
+    // 2. Check all active non-banned models (ignore 3.0, 3.1)
+    const models = acc.quota.models || [];
     if (models.length > 0) {
-        const target = (targetModel || 'flash').toLowerCase();
-        const matchingModels = models.filter(m => {
+        for (const m of models) {
             const name = (m.name || '').toLowerCase();
-            return !name.includes('3.0') && !name.includes('3.1') && (name.includes(target) || name.includes('flash'));
-        });
-        const candidates = matchingModels.length > 0 ? matchingModels : models;
-        const validPercentages = candidates
-            .map(m => m.percentage)
-            .filter((p): p is number => typeof p === 'number');
-        if (validPercentages.length > 0) {
-            return Math.min(...validPercentages);
+            if (name.includes('3.0') || name.includes('3.1')) continue;
+            if (typeof m.percentage === 'number') {
+                minValues.push(m.percentage);
+            }
         }
     }
 
-    return 100;
+    if (minValues.length > 0) {
+        return Math.min(...minValues);
+    }
+
+    return 0;
 }
 
 function calculateAccountRefillDays(acc: Account, nowMs: number): number {
@@ -523,10 +526,22 @@ export function calculateMultiplicativeScore(
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
     const isFull4h = fourHourQuotaPercent >= 100;
-    const fourHourFactor = isFull4h ? 1.0 : Math.max(0.01, fourHourQuotaPercent / 100.0);
-    const baseScore = activeFactor * tierMultiplier * weeklyQuotaPercent * fourHourFactor;
-    // Add bonus of 100,000 for accounts that have full 100% 4-hour quota so they strictly outrank accounts with < 100%
-    const score = activeFactor > 0 && isFull4h ? baseScore + 100000 : baseScore;
+    if (!isFull4h) {
+        return {
+            account: acc,
+            score: 0,
+            activeFactor: 0,
+            tierMultiplier,
+            weeklyQuotaPercent,
+            fourHourQuotaPercent,
+            daysUntilRefill: 0,
+            quotaPercentage: 0,
+            idleHours: 999,
+        };
+    }
+
+    const baseScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
+    const score = activeFactor > 0 ? baseScore + 100000 : 0;
 
     const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
@@ -553,12 +568,20 @@ export function rankSmartCandidates(
     currentAccountId?: string
 ): MultiplicativeCandidateResult[] {
     const eligible = accounts.filter(acc => {
-        const isDisabled = Boolean(acc.disabled);
+        const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
         if (isDisabled) return false;
         const isForbidden = Boolean(acc.quota?.is_forbidden);
         if (isForbidden) return false;
         const isBlocked = Boolean(acc.validation_blocked);
         if (isBlocked) return false;
+        const q4h = extract4hWindowQuotaPercent(acc);
+        const nowMs = Date.now();
+        const hasResetTimePassed = (acc.quota?.models || []).some(m => {
+            if (!m.reset_time) return false;
+            const rDate = parseFlexibleDate(m.reset_time);
+            return rDate ? rDate.getTime() <= nowMs : false;
+        });
+        if (q4h < 100 && !hasResetTimePassed) return false;
         return true;
     });
 
@@ -625,10 +648,10 @@ export function pickBestCandidateAccount(
     currentAccountId?: string
 ): Account | null {
     const smart = findSmartRotationAccount(accounts, currentAccountId, activeInUseAccountIds);
-    if (smart?.account) {
+    if (smart?.account && (smart.fourHourQuotaPercent ?? 0) >= 100) {
         return smart.account;
     }
-    return findBestSmartPlayAccount(accounts);
+    return null;
 }
 
 export const selectNextBestProfile = findBestRotationProfile;

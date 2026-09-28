@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.91.0 (2026-09-28)**:
+        -   **[Release v4.91.0: 纯净 JSON 邮件遥测、候选账号 100% 满额硬校验与 Google API 实时探针、Telegram 项目去重与集群指令、安装脚本韧性容错] 支持 `[JSON]` 纯净 JSON 邮件正文输出并规范字段、切号算法严格要求 4 小时满额 (100%) 并现场调用 Google API 探针校验拒绝疲劳账号回跳、Telegram `/projects` 按工作区路径去重并支持 `<node-alias>:<cmd>` 集群节点路由与 `/prompts` 模板索引、修复 `install.ps1` 退出码泄露确保 GitMap 一键更新零报错 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **邮件 `[JSON]` 纯净正文与字段规范化 (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/email_sender.rs`)**: 当邮件主题包含 `[JSON]` 标记时，强制剥离所有 HTML/CSS 样式与外层标签，正文直接投递标准格式化的 JSON 字符串；规范化轮换遥测键名，保留 `previous_email`、`predicted_email`、`selected_email`、`quota_percent`、`threshold_activated`、`machine_name`、`node_alias`、`local_ip`、`running_prompts_count` 与 `timestamp`，彻底剔除冗余的 `old_email`、`new_email` 与 `target_email`。
+            -   **智能切号 100% 满额门禁与 Google API 现场探针 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/modules/account.rs`, `src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`)**: 重构前后端配额计算逻辑，取短期窗口及所有非封禁模型配额的绝对最小值，杜绝 Pro 耗尽 (20%) 误判为 Flash 满额 (100%)；未满 100% 配额账号一律按 0.0% 耗尽处理；切号前对候选账号实时发起 `fetch_quota_with_retry` 探针核实真实额度，若不足 100% 或处于禁用/校验拦截状态则坚决顺延下一候选人，绝不回跳至低额度或禁用账号。
+            -   **Telegram 项目按工作区路径去重与集群调度 (`src-tauri/src/modules/telegram_inbound.rs`)**: 彻底解决 `/projects` 中同一工作区因多轮会话重复呈现多次的视觉噪音，按规范化仓库绝对路径聚合展示单一项目卡片及当前运行/总会话数统计；支持 `<node-alias>:<command>` 与 `<ip>:<command>` 语法向特定虚拟机或本地发起控制；新增 `/prompts` 模板索引（显示 slug、标题及约 200 字预览），并支持前缀/后缀与语音指令拼接注入 Antigravity IDE。
+            -   **Windows 安装脚本退出码修复与本地验证回退 (`install.ps1`)**: 修复 `install.ps1` 在 PowerShell 子进程结束时由于缺失显式退出码而向 GitMap Go 进程泄露 `exit status 1` 的异常；新增网络下载失败时的本地已验证安装回退机制，确保 `gitmap agm update` 与 `install.ps1 -DryRun` 均以状态码 0 稳健收敛。
+
     *   **v4.90.0 (2026-09-28)**:
         -   **[Release v4.90.0: 账号轮换 98% 模拟 E2E 验证、Prompt 跨工作区并行备份恢复、双层多机防冲突与沙盒生命周期闭环] 支持 98% 高阈值模拟切号全链路、候选账号 Google API 实时刷新稳定性校验、多工作区并发快照入库 Split SQLite（人类友好工程名与图片载荷）、快进按键切号接管、Prompt 自动重注与活跃度校验及失联告警、Supabase 租约与 IMAP 防冲突、沙盒实例全生命周期验证、CLI 帮助全量打磨、15.0% 生产基准收敛 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **高阈值 98% 模拟切号与候选账号 Google API 实时刷新稳定性探针 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`)**: 完整跑通 98% 阈值模拟轮换（`agm switch-if-low-credit -t 98`）。算法按 4 小时滚动窗口严格优先排序 100% 满额候选账号；在执行切实切换前，通过直连 Google 官方配额接口（`account::fetch_quota_with_retry`）进行现场配额实时刷新与稳定性验证，确保候选账号容量真实充沛后才提交轮换。
@@ -3434,6 +3441,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.91.0 (2026-09-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.90.0 (2026-09-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

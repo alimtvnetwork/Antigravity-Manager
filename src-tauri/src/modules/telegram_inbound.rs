@@ -1317,52 +1317,108 @@ pub async fn format_node_scoped_prompts(args_str: &str) -> String {
     }
 }
 
-/// Format discovered workspaces and project IDs
+/// Format discovered workspaces and project IDs (deduplicated by workspace repository path)
 pub fn format_projects_list() -> String {
     let projects = repo_db::get_live_project_execution_info();
     if projects.is_empty() {
         return "📂 <b>Workspaces:</b> No registered workspaces found.".to_string();
     }
 
+    // Deduplicate and group by canonical normalized workspace path (case-insensitive)
+    let mut deduped_map: std::collections::HashMap<String, Vec<&repo_db::ProjectExecutionInfo>> =
+        std::collections::HashMap::new();
+    let mut path_order: Vec<String> = Vec::new();
+
+    for p in &projects {
+        let clean_path = p.repo_path.trim().replace('\\', "/").to_lowercase();
+        let key = if clean_path.is_empty() {
+            p.project_id.to_lowercase()
+        } else {
+            clean_path
+        };
+        if !deduped_map.contains_key(&key) {
+            path_order.push(key.clone());
+        }
+        deduped_map.entry(key).or_default().push(p);
+    }
+
     let mut rows = String::new();
-    for (i, p) in projects.iter().enumerate() {
-        let badge = if p.is_running {
+    let mut display_idx = 0;
+
+    for key in path_order {
+        let entries = match deduped_map.get(&key) {
+            Some(e) => e,
+            None => continue,
+        };
+
+        let is_any_running = entries.iter().any(|p| p.is_running);
+        let badge = if is_any_running {
             "🟢 RUNNING"
         } else {
             "⚪ IDLE"
         };
-        let friendly_label =
-            repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
-        let prompt_preview = if let Some(ref pr) = p.active_prompt {
-            let clean = repo_db::extract_smart_prompt_summary(pr, 90);
-            format!(
-                "\n   • <i>Prompt: \"{}\"</i>",
-                clean_for_telegram_html(&clean, 90)
-            )
+
+        // Pick best representative entry (running one preferred, else latest)
+        let rep = entries
+            .iter()
+            .find(|p| p.is_running)
+            .unwrap_or_else(|| &entries[0]);
+
+        let prompt_preview = entries
+            .iter()
+            .find_map(|p| p.active_prompt.as_ref())
+            .map(|pr| {
+                let clean = repo_db::extract_smart_prompt_summary(pr, 90);
+                format!(
+                    "\n   • <i>Prompt: \"{}\"</i>",
+                    clean_for_telegram_html(&clean, 90)
+                )
+            })
+            .unwrap_or_default();
+
+        let friendly_label = repo_db::format_friendly_workspace_label(
+            &rep.project_id,
+            &rep.repo_name,
+            &rep.repo_path,
+        );
+
+        let conv_summary = if entries.len() > 1 {
+            let running_count = entries.iter().filter(|p| p.is_running).count();
+            if running_count > 0 {
+                format!(
+                    " · <b>({} running, {} total convs)</b>",
+                    running_count,
+                    entries.len()
+                )
+            } else {
+                format!(" · <b>({} convs)</b>", entries.len())
+            }
         } else {
             String::new()
         };
 
+        display_idx += 1;
         rows.push_str(&format!(
-            "{}. {} <b>{}</b>\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>{}\n\n",
-            i + 1,
+            "{}. {} <b>{}</b>{}\n   • <b>ID:</b> <code>{}</code>\n   • <b>Path:</b> <code>{}</code>{}\n\n",
+            display_idx,
             badge,
             clean_for_telegram_html(&friendly_label, 48),
-            clean_for_telegram_html(&p.project_id, 48),
-            clean_for_telegram_html(&p.repo_path, 60),
+            conv_summary,
+            clean_for_telegram_html(&rep.project_id, 48),
+            clean_for_telegram_html(&rep.repo_path, 60),
             prompt_preview
         ));
     }
 
     format!(
-        "📂 <b>Discovered Workspaces &amp; Projects ({} Total)</b>\n\n\
+        "📂 <b>Discovered Workspaces &amp; Projects ({} Unique Projects)</b>\n\n\
         {}\
         💡 <b>Sample Prompt Invocations:</b>\n\
         • <b>Local workspace:</b> <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
         • <b>Remote VM node:</b> <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
         • <b>Active conversation:</b> <code>/prompt &lt;conversation-id&gt; &lt;prompt text&gt;</code>\n\
         • <b>Prompt template:</b> <code>/prompt &lt;project-id&gt; read-all</code>",
-        projects.len(),
+        display_idx,
         rows
     )
 }
@@ -1479,40 +1535,72 @@ pub async fn format_prompt_queues_report() -> String {
     }
 }
 
-/// Format available prompt templates like `gitmap agy prompt ls`
+/// Format available prompt templates with slug, title, and preview snippet
 pub fn format_prompts_templates_report() -> String {
-    if let Ok(out) = Command::new("gitmap")
-        .args(["agy", "prompt", "ls"])
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        if !stdout.trim().is_empty()
-            && (stdout.contains("Available Prompt Templates") || stdout.contains("read-all"))
-        {
-            let cleaned = clean_for_telegram_html(stdout.trim(), 2600);
-            return format!(
-                "📋 <b>Available Reusable Prompt Templates</b>\n\n\
-                <pre>{}</pre>\n\n\
-                💡 <b>How to Run Templates:</b>\n\
-                • <code>/prompt &lt;project-id&gt; read-all</code>\n\
-                • <code>/prompt &lt;node&gt; &lt;project-id&gt; read-all</code>\n\
-                • <code>/prompt &lt;project-id&gt; is-done</code>",
-                cleaned
-            );
-        }
+    let templates = [
+        (
+            "read-all",
+            "Enhanced Read Memory & Project Ingestion",
+            "Executes mandatory pre-flight protocol: defensively reads project identity, recent git commits, CODE RED rules, specs in 02-spec/, pending plans in .ai-memory/, and ambiguities before touching codebase. Prevents hallucinations and guarantees full architectural context.",
+        ),
+        (
+            "execute-pending-tasks",
+            "Autonomous Queued Tasks Execution Loop",
+            "Autonomous orchestration loop discovering, prioritizing, and executing all pending plans and subtasks in .ai-memory/plans/pending/. Enforces quality gates, isolated branch hygiene, pre-flight checks, and clean final-state commits with strict author attribution.",
+        ),
+        (
+            "execute-parent-task",
+            "Parent Task Decomposition & N-Step Loop",
+            "Decomposes complex, multi-layered architectural initiatives into structured, isolated subtasks. Runs an autonomous continuous N-step self-loop until completion, validating each milestone against specifications, running unit tests, and preserving git hygiene across polyglot stacks.",
+        ),
+        (
+            "ci-cd-fix",
+            "Grounded 4-Part RCA & CI/CD Self-Healing",
+            "Diagnose and repair CI/CD pipeline failures using grounded 4-part Root Cause Analysis without guessing. Inspects workflow logs, reproduces failures locally with test runner scripts, patches the root cause, and verifies passing GitHub Actions pipelines.",
+        ),
+        (
+            "coding-guidelines",
+            "Grounded Coding Guidelines Audit & Enforcement",
+            "Repository-wide audit and enforcement of grounded coding standards: PascalCase database tables, positive boolean prefixes, AppError wrappers, universal response envelopes, zero-allocation string folding, and small function boundaries across Rust, Go, TypeScript, and Python.",
+        ),
+        (
+            "smart-test-runner",
+            "Smart Incremental Test Runner & Inventory",
+            "Orchestrates incremental test execution across the repository using centralized manifests, dual-queue worker pools, heavy test isolation, and dynamic ETA sleep protocols. Tracks test durations to prioritize fast feedback and prevent CI timeouts.",
+        ),
+        (
+            "minor-bump",
+            "Automated Minor Release Ceremony",
+            "Executes minor version bump, synchronizes package.json, Cargo.toml, tauri.conf.json, updates CHANGELOG.md with strict author attribution, tags git commit, and triggers release pipeline with zero untracked file drift.",
+        ),
+        (
+            "is-done",
+            "Task Completion & Quality Verification Gate",
+            "Rigorous quality gate confirming all user requirements, acceptance criteria, unit tests, and linters pass cleanly. Verifies cargo fmt, cargo clippy, and frontend build before marking task completed in .ai-memory/.",
+        ),
+    ];
+
+    let mut rows = String::new();
+    for (i, (slug, title, preview)) in templates.iter().enumerate() {
+        rows.push_str(&format!(
+            "{}. 📌 <b>{}</b> (<code>{}</code>)\n   <i>\"{}\"</i>\n   • <b>Run:</b> <code>/prompt default {}</code>\n\n",
+            i + 1,
+            title,
+            slug,
+            preview,
+            slug
+        ));
     }
 
     format!(
-        "📋 <b>Available Reusable Prompt Templates</b>\n\n\
-        1. <code>read-all</code> — Enhanced Read Memory protocol and project context ingestion\n\
-        2. <code>is-done</code> — Standard task completion and quality verification check\n\
-        3. <code>ci-cd-fix</code> — Diagnose, analyze, and fix CI/CD pipeline failures\n\
-        4. <code>minor-bump</code> — Automated version bump and changelog synchronization\n\
-        5. <code>coding-guidelines</code> — Audit and enforce grounded coding guidelines\n\
-        6. <code>smart-test-runner</code> — Smart incremental test execution\n\n\
+        "📋 <b>Available Reusable Prompt Templates ({} Templates)</b>\n\n\
+        {}\
         💡 <b>How to Run Templates:</b>\n\
-        • <code>/prompt &lt;project-id&gt; read-all</code>\n\
-        • <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; read-all</code>"
+        • <b>Local workspace:</b> <code>/prompt &lt;project-id&gt; &lt;template-slug&gt;</code>\n\
+        • <b>Target specific node:</b> <code>&lt;node-alias&gt;:/prompt &lt;project-id&gt; &lt;template-slug&gt;</code>\n\
+        • <b>With custom instruction:</b> <code>/prompt &lt;project-id&gt; &lt;template-slug&gt; with custom notes...</code>",
+        templates.len(),
+        rows
     )
 }
 
@@ -1551,6 +1639,157 @@ pub fn format_prompts_list() -> String {
         }
         _ => "📝 <b>Prompt Queue:</b> No prompts currently registered in split SQLite database."
             .to_string(),
+    }
+}
+
+/// Resolve canonical prompt template from 01-prompts directory or fallback table
+pub fn resolve_prompt_template_content(query: &str) -> Option<String> {
+    let q = query.trim().to_lowercase();
+    let q_clean = q.strip_prefix('/').unwrap_or(&q);
+
+    // 1. Check known canonical templates
+    let fallback = match q_clean {
+        "read-all" | "read-memory-enhanced" | "read" => Some(
+            "Execute enhanced read memory protocol: inspect project identity, recent git commits, CODE RED rules, specs in 02-spec/, pending plans in .ai-memory/, and ambiguities before touching codebase. Defensively ingest full architecture to guarantee grounded execution."
+        ),
+        "execute-pending-tasks" | "execute-pending" | "pending" => Some(
+            "Execute pending tasks loop: systematically discover, catalog, and execute all pending plans and subtasks in .ai-memory/plans/pending/ with full QA gates, focused unit tests, and clean final-state commits."
+        ),
+        "execute-parent-task" | "parent-task" => Some(
+            "Decompose parent task into discrete subtasks and run an autonomous N-step continuous loop until completion with strict specification adherence and coding guidelines."
+        ),
+        "ci-cd-fix" | "ci-fix" => Some(
+            "Diagnose and repair CI/CD pipeline failures using grounded 4-part Root Cause Analysis without guessing. Inspect workflow failure logs, reproduce locally with test runner, patch defect, and verify passing pipeline."
+        ),
+        "coding-guidelines" | "cg" => Some(
+            "Audit and enforce repository-wide grounded coding guidelines across all touched modules: PascalCase SQLite tables, positive boolean prefixes, AppError wrappers, zero-allocation strings, and small function boundaries."
+        ),
+        "smart-test-runner" | "test-runner" | "test" => Some(
+            "Run smart incremental test runner across repository test inventory. Enforce heavy test isolation, worker pools, and ETA sleep protocols."
+        ),
+        "minor-bump" | "bump" => Some(
+            "Execute minor version bump, synchronize manifests (package.json, Cargo.toml, tauri.conf.json), update CHANGELOG.md with strict author attribution, and trigger release pipeline."
+        ),
+        "is-done" | "done" => Some(
+            "Verify all requirements and quality gates: ensure all touched modules pass cargo fmt, cargo clippy, npm run build, and unit tests with zero regressions before completing task."
+        ),
+        _ => None,
+    };
+
+    if let Some(fb) = fallback {
+        return Some(fb.to_string());
+    }
+
+    // 2. Search on disk in 01-prompts/
+    let mut search_roots = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        search_roots.push(cwd.join("01-prompts"));
+        if let Some(parent) = cwd.parent() {
+            search_roots.push(parent.join("coding-guidelines").join("01-prompts"));
+            search_roots.push(parent.join("Antigravity-Manager").join("01-prompts"));
+        }
+    }
+
+    for root in search_roots {
+        if !root.exists() {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let fname = entry.file_name().to_string_lossy().to_lowercase();
+                if fname.contains(q_clean) {
+                    if path.is_file() {
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            return Some(content.trim().to_string());
+                        }
+                    } else if path.is_dir() {
+                        if let Ok(sub_entries) = std::fs::read_dir(&path) {
+                            let mut md_files: Vec<std::path::PathBuf> = sub_entries
+                                .flatten()
+                                .map(|e| e.path())
+                                .filter(|p| p.is_file())
+                                .collect();
+                            md_files.sort();
+                            if let Some(first_file) = md_files.first() {
+                                if let Ok(content) = std::fs::read_to_string(first_file) {
+                                    return Some(content.trim().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Helper to wrap telegram prompt text with template prefixes, suffixes, or voice instruction notes
+pub fn wrap_telegram_prompt(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let lower_slug = trimmed.to_lowercase();
+    if !lower_slug.contains(' ') {
+        if let Some(tpl) = resolve_prompt_template_content(&lower_slug) {
+            return tpl;
+        }
+    }
+
+    let mut prefix_slug: Option<String> = None;
+    let mut suffix_slug: Option<String> = None;
+    let mut clean_words: Vec<String> = Vec::new();
+
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    let mut i = 0;
+    while i < tokens.len() {
+        let t = tokens[i];
+        if t == "--prefix" || t == "-prefix" {
+            if i + 1 < tokens.len() {
+                prefix_slug = Some(tokens[i + 1].to_string());
+                i += 2;
+                continue;
+            }
+        } else if t == "--suffix" || t == "-suffix" {
+            if i + 1 < tokens.len() {
+                suffix_slug = Some(tokens[i + 1].to_string());
+                i += 2;
+                continue;
+            }
+        } else {
+            clean_words.push(t.to_string());
+        }
+        i += 1;
+    }
+
+    let core_body = clean_words.join(" ");
+    let mut parts = Vec::new();
+    if let Some(ref pref) = prefix_slug {
+        if let Some(tpl) = resolve_prompt_template_content(pref) {
+            parts.push(tpl);
+        } else {
+            parts.push(format!("[Template Prefix: {}]", pref));
+        }
+    }
+    if !core_body.is_empty() {
+        parts.push(core_body);
+    }
+    if let Some(ref suff) = suffix_slug {
+        if let Some(tpl) = resolve_prompt_template_content(suff) {
+            parts.push(tpl);
+        } else {
+            parts.push(format!("[Template Suffix: {}]", suff));
+        }
+    }
+
+    if parts.is_empty() {
+        trimmed.to_string()
+    } else {
+        parts.join("\n\n")
     }
 }
 
@@ -1643,12 +1882,13 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         };
 
         let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+        let resolved_prompt = wrap_telegram_prompt(&prompt_text);
         let active_prompt = repo_db::ActivePrompt {
             id: prompt_id.clone(),
             project_id: final_proj_id.clone(),
             instance_id: "default".to_string(),
             repo_path: repo_path.clone(),
-            prompt_content: prompt_text.clone(),
+            prompt_content: resolved_prompt.clone(),
             model: None,
             session_id: None,
             status: "running".to_string(),
@@ -1878,51 +2118,108 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                     disp
                 ));
             }
-            if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
-                let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
-                if parts.len() >= 3 {
-                    let target_node = parts[1].trim();
-                    let cmd_content = parts[2].trim();
+            let node_selector: Option<(&str, &str)> =
+                if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
+                    let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
+                    if parts.len() >= 3 {
+                        Some((parts[1].trim(), parts[2].trim()))
+                    } else {
+                        None
+                    }
+                } else if let Some(colon_pos) = trimmed.find(':') {
+                    let prefix_candidate = trimmed[..colon_pos].trim();
+                    let cmd_candidate = trimmed[colon_pos + 1..].trim();
+                    let is_node_ident = !prefix_candidate.is_empty()
+                        && !cmd_candidate.is_empty()
+                        && !prefix_candidate.contains(char::is_whitespace)
+                        && (prefix_candidate.starts_with('W')
+                            || prefix_candidate.starts_with('w')
+                            || prefix_candidate.to_lowercase().starts_with("node")
+                            || prefix_candidate.to_lowercase().starts_with("vm")
+                            || prefix_candidate
+                                .chars()
+                                .all(|c| c.is_ascii_digit() || c == '.')
+                            || prefix_candidate.eq_ignore_ascii_case("local"));
+                    if is_node_ident {
+                        Some((prefix_candidate, cmd_candidate))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
-                    let mut enqueued = false;
-                    let s_config = supabase_sync::load_config().unwrap_or_default();
-                    for ep in &s_config.endpoints {
-                        if !ep.is_enabled {
-                            continue;
-                        }
-                        if ep.role == "secondary" {
-                            if let Ok(c) = SupabaseClient::new(ep) {
-                                let cmd_id = uuid::Uuid::new_v4().to_string();
-                                let cmd_payload = json!({
-                                    "id": cmd_id,
-                                    "target_node": target_node,
-                                    "command": cmd_content,
-                                    "status": "pending",
-                                    "created_at": Utc::now().timestamp()
-                                });
-                                if c.insert("command_queue", cmd_payload).await.is_ok() {
-                                    enqueued = true;
-                                    break;
-                                }
+            if let Some((target_node, cmd_content)) = node_selector {
+                let s_config = supabase_sync::load_config().unwrap_or_default();
+                let local_alias = if s_config.node_alias.trim().is_empty() {
+                    email_watcher::detect_machine_name()
+                } else {
+                    s_config.node_alias.clone()
+                };
+                let local_ip = email_watcher::detect_local_ip();
+
+                // If targeting current local node, execute directly!
+                if target_node.eq_ignore_ascii_case("local")
+                    || target_node.eq_ignore_ascii_case(&local_alias)
+                    || target_node.eq_ignore_ascii_case(&local_ip)
+                {
+                    return Box::pin(process_telegram_command_text(cmd_content)).await;
+                }
+
+                // If remote, attempt GitMap cluster SSH execution first
+                if let Ok(out) = Command::new("gitmap")
+                    .args(["cluster", "exec", target_node, cmd_content])
+                    .output()
+                {
+                    if out.status.success() {
+                        let stdout = String::from_utf8_lossy(&out.stdout);
+                        let clean = clean_for_telegram_html(stdout.trim(), 2800);
+                        return Some(format!(
+                            "🌐 <b>Cluster Result from <code>{}</code>:</b>\n\n<pre>{}</pre>",
+                            clean_for_telegram_html(target_node, 48),
+                            clean
+                        ));
+                    }
+                }
+
+                // Fallback to Supabase command queue
+                let mut enqueued = false;
+                for ep in &s_config.endpoints {
+                    if !ep.is_enabled {
+                        continue;
+                    }
+                    if ep.role == "secondary" {
+                        if let Ok(c) = SupabaseClient::new(ep) {
+                            let cmd_id = uuid::Uuid::new_v4().to_string();
+                            let cmd_payload = json!({
+                                "id": cmd_id,
+                                "target_node": target_node,
+                                "command": cmd_content,
+                                "status": "pending",
+                                "created_at": Utc::now().timestamp()
+                            });
+                            if c.insert("command_queue", cmd_payload).await.is_ok() {
+                                enqueued = true;
+                                break;
                             }
                         }
                     }
-
-                    let reply_text = if enqueued {
-                        format!(
-                            "📥 <b>Command Enqueued:</b> Saved to Supabase Secondary DB for target node <code>{}</code>:\n<code>{}</code>",
-                            clean_for_telegram_html(target_node, 48),
-                            clean_for_telegram_html(cmd_content, 300)
-                        )
-                    } else {
-                        format!(
-                            "⚙️ <b>Command Received:</b> Target <code>{}</code>:\n<code>{}</code>",
-                            clean_for_telegram_html(target_node, 48),
-                            clean_for_telegram_html(cmd_content, 300)
-                        )
-                    };
-                    return Some(reply_text);
                 }
+
+                let reply_text = if enqueued {
+                    format!(
+                        "📥 <b>Command Enqueued:</b> Saved to Supabase Secondary DB for target node <code>{}</code>:\n<code>{}</code>",
+                        clean_for_telegram_html(target_node, 48),
+                        clean_for_telegram_html(cmd_content, 300)
+                    )
+                } else {
+                    format!(
+                        "⚙️ <b>Command Received:</b> Target <code>{}</code>:\n<code>{}</code>",
+                        clean_for_telegram_html(target_node, 48),
+                        clean_for_telegram_html(cmd_content, 300)
+                    )
+                };
+                return Some(reply_text);
             }
             None
         }
