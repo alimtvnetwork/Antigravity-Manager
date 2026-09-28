@@ -168,14 +168,16 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     };
 
     let mut candidates: Vec<PathBuf> = Vec::new();
+    // 1. Direct sibling CLI in current executable directory
     candidates.push(current_dir.join(bin_name));
 
+    // 2. Installed CLI in standard user directories
     #[cfg(target_os = "windows")]
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let local_path = PathBuf::from(&local);
         candidates.push(local_path.join("agm-cli").join("agm-update-cli.exe"));
-        candidates.push(local_path.join("Programs").join("agm-alim").join("agm.exe"));
         candidates.push(local_path.join("agm-cli").join("agm.exe"));
+        candidates.push(local_path.join("Programs").join("agm-alim").join("agm.exe"));
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -185,23 +187,20 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
         candidates.push(home_path.join(".local").join("bin").join("agm"));
     }
 
-    let current_mtime = fs::metadata(&current_exe).and_then(|m| m.modified()).ok();
+    // 3. Search PATH for agm
+    if let Ok(path_var) = env::var("PATH") {
+        for dir in env::split_paths(&path_var) {
+            let p = dir.join(bin_name);
+            if p.exists() && !candidates.contains(&p) {
+                candidates.push(p);
+            }
+        }
+    }
 
+    // Pick first existing CLI candidate; if none exists, fallback to current_exe (which handles update commands directly)
     let updater_src = candidates
         .into_iter()
-        .find(|p| {
-            if !p.exists() {
-                return false;
-            }
-            if let (Some(cur_t), Ok(cand_meta)) = (current_mtime, fs::metadata(p)) {
-                if let Ok(cand_t) = cand_meta.modified() {
-                    if cur_t.duration_since(cand_t).unwrap_or_default() > Duration::from_secs(300) {
-                        return false;
-                    }
-                }
-            }
-            true
-        })
+        .find(|p| p.exists())
         .unwrap_or_else(|| current_exe.clone());
 
     // Maintain persistent dedicated `agm-update-cli` (and `agm.exe` if source is `agm.exe`) in agm-cli folder
@@ -210,7 +209,7 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
         let cli_dir = PathBuf::from(local).join("agm-cli");
         let _ = fs::create_dir_all(&cli_dir);
         let dedicated_cli = cli_dir.join("agm-update-cli.exe");
-        if updater_src != dedicated_cli {
+        if updater_src != dedicated_cli && updater_src.exists() {
             let _ = fs::copy(&updater_src, &dedicated_cli);
         }
         let sibling_agm = current_dir.join("agm.exe");
@@ -229,7 +228,22 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     } else {
         format!("agm-update-cli-{}", caller_pid)
     };
-    let temp_cli_path = temp_dir.join(temp_name);
+    let mut temp_cli_path = temp_dir.join(&temp_name);
+
+    if temp_cli_path.exists() {
+        if let Err(_) = fs::remove_file(&temp_cli_path) {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis();
+            let alt_name = if cfg!(target_os = "windows") {
+                format!("agm-update-cli-{}-{}.exe", caller_pid, ts)
+            } else {
+                format!("agm-update-cli-{}-{}", caller_pid, ts)
+            };
+            temp_cli_path = temp_dir.join(alt_name);
+        }
+    }
 
     fs::copy(&updater_src, &temp_cli_path).map_err(|e| {
         format!(
@@ -734,30 +748,31 @@ pub fn is_ui_process_running() -> bool {
 pub fn is_ui_process_running_excluding(exclude_pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("tasklist.exe")
-            .args(["/FI", "IMAGENAME eq agm-alim.exe", "/NH"])
-            .output();
-        if let Ok(out) = output {
-            let text = String::from_utf8_lossy(&out.stdout);
-            for line in text.lines() {
-                let trimmed = line.trim();
-                if trimmed.is_empty()
-                    || trimmed.to_lowercase().starts_with("info:")
-                    || trimmed.contains("No tasks")
-                {
-                    continue;
-                }
-                if trimmed.contains("agm-alim.exe") {
-                    if exclude_pid > 0 && trimmed.contains(&exclude_pid.to_string()) {
+        let process_names = ["agm-alim.exe", "antigravity-tools.exe"];
+        for proc_name in process_names {
+            let output = Command::new("tasklist.exe")
+                .args(["/FI", &format!("IMAGENAME eq {}", proc_name), "/NH"])
+                .output();
+            if let Ok(out) = output {
+                let text = String::from_utf8_lossy(&out.stdout);
+                for line in text.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty()
+                        || trimmed.to_lowercase().starts_with("info:")
+                        || trimmed.contains("No tasks")
+                    {
                         continue;
                     }
-                    return true;
+                    if trimmed.contains(proc_name) {
+                        if exclude_pid > 0 && trimmed.contains(&exclude_pid.to_string()) {
+                            continue;
+                        }
+                        return true;
+                    }
                 }
             }
-            false
-        } else {
-            false
         }
+        false
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -786,6 +801,9 @@ pub fn kill_other_ui_processes(exclude_pid: u32) {
         };
         let _ = Command::new("taskkill.exe")
             .args(["/F", "/IM", "agm-alim.exe", "/FI", &filter])
+            .output();
+        let _ = Command::new("taskkill.exe")
+            .args(["/F", "/IM", "antigravity-tools.exe", "/FI", &filter])
             .output();
     }
     #[cfg(not(target_os = "windows"))]

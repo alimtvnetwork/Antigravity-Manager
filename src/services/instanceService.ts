@@ -499,7 +499,14 @@ export function calculateMultiplicativeScore(
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
-    const isFull4h = fourHourQuotaPercent >= 100;
+    const nowMs = Date.now();
+    const hasResetTimePassed = (acc.quota?.models || []).some(m => {
+        if (!m.reset_time) return false;
+        const rDate = parseFlexibleDate(m.reset_time);
+        return rDate ? rDate.getTime() <= nowMs : false;
+    });
+
+    const isFull4h = fourHourQuotaPercent >= 100 || hasResetTimePassed;
     if (!isFull4h || activeFactor === 0) {
         return {
             account: acc,
@@ -517,7 +524,6 @@ export function calculateMultiplicativeScore(
     const rawScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
     const score = Number((rawScore / 1000).toFixed(4));
 
-    const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
     const nowSec = Math.floor(nowMs / 1000);
     const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
@@ -542,12 +548,17 @@ export function rankSmartCandidates(
     currentAccountId?: string
 ): MultiplicativeCandidateResult[] {
     const eligible = accounts.filter(acc => {
+        // Never allow the current account or active in-use accounts to be considered as candidates to rotate into
+        if (currentAccountId && acc.id === currentAccountId) return false;
+        if (activeInUseAccountIds.includes(acc.id)) return false;
+
         const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
         if (isDisabled) return false;
         const isForbidden = Boolean(acc.quota?.is_forbidden);
         if (isForbidden) return false;
         const isBlocked = Boolean(acc.validation_blocked);
         if (isBlocked) return false;
+
         const q4h = extract4hWindowQuotaPercent(acc);
         const nowMs = Date.now();
         const hasResetTimePassed = (acc.quota?.models || []).some(m => {
@@ -562,37 +573,33 @@ export function rankSmartCandidates(
     const hasEligible = eligible.length > 0;
     if (!hasEligible) return [];
 
-    const scored = eligible.map(acc => {
-        return calculateMultiplicativeScore(
-            acc,
-            activeInUseAccountIds,
-            currentAccountId
-        );
-    });
+    const scored = eligible
+        .map(acc => {
+            return calculateMultiplicativeScore(
+                acc,
+                activeInUseAccountIds,
+                currentAccountId
+            );
+        })
+        .filter(item => item.score > 0 && item.activeFactor > 0);
 
     scored.sort((a, b) => {
-        // 1. Strict priority for 100% 4-hour window accounts
-        const aFull = (a.fourHourQuotaPercent ?? 100) >= 100;
-        const bFull = (b.fourHourQuotaPercent ?? 100) >= 100;
-        if (aFull && !bFull) return -1;
-        if (!aFull && bFull) return 1;
-
-        // 2. Score comparison (includes tier, weekly quota, and 4h factor)
+        // 1. Highest normalized score first (M_tier * Q_weekly / 1000)
         if (b.score !== a.score) {
             return b.score - a.score;
         }
 
-        // 3. 4-hour quota comparison
+        // 2. 4-hour quota comparison
         if (b.fourHourQuotaPercent !== a.fourHourQuotaPercent) {
             return b.fourHourQuotaPercent - a.fourHourQuotaPercent;
         }
 
-        // 4. Weekly quota comparison
+        // 3. Weekly quota comparison
         if (b.weeklyQuotaPercent !== a.weeklyQuotaPercent) {
             return b.weeklyQuotaPercent - a.weeklyQuotaPercent;
         }
 
-        // 5. Deterministic tie-breaker
+        // 4. Deterministic tie-breaker
         const emailA = (a.account.email || '').toLowerCase();
         const emailB = (b.account.email || '').toLowerCase();
         return emailA.localeCompare(emailB);

@@ -4,9 +4,20 @@
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() > 1 {
-        let sub = args[1].trim_start_matches('/').trim_start_matches('-');
+        let sub = args[1]
+            .trim_start_matches('/')
+            .trim_start_matches('-')
+            .to_lowercase();
         if sub == "delegate-update" || sub == "update-ui" || sub == "ui-update-runner" {
             antigravity_tools_lib::modules::delegate_updater::run(&args[2..]);
+            return;
+        }
+        if sub == "update" || sub == "update-all" || sub == "ua" {
+            let ok = antigravity_tools_lib::modules::delegate_updater::run_cli_update(&args[2..]);
+            std::process::exit(if ok { 0 } else { 1 });
+        }
+        if sub == "open-ui" || sub == "ui" || sub == "launch-ui" || sub == "start-ui" {
+            antigravity_tools_lib::modules::delegate_updater::open_ui(&args[2..]);
             return;
         }
     }

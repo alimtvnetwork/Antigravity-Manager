@@ -1575,12 +1575,26 @@ pub async fn switch_account(
     let (target_4h, target_weekly) =
         crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
 
+    let mut pred_exclusions = vec![account.id.clone(), account.email.clone()];
+    if let Some(ref p_em) = prev_email {
+        pred_exclusions.push(p_em.clone());
+    }
+    let predicted_candidate = crate::modules::auto_switcher::select_candidate_profiles(
+        target_ide.unwrap_or("default"),
+        "gemini-2.5-pro",
+        15.0,
+        &pred_exclusions,
+    )
+    .ok()
+    .and_then(|v| v.into_iter().next());
+    let predicted_next_email = predicted_candidate.map(|c| c.email);
+
     crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email,
             previous_quota_4h: prev_4h,
             previous_quota_weekly: prev_weekly,
-            predicted_next_email: Some(account.email.clone()),
+            predicted_next_email,
             selected_email: account.email.clone(),
             target_quota_4h: target_4h,
             target_quota_weekly: target_weekly,

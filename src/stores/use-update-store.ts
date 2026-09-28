@@ -61,7 +61,7 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
               // ignore
             }
           }
-        }, 600);
+        }, 500);
       }
       return res;
     } catch (e) {

@@ -1352,7 +1352,28 @@ foreach ($candVersion in $versionQueue) {
         }
 
         Write-Step "Executing installer package ($DownloadedFile)..."
-        $installExit = Invoke-IndentedCommand -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir")
+        $installExit = 0
+        if ($DownloadedFile -like "*.zip") {
+            Write-Step "Extracting release zip package..."
+            Expand-Archive -Path $DownloadedFile -DestinationPath $InstallDir -Force
+        } else {
+            # Execute NSIS installer and wait synchronously for full installation completion
+            $setupProc = Start-Process -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir") -PassThru -Wait -ErrorAction SilentlyContinue
+            if ($setupProc) {
+                $installExit = $setupProc.ExitCode
+            }
+            # Wait for any background NSIS child extractor / uninstaller processes to release all files
+            $maxWaitSec = 45
+            $waitTimer = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($waitTimer.Elapsed.TotalSeconds -lt $maxWaitSec) {
+                $lingering = Get-Process | Where-Object {
+                    ($_.ProcessName -like "*setup*" -or $_.ProcessName -like "*uninst*") -and
+                    $_.Path -and ($_.Path -like "*$InstallDir*" -or $_.Path -like "*agm*")
+                }
+                if (-not $lingering) { break }
+                Start-Sleep -Milliseconds 300
+            }
+        }
         Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
 
         # Locate and verify main executable
@@ -1454,6 +1475,37 @@ if (-not $NoPath) {
         Write-Step "User PATH already includes install directory."
     }
 }
+
+# Step 4.1: Synchronize AGM CLI & Update CLI to %LOCALAPPDATA%\agm-cli
+$cliDir = Join-Path $env:LOCALAPPDATA "agm-cli"
+try {
+    if (-not (Test-Path $cliDir)) {
+        New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
+    }
+    $installedAgm = Join-Path $InstallDir "agm.exe"
+    $globalAgm = Join-Path $cliDir "agm.exe"
+    $globalUpdateCli = Join-Path $cliDir "agm-update-cli.exe"
+
+    if (Test-Path $installedAgm) {
+        Copy-Item -Path $installedAgm -Destination $globalAgm -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path $installedAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+    } elseif (Test-Path $globalAgm) {
+        Copy-Item -Path $globalAgm -Destination $installedAgm -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path $globalAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+    } elseif ($ExePath -and (Test-Path $ExePath)) {
+        Copy-Item -Path $ExePath -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not $NoPath) {
+        $curUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+        if ($curUserPath -notlike "*$cliDir*") {
+            $newPath = if ($curUserPath) { "$curUserPath;$cliDir" } else { $cliDir }
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+            $env:Path = "$env:Path;$cliDir"
+            Write-Success "Added AGM CLI directory to User PATH: $cliDir"
+        }
+    }
+} catch {}
 
 # Step 5: Create Shortcuts
 if (-not $NoShortcut) {

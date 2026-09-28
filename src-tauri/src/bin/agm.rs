@@ -37,7 +37,10 @@ fn main() {
         return;
     }
 
-    let subcommand = args[1].trim_start_matches('/').to_lowercase();
+    let subcommand = args[1]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
     let cmd_args = if args.len() > 2 {
         args[2..].to_vec()
     } else {
@@ -5869,7 +5872,22 @@ fn cmd_switch_if_low_credit(args: &[String]) {
             let prompts_resent = running_prompts_count > 0;
             let prev_email = status_before.active_account_email.clone();
             let selected_email = status_after.active_account_email.clone();
-            let predicted_email = selected_email.clone();
+            let mut pred_exclusions = Vec::new();
+            if let Some(ref p) = prev_email {
+                pred_exclusions.push(p.clone());
+            }
+            if let Some(ref s) = selected_email {
+                pred_exclusions.push(s.clone());
+            }
+            let predicted_candidate = auto_switcher::select_candidate_profiles(
+                "default",
+                "gemini-2.5-pro",
+                15.0,
+                &pred_exclusions,
+            )
+            .ok()
+            .and_then(|v| v.into_iter().next());
+            let predicted_email = predicted_candidate.map(|c| c.email);
             let credit_before = status_before.current_quota_percent;
 
             let out = serde_json::json!({
@@ -5951,6 +5969,20 @@ fn cmd_switch_if_low_credit(args: &[String]) {
             let current_email = status_after.active_account_email.clone();
             let credit_before = status_after.current_quota_percent;
 
+            let mut pred_exclusions = Vec::new();
+            if let Some(ref c) = current_email {
+                pred_exclusions.push(c.clone());
+            }
+            let predicted_candidate = auto_switcher::select_candidate_profiles(
+                "default",
+                "gemini-2.5-pro",
+                15.0,
+                &pred_exclusions,
+            )
+            .ok()
+            .and_then(|v| v.into_iter().next());
+            let predicted_email = predicted_candidate.map(|c| c.email);
+
             let out = serde_json::json!({
                 "rotated": false,
                 "reason": "Quota is healthy (above threshold) or no alternative candidate needed",
@@ -5959,10 +5991,10 @@ fn cmd_switch_if_low_credit(args: &[String]) {
                 "vm_alias": node_alias,
                 "local_ip": local_ip,
                 "tool_version": tool_version,
-                "previous_account": current_email,
+                "previous_account": serde_json::Value::Null,
                 "current_account": current_email,
-                "predicted_next_account": current_email,
-                "selected_account": current_email,
+                "predicted_next_account": predicted_email,
+                "selected_account": serde_json::Value::Null,
                 "active_account": status_after.active_account_email,
                 "credit_before_switch": credit_before,
                 "threshold_activated": effective_threshold,
@@ -6195,9 +6227,9 @@ fn cmd_is_low_credit_for_switch(args: &[String]) {
         "vm_alias": node_alias,
         "local_ip": local_ip,
         "current_account": current_account,
-        "previous_account": current_account,
+        "previous_account": if is_low_credit { current_account.clone() } else { None },
         "predicted_next_account": next_possible_account,
-        "selected_account": if is_low_credit { next_possible_account.clone() } else { current_account.clone() },
+        "selected_account": if is_low_credit { next_possible_account.clone() } else { None },
         "credit_before_switch": current_quota_percent,
         "current_quota_percent": current_quota_percent,
         "threshold_percent": threshold_percent,
@@ -6821,6 +6853,26 @@ fn cmd_fast_forward(args: &[String]) {
     match result {
         Ok(res_msg) => {
             let prompts_resent = running_prompts_count > 0;
+            let prev_email = status_before.active_account_email.clone();
+            let selected_email = status_after.active_account_email.clone();
+            let mut pred_exclusions = Vec::new();
+            if let Some(ref p) = prev_email {
+                pred_exclusions.push(p.clone());
+            }
+            if let Some(ref s) = selected_email {
+                pred_exclusions.push(s.clone());
+            }
+            let inst_ref = target_opt.unwrap_or("default");
+            let predicted_candidate = auto_switcher::select_candidate_profiles(
+                inst_ref,
+                "gemini-2.5-pro",
+                15.0,
+                &pred_exclusions,
+            )
+            .ok()
+            .and_then(|v| v.into_iter().next());
+            let predicted_email = predicted_candidate.map(|c| c.email);
+
             if is_json {
                 let out = serde_json::json!({
                     "success": true,
@@ -6830,9 +6882,9 @@ fn cmd_fast_forward(args: &[String]) {
                     "vm_alias": node_alias,
                     "local_ip": local_ip,
                     "tool_version": format!("v{}", VERSION),
-                    "previous_account": status_before.active_account_email,
-                    "predicted_next_account": status_after.active_account_email,
-                    "selected_account": status_after.active_account_email,
+                    "previous_account": prev_email,
+                    "predicted_next_account": predicted_email,
+                    "selected_account": selected_email,
                     "active_account": status_after.active_account_email,
                     "credit_before_switch": status_before.current_quota_percent,
                     "current_quota_percent": status_after.current_quota_percent,
@@ -6844,8 +6896,14 @@ fn cmd_fast_forward(args: &[String]) {
                 println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
             } else {
                 println!("[OK] Fast-forward completed: {}", res_msg);
-                if let Ok(Some(current)) = account::get_current_account() {
-                    println!("     New Active Profile: {}", current.email);
+                if let Some(ref p) = prev_email {
+                    println!("     Previous Profile:    {}", p);
+                }
+                if let Some(ref s) = selected_email {
+                    println!("     New Active Profile:  {}", s);
+                }
+                if let Some(ref pr) = predicted_email {
+                    println!("     Predicted Next:      {}", pr);
                 }
             }
         }

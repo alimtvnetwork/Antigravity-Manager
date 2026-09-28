@@ -1124,10 +1124,20 @@ pub async fn execute_profile_rotation_with_context(
     let prev_email = ctx.as_ref().and_then(|c| c.previous_email.clone());
     let mut prev_q_4h = ctx.as_ref().and_then(|c| c.previous_quota_4h);
     let mut prev_q_weekly = ctx.as_ref().and_then(|c| c.previous_quota_weekly);
-    let predicted = ctx
+    let predicted_opt = ctx
         .as_ref()
         .and_then(|c| c.predicted_email.clone())
-        .unwrap_or_else(|| target.email.clone());
+        .filter(|em| !em.eq_ignore_ascii_case(&target.email))
+        .or_else(|| {
+            let mut pred_exclusions = vec![target.account_id.clone(), target.email.clone()];
+            if let Some(ref pe) = prev_email {
+                pred_exclusions.push(pe.clone());
+            }
+            select_candidate_profiles(&inst_id, "gemini-2.5-pro", 15.0, &pred_exclusions)
+                .ok()
+                .and_then(|v| v.into_iter().next())
+                .map(|c| c.email)
+        });
     let mut target_q_4h = ctx.as_ref().and_then(|c| c.target_quota_4h);
     let mut target_q_weekly = ctx.as_ref().and_then(|c| c.target_quota_weekly);
     let credit_before = ctx.as_ref().and_then(|c| c.credit_before_switch);
@@ -1175,7 +1185,7 @@ pub async fn execute_profile_rotation_with_context(
             previous_email: prev_email,
             previous_quota_4h: prev_q_4h,
             previous_quota_weekly: prev_q_weekly,
-            predicted_next_email: Some(predicted),
+            predicted_next_email: predicted_opt,
             selected_email: target.email.clone(),
             target_quota_4h: target_q_4h,
             target_quota_weekly: target_q_weekly,
@@ -1463,11 +1473,24 @@ pub async fn check_and_rotate_with_options(
                         (None, None)
                     };
 
+                let mut pred_exclusions = excluded_accounts.clone();
+                pred_exclusions.push(candidate.account_id.clone());
+                pred_exclusions.push(candidate.email.clone());
+                let predicted_candidate = select_candidate_profiles(
+                    &inst.id,
+                    &switcher_cfg.target_model,
+                    switcher_cfg.critical_threshold_percent,
+                    &pred_exclusions,
+                )
+                .ok()
+                .and_then(|v| v.into_iter().next());
+                let predicted_email = predicted_candidate.map(|c| c.email);
+
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
-                    predicted_email: Some(candidate.email.clone()),
+                    predicted_email,
                     target_quota_4h: target_4h,
                     target_quota_weekly: target_weekly,
                     credit_before_switch: Some(quota_percent),
@@ -1538,11 +1561,24 @@ pub async fn check_and_rotate_with_options(
                         (None, None)
                     };
 
+                let mut pred_exclusions = excluded_accounts.clone();
+                pred_exclusions.push(candidate.account_id.clone());
+                pred_exclusions.push(candidate.email.clone());
+                let predicted_candidate = select_candidate_profiles(
+                    &inst.id,
+                    &switcher_cfg.target_model,
+                    effective_low_threshold,
+                    &pred_exclusions,
+                )
+                .ok()
+                .and_then(|v| v.into_iter().next());
+                let predicted_email = predicted_candidate.map(|c| c.email);
+
                 let rot_ctx = RotationContext {
                     previous_email: Some(bound_acc.email.clone()),
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
-                    predicted_email: Some(candidate.email.clone()),
+                    predicted_email,
                     target_quota_4h: target_4h,
                     target_quota_weekly: target_weekly,
                     credit_before_switch: Some(quota_percent),
@@ -1682,11 +1718,24 @@ pub async fn trigger_manual_rotation_for_instance(
             (None, None)
         };
 
+    let mut pred_exclusions = excluded.clone();
+    pred_exclusions.push(candidate.account_id.clone());
+    pred_exclusions.push(candidate.email.clone());
+    let predicted_candidate = select_candidate_profiles(
+        &inst_id,
+        &switcher_cfg.target_model,
+        switcher_cfg.low_quota_threshold_percent,
+        &pred_exclusions,
+    )
+    .ok()
+    .and_then(|v| v.into_iter().next());
+    let predicted_email = predicted_candidate.map(|c| c.email);
+
     let rot_ctx = RotationContext {
         previous_email: prev_email,
         previous_quota_4h: prev_4h,
         previous_quota_weekly: prev_weekly,
-        predicted_email: Some(email.clone()),
+        predicted_email,
         target_quota_4h: target_4h,
         target_quota_weekly: target_weekly,
         credit_before_switch: prev_4h,

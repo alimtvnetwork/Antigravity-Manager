@@ -75,7 +75,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
               // ignore
             }
           }
-        }, 1200);
+        }, 500);
       } else {
         setUpdateState('manual');
       }

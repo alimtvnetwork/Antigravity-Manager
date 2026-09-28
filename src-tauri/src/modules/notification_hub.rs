@@ -171,8 +171,35 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
     };
     details.previous_email = Some(final_prev.clone());
 
-    if details.predicted_next_email.is_none() {
-        details.predicted_next_email = Some(selected_clean.clone());
+    let need_predict = match &details.predicted_next_email {
+        None => true,
+        Some(em) => {
+            let em_trimmed = em.trim();
+            em_trimmed.is_empty()
+                || em_trimmed.eq_ignore_ascii_case(&selected_clean)
+                || em_trimmed.eq_ignore_ascii_case(&final_prev)
+        }
+    };
+
+    if need_predict {
+        let mut pred_exclusions = vec![selected_clean.clone()];
+        if !final_prev.is_empty() && !final_prev.eq_ignore_ascii_case("(none / standby)") {
+            pred_exclusions.push(final_prev.clone());
+        }
+        let target_inst = if details.instance_id.is_empty() {
+            "default"
+        } else {
+            &details.instance_id
+        };
+        let predicted_candidate = crate::modules::auto_switcher::select_candidate_profiles(
+            target_inst,
+            "gemini-2.5-pro",
+            15.0,
+            &pred_exclusions,
+        )
+        .ok()
+        .and_then(|v| v.into_iter().next());
+        details.predicted_next_email = predicted_candidate.map(|c| c.email);
     }
 
     // Resolve target dual-window quotas if absent
@@ -290,14 +317,14 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
         .unwrap_or("(none / standby)");
 
+    let selected_display = details.selected_email.trim();
+
     let predicted_display = details
         .predicted_next_email
         .as_deref()
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .unwrap_or(details.selected_email.as_str());
-
-    let selected_display = details.selected_email.trim();
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case(selected_display))
+        .unwrap_or("(none / pool exhausted)");
 
     let credit_before_display = details
         .credit_before_switch
