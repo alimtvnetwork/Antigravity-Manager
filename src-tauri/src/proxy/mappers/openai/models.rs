@@ -1,4 +1,4 @@
-// OpenAI data models
+// OpenAI 数据模型
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -13,8 +13,16 @@ pub struct OpenAIRequest {
     #[serde(default)]
     pub stream: bool,
     #[serde(default)]
-    pub n: Option<u32>, // [NEW] Support multiple candidate count
-    #[serde(rename = "max_tokens")]
+    pub n: Option<u32>, // [NEW] 支持多候选结果数量
+    #[serde(
+        default,
+        rename = "max_tokens",
+        alias = "max_completion_tokens",
+        alias = "maxCompletionTokens",
+        alias = "maxTokens",
+        alias = "max_output_tokens",
+        alias = "maxOutputTokens"
+    )]
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     #[serde(rename = "top_p")]
@@ -42,7 +50,7 @@ pub struct OpenAIRequest {
     pub quality: Option<String>,
     #[serde(default, rename = "personGeneration")]
     pub person_generation: Option<String>,
-    // [NEW] Thinking/Extended Thinking support (compatible with Anthropic/Claude protocol)
+    // [NEW] Thinking/Extended Thinking 支持 (兼容 Anthropic/Claude 协议)
     #[serde(default)]
     pub thinking: Option<ThinkingConfig>,
     // Codex Responses API reasoning controls. Applied only to tiered Flash models.
@@ -74,12 +82,18 @@ pub struct StreamOptions {
     pub include_usage: bool,
 }
 
-/// Thinking configuration (compatible with Anthropic and OpenAI extension protocols)
+/// Thinking 配置 (兼容 Anthropic 和 OpenAI 扩展协议)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ThinkingConfig {
     #[serde(rename = "type")]
     pub thinking_type: Option<String>, // "enabled", "disabled", or "adaptive"
-    #[serde(rename = "budget_tokens", alias = "budgetTokens")]
+    #[serde(
+        default,
+        rename = "budget_tokens",
+        alias = "budgetTokens",
+        alias = "max_tokens",
+        alias = "maxTokens"
+    )]
     pub budget_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>, // "low", "high", or "max"
@@ -88,6 +102,14 @@ pub struct ThinkingConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReasoningConfig {
     pub effort: Option<String>,
+    #[serde(
+        default,
+        rename = "max_tokens",
+        alias = "maxTokens",
+        alias = "budget_tokens",
+        alias = "budgetTokens"
+    )]
+    pub max_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,10 +147,10 @@ pub enum OpenAIContentBlock {
     ImageUrl { image_url: OpenAIImageUrl },
     #[serde(rename = "audio_url")]
     AudioUrl { audio_url: AudioUrlContent },
-    // [NEW] OpenAI official multimodal audio parameter: {"type":"input_audio","input_audio":{"data":"<base64>","format":"wav"}}
+    // [NEW] OpenAI 官方多模态音频入参: {"type":"input_audio","input_audio":{"data":"<base64>","format":"wav"}}
     #[serde(rename = "input_audio", alias = "audio")]
     InputAudio { input_audio: OpenAIInputAudio },
-    // [NEW] Video multimodal input: {"type":"video_url","video_url":{"url":"..."}}
+    // [NEW] 视频多模态输入: {"type":"video_url","video_url":{"url":"..."}}
     #[serde(rename = "video_url")]
     VideoUrl { video_url: OpenAIVideoUrl },
 }
@@ -156,7 +178,7 @@ pub struct OpenAIImageUrl {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AudioUrlContent {
     pub url: String,
-    /// Optional explicit MIME/format (e.g. "audio/wav" or "wav"), inferred from data URL / extension if omitted
+    /// 可选的显式 MIME/格式 (如 "audio/wav" 或 "wav")，缺省时从 data URL / 扩展名推断
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -167,12 +189,12 @@ pub struct AudioUrlContent {
     pub mime_type: Option<String>,
 }
 
-/// OpenAI `input_audio` content block: base64 audio + format identifier
+/// OpenAI `input_audio` 内容块: base64 音频 + 格式标识
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OpenAIInputAudio {
-    /// base64 encoded audio data (also compatible with data: URLs)
+    /// base64 编码的音频数据 (也兼容传入 data: URL)
     pub data: String,
-    /// "wav" | "mp3" | "m4a" | "ogg" | "flac" | "aiff" ... also accepts full MIME
+    /// "wav" | "mp3" | "m4a" | "ogg" | "flac" | "aiff" ... 亦接受完整 MIME
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -183,7 +205,7 @@ pub struct OpenAIInputAudio {
 }
 
 impl OpenAIInputAudio {
-    /// Normalized Gemini MIME type
+    /// 归一化后的 Gemini MIME 类型
     pub fn mime_type(&self) -> String {
         crate::proxy::audio::normalize_audio_mime(self.format.as_deref().unwrap_or("mp3"))
     }

@@ -281,6 +281,7 @@ struct AccountResponse {
     id: String,
     email: String,
     name: Option<String>,
+    priority: u8,
     is_current: bool,
     disabled: bool,
     disabled_reason: Option<String>,
@@ -373,6 +374,7 @@ fn to_account_response(
         id: account.id.clone(),
         email: account.email.clone(),
         name: account.name.clone(),
+        priority: account.priority,
         is_current: current_id.as_ref() == Some(&account.id),
         disabled: account.disabled,
         disabled_reason: account.disabled_reason.clone(),
@@ -453,6 +455,9 @@ impl AxumServer {
         self.upstream.rebuild_default_client(Some(new_config)).await;
         // Stale per-proxy clients may also be affected (e.g. fallback path)
         self.upstream.clear_client_cache();
+        // 全局共享客户端（token 刷新 / 配额刷新 / 项目解析 / zai / MCP 等）同样是按
+        // 构建时的代理配置定型的，必须一并失效，否则会带着旧代理继续跑。
+        crate::utils::http::invalidate_shared_clients();
         tracing::info!("Upstream proxy config hot-reloaded");
     }
 
@@ -796,6 +801,28 @@ impl AxumServer {
                 post(admin_get_opencode_config_content),
             )
             .route("/proxy/opencode/families", get(admin_get_opencode_families))
+            .route("/proxy/hermes/status", post(admin_get_hermes_sync_status))
+            .route("/proxy/hermes/sync", post(admin_execute_hermes_sync))
+            .route("/proxy/hermes/restore", post(admin_execute_hermes_restore))
+            .route("/proxy/hermes/clear", post(admin_execute_hermes_clear))
+            .route(
+                "/proxy/hermes/config",
+                post(admin_get_hermes_config_content),
+            )
+            .route(
+                "/proxy/openclaw/status",
+                post(admin_get_openclaw_sync_status),
+            )
+            .route("/proxy/openclaw/sync", post(admin_execute_openclaw_sync))
+            .route(
+                "/proxy/openclaw/restore",
+                post(admin_execute_openclaw_restore),
+            )
+            .route("/proxy/openclaw/clear", post(admin_execute_openclaw_clear))
+            .route(
+                "/proxy/openclaw/config",
+                post(admin_get_openclaw_config_content),
+            )
             .route("/proxy/droid/status", post(admin_get_droid_sync_status))
             .route("/proxy/droid/sync", post(admin_execute_droid_sync))
             .route("/proxy/droid/restore", post(admin_execute_droid_restore))
@@ -868,6 +895,10 @@ impl AxumServer {
                 "/proxy/thinking-store/clear",
                 post(admin_clear_thinking_store),
             )
+            .route(
+                "/proxy/thinking-store/count",
+                get(admin_get_thinking_store_count),
+            )
             .route("/logs/:logId", get(admin_get_proxy_log_detail))
             // Debug Console (Log Bridge)
             .route("/debug/enable", post(admin_enable_debug_console))
@@ -911,6 +942,10 @@ impl AxumServer {
             )
             .route("/accounts/warmup", post(admin_warm_up_all_accounts))
             .route("/accounts/:accountId/warmup", post(admin_warm_up_account))
+            .route(
+                "/accounts/:accountId/priority",
+                post(admin_update_account_priority),
+            )
             .route(
                 "/system/data-dir",
                 get(admin_get_data_dir_path).post(admin_set_data_dir),
@@ -1397,6 +1432,7 @@ async fn admin_list_accounts(
                 id: acc.id,
                 email: acc.email,
                 name: acc.name,
+                priority: acc.priority,
                 is_current,
                 disabled: acc.disabled,
                 disabled_reason: acc.disabled_reason,
@@ -1478,6 +1514,7 @@ async fn admin_get_current_account(
                 id: acc.id,
                 email: acc.email,
                 name: acc.name,
+                priority: acc.priority,
                 is_current: true,
                 disabled: acc.disabled,
                 disabled_reason: acc.disabled_reason,
@@ -2412,6 +2449,41 @@ async fn admin_clear_thinking_store() -> impl IntoResponse {
     }
 }
 
+async fn admin_get_thinking_store_count() -> impl IntoResponse {
+    let res =
+        tokio::task::spawn_blocking(crate::modules::proxy_db::get_thinking_records_count).await;
+    match res {
+        Ok(Ok(count)) => (StatusCode::OK, Json(json!({ "count": count }))),
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn admin_get_proxy_db_disk_size(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let res: Result<Result<u64, String>, tokio::task::JoinError> =
+        tokio::task::spawn_blocking(move || proxy_db::get_proxy_db_disk_bytes()).await;
+
+    match res {
+        Ok(Ok(bytes)) => Ok(Json(bytes)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
 async fn admin_get_proxy_log_detail(
     Path(log_id): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
@@ -3081,6 +3153,31 @@ async fn admin_fetch_account_quota(
 struct ToggleProxyRequest {
     enable: bool,
     reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AccountPriorityRequest {
+    #[serde(deserialize_with = "crate::models::account::deserialize_priority")]
+    priority: u8,
+}
+
+async fn admin_update_account_priority(
+    State(state): State<AppState>,
+    Path(account_id): Path<String>,
+    Json(payload): Json<AccountPriorityRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::modules::account::update_account_priority(&account_id, payload.priority).map_err(
+        |e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        },
+    )?;
+    state
+        .token_manager
+        .update_account_priority(&account_id, payload.priority);
+    Ok(StatusCode::OK)
 }
 
 async fn admin_toggle_proxy_status(
@@ -4492,6 +4589,205 @@ async fn admin_execute_opencode_clear(
         })
 }
 
+// ── Hermes Agent Sync Admin Handlers ──
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HermesSyncStatusRequest {
+    #[serde(default)]
+    proxy_url: Option<String>,
+}
+
+async fn admin_get_hermes_sync_status(
+    Json(payload): Json<HermesSyncStatusRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::hermes_sync::get_hermes_sync_status(payload.proxy_url)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HermesSyncRequest {
+    proxy_url: String,
+    api_key: String,
+    discover_models: bool,
+    #[serde(default)]
+    models: Vec<String>,
+    #[serde(default)]
+    activate: bool,
+    #[serde(default)]
+    default_model: Option<String>,
+}
+
+async fn admin_execute_hermes_sync(
+    Json(payload): Json<HermesSyncRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::hermes_sync::execute_hermes_sync(
+        payload.proxy_url,
+        payload.api_key,
+        payload.discover_models,
+        payload.models,
+        payload.activate,
+        payload.default_model,
+    )
+    .await
+    .map(|_| StatusCode::OK)
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })
+}
+
+async fn admin_execute_hermes_restore(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::hermes_sync::execute_hermes_restore()
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+async fn admin_execute_hermes_clear() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
+{
+    crate::proxy::hermes_sync::execute_hermes_clear()
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+async fn admin_get_hermes_config_content(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::hermes_sync::get_hermes_config_content()
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+// ── OpenClaw Sync Admin Handlers ──
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawSyncStatusRequest {
+    #[serde(default)]
+    proxy_url: Option<String>,
+}
+
+async fn admin_get_openclaw_sync_status(
+    Json(payload): Json<OpenClawSyncStatusRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::openclaw_sync::get_openclaw_sync_status(payload.proxy_url)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawSyncRequest {
+    proxy_url: String,
+    api_key: String,
+    #[serde(default = "default_openclaw_target_version")]
+    target_version: String,
+    #[serde(default)]
+    models: Vec<String>,
+    #[serde(default)]
+    activate: bool,
+    #[serde(default)]
+    default_model: Option<String>,
+}
+
+fn default_openclaw_target_version() -> String {
+    "v2".to_string()
+}
+
+async fn admin_execute_openclaw_sync(
+    Json(payload): Json<OpenClawSyncRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::openclaw_sync::execute_openclaw_sync(
+        payload.proxy_url,
+        payload.api_key,
+        payload.target_version,
+        payload.models,
+        payload.activate,
+        payload.default_model,
+    )
+    .await
+    .map(|_| StatusCode::OK)
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })
+}
+
+async fn admin_execute_openclaw_restore(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::openclaw_sync::execute_openclaw_restore()
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+async fn admin_execute_openclaw_clear(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::openclaw_sync::execute_openclaw_clear()
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+async fn admin_get_openclaw_config_content(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    crate::proxy::openclaw_sync::get_openclaw_config_content()
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
 // ── Droid (Factory CLI) Sync Admin Handlers ──
 
 #[derive(Deserialize)]
@@ -4680,6 +4976,32 @@ mod image_scheduler_tests {
         assert!(scheduler.try_acquire("account-1").is_none());
         drop(permit);
         assert_eq!(scheduler.available_slots(), 1);
+    }
+
+    #[test]
+    fn account_priority_web_response_preserves_saved_and_default_values() {
+        let token = crate::models::TokenData::new(
+            "test".into(),
+            "test".into(),
+            3600,
+            None,
+            None,
+            None,
+            false,
+            None,
+        );
+        let mut account = crate::models::Account::new(
+            "test-priority".into(),
+            "test-priority@test.invalid".into(),
+            token,
+        );
+
+        for priority in [7, 50] {
+            account.priority = priority;
+            let payload =
+                serde_json::to_value(super::to_account_response(&account, &None)).unwrap();
+            assert_eq!(payload.get("priority"), Some(&serde_json::json!(priority)));
+        }
     }
 
     #[test]

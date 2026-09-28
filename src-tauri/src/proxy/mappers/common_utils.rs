@@ -132,7 +132,7 @@ pub fn resolve_request_config(
         _ => final_model,
     };
 
-    // [FIX] Never downgrade models silently to gemini-2.5-flash
+    // [FIX] 不再强行将模型降级为 gemini-2.5-flash，彻底杜绝静默降级
     if enable_networking && !_is_high_quality_model {
         tracing::debug!(
             "[Common-Utils] Request enables web search for model {}",
@@ -434,8 +434,8 @@ pub fn inject_google_search_tool(body: &mut Value, _mapped_model: Option<&str>) 
                 })
             });
 
-            // [STABILITY GUARD] If client already defines function tools (functionDeclarations / function_declarations),
-            // do not inject googleSearch tool to prevent unhandled client tool dispatch errors.
+            // [STABILITY GUARD] 如果客户端自身已经定义了函数工具 (functionDeclarations / function_declarations)，
+            // 不强行注入 googleSearch 工具。防止服务端接地调用导致客户端无法分发、空工具调用或报未知工具错误。
             if has_functions {
                 tracing::debug!(
                     "Skipping googleSearch injection: functionDeclarations present, avoiding client tool dispatch conflicts"
@@ -654,6 +654,60 @@ pub fn contents_has_tool_interactions(contents: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ============ requestId 与 session_id 的关系 ============
+
+    /// 会话段必须**稳定**（同一 session 多次请求共享，贴近官方 conversationId 语义），
+    /// 但整体 ID 每次唯一（含 unixMs + 轨迹段 → 幂等隔离）。
+    #[test]
+    fn test_official_request_id_stable_conversation_unique_overall() {
+        let a = build_official_request_id("sess-aaaabbbbccccdddd", 3);
+        let b = build_official_request_id("sess-aaaabbbbccccdddd", 3);
+        assert_eq!(
+            a.split('/').nth(1),
+            b.split('/').nth(1),
+            "同一 session 的会话段必须稳定"
+        );
+        assert_ne!(a, b, "整体 requestId 必须每次唯一（幂等隔离）");
+        assert_eq!(
+            a.split('/').count(),
+            5,
+            "官方形态为 5 段：agent/conversation/unixMs/trajectory/step"
+        );
+        assert!(a.starts_with("agent/"));
+        assert!(a.ends_with("/3"));
+    }
+
+    /// requestId **不得**泄露网关内部 blended session_id 的原文。
+    #[test]
+    fn test_official_request_id_never_exposes_raw_session() {
+        let sid = "sess-deadbeefcafe1234";
+        let id = build_official_request_id(sid, 1);
+        assert!(
+            !id.contains(sid),
+            "requestId 不得包含 session_id 原文（应为单向哈希派生）"
+        );
+    }
+
+    /// 不同会话（主 agent / 子 agent 并发）必须产出不同会话段 —— 隔离性保持。
+    #[test]
+    fn test_official_request_id_separates_concurrent_sessions() {
+        let main = build_official_request_id("sess-main-00000001", 1);
+        let sub = build_official_request_id("sess-sub-00000002", 1);
+        assert_ne!(
+            main.split('/').nth(1),
+            sub.split('/').nth(1),
+            "不同 session 的会话段必须不同（主子 agent 隔离）"
+        );
+    }
+
+    /// 空 session 时退化为随机会话段，不 panic 且仍为 5 段。
+    #[test]
+    fn test_official_request_id_handles_empty_session() {
+        let id = build_official_request_id("", 7);
+        assert_eq!(id.split('/').count(), 5);
+        assert!(id.ends_with("/7"));
+    }
 
     #[test]
     fn test_high_quality_model_auto_grounding() {
@@ -1206,6 +1260,138 @@ pub fn parse_markdown_images_to_parts(text: &str) -> Vec<Value> {
     parts
 }
 
+/// 严格受支持的常见图片 MIME 白名单（Gemini 官方原生兼容），
+/// 坚决排除非图片格式（音频、视频、PDF、文档、二进制文件等），避免上游报 400 不兼容。
+pub const SUPPORTED_TOOL_IMAGE_MIMES: &[&str] = &[
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/gif",
+];
+
+#[inline]
+pub fn is_supported_tool_image_mime(mime: &str) -> bool {
+    let lower = mime.trim().to_ascii_lowercase();
+    SUPPORTED_TOOL_IMAGE_MIMES.contains(&lower.as_str())
+}
+
+/// 智能解析并提取工具输出中的多模态图像数据（全协议共享：OpenAI / Claude / Gemini / Responses）。
+/// 支持：
+/// 1. Markdown 格式图片：`![alt](data:image/...;base64,...)`
+/// 2. 文本中内嵌或直接传递的 Data URL：`data:image/...;base64,...`
+/// 3. JSON 格式工具输出中的图片字段：`{"image": "data:image/...", ...}` 或 `{"screenshot": "...", ...}`
+///
+/// 安全约束：
+/// - 仅严格识别并放行常见白名单图片格式（png, jpeg, webp, gif）；
+/// - 绝对不处理音频、视频、PDF、文本或二进制文件，保证非图片数据原样透传，杜绝破坏兼容性；
+/// - 自动将提取出的 Base64 图像转化为规范的 Gemini `inlineData` part，追加到 `extra_parts` 中；
+/// - 将原工具响应字符串中冗长庞大的 Base64 替换为精炼的摘要标记（如 `[Image: forwarded to visual input (image/png)]`），
+///   既避免了 `functionResponse` JSON 负载膨胀，又让底层视觉模型能够原汁原味地进行视觉感知。
+pub fn extract_multimodal_from_tool_text(raw_text: &str, extra_parts: &mut Vec<Value>) -> String {
+    if !raw_text.contains("data:image/") {
+        return raw_text.to_string();
+    }
+
+    // 1. 如果 raw_text 是 JSON 字符串，尝试解析并提取其中的图片字段
+    if let Ok(mut val) = serde_json::from_str::<Value>(raw_text) {
+        let mut extracted_any = false;
+        if let Some(obj) = val.as_object_mut() {
+            let candidate_keys = ["image", "screenshot", "data", "image_url", "picture"];
+            for key in candidate_keys {
+                if let Some(v) = obj.get_mut(key) {
+                    if let Some(s) = v.as_str() {
+                        if s.starts_with("data:image/") {
+                            if let Some(pos) = s.find(',') {
+                                let mime_part = &s[5..pos];
+                                let mime_type = mime_part.split(';').next().unwrap_or("image/png");
+                                // 严格限制：只允许白名单中的常见图片格式，排除任何音频、文档或非标图片
+                                if is_supported_tool_image_mime(mime_type) {
+                                    let b64_data = &s[pos + 1..];
+                                    if let Some((valid_mime, valid_b64)) =
+                                        validate_and_sanitize_inline_data(Some(mime_type), b64_data)
+                                    {
+                                        extra_parts.push(create_gemini_inline_part(
+                                            Some(&valid_mime),
+                                            &valid_b64,
+                                            "Tool Result Image",
+                                        ));
+                                        *v = json!(format!(
+                                            "[Image: forwarded to visual input ({})]",
+                                            valid_mime
+                                        ));
+                                        extracted_any = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if extracted_any {
+            return val.to_string();
+        }
+    }
+
+    // 2. 检测 Markdown 图片格式：![alt](data:image/...) 或文本内嵌的 data:image/
+    let mut clean_text = String::new();
+    let mut rest = raw_text;
+    let mut found_image = false;
+
+    while let Some(start_idx) = rest.find("data:image/") {
+        clean_text.push_str(&rest[..start_idx]);
+        let data_slice = &rest[start_idx..];
+
+        if let Some(comma_idx) = data_slice.find(',') {
+            let mime_part = &data_slice[5..comma_idx];
+            let mime_type = mime_part.split(';').next().unwrap_or("image/png");
+
+            // 严格白名单校验：非白名单图片（如 svg/tiff/未知）或伪装格式不予解构，直接作为普通文本保留
+            if !is_supported_tool_image_mime(mime_type) {
+                clean_text.push_str("data:image/");
+                rest = &data_slice["data:image/".len()..];
+                continue;
+            }
+
+            let b64_start = comma_idx + 1;
+            let b64_end = data_slice[b64_start..]
+                .find(|c: char| c.is_whitespace() || c == ')' || c == '"' || c == '\'' || c == '`')
+                .map(|idx| b64_start + idx)
+                .unwrap_or(data_slice.len());
+
+            let b64_data = &data_slice[b64_start..b64_end];
+            if let Some((valid_mime, valid_b64)) =
+                validate_and_sanitize_inline_data(Some(mime_type), b64_data)
+            {
+                extra_parts.push(create_gemini_inline_part(
+                    Some(&valid_mime),
+                    &valid_b64,
+                    "Tool Result Image",
+                ));
+                clean_text.push_str(&format!(
+                    "[Image: forwarded to visual input ({})]",
+                    valid_mime
+                ));
+                found_image = true;
+            } else {
+                clean_text.push_str(&data_slice[..b64_end]);
+            }
+            rest = &data_slice[b64_end..];
+        } else {
+            clean_text.push_str("data:image/");
+            rest = &data_slice["data:image/".len()..];
+        }
+    }
+    clean_text.push_str(rest);
+
+    if found_image {
+        clean_text
+    } else {
+        raw_text.to_string()
+    }
+}
+
 /// [FIX] Inject explicit tool mapping instructions for Gemini to read SKILL.md
 pub fn enhance_gemini_skills_prompt(text: &str) -> String {
     let mut enhanced = text.to_string();
@@ -1420,7 +1606,7 @@ pub fn is_model_compatible(cached: &str, target: &str) -> bool {
         return true;
     }
 
-    // Claude models universal compatibility: any model in Claude family is compatible
+    // Claude 全系列通用兼容：凡是同属 Claude 家族模型，直接判定签名兼容（面向未来任何 Claude 5/新模型及变体）
     if c.contains("claude") && t.contains("claude") {
         return true;
     }
@@ -1460,15 +1646,101 @@ pub fn is_model_compatible(cached: &str, target: &str) -> bool {
     false
 }
 
-pub fn model_keeps_thinking_without_signature(mapped_model: &str) -> bool {
-    let m = mapped_model.to_lowercase();
-    m.contains("flash") || m.contains("gemini-pro-agent")
+/// 解析官方客户端指纹，返回 `(userAgent, ideType)`。
+///
+/// 官方 Go Worker 中**企业 / GCP 账号**（非 `@gmail.com` / `@googlemail.com` 邮箱）
+/// 使用 `jetski` 指纹，其余使用 `antigravity`。
+///
+/// **三个适配器必须共用本函数** —— 否则同一账号经不同协议入口会产出不同指纹。
+/// 历史缺陷：jetski 仿真只实现在 Gemini 路径，Claude / OpenAI 路径硬编码
+/// `"antigravity"`，导致企业账号发生指纹漂移。
+pub fn resolve_official_fingerprint(
+    token: Option<&crate::proxy::token_manager::ProxyToken>,
+) -> (&'static str, &'static str) {
+    let is_enterprise = token
+        .map(|t| !t.email.ends_with("@gmail.com") && !t.email.ends_with("@googlemail.com"))
+        .unwrap_or(false);
+    if is_enterprise {
+        ("jetski", "JETSKI")
+    } else {
+        ("antigravity", "ANTIGRAVITY")
+    }
 }
 
-/// Fallback text for transit payloads
+/// 构造官方形态的 requestId：`agent/{conversationId}/{unixMs}/{trajectoryId}/{step}`。
+///
+/// 官方样本（3 份报文逐字核对），例如：
+///
+/// ```text
+/// agent/a89a2006-72b4-470d-8282-3f1e4c88dc29/1790410048596/d3a2e3d2-21f9-411b-967f-53811898c2cd/14
+/// ```
+///
+/// **第 2 段 `unixMs` 每次请求都不同 → 天然的幂等隔离**，避免重试命中上一次的
+/// 429 / 旧缓存。历史缺陷：Claude 路径曾用 `agent/antigravity/{session[:8]}/{count}`，
+/// **不含时间戳** —— 同一会话同一轮次重试会拿到完全相同的 ID。
+///
+/// **三适配器必须共用本函数** —— 否则同一对话经不同入口会产出不同 ID 形态。
+///
+/// ## 与 `session_id` 的关系（重要）
+///
+/// 本函数**只读 `session_id`，绝不写它**，也**不影响**它的唯一性：
+/// 防主子 agent 并发串话的机制是 `thinking_store::derive_blended_session_id`
+/// 的 SHA256 多维正交哈希（tenant + 会话语义头 + query sid + body sid + anchor），
+/// 它决定的是 thinking store / signature cache / prefix cache 的 key，
+/// 与出站 requestId 是**两条独立通路**（全仓无任何代码从 requestId 反推 session）。
+///
+/// 会话段使用 `session_id` 的**单向哈希派生**而非原文：
+/// - 同一会话稳定（贴近官方 conversationId 语义）；
+/// - 不把网关内部 blended session_id 的原文暴露给上游；
+/// - 不同 agent / 会话的 session_id 不同 → 派生值不同，隔离性保持。
+pub fn build_official_request_id(session_id: &str, step: u64) -> String {
+    let ts = chrono::Utc::now().timestamp_millis();
+    let sanitized = crate::proxy::thinking_store::sanitize_session_id(session_id);
+    let conversation = if sanitized.is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
+        sha2::Digest::update(&mut hasher, sanitized.as_bytes());
+        let digest = sha2::Digest::finalize(hasher);
+        let hex = format!("{:x}", digest);
+        hex[..16].to_string()
+    };
+    // 轨迹段每请求唯一，与 unixMs 共同保证幂等隔离
+    let trajectory = &uuid::Uuid::new_v4().simple().to_string()[..8];
+    format!("agent/{}/{}/{}/{}", conversation, ts, trajectory, step)
+}
+
+/// [JEIKCODE SYNTHETIC USER REMINDER]
+/// 将对话中途动态插入的系统消息就地包装为 `<system-reminder>` 标签块。
+/// 提示词采用英文，明确告知模型：本内容为系统层注入的背景提醒，并非本轮用户输入，
+/// 从而保证用户原始 query 完整透传，同时全局顶层 systemInstruction 保持绝对冻结以稳定 KV Cache。
+pub fn wrap_in_system_reminder(content: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    if trimmed.starts_with("<system-reminder>") && trimmed.ends_with("</system-reminder>") {
+        return trimmed.to_string();
+    }
+    format!(
+        "<system-reminder>\nBefore the user's request for this turn, the system provides the following reminder for your awareness. Please note that this is from prior system messages, not spoken by the user:\n{}\n</system-reminder>",
+        trimmed
+    )
+}
+
+/// [DEFENSE] 通用中转报文保底文本（温和提示继续分析，避免触发 Agent 误进入修改阶段）
 pub const TRANSIT_DEFENSE_FALLBACK_TEXT: &str = "Please continue your analysis.";
 
-/// Ensure gemini payload ends with user turn and valid parts
+/// [DEFENSE] 通用中转报文保底防御节点（协议无关性）
+/// 确保发给 Google Gemini 的报文末尾轮次严格符合规范：
+/// 1. 自动兼容平铺 payload 或包含 "request" 包装的 payload；
+/// 2. 若 contents 为空，追加 {"role": "user", "parts": [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]}；
+/// 3. 若末尾轮次为 "model"（缺失用户轮次），追加 {"role": "user", "parts": [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]}；
+///    例外：末尾 model 轮若携带 functionCall / functionResponse（模型主动发起的工具轮），
+///    视为合法中间态，不注入（否则会与 normalize_function_response_roles 的 fr@model 对齐
+///    打架，把官方合法报文误判为缺用户轮，注入"Please continue your analysis."造成工具死循环）；
+/// 4. 若末尾轮次为 "user" 且其 parts 为空、或仅含有空文本 / "(no content)" / "·" 且无工具/图片，规范化填充为 [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]；
+/// 5. 修复中间轮次中 parts 为空的情况，防止 Google 返回 400 "parts must not be empty"。
 pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
     let contents = if let Some(contents) = body
         .get_mut("request")
@@ -1484,7 +1756,7 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
 
     let mut modified = false;
 
-    // Defense 1: empty contents
+    // 防御 1: contents 整体为空
     if contents.is_empty() {
         tracing::warn!("[Defense] Gemini contents array is empty, appending fallback user turn");
         contents.push(json!({
@@ -1494,7 +1766,7 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
         return true;
     }
 
-    // Defense 2: fix empty parts in intermediate turns
+    // 防御 2: 修复历史/中间轮次中可能存在的 parts 为空
     for turn in contents.iter_mut() {
         let is_model = turn
             .get("role")
@@ -1513,11 +1785,25 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
         }
     }
 
-    // Defense 3: check last turn
+    // 防御 3: 检查末尾轮次。
+    // 注意：InboundThinkingPipeline::normalize_function_response_roles 会把纯回执轮对齐为
+    // role=model（官方 Antigravity 报文约定 fr 恒在 model 轮）。因此「末尾为 model 轮」
+    // 并不代表报文不完整——若该轮携带 functionCall（模型主动发起工具轮，等待回执，
+    // 属于合法的中间态），绝不能注入假用户话术，否则会放大成 Agent 工具死循环。
     let need_append_user = if let Some(last_turn) = contents.last_mut() {
         let role = last_turn.get("role").and_then(|r| r.as_str()).unwrap_or("");
         if role == "model" || role == "assistant" {
-            true
+            // 工具轮合法：末尾 model 轮含 functionCall 或 functionResponse 时不注入
+            let is_tool_turn = last_turn
+                .get("parts")
+                .and_then(|p| p.as_array())
+                .map(|parts| {
+                    parts.iter().any(|part| {
+                        part.get("functionCall").is_some() || part.get("functionResponse").is_some()
+                    })
+                })
+                .unwrap_or(false);
+            !is_tool_turn
         } else {
             if let Some(parts) = last_turn.get_mut("parts").and_then(|p| p.as_array_mut()) {
                 let has_substantive_part = parts.iter().any(|part| {
@@ -1530,13 +1816,7 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
                     }
                     if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                         let t = text.trim();
-                        if t.is_empty() {
-                            false
-                        } else if t == "(no content)" || t == "·" {
-                            false
-                        } else {
-                            true
-                        }
+                        !t.is_empty() && t != "(no content)" && t != "·"
                     } else {
                         false
                     }
@@ -1572,8 +1852,8 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
     modified
 }
 
-/// Safely truncates a string slice to at most max_bytes, strictly aligning to UTF-8 character boundaries.
-/// If max_bytes falls within a multibyte character, it retreats to the nearest valid character boundary.
+/// 安全地按最大字节数截断字符串切片，保证切片边界严格对齐在 UTF-8 字符边界上。
+/// 若 max_bytes 恰好落在多字节字符中间，会自动向左回退到最近的合法字符边界。
 pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
         return s;
@@ -1585,31 +1865,13 @@ pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 
-/// Safely truncates a string slice to at most max_chars (Unicode scalar values).
-/// If total char count exceeds max_chars, returns valid slice of the first max_chars.
+/// 安全地按最大字符数 (Unicode 标量值) 截断字符串切片。
+/// 如果字符总数超过 max_chars，截取前 max_chars 个字符对应的有效切片。
 pub fn safe_truncate_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((byte_idx, _)) => &s[..byte_idx],
         None => s,
     }
-}
-
-/// [JEIKCODE SYNTHETIC USER REMINDER]
-/// Wraps mid-conversation system messages in `<system-reminder>` blocks.
-/// Informs the model that this content is a system background reminder, not user query,
-/// ensuring KV Cache stability by keeping top-level systemInstruction frozen.
-pub fn wrap_in_system_reminder(content: &str) -> String {
-    let trimmed = content.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-    if trimmed.starts_with("<system-reminder>") && trimmed.ends_with("</system-reminder>") {
-        return trimmed.to_string();
-    }
-    format!(
-        "<system-reminder>\nBefore the user's request for this turn, the system provides the following reminder for your awareness. Please note that this is from prior system messages, not spoken by the user:\n{}\n</system-reminder>",
-        trimmed
-    )
 }
 
 #[cfg(test)]
@@ -1680,6 +1942,45 @@ mod defense_tests {
     }
 
     #[test]
+    fn test_ensure_gemini_payload_ends_with_user_tool_turn_not_injected() {
+        // 末尾 model 轮为工具轮（functionCall）→ 合法中间态，不注入假用户话术
+        let mut payload = json!({
+            "contents": [
+                { "role": "user", "parts": [{ "text": "run the tool" }] },
+                {
+                    "role": "model",
+                    "parts": [
+                        { "thought": true, "text": "I should call a tool." },
+                        {
+                            "functionCall": {
+                                "id": "call_1",
+                                "name": "run_command",
+                                "args": { "CommandLine": "echo hi" }
+                            },
+                            "thoughtSignature": "AABBCC"
+                        }
+                    ]
+                }
+            ]
+        });
+        assert!(!ensure_gemini_payload_ends_with_user(&mut payload));
+        let contents = payload["contents"].as_array().unwrap();
+        assert_eq!(contents.len(), 2);
+
+        // 末尾 model 轮为纯正文（非工具轮）→ 仍然注入（原语义保留）
+        let mut payload2 = json!({
+            "contents": [
+                { "role": "user", "parts": [{ "text": "hello" }] },
+                { "role": "model", "parts": [{ "text": "hi there" }] }
+            ]
+        });
+        assert!(ensure_gemini_payload_ends_with_user(&mut payload2));
+        let contents2 = payload2["contents"].as_array().unwrap();
+        assert_eq!(contents2.len(), 3);
+        assert_eq!(contents2[2]["role"], "user");
+    }
+
+    #[test]
     fn test_wrap_in_system_reminder() {
         use super::wrap_in_system_reminder;
 
@@ -1699,23 +2000,23 @@ mod defense_tests {
 
     #[test]
     fn test_safe_truncate_str_utf8_boundaries() {
-        // "你好世界": each Chinese character is 3 bytes (12 bytes total):
+        // "你好世界" 每个汉字 3 字节，共 12 字节:
         // '你': 0..3, '好': 3..6, '世': 6..9, '界': 9..12
         let text = "你好世界";
         assert_eq!(safe_truncate_str(text, 0), "");
-        assert_eq!(safe_truncate_str(text, 1), ""); // falls inside '你', retreats to 0
-        assert_eq!(safe_truncate_str(text, 2), ""); // falls inside '你', retreats to 0
+        assert_eq!(safe_truncate_str(text, 1), ""); // 落在 '你' 中间，回退到 0
+        assert_eq!(safe_truncate_str(text, 2), ""); // 落在 '你' 中间，回退到 0
         assert_eq!(safe_truncate_str(text, 3), "你");
-        assert_eq!(safe_truncate_str(text, 4), "你"); // falls inside '好', retreats to 3
+        assert_eq!(safe_truncate_str(text, 4), "你"); // 落在 '好' 中间，回退到 3
         assert_eq!(safe_truncate_str(text, 5), "你");
         assert_eq!(safe_truncate_str(text, 6), "你好");
         assert_eq!(safe_truncate_str(text, 12), "你好世界");
         assert_eq!(safe_truncate_str(text, 100), "你好世界");
 
-        // Verify Issue #3493 scenario: 57th byte falls inside a 3-byte character
-        // Construct 55 bytes ASCII + "中文测试" (3 bytes each)
-        // "中文测试" starts at index 55: '中' (55..58)
-        // Index 57 falls directly in middle of '中' (55..58)
+        // 验证 Issue #3493 场景：第 57 字节落在 3 字节中文字符内部
+        // 构造 55 字节 ASCII + "中文测试"（每个 3 字节）
+        // "中文测试" 从索引 55 开始: '中' (55..58)
+        // 索引 57 正好落在 '中' 的中间 (55..58)
         let mut s3493 = "a".repeat(55);
         s3493.push_str("中文测试");
         assert!(!s3493.is_char_boundary(57));
@@ -1723,7 +2024,7 @@ mod defense_tests {
         assert_eq!(truncated.len(), 55);
         assert_eq!(truncated, "a".repeat(55));
 
-        // Emoji test (4 bytes: 🦀 0..4)
+        // Emoji 测试 (4 字节: 🦀 0..4)
         let emoji = "🦀🦀";
         assert_eq!(safe_truncate_str(emoji, 2), "");
         assert_eq!(safe_truncate_str(emoji, 4), "🦀");
@@ -1745,5 +2046,62 @@ mod defense_tests {
         assert_eq!(safe_truncate_chars(emoji_text, 6), "🎉Hello");
         assert_eq!(safe_truncate_chars(emoji_text, 8), "🎉Hello世界");
         assert_eq!(safe_truncate_chars(emoji_text, 9), "🎉Hello世界🦀");
+    }
+
+    #[test]
+    fn test_extract_multimodal_strictly_respects_image_whitelist_and_rejects_audio_and_files() {
+        let fake_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+        // 1. 合法白名单图片 (PNG)：正常提取
+        let mut extra_parts = Vec::new();
+        let valid_img_text = format!("![screen](data:image/png;base64,{})", fake_png_b64);
+        let res = extract_multimodal_from_tool_text(&valid_img_text, &mut extra_parts);
+        assert_eq!(extra_parts.len(), 1);
+        assert_eq!(extra_parts[0]["inlineData"]["mimeType"], "image/png");
+        assert!(res.contains("[Image: forwarded to visual input (image/png)]"));
+
+        // 2. 音频文件 (data:audio/mp3)：绝对不提取，保持原样透传
+        let mut audio_parts = Vec::new();
+        let audio_text = "Audio output: data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA";
+        let res_audio = extract_multimodal_from_tool_text(audio_text, &mut audio_parts);
+        assert_eq!(
+            audio_parts.len(),
+            0,
+            "音频文件绝对不能被提取为 inlineData 多模态"
+        );
+        assert_eq!(res_audio, audio_text, "音频文本必须 100% 原始透传");
+
+        // 3. PDF/文档文件 (data:application/pdf)：绝对不提取，保持原样透传
+        let mut pdf_parts = Vec::new();
+        let pdf_text = "PDF doc: data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwKL0xlbmd0aCAzIDA";
+        let res_pdf = extract_multimodal_from_tool_text(pdf_text, &mut pdf_parts);
+        assert_eq!(
+            pdf_parts.len(),
+            0,
+            "PDF/文档文件绝对不能被提取为 inlineData 多模态"
+        );
+        assert_eq!(res_pdf, pdf_text, "PDF 文本必须 100% 原始透传");
+
+        // 4. 非白名单图片格式 (SVG/TIFF)：绝对不提取，保持原样透传
+        let mut svg_parts = Vec::new();
+        let svg_text = "Vector icon: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg==";
+        let res_svg = extract_multimodal_from_tool_text(svg_text, &mut svg_parts);
+        assert_eq!(
+            svg_parts.len(),
+            0,
+            "SVG 非标准光栅图片绝对不能被提取为 inlineData"
+        );
+        assert_eq!(res_svg, svg_text, "SVG 必须保持原始透传");
+
+        // 5. JSON 格式工具输出中的音频或未知文件：绝对不提取
+        let mut json_audio_parts = Vec::new();
+        let json_audio = r#"{"type":"audio","image":"data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="}"#;
+        let res_json = extract_multimodal_from_tool_text(json_audio, &mut json_audio_parts);
+        assert_eq!(
+            json_audio_parts.len(),
+            0,
+            "JSON 中的音频字段绝对不能被误提取为多模态图片"
+        );
+        assert_eq!(res_json, json_audio);
     }
 }

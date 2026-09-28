@@ -15,6 +15,7 @@ import ThemeManager from './components/common/ThemeManager';
 import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
 import { UpdateNotification } from './components/UpdateNotification';
+import SuggestionDeleteThinkingModal from './components/common/SuggestionDeleteThinkingModal';
 import DebugConsole from './components/debug/DebugConsole';
 import { useEffect, startTransition } from 'react';
 import { useConfigStore } from './stores/useConfigStore';
@@ -217,6 +218,7 @@ function App() {
       <ThemeManager />
       <DebugConsole />
       <ErrorModal />
+      <SuggestionDeleteThinkingModal />
       {showNotification && (
         <UpdateNotification onClose={() => setShowNotification(false)} />
       )}

@@ -457,6 +457,22 @@ pub async fn clear_thinking_store() -> Result<usize, String> {
         .map_err(|e| format!("Spawn blocking failed: {}", e))?
 }
 
+/// 获取当前思考块存储的记录总数
+#[tauri::command]
+pub async fn get_thinking_store_count() -> Result<usize, String> {
+    tokio::task::spawn_blocking(crate::modules::proxy_db::get_thinking_records_count)
+        .await
+        .map_err(|e| format!("Spawn blocking failed: {}", e))?
+}
+
+/// 获取代理数据库磁盘占用字节数
+#[tauri::command]
+pub async fn get_proxy_db_disk_size() -> Result<u64, String> {
+    tokio::task::spawn_blocking(crate::modules::proxy_db::get_proxy_db_disk_bytes)
+        .await
+        .map_err(|e| format!("Spawn blocking failed: {}", e))?
+}
+
 /// 获取反代请求日志 (分页)
 #[tauri::command]
 pub async fn get_proxy_logs_paginated(

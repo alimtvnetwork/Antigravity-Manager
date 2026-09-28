@@ -60,6 +60,7 @@ function Accounts() {
     warmUpAccounts,
     warmUpAccount,
     updateAccountLabel,
+    updateAccountPriority,
   } = useAccountStore();
   const { config, showAllQuotas, toggleShowAllQuotas } = useConfigStore();
   const { updateInfo, installUpdate, isInstalling } = useUpdateStore();
@@ -1122,8 +1123,9 @@ function Accounts() {
       )}
 
       <AccountDetailsDialog
-        account={detailsAccount}
+        account={accounts.find(a => a.id === detailsAccount?.id) || null}
         onClose={() => setDetailsAccount(null)}
+        onUpdatePriority={updateAccountPriority}
       />
       <DeviceFingerprintDialog
         account={deviceAccount}
@@ -1221,6 +1223,7 @@ function Accounts() {
       <AccountDetailsDialog
         account={detailsAccount}
         onClose={() => setDetailsAccount(null)}
+        onUpdatePriority={updateAccountPriority}
       />
 
       {/* Account error dialog */}

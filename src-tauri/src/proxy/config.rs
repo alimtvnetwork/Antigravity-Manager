@@ -1008,6 +1008,9 @@ pub struct LogRetentionConfig {
     /// Application disk budget in MiB, including the database and WAL.
     #[serde(default = "default_max_disk_mb")]
     pub max_disk_mb: u64,
+    /// Max log storage limit in GB (supports decimals, e.g. 0.5)
+    #[serde(default = "default_max_storage_gb")]
+    pub max_storage_gb: f64,
 }
 
 fn default_max_body_age_hours() -> u64 {
@@ -1020,7 +1023,22 @@ fn default_max_rows() -> u64 {
     100_000
 }
 fn default_max_disk_mb() -> u64 {
-    450
+    1024
+}
+fn default_max_storage_gb() -> f64 {
+    1.0
+}
+
+impl LogRetentionConfig {
+    pub fn budget_bytes(&self) -> u64 {
+        if self.max_storage_gb > 0.0 {
+            (self.max_storage_gb * 1024.0 * 1024.0 * 1024.0) as u64
+        } else if self.max_disk_mb > 0 {
+            self.max_disk_mb.saturating_mul(1024 * 1024)
+        } else {
+            0
+        }
+    }
 }
 
 impl Default for LogRetentionConfig {
@@ -1029,7 +1047,8 @@ impl Default for LogRetentionConfig {
             max_body_age_hours: 24,
             max_age_days: 30,
             max_rows: 100_000,
-            max_disk_mb: default_max_disk_mb(),
+            max_disk_mb: 1024,
+            max_storage_gb: 1.0,
         }
     }
 }

@@ -1,20 +1,19 @@
-// OpenAI streaming mapper
+// OpenAI 流式转换
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use rand::Rng;
 use serde_json::{json, Value};
 use std::pin::Pin;
-use tracing::debug;
 use uuid::Uuid;
 
-/// Store thoughtSignature to session cache
+/// 保存 thoughtSignature 到会话缓存
 pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize) {
     if sig.is_empty() {
         return;
     }
 
-    // 2. [CRITICAL] Store to Session isolated cache (align with Claude protocol)
+    // 2. [CRITICAL] 存储到 Session 隔离缓存 (对齐 Claude 协议)
     crate::proxy::SignatureCache::global().cache_session_signature(
         session_id,
         sig.to_string(),
@@ -22,7 +21,7 @@ pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize
     );
 
     tracing::debug!(
-        "[ThoughtSig] Stored Session signature (sid: {}, len: {}, msg_count: {})",
+        "[ThoughtSig] 存储 Session 签名 (sid: {}, len: {}, msg_count: {})",
         session_id,
         sig.len(),
         message_count
@@ -48,12 +47,36 @@ fn extract_usage_metadata(u: &Value) -> Option<super::models::OpenAIUsage> {
 }
 
 pub fn create_openai_sse_stream<S, E>(
+    gemini_stream: Pin<Box<S>>,
+    model: String,
+    session_id: String,
+    message_count: usize,
+    client_tool_names: Option<std::collections::HashSet<String>>,
+    include_usage: bool,
+) -> Pin<Box<dyn Stream<Item = Result<Bytes, String>> + Send>>
+where
+    S: Stream<Item = Result<Bytes, E>> + Send + ?Sized + 'static,
+    E: std::fmt::Display + Send + 'static,
+{
+    create_openai_sse_stream_with_anchor(
+        gemini_stream,
+        model,
+        session_id,
+        message_count,
+        client_tool_names,
+        include_usage,
+        None,
+    )
+}
+
+pub fn create_openai_sse_stream_with_anchor<S, E>(
     mut gemini_stream: Pin<Box<S>>,
     model: String,
     session_id: String,
     message_count: usize,
     client_tool_names: Option<std::collections::HashSet<String>>,
     include_usage: bool,
+    causal_anchor: Option<String>,
 ) -> Pin<Box<dyn Stream<Item = Result<Bytes, String>> + Send>>
 where
     S: Stream<Item = Result<Bytes, E>> + Send + ?Sized + 'static,
@@ -70,9 +93,12 @@ where
         let mut emitted_tool_calls = std::collections::HashSet::new();
         let mut final_usage: Option<super::models::OpenAIUsage> = None;
         let mut error_occurred = false;
-        let mut has_emitted_content = false;
         let mut tool_call_index = 0;
-        let mut thinking_acc = crate::proxy::thinking_store::TurnAccumulator::new();
+        let mut thinking_acc = if let Some(ref a) = causal_anchor {
+            crate::proxy::thinking_store::TurnAccumulator::with_anchor(a)
+        } else {
+            crate::proxy::thinking_store::TurnAccumulator::new()
+        };
 
         let mut heartbeat_interval = tokio::time::interval(std::time::Duration::from_secs(15));
         heartbeat_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -98,7 +124,7 @@ where
                                             }
 
                                             if let Some(candidates) = actual_data.get("candidates").and_then(|c| c.as_array()) {
-                                                // [DEBUG] Log raw candidate to investigate empty reply issues
+                                                // [DEBUG] 打印原始 candidate 以排查空回复问题
                                                 if candidates.len() > 0 {
                                                      tracing::debug!("[Stream-Debug] Raw Candidate: {:?}", candidates[0]);
                                                 }
@@ -112,12 +138,14 @@ where
                                                             thinking_acc.ingest_part(part);
                                                             let is_thought_part = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
                                                             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
-                                                                let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
                                                                 if is_thought_part {
-                                                                    // Only write thought content to thought_out (for clients supporting reasoning_content) to prevent duplicate display
+                                                                    // thought 内容只写入 thought_out（给支持 reasoning_content 的客户端），防止客户端重复显示思维过程
+                                                                    let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
                                                                     thought_out.push_str(&clean_text);
+                                                                } else {
+                                                                    // 真实正文内容（非思考块）保留原始文本，避免技术讨论或代码反引号中的 `<think>` 标签被粗暴抹除为空
+                                                                    content_out.push_str(text);
                                                                 }
-                                                                else { content_out.push_str(&clean_text); }
                                                             }
                                                             if let Some(sig) = part.get("thoughtSignature").or(part.get("thought_signature")).and_then(|s| s.as_str()) {
                                                                 store_thought_signature(sig, &session_id, message_count);
@@ -136,7 +164,7 @@ where
                                                                     let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                     let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                    // [FIX #1575 & #3430] Normalize and sanitize tool parameter names and required fields for shell/PowerShell
+                                                                    // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
                                                                     super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                     let final_name = super::response::resolve_shell_tool_name(name, &client_tool_names);
@@ -193,7 +221,7 @@ where
                                                         if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                             let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                             if !query_list.is_empty() {
-                                                                grounding_text.push_str("\n\n---\n**🔍 Searched for:** ");
+                                                                grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
                                                                 grounding_text.push_str(&query_list.join(", "));
                                                             }
                                                         }
@@ -201,13 +229,13 @@ where
                                                             let mut links = Vec::new();
                                                             for (i, chunk) in chunks.iter().enumerate() {
                                                                 if let Some(web) = chunk.get("web") {
-                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
+                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
                                                                     let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                     links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                                 }
                                                             }
                                                             if !links.is_empty() {
-                                                                grounding_text.push_str("\n\n**🌐 Sources:**\n");
+                                                                grounding_text.push_str("\n\n**🌐 来源引文：**\n");
                                                                 grounding_text.push_str(&links.join("\n"));
                                                             }
                                                         }
@@ -215,7 +243,6 @@ where
                                                     }
 
                                                     let raw_finish_reason = candidate.get("finishReason").and_then(|f| f.as_str());
-                                                    let is_malformed_function_call = raw_finish_reason == Some("MALFORMED_FUNCTION_CALL");
 
                                                     let gemini_finish_reason = raw_finish_reason.map(|f| match f {
                                                         "STOP" => "stop",
@@ -226,19 +253,13 @@ where
                                                         _ => "stop",
                                                     });
 
-                                                    // [FIX #1575] If tool calls were emitted, force finish_reason to tool_calls
-                                                    // Prevents OpenAI clients from closing dialogue when Gemini returns STOP with tool calls
+                                                    // [FIX #1575] 如果发射了工具调用，强制设置为 tool_calls
+                                                    // 解决 Gemini 返回 STOP 但有工具调用时，OpenAI 客户端认为对话已结束的问题
                                                     let finish_reason = if !emitted_tool_calls.is_empty() && gemini_finish_reason.is_some() {
                                                         Some("tool_calls")
                                                     } else {
                                                         gemini_finish_reason
                                                     };
-
-                                                    // [FIX MALFORMED_FUNCTION_CALL] If model aborted due to unconfigured internal tools or format error
-                                                    // and emitted no content, inject helpful notice to avoid blank response
-                                                    if is_malformed_function_call && content_out.is_empty() && !has_emitted_content {
-                                                        content_out.push_str("We apologize, but the model encountered a format anomaly while attempting to retrieve real-time information. To query real-time weather or news, please use online mode (-online suffix) or configure a search plugin.");
-                                                    }
 
                                                     if !thought_out.is_empty() {
                                                         let reasoning_chunk = json!({
@@ -257,9 +278,11 @@ where
                                                     }
 
                                                     if !content_out.is_empty() || finish_reason.is_some() {
-                                                        if !content_out.is_empty() {
-                                                            has_emitted_content = true;
-                                                        }
+                                                        let delta = if !content_out.is_empty() {
+                                                            json!({ "content": content_out })
+                                                        } else {
+                                                            json!({})
+                                                        };
                                                         let mut openai_chunk = json!({
                                                             "id": &stream_id,
                                                             "object": "chat.completion.chunk",
@@ -267,7 +290,7 @@ where
                                                             "model": &model,
                                                             "choices": [{
                                                                 "index": idx as u32,
-                                                                "delta": { "content": content_out },
+                                                                "delta": delta,
                                                                 "finish_reason": finish_reason
                                                             }]
                                                         });
@@ -404,10 +427,14 @@ where
                                                     if let Some(parts) = candidate.get("content").and_then(|c| c.get("parts")).and_then(|p| p.as_array()) {
                                                         for part in parts {
                                                             thinking_acc.ingest_part(part);
-                                                            let _is_thought = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
+                                                            let is_thought = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
                                                             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
-                                                                let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
-                                                                content_out.push_str(&clean_text);
+                                                                if is_thought {
+                                                                    let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
+                                                                    content_out.push_str(&clean_text);
+                                                                } else {
+                                                                    content_out.push_str(text);
+                                                                }
                                                             }
                                                             if let Some(sig) = part.get("thoughtSignature").or(part.get("thought_signature")).and_then(|s| s.as_str()) {
                                                                 store_thought_signature(sig, &session_id, message_count);
@@ -647,7 +674,11 @@ where
                                                         }
 
                                                         if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
-                                                            let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
+                                                            let clean_text = if is_thought {
+                                                                text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "")
+                                                            } else {
+                                                                text.to_string()
+                                                            };
                                                             if !clean_text.is_empty() {
                                                                 if is_thought && message_item_emitted {
                                                                     // Once ordinary assistant text has started, it is the
@@ -725,7 +756,7 @@ where
                                                                 let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                 let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                // [FIX #1575 & #3430] Normalize and sanitize tool parameter names and required fields for shell/PowerShell
+                                                                // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
                                                                 super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                 let args_str = serde_json::to_string(&args).unwrap_or_default();
@@ -834,13 +865,13 @@ where
                                                     }
                                                 }
 
-                                                // Process groundingMetadata (search citations)
+                                                // 处理 groundingMetadata (搜索引文)
                                                 if let Some(grounding) = candidate.get("groundingMetadata") {
                                                     let mut grounding_text = String::new();
                                                     if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                         let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                         if !query_list.is_empty() {
-                                                            grounding_text.push_str("\n\n---\n**🔍 Searched for:** ");
+                                                            grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
                                                             grounding_text.push_str(&query_list.join(", "));
                                                         }
                                                     }
@@ -848,13 +879,13 @@ where
                                                         let mut links = Vec::new();
                                                         for (i, chunk) in chunks.iter().enumerate() {
                                                             if let Some(web) = chunk.get("web") {
-                                                                let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
+                                                                let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
                                                                 let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                 links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                             }
                                                         }
                                                         if !links.is_empty() {
-                                                            grounding_text.push_str("\n\n**🌐 Sources:**\n");
+                                                            grounding_text.push_str("\n\n**🌐 来源引文：**\n");
                                                             grounding_text.push_str(&links.join("\n"));
                                                         }
                                                     }
@@ -1611,10 +1642,8 @@ mod tests {
             if let Ok(bytes) = result {
                 let s = String::from_utf8_lossy(&bytes).to_string();
                 for line in s.lines() {
-                    if line.starts_with("data: ") {
-                        if !line.contains("[DONE]") {
-                            chunks.push(line.to_string());
-                        }
+                    if line.starts_with("data: ") && !line.contains("[DONE]") {
+                        chunks.push(line.to_string());
                     }
                 }
             }
@@ -1700,10 +1729,8 @@ mod tests {
             if let Ok(bytes) = result {
                 let s = String::from_utf8_lossy(&bytes).to_string();
                 for line in s.lines() {
-                    if line.starts_with("data: ") {
-                        if !line.contains("[DONE]") {
-                            chunks.push(line.to_string());
-                        }
+                    if line.starts_with("data: ") && !line.contains("[DONE]") {
+                        chunks.push(line.to_string());
                     }
                 }
             }
@@ -1771,10 +1798,8 @@ mod tests {
             if let Ok(bytes) = result {
                 let s = String::from_utf8_lossy(&bytes).to_string();
                 for line in s.lines() {
-                    if line.starts_with("data: ") {
-                        if !line.contains("[DONE]") {
-                            chunks.push(line.to_string());
-                        }
+                    if line.starts_with("data: ") && !line.contains("[DONE]") {
+                        chunks.push(line.to_string());
                     }
                 }
             }
@@ -1830,10 +1855,8 @@ mod tests {
             if let Ok(bytes) = result {
                 let s = String::from_utf8_lossy(&bytes).to_string();
                 for line in s.lines() {
-                    if line.starts_with("data: ") {
-                        if !line.contains("[DONE]") {
-                            chunks.push(line.to_string());
-                        }
+                    if line.starts_with("data: ") && !line.contains("[DONE]") {
+                        chunks.push(line.to_string());
                     }
                 }
             }
@@ -1871,5 +1894,73 @@ mod tests {
 
         assert!(has_reasoning, "Should stream reasoning_content");
         assert!(has_content, "Should stream content");
+    }
+
+    #[tokio::test]
+    async fn test_streaming_malformed_function_call_never_injects_hardcoded_online_prompt() {
+        let chunk_json = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        { "text": "Reasoning about weather...", "thought": true }
+                    ]
+                },
+                "finishReason": "MALFORMED_FUNCTION_CALL"
+            }]
+        });
+
+        let items: Vec<Result<Bytes, reqwest::Error>> =
+            vec![Ok(Bytes::from(format!("data: {}\n\n", chunk_json)))];
+
+        let gemini_stream = Box::pin(stream::iter(items));
+
+        let mut openai_stream = create_openai_sse_stream(
+            gemini_stream,
+            "gemini-3.7-flash".to_string(),
+            "test-malformed-session".to_string(),
+            0,
+            None,
+            false,
+        );
+
+        let mut all_content = String::new();
+        let mut final_finish_reason: Option<String> = None;
+
+        while let Some(result) = openai_stream.next().await {
+            if let Ok(bytes) = result {
+                let s = String::from_utf8_lossy(&bytes).to_string();
+                for line in s.lines() {
+                    if line.starts_with("data: ") && !line.contains("[DONE]") {
+                        let json_str = line.trim_start_matches("data: ").trim();
+                        if let Ok(json) = serde_json::from_str::<Value>(json_str) {
+                            if let Some(choices) = json.get("choices").and_then(|c| c.as_array()) {
+                                if let Some(choice) = choices.first() {
+                                    if let Some(delta) = choice.get("delta") {
+                                        if let Some(c) =
+                                            delta.get("content").and_then(|c| c.as_str())
+                                        {
+                                            all_content.push_str(c);
+                                        }
+                                    }
+                                    if let Some(fr) =
+                                        choice.get("finish_reason").and_then(|f| f.as_str())
+                                    {
+                                        final_finish_reason = Some(fr.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 验证绝对不会被注入任何臆测性的天气/联网假文本
+        assert!(
+            all_content.is_empty(),
+            "Expected empty content, got: {}",
+            all_content
+        );
+        assert_eq!(final_finish_reason, Some("stop".to_string()));
     }
 }

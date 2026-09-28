@@ -15,11 +15,13 @@ pub mod common; // Common utilities
 pub mod debug_logger;
 pub mod droid_sync; // Droid (Factory CLI) configuration sync
 pub mod handlers; // API endpoint handlers
+pub mod hermes_sync; // Hermes Agent configuration sync
 pub mod http_session_store; // HTTP multi-turn session history storage
 pub mod mappers; // Protocol mappers
 pub mod middleware; // Axum middleware
 pub mod model_specs; // Model specification management (v4.1.29)
 pub mod monitor; // Monitoring
+pub mod openclaw_sync; // OpenClaw configuration sync
 pub mod opencode_sync; // OpenCode configuration sync
 pub mod payload_audit; // Payload audit: header masking and concise persistence
 pub mod providers; // Extra upstream providers (z.ai, etc.)

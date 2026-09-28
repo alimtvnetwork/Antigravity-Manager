@@ -145,6 +145,7 @@ function Settings() {
         currentVersion: string;
         downloadUrl: string;
         source?: string;
+        channel?: 'stable' | 'beta';
     } | null>(null);
     const [isInstallerUpdating, setIsInstallerUpdating] = useState(false);
 
@@ -171,6 +172,7 @@ function Settings() {
             notify_on_update?: boolean;
             notify_via_email?: boolean;
             notify_via_telegram?: boolean;
+            update_channel?: 'stable' | 'beta';
         }>('get_update_settings')
             .then(settings => {
                 setFormData(prev => ({
@@ -180,6 +182,7 @@ function Settings() {
                     notify_on_update: settings.notify_on_update ?? true,
                     notify_via_email: settings.notify_via_email ?? true,
                     notify_via_telegram: settings.notify_via_telegram ?? true,
+                    update_channel: settings.update_channel || (appVersion.includes('-') ? 'beta' : 'stable'),
                 }));
             })
             .catch(err => console.error('Failed to load update settings:', err));
@@ -420,12 +423,14 @@ function Settings() {
                 current_version: string;
                 download_url: string;
                 source?: string;
+                channel?: 'stable' | 'beta';
             }>('check_update_via_script').catch(() => invoke<{
                 has_update: boolean;
                 latest_version: string;
                 current_version: string;
                 download_url: string;
                 source?: string;
+                channel?: 'stable' | 'beta';
             }>('check_for_updates'));
 
             setUpdateInfo({
@@ -434,6 +439,7 @@ function Settings() {
                 currentVersion: result.current_version,
                 downloadUrl: result.download_url,
                 source: result.source,
+                channel: result.channel,
             });
 
             if (result.has_update) {
@@ -2143,6 +2149,75 @@ function Settings() {
                                     </div>
                                 </div>
 
+                                {/* Update Channel Selector */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                        <span>{t('settings.about.update_channel')}:</span>
+                                        <div className="inline-flex p-1 bg-gray-100 dark:bg-base-300 rounded-xl border border-gray-200/60 dark:border-base-200">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await invoke('save_update_settings', {
+                                                            settings: {
+                                                                auto_check: formData.auto_check_update ?? true,
+                                                                last_check_time: 0,
+                                                                check_interval_hours: formData.update_check_interval ?? 24,
+                                                                update_channel: 'stable',
+                                                            }
+                                                        });
+                                                        setFormData(prev => ({ ...prev, update_channel: 'stable' }));
+                                                        setUpdateInfo(null);
+                                                        showToast(`${t('settings.about.update_channel')}: ${t('settings.about.channel_stable')}`, 'info');
+                                                    } catch (err) {
+                                                        showToast(`${t('common.error')}: ${err}`, 'error');
+                                                    }
+                                                }}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                                    (formData.update_channel || 'stable') === 'stable'
+                                                        ? 'bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm'
+                                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                                }`}
+                                            >
+                                                {t('settings.about.channel_stable')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await invoke('save_update_settings', {
+                                                            settings: {
+                                                                auto_check: formData.auto_check_update ?? true,
+                                                                last_check_time: 0,
+                                                                check_interval_hours: formData.update_check_interval ?? 24,
+                                                                update_channel: 'beta',
+                                                            }
+                                                        });
+                                                        setFormData(prev => ({ ...prev, update_channel: 'beta' }));
+                                                        setUpdateInfo(null);
+                                                        showToast(`${t('settings.about.update_channel')}: ${t('settings.about.channel_beta')}`, 'info');
+                                                    } catch (err) {
+                                                        showToast(`${t('common.error')}: ${err}`, 'error');
+                                                    }
+                                                }}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
+                                                    formData.update_channel === 'beta'
+                                                        ? 'bg-white dark:bg-base-100 text-amber-600 dark:text-amber-400 shadow-sm'
+                                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                                }`}
+                                            >
+                                                <span>{t('settings.about.channel_beta')}</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {formData.update_channel === 'beta' && (
+                                        <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90">
+                                            {t('settings.about.channel_beta_hint')}
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* Check for Updates */}
                                 <div className="flex flex-col items-center gap-3">
                                     <button
@@ -2159,8 +2234,13 @@ function Settings() {
                                         <div className="text-center">
                                             {updateInfo.hasUpdate ? (
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <div className="text-sm text-orange-600 dark:text-orange-400 font-medium">
-                                                        {t('settings.about.new_version_available', { version: updateInfo.latestVersion })}
+                                                    <div className="flex items-center gap-1.5 text-sm text-orange-600 dark:text-orange-400 font-medium">
+                                                        <span>{t('settings.about.new_version_available', { version: updateInfo.latestVersion })}</span>
+                                                        {updateInfo.channel === 'beta' && (
+                                                            <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                                                Beta
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {isBrewInstalled && (
@@ -2360,6 +2440,7 @@ function Settings() {
                         {t('settings.about.brew_upgrade_success')}
                     </p>
                 </ModalDialog>
+
 
                 {/* Support Modal */}
                 <div className={`modal ${isSupportModalOpen ? 'modal-open' : ''} z-[100]`}>

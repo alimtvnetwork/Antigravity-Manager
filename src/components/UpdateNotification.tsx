@@ -10,6 +10,9 @@ interface UpdateInfo {
   current_version: string;
   download_url: string;
   source?: string;
+  proxy_url?: string;
+  channel?: 'stable' | 'beta';
+  updater_json_url?: string;
 }
 
 type UpdateState = 'checking' | 'downloading' | 'ready' | 'error' | 'none' | 'manual';
@@ -52,6 +55,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
       setUpdateInfo(info);
       setUpdateState('manual');
       setTimeout(() => setIsVisible(true), 100);
+
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('Update check failed:', errorMsg);
@@ -147,9 +151,16 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                     : t('update_notification.title')}
                 </h3>
                 {updateInfo && (
-                  <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
-                    v{updateInfo.latest_version}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                      v{updateInfo.latest_version}
+                    </p>
+                    {updateInfo.channel === 'beta' && (
+                      <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        Beta
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

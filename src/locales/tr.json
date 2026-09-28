@@ -1292,8 +1292,8 @@
       "copy_base": "Base Kopyala"
     },
     "cli_sync": {
-      "title": "CLI Senkronizasyonu",
-      "subtitle": "Mevcut API URL'sini ve anahtarını AI CLI araçlarınızla senkronize edin",
+      "title": "Tek Tıkla Agent Araçları Yapılandırması",
+      "subtitle": "Mevcut API URL'sini ve anahtarını AI Agent araçlarınızla senkronize edin",
       "card_title": "{{name}} Yapılandırması",
       "status": {
         "not_installed": "Yüklü Değil",
@@ -1725,5 +1725,21 @@
       "fetchFailed": "Fetch failed: {{err}}",
       "queryFailed": "Failed to get valid quota or models. Please check if the API Key and Base URL are correct."
     }
+  },
+  "errors": {
+    "stream": {
+      "timeout_error": "Request timeout, please check your network connection",
+      "connection_error": "Connection failed, please check your network or proxy settings",
+      "decode_error": "Network unstable, data transmission interrupted. Try: 1) Check network 2) Switch proxy 3) Retry",
+      "stream_error": "Stream transmission error, please retry later",
+      "unknown_error": "Unknown error occurred, please retry later"
+    }
+  },
+  "suggestion_delete_thinking": {
+    "title": "Güncelleme Önerisi",
+    "message": "Yeni bir sürüm yüklendi. Geliştirici, uyumluluğu sağlamak için düşünme bloğu önbelleğini temizlemenizi önerir. Otomatik olarak yeniden oluşturulacaktır. Şimdi temizlensin mi?",
+    "confirm": "Şimdi Temizle",
+    "cancel": "İptal",
+    "success": "Düşünme bloğu önbelleği başarıyla temizlendi ve otomatik olarak yeniden oluşturulacak."
   }
 }

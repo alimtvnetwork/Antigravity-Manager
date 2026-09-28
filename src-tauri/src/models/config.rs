@@ -48,6 +48,12 @@ pub struct AppConfig {
     pub training_api_enabled: bool, // [NEW] Enable /api/v1/training REST API endpoints
     #[serde(default = "default_true")]
     pub remote_control_api_enabled: bool, // [NEW] Enable /api/v1/remote/control REST API endpoints
+    #[serde(default)]
+    pub suggestion_delete_thinking_store: Option<bool>, // [NEW] 建议删除历史思考块缓存开关
+    #[serde(default)]
+    pub thinking_cleanup_dismissed: Option<bool>, // [NEW] 用户是否已确认/忽略该建议
+    #[serde(default)]
+    pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] 用户已确认或忽略建议的目标版本号
 }
 
 fn default_auto_sync() -> bool {
@@ -241,6 +247,9 @@ impl AppConfig {
             lightweight_mode: false,
             training_api_enabled: true,
             remote_control_api_enabled: true,
+            suggestion_delete_thinking_store: None,
+            thinking_cleanup_dismissed: None,
+            dismissed_thinking_cleanup_version: None,
         }
     }
 }

@@ -1,4 +1,4 @@
-// [ported] normalized thinking and budget parameters
+// OpenAI → Gemini 请求转换
 use super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -28,9 +28,14 @@ fn collect_system_instruction_blocks(request: &OpenAIRequest) -> Vec<String> {
         }
     }
 
+    // [JEIKCODE FROZEN SYSTEM PRINCIPLE]
+    // 严格遵循系统指令绝对冻结法则：仅收集最开头的连续 system / developer 消息。
+    // 一旦遇到首个非 system/developer 消息（即对话已进入多轮状态），立即停止收集！
+    // 对话中途出现的任何 system/developer 消息一律保留在 contents 中作为 synthetic user 处理，
+    // 绝对严禁提取并追加至 systemInstruction，杜绝顶层系统前缀突变破坏 KV Cache！
     for msg in &request.messages {
         if msg.role != "system" && msg.role != "developer" {
-            continue;
+            break;
         }
         match &msg.content {
             Some(OpenAIContent::String(text)) => {
@@ -58,6 +63,7 @@ fn is_apply_patch_tool_name(name: &str) -> bool {
     name == "apply_patch" || name == "apply_patch_v2"
 }
 
+#[allow(dead_code)]
 fn should_preserve_tool_output(tool_name: &str, output: &str) -> bool {
     is_apply_patch_tool_name(tool_name)
         || output.contains("apply_patch verification failed")
@@ -174,7 +180,7 @@ pub fn transform_openai_request_with_session(
     mapped_model: &str,
     token: Option<&ProxyToken>,
     routing_session_id: &str,
-    signature_read_key: Option<&str>,
+    _signature_read_key: Option<&str>,
     is_responses_api: bool,
 ) -> (Value, String, usize, String) {
     let remember_cwd =
@@ -216,7 +222,7 @@ pub fn transform_openai_request_with_session(
         .unwrap_or(routing_session_id)
         .to_string();
     let message_count = request.messages.len();
-    // [ported] normalized thinking and budget parameters
+    // 将 OpenAI 工具转为 Value 数组以便探测
     let tools_val = request
         .tools
         .as_ref()
@@ -238,7 +244,7 @@ pub fn transform_openai_request_with_session(
     let is_under_v3 = crate::proxy::model_specs::is_gemini_under_v3(mapped_model)
         || crate::proxy::model_specs::is_gemini_under_v3(&request.model);
 
-    // [ported] normalized thinking and budget parameters
+    // [FIX] 仅当模型名称显式包含 "-thinking" 或 Gemini 3+ 思维模型时才视为 Gemini 思维模型
     let is_gemini_3_thinking = !is_under_v3
         && mapped_model_lower.contains("gemini")
         && (mapped_model_lower.contains("-thinking")
@@ -246,7 +252,7 @@ pub fn transform_openai_request_with_session(
             || mapped_model_lower.contains("gemini-pro")
             || mapped_model_lower.contains("-pro-agent"))
         && !mapped_model_lower.contains("claude");
-    // [ported] normalized thinking and budget parameters
+    // [FIX #2167] gemini-*-flash 支持 thinking (需为 Gemini 3 及以上版本)
     let is_gemini_flash_thinking = !is_under_v3
         && crate::proxy::model_specs::is_gemini_v3_or_above(mapped_model)
         && mapped_model_lower.contains("gemini")
@@ -256,16 +262,20 @@ pub fn transform_openai_request_with_session(
         && !mapped_model_lower.contains("claude");
     // Client thinking flags/budgets are ignored for enablement and fill.
     // Server authority: model-id heuristics + ThinkingStore hydrate/finalize only.
-    let user_enabled_thinking = request
+    let _user_enabled_thinking = request
         .thinking
         .as_ref()
         .map(|t| t.thinking_type.as_deref() == Some("enabled"))
         .unwrap_or(false);
-    let _user_thinking_budget = request.thinking.as_ref().and_then(|t| t.budget_tokens);
+    let _user_thinking_budget = request
+        .thinking
+        .as_ref()
+        .and_then(|t| t.budget_tokens)
+        .or_else(|| request.reasoning.as_ref().and_then(|r| r.max_tokens));
 
     let is_claude_model = mapped_model_lower.contains("claude");
     let is_claude_thinking = mapped_model_lower.ends_with("-thinking")
-        || (is_claude_model && (user_enabled_thinking || mapped_model_lower.contains("thinking")));
+        || (is_claude_model && mapped_model_lower.contains("thinking"));
     let force_server_thinking = !is_under_v3
         && crate::proxy::thinking_store::any_model_forces_server_thinking(&[
             request.model.as_str(),
@@ -276,27 +286,47 @@ pub fn transform_openai_request_with_session(
         || is_gemini_flash_thinking
         || force_server_thinking;
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    let actual_include_thinking = !is_under_v3 && (is_thinking_model || force_server_thinking);
+    // [NEW] 决定是否开启 Thinking 功能（纯服务端权威 vs 客户端直接控制）:
+    // 网关控制模式下：仅按映射后的模型 ID / 强制思考启发式开启，忽略客户端 thinking.type / budget / effort。
+    // 客户端直接控制模式下：若客户端显式关闭思考（type: disabled 或 budget: 0 或 effort: none），尊重客户端设置。
+    let client_switch = crate::proxy::pipeline::extract_client_thinking_switch(
+        request
+            .thinking
+            .as_ref()
+            .and_then(|t| t.thinking_type.as_deref()),
+        request
+            .thinking
+            .as_ref()
+            .and_then(|t| t.budget_tokens.map(|b| b as u64))
+            .or_else(|| {
+                request
+                    .reasoning
+                    .as_ref()
+                    .and_then(|r| r.max_tokens.map(|b| b as u64))
+            }),
+        request
+            .reasoning_effort
+            .as_deref()
+            .or_else(|| request.reasoning.as_ref().and_then(|r| r.effort.as_deref()))
+            .or_else(|| request.thinking.as_ref().and_then(|t| t.effort.as_deref())),
+    );
 
-    // [ported] normalized thinking and budget parameters
-    // Responses may pass previous_response_id as signature_read_key; always fall back to
-    // the stable ThinkingStore key so chat/responses share the same signature namespace.
-    let session_thought_sig = signature_read_key
-        .and_then(|key| crate::proxy::SignatureCache::global().get_session_signature(key))
-        .or_else(|| {
-            if signature_read_key == Some(thinking_store_key.as_str()) {
-                None
-            } else {
-                crate::proxy::SignatureCache::global().get_session_signature(&thinking_store_key)
-            }
-        });
+    let tb_config = crate::proxy::config::get_thinking_budget_config();
+    let is_client_control =
+        tb_config.control_source == crate::proxy::config::ThinkingControlSource::Client;
 
-    if user_enabled_thinking || _user_thinking_budget.is_some() {
+    let is_client_disabled = is_client_control && client_switch.is_disabled();
+
+    let actual_include_thinking = if is_client_disabled {
+        false
+    } else {
+        !is_under_v3 && (is_thinking_model || force_server_thinking || is_client_control)
+    };
+
+    if _user_enabled_thinking || _user_thinking_budget.is_some() {
         tracing::debug!(
             "[OpenAI-Thinking] Ignoring client thinking enable/budget (enabled={}, budget={:?}); server model heuristics decide fill",
-            user_enabled_thinking,
+            _user_enabled_thinking,
             _user_thinking_budget
         );
     }
@@ -313,12 +343,11 @@ pub fn transform_openai_request_with_session(
     // text part becomes one Gemini systemInstruction part (Anthropic-style).
     let mut system_instructions: Vec<String> = collect_system_instruction_blocks(request);
 
-    // Adheres to pure pass-through principle: does not replace date, path, UUID or other dynamic fields,
-    // preserving the client and agent's authentic environmental context.
-    // Identity declaration normalization is unified into the protocol-agnostic pipeline node:
-    // PromptSanitizer::normalize_system_identity. Per AGENTS.md Pipeline First design,
-    // adapters only handle parameter normalization and protocol translation, while sanitization
-    // is governed by the pipeline.
+    // 遵循纯透传原则：不替换日期、路径、UUID 等任何动态字段，完整保留客户端与 Agent 的真实环境感知。
+    // 身份声明归一化（Codex `based on GPT-x` / 厂商 `created by …` / Claude Agent SDK 等）已**统一收敛**
+    // 到协议无关的提示词清洗流水线节点：`PromptSanitizer::normalize_system_identity`，在系统提示词头部
+    // 窗口内做广谱匹配。依据 AGENTS.md「Pipeline First / Fix Strategy」——适配层只做参数归一化与协议转换，
+    // 清洗一律由流水线统一处理，避免同一类 WAF 风险在四个协议里各写一份特例。
     let mut seen_system_instruction_keys = std::collections::HashSet::new();
     system_instructions.retain(|inst| {
         let key = inst.trim();
@@ -347,17 +376,7 @@ pub fn transform_openai_request_with_session(
         }
     }
 
-    // [ported] normalized thinking and budget parameters
-    let thought_sig = session_thought_sig;
-    if thought_sig.is_some() {
-        tracing::debug!(
-            "[OpenAI-Request] Using session signature (sid: {}, len: {})",
-            session_id,
-            thought_sig.as_ref().unwrap().len()
-        );
-    }
-
-    // [ported] normalized thinking and budget parameters
+    // [New] 预先构建工具名称到原始 Schema 的映射，用于后续参数类型修正
     let mut tool_name_to_schema = std::collections::HashMap::new();
     if let Some(tools) = &request.tools {
         let flat_tools = flatten_tools(tools);
@@ -389,11 +408,15 @@ pub fn transform_openai_request_with_session(
         }
     }
 
-    // [ported] normalized thinking and budget parameters
-    let total_messages = request.messages.len();
-    let recent_message_window = 24usize;
-    // Find the index of the last assistant message in messages (absolute index)
-    let last_assistant_msg_idx = request
+    // 2. 构建 Gemini contents (过滤掉已作为 leading system 的指令，中途 system 消息就地转为 user 保持前缀)
+    let leading_system_count = request
+        .messages
+        .iter()
+        .take_while(|m| m.role == "system" || m.role == "developer")
+        .count();
+
+    // 找出 messages 中最后一个 assistant 角色的下标 (绝对索引)
+    let _last_assistant_msg_idx = request
         .messages
         .iter()
         .enumerate()
@@ -403,12 +426,12 @@ pub fn transform_openai_request_with_session(
         .messages
         .iter()
         .enumerate()
-        .filter(|(_, msg)| msg.role != "system" && msg.role != "developer")
+        .filter(|(idx, _)| *idx >= leading_system_count)
         .map(|(msg_index, msg)| {
-            let is_latest = msg_index >= total_messages.saturating_sub(recent_message_window);
             let role = match msg.role.as_str() {
                 "assistant" => "model",
                 "tool" | "function" => "user",
+                "system" | "developer" => "user",
                 _ => &msg.role,
             };
 
@@ -421,80 +444,27 @@ pub fn transform_openai_request_with_session(
                 .filter(|s| !s.is_empty());
 
             if role == "model" {
+                // [2026-09-27] 占位/缺失 reasoning 不再写 "..." 思考块。
+                // 官方样本 9/24 轮是「无思考块 + 锚点带签名」，空/占位思考不出站；
+                // 签名归位由流水线终审 place_turn_signature 按锚点规则处理。
                 if actual_include_thinking {
-                    // [ported] normalized thinking and budget parameters
-                    let thought_text = if let Some(rc) = client_reasoning {
-                        if crate::proxy::thinking_store::is_placeholder_thought(rc) {
-                            "..."
-                        } else {
-                            rc
-                        }
-                    } else {
-                        "..."
-                    };
-
-                    let is_last_assistant = Some(msg_index) == last_assistant_msg_idx;
-
-                    // [ported] normalized thinking and budget parameters
-                    let effective_sig = if is_responses_api {
-                        let mut sig_opt = None;
-                        if let Some(ref sig) = msg.signature {
-                            if sig == crate::proxy::thinking_store::SENTINEL_SIGNATURE || sig.len() >= 50 {
-                                let cached_family = crate::proxy::SignatureCache::global().get_signature_family(sig);
-                                match cached_family {
-                                    Some(family) => {
-                                        if crate::proxy::mappers::common_utils::is_model_compatible(&family, mapped_model) {
-                                            sig_opt = Some(sig.clone());
-                                        }
-                                    }
-                                    None => {
-                                        sig_opt = Some(sig.clone());
-                                    }
-                                }
+                    if let Some(rc) = client_reasoning {
+                        if !crate::proxy::thinking_store::is_placeholder_thought(rc) {
+                            // 纯净线缆透传：客户端若自带签名则无损透传；缺失签名全权委托流水线统一对齐与回填
+                            let mut thought_part = json!({
+                                "text": rc,
+                                "thought": true,
+                            });
+                            if let Some(ref sig) = msg.signature {
+                                thought_part["thoughtSignature"] = json!(sig);
                             }
+                            parts.push(thought_part);
                         }
-                        if sig_opt.is_none() {
-                            if let Some(ref tcs) = msg.tool_calls {
-                                for tc in tcs {
-                                    if let Some(s) = crate::proxy::SignatureCache::global().get_tool_signature(&tc.id) {
-                                        sig_opt = Some(s);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if sig_opt.is_none() {
-                            // Only latest assistant adopts global thought_sig; earlier turns freeze signatures
-                            if is_last_assistant {
-                                sig_opt = thought_sig.clone();
-                            } else {
-                                sig_opt = crate::proxy::SignatureCache::global()
-                                    .get_session_signature_at(&session_id, msg_index);
-                            }
-                            if sig_opt.is_none() {
-                                sig_opt = Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE.to_string());
-                            }
-                        }
-                        sig_opt.unwrap_or_else(|| crate::proxy::thinking_store::SENTINEL_SIGNATURE.to_string())
-                    } else {
-                        // [ported] normalized thinking and budget parameters
-                        thought_sig.clone().unwrap_or_else(|| crate::proxy::thinking_store::SENTINEL_SIGNATURE.to_string())
-                    };
-
-                    parts.push(json!({
-                        "text": thought_text,
-                        "thought": true,
-                        "thoughtSignature": effective_sig,
-                    }));
+                    }
                 } else if let Some(rc) = client_reasoning {
-                    // [ported] normalized thinking and budget parameters
-                    let text = if crate::proxy::thinking_store::is_placeholder_thought(rc) {
-                        "..."
-                    } else {
-                        rc
-                    };
-                    if !text.is_empty() {
-                        parts.push(json!({ "text": text }));
+                    // 思考关闭时，非占位思考降级为普通文本；占位/空直接跳过
+                    if !crate::proxy::thinking_store::is_placeholder_thought(rc) {
+                        parts.push(json!({ "text": rc }));
                     }
                 }
             }
@@ -503,19 +473,44 @@ pub fn transform_openai_request_with_session(
             // [FIX] Skip standard content mapping for tool/function roles to avoid duplicate parts
             // These are handled below in the "Handle tool response" section.
             let is_tool_role = msg.role == "tool" || msg.role == "function";
+            let is_mid_system_role = msg.role == "system" || msg.role == "developer";
             if let (Some(content), false) = (&msg.content, is_tool_role) {
-                match content {
-                    OpenAIContent::String(s) => {
-                        if !s.is_empty() {
-                            parts.extend(crate::proxy::mappers::common_utils::parse_markdown_images_to_parts(s));
-                        }
-                    }
-                    OpenAIContent::Array(blocks) => {
-                        for block in blocks {
-                            match block {
-                                OpenAIContentBlock::Text { text } => {
-                                    parts.extend(crate::proxy::mappers::common_utils::parse_markdown_images_to_parts(text));
+                if is_mid_system_role {
+                    // [JEIKCODE SYNTHETIC USER] 中途系统消息，转换为用户态下的 <system-reminder>，不破坏全局 systemInstruction 前缀
+                    let sys_text = match content {
+                        OpenAIContent::String(s) => s.clone(),
+                        OpenAIContent::Array(blocks) => {
+                            let mut joined = String::new();
+                            for b in blocks {
+                                if let OpenAIContentBlock::Text { text } = b {
+                                    if !joined.is_empty() {
+                                        joined.push('\n');
+                                    }
+                                    joined.push_str(text);
                                 }
+                            }
+                            joined
+                        }
+                    };
+                    let wrapped_reminder = crate::proxy::mappers::common_utils::wrap_in_system_reminder(&sys_text);
+                    if !wrapped_reminder.is_empty() {
+                        parts.push(json!({
+                            "text": wrapped_reminder
+                        }));
+                    }
+                } else {
+                    match content {
+                        OpenAIContent::String(s) => {
+                            if !s.is_empty() {
+                                parts.extend(crate::proxy::mappers::common_utils::parse_markdown_images_to_parts(s));
+                            }
+                        }
+                        OpenAIContent::Array(blocks) => {
+                            for block in blocks {
+                                match block {
+                                    OpenAIContentBlock::Text { text } => {
+                                        parts.extend(crate::proxy::mappers::common_utils::parse_markdown_images_to_parts(text));
+                                    }
                                 OpenAIContentBlock::ImageUrl { image_url } => {
                                     if image_url.url.starts_with("data:") {
                                         if let Some(pos) = image_url.url.find(",") {
@@ -536,9 +531,9 @@ pub fn transform_openai_request_with_session(
                                             "fileData": { "fileUri": &image_url.url, "mimeType": "image/jpeg" }
                                         }));
                                     } else {
-                                        // [ported] normalized thinking and budget parameters
+                                        // [NEW] 处理本地文件路径 (file:// 或 Windows/Unix 路径)
                                         let file_path = if image_url.url.starts_with("file://") {
-                                            // [ported] normalized thinking and budget parameters
+                                            // 移除 file:// 前缀
                                             #[cfg(target_os = "windows")]
                                             { image_url.url.trim_start_matches("file:///").replace('/', "\\") }
                                             #[cfg(not(target_os = "windows"))]
@@ -549,12 +544,12 @@ pub fn transform_openai_request_with_session(
 
                                         tracing::debug!("[OpenAI-Request] Reading local image: {}", file_path);
 
-                                        // [ported] normalized thinking and budget parameters
+                                        // 读取文件并转换为 base64
                                         if let Ok(file_bytes) = std::fs::read(&file_path) {
                                             use base64::Engine as _;
                                             let b64 = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
 
-                                            // [ported] normalized thinking and budget parameters
+                                            // 根据文件扩展名推断 MIME 类型
                                             let mime_type = if file_path.to_lowercase().ends_with(".png") {
                                                 "image/png"
                                             } else if file_path.to_lowercase().ends_with(".gif") {
@@ -592,7 +587,7 @@ pub fn transform_openai_request_with_session(
                                     }
                                 }
                                 OpenAIContentBlock::InputAudio { input_audio } => {
-                                    // [ported] normalized thinking and budget parameters
+                                    // [NEW] OpenAI 官方 input_audio (base64 + format) -> Gemini inlineData
                                     let mime = input_audio.mime_type();
                                     match crate::proxy::audio::audio_part_from_source(
                                         &input_audio.data,
@@ -627,11 +622,12 @@ pub fn transform_openai_request_with_session(
                     }
                 }
             }
+            }
 
             // Handle tool calls (assistant message)
             if let Some(tool_calls) = &msg.tool_calls {
                 for (_index, tc) in tool_calls.iter().enumerate() {
-                    /* Temporarily removed: prevent Codex CLI UI fragmentation
+                    /* 暂时移除：防止 Codex CLI 界面碎片化
                     if index == 0 && parts.is_empty() {
                          if mapped_model.contains("gemini-3") {
                               parts.push(json!({"text": "Thinking Process: Determining necessary tool actions."}));
@@ -639,24 +635,22 @@ pub fn transform_openai_request_with_session(
                     }
                     */
 
-                    let (mut args_str, func_name) = if let Some(func) = &tc.function {
-                        (func.arguments.clone(), func.name.clone())
+                    let mut args_str = String::new();
+                    let mut func_name = String::new();
+
+                    if let Some(func) = &tc.function {
+                        args_str = func.arguments.clone();
+                        func_name = func.name.clone();
                     } else if let Some(op) = &tc.operation {
-                        (
-                            serde_json::to_string(op).unwrap_or_else(|_| "{}".to_string()),
-                            "apply_patch".to_string(),
-                        )
+                        func_name = "apply_patch".to_string();
+                        args_str = serde_json::to_string(op).unwrap_or_else(|_| "{}".to_string());
                     } else {
                         continue;
-                    };
-
-                    if !is_latest && args_str.len() > 1000 && !is_apply_patch_tool_name(&func_name)
-                    {
-                        args_str = "{\"_truncated\": \"Arguments truncated to save context window.\"}".to_string();
                     }
+
                     let mut args = serde_json::from_str::<Value>(&args_str).unwrap_or(json!({}));
 
-                    // [ported] normalized thinking and budget parameters
+                    // [New] 利用通用引擎修正参数类型 (替代以前硬编码的 shell 工具修复逻辑)
                     if let Some(original_schema) = tool_name_to_schema.get(&func_name) {
                         crate::proxy::common::json_schema::fix_tool_call_args(&mut args, original_schema);
                     }
@@ -669,49 +663,9 @@ pub fn transform_openai_request_with_session(
                         }
                     });
 
-                    crate::proxy::common::json_schema::clean_json_schema(&mut func_call_part);
-
-                    // 1. Prefer tool-specific signature (Responses API validates client signature; other protocols query tool/session cache/sentinel)
-                    let tool_specific_sig = crate::proxy::SignatureCache::global()
-                        .get_tool_signature(&tc.id)
-                        .filter(|s| s != crate::proxy::thinking_store::SENTINEL_SIGNATURE);
-                    let mut effective_tc_sig = None;
-                    if is_responses_api {
-                        if let Some(ref sig) = tc.signature {
-                            if sig == crate::proxy::thinking_store::SENTINEL_SIGNATURE || sig.len() >= 50 {
-                                let cached_family = crate::proxy::SignatureCache::global().get_signature_family(sig);
-                                match cached_family {
-                                    Some(family) => {
-                                        if crate::proxy::mappers::common_utils::is_model_compatible(&family, mapped_model) {
-                                            effective_tc_sig = Some(sig.clone());
-                                        }
-                                    }
-                                    None => {
-                                        effective_tc_sig = Some(sig.clone());
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if effective_tc_sig.is_none() {
-                        effective_tc_sig = tool_specific_sig;
-                    }
-                    if effective_tc_sig.is_none() {
-                        effective_tc_sig = thought_sig.clone();
-                    }
-
-                    // Single genuine signature per turn principle:
-                    // First tool call attaches genuine signature (if any), subsequent parallel calls use 32-byte sentinel placeholder
-                    let has_preceding_fc = parts.iter().any(|p| p.get("functionCall").is_some());
-                    if !has_preceding_fc {
-                        if let Some(ref sig) = effective_tc_sig {
-                            func_call_part["thoughtSignature"] = json!(sig);
-                        } else if is_thinking_model || is_gemini_flash_thinking || actual_include_thinking {
-                            func_call_part["thoughtSignature"] = json!("skip_thought_signature_validator");
-                        }
-                    } else {
-                        func_call_part["thoughtSignature"] = json!("skip_thought_signature_validator");
+                    // 纯净线缆透传：客户端若自带签名则原样透传，未带则留空，全权委托进站流水线统一对齐与回填
+                    if let Some(ref sig) = tc.signature {
+                        func_call_part["thoughtSignature"] = json!(sig);
                     }
 
                     parts.push(func_call_part);
@@ -766,15 +720,11 @@ pub fn transform_openai_request_with_session(
 
                 let content_val = match &msg.content {
                     Some(OpenAIContent::String(s)) => {
-                        if !is_latest
-                            && s.len() > 1000
-                            && !should_preserve_tool_output(final_name, s)
-                        {
-                            format!("[Tool output truncated to save context. Original length: {}]", s.len())
-                        } else {
-                            s.clone()
-                        }
-                    },
+                        crate::proxy::mappers::common_utils::extract_multimodal_from_tool_text(
+                            s,
+                            &mut extra_parts,
+                        )
+                    }
                     Some(OpenAIContent::Array(blocks)) => {
                         let mut texts = Vec::new();
                         for block in blocks {
@@ -832,14 +782,21 @@ pub fn transform_openai_request_with_session(
                     None => "".to_string()
                 };
 
+                // [优化] 如果结果为空，注入显式确认信号，防止模型幻觉与 Gemini 400 校验异常
+                let final_content = if content_val.trim().is_empty() {
+                    "Command executed successfully.".to_string()
+                } else {
+                    content_val
+                };
+
                 let mut fr_part = json!({
                     "functionResponse": {
                        "name": final_name,
-                       "response": { "result": content_val },
+                       "response": { "result": final_content },
                        "id": msg.tool_call_id.clone().unwrap_or_default()
                     }
                 });
-                // Tool response (functionResponse) must never carry a thought signature
+                // 危险测试分支法则：tool 响应 (functionResponse) 绝不携带签名
                 if let Some(obj) = fr_part.as_object_mut() {
                     obj.remove("thoughtSignature");
                     obj.remove("thought_signature");
@@ -861,22 +818,13 @@ pub fn transform_openai_request_with_session(
         .filter(|msg| !msg["parts"].as_array().map(|a| a.is_empty()).unwrap_or(true))
         .collect();
 
-    // [ported] normalized thinking and budget parameters
-    let mut merged_contents: Vec<Value> = Vec::new();
-    for msg in contents {
-        if let Some(last) = merged_contents.last_mut() {
-            if last["role"] == msg["role"] {
-                // [ported] normalized thinking and budget parameters
-                if let (Some(last_parts), Some(msg_parts)) =
-                    (last["parts"].as_array_mut(), msg["parts"].as_array())
-                {
-                    last_parts.extend(msg_parts.iter().cloned());
-                    continue;
-                }
-            }
-        }
-        merged_contents.push(msg);
-    }
+    // 连续相同角色的消息**保持独立**（对齐官方形态）。
+    //
+    // 历史实现会合并它们，理由是 "Gemini 强制要求 user/model 交替"。但官方
+    // Antigravity 报文里连续 user 轮与连续 model 轮都是常态，v1internal 上游
+    // 并不要求严格交替；实测（2026-09-26，`gemini-3.8-flash-tiered` @ daily）
+    // 两种形态均 200 且上下文理解一致。
+    let mut merged_contents = contents;
     let protocol = if is_responses_api {
         crate::proxy::pipeline::ProxyProtocol::OpenAIResponses
     } else {
@@ -916,26 +864,28 @@ pub fn transform_openai_request_with_session(
         );
     }
 
-    // [ported] normalized thinking and budget parameters
+    // 3. 构建请求体
 
     let mut gen_config = json!({
-        "temperature": request.temperature.unwrap_or(1.0),
         // [CHANGED v4.1.24] Default topP from 0.95 → 1.0 to match native behavior
         "topP": request.top_p.unwrap_or(1.0),
         // [ADDED v4.1.24] topK=40 aligns with official client generationConfig
         "topK": 40,
     });
+    if let Some(temp) = request.temperature {
+        gen_config["temperature"] = json!(temp);
+    }
 
-    // [ported] normalized thinking and budget parameters
+    // [FIX] 移除旧的硬编码限额，改为动态查询 (v4.1.29)
     if let Some(max_tokens) = request.max_tokens {
         gen_config["maxOutputTokens"] = json!(max_tokens);
     } else {
-        // [ported] normalized thinking and budget parameters
+        // 使用动态优先的规格限额
         let limit = model_specs::get_max_output_tokens(mapped_model, token);
         gen_config["maxOutputTokens"] = json!(limit);
     }
 
-    // [ported] normalized thinking and budget parameters
+    // [NEW] 支持多候选结果数量 (n -> candidateCount)
     if let Some(n) = request.n {
         gen_config["candidateCount"] = json!(n);
     }
@@ -950,8 +900,21 @@ pub fn transform_openai_request_with_session(
         gen_config["seed"] = json!(seed);
     }
 
-    // [ported] normalized thinking and budget parameters
-    if actual_include_thinking {
+    // 为 thinking 模型注入 thinkingConfig (使用流水线统一配置治理)
+    if is_client_disabled {
+        tracing::debug!(
+            "[OpenAI-Request] Client direct control disabled thinking: removing thinkingConfig for {}",
+            mapped_model
+        );
+        crate::proxy::pipeline::InboundThinkingPipeline::configure_inbound_thinking(
+            mapped_model,
+            &mut gen_config,
+            client_switch,
+            None,
+            None,
+            token,
+        );
+    } else if actual_include_thinking {
         // [RESOLVE #1694] Check image thinking mode
         let image_thinking_mode = crate::proxy::config::get_image_thinking_mode();
         // Only disable if mode is explicitly "disabled" AND it's an image generation request
@@ -964,7 +927,7 @@ pub fn transform_openai_request_with_session(
                 "includeThoughts": false
             });
         } else {
-            // [CONFIGURABLE] Thinking budget: uniformly governed and resolved by InboundThinkingPipeline
+            // [CONFIGURABLE] 思考预算与思考配置：全协议统一由 InboundThinkingPipeline 流水线节点权威解析与治理
             let client_effort = request
                 .reasoning_effort
                 .as_deref()
@@ -974,24 +937,27 @@ pub fn transform_openai_request_with_session(
             let client_budget = request
                 .thinking
                 .as_ref()
-                .and_then(|t| t.budget_tokens.map(|b| b as u64));
+                .and_then(|t| t.budget_tokens.map(|b| b as u64))
+                .or_else(|| {
+                    request
+                        .reasoning
+                        .as_ref()
+                        .and_then(|r| r.max_tokens.map(|b| b as u64))
+                });
 
             let resolved_budget =
                 crate::proxy::pipeline::InboundThinkingPipeline::configure_inbound_thinking(
                     mapped_model,
                     &mut gen_config,
+                    client_switch,
                     client_effort,
                     client_budget,
                     token,
                 );
 
-            let tb_config = crate::proxy::config::get_thinking_budget_config();
-            let is_client_control =
-                tb_config.control_source == crate::proxy::config::ThinkingControlSource::Client;
-
             if let Some(final_budget) = resolved_budget {
-                // [CRITICAL] Thinking models require maxOutputTokens > thinkingBudget
-                // [FIX #1675] Use more conservative max_tokens increment for image models to avoid 128k limit
+                // [CRITICAL] 思维模型的 maxOutputTokens 必须大于 thinkingBudget
+                // [FIX #1675] 针对图像模型使用更保守的 max_tokens 增量，避免触发 128k 限制
                 let overhead = if config.request_type == "image_gen" {
                     2048
                 } else {
@@ -1023,33 +989,22 @@ pub fn transform_openai_request_with_session(
                     new_max,
                     final_budget
                 );
-
-                tracing::debug!(
-                    "[OpenAI-Request] Injected thinkingConfig for model {}: thinkingBudget={} (mode={:?})",
-                    mapped_model, final_budget, tb_config.mode
-                );
             }
 
-            // Client direct control mode: normalize and forward effort level (max, xhigh, high, medium, low)
-            if is_client_control {
-                if let Some(eff) = client_effort {
-                    if let Some(norm_level) = model_specs::normalize_client_thinking_level(eff) {
-                        let final_level =
-                            if mapped_model_lower.contains("pro") && norm_level == "MEDIUM" {
-                                "HIGH"
-                            } else {
-                                norm_level
-                            };
-                        gen_config["thinkingConfig"]["thinkingLevel"] = json!(final_level);
-                    }
-                }
-            }
+            tracing::debug!(
+                "[OpenAI-Request] Configured thinkingConfig for model {}: {:?} (source={:?})",
+                mapped_model,
+                gen_config["thinkingConfig"],
+                tb_config.control_source
+            );
         }
     }
 
-    // Tiered Flash models: includeThoughts only. Client reasoning.effort is ignored;
-    // thinking level/budget come from server model-id heuristics elsewhere.
-    if is_tiered_flash_model(mapped_model) {
+    // Tiered Flash models: if resolved_budget was None (default) in gateway authority, ensure only includeThoughts is set
+    if !is_client_control
+        && is_tiered_flash_model(mapped_model)
+        && gen_config["thinkingConfig"].get("thinkingBudget").is_none()
+    {
         gen_config["thinkingConfig"] = json!({ "includeThoughts": true });
     }
 
@@ -1099,9 +1054,9 @@ pub fn transform_openai_request_with_session(
         }
     }
 
-    // [ported] normalized thinking and budget parameters
+    // [CACHE] inner_request 先创建为空的 Map，后续按稳定顺序填充
     let mut inner_request = json!({});
-    // [ported] normalized thinking and budget parameters
+    // 先放 contents（后续会被 reordered_request 覆盖到后面）
     inner_request["contents"] = json!(contents);
     inner_request["generationConfig"] = gen_config;
     inner_request["safetySettings"] = json!([
@@ -1111,7 +1066,7 @@ pub fn transform_openai_request_with_session(
         { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "OFF" },
     ]);
 
-    // [PIPELINE] Clean prompts and anti-WAF pseudo-headers (including [undefined] deep clean via PromptSanitizer)
+    // [PIPELINE] 统一清洗提示词与风控伪 Header（含 [undefined] 深度清理，见 PromptSanitizer）
     crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
         &mut inner_request,
     );
@@ -1124,8 +1079,8 @@ pub fn transform_openai_request_with_session(
 
     let mut function_declarations: Vec<Value> = Vec::new();
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
+    // [CACHE:L2] 计算原始 tools 的 hash，查 Layer 2 缓存
+    // 命中则跳过所有 tools 处理逻辑，跨 session 复用已处理的 tools
     let mut tools_layer_hit = false;
     let tools_raw_hash = if let Some(ref original_tools) = request.tools {
         let raw_json = serde_json::to_string(original_tools).unwrap_or_default();
@@ -1161,7 +1116,7 @@ pub fn transform_openai_request_with_session(
                     func.clone()
                 } else {
                     let mut func = tool.clone();
-                    // [ported] normalized thinking and budget parameters
+                    // [FIX] 剔除 "type" 前如果不存在 "name"，则提取 "type" 兜底作为名字
                     if func.get("name").is_none() {
                         let tool_type_opt = func
                             .get("type")
@@ -1186,17 +1141,8 @@ pub fn transform_openai_request_with_session(
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 
-                if let Some(name) = &name_opt {
-                    // [ported] normalized thinking and budget parameters
-                    if name == "web_search"
-                        || name == "google_search"
-                        || name == "web_search_20250305"
-                        || name == "builtin_web_search"
-                    {
-                        continue;
-                    }
-                } else {
-                    // [ported] normalized thinking and budget parameters
+                if name_opt.is_none() {
+                    // [FIX] 如果工具没有名称，视为无效工具直接跳过 (防止 REQUIRED_FIELD_MISSING)
                     tracing::warn!(
                         "[OpenAI-Request] Skipping tool without name: {:?}",
                         gemini_func
@@ -1204,7 +1150,7 @@ pub fn transform_openai_request_with_session(
                     continue;
                 }
 
-                // [ported] normalized thinking and budget parameters
+                // [NEW CRITICAL FIX] 保留函数定义根层级的合法字段，移除所有非法字段 (如 type, execution, format 等)
                 if let Some(obj) = gemini_func.as_object_mut() {
                     let mut clean_obj = serde_json::Map::new();
                     if let Some(name) = obj.get("name") {
@@ -1219,35 +1165,23 @@ pub fn transform_openai_request_with_session(
                     *obj = clean_obj;
                 }
 
-                if gemini_func.get("name").and_then(|v| v.as_str()) == Some("apply_patch") {
-                    gemini_func.as_object_mut().unwrap().insert(
-                        "parameters".to_string(),
-                        json!({
-                            "type": "OBJECT",
-                            "properties": {
-                                "input": {
-                                    "type": "STRING",
-                                    "description": "The exact freeform V4A patch text to pass to Codex apply_patch. It must start with *** Begin Patch and end with *** End Patch. Do not wrap it in a shell command or command array."
-                                }
-                            },
-                            "required": ["input"]
-                        }),
-                    );
-                } else if let Some(params) = gemini_func.get_mut("parameters") {
-                    // [DEEP FIX] Clean JSON schema: expand $ref and strip format/definitions at all levels
+                if let Some(params) = gemini_func.get_mut("parameters") {
+                    // [DEEP FIX] 统一调用公共库清洗：展开 $ref 并剔除所有层级的 format/definitions
                     crate::proxy::common::json_schema::clean_json_schema(params);
 
-                    // Gemini v1internal requirements:
-                    // 1. type must be uppercase (OBJECT, STRING, etc.)
-                    // 2. root object must have "type": "OBJECT"
-
+                    // Gemini v1internal 要求：
+                    // 1. type 必须是大写 (OBJECT, STRING 等)
+                    // 2. 根对象必须有 "type": "OBJECT"，且必须声明 "properties" (即使为空)，杜绝 MALFORMED_FUNCTION_CALL
                     if let Some(params_obj) = params.as_object_mut() {
                         if !params_obj.contains_key("type") {
                             params_obj.insert("type".to_string(), json!("OBJECT"));
                         }
+                        if !params_obj.contains_key("properties") {
+                            params_obj.insert("properties".to_string(), json!({}));
+                        }
                     }
 
-                    // [ported] normalized thinking and budget parameters
+                    // 递归转换 type 为大写 (符合 Protobuf 定义)
                     enforce_uppercase_types(params);
                 } else {
                     gemini_func.as_object_mut().unwrap().insert(
@@ -1262,7 +1196,7 @@ pub fn transform_openai_request_with_session(
             }
         }
 
-        // [ported] normalized thinking and budget parameters
+        // [CACHE:L2] 缓存处理完成的 tools，下次相同 schema 可以直接命中
         if let Some(ref key) = tools_raw_hash {
             if !tools_layer_hit {
                 if let Ok(cached_json) = serde_json::to_string(&function_declarations) {
@@ -1278,7 +1212,7 @@ pub fn transform_openai_request_with_session(
         }
     } // end if !tools_layer_hit (includes the sort and insert below)
 
-    // [ported] normalized thinking and budget parameters
+    // [CACHE] 按 function name 稳定排序，确保跨请求的 tool schema 字节一致
     function_declarations.sort_by(|a, b| {
         let name_a = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let name_b = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -1290,28 +1224,10 @@ pub fn transform_openai_request_with_session(
     if !function_declarations.is_empty() {
         inner_request["tools"] = json!([{ "functionDeclarations": function_declarations }]);
 
-        let mut mode = "VALIDATED";
-        if let Some(tool_choice) = &request.tool_choice {
-            if let Some(s) = tool_choice.as_str() {
-                match s {
-                    "none" => mode = "NONE",
-                    "auto" => mode = "AUTO",
-                    "required" => mode = "ANY",
-                    _ => mode = "ANY",
-                }
-            } else {
-                mode = "ANY";
-            }
-        }
-
-        inner_request["toolConfig"] = json!({
-            "functionCallingConfig": { "mode": mode },
-            "includeServerSideToolInvocations": true
-        });
-        inner_request["tool_config"] = json!({
-            "function_calling_config": { "mode": mode },
-            "include_server_side_tool_invocations": true
-        });
+        // [REMOVED v4.8.2] toolConfig / tool_config 双写已移除：官方 Antigravity 报文不带该字段，
+        // 且 camelCase 与 snake_case 双份会写出一对矛盾配置 (AUTO vs VALIDATED)。
+        // 工具调用行为在协议无关节点 (align_google_request_prefix_topology) 统一处理。
+        let _mode = None as Option<&str>;
     }
 
     let global_prompt_config = crate::proxy::config::get_global_system_prompt();
@@ -1335,29 +1251,8 @@ pub fn transform_openai_request_with_session(
             &mut inner_request,
             Some(mapped_model),
         );
-        if let Some(tool_config) = inner_request.get_mut("toolConfig") {
-            if let Some(obj) = tool_config.as_object_mut() {
-                obj.insert("includeServerSideToolInvocations".to_string(), json!(true));
-            }
-        } else {
-            inner_request["toolConfig"] = json!({
-                "functionCallingConfig": { "mode": "VALIDATED" },
-                "includeServerSideToolInvocations": true
-            });
-        }
-        if let Some(tool_config_snake) = inner_request.get_mut("tool_config") {
-            if let Some(obj) = tool_config_snake.as_object_mut() {
-                obj.insert(
-                    "include_server_side_tool_invocations".to_string(),
-                    json!(true),
-                );
-            }
-        } else {
-            inner_request["tool_config"] = json!({
-                "function_calling_config": { "mode": "VALIDATED" },
-                "include_server_side_tool_invocations": true
-            });
-        }
+        // [REMOVED v4.8.2] toolConfig / tool_config 注入已移除（官方不带该字段），
+        // googleSearch 工具声明本身已由 inject_google_search_tool 写入 tools。
     }
 
     if let Some(image_config) = config.image_config {
@@ -1366,7 +1261,7 @@ pub fn transform_openai_request_with_session(
             obj.remove("systemInstruction");
             let gen_config = obj.entry("generationConfig").or_insert_with(|| json!({}));
             if let Some(gen_obj) = gen_config.as_object_mut() {
-                // [ported] normalized thinking and budget parameters
+                // [REMOVED] thinkingConfig 拦截已删除，允许图像生成时输出思维链
                 // gen_obj.remove("thinkingConfig");
                 gen_obj.remove("responseMimeType");
                 gen_obj.remove("responseModalities");
@@ -1375,11 +1270,11 @@ pub fn transform_openai_request_with_session(
         }
     }
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
+    // [ADDED v4.1.24] 注入稳定 sessionId 对齐官方规范
+    // [FIX session-1M] sessionId 混入对话指纹与代数:
+    //   - 同一对话内保持稳定(保留上游服务端会话缓存收益)
+    //   - 不同对话使用不同 sessionId,避免共享同一服务端累计会话
+    //   - 检测到上游 1M 累计报错后 bump 代数,新 sessionId = 全新上游会话,对话无感恢复
     if let Some(t) = token {
         let generation = crate::proxy::common::session::current_bump(&t.account_id, &session_id);
         inner_request["sessionId"] = json!(crate::proxy::common::session::derive_session_scoped(
@@ -1389,59 +1284,24 @@ pub fn transform_openai_request_with_session(
         ));
     }
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
-    let mut reordered_request = json!({});
-    // [ported] normalized thinking and budget parameters
-    if let Some(si) = inner_request.get("systemInstruction") {
-        reordered_request["systemInstruction"] = si.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    if let Some(tools) = inner_request.get("tools") {
-        reordered_request["tools"] = tools.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    if let Some(tc) = inner_request.get("toolConfig") {
-        reordered_request["toolConfig"] = tc.clone();
-    }
-    if let Some(tc_snake) = inner_request.get("tool_config") {
-        reordered_request["tool_config"] = tc_snake.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    if let Some(gc) = inner_request.get("generationConfig") {
-        reordered_request["generationConfig"] = gc.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    if let Some(ss) = inner_request.get("safetySettings") {
-        reordered_request["safetySettings"] = ss.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    if let Some(sid) = inner_request.get("sessionId") {
-        reordered_request["sessionId"] = sid.clone();
-    }
-    // [ported] normalized thinking and budget parameters
-    reordered_request["contents"] = inner_request.get("contents").cloned().unwrap_or(json!([]));
-    // [ported] normalized thinking and budget parameters
-    for (k, v) in inner_request.as_object().iter().flat_map(|o| o.iter()) {
-        if !reordered_request
-            .as_object()
-            .map(|o| o.contains_key(k))
-            .unwrap_or(false)
-        {
-            reordered_request[k] = v.clone();
-        }
-    }
+    // [CACHE] 重建 inner_request 字段顺序——稳定前缀在前，动态内容在后
+    // [CACHE] 统一委托进站流水线进行前缀拓扑规范化与对齐（Pipeline First 核心归一）
+    crate::proxy::pipeline::InboundThinkingPipeline::align_google_request_prefix_topology(
+        &mut inner_request,
+    );
+    let reordered_request = inner_request;
 
-    // Match the Gemini entrypoint: every upstream attempt gets a unique request ID.
-    // Reusing session/message-count IDs can pin later requests to an earlier 429 result.
-    let timestamp_ms = chrono::Utc::now().timestamp_millis();
-    let random_hex = &uuid::Uuid::new_v4().simple().to_string()[..8];
-    let request_id = format!("agent/{}/{}", timestamp_ms, random_hex);
+    // requestId：官方 5 段形态，三适配器共用（含 unixMs → 幂等隔离）。
+    // 历史教训：复用 session / message-count 的 ID 会把后续请求 pin 到一次更早的 429 结果。
+    let request_id =
+        super::super::common_utils::build_official_request_id(&session_id, message_count as u64);
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
+    // 官方客户端指纹（企业 / GCP 账号为 jetski）—— 三适配器共用，避免指纹漂移
+    let (official_user_agent, _official_ide_type) =
+        super::super::common_utils::resolve_official_fingerprint(token);
+
+    // [NEW] 动态检测是否需要标记为 agent 请求
+    // 只有在请求携带 tools，或上下文包含工具调用交互时才打上 agent 标签
     let has_tools = reordered_request
         .get("tools")
         .and_then(|t| t.as_array())
@@ -1456,10 +1316,10 @@ pub fn transform_openai_request_with_session(
 
     let mut final_body = json!({
         "project": project_id,
-        // [ported] normalized thinking and budget parameters
+        // [CACHE] 使用重排后的字段顺序，稳定前缀在前
         "request": reordered_request,
         "model": config.final_model,
-        "userAgent": "antigravity",
+        "userAgent": official_user_agent,
         // [CACHE] requestId stays last so its per-attempt value does not disturb the stable prefix.
         "requestId": request_id,
     });
@@ -1468,10 +1328,13 @@ pub fn transform_openai_request_with_session(
         final_body["requestType"] = json!("image_gen");
     } else if is_agent_request {
         final_body["requestType"] = json!("agent");
+        if let Some(obj) = final_body.as_object_mut() {
+            obj.insert("enabledCreditTypes".to_string(), json!(["GOOGLE_ONE_AI"]));
+        }
     }
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
+    // [CACHE:L3] 使用多层级缓存的 compute_prefix_hash 计算组合哈希
+    // Layer 1 + Layer 2 的独立 hash 组合 → Layer 3 key
     let prefix_hash = {
         let si_json = final_body["request"]
             .get("systemInstruction")
@@ -1493,8 +1356,8 @@ pub fn transform_openai_request_with_session(
         hash
     };
 
-    // [ported] normalized thinking and budget parameters
-    // [ported] normalized thinking and budget parameters
+    // [CACHE:L3] 尝试利用显式缓存：查询 prefix_hash 对应的 Gemini cache_id
+    // 若命中，注入 cachedContent 参数，告知 Gemini 服务端复用已缓存的前缀
     let cache_manager = crate::proxy::cache_manager::global_cache_manager();
     if let Some(cache_name) = cache_manager.lookup_prefix(&prefix_hash) {
         if let Some(req_obj) = final_body["request"].as_object_mut() {
@@ -1508,7 +1371,7 @@ pub fn transform_openai_request_with_session(
         }
     }
 
-    // [ported] normalized thinking and budget parameters
+    // [DEFENSE] 净化所有 contents 中的 inlineData，过滤或降级空数据/损坏数据
     if let Some(inner) = final_body.get_mut("request") {
         crate::proxy::mappers::common_utils::sanitize_gemini_payload_inline_data(inner);
     }
@@ -1516,7 +1379,7 @@ pub fn transform_openai_request_with_session(
     (final_body, session_id, message_count, prefix_hash)
 }
 
-fn enforce_uppercase_types(value: &mut Value) {
+pub fn enforce_uppercase_types(value: &mut Value) {
     if let Value::Object(map) = value {
         if let Some(type_val) = map.get_mut("type") {
             if let Value::String(ref mut s) = type_val {
@@ -1543,7 +1406,76 @@ fn enforce_uppercase_types(value: &mut Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proxy::mappers::openai::models::*;
+
+    #[test]
+    fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
+        // 1. max_completion_tokens 及 max_output_tokens 别名支持
+        let req1: OpenAIRequest = serde_json::from_value(json!({
+            "model": "o3-mini",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_completion_tokens": 16384
+        }))
+        .unwrap();
+        assert_eq!(req1.max_tokens, Some(16384));
+
+        let req1_resp: OpenAIRequest = serde_json::from_value(json!({
+            "model": "gpt-5",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_output_tokens": 128000
+        }))
+        .unwrap();
+        assert_eq!(req1_resp.max_tokens, Some(128000));
+
+        // 2. reasoning.max_tokens 与 reasoning.effort 支持
+        let req2: OpenAIRequest = serde_json::from_value(json!({
+            "model": "o3-mini",
+            "messages": [{"role": "user", "content": "hello"}],
+            "reasoning": {
+                "effort": "high",
+                "max_tokens": 8000
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            req2.reasoning.as_ref().and_then(|r| r.effort.as_deref()),
+            Some("high")
+        );
+        assert_eq!(
+            req2.reasoning.as_ref().and_then(|r| r.max_tokens),
+            Some(8000)
+        );
+
+        // 3. thinking.max_tokens 别名支持
+        let req3: OpenAIRequest = serde_json::from_value(json!({
+            "model": "o3-mini",
+            "messages": [{"role": "user", "content": "hello"}],
+            "thinking": {
+                "type": "enabled",
+                "max_tokens": 10240
+            }
+        }))
+        .unwrap();
+        assert_eq!(
+            req3.thinking.as_ref().and_then(|t| t.budget_tokens),
+            Some(10240)
+        );
+
+        // 4. 客户端控制模式下从 reasoning.max_tokens 提取 client_budget
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig {
+                control_source: crate::proxy::config::ThinkingControlSource::Client,
+                ..Default::default()
+            },
+        );
+        let (body, _, _, _) = transform_openai_request(&req2, "test-p", "gemini-3.7-flash", None);
+        crate::proxy::config::update_thinking_budget_config(
+            crate::proxy::config::ThinkingBudgetConfig::default(),
+        );
+        assert_eq!(
+            body["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
+            8000
+        );
+    }
 
     #[test]
     fn prompt_log_identity_cleanup_only_changes_system_instructions() {
@@ -1603,6 +1535,9 @@ mod tests {
 
     #[test]
     fn tiered_flash_ignores_client_effort_and_keeps_include_thoughts_only() {
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Server-authoritative: client reasoning.effort must not set thinkingLevel.
         for model in ["gemini-3.8-flash-tiered", "gemini-9.9-flash-tiered"] {
             assert!(is_tiered_flash_model(model));
@@ -1626,6 +1561,9 @@ mod tests {
 
     #[test]
     fn reasoning_effort_does_not_select_levels_for_pro_or_ordinary_flash() {
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         for model in ["gemini-3.1-pro-high", "gemini-3.8-flash"] {
             assert!(!is_tiered_flash_model(model));
             let body = tiered_request_body(model, Some("low"));
@@ -1643,10 +1581,7 @@ mod tests {
         let _lock = crate::proxy::config::TEST_CONFIG_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        crate::proxy::config::update_thinking_budget_config(
-            crate::proxy::config::ThinkingBudgetConfig::default(),
-        );
-        // [ported] normalized thinking and budget parameters
+        // 1. 启发式模型忽略客户端 reasoning_effort
         let req_high: OpenAIRequest = serde_json::from_value(json!({
             "model": "gemini-3.7-flash-high",
             "messages": [{"role": "user", "content": "hi"}],
@@ -1660,7 +1595,7 @@ mod tests {
             16384
         );
 
-        // [ported] normalized thinking and budget parameters
+        // 2. 裸模型 Flash 接管客户端 reasoning_effort
         let req_flash_high: OpenAIRequest = serde_json::from_value(json!({
             "model": "gemini-3-flash",
             "messages": [{"role": "user", "content": "hi"}],
@@ -1687,7 +1622,7 @@ mod tests {
             1024
         );
 
-        // [ported] normalized thinking and budget parameters
+        // 3. 裸模型 Flash 客户端未填或试图关闭：绝不关闭思考，强制回填 -medium (4096)
         let req_flash_none: OpenAIRequest = serde_json::from_value(json!({
             "model": "gemini-3-flash",
             "messages": [{"role": "user", "content": "hi"}]
@@ -1713,7 +1648,7 @@ mod tests {
             4096
         );
 
-        // [ported] normalized thinking and budget parameters
+        // 4. 裸模型 Flash 客户端传入自定义 budget_tokens：彻底被忽略，由服务端权威等级回填
         let req_flash_custom_budget: OpenAIRequest = serde_json::from_value(json!({
             "model": "gemini-3-flash",
             "messages": [{"role": "user", "content": "hi"}],
@@ -1923,7 +1858,7 @@ mod tests {
 
     #[test]
     fn test_issue_1602_custom_mode_gemini_capping() {
-        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         // [FIX #1602] Regression test for custom mode capping
@@ -1931,13 +1866,20 @@ mod tests {
             update_thinking_budget_config, ThinkingBudgetConfig, ThinkingBudgetMode,
         };
 
-        // [ported] normalized thinking and budget parameters
+        // 设置自定义模式，且数值超过 24k
         update_thinking_budget_config(ThinkingBudgetConfig {
             mode: ThinkingBudgetMode::Custom,
             custom_value: 32000,
             effort: None,
             ..Default::default()
         });
+        struct ResetGuard;
+        impl Drop for ResetGuard {
+            fn drop(&mut self) {
+                update_thinking_budget_config(ThinkingBudgetConfig::default());
+            }
+        }
+        let _guard = ResetGuard;
 
         let req = OpenAIRequest {
             model: "gemini-2.0-flash-thinking".to_string(),
@@ -1959,7 +1901,7 @@ mod tests {
             ..Default::default()
         };
 
-        // [ported] normalized thinking and budget parameters
+        // 验证针对 Gemini 模型即使是 Custom 模式也会被修正为 24576
         let (result, _sid, _msg_count, _) =
             transform_openai_request(&req, "test-v", "gemini-2.0-flash-thinking", None);
         let budget = result["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"]
@@ -1970,18 +1912,18 @@ mod tests {
             "Gemini custom budget must be capped to 24576"
         );
 
-        // [ported] normalized thinking and budget parameters
-        // [ported] normalized thinking and budget parameters
+        // 验证非 Gemini 模型（如 Claude 原生路径，假设映射后名不含 gemini）则不应截断
+        // 注意：这里的 transform_openai_request 第三个参数是 mapped_model
         let (result_claude, _, _, _) =
             transform_openai_request(&req, "test-v", "claude-3-7-sonnet", None);
         let _budget_claude = result_claude["request"]["generationConfig"]["thinkingConfig"]
             ["thinkingBudget"]
             .as_i64();
-        // [ported] normalized thinking and budget parameters
-        // [ported] normalized thinking and budget parameters
-        // [ported] normalized thinking and budget parameters
+        // 如果不是 gemini模型且协议中没带 thinking 配置，可能会是 None 或 32000
+        // 在该测试环境下，由于模拟的是 OpenAI 格式转 Gemini 路径，如果没有 gemini 关键词通常不进入 thinking 逻辑
+        // 我们只需确保 gemini 路径正确受限即可。
 
-        // [ported] normalized thinking and budget parameters
+        // 恢复默认配置
         update_thinking_budget_config(ThinkingBudgetConfig::default());
     }
 
@@ -2061,9 +2003,6 @@ mod tests {
 
     #[test]
     fn test_gemini_pro_thinking_injection() {
-        let _lock = crate::proxy::config::TEST_THINKING_BUDGET_MUTEX
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
         let req = OpenAIRequest {
             model: "gemini-3-pro-preview".to_string(),
             messages: vec![OpenAIMessage {
@@ -2087,6 +2026,9 @@ mod tests {
             ..Default::default()
         };
 
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Even Passthrough must NOT honor client budget anymore
         crate::proxy::config::update_thinking_budget_config(
             crate::proxy::config::ThinkingBudgetConfig {
@@ -2243,7 +2185,7 @@ mod tests {
         assert_eq!(max_output_tokens, 57344);
     }
     #[test]
-    fn test_vertex_ai_sentinel_injection() {
+    fn test_vertex_ai_drops_sentinel_injection() {
         // [FIX #1650] Verify sentinel signature injection for Vertex AI models
         let req = OpenAIRequest {
             model: "claude-3-7-sonnet-thinking".to_string(), // Triggers is_thinking_model
@@ -2284,16 +2226,17 @@ mod tests {
             .find(|p: &&serde_json::Value| p.get("functionCall").is_some())
             .expect("Should find functionCall part");
 
-        // Vertex AI requires sentinel
-        assert_eq!(
-            tool_part["thoughtSignature"].as_str(),
-            Some("skip_thought_signature_validator")
+        // 铁律：functionCall **绝不**携带哨兵 —— 官方报文 0/23 处出现哨兵，
+        // 它不属于 Antigravity 协议；签名归位统一交给流水线终审 `place_turn_signature`。
+        assert!(
+            tool_part.get("thoughtSignature").is_none(),
+            "functionCall must not carry a sentinel signature"
         );
     }
 
     #[test]
     fn test_issue_2167_gemini_flash_thinking_signature() {
-        // [ported] normalized thinking and budget parameters
+        // [FIX #2167] gemini-3-flash / gemini-3.1-flash 在无缓存签名时，functionCall 必须携带 thoughtSignature
         for model in &["gemini-3-flash", "gemini-3.1-flash"] {
             let req = OpenAIRequest {
                 model: model.to_string(),
@@ -2319,7 +2262,7 @@ mod tests {
             let contents = result["request"]["contents"]
                 .as_array()
                 .expect("Should have request.contents");
-            // [ported] normalized thinking and budget parameters
+            // flash 模型的 assistant role → Gemini "model" role
             let model_msg = contents
                 .iter()
                 .find(|c| c["role"] == "model")
@@ -2330,18 +2273,31 @@ mod tests {
                 .find(|p: &&serde_json::Value| p.get("functionCall").is_some())
                 .expect(&format!("[{model}] Should find functionCall part"));
 
-            assert_eq!(
-                tool_part["thoughtSignature"].as_str(),
-                Some("skip_thought_signature_validator"),
-                "[{model}] gemini-3-flash functionCall must contain thoughtSignature sentinel"
+            // 铁律：无缓存签名时**留空**（字段缺席），绝不发明哨兵。
+            // 官方报文里哨兵出现 0 次；签名缺失是被上游容忍的（在飞轮即缺席），
+            // 且该轮签名由流水线终审 `place_turn_signature` 按锚点归位。
+            assert!(
+                tool_part.get("thoughtSignature").is_none(),
+                "[{model}] functionCall must not carry a sentinel signature when unsigned"
             );
         }
     }
 
     #[test]
     fn test_openai_image_thinking_mode_disabled() {
+        let _lock = crate::proxy::config::TEST_CONFIG_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
         // 1. Set global mode to disabled
         crate::proxy::config::update_image_thinking_mode(Some("disabled".to_string()));
+        struct ImageResetGuard;
+        impl Drop for ImageResetGuard {
+            fn drop(&mut self) {
+                crate::proxy::config::update_image_thinking_mode(Some("enabled".to_string()));
+            }
+        }
+        let _guard = ImageResetGuard;
 
         let req = OpenAIRequest {
             model: "gemini-3-pro-image".to_string(),
@@ -2368,16 +2324,13 @@ mod tests {
         let thinking_config = gen_config["thinkingConfig"].as_object().unwrap();
 
         assert_eq!(thinking_config["includeThoughts"], false);
-
-        // 4. Reset global mode
-        crate::proxy::config::update_image_thinking_mode(Some("enabled".to_string()));
     }
 
     #[test]
     fn test_mixed_tools_injection_openai() {
-        // [ported] normalized thinking and budget parameters
+        // 验证 OpenAI 协议在 Gemini 2.0+ 下支持混合工具
         let req = OpenAIRequest {
-            model: "gpt-4o-online".to_string(), // [ported] normalized thinking and budget parameters
+            model: "gpt-4o-online".to_string(), // -online 触发联网
             messages: vec![OpenAIMessage {
                 role: "user".to_string(),
                 content: Some(OpenAIContent::String("Hello".to_string())),
@@ -2398,7 +2351,7 @@ mod tests {
             ..Default::default()
         };
 
-        // [ported] normalized thinking and budget parameters
+        // 使用 gemini-2.0-flash 模型执行转换
         let (result, _, _, _) = transform_openai_request(&req, "proj", "gemini-2.0-flash", None);
 
         let tools = result["request"]["tools"]
@@ -2413,7 +2366,7 @@ mod tests {
             .any(|t: &serde_json::Value| t.get("googleSearch").is_some());
 
         assert!(has_functions, "Should contain functionDeclarations");
-        // [ported] normalized thinking and budget parameters
+        // 在 v1internal 架构下，不开启混合调用以避免 400 报错
         assert!(
             !has_google_search,
             "v1internal should avoid mixed Google Search when functionDeclarations present"
@@ -2515,17 +2468,13 @@ mod tests {
             .find(|m| m["role"] == "model")
             .expect("Should have model message");
         let parts = assistant_msg["parts"].as_array().unwrap();
+        // 【2026-09-27】客户端无 reasoning 时不再填充 "..." 占位思考块；
+        // 无思考块是官方标准形态（锚点签名由流水线终审回填）。
         assert!(
-            parts
+            !parts
                 .iter()
-                .all(|p| p.get("thought") != Some(&serde_json::json!(true))),
-            "Unsigned placeholder thinking block must be stripped for Claude to avoid 400 Invalid signature"
-        );
-        assert!(
-            parts
-                .iter()
-                .any(|p| p.get("text") == Some(&serde_json::json!("Hi there!"))),
-            "Assistant visible text must be preserved"
+                .any(|p| p.get("thought") == Some(&serde_json::json!(true))),
+            "No placeholder thinking block should be injected when client reasoning is absent"
         );
     }
 
@@ -2603,11 +2552,10 @@ mod tests {
             .expect("thought part");
         // Reasoning content is preserved (Anthropic alignment)
         assert_eq!(thought["text"], client_thought);
-        // Signature is backfilled/sanitized by server (sentinel stripped on plain-text turn), ignoring client signature
-        assert!(
-            thought["thoughtSignature"].is_null()
-                || thought["thoughtSignature"].as_str()
-                    == Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
+        // Signature is backfilled by server (sentinel or cache), ignoring client signature
+        assert_eq!(
+            thought["thoughtSignature"].as_str(),
+            Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
         );
         let dumped = serde_json::to_string(&result).unwrap();
         assert!(
@@ -2640,6 +2588,183 @@ mod tests {
             gen_config.get("thinkingConfig").is_none(),
             "non-thinking model must not enable thinking from client flags"
         );
+    }
+
+    #[test]
+    fn test_issue_3515_client_direct_control_disable_thinking() {
+        use crate::proxy::config::{
+            update_thinking_budget_config, ThinkingBudgetConfig, ThinkingControlSource,
+        };
+
+        let mut config = ThinkingBudgetConfig::default();
+        config.control_source = ThinkingControlSource::Client;
+        update_thinking_budget_config(config);
+
+        struct ResetGuard;
+        impl Drop for ResetGuard {
+            fn drop(&mut self) {
+                crate::proxy::config::update_thinking_budget_config(ThinkingBudgetConfig::default());
+            }
+        }
+        let _guard = ResetGuard;
+
+        let req = OpenAIRequest {
+            model: "gemini-3.8-flash-medium".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            thinking: Some(ThinkingConfig {
+                thinking_type: None,
+                budget_tokens: Some(0),
+                effort: None,
+            }),
+            ..Default::default()
+        };
+
+        let (result, _sid, _msg_count, _) =
+            transform_openai_request(&req, "test-proj", "gemini-3.8-flash-medium", None);
+
+        let gen_config = result["request"]["generationConfig"]
+            .as_object()
+            .expect("Should have generationConfig in request payload");
+
+        // 客户端直接控制模式显式关闭思考：彻底不填任何转出报文的谷歌思考块字段和预算
+        assert!(gen_config.get("thinkingConfig").is_none());
+    }
+
+    #[test]
+    fn test_client_direct_control_all_scenarios_for_gemini_38_flash_tiered() {
+        use crate::proxy::config::{
+            update_thinking_budget_config, ThinkingBudgetConfig, ThinkingControlSource,
+        };
+
+        let mut config = ThinkingBudgetConfig::default();
+        config.control_source = ThinkingControlSource::Client;
+        update_thinking_budget_config(config);
+
+        struct ResetGuard;
+        impl Drop for ResetGuard {
+            fn drop(&mut self) {
+                crate::proxy::config::update_thinking_budget_config(ThinkingBudgetConfig::default());
+            }
+        }
+        let _guard = ResetGuard;
+
+        // 场景 1: 客户端思考块全缺省（开关缺省就是默认开，预算留空交由上游自适应）
+        let req_default = OpenAIRequest {
+            model: "gemini-3.8-flash-tiered".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let (res1, _, _, _) =
+            transform_openai_request(&req_default, "test-proj", "gemini-3.8-flash-tiered", None);
+        let tc1 = res1["request"]["generationConfig"]["thinkingConfig"]
+            .as_object()
+            .expect("Should have thinkingConfig for default thinking");
+        assert_eq!(tc1.get("includeThoughts"), Some(&json!(true)));
+        assert!(tc1.get("thinkingBudget").is_none());
+        assert!(tc1.get("thinkingLevel").is_none());
+
+        // 场景 2: 客户端仅传思考等级 low（等级透传，绝不脑补 budget，必须带上 includeThoughts: true）
+        let req_level = OpenAIRequest {
+            model: "gemini-3.8-flash-tiered".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            reasoning_effort: Some("low".to_string()),
+            ..Default::default()
+        };
+        let (res2, _, _, _) =
+            transform_openai_request(&req_level, "test-proj", "gemini-3.8-flash-tiered", None);
+        let tc2 = res2["request"]["generationConfig"]["thinkingConfig"]
+            .as_object()
+            .expect("Should have thinkingConfig for level");
+        assert_eq!(tc2.get("includeThoughts"), Some(&json!(true)));
+        assert_eq!(tc2.get("thinkingLevel"), Some(&json!("LOW")));
+        assert!(tc2.get("thinkingBudget").is_none());
+
+        // 场景 3: 客户端仅传预算 8192（忠实透传预算，绝不脑补等级，必须带上 includeThoughts: true）
+        let req_budget = OpenAIRequest {
+            model: "gemini-3.8-flash-tiered".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            thinking: Some(ThinkingConfig {
+                thinking_type: Some("enabled".to_string()),
+                budget_tokens: Some(8192),
+                effort: None,
+            }),
+            ..Default::default()
+        };
+        let (res3, _, _, _) =
+            transform_openai_request(&req_budget, "test-proj", "gemini-3.8-flash-tiered", None);
+        let tc3 = res3["request"]["generationConfig"]["thinkingConfig"]
+            .as_object()
+            .expect("Should have thinkingConfig for budget");
+        assert_eq!(tc3.get("includeThoughts"), Some(&json!(true)));
+        assert_eq!(tc3.get("thinkingBudget"), Some(&json!(8192)));
+        assert!(tc3.get("thinkingLevel").is_none());
+        // 且验证 maxOutputTokens 自动垫高保证 > budget
+        let max_out = res3["request"]["generationConfig"]["maxOutputTokens"]
+            .as_i64()
+            .unwrap();
+        assert!(max_out > 8192);
+    }
+
+    #[test]
+    fn test_issue_3515_gateway_control_preserves_medium_budget_when_client_budget_zero() {
+        use crate::proxy::config::{
+            update_thinking_budget_config, ThinkingBudgetConfig, ThinkingControlSource,
+        };
+
+        let mut config = ThinkingBudgetConfig::default();
+        config.control_source = ThinkingControlSource::Gateway;
+        update_thinking_budget_config(config);
+
+        struct ResetGuard;
+        impl Drop for ResetGuard {
+            fn drop(&mut self) {
+                crate::proxy::config::update_thinking_budget_config(ThinkingBudgetConfig::default());
+            }
+        }
+        let _guard = ResetGuard;
+
+        let req = OpenAIRequest {
+            model: "gemini-3.8-flash-medium".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            thinking: Some(ThinkingConfig {
+                thinking_type: None,
+                budget_tokens: Some(0),
+                effort: None,
+            }),
+            ..Default::default()
+        };
+
+        let (result, _sid, _msg_count, _) =
+            transform_openai_request(&req, "test-proj", "gemini-3.8-flash-medium", None);
+
+        let gen_config = result["request"]["generationConfig"]
+            .as_object()
+            .expect("Should have generationConfig in request payload");
+        let thinking_config = gen_config["thinkingConfig"].as_object().unwrap();
+
+        // 网关权威控制模式下，90% 用户行为保持不变，依然权威锁定 4000 预算
+        assert_eq!(thinking_config.get("thinkingBudget"), Some(&json!(4000)));
+        assert_eq!(thinking_config.get("includeThoughts"), Some(&json!(true)));
     }
 
     #[test]
@@ -2800,11 +2925,10 @@ mod tests {
             .find(|p| p.get("thought") == Some(&json!(true)))
             .unwrap();
         assert_eq!(chat_thought["text"], client_thought);
-        // Chat API signature must be server-filled/sanitized (sentinel stripped on plain-text turn), not client signature
-        assert!(
-            chat_thought["thoughtSignature"].is_null()
-                || chat_thought["thoughtSignature"].as_str()
-                    == Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
+        // Chat API signature must be server-filled (sentinel), not client signature
+        assert_eq!(
+            chat_thought["thoughtSignature"].as_str(),
+            Some(crate::proxy::thinking_store::SENTINEL_SIGNATURE)
         );
     }
 
@@ -2854,12 +2978,15 @@ mod tests {
         let props = run_cmd["parameters"]["properties"].as_object().unwrap();
         assert!(props.contains_key("command"));
         assert!(
-            props.contains_key("description"),
-            "description parameter is preserved via pure tool schema passthrough (#3504)"
+            !props.contains_key("description"),
+            "description parameter must be stripped for Gemini"
         );
         let req_arr = run_cmd["parameters"]["required"].as_array().unwrap();
         assert!(req_arr.iter().any(|v| v == "command"));
-        assert!(req_arr.iter().any(|v| v == "description"));
+        assert!(
+            !req_arr.iter().any(|v| v == "description"),
+            "description must not be required"
+        );
     }
 
     #[test]
@@ -2868,14 +2995,10 @@ mod tests {
         let sig_round_1 = "s1_".to_string() + &"a".repeat(60);
         let sig_round_2 = "s2_".to_string() + &"b".repeat(60);
 
-        let call_1_id = format!("call_1_{}", uuid::Uuid::new_v4());
-        let call_2_id = format!("call_2_{}", uuid::Uuid::new_v4());
+        // 缓存第 1 轮工具的专属签名
+        crate::proxy::SignatureCache::global().cache_tool_signature("call_1", sig_round_1.clone());
 
-        // Cache round 1 tool dedicated signature
-        crate::proxy::SignatureCache::global()
-            .cache_tool_signature(&call_1_id, sig_round_1.clone());
-
-        // Simulate round 2 just completed, generating session-level signature sig_round_2 (via previous_response_id)
+        // 模拟第 2 轮刚完成，产生了会话级别的最新签名 sig_round_2 (通过 previous_response_id)
         let prev_resp_id = format!("resp-prev-{}", uuid::Uuid::new_v4());
         crate::proxy::SignatureCache::global().cache_session_signature(
             &prev_resp_id,
@@ -2883,20 +3006,20 @@ mod tests {
             3,
         );
 
-        // Build round 3 request: including full context of rounds 1 and 2
+        // 构造第 3 轮请求：包含历史第 1 轮、第 2 轮的完整上下文
         let req = OpenAIRequest {
             model: "gemini-3.8-flash-high".to_string(),
             messages: vec![
                 OpenAIMessage {
                     role: "user".to_string(),
-                    content: Some(OpenAIContent::String("Round 1 instruction".to_string())),
+                    content: Some(OpenAIContent::String("第 1 轮指令".to_string())),
                     ..Default::default()
                 },
                 OpenAIMessage {
                     role: "assistant".to_string(),
                     content: None,
                     tool_calls: Some(vec![ToolCall {
-                        id: call_1_id.clone(),
+                        id: "call_1".to_string(),
                         r#type: "function".to_string(),
                         function: Some(ToolFunction {
                             name: "run_command".to_string(),
@@ -2911,7 +3034,7 @@ mod tests {
                 },
                 OpenAIMessage {
                     role: "tool".to_string(),
-                    tool_call_id: Some(call_1_id),
+                    tool_call_id: Some("call_1".to_string()),
                     content: Some(OpenAIContent::String("file1.txt".to_string())),
                     ..Default::default()
                 },
@@ -2919,7 +3042,7 @@ mod tests {
                     role: "assistant".to_string(),
                     content: None,
                     tool_calls: Some(vec![ToolCall {
-                        id: call_2_id.clone(),
+                        id: "call_2".to_string(),
                         r#type: "function".to_string(),
                         function: Some(ToolFunction {
                             name: "run_command".to_string(),
@@ -2934,13 +3057,13 @@ mod tests {
                 },
                 OpenAIMessage {
                     role: "tool".to_string(),
-                    tool_call_id: Some(call_2_id),
+                    tool_call_id: Some("call_2".to_string()),
                     content: Some(OpenAIContent::String("hello world".to_string())),
                     ..Default::default()
                 },
                 OpenAIMessage {
                     role: "user".to_string(),
-                    content: Some(OpenAIContent::String("Round 3 instruction".to_string())),
+                    content: Some(OpenAIContent::String("第 3 轮指令".to_string())),
                     ..Default::default()
                 },
             ],
@@ -2959,45 +3082,19 @@ mod tests {
 
         let contents = result["request"]["contents"].as_array().unwrap();
 
-        // Verify: Round 1 model
+        // 验证：第 1 轮 model
         let model_1_parts = contents[1]["parts"].as_array().unwrap();
-        assert_eq!(
-            model_1_parts[0]["thought"], true,
-            "Round 1 first part must be thought block"
-        );
-        let sig_1 = model_1_parts[0]["thoughtSignature"]
-            .as_str()
-            .or_else(|| {
-                model_1_parts
-                    .get(1)
-                    .and_then(|p| p["thoughtSignature"].as_str())
-            })
-            .unwrap();
-        // Core assertion: historical round 1 must never be overwritten by round 2 signature!
-        assert_ne!(
-            sig_1, sig_round_2,
-            "Historical round 1 must not be overwritten by latest signature"
-        );
+        assert_eq!(model_1_parts[0]["thought"], true, "第 1 轮首位必须是思考块");
+        let sig_1 = model_1_parts[0]["thoughtSignature"].as_str().unwrap();
+        // 核心断言：历史第 1 轮绝不能被最新一轮的签名 sig_round_2 覆盖！
+        assert_ne!(sig_1, sig_round_2, "历史第 1 轮绝不能被最新签名覆盖");
 
-        // Verify: latest model message (Round 2)
+        // 验证：最新一条 model（第 2 轮）
         let model_2_parts = contents[3]["parts"].as_array().unwrap();
-        assert_eq!(
-            model_2_parts[0]["thought"], true,
-            "Round 2 first part must be thought block"
-        );
-        let sig_2 = model_2_parts[0]["thoughtSignature"]
-            .as_str()
-            .or_else(|| {
-                model_2_parts
-                    .get(1)
-                    .and_then(|p| p["thoughtSignature"].as_str())
-            })
-            .unwrap();
-        // Latest model should adopt signature from prev_resp_id
-        assert_eq!(
-            sig_2, sig_round_2,
-            "Latest model should inherit previous round signature"
-        );
+        assert_eq!(model_2_parts[0]["thought"], true, "第 2 轮首位必须是思考块");
+        let sig_2 = model_2_parts[0]["thoughtSignature"].as_str().unwrap();
+        // 最新一条 model 应当正确采纳 prev_resp_id 的签名
+        assert_eq!(sig_2, sig_round_2, "最新一条 model 应当正确继承上一轮签名");
     }
 
     #[test]
@@ -3007,7 +3104,7 @@ mod tests {
             messages: vec![
                 OpenAIMessage {
                     role: "user".to_string(),
-                    content: Some(OpenAIContent::String("Execute command".to_string())),
+                    content: Some(OpenAIContent::String("执行命令".to_string())),
                     ..Default::default()
                 },
                 OpenAIMessage {
@@ -3045,7 +3142,7 @@ mod tests {
             transform_openai_request(&req, "test-proj", "gemini-3.8-flash-high", None);
         let contents = result["request"]["contents"].as_array().unwrap();
 
-        // Verify command in assistant functionCall.args was not stripped
+        // 验证 assistant 的 functionCall.args 中的 command 绝对未被剔除
         let model_parts = contents[1]["parts"].as_array().unwrap();
         let fc = model_parts
             .iter()
@@ -3054,13 +3151,13 @@ mod tests {
         let args = &fc["functionCall"]["args"];
         assert_eq!(
             args["command"], "git checkout main",
-            "command argument must be preserved"
+            "command 参数必须完好保留！"
         );
         assert_eq!(
             args["description"], "Run: git checkout main",
-            "description argument must be preserved"
+            "description 参数必须完好保留！"
         );
-        assert_eq!(args["shell"], "default", "shell argument must be preserved");
+        assert_eq!(args["shell"], "default", "shell 参数必须完好保留！");
     }
 
     #[test]
@@ -3070,7 +3167,7 @@ mod tests {
             messages: vec![
                 OpenAIMessage {
                     role: "user".to_string(),
-                    content: Some(OpenAIContent::String("Modify file".to_string())),
+                    content: Some(OpenAIContent::String("修改文件".to_string())),
                     ..Default::default()
                 },
                 OpenAIMessage {
@@ -3125,22 +3222,184 @@ mod tests {
             transform_openai_request(&req, "test-proj", "gemini-3.8-flash-high", None);
         let contents = result["request"]["contents"].as_array().unwrap();
 
-        // Verify round 1 tool response name is edit_file and not overwritten by subsequent run_command with same ID
+        // 验证第 1 轮工具响应的名字为 edit_file，绝不能被后续同 ID 的 run_command 覆盖
         let tool_resp_1 = contents[2]["parts"][0]["functionResponse"]["name"]
             .as_str()
             .unwrap();
         assert_eq!(
             tool_resp_1, "edit_file",
-            "Round 1 tool response must match edit_file tool name"
+            "第 1 轮工具响应必须匹配其调用时的 edit_file 工具名"
         );
 
-        // Verify round 2 tool response name is run_command
+        // 验证第 2 轮工具响应的名字为 run_command
         let tool_resp_2 = contents[4]["parts"][0]["functionResponse"]["name"]
             .as_str()
             .unwrap();
         assert_eq!(
             tool_resp_2, "run_command",
-            "Round 2 tool response must match run_command tool name"
+            "第 2 轮工具响应必须匹配其调用时的 run_command 工具名"
+        );
+    }
+
+    #[test]
+    fn test_tool_result_multimodal_image_extraction_and_passthrough() {
+        let fake_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let tool_content = format!(
+            "Here is the screenshot: ![screen](data:image/png;base64,{}) and some log text",
+            fake_b64
+        );
+
+        let req = OpenAIRequest {
+            model: "gemini-2.5-flash".to_string(),
+            messages: vec![
+                OpenAIMessage {
+                    role: "user".to_string(),
+                    content: Some(OpenAIContent::String("Take screenshot".to_string())),
+                    ..Default::default()
+                },
+                OpenAIMessage {
+                    role: "assistant".to_string(),
+                    tool_calls: Some(vec![ToolCall {
+                        id: "call_shot_1".to_string(),
+                        r#type: "function".to_string(),
+                        function: Some(ToolFunction {
+                            name: "screenshot".to_string(),
+                            arguments: "{}".to_string(),
+                        }),
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
+                },
+                OpenAIMessage {
+                    role: "tool".to_string(),
+                    tool_call_id: Some("call_shot_1".to_string()),
+                    content: Some(OpenAIContent::String(tool_content)),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        let (result, _, _, _) =
+            transform_openai_request(&req, "test-proj", "gemini-2.5-flash", None);
+        let contents = result["request"]["contents"].as_array().unwrap();
+        let tool_turn_parts = contents[2]["parts"].as_array().unwrap();
+
+        // 验证同时存在 functionResponse 和 inlineData 两个 parts
+        assert_eq!(tool_turn_parts.len(), 2);
+        assert!(tool_turn_parts[0].get("functionResponse").is_some());
+        assert!(tool_turn_parts[1].get("inlineData").is_some());
+
+        let inline_data = &tool_turn_parts[1]["inlineData"];
+        assert_eq!(inline_data["mimeType"], "image/png");
+        assert_eq!(inline_data["data"], fake_b64);
+
+        // 验证文本中的 base64 已被替换为摘要说明，防止 functionResponse 体积膨胀
+        let func_res_str = tool_turn_parts[0]["functionResponse"]["response"]["result"]
+            .as_str()
+            .unwrap();
+        assert!(!func_res_str.contains(fake_b64));
+        assert!(func_res_str.contains("[Image: forwarded to Gemini visual input (image/png)]"));
+    }
+
+    #[test]
+    fn test_function_declarations_schema_sanitization() {
+        let req = OpenAIRequest {
+            model: "gemini-2.5-flash".to_string(),
+            messages: vec![OpenAIMessage {
+                role: "user".to_string(),
+                content: Some(OpenAIContent::String("Hello".to_string())),
+                ..Default::default()
+            }],
+            tools: Some(vec![json!({
+                "type": "function",
+                "function": {
+                    "name": "complex_tool",
+                    "description": "A complex tool\nwith multi-line\r\ndescriptions",
+                    "parameters": {
+                        "type": "object"
+                        // 故意省略 properties
+                    }
+                }
+            })]),
+            ..Default::default()
+        };
+
+        let (result, _, _, _) =
+            transform_openai_request(&req, "test-proj", "gemini-2.5-flash", None);
+        let tools = result["request"]["tools"].as_array().unwrap();
+        let func_decls = tools[0]["functionDeclarations"].as_array().unwrap();
+        let decl = &func_decls[0];
+
+        // 验证 description 被规范折叠
+        assert_eq!(
+            decl["description"],
+            "A complex tool with multi-line descriptions"
+        );
+
+        // 验证 parameters 保证包含 OBJECT 和 properties: {}
+        assert_eq!(decl["parameters"]["type"], "OBJECT");
+        assert_eq!(decl["parameters"]["properties"], json!({}));
+    }
+
+    #[test]
+    fn test_openai_tool_call_retrieves_signature_from_signature_cache() {
+        let tool_id = "call_cached_test_999";
+        let valid_gemini_sig = "EmIKYAFpFH0TDqviLY1vZ8EuHqBLLj5xxD+0hchYg2VaoyolUQRP+hSCsKRpSpj+yrQA2H27yVFnF7tlp5OHIUvTdZKKErAqILJzK5FG8RJg42jCaaI2/iwqoBuRd5BDVwBxaQ==";
+        crate::proxy::SignatureCache::global()
+            .cache_tool_signature(tool_id, valid_gemini_sig.to_string());
+
+        let req = OpenAIRequest {
+            model: "gemini-3.8-flash".to_string(),
+            messages: vec![
+                OpenAIMessage {
+                    role: "user".to_string(),
+                    content: Some(OpenAIContent::String("Run tool".to_string())),
+                    ..Default::default()
+                },
+                OpenAIMessage {
+                    role: "assistant".to_string(),
+                    tool_calls: Some(vec![ToolCall {
+                        id: tool_id.to_string(),
+                        r#type: "function".to_string(),
+                        function: Some(ToolFunction {
+                            name: "bash".to_string(),
+                            arguments: "{}".to_string(),
+                        }),
+                        signature: None, // 客户端未带签名 (标准 OpenAI 协议)
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
+                },
+                OpenAIMessage {
+                    role: "tool".to_string(),
+                    tool_call_id: Some(tool_id.to_string()),
+                    content: Some(OpenAIContent::String("done".to_string())),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        let (result, _, _, _) =
+            transform_openai_request(&req, "test-proj", "gemini-3.8-flash-tiered", None);
+        let contents = result["request"]["contents"].as_array().unwrap();
+
+        // 查找 model 轮次中的 functionCall 部件
+        let model_msg = contents
+            .iter()
+            .find(|c| c["role"] == "model")
+            .expect("must find model message");
+        let fc_part = model_msg["parts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p.get("functionCall").is_some())
+            .expect("must find functionCall part");
+
+        assert_eq!(
+            fc_part["thoughtSignature"], valid_gemini_sig,
+            "OpenAI adapter and pipeline must recover real tool signature from SignatureCache"
         );
     }
 }

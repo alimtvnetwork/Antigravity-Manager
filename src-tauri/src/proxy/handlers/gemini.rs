@@ -7,7 +7,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::{json, Value};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::proxy::common::client_adapter::CLIENT_ADAPTERS;
 use crate::proxy::debug_logger;
@@ -15,7 +15,7 @@ use crate::proxy::handlers::common::{
     apply_retry_strategy, build_token_error_headers, next_rotation_attempt, should_rotate_account,
     FailureStatusTracker, RequestRetryState, RetryStrategy,
 };
-use crate::proxy::mappers::gemini::{unwrap_response, wrap_request, wrap_request_v2};
+use crate::proxy::mappers::gemini::{unwrap_response, wrap_request_v2};
 use crate::proxy::server::AppState;
 use crate::proxy::session_manager::SessionManager;
 use crate::proxy::upstream::client::mask_email;
@@ -213,8 +213,18 @@ pub async fn handle_generate(
         );
 
         // 4. 获取 Token (使用准确的 request_type)
-        // 提取 SessionId (粘性指纹)
-        let fallback_sid = SessionManager::extract_gemini_session_id(&body, &model_name);
+        // 提取 SessionId (粘性指纹，优先以显式会话头对齐跨协议 store_key)
+        let explicit_sid = headers
+            .get("x-session-id")
+            .or_else(|| headers.get("x-jeikcode-session-id"))
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty());
+        let fallback_sid = if let Some(sid) = explicit_sid {
+            sid.to_string()
+        } else {
+            SessionManager::extract_gemini_session_id(&body, &model_name)
+        };
         let session_scope = crate::proxy::thinking_store::SessionScope::from_headers_and_body(
             &headers,
             Some(&body),
@@ -296,6 +306,7 @@ pub async fn handle_generate(
             Some(&session_id),
             token_obj.as_ref(),
             Some(&token_manager),
+            Some(&state.upstream),
         );
         let tf_micros = tf_start.elapsed().as_micros() as u64;
         let norm_total_micros = norm_start.elapsed().as_micros() as u64;
@@ -350,6 +361,15 @@ pub async fn handle_generate(
             );
         }
 
+        let preceding_turn_anchor = wrapped_body
+            .get("request")
+            .and_then(|r| r.get("contents"))
+            .or_else(|| wrapped_body.get("contents"))
+            .and_then(|c| c.as_array())
+            .and_then(|a| a.last())
+            .cloned();
+        let causal_anchor =
+            crate::proxy::thinking_store::compute_causal_anchor(preceding_turn_anchor.as_ref());
         let upstream_req_start = std::time::Instant::now();
         let call_result = match upstream
             .call_v1_internal_with_headers(
@@ -597,10 +617,7 @@ pub async fn handle_generate(
                                                                 if let Some(sig) = part.get("thoughtSignature").and_then(|s| s.as_str()) {
                                                                     crate::proxy::SignatureCache::global()
                                                                         .cache_session_signature(&s_id_for_stream, sig.to_string(), 1);
-                                                                    if let Some(call_id) = part.get("functionCall").and_then(|f| f.get("id")).and_then(|id| id.as_str()) {
-                                                                        crate::proxy::SignatureCache::global().cache_tool_signature(call_id, sig.to_string());
-                                                                    }
-                                                                    debug!("[Gemini-SSE] Cached signature (len: {}) for session: {}", sig.len(), s_id_for_stream);
+                                                                    debug!("[Gemini-SSE] Cached session signature (len: {}) for session: {}", sig.len(), s_id_for_stream);
                                                                 }
                                                             }
                                                         }
@@ -637,7 +654,13 @@ pub async fn handle_generate(
                         }
                     }
 
-                    thinking_acc.commit(&s_id_for_stream);
+                    // 仅在流式完整传输、没有发生网络中断或异常失败时，才原子提交思维链到持久化存储
+                    // 防止因 connection reset by peer / unexpected EOF 导致半截残废思维块污染历史记忆
+                    if !stream_failed {
+                        thinking_acc.commit(&s_id_for_stream);
+                    } else {
+                        warn!("[Gemini-SSE] Stream terminated prematurely or failed, discarding partial thinking block to prevent context poisoning: session={}", s_id_for_stream);
+                    }
                     if track_image_success && saw_image_data && !stream_failed {
                         image_success_manager.mark_account_success(&image_success_account);
                         image_success_manager
@@ -739,15 +762,7 @@ pub async fn handle_generate(
                                         sig.to_string(),
                                         1,
                                     );
-                                    if let Some(call_id) = part
-                                        .get("functionCall")
-                                        .and_then(|f| f.get("id"))
-                                        .and_then(|id| id.as_str())
-                                    {
-                                        crate::proxy::SignatureCache::global()
-                                            .cache_tool_signature(call_id, sig.to_string());
-                                    }
-                                    debug!("[Gemini-Response] Cached signature (len: {}) for session: {}", sig.len(), session_id);
+                                    debug!("[Gemini-Response] Cached session signature (len: {}) for session: {}", sig.len(), session_id);
                                 }
                             }
                         }
@@ -881,13 +896,19 @@ pub async fn handle_generate(
                 "[Gemini] Target model [{}] not found on upstream (HTTP {}). Terminating retry loop without account lockout.",
                 mapped_model, status_code
             );
+            let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+                "gemini",
+                status_code,
+                &mapped_model,
+                &error_text,
+            );
             return Ok((
                 StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND),
                 [
                     ("X-Account-Email", email.as_str()),
                     ("X-Mapped-Model", mapped_model.as_str()),
                 ],
-                error_text,
+                Json(dual_err),
             )
                 .into_response());
         }
@@ -1000,20 +1021,19 @@ pub async fn handle_generate(
             "Gemini Upstream non-retryable error {}: {}",
             status_code, error_text
         );
+        let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+            "gemini",
+            status_code,
+            &mapped_model,
+            &error_text,
+        );
         return Ok((
             status,
             [
                 ("X-Account-Email", email.as_str()),
                 ("X-Mapped-Model", mapped_model.as_str()),
             ],
-            // [FIX] Return JSON error
-            Json(json!({
-                "error": {
-                    "code": status_code,
-                    "message": error_text,
-                    "status": "UPSTREAM_ERROR"
-                }
-            })),
+            Json(dual_err),
         )
             .into_response());
     }
@@ -1026,12 +1046,14 @@ pub async fn handle_generate(
         &last_error,
     );
 
-    Ok((
-        final_status,
-        headers,
-        format!("All accounts exhausted. Last error: {}", last_error),
-    )
-        .into_response())
+    let dual_err = crate::proxy::handlers::common::build_dual_track_error(
+        "gemini",
+        final_status.as_u16(),
+        initial_mapped_model.as_str(),
+        &last_error,
+    );
+
+    Ok((final_status, headers, Json(dual_err)).into_response())
 }
 
 pub async fn handle_list_models(

@@ -232,17 +232,17 @@ impl StreamingState {
 
         let mut chunks = Vec::new();
 
-        // Send buffered signature on thinking block completion (fallback to session or sentinel signature)
+        // Thinking 块结束时发送暂存的签名（上游未下发时回退到会话签名）。
+        // **绝不发明哨兵** —— 哨兵是"跳过校验"开关而非假合法签名，
+        // 下发给客户端只会污染其历史；且官方流量里出现 0/23 次，不属于 Antigravity 协议。
+        // 真签名的恢复由网关侧 SQL 状态机（`hydrate`）与终审 `place_turn_signature` 承担。
         if self.block_type == BlockType::Thinking {
             let signature = if self.signatures.has_pending() {
                 self.signatures.consume()
             } else {
-                self.session_id
-                    .as_deref()
-                    .and_then(|sid| {
-                        crate::proxy::SignatureCache::global().get_session_signature(sid)
-                    })
-                    .or_else(|| Some("skip_thought_signature_validator".to_string()))
+                self.session_id.as_deref().and_then(|sid| {
+                    crate::proxy::SignatureCache::global().get_session_signature(sid)
+                })
             };
 
             if let Some(sig) = signature {
@@ -536,27 +536,10 @@ impl<'a> PartProcessor<'a> {
     /// 处理单个 part
     pub fn process(&mut self, part: &GeminiPart) -> Vec<Bytes> {
         let mut chunks = Vec::new();
-        // [FIX #545] Decode Base64 signature if present (Gemini sends Base64, Claude expects Raw)
-        let signature = part.thought_signature.as_ref().map(|sig| {
-            // Try to decode as base64
-            use base64::Engine;
-            match base64::engine::general_purpose::STANDARD.decode(sig) {
-                Ok(decoded_bytes) => {
-                    match String::from_utf8(decoded_bytes) {
-                        Ok(decoded_str) => {
-                            tracing::debug!(
-                                "[Streaming] Decoded base64 signature (len {} -> {})",
-                                sig.len(),
-                                decoded_str.len()
-                            );
-                            decoded_str
-                        }
-                        Err(_) => sig.clone(), // Not valid UTF-8, keep as is
-                    }
-                }
-                Err(_) => sig.clone(), // Not base64, keep as is
-            }
-        });
+        // Gemini thought_signature is a base64 protobuf string (e.g. EiY... or EtY...)
+        // DO NOT decode it to raw UTF-8 bytes: that corrupts ASCII-range protobufs (like UUID tags 0x12, 0x26, 0x0a, 0x24)
+        // into control characters, shrinks length below MIN_SIGNATURE_LENGTH, and breaks Gemini signature validation.
+        let signature = part.thought_signature.clone();
 
         // 1. FunctionCall 处理
         if let Some(fc) = &part.function_call {

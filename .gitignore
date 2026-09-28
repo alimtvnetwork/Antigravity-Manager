@@ -80,3 +80,14 @@ tmp/
 .gitmap/release-assets
 release-assets
 telegram_config.json
+
+# Traffic dumps & Temporary analysis reports
+flows*
+docs/GEMINI_3.8_THOUGHT_SIGNATURE_ANALYSIS.md
+docs/THOUGHT_SIGNATURE_IMPL_COMPARISON.md
+docs/FLOWS4_MULTIMODEL_ANALYSIS.md
+docs/FLOWS5_COMPACTION_ANALYSIS.md
+docs/CODEBASE_ALIGNMENT_ANALYSIS.md
+
+# Captured payload samples
+testJson/

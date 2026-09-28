@@ -187,6 +187,7 @@ export interface AppConfig {
     notify_on_update?: boolean; // 是否发送系统更新通知 (默认开启)
     notify_via_email?: boolean; // 是否通过邮件发送系统更新通知 (默认开启)
     notify_via_telegram?: boolean; // 是否通过Telegram发送系统更新通知 (默认开启)
+    update_channel?: 'stable' | 'beta'; // 更新通道：正式版 vs 预览版
     accounts_page_size?: number; // 账号列表每页显示数量,默认 0 表示自动计算
     hidden_menu_items?: string[]; // 隐藏的菜单项路径列表
     scheduled_warmup: ScheduledWarmupConfig;
@@ -201,6 +202,9 @@ export interface AppConfig {
     conversation_cleanup?: ConversationCleanupConfig; // [NEW] Conversation history and cache auto-cleanup config
     training_api_enabled?: boolean; // [NEW] Enable /api/v1/training REST endpoints
     remote_control_api_enabled?: boolean; // [NEW] Enable /api/v1/remote/control REST endpoints
+    suggestion_delete_thinking_store?: boolean; // [NEW] 建议删除历史思考块缓存开关
+    thinking_cleanup_dismissed?: boolean; // [NEW] 用户是否已确认/忽略该建议
+    dismissed_thinking_cleanup_version?: string; // [NEW] 用户已确认或忽略建议的目标版本号
 }
 
 export interface ConversationCleanupConfig {

@@ -222,6 +222,63 @@ pub static USER_AGENT: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
+static ANTIGRAVITY_VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)antigravity[/\s](\d+(?:\.\d+)+)").expect("Invalid antigravity version regex")
+});
+
+pub fn sanitize_egress_user_agent(custom_ua: &str) -> String {
+    let trimmed = custom_ua.trim();
+    if trimmed.is_empty() {
+        return USER_AGENT.clone();
+    }
+
+    if !trimmed.to_ascii_lowercase().contains("antigravity") {
+        tracing::warn!(
+            custom_ua = %trimmed,
+            "Custom User-Agent lacks 'antigravity' client identity (upstream will reject with 403); falling back to default User-Agent"
+        );
+        return USER_AGENT.clone();
+    }
+
+    if let Some(caps) = ANTIGRAVITY_VERSION_REGEX.captures(trimmed) {
+        if let Some(m) = caps.get(1) {
+            let ver = m.as_str();
+            if compare_semver(ver, KNOWN_STABLE_VERSION) == std::cmp::Ordering::Less {
+                tracing::info!(
+                    custom_ua = %trimmed,
+                    outdated_version = %ver,
+                    clamped_version = %KNOWN_STABLE_VERSION,
+                    "Custom User-Agent version is below minimum supported floor; clamping version to {} to avoid upstream 404/429 model rejections",
+                    KNOWN_STABLE_VERSION
+                );
+                let mut result = String::with_capacity(trimmed.len() + KNOWN_STABLE_VERSION.len());
+                result.push_str(&trimmed[..m.start()]);
+                result.push_str(KNOWN_STABLE_VERSION);
+                result.push_str(&trimmed[m.end()..]);
+                return result;
+            }
+            return trimmed.to_string();
+        }
+    }
+
+    if let Some(ver) = parse_version(trimmed) {
+        if compare_semver(&ver, KNOWN_STABLE_VERSION) == std::cmp::Ordering::Less {
+            tracing::info!(
+                custom_ua = %trimmed,
+                outdated_version = %ver,
+                clamped_version = %KNOWN_STABLE_VERSION,
+                "Custom User-Agent version is below minimum supported floor; clamping version to {} to avoid upstream 404/429 model rejections",
+                KNOWN_STABLE_VERSION
+            );
+            return trimmed.replacen(&ver, KNOWN_STABLE_VERSION, 1);
+        }
+    } else if trimmed.eq_ignore_ascii_case("antigravity") {
+        return format!("antigravity/{} darwin/arm64", KNOWN_STABLE_VERSION);
+    }
+
+    trimmed.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

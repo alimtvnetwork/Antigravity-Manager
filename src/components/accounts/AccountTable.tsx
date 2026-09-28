@@ -595,6 +595,10 @@ function AccountRowContent({
                                 <span>{boundInstance.config.name}</span>
                             </span>
                         )}
+                        {/* 优先级 */}
+                        <span className="px-1.5 py-0.2 rounded bg-gray-100 dark:bg-base-300 text-gray-500 dark:text-gray-400 text-[9px] font-bold" title={t('accounts.priority_hint')}>
+                            {t('accounts.priority')}: {account.priority ?? 50}
+                        </span>
                         {/* 远程节点租赁徽章 */}
                         {leaseInfo && (
                             <span
