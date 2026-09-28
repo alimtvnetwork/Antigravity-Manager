@@ -851,9 +851,12 @@ mod tests {
         let temp_exe = Some(PathBuf::from(
             "C:\\Temp\\agm-updater\\agm-update-cli-999.exe",
         ));
+        let resolved = resolve_default_target_exe(temp_exe, &install_dir);
         #[cfg(target_os = "macos")]
         assert!(
-            resolved.to_string_lossy().contains("Antigravity Manager Tools.app")
+            resolved
+                .to_string_lossy()
+                .contains("Antigravity Manager Tools.app")
                 || resolved.to_string_lossy().contains("agm-alim")
         );
         #[cfg(not(target_os = "macos"))]
