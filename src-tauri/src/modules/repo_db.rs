@@ -2455,6 +2455,8 @@ pub fn get_project_conversation_tree(
 
     let mut tree_nodes: Vec<AgmProjectTreeNode> = Vec::new();
     let word_cap = if max_words == 0 { 200 } else { max_words };
+    let mut seen_project_keys: std::collections::HashSet<(String, String)> =
+        std::collections::HashSet::new();
 
     for proj in &projects {
         let norm_path = normalize_path_for_compare(&proj.repo_path);
@@ -2463,6 +2465,10 @@ pub fn get_project_conversation_tree(
         } else {
             proj.id.clone()
         };
+
+        if !seen_project_keys.insert((project_key.clone(), proj.instance_id.clone())) {
+            continue;
+        }
 
         let p_seq = if let Some(ref conn) = conn_opt {
             ensure_project_sequence_in_conn(

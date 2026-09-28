@@ -616,10 +616,14 @@ pub fn format_help_manual() -> String {
         • <code>/prompt C001 --instance #2 Check status</code> — Target specific instance (<code>#1</code>, <code>#2</code>, <code>default</code>) &amp; conv\n\
         • <code>/prompt C001 --instance #2 --node worker-1 Fix test</code> — Target remote machine + instance + conv\n\
         • <code>/prompts</code> — List reusable prompt templates (<code>read-all</code>, <code>is-done</code>, <code>ci-cd-fix</code>)\n\
-        • <code>/agy prompt -n read-all -t \"Read memory and continue\"</code>\n\
-        • <code>/agy prompt -n is-done -t \"Verify if all tasks are complete\"</code>\n\
-        • <code>/agy prompt-project P001 -n is-done -t \"Check build\"</code>\n\
-        • <code>/agy fpug</code> | <code>/agy sug</code> | <code>/agy rerun</code> — GitMap AGY fast prompt / status / rerun\n\n\
+        • <code>/agy prompt -n read-all -t \"Read memory and continue\"</code> — Dispatch template via GitMap AGY\n\
+        • <code>/agy prompt -n is-done -t \"Verify if all tasks are complete\"</code> — Dispatch verification prompt\n\
+        • <code>/agy prompt-project P001 -n is-done -t \"Check build\"</code> — Target specific project with template\n\
+        • <code>/agy prompt-txt \"Quick hotfix instruction\"</code> — Dispatch direct raw prompt text\n\
+        • <code>/agy prompt ls</code> — List all prompt templates in formatted table\n\
+        • <code>/agy fpug</code> — Loop projects until prompt queues clear &amp; CI/CD green\n\
+        • <code>/agy sug</code> — Monitor projects &amp; trigger OS shutdown when green\n\
+        • <code>/agy rerun 1</code> — Restart IDE &amp; replay prompt + media + queued checks\n\n\
         🎒 <b>AGY Running Storage Backup &amp; Restore:</b>\n\
         • <code>/backup</code> or <code>/backpack</code> — Snapshot running prompts to AGM split SQLite DB\n\
         • <code>/backup ls</code> — List saved AGM prompt backup batches\n\
@@ -627,20 +631,27 @@ pub fn format_help_manual() -> String {
         • <code>/gitmap backup-running-prompts</code> — GitMap snapshot of active AGY storage prompts\n\
         • <code>/gitmap restore-running-prompts</code> — GitMap restore &amp; re-inject backed-up prompts\n\
         • <code>/agy running-prompts ls</code> — List live AGY running prompts via GitMap\n\
-        • <code>/agy running-prompts backup</code> / <code>restore</code> — GitMap AGY storage backup &amp; restore\n\n\
+        • <code>/agy running-prompts backup</code> — Backup active AGY storage prompts via GitMap\n\
+        • <code>/agy running-prompts restore</code> — Restore active AGY storage prompts via GitMap\n\
+        • <code>/agy ccko</code> — Clean runtime cache keeping only 1 conversation\n\
+        • <code>/agy cckf</code> — Clean runtime cache keeping top 5 conversations\n\
+        • <code>/agy cc --keep 10</code> — Clean runtime cache and prune conversation history\n\n\
         🔄 <b>AGM &amp; GitMap Update Commands:</b>\n\
         • <code>/update</code> or <code>/update agm</code> — Self-update Antigravity-Manager (delegated updater)\n\
-        • <code>/update gitmap</code> — Update GitMap CLI to latest release\n\
-        • <code>/update all</code> — Update both AGM and GitMap CLI\n\
+        • <code>/update gitmap</code> — Update GitMap CLI to latest release (<code>gitmap self-update</code>)\n\
+        • <code>/update all</code> — Concurrently update both AGM and GitMap CLI\n\
         • <code>/agm update</code> — Run AGM CLI update checker &amp; installer\n\
         • <code>/gitmap agm update -y</code> — Update AGM via GitMap installer pipeline\n\
+        • <code>/gitmap agm update-all</code> — Distribute AGM update across all SSH nodes\n\
         • <code>/gitmap ssh update agm</code> — Update AGM across all SSH cluster machines\n\n\
         🖥️ <b>SSH &amp; Multi-Node Fleet Execution:</b>\n\
         • <code>/nodes</code> or <code>/ssh nodes</code> — List all registered SSH / cluster VM nodes\n\
-        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Execute command on a specific remote machine via GitMap SSH\n\
+        • <code>/ssh check &lt;node&gt;</code> — Probe connectivity, port 22, and health of remote machine\n\
+        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Execute command on specific machine via GitMap SSH (e.g. <code>/ssh vm-01 agm status</code>)\n\
+        • <code>/ssh exec \"&lt;cmd&gt;\"</code> — Run command across all remote SSH fleet nodes\n\
+        • <code>/ssh update agm</code> — Update AGM across all remote SSH nodes\n\
+        • <code>/ssh agy active</code> — Run <code>gitmap agy active</code> across remote SSH fleet\n\
         • <code>/gitmap ssh nodes</code> — Inspect GitMap SSH node inventory &amp; reachability\n\
-        • <code>/gitmap ssh exec \"agm status\"</code> — Run command across SSH fleet\n\
-        • <code>/gitmap agy ssh \"gitmap agy active\"</code> — Check active AGY prompts over SSH\n\
         • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> — Direct node command routing\n\n\
         🧭 <b>GitMap, AGM &amp; Multi-Instance Rotation:</b>\n\
         • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
@@ -2118,9 +2129,24 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         }
         "ssh" => {
             let sub = rest.trim();
-            if sub.is_empty() || sub.eq_ignore_ascii_case("nodes") || sub.eq_ignore_ascii_case("ls")
+            if sub.is_empty()
+                || sub.eq_ignore_ascii_case("nodes")
+                || sub.eq_ignore_ascii_case("ls")
+                || sub.eq_ignore_ascii_case("list")
             {
                 Some(execute_gitmap_subcommand("ssh nodes"))
+            } else if sub.starts_with("check ")
+                || sub.starts_with("exec ")
+                || sub.starts_with("update ")
+                || sub.starts_with("agy ")
+                || sub.starts_with("login ")
+                || sub.starts_with("join ")
+                || sub.starts_with("alias ")
+                || sub.eq_ignore_ascii_case("scan")
+                || sub.eq_ignore_ascii_case("status")
+                || sub.eq_ignore_ascii_case("config")
+            {
+                Some(execute_gitmap_subcommand(&format!("ssh {}", sub)))
             } else if let Some((node, cmd)) = sub.split_once(char::is_whitespace) {
                 Some(execute_gitmap_subcommand(&format!(
                     "cluster exec {} {}",
@@ -2139,6 +2165,8 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 let gm_res = execute_gitmap_subcommand("self-update");
                 let agm_res = execute_agm_subcommand("update");
                 Some(format!("{}\n\n{}", gm_res, agm_res))
+            } else if sub.starts_with("ssh") || sub.starts_with("node") {
+                Some(execute_gitmap_subcommand("ssh update agm"))
             } else {
                 Some(execute_agm_subcommand("update"))
             }
