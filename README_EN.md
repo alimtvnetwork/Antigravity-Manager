@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.95.0)
+> Professional AI Account Management & Protocol Proxy System (v4.96.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.95.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.96.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.95.0**: Unified DesktopIntegration across headless and CLI with verified 5-step non-destructive switch lifecycle, prompt task restoration cache shadowing fix in repo_db, PostgreSQL atomic claim_next_command stored function in secondary Supabase schema, and verified consecutive multi-round fast-forward switches with zero prompt loss.
+> Latest version **v4.96.0**: Fully integrated Root Supabase (Lovable) and Secondary fallback endpoints, delivered parent table `nodes` with cascading foreign keys to `instance_profiles` and `workspace_leases` preventing cross-machine account collisions, implemented comprehensive `agm supabase help` CLI guidance, PowerShell one-liner automation script with dual-directory writing, and verified 100% green PostgREST HTTP 200 connectivity.
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

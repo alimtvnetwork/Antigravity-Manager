@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.95.0)**
+**Bar 2: Version-Based Installation (v4.96.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.95.0**：全面统一直连与无头桌面集成 5 步切号生命周期（切前备份 -> 杀 IDE -> 注入新凭证 -> 启动新账号 IDE -> 恢复在途任务），修复在途任务恢复缓存遮蔽问题，补全 Supabase 原子认领存储函数并通过全量 14 项单元测试，实机连续两轮即时快进切换任务 100% 恢复零丢失。
+> 最新版本 **v4.96.0**：全面集成 Lovable 根账号与次端点 Supabase 双云架构，落地父表 `nodes` 与外键级联子表 `instance_profiles` / `workspace_leases` 跨机租约防碰模型，实现 `agm supabase help` 命令行引导体系、PowerShell 单行配置脚本与双向目录静默自愈同步，实测双端点 HTTP 200 与 PostgREST API 100% 连通。
 
 👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
 

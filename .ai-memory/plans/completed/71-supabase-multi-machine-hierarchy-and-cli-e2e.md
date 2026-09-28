@@ -2,18 +2,43 @@
 
 Spec Reference: [02-spec/21-app/71-supabase-multi-machine-hierarchy-and-cli-e2e.md](../../../02-spec/21-app/71-supabase-multi-machine-hierarchy-and-cli-e2e.md)
 
-## Summary of Completed Tasks
+## Execution Summary
 
-- **Task-01 (Repo Secrets Sync & Credential Storage)**: Pulled `d:\work\repo-secrets`, updated `02-antigravity-manager/vault/supabase_config.json`, added `03-supabase/02-lovable/supabase-credentials.json` with Root Lovable credentials in Base64 JSON format, updated README, committed, and pushed to remote `main`.
-- **Task-02 (CLI Commands & Help Guidance)**: Added native `agm supabase` subcommand with options `help`, `status`, `list-leases`, `test`, `set-endpoint`, `load-json`, `sync`, `schema`, `enable`, `disable`, and `set-alias`. Added comprehensive help detailing config location (`%APPDATA%\antigravity-manager\supabase_config.json`), JSON schema with tags/notes, and database parent-child relationships.
-- **Task-03 (Supabase Schema & Relational Parent-Child Hierarchy)**: Enhanced `ROOT_DB_SCHEMA_SQL` in `supabase_schema.rs` with `nodes` parent table, `instance_profiles` child table with FK `REFERENCES public.nodes(id) ON DELETE CASCADE`, and `workspace_leases` tracking `account_email` and `ip_address`. Upgraded `test_connection()` probe ladder in `supabase_client.rs` to handle PostgREST schema cache `PGRST205` and publishable keys.
-- **Task-04 (Account Switch Synchronization)**: Hooked manual account switching (`account.rs`), instance switching (`instance.rs`), and CLI switching (`bin/agm.rs`) to automatically acquire distributed leases in Supabase Root DB via `workspace_lease_manager::acquire_lease_with_details` and trigger immediate local node sync.
-- **Task-05 (Automation PowerShell One-Liners & JSON Suite)**: Created `scripts/setup-supabase.ps1` and `scripts/supabase-endpoints.json` enabling single-line configuration, parameter overrides, and standalone PowerShell JSON ingestion.
-- **Task-06 (End-to-End Testing & Verification)**: Executed `scripts/setup-supabase.ps1` against both live endpoints (`Root by Lovable` and `Secondary`), verifying HTTP authentication and PostgREST table verification ladder. Validated single-quoted PowerShell one-liner JSON loading.
-- **Task-07 (Minor Release & GitMap PE Verification)**: Bumped version according to minor release, updated manifests/changelogs, verified GitMap PE pipeline engine with zero errors.
+This task established complete, end-to-end multi-machine fleet synchronization and account lease management using dual Supabase endpoints (Root by Lovable and Secondary).
 
-## Verified Operational Invariants
+### Consolidated Milestones Completed:
 
-1. Both Root Lovable (`https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`) and Secondary (`https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`) endpoints successfully authenticate and respond to PostgREST table probes.
-2. Parent-child relationship enforced: `instance_profiles` and `workspace_leases` reference `nodes(id)`.
-3. Account leases accurately capture machine alias and local IP.
+1. **Repo-Secrets Synchronization (Task-01)**:
+   - Pulled `d:\work\repo-secrets`.
+   - Recorded Root Supabase (`https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`) with key `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`, role `root`, tag `lovable`, and note `Root account by Lovable`.
+   - Recorded Secondary Supabase (`https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`) with key `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`, role `secondary`, tag `secondary`, and note `Secondary fallback and command queue`.
+   - Verified Base64 encoded format in `03-supabase/02-lovable/supabase-credentials.json` and active configuration in `02-antigravity-manager/vault/supabase_config.json`.
+   - Committed and pushed to `repo-secrets` remote repository.
+
+2. **Parent-Child Relational Schema & Cross-Machine Lease Sync (Task-02)**:
+   - Defined parent table `public.nodes` tracking local machine UUID, alias (`Node-823632`), IP address (`192.168.1.12`), uptime, and active project count.
+   - Defined child table `public.instance_profiles` with foreign key `REFERENCES public.nodes(id) ON DELETE CASCADE`.
+   - Defined cross-machine lease table `public.workspace_leases` with foreign key `REFERENCES public.nodes(id) ON DELETE CASCADE`, tracking which machine and IP is currently using which account to prevent collisions.
+   - Tested atomic stored function `acquire_workspace_lease()` and REST fallback upsert.
+
+3. **CLI Help & Operational Management (Task-03)**:
+   - Implemented `agm supabase help` displaying configuration file paths, local node ID, local IP address, JSON format examples, parent-child table mappings, and command list.
+   - Implemented `agm supabase status` displaying active node telemetry, configured endpoints, and remote held leases.
+   - Implemented `agm supabase test` running multi-stage connection probe ladder with HTTP 200 table verification.
+   - Implemented `agm supabase set`, `agm supabase load-json`, `agm supabase schema`, `agm supabase enable/disable`, and `agm supabase set-alias`.
+
+4. **UI Settings & Display (Task-04)**:
+   - Configured `SupabaseSyncSettings.tsx` and `supabaseService.ts` for dual-endpoint editing, tag badges, note fields, and live lease telemetry.
+
+5. **PowerShell One-Liner Suite & JSON Ingestion (Task-05)**:
+   - Created `scripts/supabase-accounts.json` with Root (Lovable) and Secondary endpoints.
+   - Created `scripts/supabase-setup.ps1` supporting interactive/one-liner execution and `-ConfigFile` JSON ingestion.
+   - Verified single-command PowerShell one-liner:
+     `powershell -NoProfile -Command '$c = Get-Content .\scripts\supabase-accounts.json -Raw | ConvertFrom-Json; Set-Content -Path (Join-Path $env:APPDATA "antigravity-manager\supabase_config.json") -Value ($c | ConvertTo-Json -Depth 10); Write-Host "Configured $($c.endpoints.Count) endpoints via one-liner"'`
+   - Output verified: `Configured 2 endpoints via one-liner`.
+
+6. **End-to-End Verification & Minor Release (Task-06)**:
+   - E2E connection tests passed for both endpoints:
+     - `Root Supabase (Lovable)`: PASS (HTTP 200)
+     - `Secondary Supabase`: PASS (HTTP 200)
+   - Executed `git pull`, resolved conflicts, prepared minor version bump, and checked `gitmap pe`.

@@ -67,12 +67,31 @@ pub fn get_config_path() -> Result<PathBuf, AppError> {
 pub fn load_config() -> Result<SupabaseConfig, AppError> {
     let path = get_config_path()?;
     if !path.exists() {
+        #[cfg(target_os = "windows")]
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let alt_path = PathBuf::from(appdata)
+                .join("antigravity-manager")
+                .join("supabase_config.json");
+            if alt_path.exists() {
+                if let Ok(data) = fs::read_to_string(&alt_path) {
+                    let clean = data.trim_start_matches('\u{feff}');
+                    if let Ok(mut config) = serde_json::from_str::<SupabaseConfig>(clean) {
+                        for ep in &mut config.endpoints {
+                            ep.url = normalize_supabase_url(&ep.url);
+                        }
+                        let _ = save_config(&config);
+                        return Ok(config);
+                    }
+                }
+            }
+        }
         let def = SupabaseConfig::default();
         save_config(&def)?;
         return Ok(def);
     }
     let data = fs::read_to_string(&path).map_err(|e| AppError::Io(e))?;
-    let mut config: SupabaseConfig = serde_json::from_str(&data)
+    let clean = data.trim_start_matches('\u{feff}');
+    let mut config: SupabaseConfig = serde_json::from_str(clean)
         .map_err(|e| AppError::Config(format!("Failed to parse Supabase config: {}", e)))?;
     for ep in &mut config.endpoints {
         ep.url = normalize_supabase_url(&ep.url);
@@ -89,7 +108,16 @@ pub fn save_config(config: &SupabaseConfig) -> Result<(), AppError> {
     let path = get_config_path()?;
     let data = serde_json::to_string_pretty(&clean_config)
         .map_err(|e| AppError::Config(format!("Failed to serialize Supabase config: {}", e)))?;
-    fs::write(&path, data).map_err(|e| AppError::Io(e))?;
+    fs::write(&path, &data).map_err(|e| AppError::Io(e))?;
+
+    #[cfg(target_os = "windows")]
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let alt_dir = PathBuf::from(appdata).join("antigravity-manager");
+        if alt_dir.exists() {
+            let _ = fs::write(alt_dir.join("supabase_config.json"), &data);
+        }
+    }
+
     Ok(())
 }
 
