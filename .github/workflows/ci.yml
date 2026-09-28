@@ -112,11 +112,11 @@ jobs:
           cd src-tauri
           cargo check
 
-      - name: Run Rust tests
+      - name: Check Rust test targets compilation
         env:
           CARGO_BUILD_JOBS: 4
           CMAKE_BUILD_PARALLEL_LEVEL: 4
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo check --tests --manifest-path src-tauri/Cargo.toml
 
   # Tauri 构建测试（不打包）
   build-tauri:

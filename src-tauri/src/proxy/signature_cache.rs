@@ -511,7 +511,7 @@ mod tests {
         let cache = SignatureCache::new();
         let sig1 = "a".repeat(60);
         let sig2 = "b".repeat(80); // Longer, should replace
-        let sig3 = "c".repeat(40); // Too short, should be ignored
+        let sig3 = "c".repeat(20); // Too short (< 32), should be ignored
 
         // Initially empty
         assert!(cache.get_session_signature("sid-test123").is_none());

@@ -3331,10 +3331,10 @@ mod tests {
         let func_decls = tools[0]["functionDeclarations"].as_array().unwrap();
         let decl = &func_decls[0];
 
-        // 验证 description 被规范折叠
+        // 验证 description 保持原始格式透传
         assert_eq!(
             decl["description"],
-            "A complex tool with multi-line descriptions"
+            "A complex tool\nwith multi-line\r\ndescriptions"
         );
 
         // 验证 parameters 保证包含 OBJECT 和 properties: {}

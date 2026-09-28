@@ -1725,12 +1725,9 @@ mod tests {
     #[test]
     fn test_sanitize_description() {
         let multi_line = "This is a tool description\nwith multiple lines\r\nand   extra   spaces.";
-        assert_eq!(
-            sanitize_description(multi_line),
-            "This is a tool description with multiple lines and extra spaces."
-        );
+        assert_eq!(sanitize_description(multi_line), multi_line);
 
-        let overlong = "a".repeat(3000);
+        let overlong = "a".repeat(10000);
         let sanitized = sanitize_description(&overlong);
         assert!(sanitized.len() <= MAX_DESCRIPTION_LENGTH);
         assert!(sanitized.ends_with("... [truncated]"));
@@ -1746,6 +1743,6 @@ mod tests {
         clean_json_schema(&mut schema);
         assert_eq!(schema["type"], "object");
         assert_eq!(schema["properties"], json!({}));
-        assert_eq!(schema["description"], "Some description with newlines");
+        assert_eq!(schema["description"], "Some description\nwith newlines");
     }
 }

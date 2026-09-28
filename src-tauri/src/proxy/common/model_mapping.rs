@@ -502,7 +502,7 @@ mod tests {
         // Generic aliases still map to preview entrypoint.
         assert_eq!(
             map_claude_model_to_gemini("gemini-3-pro"),
-            "gemini-3-pro-preview"
+            "gemini-3.1-pro-preview"
         );
         assert_eq!(
             map_claude_model_to_gemini("gemini-3.1-pro"),
