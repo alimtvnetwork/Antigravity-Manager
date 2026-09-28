@@ -71,7 +71,7 @@ pub fn resolve_effective_target(
 
 /// 桌面版实现：包含完整的进程控制 and UI 同步
 pub struct DesktopIntegration {
-    pub app_handle: tauri::AppHandle,
+    pub app_handle: Option<tauri::AppHandle>,
 }
 
 /// 写入账号凭据：>= 2.0.0 的原生应用走系统 Keyring，旧架构与定制 IDE 走 SQLite 注入。
@@ -258,7 +258,9 @@ impl SystemIntegration for DesktopIntegration {
                     Some(inst_id),
                 ))
                 .await;
-                let _ = crate::modules::tray::update_tray_menus(&self.app_handle);
+                if let Some(ref h) = self.app_handle {
+                    let _ = crate::modules::tray::update_tray_menus(h);
+                }
                 return res;
             }
         }
@@ -381,13 +383,17 @@ impl SystemIntegration for DesktopIntegration {
         let _ = crate::modules::repo_db::dispatch_running_prompts("default");
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
-        let _ = crate::modules::tray::update_tray_menus(&self.app_handle);
+        if let Some(ref h) = self.app_handle {
+            let _ = crate::modules::tray::update_tray_menus(h);
+        }
 
         Ok(())
     }
 
     fn update_tray(&self) {
-        let _ = crate::modules::tray::update_tray_menus(&self.app_handle);
+        if let Some(ref h) = self.app_handle {
+            let _ = crate::modules::tray::update_tray_menus(h);
+        }
     }
 
     fn show_notification(&self, title: &str, body: &str) {
@@ -959,9 +965,9 @@ impl SystemIntegration for HeadlessIntegration {
     async fn on_account_switch(
         &self,
         account: &crate::models::Account,
-        _target_ide: Option<&str>,
+        target_ide: Option<&str>,
     ) -> Result<(), String> {
-        if _target_ide == Some("agy") {
+        if target_ide == Some("agy") {
             return Err(
                 "Switching to the agy CLI is not supported in headless mode (no host keyring access)."
                     .to_string(),
@@ -969,12 +975,11 @@ impl SystemIntegration for HeadlessIntegration {
         }
 
         crate::modules::logger::log_info(&format!(
-            "[Headless] Account switched in memory: {}",
+            "[Headless] Delegating account switch for '{}' to DesktopIntegration without GUI handle",
             account.email
         ));
-        // Docker 模式下通常不直接控制宿主机的 VS Code 进程
-        // 如果需要同步配置 to 某个 volume，可以在此处添加逻辑
-        Ok(())
+        let desktop = DesktopIntegration { app_handle: None };
+        desktop.on_account_switch(account, target_ide).await
     }
 
     fn update_tray(&self) {
@@ -1002,12 +1007,12 @@ impl SystemManager {
         match self {
             SystemManager::Desktop(handle) => {
                 let integration = DesktopIntegration {
-                    app_handle: handle.clone(),
+                    app_handle: Some(handle.clone()),
                 };
                 integration.on_account_switch(account, target_ide).await
             }
             SystemManager::Headless => {
-                let integration = HeadlessIntegration;
+                let integration = DesktopIntegration { app_handle: None };
                 integration.on_account_switch(account, target_ide).await
             }
         }
@@ -1016,7 +1021,7 @@ impl SystemManager {
     pub fn update_tray(&self) {
         if let SystemManager::Desktop(handle) = self {
             let integration = DesktopIntegration {
-                app_handle: handle.clone(),
+                app_handle: Some(handle.clone()),
             };
             integration.update_tray();
         }
@@ -1026,7 +1031,7 @@ impl SystemManager {
         match self {
             SystemManager::Desktop(handle) => {
                 let integration = DesktopIntegration {
-                    app_handle: handle.clone(),
+                    app_handle: Some(handle.clone()),
                 };
                 integration.show_notification(title, body);
             }
@@ -1047,12 +1052,12 @@ impl SystemIntegration for SystemManager {
         match self {
             SystemManager::Desktop(handle) => {
                 let integration = DesktopIntegration {
-                    app_handle: handle.clone(),
+                    app_handle: Some(handle.clone()),
                 };
                 integration.on_account_switch(account, target_ide).await
             }
             SystemManager::Headless => {
-                let integration = HeadlessIntegration;
+                let integration = DesktopIntegration { app_handle: None };
                 integration.on_account_switch(account, target_ide).await
             }
         }

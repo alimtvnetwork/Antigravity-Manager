@@ -543,6 +543,9 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         params![now, stale_cutoff],
     );
 
+    // Step 0.5: Clear dispatched prompts cache so that any prompt backed up can be cleanly re-dispatched upon switch completion
+    reset_dispatched_prompts_cache();
+
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
 
@@ -950,7 +953,9 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     for prompt in prompts {
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
-        let already_dispatched = {
+        let already_dispatched = if prompt.status == "backed_up" {
+            false
+        } else {
             let mut cache = get_dispatched_prompts_cache().lock().unwrap();
             let seen = cache.contains(&prompt.id) || cache.contains(&sig);
             if !seen {
@@ -1808,7 +1813,9 @@ pub fn resend_running_commands_for_instance(
         dispatched_repos.insert(clean_path);
 
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
-        let already_dispatched = {
+        let already_dispatched = if prompt.status == "backed_up" {
+            false
+        } else {
             let mut cache = get_dispatched_prompts_cache().lock().unwrap();
             let seen = cache.contains(&prompt.id) || cache.contains(&sig);
             if !seen {

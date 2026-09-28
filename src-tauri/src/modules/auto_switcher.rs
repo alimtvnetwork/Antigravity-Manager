@@ -1285,7 +1285,14 @@ pub async fn execute_profile_rotation_with_context(
     });
 
     // Step 3: Automatically re-inject and resend backed-up running prompts across workspaces
-    let resent_count = match crate::modules::repo_db::resend_all_running_commands(20) {
+    let resent_count = match crate::modules::repo_db::resend_running_commands_for_instance(
+        if inst_id == "default" {
+            None
+        } else {
+            Some(inst_id)
+        },
+        20,
+    ) {
         Ok(resent) => {
             logger::log_info(&format!(
                 "[AutoSwitcher] Post-switch re-injected {} backed-up running prompts across workspaces",
@@ -1747,6 +1754,9 @@ pub async fn trigger_manual_rotation_for_instance(
         Some(id) => instance::resolve_instance_id(id)?,
         None => instance::get_active_instance_id()?,
     };
+
+    // Step 0: Ensure running prompts are snapshotted and backed up before rotation starts
+    let _ = crate::modules::repo_db::backup_running_prompts(&inst_id);
     let in_use_account_ids = get_active_in_use_account_ids();
 
     let registry = instance::load_registry()?;

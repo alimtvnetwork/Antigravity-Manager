@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.94.0-3B82F6?style=flat-square" alt="Version 4.94.0">
+    <img src="https://img.shields.io/badge/Version-4.95.0-3B82F6?style=flat-square" alt="Version 4.95.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.93.0)**
+**Bar 2: Version-Based Installation (v4.95.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -511,6 +511,12 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 > [!TIP]
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
+
+## 📝 更新日志
+
+> 最新版本 **v4.95.0**：全面统一直连与无头桌面集成 5 步切号生命周期（切前备份 -> 杀 IDE -> 注入新凭证 -> 启动新账号 IDE -> 恢复在途任务），修复在途任务恢复缓存遮蔽问题，补全 Supabase 原子认领存储函数并通过全量 14 项单元测试，实机连续两轮即时快进切换任务 100% 恢复零丢失。
+
+👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
 
 ---
 

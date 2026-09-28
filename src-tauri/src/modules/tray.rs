@@ -214,7 +214,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 
                             // 2. Switch
                             let integration = crate::modules::integration::DesktopIntegration {
-                                app_handle: app_handle.clone(),
+                                app_handle: Some(app_handle.clone()),
                             };
                             if let Ok(_) =
                                 modules::switch_account(&next_account.id, None, &integration).await

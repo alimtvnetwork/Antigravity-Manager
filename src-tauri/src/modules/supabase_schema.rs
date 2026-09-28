@@ -137,7 +137,29 @@ CREATE TABLE IF NOT EXISTS public.endpoint_health (
     last_checked_at BIGINT NOT NULL DEFAULT 0
 );
 
--- 4. FIFO Auto-Pruning Stored Function
+-- 4. Atomic Command Claim Stored Function
+CREATE OR REPLACE FUNCTION public.claim_next_command(p_node_id TEXT)
+RETURNS SETOF public.command_queue AS $$
+BEGIN
+    RETURN QUERY
+    WITH next_cmd AS (
+        SELECT id FROM public.command_queue
+        WHERE status = 'pending'
+          AND (target_node_id = p_node_id OR target_node_id = '*')
+        ORDER BY created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+    )
+    UPDATE public.command_queue
+    SET status = 'running',
+        started_at = EXTRACT(EPOCH FROM NOW())::BIGINT
+    FROM next_cmd
+    WHERE public.command_queue.id = next_cmd.id
+    RETURNING public.command_queue.*;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. FIFO Auto-Pruning Stored Function
 CREATE OR REPLACE FUNCTION public.prune_old_commands(p_keep_limit INT)
 RETURNS INT AS $$
 DECLARE

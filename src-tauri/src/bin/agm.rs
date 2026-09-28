@@ -6653,10 +6653,15 @@ fn cmd_instances(args: &[String]) {
                 resolved_id, target_spec
             );
             let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+            // Snapshot & backup running prompts before rotation
+            let _ = repo_db::backup_running_prompts(&resolved_id);
             match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
                 &resolved_id,
             ))) {
-                Ok(msg) => println!("[SUCCESS] {}", msg),
+                Ok(msg) => {
+                    let _ = repo_db::resend_running_commands_for_instance(Some(&resolved_id), 20);
+                    println!("[SUCCESS] {}", msg);
+                }
                 Err(e) => {
                     eprintln!("[ERROR] Instance fast-forward failed: {}", e);
                     std::process::exit(1);
