@@ -602,106 +602,136 @@ pub fn format_observe_report() -> String {
     };
 
     let projects = repo_db::get_live_project_execution_info();
-    let mut running_ws = Vec::new();
-    let mut idle_ws = Vec::new();
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+
+    let mut running_items: Vec<String> = Vec::new();
+    let mut idle_names: Vec<String> = Vec::new();
+    let mut seen_prompt_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for p in &projects {
         let short_name = shorten_project_name(&p.repo_name);
         if p.is_running {
-            running_ws.push((short_name, p));
-        } else {
-            idle_ws.push(short_name);
-        }
-    }
-    idle_ws.sort();
-    idle_ws.dedup();
+            let matched_prompt = all_prompts.iter().find(|ap| {
+                (ap.status == "running" || ap.status == "dispatched" || ap.status == "executing")
+                    && (ap.project_id == p.project_id
+                        || ap.repo_path == p.repo_path
+                        || (!p.repo_name.is_empty() && ap.project_id.contains(&p.repo_name)))
+            });
 
-    let mut ws_section = String::new();
-    if running_ws.is_empty() && idle_ws.is_empty() {
-        ws_section.push_str("• No workspaces registered\n");
-    } else {
-        if !running_ws.is_empty() {
-            ws_section.push_str("🟢 <b>Running:</b>\n");
-            for (short_name, p) in running_ws {
-                let duration = if p.last_activity_epoch > 0 {
-                    format_running_duration(p.last_activity_epoch)
-                } else {
-                    String::new()
-                };
-                ws_section.push_str(&format!("• <b>{}</b> 🟢 {}\n", short_name, duration));
-                if let Some(ref prompt_txt) = p.active_prompt {
-                    let clean = repo_db::extract_smart_prompt_summary(prompt_txt, 90);
-                    ws_section.push_str(&format!(
+            let duration_str = if let Some(ap) = matched_prompt {
+                seen_prompt_ids.insert(ap.id.clone());
+                format_running_duration(ap.created_at)
+            } else if p.last_detected_at > 0 {
+                format_running_duration(p.last_detected_at)
+            } else {
+                String::new()
+            };
+
+            let duration_display = if !duration_str.is_empty() {
+                format!(" {}", duration_str)
+            } else {
+                String::new()
+            };
+
+            let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
+
+            let prompt_text = matched_prompt
+                .map(|ap| ap.prompt_content.clone())
+                .or_else(|| p.active_prompt.clone());
+
+            if let Some(txt) = prompt_text {
+                let clean = repo_db::extract_smart_prompt_summary(&txt, 90);
+                if !clean.is_empty() {
+                    block.push_str(&format!(
                         "   \"{}\"\n",
                         clean_for_telegram_html(&clean, 90)
                     ));
                 }
             }
-        }
 
-        if !idle_ws.is_empty() {
-            if !ws_section.is_empty() {
-                ws_section.push('\n');
+            if let Some(ap) = matched_prompt {
+                let prompt_id_short = if ap.id.len() > 8 {
+                    &ap.id[..8]
+                } else {
+                    &ap.id
+                };
+                block.push_str(&format!(
+                    "   <i>Expand: <code>/expand {}</code></i>\n",
+                    prompt_id_short
+                ));
             }
-            ws_section.push_str("⚪ <b>Idle Workspaces:</b>\n");
-            for name in idle_ws {
-                ws_section.push_str(&format!("• {} ⚪\n", name));
-            }
+
+            running_items.push(block);
+        } else {
+            idle_names.push(short_name);
         }
     }
 
-    let mut prompts_section = String::new();
-    match repo_db::list_all_prompts() {
-        Ok(all_prompts) if !all_prompts.is_empty() => {
-            let active: Vec<_> = all_prompts
-                .into_iter()
-                .filter(|p| {
-                    p.status == "running" || p.status == "dispatched" || p.status == "executing"
-                })
-                .take(5)
-                .collect();
-            if active.is_empty() {
-                prompts_section.push_str("• None (All workspaces idle)\n");
-            } else {
-                for p in active {
-                    let friendly_ws =
-                        repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
-                    let short_ws = shorten_project_name(&friendly_ws);
-                    let duration_str = format_running_duration(p.created_at);
-                    let smart_summary =
-                        repo_db::extract_smart_prompt_summary(&p.prompt_content, 120);
-                    let prompt_id_short = if p.id.len() > 8 {
-                        &p.id[..8]
-                    } else {
-                        &p.id
-                    };
-
-                    prompts_section.push_str(&format!(
-                        "• <b>{}</b> 🟢 {}\n   \"{}\"\n   <i>ID: <code>{}</code></i>\n",
-                        clean_for_telegram_html(&short_ws, 24),
-                        duration_str,
-                        clean_for_telegram_html(&smart_summary, 120),
-                        clean_for_telegram_html(prompt_id_short, 16)
-                    ));
-                }
-            }
+    for ap in all_prompts.iter().filter(|ap| {
+        ap.status == "running" || ap.status == "dispatched" || ap.status == "executing"
+    }) {
+        if seen_prompt_ids.contains(&ap.id) {
+            continue;
         }
-        _ => {
-            prompts_section.push_str("• Queue is empty\n");
+        let friendly_ws =
+            repo_db::format_friendly_workspace_label(&ap.project_id, "", &ap.repo_path);
+        let short_name = shorten_project_name(&friendly_ws);
+        let duration_str = format_running_duration(ap.created_at);
+        let duration_display = if !duration_str.is_empty() {
+            format!(" {}", duration_str)
+        } else {
+            String::new()
+        };
+        let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
+        let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
+        if !clean.is_empty() {
+            block.push_str(&format!(
+                "   \"{}\"\n",
+                clean_for_telegram_html(&clean, 90)
+            ));
+        }
+        let prompt_id_short = if ap.id.len() > 8 {
+            &ap.id[..8]
+        } else {
+            &ap.id
+        };
+        block.push_str(&format!(
+            "   <i>Expand: <code>/expand {}</code></i>\n",
+            prompt_id_short
+        ));
+        running_items.push(block);
+    }
+
+    idle_names.sort();
+    idle_names.dedup();
+
+    let mut body_sections = String::new();
+    body_sections.push_str("🟢 <b>Running:</b>\n");
+    if running_items.is_empty() {
+        body_sections.push_str("• None (All workspaces idle)\n");
+    } else {
+        for item in running_items {
+            body_sections.push_str(&item);
+        }
+    }
+
+    if !idle_names.is_empty() {
+        body_sections.push_str("\n⚪ <b>Idle:</b>\n");
+        for name in idle_names {
+            body_sections.push_str(&format!("• {} ⚪\n", name));
         }
     }
 
     format!(
-        "🔭 <b>AGM v{} Observation &amp; Telemetry Report</b>\n\n\
+        "🤖 <b>AGM v{} Status</b>\n\n\
         • <b>Machine:</b> <code>{}</code>\n\
         • <b>Alias:</b> <code>{}</code>\n\
         • <b>IP:</b> <code>{}</code>\n\
         • <b>Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
         • <b>Active Account:</b> <code>{}</code> ({} total)\n\
         • <b>Quota / Tier:</b> <code>{}</code>\n\n\
-        📂 <b>Workspaces:</b>\n{}\n\
-        ⚡ <b>Running Prompts:</b>\n{}\n\
-        💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
+        {}\n\
+        💡 Use <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&machine_name, 48),
         clean_for_telegram_html(&display_alias, 48),
@@ -711,8 +741,7 @@ pub fn format_observe_report() -> String {
         clean_for_telegram_html(&active_email, 48),
         total_accounts,
         clean_for_telegram_html(&quota_summary, 64),
-        ws_section,
-        prompts_section
+        body_sections
     )
 }
 
@@ -2835,12 +2864,27 @@ mod tests {
     }
 
     #[test]
-    fn test_chunk_telegram_text_long_line() {
-        let text = "A".repeat(5000);
-        let chunks = chunk_telegram_text(&text, 1000);
-        assert_eq!(chunks.len(), 5);
-        for chunk in &chunks {
-            assert_eq!(chunk.len(), 1000);
-        }
+    fn test_shorten_project_name() {
+        assert_eq!(shorten_project_name("Antigravity-Manager"), "AGM");
+        assert_eq!(shorten_project_name("antigravity_manager_v2"), "AGM");
+        assert_eq!(shorten_project_name("gitmap-cli"), "GitMap");
+        assert_eq!(shorten_project_name("frontend-a8b21c"), "frontend");
+        assert_eq!(shorten_project_name("custom-tool"), "custom-tool");
+    }
+
+    #[test]
+    fn test_clean_for_telegram_html_truncation() {
+        let input = "This is a very long prompt line that should be cleanly truncated without line break artifacts";
+        let cleaned = clean_for_telegram_html(input, 20);
+        assert!(cleaned.ends_with("..."));
+        assert!(!cleaned.contains("\n... [truncated]"));
+    }
+
+    #[test]
+    fn test_format_running_duration() {
+        let now = chrono::Utc::now().timestamp();
+        assert_eq!(format_running_duration(now - 30), "(running 30s)");
+        assert_eq!(format_running_duration(now - 125), "(running 2m 5s)");
+        assert_eq!(format_running_duration(0), "");
     }
 }

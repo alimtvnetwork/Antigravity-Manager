@@ -16,11 +16,12 @@ Initiated from user feedback on Telegram `/status` telemetry UX degradation, unr
 - Added auto-switch threshold percentage to the Quota / Tier bullet (`switch threshold: 15%`).
 
 ### 2. Workspaces & Prompts Visualization
-- Workspaces separated into clean `🟢 Running` (with 🟢 symbol and prompt snippets) and `⚪ Idle Workspaces` with vertical spacing.
+- Unified running workspaces and active prompts into a single consolidated `🟢 Running:` block, eliminating redundant dispatch and duplicate prompt queue headers.
 - Abbreviated project names (`Antigravity-Manager` -> `AGM`).
 - Eliminated Telegram `<code>` monospace wrapping on prompt bodies that rendered as unreadable dark-blue-on-dark-blue on mobile/desktop clients; now rendered in clean indented white text.
-- Replaced `Recent Prompts Queue` and `[dispatched]` with `⚡ Running Prompts:` and calculated elapsed duration (`(running Xm Ys)`).
+- Formatted running status with compact green indicator: `• <b>AGM</b> 🟢 (running Xm Ys)`.
 - Replaced `clean_for_telegram_html`'s `\n... [truncated]` line break artifact with clean inline ellipsis `...`.
+- Grouped idle workspaces into a separate `⚪ Idle:` block with clear spacing.
 
 ### 3. Interactive Prompt Expansion Command
 - Added `/expand <id>` (and `/expand`) command handler to display full untruncated prompt instructions.

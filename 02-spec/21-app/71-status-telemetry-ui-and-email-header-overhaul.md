@@ -28,7 +28,7 @@ Okay. Your message that actually shows up on the status, that is not that good, 
 ## Concrete Architecture & Design Changes
 
 ### 1. Header & Bullet Points
-- **Title:** `🔭 <b>AGM v{} Observation &amp; Telemetry Report</b>`
+- **Title:** `🤖 <b>AGM v{} Status</b>`
 - **Machine Identification:**
   - `• <b>Machine:</b> <COMPUTERNAME>`
   - `• <b>Alias:</b> <node_alias_or_None>`
@@ -38,16 +38,15 @@ Okay. Your message that actually shows up on the status, that is not that good, 
 - **Quota & Auto-Switch:** `• <b>Quota / Tier:</b> {} (switch threshold: {}%)`
 - **Purge:** Completely remove `Backup Batches: ...` line.
 
-### 2. Discovered Workspaces & Running State
-- Group running workspaces first with `🟢` and idle workspaces with `⚪`.
+### 2. Unified Workspaces & Prompts Architecture
+- Combine workspaces and running prompts into a unified list under `🟢 <b>Running:</b>` (no separate or redundant dispatch header).
+- Each running workspace displays short name, green symbol, and duration:
+  `• <b><short_ws></b> 🟢 (running Xm Ys)`
+- Prompt content is indented with 3 spaces on a new line in plain white text (no `<code>` tags):
+  `   "<clean_prompt_summary>"`
+  `   <i>Expand: <code>/expand <id></code></i>`
 - Shorten workspace names (e.g., `Antigravity-Manager` -> `AGM`).
-- Clean separation with spacing between running and idle nodes.
-- Remove redundant `(RUNNING)` or `(IDLE)` badges.
-
-### 3. Running Prompts Visualization
-- Header: `⚡ <b>Running Prompts:</b>` (no `[dispatched]` prefix).
-- White text with indentation (no `<code>` wrapping on prompt content).
-- Show elapsed runtime: `(running for 2m 15s)`.
+- Clean separation with spacing before `⚪ <b>Idle:</b>` section.
 - Strip `\n... [truncated]` from `clean_for_telegram_html` and use clean inline ellipsis `...`.
 
 ### 4. Interactive Expand Command
