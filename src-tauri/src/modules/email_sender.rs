@@ -513,8 +513,8 @@ fn escape_html_entities(raw: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// Format an RFC 5322 subject with standard telemetry prefix: `[Antigravity | v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`
-/// Replaces any obsolete or unversioned prefix like `[VM | IP]`, `[vX | VM | IP]`, or duplicate `[Antigravity]`,
+/// Format an RFC 5322 subject with standard telemetry prefix: `[AGM v<VERSION> | <VM_ALIAS> | <LOCAL_IP>]`
+/// Replaces any obsolete or unversioned prefix like `[Antigravity | ...]`, `[VM | IP]`, `[vX | VM | IP]`, or duplicate `[AGM]`,
 /// preserves `Re:` prefix, and handles arbitrary whitespace around pipes.
 pub fn format_subject_with_telemetry(
     subject: &str,
@@ -522,13 +522,18 @@ pub fn format_subject_with_telemetry(
     machine_name: &str,
     machine_ip: &str,
 ) -> String {
+    let ver_tag = if pkg_ver.starts_with('v') || pkg_ver.starts_with('V') {
+        pkg_ver.to_string()
+    } else {
+        format!("v{}", pkg_ver)
+    };
     let prefix = format!(
-        "[Antigravity | {} | {} | {}]",
-        pkg_ver, machine_name, machine_ip
+        "[AGM {} | {} | {}]",
+        ver_tag, machine_name, machine_ip
     );
     let mut trimmed = subject.trim();
 
-    // Strip any leading telemetry tag like [Antigravity | ...], [v4.75.0 | ...], or [VM | IP]
+    // Strip any leading telemetry tag like [AGM v... | ...], [Antigravity | ...], [v4.75.0 | ...], or [VM | IP]
     if trimmed.starts_with('[') {
         if let Some(end_idx) = trimmed.find(']') {
             let inside = &trimmed[1..end_idx];
@@ -552,9 +557,12 @@ pub fn format_subject_with_telemetry(
         }
     }
 
-    // Strip leading [Antigravity] if present (case-insensitive)
+    // Strip leading [Antigravity] or [AGM] if present (case-insensitive)
     while trimmed.to_lowercase().starts_with("[antigravity]") {
         trimmed = trimmed["[antigravity]".len()..].trim();
+    }
+    while trimmed.to_lowercase().starts_with("[agm]") {
+        trimmed = trimmed["[agm]".len()..].trim();
     }
 
     // Strip redundant leading node alias or wildcard prefix like "W2 |", "w2 |", or "* |"
@@ -1238,7 +1246,7 @@ pub fn render_quota_drop_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] Low Quota Warning ({:.1}%) - {}",
+        "[AGM {} | {} | {}] Low Quota Warning ({:.1}%) - {}",
         pkg_ver, machine_name, machine_ip, current_quota, email
     );
     let content = format!(
@@ -1263,7 +1271,7 @@ pub fn render_workspace_switch_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [Notice] Workspace Auto-Switched: {}",
+        "[AGM {} | {} | {}] [Notice] Workspace Auto-Switched: {}",
         pkg_ver, machine_name, machine_ip, to_instance
     );
     let content = format!(
@@ -1291,7 +1299,7 @@ pub fn render_idle_projects_email(
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let git_hash = crate::modules::git_info::get_git_hash();
     let subject = format!(
-        "[Antigravity | {} | {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
+        "[AGM {} | {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
         pkg_ver, git_hash, machine_name, machine_ip
     );
 
@@ -1523,7 +1531,7 @@ pub fn render_system_update_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [System Update] Application Updated: v{} -> v{}",
+        "[AGM {} | {} | {}] [System Update] Application Updated: v{} -> v{}",
         pkg_ver, machine_name, machine_ip, previous_version, current_version
     );
     let extra_notes = details.unwrap_or("System update successfully applied.");
@@ -1557,7 +1565,7 @@ pub fn render_exec_result_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [Execution Report] exit: {} - {}",
+        "[AGM {} | {} | {}] [Execution Report] exit: {} - {}",
         pkg_ver, machine_name, machine_ip, exit_code, cmd
     );
     let status = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
@@ -1583,7 +1591,7 @@ pub fn render_exec_result_email(
 pub fn render_help_email(machine_name: &str, machine_ip: &str) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] Inbound Remote Mailbox Instructions Cheat Sheet",
+        "[AGM {} | {} | {}] Inbound Remote Mailbox Instructions Cheat Sheet",
         pkg_ver, machine_name, machine_ip
     );
     let content = format!(
@@ -1667,7 +1675,7 @@ pub fn render_self_test_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] Mailbox Connection Verified - {}",
+        "[AGM {} | {} | {}] Mailbox Connection Verified - {}",
         pkg_ver, machine_name, machine_ip, email
     );
     let content = format!(
@@ -1696,7 +1704,7 @@ pub fn render_test_ping_email(
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = format!(
-        "[Antigravity | {} | {} | {}] Test Command Ping: {}",
+        "[AGM {} | {} | {}] Test Command Ping: {}",
         pkg_ver, machine_name, machine_ip, project_name
     );
     let content = format!(
@@ -1721,9 +1729,10 @@ mod tests {
             render_quota_drop_email("test@example.com", 12.5, 15, "my-pc", "192.168.1.50");
         assert!(subj.contains("12.5%"));
         assert!(subj.starts_with(&format!(
-            "[Antigravity | {} | my-pc | 192.168.1.50]",
+            "[AGM {} | my-pc | 192.168.1.50]",
             pkg_ver
         )));
+        assert!(!subj.contains("] [AGM]"));
         assert!(!subj.contains("] [Antigravity]"));
         assert!(text.contains("192.168.1.50"));
         assert!(text.contains("<html"));
@@ -1741,32 +1750,32 @@ mod tests {
         let s1 = format_subject_with_telemetry("[Antigravity] Account Switched", ver, node, ip);
         assert_eq!(
             s1,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Account Switched"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] Account Switched"
         );
 
         // Old tag upgrade
         let s2 = format_subject_with_telemetry("[VM3 | 192.168.1.12] Alert", ver, node, ip);
-        assert_eq!(s2, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Alert");
+        assert_eq!(s2, "[AGM v4.71.4 | VM3 | 192.168.1.12] Alert");
 
         // Reply subject with old tag
         let s3 = format_subject_with_telemetry("Re: [VM3 | 192.168.1.12] Result", ver, node, ip);
         assert_eq!(
             s3,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Re: Result"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] Re: Result"
         );
 
         // Reply subject without tag
         let s4 = format_subject_with_telemetry("Re: help", ver, node, ip);
-        assert_eq!(s4, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Re: help");
+        assert_eq!(s4, "[AGM v4.71.4 | VM3 | 192.168.1.12] Re: help");
 
         // Already tagged cleanly
         let s5 = format_subject_with_telemetry(
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Status",
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] Status",
             ver,
             node,
             ip,
         );
-        assert_eq!(s5, "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Status");
+        assert_eq!(s5, "[AGM v4.71.4 | VM3 | 192.168.1.12] Status");
 
         // User request sample upgrade: strips redundant [Antigravity] before [JSON]
         let s6 = format_subject_with_telemetry(
@@ -1777,7 +1786,7 @@ mod tests {
         );
         assert_eq!(
             s6,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] [JSON] Node & Credits Status"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] [JSON] Node & Credits Status"
         );
 
         // Other subject with redundant tag
@@ -1789,7 +1798,7 @@ mod tests {
         );
         assert_eq!(
             s7,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] Write the subject"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] Write the subject"
         );
 
         // Deduplicate node alias when subject has "W2 | prompt | proj-..."
@@ -1797,7 +1806,7 @@ mod tests {
             format_subject_with_telemetry("VM3 | prompt | proj-Antigravity-Manager", ver, node, ip);
         assert_eq!(
             s8,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
         );
 
         // Deduplicate wildcard prefix "* | prompt | ..."
@@ -1805,7 +1814,7 @@ mod tests {
             format_subject_with_telemetry("* | prompt | proj-Antigravity-Manager", ver, node, ip);
         assert_eq!(
             s9,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
         );
 
         // Subject with old telemetry tag and duplicate node alias
@@ -1817,7 +1826,7 @@ mod tests {
         );
         assert_eq!(
             s10,
-            "[Antigravity | v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
+            "[AGM v4.71.4 | VM3 | 192.168.1.12] prompt | proj-Antigravity-Manager"
         );
     }
 
@@ -1849,7 +1858,7 @@ mod tests {
         assert!(mime.contains("Content-Type: text/plain; charset=UTF-8"));
         assert!(!mime.contains("Content-Type: text/html"));
         assert!(!mime.contains("multipart/alternative"));
-        assert!(mime.contains("Subject: [Antigravity | "));
+        assert!(mime.contains("Subject: [AGM "));
         assert!(mime.contains("[JSON] Node & Credits Status"));
     }
 

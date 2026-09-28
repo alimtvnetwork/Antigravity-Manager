@@ -7119,7 +7119,7 @@ fn cmd_email(args: &[String]) {
             if is_json {
                 if !target_recipients.is_empty() {
                     let subject = format!(
-                        "[Antigravity | v{} | {} | {}] [JSON] Node & Credits Status",
+                        "[AGM v{} | {} | {}] [JSON] Node & Credits Status",
                         VERSION, node_alias, m_ip
                     );
                     let json_body = serde_json::to_string_pretty(&status_json).unwrap_or_default();
@@ -7197,7 +7197,7 @@ fn cmd_email(args: &[String]) {
 
             if !target_recipients.is_empty() {
                 let subject = format!(
-                    "[Antigravity | v{} | {} | {}] Node & Credits Status",
+                    "[AGM v{} | {} | {}] Node & Credits Status",
                     VERSION, node_alias, m_ip
                 );
                 let html = email_sender::render_node_credits_status_table_html(

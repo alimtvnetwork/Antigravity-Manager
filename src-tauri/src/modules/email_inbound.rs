@@ -1148,7 +1148,7 @@ pub fn format_reply_subject(
 ) -> String {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let node_tag = format!(
-        "[Antigravity | {} | {} | {}]",
+        "[AGM {} | {} | {}]",
         pkg_ver, local_name, local_ip
     );
     if let Some(orig) = original_subject {
@@ -3539,7 +3539,7 @@ mod tests {
         let local_ip = "192.168.1.12";
         let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
         let node_tag = format!(
-            "[Antigravity | {} | {} | {}]",
+            "[AGM {} | {} | {}]",
             pkg_ver, local_name, local_ip
         );
 

@@ -362,7 +362,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         .unwrap_or_else(|| condition.to_string());
 
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [JSON] Account Switched: {} -> {}",
+        "[AGM {} | {} | {}] [JSON] Account Switched: {} -> {}",
         pkg_ver, m_name, m_ip, from_display, selected_display
     );
 
@@ -566,7 +566,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
   <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 4px solid #38bdf8; padding: 24px 28px; color: #ffffff;">
       <div style="margin-bottom: 12px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[Antigravity | {} | {} | {}]</span>
+        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[AGM {} | {} | {}]</span>
         <span style="background: #059669; color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">SWITCHED</span>
       </div>
       <h2 style="margin: 6px 0 0 0; font-size: 24px; color: #ffffff; font-weight: 700; line-height: 1.3;">Antigravity Account Switched</h2>
@@ -656,7 +656,7 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
         .unwrap_or("(none / standby)");
 
     let subject = format!(
-        "[Antigravity | IN-USE | {} | {}] {} (1h lease)",
+        "[AGM IN-USE | {} | {}] {} (1h lease)",
         m_name, m_ip, target_email
     );
 
@@ -863,7 +863,7 @@ fn dispatch_email_config_added_alert(title: &str, details: serde_json::Value) {
     let m_ip = email_watcher::detect_local_ip();
 
     let subject = format!(
-        "[Antigravity | {} | {} | {}] [JSON] Email Config Added: {}",
+        "[AGM {} | {} | {}] [JSON] Email Config Added: {}",
         pkg_ver, m_name, m_ip, title
     );
 

@@ -428,7 +428,7 @@ pub fn clean_for_telegram_html(input: &str, max_chars: usize) -> String {
 
     let truncated: String = if no_ansi.chars().count() > max_chars {
         let mut s: String = no_ansi.chars().take(max_chars).collect();
-        s.push_str("\n... [truncated]");
+        s.push_str("...");
         s
     } else {
         no_ansi
@@ -440,13 +440,67 @@ pub fn clean_for_telegram_html(input: &str, max_chars: usize) -> String {
         .replace('>', "&gt;")
 }
 
+/// Helper to abbreviate project names (e.g. Antigravity-Manager -> AGM)
+pub fn shorten_project_name(name: &str) -> String {
+    let lower = name.to_lowercase();
+    if lower.contains("antigravity-manager") || lower.contains("antigravity_manager") {
+        "AGM".to_string()
+    } else if lower.contains("gitmap") {
+        "GitMap".to_string()
+    } else if lower == "repo" {
+        "repo".to_string()
+    } else {
+        let trimmed = name.trim();
+        if let Some(idx) = trimmed.rfind('-') {
+            let suffix = &trimmed[idx + 1..];
+            if suffix.len() >= 6 && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
+                return trimmed[..idx].to_string();
+            }
+        }
+        trimmed.to_string()
+    }
+}
+
+/// Helper to format running duration from a Unix timestamp in seconds
+pub fn format_running_duration(created_at: i64) -> String {
+    if created_at <= 0 {
+        return String::new();
+    }
+    let now = chrono::Utc::now().timestamp();
+    let elapsed = (now - created_at).max(0);
+    if elapsed < 60 {
+        format!("(running {}s)", elapsed)
+    } else if elapsed < 3600 {
+        let mins = elapsed / 60;
+        let secs = elapsed % 60;
+        format!("(running {}m {}s)", mins, secs)
+    } else {
+        let hours = elapsed / 3600;
+        let mins = (elapsed % 3600) / 60;
+        format!("(running {}h {}m)", hours, mins)
+    }
+}
+
 /// Format rich ping telemetry report
 pub fn format_ping_report() -> String {
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let local_alias = if local_config.node_alias.trim().is_empty() {
-        email_watcher::detect_machine_name()
+    let machine_name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let raw_alias = if !local_config.node_alias.trim().is_empty() {
+        local_config.node_alias.trim().to_string()
+    } else if let Ok(settings) = email_vault_db::get_notification_settings() {
+        settings.local_machine_name.trim().to_string()
     } else {
-        local_config.node_alias
+        String::new()
+    };
+    let display_alias = if (raw_alias.starts_with("Node-")
+        && raw_alias[5..].chars().all(|c| c.is_ascii_hexdigit()))
+        || raw_alias.is_empty()
+    {
+        "None".to_string()
+    } else {
+        raw_alias
     };
     let local_ip = email_watcher::detect_local_ip();
     let uptime_min = supabase_sync::get_uptime_seconds() / 60;
@@ -465,37 +519,56 @@ pub fn format_ping_report() -> String {
         .unwrap_or_else(|| "None".to_string());
 
     format!(
-        "🏓 <b>PONG — Antigravity Node Online</b>\n\n\
-        • <b>Node:</b> <code>{}</code> (IP: <code>{}</code>)\n\
-        • <b>Version:</b> <code>v{}</code> | <b>Commit:</b> <code>{}</code>\n\
-        • <b>Branch:</b> <code>{}</code> | <b>Last Release:</b> <code>{}</code>\n\
+        "🏓 <b>PONG — AGM v{} Online</b>\n\n\
+        • <b>Machine:</b> <code>{}</code>\n\
+        • <b>Alias:</b> <code>{}</code>\n\
+        • <b>IP:</b> <code>{}</code>\n\
+        • <b>Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
+        • <b>Branch:</b> <code>{}</code> | <b>Release:</b> <code>{}</code>\n\
         • <b>Uptime:</b> <code>{}m</code>\n\
         • <b>Active Account:</b> <code>{}</code>\n\n\
         💡 Send <code>/observe</code> for live workspaces &amp; prompts or <code>/help</code> for all commands.",
-        clean_for_telegram_html(&local_alias, 64),
-        clean_for_telegram_html(&local_ip, 64),
-        clean_for_telegram_html(&ver, 32),
-        clean_for_telegram_html(&hash, 32),
-        clean_for_telegram_html(&branch, 32),
-        clean_for_telegram_html(&last_rel, 32),
+        clean_for_telegram_html(&ver, 24),
+        clean_for_telegram_html(&machine_name, 48),
+        clean_for_telegram_html(&display_alias, 48),
+        clean_for_telegram_html(&local_ip, 48),
+        clean_for_telegram_html(&ver, 24),
+        clean_for_telegram_html(&hash, 24),
+        clean_for_telegram_html(&branch, 24),
+        clean_for_telegram_html(&last_rel, 24),
         uptime_min,
         clean_for_telegram_html(&active_acc, 64)
     )
 }
 
-/// Format live observation & status report (Accounts, Workspaces, Running Prompts, Backups)
+/// Format live observation & status report (Accounts, Workspaces, Running Prompts)
 pub fn format_observe_report() -> String {
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let local_alias = if local_config.node_alias.trim().is_empty() {
-        email_watcher::detect_machine_name()
+    let machine_name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let raw_alias = if !local_config.node_alias.trim().is_empty() {
+        local_config.node_alias.trim().to_string()
+    } else if let Ok(settings) = email_vault_db::get_notification_settings() {
+        settings.local_machine_name.trim().to_string()
     } else {
-        local_config.node_alias
+        String::new()
+    };
+    let display_alias = if (raw_alias.starts_with("Node-")
+        && raw_alias[5..].chars().all(|c| c.is_ascii_hexdigit()))
+        || raw_alias.is_empty()
+    {
+        "None".to_string()
+    } else {
+        raw_alias
     };
     let local_ip = email_watcher::detect_local_ip();
     let ver = git_info::get_app_version();
     let hash = git_info::get_git_hash();
-    let branch = git_info::get_git_branch();
-    let last_rel = git_info::get_last_release();
+
+    let switch_threshold = crate::modules::config::load_app_config()
+        .map(|c| c.quota_protection.threshold_percentage)
+        .unwrap_or(15);
 
     let (active_email, total_accounts, quota_summary) = match account::load_account_index() {
         Ok(idx) => {
@@ -513,49 +586,104 @@ pub fn format_observe_report() -> String {
                 .map(|q| {
                     let tier = q.subscription_tier.unwrap_or_else(|| "PRO".to_string());
                     let min_pct = q.models.iter().map(|m| m.percentage).min().unwrap_or(100);
-                    format!("{} ({}% min model quota)", tier, min_pct)
+                    format!(
+                        "{} ({}% min model quota | switch threshold: {}%)",
+                        tier, min_pct, switch_threshold
+                    )
                 })
-                .unwrap_or_else(|| "N/A".to_string());
+                .unwrap_or_else(|| format!("N/A (switch threshold: {}%)", switch_threshold));
             (email, total, quota_str)
         }
-        Err(_) => ("None".to_string(), 0, "N/A".to_string()),
+        Err(_) => (
+            "None".to_string(),
+            0,
+            format!("N/A (switch threshold: {}%)", switch_threshold),
+        ),
     };
 
-    let mut ws_section = String::new();
-    let mut prompts_section = String::new();
     let projects = repo_db::get_live_project_execution_info();
-    if projects.is_empty() {
+    let mut running_ws = Vec::new();
+    let mut idle_ws = Vec::new();
+
+    for p in &projects {
+        let short_name = shorten_project_name(&p.repo_name);
+        if p.is_running {
+            running_ws.push((short_name, p));
+        } else {
+            idle_ws.push(short_name);
+        }
+    }
+    idle_ws.sort();
+    idle_ws.dedup();
+
+    let mut ws_section = String::new();
+    if running_ws.is_empty() && idle_ws.is_empty() {
         ws_section.push_str("• No workspaces registered\n");
     } else {
-        for p in projects.iter().take(8) {
-            let badge = if p.is_running {
-                "🟢 RUNNING"
-            } else {
-                "⚪ IDLE"
-            };
-            let friendly_label =
-                repo_db::format_friendly_workspace_label(&p.project_id, &p.repo_name, &p.repo_path);
-            ws_section.push_str(&format!(
-                "• <b>{}</b> [{}] (<code>{}</code>)\n",
-                clean_for_telegram_html(&friendly_label, 48),
-                badge,
-                clean_for_telegram_html(&p.status, 20)
-            ));
+        if !running_ws.is_empty() {
+            ws_section.push_str("🟢 <b>Running:</b>\n");
+            for (short_name, p) in running_ws {
+                let duration = if p.last_activity_epoch > 0 {
+                    format_running_duration(p.last_activity_epoch)
+                } else {
+                    String::new()
+                };
+                ws_section.push_str(&format!("• <b>{}</b> 🟢 {}\n", short_name, duration));
+                if let Some(ref prompt_txt) = p.active_prompt {
+                    let clean = repo_db::extract_smart_prompt_summary(prompt_txt, 90);
+                    ws_section.push_str(&format!(
+                        "   \"{}\"\n",
+                        clean_for_telegram_html(&clean, 90)
+                    ));
+                }
+            }
+        }
+
+        if !idle_ws.is_empty() {
+            if !ws_section.is_empty() {
+                ws_section.push('\n');
+            }
+            ws_section.push_str("⚪ <b>Idle Workspaces:</b>\n");
+            for name in idle_ws {
+                ws_section.push_str(&format!("• {} ⚪\n", name));
+            }
         }
     }
 
+    let mut prompts_section = String::new();
     match repo_db::list_all_prompts() {
-        Ok(recent_prompts) if !recent_prompts.is_empty() => {
-            for p in recent_prompts.iter().take(5) {
-                let friendly_ws =
-                    repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
-                let smart_summary = repo_db::extract_smart_prompt_summary(&p.prompt_content, 70);
-                prompts_section.push_str(&format!(
-                    "• [<code>{}</code>] <b>{}</b>: <code>\"{}\"</code>\n",
-                    clean_for_telegram_html(&p.status, 16),
-                    clean_for_telegram_html(&friendly_ws, 36),
-                    clean_for_telegram_html(&smart_summary, 70)
-                ));
+        Ok(all_prompts) if !all_prompts.is_empty() => {
+            let active: Vec<_> = all_prompts
+                .into_iter()
+                .filter(|p| {
+                    p.status == "running" || p.status == "dispatched" || p.status == "executing"
+                })
+                .take(5)
+                .collect();
+            if active.is_empty() {
+                prompts_section.push_str("• None (All workspaces idle)\n");
+            } else {
+                for p in active {
+                    let friendly_ws =
+                        repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
+                    let short_ws = shorten_project_name(&friendly_ws);
+                    let duration_str = format_running_duration(p.created_at);
+                    let smart_summary =
+                        repo_db::extract_smart_prompt_summary(&p.prompt_content, 120);
+                    let prompt_id_short = if p.id.len() > 8 {
+                        &p.id[..8]
+                    } else {
+                        &p.id
+                    };
+
+                    prompts_section.push_str(&format!(
+                        "• <b>{}</b> 🟢 {}\n   \"{}\"\n   <i>ID: <code>{}</code></i>\n",
+                        clean_for_telegram_html(&short_ws, 24),
+                        duration_str,
+                        clean_for_telegram_html(&smart_summary, 120),
+                        clean_for_telegram_html(prompt_id_short, 16)
+                    ));
+                }
             }
         }
         _ => {
@@ -563,32 +691,100 @@ pub fn format_observe_report() -> String {
         }
     }
 
-    let backup_count = backup_prompts_db::list_backup_batches(None)
-        .map(|b| b.len())
-        .unwrap_or(0);
-
     format!(
-        "🔭 <b>AGM Node Observation &amp; Telemetry Report</b>\n\n\
-        🖥 <b>Node:</b> <code>{}</code> (<code>{}</code>)\n\
-        📦 <b>Build:</b> <code>v{}</code> | <code>{}</code> | <code>{}</code> (rel: <code>{}</code>)\n\
-        👤 <b>Active Account:</b> <code>{}</code> ({} total)\n\
-        🔋 <b>Quota / Tier:</b> <code>{}</code>\n\
-        💾 <b>Backup Batches:</b> <code>{}</code> split SQLite batch(es)\n\n\
-        📂 <b>Discovered Workspaces:</b>\n{}\n\
-        📝 <b>Recent Prompts Queue:</b>\n{}",
-        clean_for_telegram_html(&local_alias, 48),
+        "🔭 <b>AGM v{} Observation &amp; Telemetry Report</b>\n\n\
+        • <b>Machine:</b> <code>{}</code>\n\
+        • <b>Alias:</b> <code>{}</code>\n\
+        • <b>IP:</b> <code>{}</code>\n\
+        • <b>Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
+        • <b>Active Account:</b> <code>{}</code> ({} total)\n\
+        • <b>Quota / Tier:</b> <code>{}</code>\n\n\
+        📂 <b>Workspaces:</b>\n{}\n\
+        ⚡ <b>Running Prompts:</b>\n{}\n\
+        💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
+        clean_for_telegram_html(&ver, 24),
+        clean_for_telegram_html(&machine_name, 48),
+        clean_for_telegram_html(&display_alias, 48),
         clean_for_telegram_html(&local_ip, 48),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
-        clean_for_telegram_html(&branch, 24),
-        clean_for_telegram_html(&last_rel, 24),
         clean_for_telegram_html(&active_email, 48),
         total_accounts,
-        clean_for_telegram_html(&quota_summary, 48),
-        backup_count,
+        clean_for_telegram_html(&quota_summary, 64),
         ws_section,
         prompts_section
     )
+}
+
+/// Format detailed expanded view of a prompt
+pub fn format_expand_prompt_report(query_str: &str) -> String {
+    let prompts = match repo_db::list_all_prompts() {
+        Ok(p) => p,
+        Err(e) => {
+            return format!(
+                "⚠️ <b>Failed to query prompts:</b> <code>{}</code>",
+                clean_for_telegram_html(&e, 200)
+            )
+        }
+    };
+
+    if prompts.is_empty() {
+        return "⚠️ <b>No Prompts:</b> No prompts found in split database.".to_string();
+    }
+
+    let query = query_str.trim();
+    let target = if query.is_empty() {
+        prompts
+            .iter()
+            .find(|p| p.status == "running" || p.status == "dispatched")
+            .or_else(|| prompts.first())
+    } else if let Ok(idx) = query.parse::<usize>() {
+        if idx >= 1 && idx <= prompts.len() {
+            prompts.get(idx - 1)
+        } else {
+            None
+        }
+    } else {
+        prompts.iter().find(|p| {
+            p.id.starts_with(query)
+                || p.id.eq_ignore_ascii_case(query)
+                || p.project_id.contains(query)
+        })
+    };
+
+    match target {
+        Some(p) => {
+            let friendly_ws =
+                repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
+            let short_ws = shorten_project_name(&friendly_ws);
+            let duration = format_running_duration(p.created_at);
+            let badge = if p.status == "running" || p.status == "dispatched" {
+                "🟢 RUNNING"
+            } else {
+                "⚪ IDLE"
+            };
+
+            format!(
+                "📄 <b>Expanded Prompt Details:</b>\n\n\
+                • <b>ID:</b> <code>{}</code>\n\
+                • <b>Project:</b> <b>{}</b>\n\
+                • <b>Status:</b> {} {}\n\
+                • <b>Path:</b> <code>{}</code>\n\n\
+                <b>Full Prompt Instructions:</b>\n{}\n",
+                clean_for_telegram_html(&p.id, 48),
+                clean_for_telegram_html(&short_ws, 32),
+                badge,
+                duration,
+                clean_for_telegram_html(&p.repo_path, 80),
+                clean_for_telegram_html(&p.prompt_content, 3500)
+            )
+        }
+        None => format!(
+            "⚠️ <b>Prompt Not Found:</b> No prompt matched <code>{}</code>.\n\
+            💡 Send <code>/active</code> to view running prompts or <code>/prompts all</code> for all IDs.",
+            clean_for_telegram_html(query, 32)
+        ),
+    }
 }
 
 /// Format comprehensive Telegram command manual
@@ -599,7 +795,7 @@ pub fn format_help_manual() -> String {
     let last_rel = git_info::get_last_release();
 
     format!(
-        "🤖 <b>Antigravity-Manager Telegram Remote Manual</b>\n\
+        "🤖 <b>AGM v{} Telegram Remote Manual</b>\n\
         <code>v{} | commit {} | branch {} | release {}</code>\n\n\
         📌 <b>Core Telemetry &amp; Dual-Sequence Tree View (AGM + GitMap):</b>\n\
         • <code>/help</code> or <code>/start</code> — Display this full interactive command manual\n\
@@ -608,6 +804,8 @@ pub fn format_help_manual() -> String {
         • <code>/tree all</code> — Full tree of all workspaces &amp; conversations across all instances\n\
         • <code>/active</code> or <code>/running</code> — Active running prompts + Dual-Sequence Tree View\n\
         • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
+        • <code>/expand &lt;id&gt;</code> — View full untruncated prompt instructions\n\
+        • <code>/snapshot</code> — Multi-node cluster status snapshot\n\
         • <code>/projects</code> — List registered workspaces, AGM/GitMap Seq IDs &amp; sample syntax\n\
         • <code>/queues</code> — Inspect pending workspace prompt queues\n\n\
         🎯 <b>Prompt Injection (By Dual Seq ID, Instance &amp; Remote Machine):</b>\n\
@@ -653,13 +851,14 @@ pub fn format_help_manual() -> String {
         • <code>/ssh agy active</code> — Run <code>gitmap agy active</code> across remote SSH fleet\n\
         • <code>/gitmap ssh nodes</code> — Inspect GitMap SSH node inventory &amp; reachability\n\
         • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> — Direct node command routing\n\n\
-        🧭 <b>GitMap, AGM &amp; Multi-Instance Rotation:</b>\n\
+        🧭 <b>GitMap, AGM &amp; Multi-Instance Rotation:</b>\n
         • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
         • <code>/agy active</code> or <code>/gitmap agy active</code> — Check Antigravity active prompts via GitMap\n\
         • <code>/agm tree</code> / <code>/agm wpr</code> / <code>/agm accounts</code> — Run AGM CLI views\n\
         • <code>/api</code> — Inspect local API proxy (port 8045) &amp; account bindings\n\
         • <code>/ff</code> — Fast-forward switch to freshest highest-quota account\n\
         • <code>/email status</code> | <code>/email ping</code> | <code>/email help</code> — Email notifications",
+        clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
         clean_for_telegram_html(&branch, 24),
@@ -2117,6 +2316,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             let only_running = !rest.eq_ignore_ascii_case("all");
             Some(repo_db::format_tree_view_telegram_html(200, only_running))
         }
+        "expand" | "exp" => Some(format_expand_prompt_report(rest)),
         "active" | "running" => Some(format_active_prompts_report().await),
         "queues" | "queue" => Some(format_prompt_queues_report().await),
         "nodes" | "node" => {
@@ -2180,6 +2380,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 Some(format_prompt_queues_report().await)
             } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())
+            } else if sub.starts_with("expand") {
+                let id = sub["expand".len()..].trim();
+                Some(format_expand_prompt_report(id))
             } else {
                 Some(execute_prompt_injection(sub).await)
             }
