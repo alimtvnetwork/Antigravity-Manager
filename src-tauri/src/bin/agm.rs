@@ -6879,19 +6879,22 @@ fn cmd_fast_forward(args: &[String]) {
         }
     };
 
-    // Snapshot & backup running prompts before rotation
-    let _ = repo_db::backup_running_prompts("default");
+    let target_instance = target_opt
+        .map(|target| instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string()))
+        .unwrap_or_else(|| "default".to_string());
 
-    let result = if let Some(target) = target_opt {
-        let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string());
+    // Snapshot & backup running prompts before rotation
+    let _ = repo_db::backup_running_prompts(&target_instance);
+
+    let result = if target_opt.is_some() {
         if !is_json {
             println!(
                 "[*] Triggering fast-forward account rotation for instance '{}'...",
-                resolved
+                target_instance
             );
         }
         rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
-            &resolved,
+            &target_instance,
         )))
     } else {
         if !is_json {
