@@ -3,7 +3,16 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
-    *   **v4.89.0 (2026-09-28)**:
+    *   **v4.90.0 (2026-09-28)**:
+        -   **[Release v4.90.0: 账号轮换 98% 模拟 E2E 验证、Prompt 跨工作区并行备份恢复、双层多机防冲突与沙盒生命周期闭环] 支持 98% 高阈值模拟切号全链路、候选账号 Google API 实时刷新稳定性校验、多工作区并发快照入库 Split SQLite（人类友好工程名与图片载荷）、快进按键切号接管、Prompt 自动重注与活跃度校验及失联告警、Supabase 租约与 IMAP 防冲突、沙盒实例全生命周期验证、CLI 帮助全量打磨、15.0% 生产基准收敛 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **高阈值 98% 模拟切号与候选账号 Google API 实时刷新稳定性探针 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`)**: 完整跑通 98% 阈值模拟轮换（`agm switch-if-low-credit -t 98`）。算法按 4 小时滚动窗口严格优先排序 100% 满额候选账号；在执行切实切换前，通过直连 Google 官方配额接口（`account::fetch_quota_with_retry`）进行现场配额实时刷新与稳定性验证，确保候选账号容量真实充沛后才提交轮换。
+            -   **多工作区 Prompt 并行快照与 Split SQLite 持久化 (`src-tauri/src/modules/backup_prompts_db.rs`, `src-tauri/src/modules/repo_db.rs`)**: 引入 `std::thread::scope` 对所有活跃工作区 `state.vscdb` 与 `.antigravity_resume_task.json` 进行并发无阻塞扫描；解析人类友好工程名（如 `Antigravity-Manager`、`gitmap`），剔除无意义 UUID 哈希乱码；将 Prompt 文本、图片路径及 base64 载荷持久化至独立的 Split SQLite 数据库 `backup-prompts.db`。
+            -   **快进按键切号接管与 Prompt 自动重注恢复 (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/auto_switcher.rs`)**: 切号委托至统一快进按键流程，切号完成后自动触发 `agm restore` 将在途 Prompt 重新注入活跃工作区任务队列，并通过 `verify_prompts_running()` 实时确认 Prompt 处于 `dispatched` 运行状态，若未运行则即时触发紧急报警。
+            -   **Telegram 与邮件多阶段告警遥测卡片与失联紧急预警 (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/telegram_inbound.rs`)**: 全链路打通 Telegram 与邮件双端遥测，阶段性卡片清晰列举受保护项目的人类友好名称、备份 Prompt 数量、选定轮换账号与 API 探针校验状态及重新恢复注入统计；若切号后未检测到活跃 Prompt 则触发 `[AGM EMERGENCY]` 级双端告警。
+            -   **Supabase 租约与 IMAP 邮件广播双层多机冲突防御 (`src-tauri/src/modules/workspace_lease_manager.rs`, `src-tauri/src/modules/auto_switcher.rs`)**: 严格联合 Supabase Root DB 分布式租约锁（`workspace_leases`）与最近 3600 秒 IMAP 切号广播事件，自动跳过被其他虚拟机节点占用的账号，保障集群多机并发切号零冲突。
+            -   **沙盒隔离实例全生命周期 E2E 验证 (`src-tauri/src/modules/instance.rs`, `src-tauri/src/bin/agm.rs`)**: 创建全新沙盒实例 `agm instances create test-sandbox-e2e`，在隔离环境中验证独立配置、切号轮换与 Prompt 快照恢复，测试完成后通过 `agm instances rm test-sandbox-e2e --force` 彻底干净清理，做到零残留。
+            -   **CLI 全指令帮助文档与示例完善 (`src-tauri/src/bin/agm.rs`)**: 全面重构并补充 `agm prompts`、`agm accounts`、`agm switch`、`agm instances`、`agm backup`、`agm restore`、`agm auto-switch` 等核心指令的 `--help` 文本与实战示例，确保终端指令帮助文档 100% 覆盖。
+            -   **生产环境标准低额度阈值 15.0% 严格对齐 (`src-tauri/src/models/config.rs`, `src/components/settings/AutoSwitcherSettings.tsx`)**: 前后端统一将默认低额度阈值收敛并锁定为 15.0% 生产基准（`low_quota_threshold_percent: 15.0`）。
         -   **[Release v4.89.0: 账号轮换 98% 模拟 E2E 验证、Prompt 跨工作区并行备份恢复、多虚拟机防抢占防御与沙盒生命周期闭环] 支持 98% 高阈值模拟切号全链路、切换前直连 Google API 实时刷新校验、多工作区并发快照入库 Split SQLite（人类友好工程名与图片载荷）、快进按键切号接管、Prompt 自动重注与状态遥测、Supabase 租约与 IMAP 防冲突、沙盒实例全生命周期验证、CLI 帮助全量打磨、15.0% 生产基准收敛 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **高阈值 98% 模拟切号与候选账号 Google API 实时刷新探针 (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`)**: 完整跑通 98% 阈值模拟轮换（`agm switch-if-low-credit -t 98`）。算法按 4 小时滚动窗口严格优先排序 100% 满额候选账号；在执行切实切换前，通过直连 Google 官方配额接口（`account::fetch_quota_with_retry`）进行现场配额实时刷新验证，确保候选账号容量真实充沛后才提交轮换。
             -   **多工作区 Prompt 并行快照与 Split SQLite 持久化 (`src-tauri/src/modules/backup_prompts_db.rs`, `src-tauri/src/modules/repo_db.rs`)**: 引入 `std::thread::scope` 对所有活跃工作区 `state.vscdb` 与 `.antigravity_resume_task.json` 进行并发无阻塞扫描；解析人类友好工程名（如 `Antigravity-Manager`、`gitmap`），剔除无意义 UUID 哈希乱码；将 Prompt 文本、图片路径及 base64 载荷持久化至独立的 Split SQLite 数据库 `backup-prompts.db`。
@@ -3425,6 +3434,11 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.90.0 (2026-09-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
+
+
     *   **v4.89.0 (2026-09-28)**:
         -   **[Release v4.89.0: Account Switch 98% Simulation E2E, Parallel Prompt Backup & Restoration, Multi-VM Collision Shielding & Sandbox Lifecycle Verification] Validated end-to-end 98% simulated failover, pre-switch live API quota refresh probe, multi-workspace parallel prompt snapshot to split SQLite with human names & image payloads, fast-forward button delegation, automatic prompt resumption, Supabase lease & IMAP collision avoidance, sandbox instance lifecycle verification, comprehensive CLI help polish, and 15.0% production standard alignment (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **98% Simulated Failover & Live Google API Refresh Probe (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`)**: Successfully tested high-threshold (98%) simulated account switch (`agm switch-if-low-credit -t 98`). The candidate scoring algorithm ranks and prioritizes 100% full-quota accounts, and performs a live Google API quota refresh probe (`account::fetch_quota_with_retry`) immediately before switching to verify fresh capacity before rotation commits.
