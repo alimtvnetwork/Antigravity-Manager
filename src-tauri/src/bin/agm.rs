@@ -10,7 +10,8 @@ use antigravity_tools_lib::modules::repo_db::ActivePrompt;
 use antigravity_tools_lib::modules::{
     account, agy_cleaner, auto_switcher, backup_prompts_db, config, email_inbound, email_io,
     email_sender, email_vault_db, email_watcher, instance, notification_hub, proxy_db, repo_db,
-    security_db, supabase_sync, telegram_inbound, training_api,
+    security_db, supabase_client, supabase_schema, supabase_sync, telegram_inbound, training_api,
+    workspace_lease_manager,
 };
 use chrono::Utc;
 use std::env;
@@ -88,6 +89,9 @@ fn main() {
         }
         "telegram" => {
             cmd_telegram(&cmd_args);
+        }
+        "supabase" | "supa" => {
+            cmd_supabase(&cmd_args);
         }
         "nodes" => {
             cmd_telegram(&["nodes".to_string()]);
@@ -272,6 +276,19 @@ fn print_help_json() {
                     { "name": "telegram", "aliases": [], "flags": ["ls", "set", "ping", "cmds", "chat", "setup", "help"], "description": "Manage Telegram bot token, chat ID, automated setup, and alerts" },
                     { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" }
                 ]
+            },
+            {
+                "group": "Supabase Fleet Sync & Lease Architecture",
+                "items": [
+                    { "name": "supabase help", "aliases": ["supa help"], "flags": [], "description": "Display complete config locations, JSON examples, and syntax guide" },
+                    { "name": "supabase status", "aliases": ["supa status", "supa ls"], "flags": [], "description": "Show local node alias, IP, endpoints, and active remote leases" },
+                    { "name": "supabase list-leases", "aliases": ["leases", "in-use"], "flags": [], "description": "List all accounts currently leased and in-use across cluster machines" },
+                    { "name": "supabase test", "aliases": ["supa test"], "flags": ["[endpoint_id]"], "description": "Test HTTP connection and table accessibility to Supabase endpoints" },
+                    { "name": "supabase set", "aliases": ["set-endpoint"], "flags": ["<id> <name> <url> <key> <role> [notes] [tags]"], "description": "Configure or update Supabase endpoint directly from terminal" },
+                    { "name": "supabase load-json", "aliases": ["import"], "flags": ["<file>"], "description": "Ingest and merge endpoints from JSON file" },
+                    { "name": "supabase sync", "aliases": ["supa sync"], "flags": [], "description": "Trigger immediate local node heartbeat and instance profile sync" },
+                    { "name": "supabase schema", "aliases": ["supa schema"], "flags": ["[root|secondary]"], "description": "Output SQL schema DDL for Supabase SQL Editor" }
+                ]
             }
         ]
     });
@@ -364,6 +381,26 @@ fn print_help() {
     println!("        Manage Telegram bot token, chat ID, automated setup, and alerts");
     println!("    broadcast-email [ls|add|rm|send-to-all|send|send-help|test]");
     println!("        Manage multi-recipient email broadcasts");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SUPABASE FLEET SYNC & LEASE ARCHITECTURE");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    supabase [help]");
+    println!("        Complete operational guide, config file locations, and JSON formatting");
+    println!("    supabase status, ls");
+    println!("        Show local node ID, alias, IP, configured endpoints, and active leases");
+    println!("    supabase list-leases, leases, in-use");
+    println!("        Show which accounts are currently selected / in-use across machines");
+    println!("    supabase test [endpoint_id]");
+    println!("        Test connection & table schema for configured Supabase endpoints");
+    println!("    supabase set <id> <name> <url> <key> <role> [notes] [tags]");
+    println!("        Add or update Supabase endpoint directly from command line");
+    println!("    supabase load-json <file>");
+    println!("        Load endpoints and configuration from JSON file");
+    println!("    supabase sync");
+    println!("        Synchronize local machine node and instance profiles to Supabase");
+    println!("    supabase schema [root|secondary]");
+    println!("        Output SQL schema DDL to create tables in Supabase SQL Editor");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");
@@ -952,6 +989,17 @@ fn cmd_switch(args: &[String]) {
 
     let _ = account::apply_device_profile(&target.id);
     let _ = instance::bind_account_to_instance("default", &target.id, &target.email);
+
+    // Acquire distributed lease in Supabase Root DB and sync local node state
+    if let Ok(rt) = tokio::runtime::Runtime::new() {
+        let _ = rt.block_on(workspace_lease_manager::acquire_lease_with_details(
+            &target.id,
+            &target.email,
+            "default",
+            90,
+        ));
+        let _ = rt.block_on(supabase_sync::sync_local_node_now());
+    }
 
     println!("[SUCCESS] Active account switched:");
     println!("          Previous: {}", prev_email);
@@ -4382,6 +4430,523 @@ fn cmd_telegram(args: &[String]) {
     }
 
     println!("AGM Telegram Subsystem. Run 'agm telegram help' for available commands.");
+}
+
+fn cmd_supabase(args: &[String]) {
+    let sub = args
+        .first()
+        .map(|s| s.trim_start_matches('/').to_lowercase())
+        .unwrap_or_else(|| "help".to_string());
+    let sub_args = if args.len() > 1 { &args[1..] } else { &[] };
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[ERROR] Tokio runtime error: {}", e);
+            return;
+        }
+    };
+
+    match sub.as_str() {
+        "help" | "--help" | "-h" => print_supabase_help(),
+        "status" | "info" | "ls" => cmd_supabase_status(&rt),
+        "list-leases" | "leases" | "in-use" => cmd_supabase_list_leases(&rt),
+        "test" => cmd_supabase_test(&rt, sub_args),
+        "set-endpoint" | "set" | "add" => cmd_supabase_set_endpoint(sub_args),
+        "load-json" | "import" => cmd_supabase_load_json(sub_args),
+        "schema" => cmd_supabase_schema(sub_args),
+        "sync" => cmd_supabase_sync(&rt),
+        "enable" => {
+            let mut cfg = supabase_sync::load_config().unwrap_or_default();
+            cfg.is_sync_enabled = true;
+            let _ = supabase_sync::save_config(&cfg);
+            println!("✅ Supabase synchronization ENABLED.");
+        }
+        "disable" => {
+            let mut cfg = supabase_sync::load_config().unwrap_or_default();
+            cfg.is_sync_enabled = false;
+            let _ = supabase_sync::save_config(&cfg);
+            println!("⏸️ Supabase synchronization DISABLED.");
+        }
+        "set-alias" => {
+            if let Some(alias) = sub_args.first() {
+                let mut cfg = supabase_sync::load_config().unwrap_or_default();
+                cfg.node_alias = alias.to_string();
+                let _ = supabase_sync::save_config(&cfg);
+                println!("✅ Node alias updated to: {}", alias);
+            } else {
+                eprintln!("[ERROR] Usage: agm supabase set-alias <new_alias>");
+            }
+        }
+        _ => {
+            eprintln!(
+                "[ERROR] Unknown command: 'agm supabase {}'. Run 'agm supabase help' for guide.",
+                sub
+            );
+        }
+    }
+}
+
+fn print_supabase_help() {
+    let cfg_path = supabase_sync::get_config_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "%APPDATA%\\antigravity-manager\\supabase_config.json".to_string());
+    let node_id = supabase_sync::get_local_node_id();
+    let local_ip = supabase_sync::get_local_ip();
+
+    println!("================================================================================");
+    println!("  AGM Supabase Multi-Machine Fleet Synchronization & Lease Architecture");
+    println!("================================================================================");
+    println!();
+    println!("📁 CONFIGURATION FILE LOCATION:");
+    println!("   Target Path:      {}", cfg_path);
+    println!("   Local Node ID:    {}", node_id);
+    println!("   Local IPv4:       {}", local_ip);
+    println!();
+    println!("📄 CONFIGURATION JSON STRUCTURE & EXAMPLE:");
+    println!(r#"   {{
+     "endpoints": [
+       {{
+         "id": "ep-root-lovable-01",
+         "name": "Root Supabase (Lovable)",
+         "url": "https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/",
+         "api_key": "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69",
+         "role": "root",
+         "is_enabled": true,
+         "prune_threshold_mb": 400,
+         "priority": 1,
+         "notes": "Root account by Lovable",
+         "tags": ["lovable", "root"]
+       }},
+       {{
+         "id": "ep-secondary-01",
+         "name": "Secondary Supabase",
+         "url": "https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/",
+         "api_key": "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o",
+         "role": "secondary",
+         "is_enabled": true,
+         "prune_threshold_mb": 200,
+         "priority": 2,
+         "notes": "Secondary fallback and command queue",
+         "tags": ["secondary"]
+       }}
+     ],
+     "node_alias": "Node-823632",
+     "is_sync_enabled": true,
+     "auto_prune_root_mb": 400,
+     "auto_prune_secondary_mb": 200,
+     "heartbeat_interval_secs": 30
+   }}"#);
+    println!();
+    println!("🗄️ DATABASE ROLES & PARENT-CHILD RELATIONSHIPS:");
+    println!("   • Root Role ('root'):");
+    println!("     - Table 'public.nodes' (Parent Machine): id, alias, ip_address, uptime_seconds, project_count, status");
+    println!("     - Table 'public.instance_profiles' (Child Instances): id, node_id (FK->nodes.id), profile_name, active_account_email, is_active, status");
+    println!("     - Table 'public.workspace_leases' (Cross-Machine In-Use Leases): account_id, account_email, node_id, node_alias, ip_address, profile_name, expires_at");
+    println!("     - Function 'acquire_workspace_lease()': Atomic lock acquiring preventing multi-machine account collisions");
+    println!("   • Secondary Role ('secondary'):");
+    println!("     - Table 'public.command_queue': Remote inbound commands");
+    println!("     - Table 'public.command_telemetry': Command stdout/stderr/exit_code logs");
+    println!("     - Table 'public.endpoint_health': Storage tracking & FIFO auto-pruning");
+    println!();
+    println!("🛠️ CLI COMMANDS:");
+    println!("   agm supabase status                    Display current configuration, endpoints & active leases");
+    println!("   agm supabase list-leases               Show which accounts are currently in-use across machines");
+    println!("   agm supabase test [endpoint_id]        Test connectivity & schema tables for configured endpoints");
+    println!("   agm supabase set <id> <name> <url> <key> <role> [notes] [tags]");
+    println!("                                          Configure/update endpoint directly from command line");
+    println!("   agm supabase load-json <file>          Ingest and merge endpoints from JSON file");
+    println!("   agm supabase sync                      Trigger immediate local node & instance profile sync");
+    println!("   agm supabase schema [root|secondary]   Output SQL schema script for Supabase SQL Editor");
+    println!("   agm supabase enable / disable          Toggle Supabase synchronization");
+    println!("   agm supabase set-alias <alias>         Update local machine alias");
+    println!("================================================================================");
+}
+
+fn cmd_supabase_status(rt: &tokio::runtime::Runtime) {
+    let cfg = match supabase_sync::load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load Supabase config: {}", e);
+            return;
+        }
+    };
+
+    let node_id = supabase_sync::get_local_node_id();
+    let local_ip = supabase_sync::get_local_ip();
+    let uptime = supabase_sync::get_uptime_seconds();
+    let cfg_path = supabase_sync::get_config_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    println!("================================================================================");
+    println!("  AGM Supabase Node & Fleet Status");
+    println!("================================================================================");
+    println!("  Node ID:         {}", node_id);
+    println!("  Node Alias:      {}", cfg.node_alias);
+    println!("  Local IPv4:      {}", local_ip);
+    println!("  Uptime:          {}s ({}m)", uptime, uptime / 60);
+    println!(
+        "  Sync Active:     {}",
+        if cfg.is_sync_enabled {
+            "YES (Enabled)"
+        } else {
+            "NO (Disabled)"
+        }
+    );
+    println!("  Heartbeat:       every {}s", cfg.heartbeat_interval_secs);
+    println!("  Config File:     {}", cfg_path);
+    println!();
+
+    println!("  --- Configured Endpoints ({}) ---", cfg.endpoints.len());
+    if cfg.endpoints.is_empty() {
+        println!("  (No endpoints configured. Use 'agm supabase set ...' or 'agm supabase load-json <file>')");
+    } else {
+        println!(
+            "  {:<20} {:<10} {:<8} {:<8} {:<24} {:<30}",
+            "ID", "ROLE", "ENABLED", "PRIORITY", "TAGS/NOTES", "URL"
+        );
+        println!("  {}", "-".repeat(105));
+        for ep in &cfg.endpoints {
+            let notes_str = ep
+                .notes
+                .as_deref()
+                .unwrap_or(if ep.tags.is_empty() { "-" } else { "" });
+            let tags_str = if !ep.tags.is_empty() {
+                format!("[{}] {}", ep.tags.join(", "), notes_str)
+            } else {
+                notes_str.to_string()
+            };
+            println!(
+                "  {:<20} {:<10} {:<8} {:<8} {:<24} {:<30}",
+                ep.id,
+                ep.role,
+                if ep.is_enabled { "yes" } else { "no" },
+                ep.priority,
+                if tags_str.len() > 22 {
+                    format!("{}...", &tags_str[..20])
+                } else {
+                    tags_str
+                },
+                if ep.url.len() > 28 {
+                    format!("{}...", &ep.url[..26])
+                } else {
+                    ep.url.clone()
+                }
+            );
+        }
+    }
+    println!();
+
+    println!("  --- Active Remote Workspace Leases (In-Use Accounts Across Machines) ---");
+    match rt.block_on(workspace_lease_manager::list_active_leases()) {
+        Ok(leases) => {
+            if leases.is_empty() {
+                println!("  (No active remote leases held across fleet)");
+            } else {
+                let now = Utc::now().timestamp();
+                println!(
+                    "  {:<30} {:<16} {:<16} {:<16} {:<10}",
+                    "ACCOUNT EMAIL / ID", "NODE ALIAS", "IP ADDRESS", "PROFILE", "EXPIRES IN"
+                );
+                println!("  {}", "-".repeat(95));
+                for l in &leases {
+                    let display_acc = if !l.account_email.is_empty() {
+                        l.account_email.clone()
+                    } else {
+                        l.account_id.clone()
+                    };
+                    let exp = if l.expires_at > now {
+                        format!("{}s", l.expires_at - now)
+                    } else {
+                        "expired".to_string()
+                    };
+                    let display_ip = if !l.ip_address.is_empty() {
+                        l.ip_address.clone()
+                    } else {
+                        "-".to_string()
+                    };
+                    println!(
+                        "  {:<30} {:<16} {:<16} {:<16} {:<10}",
+                        if display_acc.len() > 28 {
+                            format!("{}...", &display_acc[..26])
+                        } else {
+                            display_acc
+                        },
+                        l.node_alias,
+                        display_ip,
+                        l.profile_name,
+                        exp
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            println!("  (Could not fetch remote leases: {})", e);
+        }
+    }
+    println!("================================================================================");
+}
+
+fn cmd_supabase_list_leases(rt: &tokio::runtime::Runtime) {
+    println!("Fetching active workspace account leases from Supabase Root DB...");
+    match rt.block_on(workspace_lease_manager::list_active_leases()) {
+        Ok(leases) => {
+            if leases.is_empty() {
+                println!("No active accounts currently leased across the cluster.");
+                return;
+            }
+            let now = Utc::now().timestamp();
+            println!(
+                "\n{:<32} {:<24} {:<18} {:<16} {:<16} {:<10}",
+                "ACCOUNT EMAIL",
+                "ACCOUNT ID",
+                "NODE ALIAS",
+                "IP ADDRESS",
+                "INSTANCE",
+                "EXPIRES IN"
+            );
+            println!("{}", "-".repeat(120));
+            for l in &leases {
+                let exp = if l.expires_at > now {
+                    format!("{}s", l.expires_at - now)
+                } else {
+                    "expired".to_string()
+                };
+                let display_ip = if !l.ip_address.is_empty() {
+                    l.ip_address.clone()
+                } else {
+                    "-".to_string()
+                };
+                println!(
+                    "{:<32} {:<24} {:<18} {:<16} {:<16} {:<10}",
+                    if l.account_email.len() > 30 {
+                        format!("{}...", &l.account_email[..28])
+                    } else {
+                        l.account_email.clone()
+                    },
+                    if l.account_id.len() > 22 {
+                        format!("{}...", &l.account_id[..20])
+                    } else {
+                        l.account_id.clone()
+                    },
+                    l.node_alias,
+                    display_ip,
+                    l.profile_name,
+                    exp
+                );
+            }
+            println!(
+                "\nTotal active accounts in use across machines: {}",
+                leases.len()
+            );
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to query workspace leases: {}", e);
+        }
+    }
+}
+
+fn cmd_supabase_test(rt: &tokio::runtime::Runtime, args: &[String]) {
+    let cfg = match supabase_sync::load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load Supabase config: {}", e);
+            return;
+        }
+    };
+
+    let target_id = args.first().map(|s| s.as_str());
+    let endpoints: Vec<_> = cfg
+        .endpoints
+        .iter()
+        .filter(|ep| {
+            if let Some(id) = target_id {
+                ep.id == id || ep.name.to_lowercase().contains(&id.to_lowercase())
+            } else {
+                ep.is_enabled
+            }
+        })
+        .collect();
+
+    if endpoints.is_empty() {
+        println!("No matching endpoints found to test.");
+        return;
+    }
+
+    println!("Testing {} Supabase endpoint(s)...", endpoints.len());
+    for ep in endpoints {
+        print!("  Connecting to [{}] {} ({}) ... ", ep.id, ep.name, ep.role);
+        let client = match supabase_client::SupabaseClient::new(ep) {
+            Ok(c) => c,
+            Err(e) => {
+                println!("FAILED (Client init error: {})", e);
+                continue;
+            }
+        };
+        match rt.block_on(client.test_connection()) {
+            Ok(res) => {
+                if res.is_success {
+                    println!("PASS (HTTP {})", res.status_code.unwrap_or(200));
+                    println!("    -> {}", res.message);
+                } else {
+                    println!("FAIL (HTTP {})", res.status_code.unwrap_or(0));
+                    println!("    -> {}", res.message);
+                }
+            }
+            Err(e) => {
+                println!("ERROR: {}", e);
+            }
+        }
+    }
+}
+
+fn cmd_supabase_set_endpoint(args: &[String]) {
+    if args.len() < 5 {
+        println!("Usage: agm supabase set <id> <name> <url> <api_key> <role> [notes] [tags]");
+        println!("Example:");
+        println!("  agm supabase set ep-root-lovable-01 \"Root Lovable\" https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/ sb_publishable_... root \"Root by Lovable\" \"lovable,root\"");
+        return;
+    }
+
+    let id = args[0].trim().to_string();
+    let name = args[1].trim().to_string();
+    let url = args[2].trim().to_string();
+    let api_key = args[3].trim().to_string();
+    let role = args[4].trim().to_lowercase();
+
+    if role != "root" && role != "secondary" {
+        eprintln!(
+            "[ERROR] Role must be 'root' or 'secondary', got '{}'",
+            role
+        );
+        return;
+    }
+
+    let notes = args
+        .get(5)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let tags: Vec<String> = args
+        .get(6)
+        .map(|s| {
+            s.split(',')
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut cfg = supabase_sync::load_config().unwrap_or_default();
+    if let Some(existing) = cfg.endpoints.iter_mut().find(|e| e.id == id) {
+        existing.name = name;
+        existing.url = url;
+        existing.api_key = api_key;
+        existing.role = role;
+        existing.notes = notes;
+        existing.tags = tags;
+        println!("✅ Updated existing endpoint '{}'", id);
+    } else {
+        let prune = if role == "root" { 400 } else { 200 };
+        cfg.endpoints.push(supabase_client::SupabaseEndpoint {
+            id: id.clone(),
+            name,
+            url,
+            api_key,
+            role,
+            is_enabled: true,
+            prune_threshold_mb: prune,
+            priority: (cfg.endpoints.len() + 1) as u32,
+            notes,
+            tags,
+        });
+        println!("✅ Added new endpoint '{}'", id);
+    }
+
+    cfg.is_sync_enabled = true;
+    if let Err(e) = supabase_sync::save_config(&cfg) {
+        eprintln!("[ERROR] Failed to save config: {}", e);
+    } else {
+        println!("✅ Saved to supabase_config.json");
+    }
+}
+
+fn cmd_supabase_load_json(args: &[String]) {
+    let path_str = match args.first() {
+        Some(p) => p,
+        None => {
+            eprintln!("Usage: agm supabase load-json <file_path>");
+            return;
+        }
+    };
+    let content = match fs::read_to_string(path_str) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
+            return;
+        }
+    };
+    let mut cfg = supabase_sync::load_config().unwrap_or_default();
+    if let Ok(full) = serde_json::from_str::<supabase_sync::SupabaseConfig>(&content) {
+        cfg = full;
+        println!("✅ Parsed full SupabaseConfig from JSON.");
+    } else if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(arr) = val.get("endpoints").and_then(|v| v.as_array()) {
+            if let Ok(eps) = serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(
+                serde_json::Value::Array(arr.clone()),
+            ) {
+                for new_ep in eps {
+                    if let Some(pos) = cfg.endpoints.iter().position(|e| e.id == new_ep.id) {
+                        cfg.endpoints[pos] = new_ep;
+                    } else {
+                        cfg.endpoints.push(new_ep);
+                    }
+                }
+                println!("✅ Merged endpoints from JSON object.");
+            }
+        } else if let Ok(eps) =
+            serde_json::from_str::<Vec<supabase_client::SupabaseEndpoint>>(&content)
+        {
+            for new_ep in eps {
+                if let Some(pos) = cfg.endpoints.iter().position(|e| e.id == new_ep.id) {
+                    cfg.endpoints[pos] = new_ep;
+                } else {
+                    cfg.endpoints.push(new_ep);
+                }
+            }
+            println!("✅ Merged endpoints array from JSON.");
+        }
+    }
+    cfg.is_sync_enabled = true;
+    if let Err(e) = supabase_sync::save_config(&cfg) {
+        eprintln!("[ERROR] Failed to save config: {}", e);
+    } else {
+        println!(
+            "✅ Saved {} endpoints to supabase_config.json",
+            cfg.endpoints.len()
+        );
+    }
+}
+
+fn cmd_supabase_schema(args: &[String]) {
+    let role = args
+        .first()
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "root".to_string());
+    let sql = supabase_schema::get_schema_sql(&role);
+    println!(
+        "-- SQL Schema for Supabase {} Database --",
+        role.to_uppercase()
+    );
+    println!("{}", sql);
+}
+
+fn cmd_supabase_sync(rt: &tokio::runtime::Runtime) {
+    println!("Synchronizing local machine node and instance profiles to Supabase...");
+    match rt.block_on(supabase_sync::sync_local_node_now()) {
+        Ok(_) => println!("✅ Sync completed successfully."),
+        Err(e) => eprintln!("[ERROR] Sync failed: {}", e),
+    }
 }
 
 fn cmd_tree(args: &[String]) {

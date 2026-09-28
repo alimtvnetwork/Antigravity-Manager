@@ -10,6 +10,8 @@ export interface SupabaseEndpoint {
     is_enabled: boolean;
     prune_threshold_mb: number;
     priority: number;
+    notes?: string;
+    tags?: string[];
 }
 
 export interface SupabaseConfig {
@@ -23,8 +25,10 @@ export interface SupabaseConfig {
 
 export interface WorkspaceLease {
     account_id: string;
+    account_email?: string;
     node_id: string;
     node_alias: string;
+    ip_address?: string;
     profile_name: string;
     leased_at: number;
     expires_at: number;

@@ -20,8 +20,12 @@ static ACTIVE_REMOTE_LEASES: Lazy<RwLock<HashMap<String, WorkspaceLease>>> =
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceLease {
     pub account_id: String,
+    #[serde(default)]
+    pub account_email: String,
     pub node_id: String,
     pub node_alias: String,
+    #[serde(default)]
+    pub ip_address: String,
     pub profile_name: String,
     pub leased_at: i64,
     pub expires_at: i64,
@@ -61,6 +65,16 @@ pub async fn acquire_lease(
     profile_name: &str,
     ttl_secs: i64,
 ) -> Result<LeaseResult, AppError> {
+    acquire_lease_with_details(account_id, "", profile_name, ttl_secs).await
+}
+
+/// Attempt to acquire an exclusive lease for an account with rich metadata
+pub async fn acquire_lease_with_details(
+    account_id: &str,
+    account_email: &str,
+    profile_name: &str,
+    ttl_secs: i64,
+) -> Result<LeaseResult, AppError> {
     let config = supabase_sync::load_config()?;
     let client = match get_root_client(&config) {
         Some(c) => c,
@@ -78,6 +92,14 @@ pub async fn acquire_lease(
 
     let node_id = supabase_sync::get_local_node_id();
     let node_alias = config.node_alias;
+    let local_ip = supabase_sync::get_local_ip();
+    let email_to_use = if !account_email.is_empty() {
+        account_email.to_string()
+    } else {
+        crate::modules::account::load_account(account_id)
+            .map(|a| a.email)
+            .unwrap_or_default()
+    };
     let now = Utc::now().timestamp();
     let expires = now + ttl_secs;
 
@@ -87,7 +109,9 @@ pub async fn acquire_lease(
         "p_node_id": node_id,
         "p_node_alias": node_alias,
         "p_profile_name": profile_name,
-        "p_ttl_seconds": ttl_secs
+        "p_ttl_seconds": ttl_secs,
+        "p_account_email": email_to_use,
+        "p_ip_address": local_ip
     });
 
     if let Ok(rpc_resp) = client.rpc("acquire_workspace_lease", rpc_payload).await {
@@ -156,8 +180,10 @@ pub async fn acquire_lease(
     // Upsert lease record
     let lease_payload = json!({
         "account_id": account_id,
+        "account_email": email_to_use,
         "node_id": node_id,
         "node_alias": node_alias,
+        "ip_address": local_ip,
         "profile_name": profile_name,
         "leased_at": now,
         "expires_at": expires

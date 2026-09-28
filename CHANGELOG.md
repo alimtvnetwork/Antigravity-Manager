@@ -3,6 +3,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.92.0 (2026-09-28)**:
+        -   **[Release v4.92.0: Supabase 多机层级关系体系、原生 CLI 指令套件、PowerShell 极简一键配置与跨机防抢占租约锁] 支持 Root (Lovable 标记) 与 Secondary 架构、父机与子实例 Profile 级联关系、跨机在途使用租约与账号切换即时注册、原生 `agm supabase` 全套管理指令与架构帮助、PowerShell 一键配置脚本与 JSON 极简加载 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **Supabase Root (Lovable) 与 Secondary 双端架构与凭据库同步 (`src-tauri/src/modules/supabase_client.rs`, `src-tauri/src/modules/supabase_sync.rs`)**: 严格规范多端点角色模型，将 Lovable 主账号标记为 Root 角色并附带 notes 与 tags 元数据标签；支持 Secondary 辅助回退端点；优化 PostgREST 探针阶梯，兼容 publishable key (`sb_publishable_...`) 对表缓存状态的处理，并与 `repo-secrets` 凭据库双向同步。
+            -   **父机与子实例级联关系模型与分布式防抢占租约 (`src-tauri/src/modules/supabase_schema.rs`, `src-tauri/src/modules/workspace_lease_manager.rs`)**: 重构 `ROOT_DB_SCHEMA_SQL`，将 `nodes`（物理机/虚拟机）作为父级核心实体，`instance_profiles`（多实例配置）与 `workspace_leases`（在途使用租约）通过外键 `REFERENCES public.nodes(id) ON DELETE CASCADE` 建立级联关联，支持记录节点 IP、别名与正在使用的账号邮箱；每次账号切换（UI、CLI、多实例或智能切号）均向 Supabase 实时注册或续期分布式租约，杜绝多机切中同一账号产生并发封禁。
+            -   **原生 CLI 管理指令套件与全景帮助 (`src-tauri/src/bin/agm.rs`)**: 新增 `agm supabase` 子命令族（`help`、`status`、`list-leases`、`test`、`set`、`load-json`、`sync`、`schema`、`enable`、`disable`、`set-alias`），在终端详细输出配置路径、JSON 结构示例、数据库层级与 SQL 建表 DDL，并全面对齐 `agm help` 与 `agm help --json`。
+            -   **PowerShell 极简一键安装与 JSON 加载脚本 (`scripts/setup-supabase.ps1`, `scripts/supabase-endpoints.json`)**: 提供轻量化跨平台 PowerShell 配置工具与示例 JSON，支持单行指令 `powershell -File .\scripts\setup-supabase.ps1` 即刻完成本地持久化配置写入与双端点连通性测试。
+
     *   **v4.91.1 (2026-09-28)**:
         -   **[Release v4.91.1: 自动同步登录态探针弹窗抑制、失效 Token 缓存与优雅静默回退] 修复后台自动同步因本地失效/过期 OAuth Token 触发 E9001 全局诊断红框弹窗的问题，引入失败 Token 缓存机制防止重复无效请求，全面抑制非致命后台探针弹窗 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **失效 Token 缓存与静默回退 (`src-tauri/src/commands/mod.rs`, `src-tauri/src/proxy/server.rs`)**: 在 `sync_account_from_db` 中引入 `LAST_FAILED_SYNC_TOKEN` 缓存，当本地数据库中提取的 Token 已经失败过时直接跳过，避免每 4 分钟循环触发无效的 OAuth 刷新请求；当本地账号导入失败时优雅记录 info 日志并返回 `Ok(None)`，杜绝将非致命探针错误抛至前端。
@@ -3447,6 +3454,14 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.92.0 (2026-09-28)**:
+        -   **[Release v4.92.0: Supabase Multi-Machine Relational Hierarchy, Native CLI Suite, PowerShell One-Liners & Distributed Cross-Machine In-Use Leases] Implemented Root (Lovable tagged) and Secondary architecture, parent machine nodes & child instance profiles cascading foreign keys, cross-machine active in-use lease tracking on account switches, native agm supabase CLI suite with comprehensive schema help, and standalone PowerShell one-liner configuration scripts (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **Supabase Root (Lovable) & Secondary Multi-Endpoint Architecture (`src-tauri/src/modules/supabase_client.rs`, `src-tauri/src/modules/supabase_sync.rs`)**: Enforced dual-role endpoint models with Lovable designated as Root annotated with notes and tags metadata; supported Secondary fallback endpoints; improved PostgREST probe ladders to reliably handle publishable keys (`sb_publishable_...`) schema cache states.
+            -   **Machine Parent-Child Hierarchy & Distributed Collision Leases (`src-tauri/src/modules/supabase_schema.rs`, `src-tauri/src/modules/workspace_lease_manager.rs`)**: Restructured SQL schema establishing `nodes` as parent machine entities, with child `instance_profiles` and active `workspace_leases` referencing `nodes.id` with `ON DELETE CASCADE`; enriched leases with machine IP and account email; every account switch (UI, CLI, multi-instance, auto-switch) actively registers in Supabase Root DB to prevent cross-machine collisions.
+            -   **Native CLI Management Suite & Schema Help (`src-tauri/src/bin/agm.rs`)**: Added `agm supabase` subcommand family (`help`, `status`, `list-leases`, `test`, `set`, `load-json`, `sync`, `schema`, `enable`, `disable`, `set-alias`), surfacing target config file locations, JSON format guides, DB relational hierarchy diagrams, and migration DDL; fully integrated with `agm help` and `agm help --json`.
+            -   **PowerShell Automation & JSON Ingestion Suite (`scripts/setup-supabase.ps1`, `scripts/supabase-endpoints.json`)**: Delivered automated PowerShell setup scripts and companion JSON templates supporting one-liner execution and immediate live HTTP connectivity testing.
+
+
     *   **v4.91.1 (2026-09-28)**:
         -   **[Release v4.91.1: Auto-Sync Login State Modal Suppression, Failed Token Caching & Silent Graceful Fallback] Eliminated intrusive E9001 global error diagnostic popups triggered by background account sync when local IDE or Keyring holds expired/revoked OAuth tokens, added failed token caching to prevent recurring queries, and enforced background probe modal suppression (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Failed Token Caching & Silent Fallback (`src-tauri/src/commands/mod.rs`, `src-tauri/src/proxy/server.rs`)**: Implemented `LAST_FAILED_SYNC_TOKEN` in `sync_account_from_db` to cache tokens that fail local import, skipping expensive repeated OAuth queries; handled `import_from_db` errors gracefully by logging informative messages and returning `Ok(None)` / `Ok(Json(None))` instead of bubbling fatal errors across the IPC bridge.

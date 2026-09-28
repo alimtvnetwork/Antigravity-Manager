@@ -1552,6 +1552,21 @@ pub async fn switch_account(
     account.update_last_used();
     save_account(&account)?;
 
+    // Acquire distributed lease in Supabase Root DB and sync local node state
+    let lease_acc_id = account.id.clone();
+    let lease_acc_email = account.email.clone();
+    let lease_profile = target_ide.unwrap_or("default").to_string();
+    tauri::async_runtime::spawn(async move {
+        let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
+            &lease_acc_id,
+            &lease_acc_email,
+            &lease_profile,
+            90,
+        )
+        .await;
+        let _ = crate::modules::supabase_sync::sync_local_node_now().await;
+    });
+
     crate::modules::logger::log_info(&format!(
         "Account switch core logic completed: {}",
         account.email

@@ -18,11 +18,13 @@ CREATE TABLE IF NOT EXISTS public.nodes (
 
 CREATE INDEX IF NOT EXISTS idx_nodes_heartbeat ON public.nodes (last_heartbeat_at DESC);
 
--- 2. Instance Profiles Status Table
+-- 2. Instance Profiles Status Table (Child of Nodes)
 CREATE TABLE IF NOT EXISTS public.instance_profiles (
     id TEXT PRIMARY KEY,
-    node_id TEXT NOT NULL,
+    node_id TEXT NOT NULL REFERENCES public.nodes(id) ON DELETE CASCADE,
     profile_name TEXT NOT NULL,
+    active_account_id TEXT NOT NULL DEFAULT '',
+    active_account_email TEXT NOT NULL DEFAULT '',
     is_active BOOLEAN NOT NULL DEFAULT false,
     quota_percent INT NOT NULL DEFAULT 100,
     status TEXT NOT NULL DEFAULT 'idle',
@@ -31,11 +33,13 @@ CREATE TABLE IF NOT EXISTS public.instance_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_profiles_node ON public.instance_profiles (node_id);
 
--- 3. Distributed Workspace & Account Leases Table (Collision Prevention)
+-- 3. Distributed Workspace & Account Leases Table (Collision Prevention & Cross-Node In-Use Tracking)
 CREATE TABLE IF NOT EXISTS public.workspace_leases (
     account_id TEXT PRIMARY KEY,
-    node_id TEXT NOT NULL,
+    account_email TEXT NOT NULL DEFAULT '',
+    node_id TEXT NOT NULL REFERENCES public.nodes(id) ON DELETE CASCADE,
     node_alias TEXT NOT NULL DEFAULT '',
+    ip_address TEXT NOT NULL DEFAULT '',
     profile_name TEXT NOT NULL DEFAULT '',
     leased_at BIGINT NOT NULL DEFAULT 0,
     expires_at BIGINT NOT NULL DEFAULT 0
@@ -50,7 +54,9 @@ CREATE OR REPLACE FUNCTION public.acquire_workspace_lease(
     p_node_id TEXT,
     p_node_alias TEXT,
     p_profile_name TEXT,
-    p_ttl_seconds INT
+    p_ttl_seconds INT,
+    p_account_email TEXT DEFAULT '',
+    p_ip_address TEXT DEFAULT ''
 ) RETURNS JSONB AS $$
 DECLARE
     v_now BIGINT := EXTRACT(EPOCH FROM NOW())::BIGINT;
@@ -71,11 +77,13 @@ BEGIN
         END IF;
     END IF;
 
-    INSERT INTO public.workspace_leases (account_id, node_id, node_alias, profile_name, leased_at, expires_at)
-    VALUES (p_account_id, p_node_id, p_node_alias, p_profile_name, v_now, v_expires)
+    INSERT INTO public.workspace_leases (account_id, account_email, node_id, node_alias, ip_address, profile_name, leased_at, expires_at)
+    VALUES (p_account_id, p_account_email, p_node_id, p_node_alias, p_ip_address, p_profile_name, v_now, v_expires)
     ON CONFLICT (account_id) DO UPDATE SET
+        account_email = CASE WHEN EXCLUDED.account_email <> '' THEN EXCLUDED.account_email ELSE public.workspace_leases.account_email END,
         node_id = EXCLUDED.node_id,
         node_alias = EXCLUDED.node_alias,
+        ip_address = CASE WHEN EXCLUDED.ip_address <> '' THEN EXCLUDED.ip_address ELSE public.workspace_leases.ip_address END,
         profile_name = EXCLUDED.profile_name,
         leased_at = EXCLUDED.leased_at,
         expires_at = EXCLUDED.expires_at;

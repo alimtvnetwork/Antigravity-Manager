@@ -1537,6 +1537,21 @@ pub async fn switch_account_to_instance(
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);
 
+    // Acquire distributed lease in Supabase Root DB for this instance profile
+    let lease_acc_id = account.id.clone();
+    let lease_acc_email = account.email.clone();
+    let lease_inst_name = instance.name.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
+            &lease_acc_id,
+            &lease_acc_email,
+            &lease_inst_name,
+            90,
+        )
+        .await;
+        let _ = crate::modules::supabase_sync::sync_local_node_now().await;
+    });
+
     // 5. [Step 4/5] Relaunch Antigravity preserving exact executable path and bound workspace folders
     if is_default_inst {
         if let Err(e) = crate::modules::process::start_antigravity_with_fallback_path(

@@ -150,14 +150,18 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
 
     client.upsert("nodes", node_payload, "id").await?;
 
-    // 2. Upsert instance profiles
+    // 2. Upsert instance profiles (Child of this node)
     for inst in instances_to_sync {
         let is_active = inst.is_default;
         let profile_id = format!("{}_{}", node_id, inst.id);
+        let active_acc_id = inst.bound_account_id.clone().unwrap_or_default();
+        let active_acc_email = inst.bound_email.clone().unwrap_or_default();
         let profile_payload = json!({
             "id": profile_id,
             "node_id": node_id,
             "profile_name": inst.name,
+            "active_account_id": active_acc_id,
+            "active_account_email": active_acc_email,
             "is_active": is_active,
             "quota_percent": 100,
             "status": if is_active { "running" } else { "idle" },
@@ -168,6 +172,17 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
             .await;
     }
 
+    Ok(())
+}
+
+/// Force an immediate heartbeat and instance registry sync to all root endpoints
+pub async fn sync_local_node_now() -> Result<(), AppError> {
+    let config = load_config()?;
+    for ep in &config.endpoints {
+        if ep.is_enabled && ep.role == "root" {
+            let _ = send_heartbeat(ep, &config.node_alias).await;
+        }
+    }
     Ok(())
 }
 

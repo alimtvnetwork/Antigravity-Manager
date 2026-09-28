@@ -20,6 +20,10 @@ pub struct SupabaseEndpoint {
     pub is_enabled: bool,
     pub prune_threshold_mb: u64,
     pub priority: u32,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Table verification result for schema checking
@@ -130,14 +134,18 @@ impl SupabaseClient {
                     });
                 }
                 if status == 401 || status == 403 {
-                    return Ok(EndpointTestResult {
-                        is_success: false,
-                        message: format!(
-                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
-                            status
-                        ),
-                        status_code: Some(status),
-                    });
+                    let body = resp.text().await.unwrap_or_default();
+                    if !body.contains("Secret API key required") {
+                        return Ok(EndpointTestResult {
+                            is_success: false,
+                            message: format!(
+                                "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                                status
+                            ),
+                            status_code: Some(status),
+                        });
+                    }
+                    // Publishable key: root OpenAPI spec requires secret key; proceed to table probe
                 }
                 // Status 404 or other 4xx: proceed to table and auth probes
             }
