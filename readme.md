@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.96.0)**
+**Bar 2: Version-Based Installation (v4.97.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.96.0**：全面集成 Lovable 根账号与次端点 Supabase 双云架构，落地父表 `nodes` 与外键级联子表 `instance_profiles` / `workspace_leases` 跨机租约防碰模型，实现 `agm supabase help` 命令行引导体系、PowerShell 单行配置脚本与双向目录静默自愈同步，实测双端点 HTTP 200 与 PostgREST API 100% 连通。
+> 最新版本 **v4.97.0**：为发布流水线 `publish-release` 补齐 `actions: write` 权限并根除 `34-purge-github-actions-artifacts.py` 产物清理无限重试死循环（防止耗尽 GITHUB_TOKEN API 配额，释放 2.15 GB 存储空间），完成新建沙箱实例连续两轮即时快进切号（自动抓取在途会话 Prompt、关闭 IDE、轮换账号、重启 IDE 握手 DevTools、连续生成 `.antigravity_resume_task.json`）与 Supabase 双云端点 HTTP 200 同步实测验证。
 
 👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
 

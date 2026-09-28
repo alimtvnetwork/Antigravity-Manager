@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.96.0)
+> Professional AI Account Management & Protocol Proxy System (v4.97.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.96.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.97.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.96.0**: Fully integrated Root Supabase (Lovable) and Secondary fallback endpoints, delivered parent table `nodes` with cascading foreign keys to `instance_profiles` and `workspace_leases` preventing cross-machine account collisions, implemented comprehensive `agm supabase help` CLI guidance, PowerShell one-liner automation script with dual-directory writing, and verified 100% green PostgREST HTTP 200 connectivity.
+> Latest version **v4.97.0**: Added `actions: write` permission to `publish-release` in `release.yml`, eliminated the infinite retry loop in `34-purge-github-actions-artifacts.py` when artifact deletions fail (preventing GITHUB_TOKEN rate-limit exhaustion and freeing 2.15 GB of storage), and verified live 2-round consecutive fast-forward account switching (automatic in-flight conversation prompt backup, IDE termination, credential swap, IDE relaunch, and `.antigravity_resume_task.json` restoration) alongside dual-endpoint Supabase HTTP 200 synchronization.
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

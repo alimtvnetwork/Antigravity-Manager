@@ -216,6 +216,7 @@ jobs:
     if: always() && !cancelled() && needs.build-tauri.result != 'cancelled'
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -429,6 +430,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           allowUpdates: true
+          tag: "${{ github.ref_name }}"
           name: "Antigravity Manager Tools By Alim ${{ github.ref_name }}"
           bodyFile: "release_notes.md"
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -447,7 +449,7 @@ jobs:
             gh release create "${{ github.ref_name }}" --title "Antigravity Manager Tools By Alim ${{ github.ref_name }}" --notes-file release_notes.md || true
           fi
           gh release upload "${{ github.ref_name }}" release-files/* updater.json --clobber || true
-          gh release view "${{ github.ref_name }}"
+          gh release view "${{ github.ref_name }}" || true
 
       # 清理本次运行的中间 Artifacts 以维持零存储占用 (Release 资产已独立存放在 GitHub Releases)
       - name: Purge Run Artifacts Post-Release
