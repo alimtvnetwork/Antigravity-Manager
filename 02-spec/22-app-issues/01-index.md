@@ -59,6 +59,7 @@ Any content that analyzes bugs, failures, root causes, or fixes for application-
 | 21 | [21-supabase-connection-test-404-rca.md](21-supabase-connection-test-404-rca.md) | Supabase Connection Test 404 & URL Normalization RCA | High | Fixed |
 | 22 | [22-meaningless-workspace-uuid-and-truncated-prompt-preview-rca.md](22-meaningless-workspace-uuid-and-truncated-prompt-preview-rca.md) | Meaningless Workspace UUIDs & Truncated Prompt Preview RCA | High | Fixed |
 | 23 | [23-windows-runner-build-starvation-and-linker-bottleneck-rca.md](23-windows-runner-build-starvation-and-linker-bottleneck-rca.md) | Windows Runner Build Starvation & MSVC Linker Bottleneck RCA | Critical | Fixed |
+| 24 | [24-auto-sync-no-login-state-modal-suppression-rca.md](24-auto-sync-no-login-state-modal-suppression-rca.md) | Auto Sync No Login State Modal Suppression & Token Failure Caching RCA | High | Fixed |
 
 ---
 

@@ -290,25 +290,33 @@ pub async fn import_all_local_accounts(target_ide: Option<&str>) -> Result<Vec<A
         let refresh_token = oauth_state.refresh_token.clone();
         if !refresh_token.is_empty() && seen_refresh_tokens.insert(refresh_token.clone()) {
             crate::modules::logger::log_info("Discovered OAuth state in System Keyring/Keychain");
-            if let Ok(token_resp) = oauth::refresh_access_token(&refresh_token, None).await {
-                let email = match oauth::get_user_info(&token_resp.access_token, None).await {
-                    Ok(info) => info.email,
-                    Err(_) => "Unknown".to_string(),
-                };
-                let token_data = TokenData::new(
-                    token_resp.access_token,
-                    refresh_token,
-                    token_resp.expires_in,
-                    Some(email.clone()),
-                    oauth_state.project_id,
-                    None,
-                    oauth_state.is_gcp_tos,
-                    token_resp.id_token,
-                )
-                .with_oauth_client_key(token_resp.oauth_client_key);
+            match oauth::refresh_access_token(&refresh_token, None).await {
+                Ok(token_resp) => {
+                    let email = match oauth::get_user_info(&token_resp.access_token, None).await {
+                        Ok(info) => info.email,
+                        Err(_) => "Unknown".to_string(),
+                    };
+                    let token_data = TokenData::new(
+                        token_resp.access_token,
+                        refresh_token,
+                        token_resp.expires_in,
+                        Some(email.clone()),
+                        oauth_state.project_id,
+                        None,
+                        oauth_state.is_gcp_tos,
+                        token_resp.id_token,
+                    )
+                    .with_oauth_client_key(token_resp.oauth_client_key);
 
-                if let Ok(acc) = account::upsert_account(email, None, token_data) {
-                    imported_accounts.push(acc);
+                    if let Ok(acc) = account::upsert_account(email, None, token_data) {
+                        imported_accounts.push(acc);
+                    }
+                }
+                Err(e) => {
+                    crate::modules::logger::log_warn(&format!(
+                        "Candidate Keyring OAuth token refresh failed (likely expired/revoked): {}",
+                        e
+                    ));
                 }
             }
         }
@@ -325,27 +333,34 @@ pub async fn import_all_local_accounts(target_ide: Option<&str>) -> Result<Vec<A
                         "Discovered OAuth state in DB path: {:?}",
                         db_path
                     ));
-                    if let Ok(token_resp) = oauth::refresh_access_token(&refresh_token, None).await
-                    {
-                        let email = match oauth::get_user_info(&token_resp.access_token, None).await
-                        {
-                            Ok(info) => info.email,
-                            Err(_) => "Unknown".to_string(),
-                        };
-                        let token_data = TokenData::new(
-                            token_resp.access_token,
-                            refresh_token,
-                            token_resp.expires_in,
-                            Some(email.clone()),
-                            oauth_state.project_id,
-                            None,
-                            oauth_state.is_gcp_tos,
-                            token_resp.id_token,
-                        )
-                        .with_oauth_client_key(token_resp.oauth_client_key);
+                    match oauth::refresh_access_token(&refresh_token, None).await {
+                        Ok(token_resp) => {
+                            let email =
+                                match oauth::get_user_info(&token_resp.access_token, None).await {
+                                    Ok(info) => info.email,
+                                    Err(_) => "Unknown".to_string(),
+                                };
+                            let token_data = TokenData::new(
+                                token_resp.access_token,
+                                refresh_token,
+                                token_resp.expires_in,
+                                Some(email.clone()),
+                                oauth_state.project_id,
+                                None,
+                                oauth_state.is_gcp_tos,
+                                token_resp.id_token,
+                            )
+                            .with_oauth_client_key(token_resp.oauth_client_key);
 
-                        if let Ok(acc) = account::upsert_account(email, None, token_data) {
-                            imported_accounts.push(acc);
+                            if let Ok(acc) = account::upsert_account(email, None, token_data) {
+                                imported_accounts.push(acc);
+                            }
+                        }
+                        Err(e) => {
+                            crate::modules::logger::log_warn(&format!(
+                                "Candidate DB ({:?}) OAuth token refresh failed (likely expired/revoked): {}",
+                                db_path, e
+                            ));
                         }
                     }
                 }

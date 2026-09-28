@@ -3,6 +3,12 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.91.1 (2026-09-28)**:
+        -   **[Release v4.91.1: 自动同步登录态探针弹窗抑制、失效 Token 缓存与优雅静默回退] 修复后台自动同步因本地失效/过期 OAuth Token 触发 E9001 全局诊断红框弹窗的问题，引入失败 Token 缓存机制防止重复无效请求，全面抑制非致命后台探针弹窗 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **失效 Token 缓存与静默回退 (`src-tauri/src/commands/mod.rs`, `src-tauri/src/proxy/server.rs`)**: 在 `sync_account_from_db` 中引入 `LAST_FAILED_SYNC_TOKEN` 缓存，当本地数据库中提取的 Token 已经失败过时直接跳过，避免每 4 分钟循环触发无效的 OAuth 刷新请求；当本地账号导入失败时优雅记录 info 日志并返回 `Ok(None)`，杜绝将非致命探针错误抛至前端。
+            -   **前端全局错误弹窗抑制 (`src/services/accountService.ts`)**: 在 `syncAccountFromDb()` IPC 调用中传递 `{ _suppressGlobalModal: true }`，确保即使用户处于 `/email` 或 `/settings` 页面且发生底层网络或协议偶发异常，也绝不弹出侵入式全局错误诊断模态框，保障用户交互体验流畅。
+            -   **本地导入诊断与日志完善 (`src-tauri/src/modules/migration.rs`)**: 细化 Keyring 与 IDE 数据库中候选 OAuth Token 刷新失败时的告警日志，标明可能是过期或已撤销的凭据，提高排错可观测性。
+
     *   **v4.91.0 (2026-09-28)**:
         -   **[Release v4.91.0: 纯净 JSON 邮件遥测、候选账号 100% 满额硬校验与 Google API 实时探针、Telegram 项目去重与集群指令、安装脚本韧性容错] 支持 `[JSON]` 纯净 JSON 邮件正文输出并规范字段、切号算法严格要求 4 小时满额 (100%) 并现场调用 Google API 探针校验拒绝疲劳账号回跳、Telegram `/projects` 按工作区路径去重并支持 `<node-alias>:<cmd>` 集群节点路由与 `/prompts` 模板索引、修复 `install.ps1` 退出码泄露确保 GitMap 一键更新零报错 (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **邮件 `[JSON]` 纯净正文与字段规范化 (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/email_sender.rs`)**: 当邮件主题包含 `[JSON]` 标记时，强制剥离所有 HTML/CSS 样式与外层标签，正文直接投递标准格式化的 JSON 字符串；规范化轮换遥测键名，保留 `previous_email`、`predicted_email`、`selected_email`、`quota_percent`、`threshold_activated`、`machine_name`、`node_alias`、`local_ip`、`running_prompts_count` 与 `timestamp`，彻底剔除冗余的 `old_email`、`new_email` 与 `target_email`。
@@ -3441,6 +3447,13 @@
 > Full version history. For the project homepage, see [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.91.1 (2026-09-28)**:
+        -   **[Release v4.91.1: Auto-Sync Login State Modal Suppression, Failed Token Caching & Silent Graceful Fallback] Eliminated intrusive E9001 global error diagnostic popups triggered by background account sync when local IDE or Keyring holds expired/revoked OAuth tokens, added failed token caching to prevent recurring queries, and enforced background probe modal suppression (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
+            -   **Failed Token Caching & Silent Fallback (`src-tauri/src/commands/mod.rs`, `src-tauri/src/proxy/server.rs`)**: Implemented `LAST_FAILED_SYNC_TOKEN` in `sync_account_from_db` to cache tokens that fail local import, skipping expensive repeated OAuth queries; handled `import_from_db` errors gracefully by logging informative messages and returning `Ok(None)` / `Ok(Json(None))` instead of bubbling fatal errors across the IPC bridge.
+            -   **Frontend Diagnostic Modal Suppression (`src/services/accountService.ts`)**: Added `{ _suppressGlobalModal: true }` to `syncAccountFromDb()` Tauri IPC invocation, preventing speculative background account synchronization tasks from ever triggering intrusive full-screen red error modals in the UI.
+            -   **Migration Logging & Observability (`src-tauri/src/modules/migration.rs`)**: Enhanced logging in `import_all_local_accounts` to provide clear warnings when candidate Keyring or SQLite DB OAuth tokens fail refresh due to expiration or revocation.
+
+
     *   **v4.91.0 (2026-09-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.

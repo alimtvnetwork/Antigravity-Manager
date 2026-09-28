@@ -3552,14 +3552,16 @@ async fn admin_sync_account_from_db(
         }
     }
 
-    let account = migration::import_from_db(current_target)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse { error: e }),
-            )
-        })?;
+    let account = match migration::import_from_db(current_target).await {
+        Ok(acc) => acc,
+        Err(e) => {
+            crate::modules::logger::log_info(&format!(
+                "HTTP API 自动同步跳过 (本地账号导入失败): {}",
+                e
+            ));
+            return Ok(Json(None));
+        }
+    };
 
     let account_id = account.id.clone();
     account::set_current_account_id_with_target(&account_id, current_target).map_err(|e| {

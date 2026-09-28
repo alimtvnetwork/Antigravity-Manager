@@ -770,6 +770,9 @@ pub async fn import_custom_db(
     Ok(account)
 }
 
+static LAST_FAILED_SYNC_TOKEN: once_cell::sync::Lazy<std::sync::Mutex<Option<String>>> =
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+
 #[tauri::command]
 pub async fn sync_account_from_db(
     app: tauri::AppHandle,
@@ -792,14 +795,22 @@ pub async fn sync_account_from_db(
         }
     };
 
+    // 1.1 检查是否是上一次已知导入失败的失效 Token，避免周期性死循环重试
+    if let Ok(guard) = LAST_FAILED_SYNC_TOKEN.lock() {
+        if let Some(ref failed_token) = *guard {
+            if failed_token == &db_refresh_token {
+                return Ok(None);
+            }
+        }
+    }
+
     // 2. 获取 Manager 当前账号
     let curr_account = modules::account::get_current_account()?;
 
     // 3. 对比：如果 Refresh Token 相同，说明账号没变，无需导入
     if let Some(acc) = curr_account {
         if acc.token.refresh_token == db_refresh_token {
-            // 账号未变，由于已经是周期性任务，我们可以选择性刷新一下配额，或者直接返回
-            // 这里为了节省 API 流量，直接返回
+            // 账号未变，由于已经是周期性任务，直接返回
             return Ok(None);
         }
         modules::logger::log_info(&format!(
@@ -810,8 +821,22 @@ pub async fn sync_account_from_db(
         modules::logger::log_info("检测到新登录账号，正在自动同步...");
     }
 
-    // 4. 执行完整导入
-    let mut account = modules::migration::import_from_db(current_target).await?;
+    // 4. 执行完整导入（非致命探针，若本地 Token 失效或无可导入账号，记录并返回 Ok(None)，杜绝弹窗打扰用户）
+    let mut account = match modules::migration::import_from_db(current_target).await {
+        Ok(acc) => {
+            if let Ok(mut guard) = LAST_FAILED_SYNC_TOKEN.lock() {
+                *guard = None;
+            }
+            acc
+        }
+        Err(e) => {
+            if let Ok(mut guard) = LAST_FAILED_SYNC_TOKEN.lock() {
+                *guard = Some(db_refresh_token);
+            }
+            modules::logger::log_info(&format!("自动同步跳过 (本地账号导入失败): {}", e));
+            return Ok(None);
+        }
+    };
 
     // 既然是从数据库导入，自动将其设为 Manager 的当前账号并保留当前 target
     let account_id = account.id.clone();

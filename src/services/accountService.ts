@@ -135,7 +135,7 @@ export async function importFromCustomDb(path: string): Promise<Account> {
 }
 
 export async function syncAccountFromDb(): Promise<Account | null> {
-    return await invoke('sync_account_from_db');
+    return await invoke('sync_account_from_db', { _suppressGlobalModal: true });
 }
 
 export async function toggleProxyStatus(accountId: string, enable: boolean, reason?: string): Promise<void> {
