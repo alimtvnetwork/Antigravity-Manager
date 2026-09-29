@@ -19,8 +19,9 @@ fn main() {
         let manifest_path = std::path::Path::new("windows-test.manifest");
         if manifest_path.exists() {
             if let Ok(abs_path) = manifest_path.canonicalize() {
+                let clean_path = abs_path.to_string_lossy().replace(r"\\?\", "");
                 println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
-                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", abs_path.display());
+                println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", clean_path);
             }
         }
 

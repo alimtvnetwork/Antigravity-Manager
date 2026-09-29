@@ -4,12 +4,97 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag name (e.g. v4.102.0 on main branch, or v4.102.0-beta.1 on beta branch). Leave empty to auto-detect from package.json.'
+        required: false
+        default: ''
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  verify-release-target:
+    name: Verify Branch & Release Type Compatibility
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.gate.outputs.release_tag }}
+      is_prerelease: ${{ steps.gate.outputs.is_prerelease }}
+      release_type: ${{ steps.gate.outputs.release_type }}
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and Validate Tag and Branch Alignment
+        id: gate
+        shell: bash
+        run: |
+          set -e
+
+          # 1. 确定本次发布的 Tag 名称
+          INPUT_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG_NAME="$INPUT_TAG"
+            echo "Using manual input tag: $TAG_NAME"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+            echo "Using git push tag: $TAG_NAME"
+          else
+            PKG_VERSION=$(jq -r '.version' package.json)
+            TAG_NAME="v${PKG_VERSION}"
+            echo "Auto-resolved tag from package.json: $TAG_NAME"
+          fi
+
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::❌ Invalid tag format: '$TAG_NAME'. Must conform to SemVer (e.g. v4.102.0 or v4.102.0-beta.1)!"
+            exit 1
+          fi
+
+          # 2. 识别是否为预发布标签 (包含 '-')
+          if [[ "$TAG_NAME" == *-* ]]; then
+            IS_PRERELEASE="true"
+            RELEASE_TYPE="prerelease"
+            echo "📋 Release category: Pre-release ($TAG_NAME)"
+          else
+            IS_PRERELEASE="false"
+            RELEASE_TYPE="stable"
+            echo "📋 Release category: Stable Release ($TAG_NAME)"
+          fi
+
+          # 3. 检查当前 commit 属于哪些远程分支
+          CURRENT_COMMIT="${{ github.sha }}"
+          BRANCHES=$(git branch -r --contains "$CURRENT_COMMIT" | sed 's/^[[:space:]]*origin\///' | tr '\n' ' ')
+          echo "Commit $CURRENT_COMMIT belongs to remote branches: [ $BRANCHES ]"
+
+          DISPATCH_BRANCH="${{ github.ref_name }}"
+
+          # 4. 严格通道隔离门禁 (Main 纯净正式版 / Beta 专属预发布版)
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            # 预发布版本只允许在 beta 分支发布，严禁在 main 分支单独发布！
+            if echo "$BRANCHES" | grep -qw "beta" || [ "$DISPATCH_BRANCH" = "beta" ]; then
+              echo "✅ Pre-release verification passed: target is linked to 'beta' branch."
+            else
+              echo "::error::❌ [Release Gate Intercept] Pre-release tag '$TAG_NAME' (containing '-') is strictly forbidden on 'main' branch! Pre-releases must be published from the 'beta' branch to keep 'main' purely stable."
+              exit 1
+            fi
+          else
+            # 正式版必须在 main 分支发布，严禁直接在 beta 分支发布正式版！
+            if echo "$BRANCHES" | grep -qw "main" || [ "$DISPATCH_BRANCH" = "main" ]; then
+              echo "✅ Stable release verification passed: target is linked to 'main' branch."
+            else
+              echo "::error::❌ [Release Gate Intercept] Stable release tag '$TAG_NAME' (without '-') must be published from the 'main' branch! Please merge 'beta' into 'main' first."
+              exit 1
+            fi
+          fi
+
+          echo "release_tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
+
   build-tauri:
+    needs: verify-release-target
     permissions:
       contents: write
     strategy:
@@ -135,6 +220,17 @@ jobs:
             fi
           done
 
+          # Package .app bundle into tar.gz if universal and no archive exists yet
+          if [ "$ARCH" = "universal" ]; then
+            for app_dir in *.app; do
+              if [ -d "$app_dir" ] && [ ! -f "${app_dir%.app}_${ARCH}.app.tar.gz" ]; then
+                base="${app_dir%.app}"
+                tar -czf "${base}_${ARCH}.app.tar.gz" "$app_dir"
+                echo "Packaged universal app bundle: ${base}_${ARCH}.app.tar.gz"
+              fi
+            done
+          fi
+
           # Update updater json reference if present
           UPDATER_JSON="../../../updater/install.json"
           if [ ! -f "$UPDATER_JSON" ]; then
@@ -211,9 +307,9 @@ jobs:
           retention-days: 1
 
   publish-release:
-    needs: build-tauri
+    needs: [verify-release-target, build-tauri]
     runs-on: ubuntu-latest
-    if: always() && !cancelled() && needs.build-tauri.result != 'cancelled'
+    if: always() && !cancelled() && needs.verify-release-target.result == 'success' && needs.build-tauri.result != 'cancelled'
     permissions:
       contents: write
       actions: write
@@ -231,7 +327,7 @@ jobs:
 
       - name: Extract Release Notes
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ needs.verify-release-target.outputs.release_tag }}
           REPO: ${{ github.repository }}
         run: |
           echo "Extracting release notes for version $VERSION"
@@ -291,14 +387,16 @@ jobs:
           p = pathlib.Path("release_notes.md")
           if p.exists():
               text = p.read_text(encoding="utf-8")
-              text = re.sub(r"\(Thanks to [^)]*\)", "(Thanks to @aukgit)", text, flags=re.IGNORECASE)
+              # Standardize all Thanks / 鸣谢 / 感谢 attributions strictly to @aukgit
+              text = re.sub(r"[（(]\s*(?:Thanks to|鸣谢|感谢)\s*[^）)]*[)）]", "(Thanks to @aukgit)", text, flags=re.IGNORECASE)
+              # Strip any raw @user mentions except @aukgit to prevent unwanted GitHub Release contributor listing
               text = re.sub(r"(?<![a-zA-Z0-9_.+-])@(?!(?:aukgit)\b)([a-zA-Z0-9_-]+)", r"\1", text)
               p.write_text(text, encoding="utf-8")
           '
 
       - name: Build updater.json from signatures
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ needs.verify-release-target.outputs.release_tag }}
           REPO: ${{ github.repository }}
         run: |
           DOWNLOAD_BASE="https://github.com/${REPO}/releases/download/${VERSION}"
@@ -442,34 +540,39 @@ jobs:
         id: create_release
         continue-on-error: true
         uses: ncipollo/release-action@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           allowUpdates: true
-          tag: "${{ github.ref_name }}"
-          name: "Antigravity Manager Tools By Alim ${{ github.ref_name }}"
+          tag: "${{ needs.verify-release-target.outputs.release_tag }}"
+          name: "Antigravity Manager Tools By Alim ${{ needs.verify-release-target.outputs.release_tag }}"
           bodyFile: "release_notes.md"
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: "release-files/*,updater.json"
           artifactErrorsFailBuild: false
           replacesArtifacts: true
-          makeLatest: legacy
+          prerelease: ${{ needs.verify-release-target.outputs.is_prerelease == 'true' }}
+          makeLatest: ${{ needs.verify-release-target.outputs.is_prerelease == 'true' && 'false' || 'legacy' }}
           generateReleaseNotes: false
 
       - name: Verify or Upload GitHub Release via CLI Fallback
-        if: always() && startsWith(github.ref, 'refs/tags/') && steps.create_release.outcome != 'success'
+        if: always() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && steps.create_release.outcome != 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "release-action did not complete successfully (e.g. API rate limit). Checking release status..."
-          if ! gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release create "${{ github.ref_name }}" --title "Antigravity Manager Tools By Alim ${{ github.ref_name }}" --notes-file release_notes.md || true
+          EXTRA_FLAGS=""
+          if [ "${{ needs.verify-release-target.outputs.is_prerelease }}" = "true" ]; then
+            EXTRA_FLAGS="--prerelease"
           fi
-          gh release upload "${{ github.ref_name }}" release-files/* updater.json --clobber || true
-          gh release view "${{ github.ref_name }}" || true
+          if ! gh release view "${{ needs.verify-release-target.outputs.release_tag }}" >/dev/null 2>&1; then
+            gh release create "${{ needs.verify-release-target.outputs.release_tag }}" --title "Antigravity Manager Tools By Alim ${{ needs.verify-release-target.outputs.release_tag }}" --notes-file release_notes.md $EXTRA_FLAGS || true
+          fi
+          gh release upload "${{ needs.verify-release-target.outputs.release_tag }}" release-files/* updater.json --clobber || true
+          gh release view "${{ needs.verify-release-target.outputs.release_tag }}" || true
 
       # 清理本次运行的中间 Artifacts 以维持零存储占用 (Release 资产已独立存放在 GitHub Releases)
       - name: Purge Run Artifacts Post-Release
-        if: always() && startsWith(github.ref, 'refs/tags/')
+        if: always() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -493,6 +596,7 @@ jobs:
           generateReleaseNotes: false
 
   docker-build-amd64:
+    needs: verify-release-target
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
@@ -517,11 +621,12 @@ jobs:
           push: true
           tags: |
             ${{ github.repository_owner }}/antigravity-manager:latest-amd64
-            ${{ github.repository_owner }}/antigravity-manager:${{ github.ref_name }}-amd64
+            ${{ github.repository_owner }}/antigravity-manager:${{ needs.verify-release-target.outputs.release_tag }}-amd64
           build-args: |
             USE_MIRROR=false
 
   docker-build-arm64:
+    needs: verify-release-target
     runs-on: ubuntu-24.04-arm
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
@@ -546,12 +651,12 @@ jobs:
           push: true
           tags: |
             ${{ github.repository_owner }}/antigravity-manager:latest-arm64
-            ${{ github.repository_owner }}/antigravity-manager:${{ github.ref_name }}-arm64
+            ${{ github.repository_owner }}/antigravity-manager:${{ needs.verify-release-target.outputs.release_tag }}-arm64
           build-args: |
             USE_MIRROR=false
 
   docker-manifest:
-    needs: [docker-build-amd64, docker-build-arm64]
+    needs: [verify-release-target, docker-build-amd64, docker-build-arm64]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
@@ -563,10 +668,12 @@ jobs:
 
       - name: Create and push manifest
         run: |
-          docker buildx imagetools create -t ${{ github.repository_owner }}/antigravity-manager:latest \
-            ${{ github.repository_owner }}/antigravity-manager:latest-amd64 \
-            ${{ github.repository_owner }}/antigravity-manager:latest-arm64
+          if [ "${{ needs.verify-release-target.outputs.is_prerelease }}" != "true" ]; then
+            docker buildx imagetools create -t ${{ github.repository_owner }}/antigravity-manager:latest \
+              ${{ github.repository_owner }}/antigravity-manager:latest-amd64 \
+              ${{ github.repository_owner }}/antigravity-manager:latest-arm64
+          fi
 
-          docker buildx imagetools create -t ${{ github.repository_owner }}/antigravity-manager:${{ github.ref_name }} \
-            ${{ github.repository_owner }}/antigravity-manager:${{ github.ref_name }}-amd64 \
-            ${{ github.repository_owner }}/antigravity-manager:${{ github.ref_name }}-arm64
+          docker buildx imagetools create -t ${{ github.repository_owner }}/antigravity-manager:${{ needs.verify-release-target.outputs.release_tag }} \
+            ${{ github.repository_owner }}/antigravity-manager:${{ needs.verify-release-target.outputs.release_tag }}-amd64 \
+            ${{ github.repository_owner }}/antigravity-manager:${{ needs.verify-release-target.outputs.release_tag }}-arm64

@@ -159,7 +159,6 @@ pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String
          );
          CREATE INDEX IF NOT EXISTS idx_prompt_backups_batch ON prompt_backups(backup_batch_id);
          CREATE INDEX IF NOT EXISTS idx_prompt_backups_restored ON prompt_backups(is_restored, restored_at);
-         CREATE INDEX IF NOT EXISTS idx_prompt_backups_instance ON prompt_backups(instance_id);
 
          CREATE TABLE IF NOT EXISTS green_projects (
              id TEXT PRIMARY KEY,
@@ -175,6 +174,10 @@ pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String
     // Migrate existing DB if instance_id is missing
     let _ = conn.execute(
         "ALTER TABLE prompt_backups ADD COLUMN instance_id TEXT DEFAULT 'default'",
+        [],
+    );
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_prompt_backups_instance ON prompt_backups(instance_id)",
         [],
     );
 

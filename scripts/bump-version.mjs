@@ -313,13 +313,15 @@ const TARGET_FILES = [
             }
             const eol = content.includes('\r\n') ? '\r\n' : '\n';
             const newBlock = `    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}${eol}`;
-            const historyAnchor = '*   **Version History**:';
-            if (content.includes(historyAnchor)) {
-                return content.replace(historyAnchor, `${historyAnchor}${eol}${newBlock}`);
-            }
-            const zhAnchor = '*   **版本演进**:';
-            if (content.includes(zhAnchor)) {
-                return content.replace(zhAnchor, `${zhAnchor}${eol}${newBlock}`);
+            const anchors = [
+                '*   **版本历史记录 (Version History)**:',
+                '*   **版本演进**:',
+                '*   **Version History**:'
+            ];
+            for (const a of anchors) {
+                if (content.includes(a)) {
+                    return content.replace(a, `${a}${eol}${newBlock}`);
+                }
             }
             const firstVersion = content.match(/\s*\*\s+\*\*v\d+\.\d+\.\d+/);
             if (firstVersion && firstVersion.index !== undefined) {

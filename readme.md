@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.101.0)**
+**Bar 2: Version-Based Installation (v4.102.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.101.0**：加固 GitHub Actions 发布工作流，内置 Python 自动更新日志清洗流水线，将发布说明中的贡献者致谢严格归一至 @aukgit 并脱敏外部用户 handle，在正式版与预发通道全面关闭 generateReleaseNotes 杜绝外部贡献者误入 Release 页面；全量归一主页与英文 README 的维护者展示，升级版本自增脚本支持大小写文件名自动回退，同步完成全仓库小写规范化。
+> 最新版本 **v4.102.0**：彻底修复 GitHub Actions 发布工作流中的预发通道判定与 CLI 降级兜底预发参数，增强发布说明多语言致谢正则严格归一至 @aukgit 并脱敏外部用户 handle，自动完成 macOS 通用应用包打包归档，深化多实例 Keyring 旁路标记与凭据独立会话隔离，修复 Clippy 文档注释警告与 Windows 清单路径规范化。
 
 👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 

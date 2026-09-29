@@ -137,6 +137,156 @@ pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Helper to synchronize app_storage.json across all instance storage locations
+/// ensuring ide-install-wizard-shown, jetski.onboarding.lastLoginUsername, and
+/// jetski.onboarding.lastLoginIsGcpTos reflect the bound account.
+pub fn update_instance_app_storage(
+    data_dir: &Path,
+    bound_email: Option<&str>,
+    is_gcp_tos: bool,
+) -> Result<(), String> {
+    let mut targets = vec![
+        data_dir.join("app_storage.json"),
+        data_dir
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("app_storage.json"),
+    ];
+
+    if let Some(parent) = data_dir.parent() {
+        let home_app_storage = parent
+            .join("home")
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("app_storage.json");
+        targets.push(home_app_storage);
+    }
+
+    for target in targets {
+        if let Some(p) = target.parent() {
+            let _ = fs::create_dir_all(p);
+        }
+        let mut map: serde_json::Map<String, serde_json::Value> = if target.exists() {
+            fs::read_to_string(&target)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            serde_json::Map::new()
+        };
+
+        map.insert(
+            "ide-install-wizard-shown".to_string(),
+            serde_json::Value::String("true".to_string()),
+        );
+
+        if let Some(email) = bound_email.map(str::trim).filter(|e| !e.is_empty()) {
+            map.insert(
+                "jetski.onboarding.lastLoginUsername".to_string(),
+                serde_json::Value::String(email.to_string()),
+            );
+            map.insert(
+                "jetski.onboarding.lastLoginIsGcpTos".to_string(),
+                serde_json::Value::Bool(is_gcp_tos),
+            );
+        }
+
+        if let Ok(content) = serde_json::to_string_pretty(&map) {
+            let _ = fs::write(&target, content);
+        }
+    }
+    Ok(())
+}
+
+/// Purge transient caches, LevelDB session storage, cookies, and lock files
+/// to guarantee clean account initialization and prevent stale credential caching.
+pub fn purge_volatile_instance_sessions(data_dir: &Path) {
+    let folders_to_purge = [
+        "Local Storage",
+        "Session Storage",
+        "Network",
+        "GPUCache",
+        "Cache",
+        "Code Cache",
+        "DawnCache",
+        "blob_storage",
+    ];
+
+    let mut candidate_roots = vec![data_dir.to_path_buf()];
+    let roaming = data_dir.join("AppData").join("Roaming").join("Antigravity");
+    if roaming.exists() {
+        candidate_roots.push(roaming);
+    }
+    if let Some(parent) = data_dir.parent() {
+        let home_roaming = parent
+            .join("home")
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity");
+        if home_roaming.exists() {
+            candidate_roots.push(home_roaming);
+        }
+    }
+
+    for root in candidate_roots {
+        for folder in &folders_to_purge {
+            let target = root.join(folder);
+            if target.exists() {
+                let _ = fs::remove_dir_all(&target);
+            }
+        }
+        for lock in &["lockfile", "code.lock"] {
+            let p = root.join(lock);
+            if p.exists() {
+                let _ = fs::remove_file(&p);
+            }
+        }
+    }
+}
+
+/// Helper to write keyring unavailable markers across all instance paths
+/// to force Antigravity language_server to use isolated file credentials instead of system keyring.
+pub fn write_keyring_bypass_markers(target_data_path: &Path, inst_home: Option<&Path>) {
+    let mut marker_dirs = Vec::new();
+    if let Some(home) = inst_home {
+        marker_dirs.push(home.join(".gemini"));
+        marker_dirs.push(home.join(".gemini").join("antigravity"));
+        marker_dirs.push(home.join(".gemini").join("antigravity-ide"));
+        marker_dirs.push(home.join(".gemini").join("antigravity-cli"));
+        marker_dirs.push(home.join(".gemini").join("cache"));
+        marker_dirs.push(home.join("AppData").join("Roaming").join("Antigravity"));
+        marker_dirs.push(home.to_path_buf());
+    }
+    marker_dirs.push(target_data_path.to_path_buf());
+    marker_dirs.push(target_data_path.join(".gemini"));
+    marker_dirs.push(target_data_path.join(".gemini").join("antigravity"));
+    marker_dirs.push(target_data_path.join(".gemini").join("antigravity-ide"));
+    marker_dirs.push(target_data_path.join(".gemini").join("antigravity-cli"));
+    marker_dirs.push(target_data_path.join(".gemini").join("cache"));
+    marker_dirs.push(
+        target_data_path
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity"),
+    );
+
+    let marker_names = [
+        "antigravity-keyring-unavailable",
+        "antigravity-ide-keyring-unavailable",
+        "antigravity-cli-keyring-unavailable",
+    ];
+
+    for dir in marker_dirs {
+        let _ = fs::create_dir_all(&dir);
+        for name in &marker_names {
+            let marker_path = dir.join(name);
+            let _ = fs::write(&marker_path, b"1\n");
+        }
+    }
+}
+
 /// Fallback default user data directory
 pub fn get_default_antigravity_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
@@ -498,22 +648,7 @@ pub fn create_instance_with_account(
     let _ = fs::create_dir_all(&gemini_dir);
 
     // Pre-seed app_storage.json with ide-install-wizard-shown: true to skip onboarding wizard
-    let app_storage_file = instance_data_dir.join("app_storage.json");
-    let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
-        fs::read_to_string(&app_storage_file)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    } else {
-        serde_json::Map::new()
-    };
-    map.insert(
-        "ide-install-wizard-shown".to_string(),
-        serde_json::Value::String("true".to_string()),
-    );
-    if let Ok(content) = serde_json::to_string_pretty(&map) {
-        let _ = fs::write(&app_storage_file, content);
-    }
+    let _ = update_instance_app_storage(&instance_data_dir, None, false);
 
     let user_dir = instance_data_dir.join("User");
     let _ = fs::create_dir_all(&user_dir);
@@ -562,8 +697,18 @@ pub fn create_instance_with_account(
             bound_acc_id = Some(acc.id.clone());
             bound_acc_email = Some(acc.email.clone());
 
+            let _ = update_instance_app_storage(
+                &instance_data_dir,
+                Some(&acc.email),
+                acc.token.is_gcp_tos,
+            );
+            purge_volatile_instance_sessions(&instance_data_dir);
+            write_keyring_bypass_markers(&instance_data_dir, Some(&instance_home_dir));
+
             let _ =
                 crate::modules::integration::write_to_file_credentials_at(&instance_home_dir, acc);
+            let _ =
+                crate::modules::integration::write_to_file_credentials_at(&instance_data_dir, acc);
 
             let db_dir = instance_data_dir.join("User").join("globalStorage");
             let _ = fs::create_dir_all(&db_dir);
@@ -617,12 +762,39 @@ pub fn create_instance_with_account(
                     &appdata_db_path,
                     &profile.mac_machine_id,
                 );
+
+                let home_appdata_db_dir = instance_home_dir
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                let _ = fs::create_dir_all(&home_appdata_db_dir);
+                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                let _ = crate::modules::db::inject_token(
+                    &home_appdata_db_path,
+                    &acc.token.access_token,
+                    &acc.token.refresh_token,
+                    acc.token.expiry_timestamp,
+                    &acc.email,
+                    acc.token.is_gcp_tos,
+                    acc.token.project_id.as_deref(),
+                    acc.token.id_token.as_deref(),
+                    acc.token.oauth_client_key.as_deref(),
+                    None,
+                );
+                let home_storage_path = home_appdata_db_dir.join("storage.json");
+                let _ = crate::modules::device::write_profile(&home_storage_path, &profile);
+                let _ = crate::modules::db::write_service_machine_id(
+                    &home_appdata_db_path,
+                    &profile.mac_machine_id,
+                );
             }
         }
     }
 
     let config = InstanceConfig {
-        id: instance_id,
+        id: instance_id.clone(),
         name: trimmed_name.to_string(),
         data_dir: instance_data_dir.to_string_lossy().to_string(),
         executable_path: None,
@@ -638,6 +810,15 @@ pub fn create_instance_with_account(
 
     registry.instances.push(config.clone());
     save_registry(&registry)?;
+
+    let cloned_exe = clone_instance_executable(&instance_id).ok();
+    let config = if let Some(exe) = cloned_exe {
+        let mut c = config;
+        c.executable_path = Some(exe);
+        c
+    } else {
+        config
+    };
 
     Ok(config)
 }
@@ -689,6 +870,17 @@ pub fn copy_instance(
             let _ = copy_dir_recursive(&src_path, &dst_path);
         }
 
+        purge_volatile_instance_sessions(&dst_path);
+
+        let is_tos = new_instance
+            .bound_account_id
+            .as_ref()
+            .and_then(|id| crate::modules::account::load_account(id).ok())
+            .map(|a| a.token.is_gcp_tos)
+            .unwrap_or(false);
+        let _ = update_instance_app_storage(&dst_path, new_instance.bound_email.as_deref(), is_tos);
+        let _ = clone_instance_executable(&new_instance.id);
+
         // Sanitize cloned session and reseed with newly bound account credentials
         let cloned_db = dst_path
             .join("User")
@@ -703,7 +895,13 @@ pub fn copy_instance(
                         let _ = crate::modules::integration::write_to_file_credentials_at(
                             &new_home, &acc,
                         );
+                        write_keyring_bypass_markers(&dst_path, Some(&new_home));
+                    } else {
+                        write_keyring_bypass_markers(&dst_path, None);
                     }
+                    let _ =
+                        crate::modules::integration::write_to_file_credentials_at(&dst_path, &acc);
+
                     let _ = crate::modules::db::inject_token(
                         &cloned_db,
                         &acc.token.access_token,
@@ -758,6 +956,36 @@ pub fn copy_instance(
                             &appdata_db_path,
                             &profile.mac_machine_id,
                         );
+
+                        if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {
+                            let home_appdata_db_dir = new_home
+                                .join("AppData")
+                                .join("Roaming")
+                                .join("Antigravity")
+                                .join("User")
+                                .join("globalStorage");
+                            let _ = fs::create_dir_all(&home_appdata_db_dir);
+                            let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                            let _ = crate::modules::db::inject_token(
+                                &home_appdata_db_path,
+                                &acc.token.access_token,
+                                &acc.token.refresh_token,
+                                acc.token.expiry_timestamp,
+                                &acc.email,
+                                acc.token.is_gcp_tos,
+                                acc.token.project_id.as_deref(),
+                                acc.token.id_token.as_deref(),
+                                acc.token.oauth_client_key.as_deref(),
+                                None,
+                            );
+                            let home_storage_path = home_appdata_db_dir.join("storage.json");
+                            let _ =
+                                crate::modules::device::write_profile(&home_storage_path, &profile);
+                            let _ = crate::modules::db::write_service_machine_id(
+                                &home_appdata_db_path,
+                                &profile.mac_machine_id,
+                            );
+                        }
                     }
                 }
             }
@@ -1165,15 +1393,24 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         None
     };
 
-    if let Some(account) = resolved_account {
+    if let Some(account) = resolved_account.as_ref() {
+        let is_tos = account.token.is_gcp_tos;
+        let _ = update_instance_app_storage(&target_data_path, Some(&account.email), is_tos);
+        purge_volatile_instance_sessions(&target_data_path);
+
         if is_default {
-            let _ = crate::modules::integration::write_to_system_keyring(&account);
-            let _ = crate::modules::integration::write_to_file_credentials(&account);
+            let _ = crate::modules::integration::write_to_system_keyring(account);
+            let _ = crate::modules::integration::write_to_file_credentials(account);
             let _ = crate::modules::account::set_current_account_id(&account.id);
         }
         if let Ok(inst_home) = get_instance_home_dir(instance_id) {
-            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, &account);
+            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, account);
+            write_keyring_bypass_markers(&target_data_path, Some(&inst_home));
+        } else {
+            write_keyring_bypass_markers(&target_data_path, None);
         }
+        let _ =
+            crate::modules::integration::write_to_file_credentials_at(&target_data_path, account);
 
         let db_dir = target_data_path.join("User").join("globalStorage");
         let has_db_dir = db_dir.exists();
@@ -1230,6 +1467,37 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                 let storage_path = appdata_db_dir.join("storage.json");
                 let _ = crate::modules::device::write_profile(&storage_path, profile);
             }
+
+            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+                let home_appdata_db_dir = inst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                let _ = fs::create_dir_all(&home_appdata_db_dir);
+                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                let _ = crate::modules::db::inject_token(
+                    &home_appdata_db_path,
+                    &account.token.access_token,
+                    &account.token.refresh_token,
+                    account.token.expiry_timestamp,
+                    &account.email,
+                    account.token.is_gcp_tos,
+                    account.token.project_id.as_deref(),
+                    account.token.id_token.as_deref(),
+                    account.token.oauth_client_key.as_deref(),
+                    None,
+                );
+                if let Some(ref profile) = account.device_profile {
+                    let _ = crate::modules::db::write_service_machine_id(
+                        &home_appdata_db_path,
+                        &profile.mac_machine_id,
+                    );
+                    let storage_path = home_appdata_db_dir.join("storage.json");
+                    let _ = crate::modules::device::write_profile(&storage_path, profile);
+                }
+            }
         }
 
         // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
@@ -1257,12 +1525,19 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
-            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
-                let _ = fs::create_dir_all(&inst_home);
-                cmd.env("HOME", &inst_home);
+            let inst_home_opt = get_instance_home_dir(instance_id).ok();
+            write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
+            if let Some(ref inst_home) = inst_home_opt {
+                let _ = fs::create_dir_all(inst_home);
+                cmd.env("HOME", inst_home);
             }
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+            cmd.env("SSH_TTY", "pty/0");
+            if let Some(ref acc) = resolved_account {
+                cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+            }
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1274,6 +1549,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         } else {
             cmd.arg("--new-window");
         }
+
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
 
         let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!(
@@ -1301,31 +1580,23 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
-            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
-                let _ = fs::create_dir_all(&inst_home);
+            let inst_home_opt = get_instance_home_dir(instance_id).ok();
+            write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
+
+            if let Some(ref inst_home) = inst_home_opt {
+                let _ = fs::create_dir_all(inst_home);
                 let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
                 let gemini_dir = inst_home.join(".gemini").join("antigravity");
                 let _ = fs::create_dir_all(&gemini_ide_dir);
                 let _ = fs::create_dir_all(&gemini_dir);
 
-                // Ensure app_storage.json has ide-install-wizard-shown: true to skip onboarding wizard
-                let app_storage_file = target_data_path.join("app_storage.json");
-                let mut map: serde_json::Map<String, serde_json::Value> =
-                    if app_storage_file.exists() {
-                        fs::read_to_string(&app_storage_file)
-                            .ok()
-                            .and_then(|s| serde_json::from_str(&s).ok())
-                            .unwrap_or_default()
-                    } else {
-                        serde_json::Map::new()
-                    };
-                map.insert(
-                    "ide-install-wizard-shown".to_string(),
-                    serde_json::Value::String("true".to_string()),
-                );
-                if let Ok(content) = serde_json::to_string_pretty(&map) {
-                    let _ = fs::write(&app_storage_file, content);
-                }
+                // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
+                let is_tos = resolved_account
+                    .as_ref()
+                    .map(|a| a.token.is_gcp_tos)
+                    .unwrap_or(false);
+                let _ =
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
 
                 #[cfg(target_os = "windows")]
                 {
@@ -1337,8 +1608,6 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
                     cmd.env("USERPROFILE", &home_str);
                     cmd.env("HOME", &home_str);
-                    cmd.env("APPDATA", roaming.to_string_lossy().to_string());
-                    cmd.env("LOCALAPPDATA", local.to_string_lossy().to_string());
                     if home_str.len() >= 2 && &home_str[1..2] == ":" {
                         cmd.env("HOMEDRIVE", &home_str[..2]);
                         cmd.env("HOMEPATH", &home_str[2..]);
@@ -1355,11 +1624,16 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
-                    cmd.env("HOME", &inst_home);
+                    cmd.env("HOME", inst_home);
                 }
             }
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+            cmd.env("SSH_TTY", "pty/0");
+            if let Some(ref acc) = resolved_account {
+                cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+            }
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1371,6 +1645,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         } else {
             cmd.arg("--new-window");
         }
+
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
 
         #[cfg(target_os = "windows")]
         {
@@ -2009,12 +2287,20 @@ pub async fn switch_account_to_instance(
 
     // Helper closure to inject credentials into all relevant state.vscdb & storage.json & OS keyring locations
     let inject_all_credentials = |acc: &crate::models::Account| -> Result<(), String> {
+        let target_data_path = PathBuf::from(&instance.data_dir);
+        let is_tos = acc.token.is_gcp_tos;
+
+        let _ = update_instance_app_storage(&target_data_path, Some(&acc.email), is_tos);
+        purge_volatile_instance_sessions(&target_data_path);
+
         if is_default_inst {
             let _ = crate::modules::integration::write_to_system_keyring(acc);
             let _ = crate::modules::integration::write_to_file_credentials(acc);
         }
-        if let Ok(inst_home) = get_instance_home_dir(&instance.id) {
-            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, acc);
+
+        let inst_home_opt = get_instance_home_dir(&instance.id).ok();
+        if let Some(ref inst_home) = inst_home_opt {
+            let _ = crate::modules::integration::write_to_file_credentials_at(inst_home, acc);
             #[cfg(target_os = "windows")]
             {
                 let roaming = inst_home.join("AppData").join("Roaming");
@@ -2026,25 +2312,11 @@ pub async fn switch_account_to_instance(
             let gemini_dir = inst_home.join(".gemini").join("antigravity");
             let _ = fs::create_dir_all(&gemini_ide_dir);
             let _ = fs::create_dir_all(&gemini_dir);
-        }
-
-        // Ensure app_storage.json has ide-install-wizard-shown: true to skip onboarding wizard
-        let app_storage_file = PathBuf::from(&instance.data_dir).join("app_storage.json");
-        let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
-            fs::read_to_string(&app_storage_file)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default()
+            write_keyring_bypass_markers(&target_data_path, Some(inst_home));
         } else {
-            serde_json::Map::new()
-        };
-        map.insert(
-            "ide-install-wizard-shown".to_string(),
-            serde_json::Value::String("true".to_string()),
-        );
-        if let Ok(content) = serde_json::to_string_pretty(&map) {
-            let _ = fs::write(&app_storage_file, content);
+            write_keyring_bypass_markers(&target_data_path, None);
         }
+        let _ = crate::modules::integration::write_to_file_credentials_at(&target_data_path, acc);
 
         crate::modules::db::inject_token(
             &db_path,
@@ -2070,7 +2342,7 @@ pub async fn switch_account_to_instance(
 
         #[cfg(target_os = "windows")]
         if !is_default_inst {
-            let appdata_db_dir = PathBuf::from(&instance.data_dir)
+            let appdata_db_dir = target_data_path
                 .join("AppData")
                 .join("Roaming")
                 .join("Antigravity")
@@ -2097,6 +2369,37 @@ pub async fn switch_account_to_instance(
                 );
                 let storage_path = appdata_db_dir.join("storage.json");
                 let _ = crate::modules::device::write_profile(&storage_path, profile);
+            }
+
+            if let Some(ref inst_home) = inst_home_opt {
+                let home_appdata_db_dir = inst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                let _ = fs::create_dir_all(&home_appdata_db_dir);
+                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                let _ = crate::modules::db::inject_token(
+                    &home_appdata_db_path,
+                    &acc.token.access_token,
+                    &acc.token.refresh_token,
+                    acc.token.expiry_timestamp,
+                    &acc.email,
+                    acc.token.is_gcp_tos,
+                    acc.token.project_id.as_deref(),
+                    acc.token.id_token.as_deref(),
+                    acc.token.oauth_client_key.as_deref(),
+                    None,
+                );
+                if let Some(ref profile) = acc.device_profile {
+                    let _ = crate::modules::db::write_service_machine_id(
+                        &home_appdata_db_path,
+                        &profile.mac_machine_id,
+                    );
+                    let home_storage_path = home_appdata_db_dir.join("storage.json");
+                    let _ = crate::modules::device::write_profile(&home_storage_path, profile);
+                }
             }
         }
 

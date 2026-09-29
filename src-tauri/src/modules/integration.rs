@@ -686,7 +686,11 @@ pub fn write_to_file_credentials_at(
     base_home: &std::path::Path,
     account: &crate::models::Account,
 ) -> Result<(), String> {
-    let gemini_dir = base_home.join(".gemini");
+    let gemini_dir = if base_home.ends_with(".gemini") {
+        base_home.to_path_buf()
+    } else {
+        base_home.join(".gemini")
+    };
 
     if !gemini_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(&gemini_dir) {
@@ -805,6 +809,43 @@ pub fn write_to_file_credentials_at(
         {
             use std::os::unix::fs::PermissionsExt;
             let _ = std::fs::set_permissions(&jetski_path, std::fs::Permissions::from_mode(0o600));
+        }
+    }
+
+    // Also mirror to .gemini subdirectories for language_server, agy CLI, and background workers
+    for sub in &["antigravity", "antigravity-ide", "antigravity-cli", "cache"] {
+        let target_sub = gemini_dir.join(sub);
+        if std::fs::create_dir_all(&target_sub).is_ok() {
+            let _ = std::fs::copy(&creds_path, target_sub.join("oauth_creds.json"));
+            let _ = std::fs::copy(&accounts_path, target_sub.join("google_accounts.json"));
+            let _ = std::fs::copy(
+                &jetski_path,
+                target_sub.join("jetski-standalone-oauth-token"),
+            );
+        }
+    }
+
+    if !base_home.ends_with(".gemini") {
+        let _ = std::fs::copy(&creds_path, base_home.join("oauth_creds.json"));
+        let _ = std::fs::copy(&accounts_path, base_home.join("google_accounts.json"));
+        let _ = std::fs::copy(
+            &jetski_path,
+            base_home.join("jetski-standalone-oauth-token"),
+        );
+    }
+
+    for marker_name in &[
+        "antigravity-keyring-unavailable",
+        "antigravity-ide-keyring-unavailable",
+        "antigravity-cli-keyring-unavailable",
+    ] {
+        let _ = std::fs::write(gemini_dir.join(marker_name), b"1\n");
+        let _ = std::fs::write(gemini_dir.join("antigravity").join(marker_name), b"1\n");
+        let _ = std::fs::write(gemini_dir.join("antigravity-ide").join(marker_name), b"1\n");
+        let _ = std::fs::write(gemini_dir.join("antigravity-cli").join(marker_name), b"1\n");
+        let _ = std::fs::write(gemini_dir.join("cache").join(marker_name), b"1\n");
+        if !base_home.ends_with(".gemini") {
+            let _ = std::fs::write(base_home.join(marker_name), b"1\n");
         }
     }
 

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.101.0)
+> Professional AI Account Management & Protocol Proxy System (v4.102.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.101.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.102.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.101.0**: Hardened the GitHub Release workflow by integrating an automated Python release notes sanitizer that strictly isolates contributor attribution to @aukgit and strips unwanted GitHub handles while preserving email addresses, enforced `generateReleaseNotes: false` across release channels to prevent auto-generated contributor pollution, normalized repository-wide maintainer attributions in READMEs and developer guidelines, upgraded version bump automation with case-insensitive file resolution, and synchronized full lowercase repository hygiene.
+> Latest version **v4.102.0**: Hardened GitHub Actions release workflow with direct tag-based channel gating and CLI fallback prerelease flags, enhanced Python release notes sanitizer to normalize all multilingual attributions to @aukgit and strip extraneous GitHub handles, automated macOS universal application bundle packaging into tarball assets, deepened multi-instance keyring bypass markers and session isolation, and resolved compiler clippy doc-comment warnings.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

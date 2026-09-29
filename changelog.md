@@ -3,6 +3,14 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.102.0 (2026-09-29)**:
+        -   **[Release v4.102.0: 发布流水线预发通道门禁加固、多语言贡献者清洗管道、macOS 通用产物打包与 Keyring 旁路会话隔离] 彻底修复 GitHub Actions 发布工作流中的预发通道判定与 CLI 降级兜底预发参数，增强发布说明多语言致谢正则严格归一至 @aukgit 并脱敏外部用户 handle，自动完成 macOS 通用应用包打包归档，深化多实例 Keyring 旁路标记与凭据独立会话隔离，修复 Clippy 文档注释警告与 Windows 清单路径规范化 (Thanks to @aukgit)**:
+            -   **发布流水线通道门禁加固与预发判定自愈 (`.github/workflows/release.yml`)**: 修复 `release.yml` 中对不存在的任务输出引用的缺陷，重构为直接依据 `github.ref_name` 动态判定预发通道，动态配置 `ncipollo/release-action@v1` 的 `prerelease` 与 `makeLatest` 标识，并在 CLI 降级上传中支持 `--prerelease` 参数；
+            -   **多语言贡献者清洗管道强化 (`.github/workflows/release.yml`)**: 升级 Python 日志脱敏正则以全面覆盖中英文致谢格式（`[（(](?:Thanks to|鸣谢|感谢)[^）)]*[)）]` -> `(Thanks to @aukgit)`），剥离除 `@aukgit` 外的所有外部 `@user` 标记，确保 GitHub Releases 页面贡献者名单仅保留 `aukgit`；
+            -   **macOS 通用架构应用打包归档 (`.github/workflows/release.yml`)**: 在资产重命名阶段自动将 universal `.app` 目录压缩为 `agm-alim_universal.app.tar.gz`，彻底解决通用架构构建未上传任何资产并产生警告的问题；
+            -   **多实例 Keyring 旁路标记与会话隔离 (`src-tauri/src/modules/instance.rs`, `src-tauri/src/modules/integration.rs`)**: 在 `.gemini`、`antigravity` 与 `antigravity-ide` 目录中统一写入 Keyring 不可用哨兵标记，镜像写入私有文件凭据并在实例启动时注入 `SSH_TTY` 与 `JETSKI_OAUTH_TOKEN`，杜绝多实例凭据相互串染；
+            -   **编译与构建规范加固 (`src-tauri/src/proxy/`, `src-tauri/build.rs`)**: 修复 Claude 请求映射器与 Upstream Client 中的 Clippy 空行文档注释告警，并在 Windows MSVC 构建中去除清单绝对路径的 `\\?\` 前缀。
+
     *   **v4.101.0 (2026-09-29)**:
         -   **[Release v4.101.0: 发布流水线贡献者隔离加固、自动更新日志清洗管道、全文档维护者归一与全平台大小写自愈同步] 加固 GitHub Actions 发布工作流，内置 Python 自动更新日志清洗流水线，将发布说明中的贡献者致谢严格归一至 @aukgit 并脱敏外部用户 handle，在正式版与预发通道全面关闭 `generateReleaseNotes` 杜绝外部贡献者误入 Release 页面；全量归一主页与英文 README 的维护者展示，升级版本自增脚本支持大小写文件名自动回退，同步完成全仓库小写规范化 (Thanks to @aukgit)**:
             -   **发布流水线贡献者隔离与自动日志脱敏 (`.github/workflows/release.yml`, `docs/release_guide.md`, `docs/release-guide.md`)**: 在 `release.yml` 发布前置流程中增加 Python 正则过滤管道，统一将历史致谢块归一至 `(Thanks to @aukgit)`，剔除多余的用户 `@` 标记且完整保留有效邮箱；在 `ncipollo/release-action@v1` 显式设置 `generateReleaseNotes: false`，并在发版规范文档中明确归一标准；
