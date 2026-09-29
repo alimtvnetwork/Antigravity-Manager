@@ -49,8 +49,10 @@ fn main() {
 
     match subcommand.as_str() {
         "status" | "credits" | "credit" | "status/credits" => cmd_status(&cmd_args),
-        "instances" | "instance" | "ls" => cmd_instances(&cmd_args),
-        "create" | "create-instance" | "create_instance" | "instance-create" => {
+        "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
+            cmd_instances(&cmd_args)
+        }
+        "create" | "create-instance" | "create_instance" | "instance-create" | "intrance-create" | "intrance_create" => {
             let mut forward_args = vec!["create".to_string()];
             forward_args.extend(cmd_args);
             cmd_instances(&forward_args);
@@ -58,7 +60,8 @@ fn main() {
         "instances-all" => cmd_instances_all(&cmd_args),
         "doctor" | "check" => cmd_doctor(&cmd_args),
         "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
-        "switch" | "switch-account" | "switch_account" | "account-switch" => {
+        "switch" | "switch-account" | "switch_account" | "account-switch" | "swtich"
+        | "swtich-account" | "swtich_account" | "account-swtich" => {
             cmd_switch(&cmd_args);
         }
         "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
@@ -1003,6 +1006,7 @@ fn cmd_switch(args: &[String]) {
         println!("AGM Account & Profile Switch CLI:");
         println!("  agm switch <account> [--instance <id|alias>] [--json]");
         println!("  agm switch <instance> <account> [--json]");
+        println!("  agm switch account <account> [--instance <id>]");
         println!("  agm switch <email|prefix|id|#seq>");
         println!("\nDescription:");
         println!("  Directly switches authenticated Google Gemini account credentials for an");
@@ -1010,7 +1014,7 @@ fn cmd_switch(args: &[String]) {
             "  Antigravity IDE profile (or the active/default profile) without GUI intervention."
         );
         println!("  Automatically injects tokens, updates profile configurations, and preserves running prompts.");
-        println!("\nAliases: agm switch, agm switch-account, agm account switch");
+        println!("\nAliases: agm switch, agm switch-account, agm switch account, agm account-switch, agm swtich, agm swtich-account");
         println!("\nArguments & Options:");
         println!("  <account>                   Account email, email prefix, account ID, or account number (#1, #2)");
         println!("  <instance>                  Instance name, ID, sequence number (#1, #2), or 'default' / 'active'");
@@ -1018,9 +1022,11 @@ fn cmd_switch(args: &[String]) {
         println!("  --json, -j                  Output switch outcome in structured JSON format");
         println!("\nExamples:");
         println!("  agm switch dev.user@gmail.com                        # Switch active profile to dev.user@gmail.com");
+        println!("  agm switch account dev.user@gmail.com                # Switch account using 'switch account' syntax");
         println!("  agm switch dev.user                                  # Switch by email prefix");
         println!("  agm switch #2 dev.user@gmail.com                     # Switch instance #2 to dev.user@gmail.com");
         println!("  agm switch dev.user@gmail.com --instance #2          # Same: specify target instance with flag");
+        println!("  agm switch dev.user@gmail.com -i Worker-1            # Target instance by name with -i flag");
         println!("  agm switch Worker-1 dev.user@gmail.com               # Switch instance named 'Worker-1'");
         println!("  agm switch acc_01j7x8a                               # Switch using exact internal account ID");
         println!("  agm switch #2                                        # Switch active profile to account #2 in list");
@@ -1028,14 +1034,28 @@ fn cmd_switch(args: &[String]) {
     }
 
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
-    let non_flag_args: Vec<&String> = args
+    let raw_non_flag: Vec<&String> = args
         .iter()
         .filter(|a| {
             !a.starts_with('-')
                 && !a.eq_ignore_ascii_case("switch")
+                && !a.eq_ignore_ascii_case("swtich")
                 && !a.eq_ignore_ascii_case("use")
         })
         .collect();
+
+    // Strip semantic filler keywords like "account", "to", "for" when followed by actual values
+    let mut non_flag_args: Vec<&String> = Vec::new();
+    for (idx, arg) in raw_non_flag.iter().enumerate() {
+        let lower = arg.to_lowercase();
+        if (lower == "account" || lower == "acc" || lower == "to" || lower == "for")
+            && (idx == 0 || idx + 1 < raw_non_flag.len())
+            && raw_non_flag.len() > 1
+        {
+            continue;
+        }
+        non_flag_args.push(arg);
+    }
 
     let index = match account::load_account_index() {
         Ok(idx) => idx,
@@ -1057,6 +1077,7 @@ fn cmd_switch(args: &[String]) {
         );
         println!("\nUsage: agm switch <email|id|#seq> [--instance <id>]");
         println!("       agm switch <instance> <account>");
+        println!("       agm switch account <email>");
         println!("Run 'agm switch --help' for full guide or 'agm accounts' to list accounts.");
         std::process::exit(1);
     }
@@ -2744,11 +2765,22 @@ fn cmd_auto_switch(args: &[String]) {
     }
 
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
-    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let mut non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if non_flag_args
+        .first()
+        .map(|s| {
+            s.eq_ignore_ascii_case("switch")
+                || s.eq_ignore_ascii_case("switcher")
+                || s.eq_ignore_ascii_case("swtich")
+        })
+        .unwrap_or(false)
+    {
+        non_flag_args.remove(0);
+    }
     let sub = non_flag_args.first().map(|s| s.to_lowercase());
 
     match sub.as_deref() {
-        Some("enable") | Some("on") => {
+        Some("enable") | Some("on") | Some("start") => {
             app_cfg.auto_profile_switcher.is_enabled = true;
             if let Err(e) = config::save_app_config(&app_cfg) {
                 eprintln!("[ERROR] Failed to save config: {}", e);
@@ -2756,7 +2788,7 @@ fn cmd_auto_switch(args: &[String]) {
             }
             println!("[SUCCESS] Auto-profile switcher daemon is now ENABLED.");
         }
-        Some("disable") | Some("off") => {
+        Some("disable") | Some("off") | Some("stop") => {
             app_cfg.auto_profile_switcher.is_enabled = false;
             if let Err(e) = config::save_app_config(&app_cfg) {
                 eprintln!("[ERROR] Failed to save config: {}", e);
@@ -2839,7 +2871,7 @@ fn cmd_auto_switch(args: &[String]) {
                 );
             }
         }
-        Some("run") | Some("trigger") | Some("eval") => {
+        Some("run") | Some("trigger") | Some("eval") | Some("check") | Some("rotate") => {
             println!("[*] Triggering immediate auto-switch evaluation across instances...");
             let rt = match tokio::runtime::Runtime::new() {
                 Ok(r) => r,
@@ -7143,7 +7175,11 @@ fn cmd_instances(args: &[String]) {
     // Subcommand: agm instances create <name> [options]
     if non_flag_args
         .first()
-        .map(|s| s.eq_ignore_ascii_case("create") || s.eq_ignore_ascii_case("add"))
+        .map(|s| {
+            s.eq_ignore_ascii_case("create")
+                || s.eq_ignore_ascii_case("add")
+                || s.eq_ignore_ascii_case("new")
+        })
         .unwrap_or(false)
     {
         let is_data_only = args.iter().any(|a| {
@@ -7396,10 +7432,14 @@ fn cmd_instances(args: &[String]) {
     }
 
     // Subcommand: agm instances switch <target> <account> OR agm instances <target> switch <account>
-    let is_switch_order1 =
-        non_flag_args.len() >= 3 && non_flag_args[0].eq_ignore_ascii_case("switch");
-    let is_switch_order2 =
-        non_flag_args.len() >= 3 && non_flag_args[1].eq_ignore_ascii_case("switch");
+    let is_switch_order1 = non_flag_args.len() >= 3
+        && (non_flag_args[0].eq_ignore_ascii_case("switch")
+            || non_flag_args[0].eq_ignore_ascii_case("swtich")
+            || non_flag_args[0].eq_ignore_ascii_case("use"));
+    let is_switch_order2 = non_flag_args.len() >= 3
+        && (non_flag_args[1].eq_ignore_ascii_case("switch")
+            || non_flag_args[1].eq_ignore_ascii_case("swtich")
+            || non_flag_args[1].eq_ignore_ascii_case("use"));
     if is_switch_order1 || is_switch_order2 {
         let (target_spec, acc_query) = if is_switch_order1 {
             (

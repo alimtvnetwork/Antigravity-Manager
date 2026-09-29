@@ -73,7 +73,18 @@ if ($args.Count -gt 0 -and $args[0] -eq "dev-tool-clear") {
     exit $LASTEXITCODE
 }
 
-if ($args.Count -gt 0 -and ($args[0] -in @("agy", "agi", "ccko", "cckf", "undo", "cache-clear", "clear-cache", "clear", "clean", "instances", "instance", "switch", "prompt", "ff", "accounts", "account", "backup", "restore", "backup-running-prompts", "restore-running-prompts", "running-prompts", "running-projects", "--help", "-h", "help"))) {
+$cliCommands = @(
+    "agy", "agi", "ccko", "cckf", "undo", "cache-clear", "clear-cache", "clear", "clean",
+    "instances", "instance", "intrance", "intrances", "profile", "profiles",
+    "create", "create-instance", "create_instance", "instance-create", "intrance-create",
+    "switch", "switch-account", "switch_account", "account-switch", "swtich", "swtich-account",
+    "auto-switch", "auto-swtich", "autoswitch", "auto_switch", "auto", "switcher", "test-switcher",
+    "prompt", "prompts", "ff", "fast-forward", "accounts", "account",
+    "backup", "restore", "backup-running-prompts", "restore-running-prompts", "running-prompts", "running-projects",
+    "status", "doctor", "check", "--help", "-h", "help"
+)
+
+if ($args.Count -gt 0 -and ($args[0].ToLower().TrimStart('-').TrimStart('/') -in $cliCommands -or $args[0] -in $cliCommands)) {
     $cargoArgs = @("run", "--bin", "agm", "--manifest-path", (Join-Path $ScriptDir "src-tauri\Cargo.toml"), "--") + $args
     & cargo @cargoArgs
     exit $LASTEXITCODE

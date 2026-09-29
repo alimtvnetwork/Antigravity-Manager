@@ -415,7 +415,17 @@ pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
                 let is_antigravity =
                     proc_name.contains("antigravity") || proc_exe.contains("antigravity");
                 if is_antigravity && !pids.contains(&saved_pid) {
-                    pids.push(saved_pid);
+                    let args_str = proc
+                        .cmd()
+                        .iter()
+                        .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
+                    let clean_data = norm_data.trim_end_matches('/');
+                    if is_default_inst || args_str.contains(clean_data) {
+                        pids.push(saved_pid);
+                    }
                 }
             }
         }
@@ -468,6 +478,36 @@ pub fn create_instance_with_account(
         .map_err(|e| format!("Failed to create instance directory: {}", e))?;
     fs::create_dir_all(&instance_home_dir)
         .map_err(|e| format!("Failed to create instance home directory: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let roaming = instance_home_dir.join("AppData").join("Roaming");
+        let local = instance_home_dir.join("AppData").join("Local");
+        let _ = fs::create_dir_all(&roaming);
+        let _ = fs::create_dir_all(&local);
+    }
+    let gemini_ide_dir = instance_home_dir.join(".gemini").join("antigravity-ide");
+    let gemini_dir = instance_home_dir.join(".gemini").join("antigravity");
+    let _ = fs::create_dir_all(&gemini_ide_dir);
+    let _ = fs::create_dir_all(&gemini_dir);
+
+    // Pre-seed app_storage.json with ide-install-wizard-shown: true to skip onboarding wizard
+    let app_storage_file = instance_data_dir.join("app_storage.json");
+    let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
+        fs::read_to_string(&app_storage_file)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    } else {
+        serde_json::Map::new()
+    };
+    map.insert(
+        "ide-install-wizard-shown".to_string(),
+        serde_json::Value::String("true".to_string()),
+    );
+    if let Ok(content) = serde_json::to_string_pretty(&map) {
+        let _ = fs::write(&app_storage_file, content);
+    }
 
     let user_dir = instance_data_dir.join("User");
     let _ = fs::create_dir_all(&user_dir);
@@ -1163,11 +1203,41 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             cmd.arg("--password-store=basic");
             if let Ok(inst_home) = get_instance_home_dir(instance_id) {
                 let _ = fs::create_dir_all(&inst_home);
+                let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
+                let gemini_dir = inst_home.join(".gemini").join("antigravity");
+                let _ = fs::create_dir_all(&gemini_ide_dir);
+                let _ = fs::create_dir_all(&gemini_dir);
+
+                // Ensure app_storage.json has ide-install-wizard-shown: true to skip onboarding wizard
+                let app_storage_file = target_data_path.join("app_storage.json");
+                let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
+                    fs::read_to_string(&app_storage_file)
+                        .ok()
+                        .and_then(|s| serde_json::from_str(&s).ok())
+                        .unwrap_or_default()
+                } else {
+                    serde_json::Map::new()
+                };
+                map.insert(
+                    "ide-install-wizard-shown".to_string(),
+                    serde_json::Value::String("true".to_string()),
+                );
+                if let Ok(content) = serde_json::to_string_pretty(&map) {
+                    let _ = fs::write(&app_storage_file, content);
+                }
+
                 #[cfg(target_os = "windows")]
                 {
                     let home_str = inst_home.to_string_lossy().to_string();
+                    let roaming = inst_home.join("AppData").join("Roaming");
+                    let local = inst_home.join("AppData").join("Local");
+                    let _ = fs::create_dir_all(&roaming);
+                    let _ = fs::create_dir_all(&local);
+
                     cmd.env("USERPROFILE", &home_str);
                     cmd.env("HOME", &home_str);
+                    cmd.env("APPDATA", roaming.to_string_lossy().to_string());
+                    cmd.env("LOCALAPPDATA", local.to_string_lossy().to_string());
                     if home_str.len() >= 2 && &home_str[1..2] == ":" {
                         cmd.env("HOMEDRIVE", &home_str[..2]);
                         cmd.env("HOMEPATH", &home_str[2..]);
@@ -1414,6 +1484,46 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 }
             }
         }
+    }
+
+    if !is_default_inst {
+        let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
+        let clean_data = norm_data.trim_end_matches('/');
+        pids.retain(|&pid| {
+            if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
+                let args_str = proc
+                    .cmd()
+                    .iter()
+                    .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                if args_str.contains(clean_data) {
+                    return true;
+                }
+                let mut curr = pid;
+                for _ in 0..10 {
+                    if let Some(p) = system.process(sysinfo::Pid::from_u32(curr)).and_then(|pr| pr.parent()).map(|pp| pp.as_u32()) {
+                        if let Some(parent_proc) = system.process(sysinfo::Pid::from_u32(p)) {
+                            let parent_args = parent_proc
+                                .cmd()
+                                .iter()
+                                .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
+                                .collect::<Vec<String>>()
+                                .join(" ");
+                            if parent_args.contains(clean_data) {
+                                return true;
+                            }
+                        }
+                        curr = p;
+                    } else {
+                        break;
+                    }
+                }
+                false
+            } else {
+                false
+            }
+        });
     }
 
     if pids.is_empty() {
@@ -1771,6 +1881,35 @@ pub async fn switch_account_to_instance(
         }
         if let Ok(inst_home) = get_instance_home_dir(&instance.id) {
             let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, acc);
+            #[cfg(target_os = "windows")]
+            {
+                let roaming = inst_home.join("AppData").join("Roaming");
+                let local = inst_home.join("AppData").join("Local");
+                let _ = fs::create_dir_all(&roaming);
+                let _ = fs::create_dir_all(&local);
+            }
+            let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
+            let gemini_dir = inst_home.join(".gemini").join("antigravity");
+            let _ = fs::create_dir_all(&gemini_ide_dir);
+            let _ = fs::create_dir_all(&gemini_dir);
+        }
+
+        // Ensure app_storage.json has ide-install-wizard-shown: true to skip onboarding wizard
+        let app_storage_file = PathBuf::from(&instance.data_dir).join("app_storage.json");
+        let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
+            fs::read_to_string(&app_storage_file)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            serde_json::Map::new()
+        };
+        map.insert(
+            "ide-install-wizard-shown".to_string(),
+            serde_json::Value::String("true".to_string()),
+        );
+        if let Ok(content) = serde_json::to_string_pretty(&map) {
+            let _ = fs::write(&app_storage_file, content);
         }
 
         crate::modules::db::inject_token(

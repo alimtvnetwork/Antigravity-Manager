@@ -102,6 +102,20 @@ pub fn get_gemini_candidate_dirs() -> Vec<PathBuf> {
             }
         }
     }
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        for inst in reg.instances {
+            if !inst.is_default && inst.id != "default" {
+                if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(&inst.id) {
+                    for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                        let p = inst_home.join(".gemini").join(sub);
+                        if p.exists() && !dirs_list.contains(&p) {
+                            dirs_list.push(p);
+                        }
+                    }
+                }
+            }
+        }
+    }
     if dirs_list.is_empty() {
         if let Some(def) = get_gemini_base_dir() {
             dirs_list.push(def);

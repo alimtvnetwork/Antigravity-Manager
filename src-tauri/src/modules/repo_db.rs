@@ -384,7 +384,20 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
 pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<ActivePrompt> {
     let mut prompts = Vec::new();
     let mut seen_cids = std::collections::HashSet::new();
-    let candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
+    let mut candidate_dirs = Vec::new();
+    if instance_id != "all" && instance_id != "default" && !instance_id.is_empty() && instance_id != "__default__" {
+        if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(instance_id) {
+            for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                let p = inst_home.join(".gemini").join(sub);
+                if p.exists() && !candidate_dirs.contains(&p) {
+                    candidate_dirs.push(p);
+                }
+            }
+        }
+    }
+    if candidate_dirs.is_empty() {
+        candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
+    }
 
     for base_dir in candidate_dirs {
         let summaries_db = base_dir.join("conversation_summaries.db");

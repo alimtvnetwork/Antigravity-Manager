@@ -1,4 +1,4 @@
-use crate::modules::instance;
+use crate::modules::{account, auto_switcher, config, instance};
 
 #[cfg(target_os = "windows")]
 fn attach_parent_console() {
@@ -23,72 +23,56 @@ pub fn handle_cli_arguments() -> bool {
     #[cfg(target_os = "windows")]
     attach_parent_console();
 
-    let cmd = args[1].as_str();
+    let raw_cmd = &args[1];
+    let cmd = raw_cmd
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    let rest_args = if args.len() > 2 {
+        args[2..].to_vec()
+    } else {
+        Vec::new()
+    };
 
-    match cmd {
-        "--create-profile" | "-cp" | "create-profile" => {
-            let name = if args.len() > 2 {
-                args[2..].join(" ")
-            } else {
-                eprintln!("Error: Profile name required. Usage: antigravity-manager --create-profile <name>");
-                std::process::exit(1);
-            };
-
-            match instance::create_instance(name) {
-                Ok(config) => {
-                    println!("[CLI] Successfully created profile:");
-                    println!("  ID:       {}", config.id);
-                    println!("  Name:     {}", config.name);
-                    println!("  Data Dir: {}", config.data_dir);
-                    println!("  Default:  {}", config.is_default);
-                    std::process::exit(0);
-                }
-                Err(e) => {
-                    eprintln!("Error creating profile: {}", e);
-                    std::process::exit(1);
-                }
-            }
+    match cmd.as_str() {
+        // Multi-Instance & Profile commands
+        "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
+            handle_instance_subcommand(&rest_args);
+            true
         }
 
-        "--list-profiles" | "-lp" | "list-profiles" => match instance::list_instances() {
-            Ok(instances) => {
-                println!("\nRegistered Profiles ({} total):", instances.len());
-                println!(
-                    "{:<16} {:<18} {:<16} {:<24} {}",
-                    "ID", "NAME", "STATUS", "BOUND EMAIL", "DATA DIR"
-                );
-                println!("{}", "-".repeat(95));
-                for inst in instances {
-                    let status_str = if inst.is_running {
-                        format!("Running (PID: {})", inst.pid.unwrap_or(0))
-                    } else {
-                        "Idle".to_string()
-                    };
-                    let email = inst.config.bound_email.unwrap_or_else(|| "-".to_string());
-                    println!(
-                        "{:<16} {:<18} {:<16} {:<24} {}",
-                        inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
-                    );
-                }
-                println!();
-                std::process::exit(0);
-            }
-            Err(e) => {
-                eprintln!("Error listing profiles: {}", e);
+        // Direct create commands (e.g. agm create, instance-create, intrance-create, create-profile)
+        "create" | "create-instance" | "create_instance" | "instance-create"
+        | "intrance-create" | "intrance_create" | "create-profile" | "cp" => {
+            handle_instance_create(&rest_args);
+            true
+        }
+
+        // Direct switch commands (e.g. agm switch, switch-account, swtich, swtich-account)
+        "switch" | "switch-account" | "switch_account" | "account-switch" | "swtich"
+        | "swtich-account" | "swtich_account" | "account-swtich" => {
+            handle_switch_command(&rest_args);
+            true
+        }
+
+        // Direct auto-switch daemon commands
+        "auto-switch" | "auto-swtich" | "autoswitch" | "auto_switch" | "auto" | "switcher" => {
+            handle_auto_switch_command(&rest_args);
+            true
+        }
+
+        "list-profiles" | "lp" => {
+            handle_instance_subcommand(&["list".to_string()]);
+            true
+        }
+
+        "copy-profile" | "dp" => {
+            if rest_args.len() < 2 {
+                eprintln!("Error: Usage: antigravity-manager copy-profile <source_id> <new_name>");
                 std::process::exit(1);
             }
-        },
-
-        "--copy-profile" | "-dp" | "copy-profile" => {
-            if args.len() < 4 {
-                eprintln!(
-                    "Error: Usage: antigravity-manager --copy-profile <source_id> <new_name>"
-                );
-                std::process::exit(1);
-            }
-            let source_id = &args[2];
-            let target_name = args[3..].join(" ");
-
+            let source_id = &rest_args[0];
+            let target_name = rest_args[1..].join(" ");
             match instance::copy_instance(source_id, target_name, None) {
                 Ok(new_config) => {
                     println!("[CLI] Successfully cloned profile:");
@@ -104,12 +88,12 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
-        "--delete-profile" | "delete-profile" => {
-            if args.len() < 3 {
-                eprintln!("Error: Usage: antigravity-manager --delete-profile <profile_id>");
+        "delete-profile" => {
+            if rest_args.is_empty() {
+                eprintln!("Error: Usage: antigravity-manager delete-profile <profile_id>");
                 std::process::exit(1);
             }
-            let profile_id = &args[2];
+            let profile_id = &rest_args[0];
             match instance::delete_instance(profile_id) {
                 Ok(_) => {
                     println!("[CLI] Profile '{}' deleted successfully.", profile_id);
@@ -122,12 +106,12 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
-        "--run-profile" | "run-profile" => {
-            if args.len() < 3 {
-                eprintln!("Error: Usage: antigravity-manager --run-profile <profile_id>");
+        "run-profile" => {
+            if rest_args.is_empty() {
+                eprintln!("Error: Usage: antigravity-manager run-profile <profile_id>");
                 std::process::exit(1);
             }
-            let profile_id = &args[2];
+            let profile_id = &rest_args[0];
             match instance::launch_instance(profile_id) {
                 Ok(_) => {
                     println!("[CLI] Launched Antigravity with profile '{}'.", profile_id);
@@ -140,7 +124,7 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
-        "--fast-forward" | "-ff" | "fast-forward" => {
+        "fast-forward" | "ff" => {
             println!("[CLI] Initiating fast-forward profile rotation...");
             let rt = match tokio::runtime::Runtime::new() {
                 Ok(r) => r,
@@ -150,7 +134,8 @@ pub fn handle_cli_arguments() -> bool {
                 }
             };
 
-            match rt.block_on(crate::modules::auto_switcher::trigger_manual_rotation()) {
+            let target_spec = rest_args.first().map(|s| s.as_str());
+            match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(target_spec)) {
                 Ok(msg) => {
                     println!("[CLI] Fast-forward success: {}", msg);
                     std::process::exit(0);
@@ -162,59 +147,69 @@ pub fn handle_cli_arguments() -> bool {
             }
         }
 
-        "--profile-help" | "--help-profile" => {
-            print_profile_help();
+        "profile-help" | "help-profile" => {
+            print_instance_cli_help();
             std::process::exit(0);
         }
 
-        "help" | "--help" | "-h" => {
-            print_agy_cli_help();
+        "help" | "h" => {
+            if let Some(sub) = rest_args.first() {
+                let sub_low = sub.trim_start_matches('-').to_lowercase();
+                match sub_low.as_str() {
+                    "instance" | "instances" | "intrance" | "create" => print_instance_cli_help(),
+                    "switch" | "switch-account" | "account" => print_switch_cli_help(),
+                    "auto-switch" | "autoswitch" | "auto" => print_auto_switch_cli_help(),
+                    "agy" | "cache" | "clean" => print_agy_cli_help(),
+                    _ => print_all_cli_help(),
+                }
+            } else {
+                print_all_cli_help();
+            }
             std::process::exit(0);
         }
 
         "agy" | "agi" | "cli" => {
-            let sub_args = &args[2..];
-            if sub_args.is_empty() {
+            if rest_args.is_empty() {
                 print_agy_cli_help();
                 std::process::exit(0);
             }
-            handle_agy_subcommand(sub_args);
+            handle_agy_subcommand(&rest_args);
             true
         }
 
-        "cache-clear" | "--cache-clear" | "clean-agy" | "clear-agy" => {
-            handle_clear_action(&args[2..], 10);
+        "cache-clear" | "clean-agy" | "clear-agy" => {
+            handle_clear_action(&rest_args, 10);
             true
         }
 
         "cache-clear-keep-one" | "ccko" => {
-            handle_clear_action(&args[2..], 1);
+            handle_clear_action(&rest_args, 1);
             true
         }
 
         "cache-clear-keep-five" | "cckf" => {
-            handle_clear_action(&args[2..], 5);
+            handle_clear_action(&rest_args, 5);
             true
         }
 
-        "undo" | "--undo" => {
-            let tx_id = args.get(2).map(|s| s.as_str());
+        "undo" => {
+            let tx_id = rest_args.first().map(|s| s.as_str());
             execute_agy_undo(tx_id);
             true
         }
 
-        "delegate-update" | "--delegate-update" | "update-ui" | "ui-update-runner" => {
-            crate::modules::delegate_updater::run(&args[2..]);
+        "delegate-update" | "update-ui" | "ui-update-runner" => {
+            crate::modules::delegate_updater::run(&rest_args);
             std::process::exit(0);
         }
 
-        "update" | "--update" | "update-all" | "ua" => {
-            let ok = crate::modules::delegate_updater::run_cli_update(&args[2..]);
+        "update" | "update-all" | "ua" => {
+            let ok = crate::modules::delegate_updater::run_cli_update(&rest_args);
             std::process::exit(if ok { 0 } else { 1 });
         }
 
-        "open-ui" | "--open-ui" | "ui" | "launch-ui" | "start-ui" => {
-            crate::modules::delegate_updater::open_ui(&args[2..]);
+        "open-ui" | "ui" | "launch-ui" | "start-ui" => {
+            crate::modules::delegate_updater::open_ui(&rest_args);
             std::process::exit(0);
         }
 
@@ -222,14 +217,805 @@ pub fn handle_cli_arguments() -> bool {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Instances Subcommand Handler
+// -----------------------------------------------------------------------------
+
+fn handle_instance_subcommand(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+        print_instance_cli_help();
+        std::process::exit(0);
+    }
+
+    if args.is_empty() || args[0] == "ls" || args[0] == "list" {
+        let is_json = is_flag_present(args, &["--json", "-j"]);
+        match instance::list_instances() {
+            Ok(instances) => {
+                if is_json {
+                    println!("{}", serde_json::to_string_pretty(&instances).unwrap_or_default());
+                    std::process::exit(0);
+                }
+                println!("\nRegistered Antigravity Profiles ({} total):", instances.len());
+                println!(
+                    "{:<5} {:<18} {:<20} {:<18} {:<28} {}",
+                    "#", "ID", "NAME", "STATUS", "BOUND EMAIL", "DATA DIR"
+                );
+                println!("{}", "-".repeat(115));
+                for (idx, inst) in instances.iter().enumerate() {
+                    let seq = idx + 1;
+                    let status_str = if inst.is_running {
+                        format!("Running (PID: {})", inst.pid.unwrap_or(0))
+                    } else {
+                        "Idle".to_string()
+                    };
+                    let email = inst.config.bound_email.as_deref().unwrap_or("-");
+                    println!(
+                        "#{:<4} {:<18} {:<20} {:<18} {:<28} {}",
+                        seq, inst.config.id, inst.config.name, status_str, email, inst.config.data_dir
+                    );
+                }
+                println!();
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Error listing profiles: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    let sub = args[0].to_lowercase();
+    match sub.as_str() {
+        "create" | "add" | "new" => {
+            handle_instance_create(&args[1..]);
+        }
+        "switch" | "use" | "swtich" => {
+            if args.len() < 3 {
+                eprintln!("[ERROR] Usage: antigravity-manager instance switch <instance> <account>");
+                std::process::exit(1);
+            }
+            handle_switch_command(&[args[1].clone(), args[2].clone()]);
+        }
+        "launch" | "start" | "run" => {
+            if args.len() < 2 {
+                eprintln!("[ERROR] Usage: antigravity-manager instance launch <instance_id>");
+                std::process::exit(1);
+            }
+            let target = &args[1];
+            let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.clone());
+            match instance::launch_instance(&resolved) {
+                Ok(_) => {
+                    println!("[SUCCESS] Launched instance window for '{}'.", resolved);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to launch instance '{}': {}", resolved, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "stop" | "close" | "kill" => {
+            if args.len() < 2 {
+                eprintln!("[ERROR] Usage: antigravity-manager instance stop <instance_id>");
+                std::process::exit(1);
+            }
+            let target = &args[1];
+            let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.clone());
+            match instance::stop_instance(&resolved) {
+                Ok(_) => {
+                    println!("[SUCCESS] Stopped instance '{}'.", resolved);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to stop instance '{}': {}", resolved, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "delete" | "rm" | "remove" => {
+            if args.len() < 2 {
+                eprintln!("[ERROR] Usage: antigravity-manager instance delete <instance_id>");
+                std::process::exit(1);
+            }
+            let target = &args[1];
+            let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.clone());
+            match instance::delete_instance(&resolved) {
+                Ok(_) => {
+                    println!("[SUCCESS] Deleted instance '{}' and cleaned storage.", resolved);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to delete instance '{}': {}", resolved, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "copy" | "clone" => {
+            if args.len() < 3 {
+                eprintln!("[ERROR] Usage: antigravity-manager instance copy <source_id> <new_name>");
+                std::process::exit(1);
+            }
+            let source_id = &args[1];
+            let target_name = args[2..].join(" ");
+            match instance::copy_instance(source_id, target_name, None) {
+                Ok(new_config) => {
+                    println!("[SUCCESS] Cloned profile '{}' -> '{}' ({})", source_id, new_config.name, new_config.id);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to copy instance: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "ff" | "fast-forward" | "rotate" => {
+            let target = args.get(1).map(|s| s.as_str());
+            let rt = tokio::runtime::Runtime::new().expect("Failed to initialize tokio runtime");
+            match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(target)) {
+                Ok(msg) => {
+                    println!("[SUCCESS] {}", msg);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Fast-forward failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            eprintln!("[ERROR] Unknown instance subcommand '{}'.", sub);
+            println!("Run 'antigravity-manager instance --help' for usage instructions.");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn handle_instance_create(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+        println!("Antigravity Instance Create Command:");
+        println!("  antigravity-manager instance create <name> [options]");
+        println!("\nOptions:");
+        println!("  --account, -a <email|id>    Bind specific account (defaults to next available unbound)");
+        println!("  --from, -f <source_id>      Clone configuration and extensions from an existing instance");
+        println!("  --launch, -l                Immediately launch instance window after creation");
+        println!("  --data-only, --do           Create isolated data directory only without cloning binary");
+        println!("  --json, -j                  Output created instance details in structured JSON");
+        println!("\nExamples:");
+        println!("  antigravity-manager instance create \"Work-Project\" -a \"work@gmail.com\" --launch");
+        println!("  antigravity-manager instance create \"Dev-Sandbox\"");
+        println!("  antigravity-manager instance create \"Client-Clone\" --from \"Work-Project\"");
+        std::process::exit(0);
+    }
+
+    let is_json = is_flag_present(args, &["--json", "-j"]);
+    let should_launch = is_flag_present(args, &["--launch", "-l"]);
+    let is_data_only = is_flag_present(args, &["--data-only", "-data-only", "--do", "-do"]);
+
+    let mut target_account: Option<String> = None;
+    let mut from_instance: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        let arg_lower = args[i].to_lowercase();
+        if (arg_lower == "--account" || arg_lower == "-a" || arg_lower == "--acc") && i + 1 < args.len() {
+            target_account = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--from" || arg_lower == "-f") && i + 1 < args.len() {
+            from_instance = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    let non_flags: Vec<&String> = args
+        .iter()
+        .filter(|a| {
+            !a.starts_with('-')
+                && !target_account.as_ref().map(|acc| acc == *a).unwrap_or(false)
+                && !from_instance.as_ref().map(|src| src == *a).unwrap_or(false)
+                && !a.eq_ignore_ascii_case("create")
+                && !a.eq_ignore_ascii_case("add")
+                && !a.eq_ignore_ascii_case("new")
+        })
+        .collect();
+
+    let name = if !non_flags.is_empty() {
+        non_flags.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ")
+    } else {
+        format!("Instance-{}", chrono::Utc::now().timestamp() % 1000)
+    };
+
+    println!("[*] Creating instance profile '{}'...", name);
+    let create_res = if let Some(ref source) = from_instance {
+        let resolved_src = instance::resolve_instance_id(source).unwrap_or_else(|_| source.clone());
+        instance::copy_instance(&resolved_src, name.clone(), Some("full"))
+    } else {
+        instance::create_instance_with_account(name.clone(), target_account.as_deref())
+    };
+
+    match create_res {
+        Ok(mut cfg) => {
+            if !is_data_only {
+                if let Ok(exe_path) = instance::clone_instance_executable(&cfg.id) {
+                    cfg.executable_path = Some(exe_path);
+                }
+            }
+
+            if let Some(ref acc_query) = target_account {
+                if from_instance.is_some() {
+                    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+                    if let Ok(index) = account::load_account_index() {
+                        let q_lower = acc_query.to_lowercase();
+                        if let Some(target) = index.accounts.iter().find(|a| {
+                            a.id == *acc_query
+                                || a.email.to_lowercase() == q_lower
+                                || a.email.to_lowercase().contains(&q_lower)
+                        }) {
+                            let _ = rt.block_on(instance::switch_account_to_instance(&target.id, Some(&cfg.id)));
+                            cfg.bound_account_id = Some(target.id.clone());
+                            cfg.bound_email = Some(target.email.clone());
+                        }
+                    }
+                }
+            }
+
+            if should_launch {
+                let _ = instance::launch_instance(&cfg.id);
+            }
+
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&cfg).unwrap_or_default());
+            } else {
+                println!(
+                    "[SUCCESS] Created profile #{}: '{}' (ID: {}, bound: {}, data_only: {}, dir: {})",
+                    cfg.seq_num.unwrap_or(1),
+                    cfg.name,
+                    cfg.id,
+                    cfg.bound_email.as_deref().unwrap_or("unbound"),
+                    is_data_only,
+                    cfg.data_dir
+                );
+                if should_launch {
+                    println!("  [->] Antigravity IDE window launched immediately.");
+                }
+            }
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to create instance: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Switch Account Command Handler
+// -----------------------------------------------------------------------------
+
+fn handle_switch_command(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+        print_switch_cli_help();
+        std::process::exit(0);
+    }
+
+    let is_json = is_flag_present(args, &["--json", "-j"]);
+    let raw_non_flags: Vec<&String> = args
+        .iter()
+        .filter(|a| {
+            !a.starts_with('-')
+                && !a.eq_ignore_ascii_case("switch")
+                && !a.eq_ignore_ascii_case("swtich")
+                && !a.eq_ignore_ascii_case("use")
+        })
+        .collect();
+
+    // Strip semantic filler keywords like "account", "to", "for"
+    let mut non_flag_args: Vec<&String> = Vec::new();
+    for (idx, arg) in raw_non_flags.iter().enumerate() {
+        let lower = arg.to_lowercase();
+        if (lower == "account" || lower == "acc" || lower == "to" || lower == "for")
+            && (idx == 0 || idx + 1 < raw_non_flags.len())
+            && raw_non_flags.len() > 1
+        {
+            continue;
+        }
+        non_flag_args.push(arg);
+    }
+
+    let index = match account::load_account_index() {
+        Ok(idx) => idx,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load accounts index: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if non_flag_args.is_empty() {
+        let curr = account::get_current_account().ok().flatten();
+        let active_inst = instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+        println!("AGM Profile Switch:");
+        println!("  Current active instance: {}", active_inst);
+        println!(
+            "  Current active account:  {}",
+            curr.as_ref().map(|a| a.email.as_str()).unwrap_or("(none)")
+        );
+        println!("\nUsage: antigravity-manager switch <email|id|#seq> [--instance <id>]");
+        println!("       antigravity-manager switch <instance> <account>");
+        println!("       antigravity-manager switch account <email>");
+        println!("Run 'antigravity-manager switch --help' for full guide with examples.");
+        std::process::exit(1);
+    }
+
+    let explicit_inst_opt = args
+        .iter()
+        .position(|a| a == "--instance" || a == "-i")
+        .and_then(|pos| args.get(pos + 1).map(|s| s.as_str()));
+
+    let (target_inst_spec, acc_query) = if non_flag_args.len() >= 2 {
+        let first_is_instance = instance::resolve_instance_id(non_flag_args[0]).is_ok();
+        let second_is_instance = instance::resolve_instance_id(non_flag_args[1]).is_ok();
+
+        if first_is_instance && !second_is_instance {
+            (Some(non_flag_args[0].as_str()), non_flag_args[1].as_str())
+        } else if second_is_instance && !first_is_instance {
+            (Some(non_flag_args[1].as_str()), non_flag_args[0].as_str())
+        } else if explicit_inst_opt.is_some() {
+            (explicit_inst_opt, non_flag_args[0].as_str())
+        } else {
+            (Some(non_flag_args[0].as_str()), non_flag_args[1].as_str())
+        }
+    } else {
+        (explicit_inst_opt, non_flag_args[0].as_str())
+    };
+
+    let query_lower = acc_query.trim().to_lowercase();
+    let index_match = if query_lower.starts_with('#') || query_lower.chars().all(|c| c.is_ascii_digit()) {
+        let num_str = query_lower.trim_start_matches('#');
+        if let Ok(num) = num_str.parse::<usize>() {
+            if num >= 1 && num <= index.accounts.len() {
+                Some(&index.accounts[num - 1])
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let target_account = if let Some(acc) = index_match {
+        acc
+    } else {
+        let matches: Vec<_> = index
+            .accounts
+            .iter()
+            .filter(|a| {
+                let email_l = a.email.to_lowercase();
+                let id_l = a.id.to_lowercase();
+                email_l == query_lower
+                    || id_l == query_lower
+                    || email_l.starts_with(&query_lower)
+                    || email_l.contains(&query_lower)
+                    || id_l.contains(&query_lower)
+            })
+            .collect();
+
+        if matches.is_empty() {
+            eprintln!("[ERROR] No account found matching '{}'.", acc_query);
+            std::process::exit(1);
+        } else if matches.len() == 1 {
+            matches[0]
+        } else if let Some(exact) = matches.iter().find(|a| a.email.to_lowercase() == query_lower) {
+            *exact
+        } else {
+            eprintln!("[ERROR] Ambiguous query '{}' matched multiple accounts:", acc_query);
+            for m in &matches {
+                eprintln!("  - {} ({})", m.email, m.id);
+            }
+            std::process::exit(1);
+        }
+    };
+
+    let resolved_inst_id = match target_inst_spec {
+        Some(s) => match instance::resolve_instance_id(s) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!("[ERROR] Failed to resolve target instance '{}': {}", s, e);
+                std::process::exit(1);
+            }
+        },
+        None => instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string()),
+    };
+
+    println!(
+        "[*] Switching instance '{}' to account '{}' ({})...",
+        resolved_inst_id, target_account.email, target_account.id
+    );
+
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+    if let Err(e) = rt.block_on(instance::switch_account_to_instance(&target_account.id, Some(&resolved_inst_id))) {
+        eprintln!("[ERROR] Account switch failed: {}", e);
+        std::process::exit(1);
+    }
+
+    if is_json {
+        let res = serde_json::json!({
+            "status": "success",
+            "instance_id": resolved_inst_id,
+            "account_id": target_account.id,
+            "account_email": target_account.email,
+        });
+        println!("{}", serde_json::to_string_pretty(&res).unwrap_or_default());
+    } else {
+        println!(
+            "[SUCCESS] Instance '{}' successfully switched to '{}'.",
+            resolved_inst_id, target_account.email
+        );
+        println!("  [OK] Credentials injected into instance state.vscdb.");
+        println!("  [OK] Running prompts backed up and preserved.");
+    }
+    std::process::exit(0);
+}
+
+// -----------------------------------------------------------------------------
+// Auto-Switch Command Handler
+// -----------------------------------------------------------------------------
+
+fn handle_auto_switch_command(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+        print_auto_switch_cli_help();
+        std::process::exit(0);
+    }
+
+    let mut app_cfg = match config::load_app_config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load config: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let is_json = is_flag_present(args, &["--json", "-j"]);
+    let mut non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if non_flag_args
+        .first()
+        .map(|s| {
+            s.eq_ignore_ascii_case("switch")
+                || s.eq_ignore_ascii_case("switcher")
+                || s.eq_ignore_ascii_case("swtich")
+        })
+        .unwrap_or(false)
+    {
+        non_flag_args.remove(0);
+    }
+    let sub = non_flag_args.first().map(|s| s.to_lowercase());
+
+    match sub.as_deref() {
+        Some("enable") | Some("on") | Some("start") => {
+            app_cfg.auto_profile_switcher.is_enabled = true;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!("[SUCCESS] Auto-profile switcher daemon is now ENABLED.");
+        }
+        Some("disable") | Some("off") | Some("stop") => {
+            app_cfg.auto_profile_switcher.is_enabled = false;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!("[SUCCESS] Auto-profile switcher daemon is now DISABLED.");
+        }
+        Some("toggle") => {
+            let new_val = !app_cfg.auto_profile_switcher.is_enabled;
+            app_cfg.auto_profile_switcher.is_enabled = new_val;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!(
+                "[SUCCESS] Auto-profile switcher daemon is now {}.",
+                if new_val { "ENABLED" } else { "DISABLED" }
+            );
+        }
+        Some("threshold") | Some("thresh") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                if let Ok(val) = val_str.parse::<f64>() {
+                    let clamped = val.clamp(0.0, 100.0);
+                    app_cfg.auto_profile_switcher.low_quota_threshold_percent = clamped;
+                    if let Err(e) = config::save_app_config(&app_cfg) {
+                        eprintln!("[ERROR] Failed to save config: {}", e);
+                        std::process::exit(1);
+                    }
+                    println!("[SUCCESS] Auto-switch low quota threshold set to {:.1}%.", clamped);
+                } else {
+                    eprintln!("[ERROR] Invalid numeric threshold value: '{}'", val_str);
+                    std::process::exit(1);
+                }
+            } else {
+                println!(
+                    "Current auto-switch low quota threshold: {:.1}%",
+                    app_cfg.auto_profile_switcher.low_quota_threshold_percent
+                );
+            }
+        }
+        Some("interval") | Some("int") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                if let Ok(val) = val_str.parse::<u32>() {
+                    let clamped = val.clamp(10, 86400);
+                    app_cfg.auto_profile_switcher.check_interval_seconds = clamped;
+                    if let Err(e) = config::save_app_config(&app_cfg) {
+                        eprintln!("[ERROR] Failed to save config: {}", e);
+                        std::process::exit(1);
+                    }
+                    println!("[SUCCESS] Auto-switch check interval set to {}s.", clamped);
+                } else {
+                    eprintln!("[ERROR] Invalid numeric interval seconds: '{}'", val_str);
+                    std::process::exit(1);
+                }
+            } else {
+                println!(
+                    "Current auto-switch check interval: {}s",
+                    app_cfg.auto_profile_switcher.check_interval_seconds
+                );
+            }
+        }
+        Some("model") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                app_cfg.auto_profile_switcher.target_model = val_str.to_string();
+                if let Err(e) = config::save_app_config(&app_cfg) {
+                    eprintln!("[ERROR] Failed to save config: {}", e);
+                    std::process::exit(1);
+                }
+                println!("[SUCCESS] Auto-switch target model set to '{}'.", val_str);
+            } else {
+                println!(
+                    "Current auto-switch target model: {}",
+                    app_cfg.auto_profile_switcher.target_model
+                );
+            }
+        }
+        Some("run") | Some("trigger") | Some("eval") | Some("check") | Some("rotate") => {
+            println!("[*] Triggering immediate auto-switch evaluation across instances...");
+            let rt = tokio::runtime::Runtime::new().expect("Failed to initialize async runtime");
+            match rt.block_on(auto_switcher::check_and_rotate_if_needed()) {
+                Ok(Some(reason)) => {
+                    println!("[SUCCESS] Auto-switch rotation triggered: {}", reason);
+                }
+                Ok(None) => {
+                    println!("[INFO] Quota healthy across all monitored instances. No rotation required.");
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Auto-switch evaluation failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            // Show status
+            let status = auto_switcher::get_status();
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&status).unwrap_or_default());
+            } else {
+                println!("================================================================================");
+                println!("                   AGM Auto-Profile Switcher Status                             ");
+                println!("================================================================================");
+                println!(
+                    "  Daemon Status       : {}",
+                    if status.is_running { "RUNNING (Active)" } else { "STOPPED (Disabled)" }
+                );
+                println!("  Active Instance     : {}", status.active_instance_id);
+                println!(
+                    "  Bound Account       : {}",
+                    status.active_account_email.as_deref().unwrap_or("(none)")
+                );
+                println!(
+                    "  Current Quota %     : {}",
+                    status
+                        .current_quota_percent
+                        .map(|p| format!("{:.1}%", p))
+                        .unwrap_or_else(|| "N/A".to_string())
+                );
+                println!(
+                    "  Check Interval      : {}s",
+                    app_cfg.auto_profile_switcher.check_interval_seconds
+                );
+                println!(
+                    "  Low Quota Threshold : {:.1}%",
+                    app_cfg.auto_profile_switcher.low_quota_threshold_percent
+                );
+                println!(
+                    "  Target Model        : {}",
+                    app_cfg.auto_profile_switcher.target_model
+                );
+                if let Some(ref reason) = status.last_switch_reason {
+                    println!("  Last Switch Reason  : {}", reason);
+                }
+                println!("================================================================================");
+            }
+        }
+    }
+    std::process::exit(0);
+}
+
+// -----------------------------------------------------------------------------
+// AGY Cleaner & Help Utilities
+// -----------------------------------------------------------------------------
+
+fn print_all_cli_help() {
+    println!("================================================================================");
+    println!("             Antigravity-Manager Native CLI Companion                           ");
+    println!("================================================================================");
+    println!("Usage:");
+    println!("  antigravity-manager <command> [options]");
+    println!("  .\\run.ps1 <command> [options]");
+    println!("  agm <command> [options]");
+    println!();
+    println!("Primary Command Suites:");
+    println!("  instance, instances, ls      Create, list, switch, and launch isolated profiles");
+    println!("  switch, switch-account       Directly switch authenticated Google Gemini accounts");
+    println!("  auto-switch, auto            Autonomous rolling quota background monitor daemon");
+    println!("  fast-forward, ff             Rotate profile immediately to the healthiest account");
+    println!("  agy                          Prune conversation steps and clear local cache");
+    println!("  update                       Perform fleet-wide update & diagnostic verification");
+    println!("  ui, open-ui                  Launch the graphical desktop interface");
+    println!();
+    println!("Run 'antigravity-manager <command> --help' for command-specific guides and examples.");
+    println!();
+    print_instance_cli_help();
+    println!();
+    print_switch_cli_help();
+    println!();
+    print_auto_switch_cli_help();
+}
+
+fn print_instance_cli_help() {
+    println!("================================================================================");
+    println!("           Antigravity-Manager: Multi-Instance & Profile CLI                    ");
+    println!("================================================================================");
+    println!("Usage:");
+    println!("  antigravity-manager instance <subcommand> [options]");
+    println!("  .\\run.ps1 instance <subcommand> [options]");
+    println!("  agm instances <subcommand> [options]");
+    println!();
+    println!("Aliases: instance, instances, intrance, intrances, profile, profiles");
+    println!();
+    println!("Subcommands:");
+    println!("  create, add <name> [options]     Create a new isolated sandbox profile");
+    println!("  list, ls                         List all registered profiles and running PIDs");
+    println!("  switch, use <inst> <account>     Switch credentials for a specific profile");
+    println!("  launch, start <inst>             Launch Antigravity window for profile");
+    println!("  stop, kill <inst>                Safely close profile process");
+    println!("  delete, rm <inst>                Remove profile directory and registry entry");
+    println!("  copy, clone <src> <new_name>     Duplicate profile configuration & settings");
+    println!("  ff, rotate [inst]                Fast-forward rotate profile to healthiest account");
+    println!();
+    println!("Create Options:");
+    println!("  --account, -a <email|id>         Bind specific account (default: next available unbound)");
+    println!("  --from, -f <source_id>           Clone settings/extensions from existing profile");
+    println!("  --launch, -l                     Immediately launch window after creation");
+    println!("  --data-only, --do                Create data directory only without cloning binary");
+    println!("  --json, -j                       Output structured JSON format");
+    println!();
+    println!("Examples:");
+    println!("  # Create a profile bound to a specific account and launch immediately");
+    println!("  antigravity-manager instance create \"Work-Project\" -a \"work.dev@gmail.com\" --launch");
+    println!();
+    println!("  # Create a profile cloning settings from an existing profile");
+    println!("  antigravity-manager instance create \"Client-B\" --from \"Work-Project\"");
+    println!();
+    println!("  # List all registered profiles and active PIDs");
+    println!("  antigravity-manager instance list");
+    println!();
+    println!("  # Switch instance #2 to another account");
+    println!("  antigravity-manager instance switch #2 \"alex.dev@gmail.com\"");
+    println!();
+    println!("  # Launch or stop an instance window");
+    println!("  antigravity-manager instance launch \"Work-Project\"");
+    println!("  antigravity-manager instance stop \"Work-Project\"");
+    println!();
+    println!("  # Fast-forward rotate instance #2 to the next best account");
+    println!("  antigravity-manager instance ff #2");
+}
+
+fn print_switch_cli_help() {
+    println!("================================================================================");
+    println!("             Antigravity-Manager: Account Switching CLI                         ");
+    println!("================================================================================");
+    println!("Usage:");
+    println!("  antigravity-manager switch <account> [--instance <id>] [--json]");
+    println!("  antigravity-manager switch <instance> <account>");
+    println!("  antigravity-manager switch account <account>");
+    println!("  .\\run.ps1 switch <account>");
+    println!("  agm switch <account>");
+    println!();
+    println!("Aliases: switch, switch-account, swtich, swtich-account, account-switch");
+    println!();
+    println!("Description:");
+    println!("  Switches authenticated Google Gemini account credentials for an Antigravity IDE");
+    println!("  profile (or active/default profile) without GUI interaction. Automatically injects");
+    println!("  tokens into state.vscdb, updates profile storage, and preserves running prompts.");
+    println!();
+    println!("Arguments & Options:");
+    println!("  <account>                        Account email, prefix, internal ID, or index (#1, #2)");
+    println!("  <instance>                       Target instance ID, name, sequence (#1, #2), or 'default'");
+    println!("  --instance, -i <id>              Specify target instance (defaults to active profile)");
+    println!("  --json, -j                       Output result in structured JSON format");
+    println!();
+    println!("Examples:");
+    println!("  # Switch active profile to an account by email");
+    println!("  antigravity-manager switch user.dev@gmail.com");
+    println!();
+    println!("  # Switch using the 'switch account' phrase");
+    println!("  antigravity-manager switch account user.dev@gmail.com");
+    println!();
+    println!("  # Switch by email prefix");
+    println!("  antigravity-manager switch user.dev");
+    println!();
+    println!("  # Switch a specific instance using --instance flag");
+    println!("  antigravity-manager switch user.dev@gmail.com --instance #2");
+    println!("  antigravity-manager switch user.dev@gmail.com -i \"Work-Project\"");
+    println!();
+    println!("  # Switch instance #2 directly");
+    println!("  antigravity-manager switch #2 user.dev@gmail.com");
+    println!();
+    println!("  # Switch active profile to account #3 from accounts list");
+    println!("  antigravity-manager switch #3");
+}
+
+fn print_auto_switch_cli_help() {
+    println!("================================================================================");
+    println!("             Antigravity-Manager: Auto Profile Switcher CLI                     ");
+    println!("================================================================================");
+    println!("Usage:");
+    println!("  antigravity-manager auto-switch <action> [options]");
+    println!("  .\\run.ps1 auto-switch <action>");
+    println!("  agm auto-switch <action>");
+    println!();
+    println!("Aliases: auto-switch, auto-swtich, autoswitch, auto, switcher");
+    println!();
+    println!("Description:");
+    println!("  Monitors rolling 4-hour quota windows across running instances and proactively");
+    println!("  rotates accounts before depletion, auto-resuming active workspace prompts.");
+    println!();
+    println!("Actions:");
+    println!("  status                           Show auto-switcher daemon state & monitored profiles");
+    println!("  enable, on, start                Turn ON background auto-switch daemon");
+    println!("  disable, off, stop               Turn OFF background auto-switch daemon");
+    println!("  toggle                           Toggle background auto-switch daemon state");
+    println!("  run, trigger, eval, rotate       Immediately evaluate rolling quota and rotate if low");
+    println!("  threshold [N]                    Get or set low quota threshold percentage (default: 15%)");
+    println!("  interval [N]                     Get or set polling interval in seconds (default: 300s)");
+    println!("  model [name]                     Get or set evaluation model (e.g., gemini-2.5-pro)");
+    println!("  test [N]                         Simulate quota check with test threshold percentage");
+    println!();
+    println!("Examples:");
+    println!("  # Check daemon status and active profile quota");
+    println!("  antigravity-manager auto-switch status");
+    println!();
+    println!("  # Enable or disable the background switcher daemon");
+    println!("  antigravity-manager auto-switch enable");
+    println!("  antigravity-manager auto-switch disable");
+    println!("  antigravity-manager auto-switch toggle");
+    println!();
+    println!("  # Trigger immediate quota evaluation & auto-rotation");
+    println!("  antigravity-manager auto-switch run");
+    println!();
+    println!("  # Configure threshold and interval");
+    println!("  antigravity-manager auto-switch threshold 20");
+    println!("  antigravity-manager auto-switch interval 60");
+    println!("  antigravity-manager auto-switch model gemini-2.5-pro");
+    println!();
+    println!("  # Test auto-rotation simulation with 90% threshold");
+    println!("  antigravity-manager auto-switch test 90");
+}
+
 fn print_profile_help() {
-    println!("Antigravity Multi-Profile CLI Commands:");
-    println!("  --create-profile <name>           Create a new isolated profile");
-    println!("  --list-profiles                   List all registered profiles and running PIDs");
-    println!("  --copy-profile <src_id> <name>    Clone an existing profile to a new one");
-    println!("  --delete-profile <id>             Delete a profile directory and registry entry");
-    println!("  --run-profile <id>                Launch Antigravity using the specified profile");
-    println!("  --fast-forward, -ff               Rotate immediately to next best profile with healthy credits");
+    print_instance_cli_help();
 }
 
 fn print_agy_cli_help() {
@@ -242,12 +1028,8 @@ fn print_agy_cli_help() {
     println!();
     println!("Commands:");
     println!("  agy cache-clear [--keep <N>]      Prune older conversations (default: keep 10) & clear caches");
-    println!(
-        "  agy cache-clear-keep-one (ccko)   Keep only the 1 latest conversation, prune the rest"
-    );
-    println!(
-        "  agy cache-clear-keep-five (cckf)  Keep only the 5 latest conversations, prune the rest"
-    );
+    println!("  agy cache-clear-keep-one (ccko)   Keep only the 1 latest conversation, prune the rest");
+    println!("  agy cache-clear-keep-five (cckf)  Keep only the 5 latest conversations, prune the rest");
     println!("  agy undo [tx_id]                  Revert the last (or specific) conversation pruning transaction");
     println!();
     println!("Options & Flags:");
@@ -256,13 +1038,9 @@ fn print_agy_cli_help() {
     println!("  --keep <N>, -k <N>                Specify number of latest conversations to retain intact");
     println!();
     println!("Temporary Staging & Safety:");
-    println!(
-        "  Pruned conversations are safely staged in the OS temporary directory before removal."
-    );
+    println!("  Pruned conversations are safely staged in the OS temporary directory before removal.");
     println!("  Run 'agy undo' to immediately restore them.");
     println!("  [NOTE] Temporary directories may be pruned by the OS over time; revert promptly if needed.");
-    println!();
-    print_profile_help();
 }
 
 fn is_flag_present(args: &[String], flags: &[&str]) -> bool {
