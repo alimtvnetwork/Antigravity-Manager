@@ -582,6 +582,36 @@ pub fn create_instance_with_account(
             let storage_path = db_dir.join("storage.json");
             let _ = crate::modules::device::write_profile(&storage_path, &profile);
             let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+
+            #[cfg(target_os = "windows")]
+            {
+                let appdata_db_dir = instance_data_dir
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                let _ = fs::create_dir_all(&appdata_db_dir);
+                let appdata_db_path = appdata_db_dir.join("state.vscdb");
+                let _ = crate::modules::db::inject_token(
+                    &appdata_db_path,
+                    &acc.token.access_token,
+                    &acc.token.refresh_token,
+                    acc.token.expiry_timestamp,
+                    &acc.email,
+                    acc.token.is_gcp_tos,
+                    acc.token.project_id.as_deref(),
+                    acc.token.id_token.as_deref(),
+                    acc.token.oauth_client_key.as_deref(),
+                    None,
+                );
+                let storage_path = appdata_db_dir.join("storage.json");
+                let _ = crate::modules::device::write_profile(&storage_path, &profile);
+                let _ = crate::modules::db::write_service_machine_id(
+                    &appdata_db_path,
+                    &profile.mac_machine_id,
+                );
+            }
         }
     }
 
@@ -693,6 +723,36 @@ pub fn copy_instance(
                         &cloned_db,
                         &profile.mac_machine_id,
                     );
+
+                    #[cfg(target_os = "windows")]
+                    {
+                        let appdata_db_dir = dst_path
+                            .join("AppData")
+                            .join("Roaming")
+                            .join("Antigravity")
+                            .join("User")
+                            .join("globalStorage");
+                        let _ = fs::create_dir_all(&appdata_db_dir);
+                        let appdata_db_path = appdata_db_dir.join("state.vscdb");
+                        let _ = crate::modules::db::inject_token(
+                            &appdata_db_path,
+                            &acc.token.access_token,
+                            &acc.token.refresh_token,
+                            acc.token.expiry_timestamp,
+                            &acc.email,
+                            acc.token.is_gcp_tos,
+                            acc.token.project_id.as_deref(),
+                            acc.token.id_token.as_deref(),
+                            acc.token.oauth_client_key.as_deref(),
+                            None,
+                        );
+                        let storage_path = appdata_db_dir.join("storage.json");
+                        let _ = crate::modules::device::write_profile(&storage_path, &profile);
+                        let _ = crate::modules::db::write_service_machine_id(
+                            &appdata_db_path,
+                            &profile.mac_machine_id,
+                        );
+                    }
                 }
             }
         }
@@ -1134,6 +1194,38 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             let _ = crate::modules::device::write_profile(&storage_path, profile);
         }
 
+        #[cfg(target_os = "windows")]
+        if !is_default {
+            let appdata_db_dir = target_data_path
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage");
+            let _ = fs::create_dir_all(&appdata_db_dir);
+            let appdata_db_path = appdata_db_dir.join("state.vscdb");
+            let _ = crate::modules::db::inject_token(
+                &appdata_db_path,
+                &account.token.access_token,
+                &account.token.refresh_token,
+                account.token.expiry_timestamp,
+                &account.email,
+                account.token.is_gcp_tos,
+                account.token.project_id.as_deref(),
+                account.token.id_token.as_deref(),
+                account.token.oauth_client_key.as_deref(),
+                None,
+            );
+            if let Some(ref profile) = account.device_profile {
+                let _ = crate::modules::db::write_service_machine_id(
+                    &appdata_db_path,
+                    &profile.mac_machine_id,
+                );
+                let storage_path = appdata_db_dir.join("storage.json");
+                let _ = crate::modules::device::write_profile(&storage_path, profile);
+            }
+        }
+
         // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
         let local_storage = target_data_path.join("Local Storage");
         if local_storage.exists() {
@@ -1163,6 +1255,8 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                 let _ = fs::create_dir_all(&inst_home);
                 cmd.env("HOME", &inst_home);
             }
+            cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+            cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1242,12 +1336,20 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                         cmd.env("HOMEDRIVE", &home_str[..2]);
                         cmd.env("HOMEPATH", &home_str[2..]);
                     }
+                    let appdata_dir = PathBuf::from(&data_dir).join("AppData").join("Roaming");
+                    let localappdata_dir = PathBuf::from(&data_dir).join("AppData").join("Local");
+                    let _ = fs::create_dir_all(&appdata_dir);
+                    let _ = fs::create_dir_all(&localappdata_dir);
+                    cmd.env("APPDATA", &appdata_dir.to_string_lossy().to_string());
+                    cmd.env("LOCALAPPDATA", &localappdata_dir.to_string_lossy().to_string());
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
                     cmd.env("HOME", &inst_home);
                 }
             }
+            cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+            cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1489,6 +1591,16 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     if !is_default_inst {
         let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
         let clean_data = norm_data.trim_end_matches('/');
+        let inst_id_lower = instance_id.to_lowercase();
+        let inst_marker_slash = format!("instances/{}", inst_id_lower);
+        let inst_marker_bslash = format!("instances\\{}", inst_id_lower);
+
+        let matches_instance = |args: &str| -> bool {
+            args.contains(clean_data)
+                || args.contains(&inst_marker_slash)
+                || args.contains(&inst_marker_bslash)
+        };
+
         pids.retain(|&pid| {
             if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
                 let args_str = proc
@@ -1497,12 +1609,19 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                     .collect::<Vec<String>>()
                     .join(" ");
-                if args_str.contains(clean_data) {
+
+                if matches_instance(&args_str) {
                     return true;
                 }
+
+                // Check ancestors in process tree
                 let mut curr = pid;
                 for _ in 0..10 {
-                    if let Some(p) = system.process(sysinfo::Pid::from_u32(curr)).and_then(|pr| pr.parent()).map(|pp| pp.as_u32()) {
+                    if let Some(p) = system
+                        .process(sysinfo::Pid::from_u32(curr))
+                        .and_then(|pr| pr.parent())
+                        .map(|pp| pp.as_u32())
+                    {
                         if let Some(parent_proc) = system.process(sysinfo::Pid::from_u32(p)) {
                             let parent_args = parent_proc
                                 .cmd()
@@ -1510,7 +1629,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                                 .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                                 .collect::<Vec<String>>()
                                 .join(" ");
-                            if parent_args.contains(clean_data) {
+                            if matches_instance(&parent_args) {
                                 return true;
                             }
                         }
@@ -1519,6 +1638,11 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                         break;
                     }
                 }
+
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Safety filter: PID {} rejected from close list for instance '{}' because process arguments do not match instance data_dir",
+                    pid, instance_id
+                ));
                 false
             } else {
                 false
@@ -1932,6 +2056,38 @@ pub async fn switch_account_to_instance(
         let instance_storage_path = db_dir.join("storage.json");
         if let Some(ref profile) = acc.device_profile {
             let _ = crate::modules::device::write_profile(&instance_storage_path, profile);
+        }
+
+        #[cfg(target_os = "windows")]
+        if !is_default_inst {
+            let appdata_db_dir = PathBuf::from(&instance.data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage");
+            let _ = fs::create_dir_all(&appdata_db_dir);
+            let appdata_db_path = appdata_db_dir.join("state.vscdb");
+            let _ = crate::modules::db::inject_token(
+                &appdata_db_path,
+                &acc.token.access_token,
+                &acc.token.refresh_token,
+                acc.token.expiry_timestamp,
+                &acc.email,
+                acc.token.is_gcp_tos,
+                acc.token.project_id.as_deref(),
+                acc.token.id_token.as_deref(),
+                acc.token.oauth_client_key.as_deref(),
+                None,
+            );
+            if let Some(ref profile) = acc.device_profile {
+                let _ = crate::modules::db::write_service_machine_id(
+                    &appdata_db_path,
+                    &profile.mac_machine_id,
+                );
+                let storage_path = appdata_db_dir.join("storage.json");
+                let _ = crate::modules::device::write_profile(&storage_path, profile);
+            }
         }
 
         // Clean any stale Session Storage / Local Storage in the instance data directory

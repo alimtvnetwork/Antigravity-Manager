@@ -428,9 +428,9 @@ pub fn clean_for_telegram_html(input: &str, max_chars: usize) -> String {
     }
 
     let truncated: String = if no_ansi.chars().count() > max_chars {
-        let mut s: String = no_ansi.chars().take(max_chars).collect();
-        s.push_str("...");
-        s
+        let trimmed_slice: String = no_ansi.chars().take(max_chars).collect();
+        let base = trimmed_slice.trim_end_matches('.');
+        format!("{}...", base.trim_end())
     } else {
         no_ansi
     };
@@ -628,7 +628,7 @@ pub fn format_observe_report() -> String {
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
                 if !clean.is_empty() {
-                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
+                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
                 }
                 let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
@@ -651,7 +651,7 @@ pub fn format_observe_report() -> String {
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let clean = repo_db::extract_smart_prompt_summary(txt, 90);
                 if !clean.is_empty() {
-                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
+                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
                 }
                 running_items.push(block);
             } else if !running_workspace_names.contains(&short_name) {
@@ -684,7 +684,7 @@ pub fn format_observe_report() -> String {
         let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
         let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
         if !clean.is_empty() {
-            block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
+            block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
         }
         let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
         block.push_str(&format!(
@@ -726,14 +726,14 @@ pub fn format_observe_report() -> String {
         {}\n\
         💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
         clean_for_telegram_html(&ver, 24),
-        clean_for_telegram_html(&machine_name, 48),
-        clean_for_telegram_html(&display_alias, 48),
+        clean_for_telegram_html(&machine_name, 64),
+        clean_for_telegram_html(&display_alias, 64),
         clean_for_telegram_html(&local_ip, 48),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
-        clean_for_telegram_html(&active_email, 48),
+        clean_for_telegram_html(&active_email, 96),
         total_accounts,
-        clean_for_telegram_html(&quota_summary, 64),
+        clean_for_telegram_html(&quota_summary, 128),
         body_sections
     )
 }
@@ -2863,6 +2863,13 @@ mod tests {
         let cleaned = clean_for_telegram_html(input, 20);
         assert!(cleaned.ends_with("..."));
         assert!(!cleaned.contains("\n... [truncated]"));
+        assert!(!cleaned.ends_with("...."));
+
+        // Verify that strings ending with dots do not produce stacked dots (e.g. .....)
+        let with_dots = "Prompt ending with dots...";
+        let cleaned_dots = clean_for_telegram_html(with_dots, 25);
+        assert!(cleaned_dots.ends_with("..."));
+        assert!(!cleaned_dots.ends_with("...."));
     }
 
     #[test]

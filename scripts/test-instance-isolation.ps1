@@ -7,7 +7,15 @@ Write-Host "==========================================================" -Foregro
 
 $agmExe = "D:\work\Antigravity-Manager\src-tauri\target\debug\agm.exe"
 if (-not (Test-Path $agmExe)) {
-    throw "agm.exe not found at $agmExe"
+    $cmd = Get-Command "agm" -ErrorAction SilentlyContinue
+    if (-not $cmd) {
+        $cmd = Get-Command "adm" -ErrorAction SilentlyContinue
+    }
+    if ($cmd) {
+        $agmExe = $cmd.Source
+    } else {
+        throw "agm.exe not found at $agmExe or on PATH"
+    }
 }
 
 # 1. Verify default session PID 7872 is running and protected

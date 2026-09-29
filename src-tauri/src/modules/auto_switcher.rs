@@ -929,6 +929,34 @@ pub fn select_candidate_profiles(
         }
     }
 
+    // If no candidate met the 100% or period-finished criteria, fall back to best available accounts above threshold
+    if candidates.is_empty() {
+        for acc in &all_accounts {
+            if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
+                continue;
+            }
+            if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
+                continue;
+            }
+            if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+                &acc.id, &acc.email,
+            ) {
+                continue;
+            }
+            let quota = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
+            if quota > threshold {
+                let score = quota / 100.0;
+                candidates.push(ProfileCandidate {
+                    instance_id: current_instance_id.to_string(),
+                    account_id: acc.id.clone(),
+                    email: acc.email.clone(),
+                    quota_percent: quota,
+                    score,
+                });
+            }
+        }
+    }
+
     // Priority Sorting:
     // Sort all verified candidates by subscription tier score descending (Ultra > Pro > Free).
     // Tie-breaker: deterministic email ordering.
@@ -982,6 +1010,9 @@ pub async fn select_and_verify_next_best_profile(
         );
         return Ok(None);
     }
+
+    let mut best_fallback: Option<ProfileCandidate> = None;
+    let mut highest_fallback_quota: f64 = 0.0;
 
     for candidate in candidates {
         logger::log_info(&format!(
@@ -1058,7 +1089,6 @@ pub async fn select_and_verify_next_best_profile(
         };
 
         // Strict 100% requirement for 4-hour window:
-        // Any account with < 100% is strictly treated as exhausted (0.0%). We do NOT touch it!
         if fresh_4h_quota >= 100.0 {
             logger::log_info(&format!(
                 "[AutoSwitcher] Candidate '{}' confirmed with 100.0% quota for 4h window. Selected for switch!",
@@ -1072,16 +1102,33 @@ pub async fn select_and_verify_next_best_profile(
                 score: candidate.score,
             }));
         } else {
-            logger::log_warn(&format!(
-                "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Strictly rejecting (<100% is treated as exhausted). Checking next candidate in pool...",
+            logger::log_info(&format!(
+                "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Staging as fallback candidate...",
                 candidate.email, fresh_4h_quota
             ));
-            // DO NOT fallback to < 100% accounts under any circumstances!
+            if fresh_4h_quota > threshold && fresh_4h_quota > highest_fallback_quota {
+                highest_fallback_quota = fresh_4h_quota;
+                best_fallback = Some(ProfileCandidate {
+                    instance_id: candidate.instance_id,
+                    account_id: candidate.account_id,
+                    email: candidate.email,
+                    quota_percent: fresh_4h_quota,
+                    score: candidate.score,
+                });
+            }
         }
     }
 
+    if let Some(fallback) = best_fallback {
+        logger::log_info(&format!(
+            "[AutoSwitcher] No 100.0% quota profile found; selecting best available candidate '{}' with {:.1}% quota.",
+            fallback.email, fallback.quota_percent
+        ));
+        return Ok(Some(fallback));
+    }
+
     logger::log_warn(
-        "[AutoSwitcher] All candidate profiles examined. Zero profiles verified at 100.0% 4-hour quota. Aborting rotation.",
+        "[AutoSwitcher] All candidate profiles examined. Zero profiles verified with usable quota. Aborting rotation.",
     );
     Ok(None)
 }

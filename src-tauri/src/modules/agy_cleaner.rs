@@ -101,7 +101,6 @@ pub fn get_gemini_candidate_dirs() -> Vec<PathBuf> {
                 dirs_list.push(p);
             }
         }
-    }
     if let Ok(reg) = crate::modules::instance::load_registry() {
         for inst in reg.instances {
             if !inst.is_default && inst.id != "default" {

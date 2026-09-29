@@ -517,24 +517,47 @@ pub fn restore_running_prompts_for_instance(
     let conn = connect_backup_db(custom_file)?;
     let now = Utc::now().timestamp();
 
-    // Query unrestored prompts scoped to target instance
-    let mut stmt = conn
-        .prepare(
+    // Query unrestored prompts scoped strictly to target instance
+    let is_target_default = target_inst == "default" || target_inst == "__default__";
+    let (query, update_query) = if is_target_default {
+        (
             "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                     conversation_id, conversation_name, sequence_id, prompt_text, has_images,
                     images_payload, status, created_at, is_restored, restored_at, instance_id
              FROM prompt_backups 
              WHERE is_restored = 0
-               AND (instance_id = ?1 OR instance_id IS NULL OR instance_id = '' OR (?1 = 'default' AND instance_id = 'default'))
+               AND (instance_id = 'default' OR instance_id IS NULL OR instance_id = '')
              ORDER BY created_at ASC, sequence_id ASC",
+            "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND (instance_id = 'default' OR instance_id IS NULL OR instance_id = '')",
         )
+    } else {
+        (
+            "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
+                    conversation_id, conversation_name, sequence_id, prompt_text, has_images,
+                    images_payload, status, created_at, is_restored, restored_at, instance_id
+             FROM prompt_backups 
+             WHERE is_restored = 0
+               AND instance_id = ?1
+             ORDER BY created_at ASC, sequence_id ASC",
+            "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND instance_id = ?2",
+        )
+    };
+
+    let mut stmt = conn
+        .prepare(query)
         .map_err(|e| format!("Failed to prepare restore query: {}", e))?;
 
-    let records: Vec<PromptBackupRecord> = stmt
-        .query_map(params![target_inst], |row| parse_prompt_record(row))
-        .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
-        .flatten()
-        .collect();
+    let records: Vec<PromptBackupRecord> = if is_target_default {
+        stmt.query_map([], |row| parse_prompt_record(row))
+            .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
+            .flatten()
+            .collect()
+    } else {
+        stmt.query_map(params![target_inst], |row| parse_prompt_record(row))
+            .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
+            .flatten()
+            .collect()
+    };
 
     // Reset dispatched prompts cache to allow restored prompts to execute post-switch
     repo_db::reset_dispatched_prompts_cache();
@@ -559,10 +582,11 @@ pub fn restore_running_prompts_for_instance(
     }
 
     if !keep_backup && !records.is_empty() {
-        let _ = conn.execute(
-            "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND (instance_id = ?2 OR instance_id IS NULL OR instance_id = '' OR (?2 = 'default' AND instance_id = 'default'))",
-            params![now, target_inst],
-        );
+        if is_target_default {
+            let _ = conn.execute(update_query, params![now]);
+        } else {
+            let _ = conn.execute(update_query, params![now, target_inst]);
+        }
         let _ = conn.execute(
             "UPDATE backup_batches SET is_fully_restored = 1 WHERE id IN (
                 SELECT backup_batch_id FROM prompt_backups GROUP BY backup_batch_id HAVING min(is_restored) = 1

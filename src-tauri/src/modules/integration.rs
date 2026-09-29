@@ -785,13 +785,17 @@ pub fn write_to_file_credentials_at(
     }
 
     // Sync jetski-standalone-oauth-token in ~/.gemini for Go language_server worker fallback
+    let mut token_obj = serde_json::json!({
+        "access_token": account.token.access_token,
+        "token_type": "Bearer",
+        "refresh_token": account.token.refresh_token,
+        "expiry": expiry_rfc3339,
+    });
+    if let Some(ref id_tok) = account.token.id_token {
+        token_obj["id_token"] = serde_json::Value::String(id_tok.clone());
+    }
     let jetski_payload = serde_json::json!({
-        "token": {
-            "access_token": account.token.access_token,
-            "token_type": "Bearer",
-            "refresh_token": account.token.refresh_token,
-            "expiry": expiry_rfc3339,
-        },
+        "token": token_obj,
         "auth_method": "consumer"
     });
     let jetski_path = gemini_dir.join("jetski-standalone-oauth-token");
