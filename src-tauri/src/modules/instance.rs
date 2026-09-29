@@ -1304,14 +1304,15 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
                 // Ensure app_storage.json has ide-install-wizard-shown: true to skip onboarding wizard
                 let app_storage_file = target_data_path.join("app_storage.json");
-                let mut map: serde_json::Map<String, serde_json::Value> = if app_storage_file.exists() {
-                    fs::read_to_string(&app_storage_file)
-                        .ok()
-                        .and_then(|s| serde_json::from_str(&s).ok())
-                        .unwrap_or_default()
-                } else {
-                    serde_json::Map::new()
-                };
+                let mut map: serde_json::Map<String, serde_json::Value> =
+                    if app_storage_file.exists() {
+                        fs::read_to_string(&app_storage_file)
+                            .ok()
+                            .and_then(|s| serde_json::from_str(&s).ok())
+                            .unwrap_or_default()
+                    } else {
+                        serde_json::Map::new()
+                    };
                 map.insert(
                     "ide-install-wizard-shown".to_string(),
                     serde_json::Value::String("true".to_string()),
@@ -1341,7 +1342,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                     let _ = fs::create_dir_all(&appdata_dir);
                     let _ = fs::create_dir_all(&localappdata_dir);
                     cmd.env("APPDATA", &appdata_dir.to_string_lossy().to_string());
-                    cmd.env("LOCALAPPDATA", &localappdata_dir.to_string_lossy().to_string());
+                    cmd.env(
+                        "LOCALAPPDATA",
+                        &localappdata_dir.to_string_lossy().to_string(),
+                    );
                 }
                 #[cfg(not(target_os = "windows"))]
                 {

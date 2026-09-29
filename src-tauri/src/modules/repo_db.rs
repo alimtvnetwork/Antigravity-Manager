@@ -385,7 +385,11 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
     let mut prompts = Vec::new();
     let mut seen_cids = std::collections::HashSet::new();
     let mut candidate_dirs = Vec::new();
-    if instance_id != "all" && instance_id != "default" && !instance_id.is_empty() && instance_id != "__default__" {
+    if instance_id != "all"
+        && instance_id != "default"
+        && !instance_id.is_empty()
+        && instance_id != "__default__"
+    {
         if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(instance_id) {
             for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
                 let p = inst_home.join(".gemini").join(sub);
