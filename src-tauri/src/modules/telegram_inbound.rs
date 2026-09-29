@@ -181,6 +181,7 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
             { "command": "ping", "description": "Verify node connectivity, IP, Git version & uptime" },
             { "command": "status", "description": "Full node, account quota & proxy status" },
             { "command": "observe", "description": "Inspect live workspaces & running prompt queues" },
+            { "command": "expand", "description": "Display full prompt instructions by ID (/expand <id>)" },
             { "command": "gitmap", "description": "Run GitMap CLI command (e.g. /gitmap agy active)" },
             { "command": "agm", "description": "Run AGM CLI command (e.g. /agm tree, /agm update)" },
             { "command": "api", "description": "Query local API proxy status & account bindings" },
@@ -627,7 +628,7 @@ pub fn format_observe_report() -> String {
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
                 if !clean.is_empty() {
-                    block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
+                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
                 }
                 let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
@@ -650,7 +651,7 @@ pub fn format_observe_report() -> String {
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let clean = repo_db::extract_smart_prompt_summary(txt, 90);
                 if !clean.is_empty() {
-                    block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
+                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
                 }
                 running_items.push(block);
             } else if !running_workspace_names.contains(&short_name) {
@@ -683,7 +684,7 @@ pub fn format_observe_report() -> String {
         let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
         let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
         if !clean.is_empty() {
-            block.push_str(&format!("   \"{}\"\n", clean_for_telegram_html(&clean, 90)));
+            block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 90)));
         }
         let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
         block.push_str(&format!(
@@ -716,14 +717,14 @@ pub fn format_observe_report() -> String {
 
     format!(
         "🤖 <b>AGM v{} Status</b>\n\n\
-        • <b>Machine:</b> <code>{}</code>\n\
-        • <b>Alias:</b> <code>{}</code>\n\
-        • <b>IP:</b> <code>{}</code>\n\
-        • <b>Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
-        • <b>Active Account:</b> <code>{}</code> ({} total)\n\
-        • <b>Quota / Tier:</b> <code>{}</code>\n\n\
+        • <b>Machine:</b> {}\n\
+        • <b>Alias:</b> {}\n\
+        • <b>IP:</b> {}\n\
+        • <b>Build:</b> v{} (commit {})\n\
+        • <b>Active Account:</b> {} ({} total)\n\
+        • <b>Quota / Tier:</b> {}\n\n\
         {}\n\
-        💡 Use <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
+        💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&machine_name, 48),
         clean_for_telegram_html(&display_alias, 48),
@@ -2870,5 +2871,22 @@ mod tests {
         assert_eq!(format_running_duration(now - 30), "(running 30s)");
         assert_eq!(format_running_duration(now - 125), "(running 2m 5s)");
         assert_eq!(format_running_duration(0), "");
+    }
+
+    #[test]
+    fn test_format_observe_report_structure() {
+        let report = format_observe_report();
+        assert!(report.contains("🤖 <b>AGM v"));
+        assert!(report.contains("Status</b>"));
+        assert!(report.contains("• <b>Machine:</b> "));
+        assert!(report.contains("• <b>Alias:</b> "));
+        assert!(report.contains("• <b>IP:</b> "));
+        assert!(report.contains("• <b>Build:</b> v"));
+        assert!(report.contains("• <b>Active Account:</b> "));
+        assert!(report.contains("• <b>Quota / Tier:</b> "));
+        assert!(report.contains("switch threshold:"));
+        assert!(report.contains("🟢 <b>Running:</b>"));
+        assert!(!report.contains("Backup Batches:"));
+        assert!(report.contains("Send <code>/expand"));
     }
 }

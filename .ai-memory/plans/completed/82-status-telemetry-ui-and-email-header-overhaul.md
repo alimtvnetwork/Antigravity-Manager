@@ -10,7 +10,7 @@ Initiated from user feedback on Telegram `/status` telemetry UX degradation, unr
 ## Delivered Architectural Changes
 
 ### 1. Header & Node Telemetry Refinement
-- Telegram `/status` (observe) report header rebranded to `🤖 AGM v<version> Status`.
+- Telegram `/status` (observe) report header rebranded to `🤖 <b>AGM v<version> Status</b>`.
 - Generic `Node-XXXXXX` suppressed, displaying `None` if unconfigured while highlighting the true Windows Machine Name (`COMPUTERNAME` / hostname) and configured operator Alias.
 - Removed noisy `Backup Batches: ...` line.
 - Added auto-switch threshold percentage to the Quota / Tier bullet (`switch threshold: 15%`).

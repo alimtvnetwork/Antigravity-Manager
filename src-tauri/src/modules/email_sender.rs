@@ -1294,10 +1294,9 @@ pub fn render_idle_projects_email(
     machine_ip: &str,
 ) -> (String, String) {
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
-    let git_hash = crate::modules::git_info::get_git_hash();
     let subject = format!(
-        "[AGM {} | {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
-        pkg_ver, git_hash, machine_name, machine_ip
+        "[AGM {} | {} | {}] [Prompt Request] Running Projects Idle - Ready for Instructions",
+        pkg_ver, machine_name, machine_ip
     );
 
     let mut proj_rows = String::new();

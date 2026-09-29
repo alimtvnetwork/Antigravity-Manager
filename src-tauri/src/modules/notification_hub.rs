@@ -1006,15 +1006,16 @@ async fn dispatch_post_switch_prompt_telemetry(
         return;
     }
 
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
     let subject = if is_emergency {
         format!(
-            "[Antigravity | EMERGENCY] Prompts Failed to Resume on {} ({})",
-            m_name, m_ip
+            "[AGM {} | {} | {}] [EMERGENCY] Prompts Failed to Resume on {} ({})",
+            pkg_ver, m_name, m_ip, m_name, m_ip
         )
     } else {
         format!(
-            "[Antigravity | STATUS] Post-Switch Liveness Verified: {} Prompts Running on {}",
-            verified_running, m_name
+            "[AGM {} | {} | {}] [STATUS] Post-Switch Liveness Verified: {} Prompts Running on {}",
+            pkg_ver, m_name, m_ip, verified_running, m_name
         )
     };
 
