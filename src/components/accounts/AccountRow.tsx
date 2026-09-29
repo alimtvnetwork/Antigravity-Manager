@@ -90,9 +90,15 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
     };
 
     return (
-        <tr className={cn(
+        <tr
+            id={`account-row-${account.id}`}
+            className={cn(
             "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
-            isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-amber-400 dark:border-l-amber-400 font-medium" : "border-l-transparent hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-amber-400/80",
+            isCurrent
+                ? "bg-amber-500/15 dark:bg-amber-950/40 border-l-amber-500 dark:border-l-amber-400 font-medium hover:bg-amber-500/25 dark:hover:bg-amber-900/60 hover:shadow-xs"
+                : selected
+                ? "bg-amber-500/10 dark:bg-amber-950/30 border-l-amber-400 font-medium hover:bg-amber-500/20 dark:hover:bg-amber-900/50"
+                : "border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-l-stone-400 dark:hover:border-l-stone-500",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}

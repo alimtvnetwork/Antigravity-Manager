@@ -1,0 +1,37 @@
+{
+  "attributes": {
+    "type": "agm/supabase-endpoints",
+    "version": "1.0",
+    "source": "agm-cli",
+    "created_at": "2026-09-29T12:00:00Z",
+    "description": "Mock sample Supabase fleet endpoints for automated testing"
+  },
+  "data": {
+    "endpoints": [
+      {
+        "id": "ep-mock-sample-01",
+        "name": "Sample Mock Root DB",
+        "url": "https://sample-mock-root.supabase.co/rest/v1/",
+        "api_key": "sb_publishable_mock_root_token_abc123",
+        "role": "root",
+        "is_enabled": true,
+        "prune_threshold_mb": 400,
+        "priority": 1,
+        "notes": "Safe mock root endpoint for CI/CD tests",
+        "tags": ["mock", "test", "root"]
+      },
+      {
+        "id": "ep-mock-sample-02",
+        "name": "Sample Mock Secondary DB",
+        "url": "https://sample-mock-sec.supabase.co/rest/v1/",
+        "api_key": "sb_publishable_mock_sec_token_xyz789",
+        "role": "secondary",
+        "is_enabled": true,
+        "prune_threshold_mb": 200,
+        "priority": 2,
+        "notes": "Safe mock secondary endpoint for CI/CD tests",
+        "tags": ["mock", "test", "secondary"]
+      }
+    ]
+  }
+}

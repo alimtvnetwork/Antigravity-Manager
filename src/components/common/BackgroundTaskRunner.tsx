@@ -3,6 +3,7 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { showToast } from './ToastContainer';
+import { isTauri } from '../../utils/env';
 
 function getAccountRemainingQuota(account: any, targetModel: string): number {
     if (!account?.quota) return 100;
@@ -142,37 +143,43 @@ function BackgroundTaskRunner() {
 
         const checkAndSmartFastForward = async () => {
             if (isRotatingRef.current) return;
+            // In desktop Tauri environment, the native Rust background daemon (start_auto_switcher)
+            // runs the authoritative unified single-circle loop and broadcasts account://auto-switched events.
+            if (isTauri()) return;
+
             try {
                 const accountStore = useAccountStore.getState();
                 const instanceStore = useInstanceStore.getState();
 
-                const activeInstId = instanceStore.activeInstanceId || 'default';
-                const inst = instanceStore.instances.find(i => i.config.id === activeInstId);
-                const boundAccId = inst?.config.bound_account_id || accountStore.currentAccount?.id;
+                const instancesToEvaluate = instanceStore.instances.length > 0
+                    ? instanceStore.instances
+                    : [{ config: { id: 'default', bound_account_id: accountStore.currentAccount?.id } }];
 
-                let boundAcc = accountStore.accounts.find(a => a.id === boundAccId);
-                if (!boundAcc && accountStore.currentAccount) {
-                    boundAcc = accountStore.currentAccount;
-                }
-
-                if (!boundAcc) return;
-
-                const remainingQuota = getAccountRemainingQuota(boundAcc, targetModel);
-
-                if (remainingQuota <= threshold && accountStore.accounts.length > 1) {
-                    const now = Date.now();
-                    const lastSwitch = lastSwitchTimeRef.current[activeInstId] || 0;
-                    if (now - lastSwitch < 15000) {
-                        return; // Cooldown of 15 seconds per instance
+                for (const inst of instancesToEvaluate) {
+                    const instId = inst.config.id;
+                    const boundAccId = inst.config.bound_account_id || accountStore.currentAccount?.id;
+                    let boundAcc = accountStore.accounts.find(a => a.id === boundAccId);
+                    if (!boundAcc && accountStore.currentAccount) {
+                        boundAcc = accountStore.currentAccount;
                     }
+                    if (!boundAcc) continue;
 
-                    isRotatingRef.current = true;
-                    lastSwitchTimeRef.current[activeInstId] = now;
-                    console.log(`[AutoSwitcher] Active account ${boundAcc.email} quota ${remainingQuota}% <= ${threshold}%. Triggering Smart Fast-Forward...`);
+                    const remainingQuota = getAccountRemainingQuota(boundAcc, targetModel);
+                    if (remainingQuota <= threshold && accountStore.accounts.length > 1) {
+                        const now = Date.now();
+                        const lastSwitch = lastSwitchTimeRef.current[instId] || 0;
+                        if (now - lastSwitch < 15000) {
+                            continue; // Cooldown of 15 seconds per instance
+                        }
 
-                    const result = await instanceStore.smartRotateProfileAccount(activeInstId);
-                    if (result) {
-                        showToast(`Smart Fast-Forward: Switched to ${result.accountEmail} (quota ${remainingQuota}% <= ${threshold}%)`, 'success');
+                        isRotatingRef.current = true;
+                        lastSwitchTimeRef.current[instId] = now;
+                        console.log(`[AutoSwitcher] Instance ${instId} account ${boundAcc.email} quota ${remainingQuota}% <= ${threshold}%. Triggering Smart Fast-Forward in unified circle...`);
+
+                        const result = await instanceStore.smartRotateProfileAccount(instId);
+                        if (result) {
+                            showToast(`Smart Fast-Forward: Switched instance ${instId} to ${result.accountEmail} (quota ${remainingQuota}% <= ${threshold}%)`, 'success');
+                        }
                     }
                 }
             } catch (err) {

@@ -168,11 +168,15 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         return account.protected_models?.includes(key);
     };
     return (
-        <div className={cn(
-            "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-150 hover:shadow-md",
+        <div
+            id={`account-card-${account.id}`}
+            className={cn(
+            "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-150",
             isCurrent
-                ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-amber-400 border-amber-300/80 dark:border-blue-900/60 font-medium shadow-sm"
-                : "bg-white dark:bg-base-100 border-gray-200 dark:border-base-300 border-l-transparent hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-amber-400/80",
+                ? "bg-amber-500/15 dark:bg-amber-950/40 border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/50 font-medium shadow-sm hover:bg-amber-500/25 dark:hover:bg-amber-900/60 hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/40"
+                : selected
+                ? "bg-amber-500/10 dark:bg-amber-950/30 border-l-amber-400 border-amber-200 dark:border-amber-600/40 font-medium hover:bg-amber-500/20 dark:hover:bg-amber-900/50 hover:border-amber-400"
+                : "bg-white dark:bg-base-100 border-gray-200 dark:border-base-300 border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-gray-300 dark:hover:border-base-content/20 hover:border-l-stone-400 dark:hover:border-l-stone-500 hover:shadow-xs",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 

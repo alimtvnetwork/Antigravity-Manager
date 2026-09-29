@@ -974,8 +974,14 @@ fn load_account_index_in_dir(data_dir: &PathBuf) -> Result<AccountIndex, String>
         return Ok(recovered);
     }
 
-    // Try to parse sanitized content
-    match serde_json::from_str::<AccountIndex>(&sanitized) {
+    // Try to parse sanitized content (flat or enveloped)
+    let parsed_result = serde_json::from_str::<AccountIndex>(&sanitized).or_else(|_| {
+        serde_json::from_str::<crate::modules::json_envelope::JsonEnvelope<AccountIndex>>(
+            &sanitized,
+        )
+        .map(|env| env.data)
+    });
+    match parsed_result {
         Ok(index) => {
             crate::modules::logger::log_info(&format!(
                 "Successfully loaded index with {} accounts",

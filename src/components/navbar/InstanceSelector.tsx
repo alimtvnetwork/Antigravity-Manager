@@ -571,8 +571,8 @@ export function InstanceSelector() {
                                         className={cn(
                                             "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? "bg-amber-500/15 dark:bg-blue-950/80 border-l-amber-400 dark:border-l-amber-400 text-amber-950 dark:text-blue-200 font-medium shadow-xs"
-                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-amber-500/10 dark:hover:bg-blue-900/40 hover:border-l-amber-400/80"
+                                                ? "bg-amber-500/15 dark:bg-amber-950/50 border-l-amber-500 dark:border-l-amber-400 text-amber-950 dark:text-amber-100 font-medium shadow-xs hover:bg-amber-500/25 dark:hover:bg-amber-900/60"
+                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-stone-100/70 dark:hover:bg-base-200/70 hover:border-l-stone-400 dark:hover:border-l-stone-500"
                                         )}
                                     >
                                         <button

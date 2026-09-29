@@ -1,0 +1,24 @@
+{
+  "attributes": {
+    "type": "agm/accounts-export",
+    "version": "1.0",
+    "source": "agm-cli",
+    "description": "Mock sample accounts export"
+  },
+  "data": {
+    "accounts": [
+      {
+        "id": "acc-mock-01",
+        "email": "mock.developer1@example.com",
+        "subscription_tier": "Pro",
+        "remaining_fraction": 1.0
+      },
+      {
+        "id": "acc-mock-02",
+        "email": "mock.developer2@example.com",
+        "subscription_tier": "Ultra",
+        "remaining_fraction": 0.85
+      }
+    ]
+  }
+}

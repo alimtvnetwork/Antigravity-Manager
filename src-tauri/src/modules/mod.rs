@@ -17,6 +17,7 @@ pub mod email_vault_db;
 pub mod email_watcher;
 pub mod git_info;
 pub mod instance;
+pub mod json_envelope;
 
 #[allow(dead_code)]
 pub mod http_api;

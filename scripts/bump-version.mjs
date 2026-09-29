@@ -235,8 +235,8 @@ const TARGET_FILES = [
         name: 'version.json',
         relPath: 'version.json',
         replace: (content) => content
-            .replace(`"Version": "${currentVersion}"`, `"Version": "${newVersion}"`)
-            .replace(`"version": "${currentVersion}"`, `"version": "${newVersion}"`),
+            .replace(/"Version"\s*:\s*"[^"]+"/g, `"Version": "${newVersion}"`)
+            .replace(/"version"\s*:\s*"[^"]+"/g, `"version": "${newVersion}"`),
     },
     {
         name: 'src-tauri/Cargo.toml',

@@ -9,9 +9,9 @@ use antigravity_tools_lib::modules::email_vault_db::NotifyRecipientInput;
 use antigravity_tools_lib::modules::repo_db::ActivePrompt;
 use antigravity_tools_lib::modules::{
     account, agy_cleaner, auto_switcher, backup_prompts_db, config, email_inbound, email_io,
-    email_sender, email_vault_db, email_watcher, instance, notification_hub, proxy_db, repo_db,
-    security_db, supabase_client, supabase_schema, supabase_sync, telegram_inbound, training_api,
-    workspace_lease_manager,
+    email_sender, email_vault_db, email_watcher, instance, json_envelope, notification_hub,
+    proxy_db, repo_db, security_db, supabase_client, supabase_schema, supabase_sync,
+    telegram_inbound, training_api, workspace_lease_manager,
 };
 use chrono::Utc;
 use std::env;
@@ -113,6 +113,9 @@ fn main() {
         }
         "supabase" | "supa" => {
             cmd_supabase(&cmd_args);
+        }
+        "which-format" | "which_format" | "format" | "inspect-format" | "scan-format" => {
+            cmd_which_format(&cmd_args);
         }
         "nodes" => {
             cmd_telegram(&["nodes".to_string()]);
@@ -983,9 +986,10 @@ fn cmd_accounts(args: &[String]) {
                 })
             })
             .collect();
+        let envelope = json_envelope::JsonEnvelope::new("agm/accounts-export", json_items);
         println!(
             "{}",
-            serde_json::to_string_pretty(&json_items).unwrap_or_default()
+            serde_json::to_string_pretty(&envelope).unwrap_or_default()
         );
         return;
     }
@@ -5342,25 +5346,57 @@ fn cmd_supabase_set_endpoint(args: &[String]) {
 }
 
 fn cmd_supabase_load_json(args: &[String]) {
-    let path_str = match args.first() {
-        Some(p) => p,
-        None => {
-            eprintln!("Usage: agm supabase load-json <file_path>");
-            return;
-        }
-    };
-    let content = match fs::read_to_string(path_str) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
-            return;
-        }
-    };
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    let paths: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if paths.is_empty() {
+        eprintln!("Usage: agm supabase load-json <file_path...> [-y]");
+        return;
+    }
+
     let mut cfg = supabase_sync::load_config().unwrap_or_default();
-    if let Ok(full) = serde_json::from_str::<supabase_sync::SupabaseConfig>(&content) {
-        cfg = full;
-        println!("✅ Parsed full SupabaseConfig from JSON.");
-    } else if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+    let mut total_endpoints_added = 0;
+    let mut total_creds_added = 0;
+
+    for path_str in paths {
+        let content = match fs::read_to_string(path_str) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
+                continue;
+            }
+        };
+
+        let raw_val: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[ERROR] Failed to parse JSON in '{}': {}", path_str, e);
+                continue;
+            }
+        };
+
+        // Unpack envelope if present
+        let (attrs_opt, val) = json_envelope::unpack_envelope(raw_val.clone());
+        let is_b64 = attrs_opt
+            .as_ref()
+            .and_then(|a| a.encoding.as_deref())
+            .map(|enc| enc.eq_ignore_ascii_case("base64"))
+            .unwrap_or(false)
+            || raw_val.get("encoding_format").and_then(|f| f.as_str()) == Some("base64");
+
+        let decode_val = |raw: Option<&serde_json::Value>| -> Option<String> {
+            let s = raw.and_then(|v| v.as_str())?;
+            if is_b64 {
+                if let Ok(b) = STANDARD.decode(s.trim()) {
+                    if let Ok(utf) = String::from_utf8(b) {
+                        return Some(utf.trim().to_string());
+                    }
+                }
+            }
+            Some(s.trim().to_string())
+        };
+
         if let Some(arr) = val.get("endpoints").and_then(|v| v.as_array()) {
             if let Ok(eps) = serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(
                 serde_json::Value::Array(arr.clone()),
@@ -5371,11 +5407,12 @@ fn cmd_supabase_load_json(args: &[String]) {
                     } else {
                         cfg.endpoints.push(new_ep);
                     }
+                    total_endpoints_added += 1;
                 }
-                println!("✅ Merged endpoints from JSON object.");
+                println!("✅ Merged endpoints from '{}'.", path_str);
             }
         } else if let Ok(eps) =
-            serde_json::from_str::<Vec<supabase_client::SupabaseEndpoint>>(&content)
+            serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(val.clone())
         {
             for new_ep in eps {
                 if let Some(pos) = cfg.endpoints.iter().position(|e| e.id == new_ep.id) {
@@ -5383,18 +5420,215 @@ fn cmd_supabase_load_json(args: &[String]) {
                 } else {
                     cfg.endpoints.push(new_ep);
                 }
+                total_endpoints_added += 1;
             }
-            println!("✅ Merged endpoints array from JSON.");
+            println!("✅ Merged endpoints array from '{}'.", path_str);
+        } else if let Some(creds) = val
+            .get("credentials")
+            .and_then(|v| v.as_object())
+            .or_else(|| val.as_object())
+        {
+            let endpoint_url = decode_val(creds.get("endpoint"));
+            let token = decode_val(creds.get("token"));
+            let service =
+                decode_val(creds.get("service")).unwrap_or_else(|| "supabase-service".to_string());
+            if let (Some(url), Some(tok)) = (endpoint_url, token) {
+                let clean_id = format!("ep-{}", service.to_lowercase().replace([' ', '_'], "-"));
+                let role = if service.to_lowercase().contains("root")
+                    || service.to_lowercase().contains("lovable")
+                {
+                    "root"
+                } else {
+                    "secondary"
+                };
+                let norm_url = supabase_client::normalize_supabase_url(&url);
+                let new_ep = supabase_client::SupabaseEndpoint {
+                    id: clean_id.clone(),
+                    name: format!("Supabase ({})", service),
+                    url: norm_url.clone(),
+                    api_key: tok,
+                    role: role.to_string(),
+                    is_enabled: true,
+                    prune_threshold_mb: if role == "root" { 400 } else { 200 },
+                    priority: if role == "root" { 1 } else { 2 },
+                    notes: Some(format!("Imported from credentials JSON ({})", path_str)),
+                    tags: vec![role.to_string(), service],
+                };
+                if let Some(pos) = cfg
+                    .endpoints
+                    .iter()
+                    .position(|e| e.id == clean_id || e.url == norm_url)
+                {
+                    cfg.endpoints[pos] = new_ep;
+                } else {
+                    cfg.endpoints.push(new_ep);
+                }
+                println!(
+                    "✅ Ingested credentials database '{}' ({}) from '{}'",
+                    clean_id, norm_url, path_str
+                );
+                total_creds_added += 1;
+            }
         }
     }
+
     cfg.is_sync_enabled = true;
     if let Err(e) = supabase_sync::save_config(&cfg) {
         eprintln!("[ERROR] Failed to save config: {}", e);
     } else {
         println!(
-            "✅ Saved {} endpoints to supabase_config.json",
-            cfg.endpoints.len()
+            "✅ Saved {} active endpoint(s) to supabase_config.json (added: {} endpoints, {} credentials)",
+            cfg.endpoints.len(),
+            total_endpoints_added,
+            total_creds_added
         );
+    }
+}
+
+fn cmd_which_format(args: &[String]) {
+    use json_envelope::*;
+    use std::path::PathBuf;
+
+    let mut paths: Vec<PathBuf> = Vec::new();
+    let mut auto_yes = false;
+    let mut auto_run = false;
+
+    for arg in args {
+        match arg.as_str() {
+            "-y" | "--yes" => auto_yes = true,
+            "-r" | "--run" | "--import" | "-i" => auto_run = true,
+            "-h" | "--help" => {
+                println!("================================================================================");
+                println!("  AGM Universal Format Inspector & Importer");
+                println!("================================================================================");
+                println!("Usage:");
+                println!("  agm which-format [files_or_dir...] [-y] [--run]");
+                println!("  agm format inspect [files_or_dir...]");
+                println!();
+                println!("Description:");
+                println!(
+                    "  Scans specified JSON file(s) or folder, classifies each format against AGM"
+                );
+                println!("  envelope standards (attributes + data), displays what importing them will change,");
+                println!(
+                    "  and generates both individual and single-line bulk execution commands."
+                );
+                println!();
+                println!("Options:");
+                println!("  -y, --yes          Bypass confirmation prompts in generated commands");
+                println!("  -r, --run          Immediately execute import for all matched schemas");
+                println!("================================================================================");
+                return;
+            }
+            other if !other.starts_with('-') => {
+                paths.push(PathBuf::from(other));
+            }
+            _ => {}
+        }
+    }
+
+    let targets = resolve_json_targets(&paths);
+    if targets.is_empty() {
+        println!("⚠️ No JSON files found in target path(s).");
+        return;
+    }
+
+    let mut matched = Vec::new();
+    let mut unmatched = Vec::new();
+
+    for target in &targets {
+        let res = inspect_json_file(target);
+        if res.detected_type.is_some() {
+            matched.push(res);
+        } else {
+            unmatched.push(res);
+        }
+    }
+
+    println!("================================================================================");
+    println!("  AGM Universal Format Inspector & Schema Classifier");
+    println!("================================================================================");
+    println!(
+        "  Discovered: {} JSON file(s) across target path(s)\n",
+        targets.len()
+    );
+
+    if !matched.is_empty() {
+        println!(
+            "  --- Matched Supported Schemas ({} file(s)) ---",
+            matched.len()
+        );
+        for (i, m) in matched.iter().enumerate() {
+            let env_badge = if m.is_envelope {
+                "Envelope v1.0"
+            } else if m.is_legacy {
+                "Legacy Flat (Auto-Compatible)"
+            } else {
+                "Custom"
+            };
+            println!(
+                "  #{:<2} [{}] ({})",
+                i + 1,
+                m.detected_type.as_deref().unwrap_or("unknown"),
+                env_badge
+            );
+            println!("      Path:     {}", m.file_path);
+            println!("      Changes:  {}", m.mutation_summary);
+            println!("      Command:  {}", m.recommended_command);
+            println!();
+        }
+    }
+
+    if !unmatched.is_empty() {
+        println!(
+            "  --- Unmatched / Incompatible Schemas ({} file(s)) ---",
+            unmatched.len()
+        );
+        for u in &unmatched {
+            println!("  ✖ {}", u.file_path);
+            if let Some(ref err) = u.error_detail {
+                println!("    Reason:   {}", err);
+            } else {
+                println!("    Reason:   {}", u.mutation_summary);
+            }
+            println!();
+        }
+    }
+
+    if let Some(bulk_cmd) = build_bulk_import_command(&matched) {
+        println!("  --- Bulk Execution Command (Import All Matched) ---");
+        println!(
+            "  To import all {} matched file(s) in one command, run:",
+            matched.len()
+        );
+        println!("  {}", bulk_cmd);
+        println!();
+        println!("  💡 Tip: Append '-y' or '--yes' to bypass all confirmation prompts.");
+    }
+
+    println!("================================================================================");
+
+    if auto_run && !matched.is_empty() {
+        println!(
+            "\n🚀 Auto-executing import for {} matched file(s)...",
+            matched.len()
+        );
+        let mut supabase_targets = Vec::new();
+        for m in &matched {
+            if let Some(ref dtype) = m.detected_type {
+                if dtype.contains("supabase") {
+                    supabase_targets.push(m.file_path.clone());
+                }
+            }
+        }
+        if !supabase_targets.is_empty() {
+            let mut sb_args = supabase_targets;
+            if auto_yes {
+                sb_args.push("-y".to_string());
+            }
+            cmd_supabase_load_json(&sb_args);
+        }
+        println!("✅ Auto-import completed successfully.");
     }
 }
 
@@ -7624,9 +7858,10 @@ fn cmd_instances(args: &[String]) {
                         })
                     })
                     .collect();
+                let envelope = json_envelope::JsonEnvelope::new("agm/instances-export", items);
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+                    serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| "{}".to_string())
                 );
                 return;
             }

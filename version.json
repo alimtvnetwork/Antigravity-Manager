@@ -7,7 +7,7 @@
     "inheritanceRule": "When a section is set to 'inherit', all tooling and codebases resolving that sub-package must inherit the root global Version.",
     "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
   },
-  "Version": "4.75.0",
+  "Version": "4.99.0",
   "Title": "Antigravity Manager Tools",
   "FullName": "Antigravity Manager Tools",
   "Publisher": "Maintained by Alim, Sponsored by RISEUP ASIA LLC",

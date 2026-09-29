@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   List,
   Loader2,
+  LocateFixed,
   RefreshCw,
   Search,
   Sparkles,
@@ -577,6 +578,68 @@ function Accounts() {
     }
   };
 
+  // Focus onto the currently active or picked account in the scroll view
+  const handleFocusActiveAccount = () => {
+    // 1. Identify target account: prioritized active currentAccount, or first of selectedIds
+    const targetAccount =
+      currentAccount ||
+      (selectedIds.size > 0 ? accounts.find((a) => selectedIds.has(a.id)) : null);
+    if (!targetAccount) {
+      showToast(
+        t("accounts.no_active_to_focus", "No active account found to focus"),
+        "info"
+      );
+      return;
+    }
+
+    // 2. Clear filters if targetAccount is hidden by active filter
+    const isVisibleInFilter = filteredAccounts.some(
+      (a) => a.id === targetAccount.id
+    );
+    if (!isVisibleInFilter) {
+      setFilter("all");
+      setSearchQuery("");
+    }
+
+    // 3. Calculate page number if paginated
+    const targetIndex = (isVisibleInFilter ? filteredAccounts : accounts).findIndex(
+      (a) => a.id === targetAccount.id
+    );
+    if (targetIndex >= 0) {
+      const targetPage = Math.floor(targetIndex / ITEMS_PER_PAGE) + 1;
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
+      }
+    }
+
+    // 4. Scroll smoothly to target element and highlight it
+    setTimeout(() => {
+      const cardEl = document.getElementById(`account-card-${targetAccount.id}`);
+      const rowEl = document.getElementById(`account-row-${targetAccount.id}`);
+      const targetEl = cardEl || rowEl;
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        targetEl.classList.add(
+          "ring-4",
+          "ring-amber-400",
+          "dark:ring-amber-500",
+          "ring-offset-2",
+          "transition-all"
+        );
+        setTimeout(() => {
+          targetEl.classList.remove(
+            "ring-4",
+            "ring-amber-400",
+            "dark:ring-amber-500",
+            "ring-offset-2"
+          );
+        }, 2500);
+      } else {
+        showToast(targetAccount.email, "info");
+      }
+    }, 120);
+  };
+
   const exportAccountsToJson = async (accountsToExport: Account[]) => {
     try {
       if (accountsToExport.length === 0) {
@@ -867,6 +930,21 @@ function Accounts() {
 
         {/* Action buttons group */}
         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          {/* Focus Active/Picked Account Button */}
+          <button
+            type="button"
+            className="px-2.5 py-2 bg-amber-500/15 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 text-xs font-semibold rounded-lg hover:bg-amber-500/25 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+            onClick={handleFocusActiveAccount}
+            title={
+              currentAccount
+                ? `Focus onto active account: ${currentAccount.email}`
+                : "Focus active/picked account"
+            }
+          >
+            <LocateFixed className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="hidden sm:inline font-bold">Focus</span>
+          </button>
+
           <AddAccountDialog onAdd={handleAddAccount} showText={false} />
 
           {selectedIds.size > 0 && (

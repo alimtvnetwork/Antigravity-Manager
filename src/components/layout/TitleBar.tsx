@@ -8,9 +8,20 @@ import versionData from '../../../version.json';
 export default function TitleBar() {
     const { t } = useTranslation();
     const [isMaximized, setIsMaximized] = useState(false);
+    const [appVersion, setAppVersion] = useState<string>(
+        versionData.version || versionData.Version || '4.99.0'
+    );
 
     useEffect(() => {
         if (!isTauri()) return;
+
+        import('@tauri-apps/api/app').then(({ getVersion }) => {
+            getVersion().then((v) => {
+                if (v) {
+                    setAppVersion(v);
+                }
+            }).catch(() => {});
+        });
 
         const win = getCurrentWindow();
         win.isMaximized().then(setIsMaximized).catch(() => {});
@@ -80,6 +91,8 @@ export default function TitleBar() {
 
     const isMac = isMacOS();
 
+    const displayVersion = appVersion.startsWith('v') ? appVersion : `v${appVersion}`;
+
     return (
         <header
             data-tauri-drag-region
@@ -134,8 +147,11 @@ export default function TitleBar() {
                             <span className="opacity-0 group-hover:opacity-100 text-[#004D11] text-[8px] font-bold leading-none pointer-events-none">＋</span>
                         </button>
                     </div>
-                    <div className="flex-1 h-full flex items-center justify-center" data-tauri-drag-region>
+                    <div className="flex-1 h-full flex items-center justify-center gap-1.5" data-tauri-drag-region>
                         <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400" title="Antigravity Manager Tools By Alim">Agm Tool By Alim</span>
+                        <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-gray-200/60 dark:bg-base-200 text-gray-500 font-medium">
+                            {displayVersion}
+                        </span>
                     </div>
                     <div className="w-16 h-full" data-tauri-drag-region />
                 </>
@@ -151,7 +167,7 @@ export default function TitleBar() {
                             Agm Tool By Alim
                         </span>
                         <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-gray-200/60 dark:bg-base-200 text-gray-500 font-medium">
-                            v{versionData.version || versionData.Version}
+                            {displayVersion}
                         </span>
                     </div>
 
