@@ -1141,7 +1141,8 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
         return Err("Cannot wipe session while instance is running. Close it first.".to_string());
     }
 
-    let state_db = PathBuf::from(&config.data_dir)
+    let target_data_path = PathBuf::from(&config.data_dir);
+    let state_db = target_data_path
         .join("User")
         .join("globalStorage")
         .join("state.vscdb");
@@ -1149,6 +1150,36 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
     if state_db.exists() {
         let _ = fs::remove_file(&state_db);
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata_db = target_data_path
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        if appdata_db.exists() {
+            let _ = fs::remove_file(&appdata_db);
+        }
+
+        if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+            let home_db = inst_home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb");
+            if home_db.exists() {
+                let _ = fs::remove_file(&home_db);
+            }
+        }
+    }
+
+    purge_volatile_instance_sessions(&target_data_path);
+    let _ = update_instance_app_storage(&target_data_path, None, false);
 
     Ok(())
 }
@@ -1275,11 +1306,36 @@ pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Resul
     let ws_json_payload = serde_json::json!({
         "folder": folder_uri
     });
-    fs::write(
-        ws_dir.join("workspace.json"),
-        serde_json::to_string_pretty(&ws_json_payload).unwrap_or_default(),
-    )
-    .map_err(|e| format!("Failed to write workspace.json: {}", e))?;
+    let ws_content = serde_json::to_string_pretty(&ws_json_payload).unwrap_or_default();
+    fs::write(ws_dir.join("workspace.json"), &ws_content)
+        .map_err(|e| format!("Failed to write workspace.json: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata_ws_dir = PathBuf::from(&inst.data_dir)
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("workspaceStorage")
+            .join(&ws_id);
+        if fs::create_dir_all(&appdata_ws_dir).is_ok() {
+            let _ = fs::write(appdata_ws_dir.join("workspace.json"), &ws_content);
+        }
+
+        if let Ok(inst_home) = get_instance_home_dir(&inst.id) {
+            let home_ws_dir = inst_home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("workspaceStorage")
+                .join(&ws_id);
+            if fs::create_dir_all(&home_ws_dir).is_ok() {
+                let _ = fs::write(home_ws_dir.join("workspace.json"), &ws_content);
+            }
+        }
+    }
 
     // 2. Register in repo_db running_projects & sequence table
     let _ = crate::modules::repo_db::detect_running_projects(&inst.id);
@@ -1630,6 +1686,8 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
             cmd.env("SSH_TTY", "pty/0");
+            cmd.env("WSL_DISTRO_NAME", "antigravity-isolated");
+            cmd.env("DOCKER_CONTAINER", "1");
             if let Some(ref acc) = resolved_account {
                 cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
                 cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);

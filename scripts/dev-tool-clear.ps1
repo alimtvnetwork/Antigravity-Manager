@@ -11,6 +11,8 @@ param(
     [string]$Arg1 = "",
     [string]$Arg2 = "",
     [switch]$CargoOnly,
+    [switch]$CleanInstances,
+    [switch]$InstancesOnly,
     [switch]$Force
 )
 
@@ -38,6 +40,11 @@ for ($i = 0; $i -lt $allArgs.Count; $i++) {
         $KeepCount = [int]$a
     } elseif ($a -eq '--cargo-only') {
         $CargoOnly = $true
+    } elseif ($a -in @('--clean-instances', '-i', '--instances', 'clean-instances')) {
+        $CleanInstances = $true
+    } elseif ($a -in @('--instances-only')) {
+        $InstancesOnly = $true
+        $CleanInstances = $true
     }
 }
 
@@ -96,6 +103,46 @@ if (Get-Command "adm" -ErrorAction SilentlyContinue) {
     } finally {
         Pop-Location
     }
+}
+
+# 4. Clean temporary/test instances and stale instance lockfiles
+$instancesRoot = Join-Path $env:USERPROFILE ".antigravity_tools\instances"
+$hasInstances = Test-Path $instancesRoot
+if ($CleanInstances -or $hasInstances) {
+    Write-Host "[4/4] Cleaning test instances and stale lockfiles..." -ForegroundColor Yellow
+    
+    # Clean stale lockfiles across all instances
+    if ($hasInstances) {
+        Get-ChildItem -Path $instancesRoot -Recurse -File -Include "lockfile", "code.lock", "singleton*" -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                Remove-Item -Force $_.FullName -ErrorAction SilentlyContinue
+                Write-Host "  Removed lockfile: $($_.FullName)" -ForegroundColor DarkGray
+            } catch {}
+        }
+    }
+
+    # Clean orphaned test instances (test-* or tmp-*)
+    $agmCmd = if (Test-Path $localAgm) { $localAgm } elseif (Test-Path $cargoAgm) { $cargoAgm } elseif (Get-Command "agm" -ErrorAction SilentlyContinue) { "agm" } else { $null }
+    if ($agmCmd -and (Test-Path $instancesRoot)) {
+        Get-ChildItem -Path $instancesRoot -Directory -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -match '^(?:test[-_]|tmp[-_]|testdiag)'
+        } | ForEach-Object {
+            $instId = $_.Name
+            Write-Host "  Purging test instance: $instId" -ForegroundColor Yellow
+            try {
+                & $agmCmd instances rm $instId --force 2>$null
+            } catch {}
+            if (Test-Path $_.FullName) {
+                Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+if ($InstancesOnly) {
+    Write-Host ""
+    Write-Host "[OK] Instance hygiene cleanup completed successfully!" -ForegroundColor Green
+    exit 0
 }
 
 Write-Host ""

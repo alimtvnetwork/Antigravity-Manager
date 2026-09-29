@@ -20,6 +20,11 @@
     "clean:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
     "dev:clean": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
     "dev-tool-clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "devtool:clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "dev:tool:clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "devtool-clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "clean:instances": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 --clean-instances",
+    "clean:instance": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 --clean-instances",
     "clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
     "clean:demo": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 --cargo-only"
   },

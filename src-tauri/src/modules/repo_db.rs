@@ -1751,8 +1751,24 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                     cmd.env("USERPROFILE", &inst_home);
                 }
                 cmd.env("HOME", &inst_home);
-                cmd.env("SSH_CONNECTION", "127.0.0.1 1 127.0.0.1 1");
-                cmd.env("SSH_CLIENT", "127.0.0.1 1 1");
+                cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+                cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+                cmd.env("SSH_TTY", "pty/0");
+                cmd.env("WSL_DISTRO_NAME", "antigravity-isolated");
+                cmd.env("DOCKER_CONTAINER", "1");
+
+                if let Ok(registry) = crate::modules::instance::load_registry() {
+                    if let Some(inst) =
+                        registry.instances.iter().find(|i| i.id == prompt.instance_id)
+                    {
+                        if let Some(ref acc_id) = inst.bound_account_id {
+                            if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                                cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                                cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+                            }
+                        }
+                    }
+                }
             }
         }
 
