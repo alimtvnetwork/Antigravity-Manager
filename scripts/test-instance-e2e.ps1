@@ -44,8 +44,8 @@ foreach ($oldInst in @($instA, $instB, "test-diag-1-8492")) {
 # Helper to query SQLite value in a state.vscdb
 function Get-VscdbEmail($dbPath) {
     if (!(Test-Path $dbPath)) { return "" }
-    $cmd = 'import sqlite3, sys, json; conn = sqlite3.connect(sys.argv[1]); c = conn.cursor(); c.execute("SELECT value FROM ItemTable WHERE key = ''antigravityAuth.token''"); r = c.fetchone(); print(json.loads(r[0]).get("email", "") if r and r[0] else "")'
-    $res = python -c $cmd "$dbPath" 2>$null
+    $helperPy = Join-Path $RootDir "scripts\query_vscdb_email.py"
+    $res = python "$helperPy" "$dbPath"
     if ($res) { return $res.Trim() } else { return "" }
 }
 
@@ -210,34 +210,10 @@ $testPromptText = "Test Prompt for E2E Switch Preservation $(Get-Random)"
 $testPromptId = "prompt-test-e2e-$((Get-Date).Ticks)"
 $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
-$pythonSeedPrompt = @"
-import sqlite3, os
-db_path = os.path.expanduser(r'~/.antigravity_tools/repo_prompts.db')
-conn = sqlite3.connect(db_path)
-c = conn.cursor()
-c.execute("""
-INSERT OR REPLACE INTO active_prompts 
-(id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, 'running', ?, ?)
-""", ('$testPromptId', 'proj-test', '$instA', r'$testWs', '$testPromptText', 'gemini-pro', 'sess-e2e', $nowUnix, $nowUnix))
-conn.commit()
-conn.close()
-"@
-python -c $pythonSeedPrompt
+$helperScript = Join-Path $RootDir "scripts\test_prompt_helper.py"
+python "$helperScript" seed "$testPromptId" "$instA" "$testWs" "$testPromptText" | Out-Null
 
-# Verify prompt is running in DB
-$checkPromptPy = @"
-import sqlite3, os
-db_path = os.path.expanduser(r'~/.antigravity_tools/repo_prompts.db')
-conn = sqlite3.connect(db_path)
-c = conn.cursor()
-c.execute("SELECT status, prompt_content FROM active_prompts WHERE id = '$testPromptId'")
-row = c.fetchone()
-if row:
-    print(f"{row[0]}|{row[1]}")
-conn.close()
-"@
-$statusBefore = (python -c $checkPromptPy).Trim()
+$statusBefore = (python "$helperScript" check "$testPromptId").Trim()
 Write-Host "  Prompt before switch: $statusBefore" -ForegroundColor DarkGray
 
 # Now execute switch on Instance A to $accA
@@ -245,7 +221,7 @@ Write-Host "  Switching Instance A to trigger backup, close, inject, launch, and
 & $agm instances switch $instA $accA | Out-Null
 
 # Check prompt status post-switch
-$statusAfter = (python -c $checkPromptPy).Trim()
+$statusAfter = (python "$helperScript" check "$testPromptId").Trim()
 Write-Host "  Prompt post-switch status: $statusAfter" -ForegroundColor Green
 
 # Also check that .antigravity_resume_task.json was written to the workspace
