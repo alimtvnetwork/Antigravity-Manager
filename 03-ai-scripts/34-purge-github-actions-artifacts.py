@@ -44,7 +44,7 @@ def fetch_artifact_batch(repo: str, page: int = 1, per_page: int = 100):
     cmd = [
         "gh", "api",
         f"repos/{repo}/actions/artifacts?per_page={per_page}&page={page}",
-        "--jq", "{total_count: .total_count, artifacts: [.artifacts[] | select(.expired == false) | {id: .id, name: .name, size: .size_in_bytes}]}"
+        "--jq", "{total_count: .total_count, artifacts: [.artifacts[] | {id: .id, name: .name, size: .size_in_bytes}]}"
     ]
     res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
@@ -77,24 +77,19 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
 
     deleted_count = 0
     freed_bytes = 0
-    attempted_ids = set()
 
     while True:
         batch = fetch_artifact_batch(repo, page=1, per_page=100)
         if not batch or not batch.get("artifacts"):
             break
 
-        artifacts = [a for a in batch["artifacts"] if a["id"] not in attempted_ids]
+        artifacts = batch["artifacts"]
         if not artifacts:
             break
-
-        for a in artifacts:
-            attempted_ids.add(a["id"])
 
         batch_size = len(artifacts)
         print(f"Deleting batch of {batch_size} artifact(s) using {max_workers} worker threads...", flush=True)
 
-        batch_deleted = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_art = {
                 executor.submit(delete_single_artifact, repo, art["id"]): art
@@ -105,14 +100,10 @@ def purge_repo_artifacts(repo: str, max_workers: int = 12):
                 is_success = future.result()
                 if is_success:
                     deleted_count += 1
-                    batch_deleted += 1
                     freed_bytes += art.get("size", 0)
 
         mb_freed = freed_bytes / (1024 * 1024)
         print(f"Progress: {deleted_count}/{total_count} artifacts deleted (~{mb_freed:.2f} MB freed)...", flush=True)
-        if batch_deleted == 0:
-            print(f"⚠️ 0 artifacts deleted in batch (insufficient permissions or rate limit). Stopping retry loop.", flush=True)
-            break
         time.sleep(0.5)
 
     mb_freed = freed_bytes / (1024 * 1024)
@@ -155,24 +146,19 @@ def purge_repo_caches(repo: str, max_workers: int = 8):
 
     deleted_count = 0
     freed_bytes = 0
-    attempted_ids = set()
 
     while True:
         batch = fetch_cache_batch(repo, page=1, per_page=100)
         if not batch or not batch.get("caches"):
             break
 
-        caches = [c for c in batch["caches"] if c["id"] not in attempted_ids]
+        caches = batch["caches"]
         if not caches:
             break
-
-        for c in caches:
-            attempted_ids.add(c["id"])
 
         batch_size = len(caches)
         print(f"Deleting batch of {batch_size} cache(s) using {max_workers} worker threads...", flush=True)
 
-        batch_deleted = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_cache = {
                 executor.submit(delete_single_cache, repo, c["id"]): c
@@ -183,14 +169,10 @@ def purge_repo_caches(repo: str, max_workers: int = 8):
                 is_success = future.result()
                 if is_success:
                     deleted_count += 1
-                    batch_deleted += 1
                     freed_bytes += c.get("size", 0)
 
         mb_freed = freed_bytes / (1024 * 1024)
         print(f"Progress: {deleted_count}/{total_count} caches deleted (~{mb_freed:.2f} MB freed)...", flush=True)
-        if batch_deleted == 0:
-            print(f"⚠️ 0 caches deleted in batch (insufficient permissions or rate limit). Stopping retry loop.", flush=True)
-            break
         time.sleep(0.5)
 
     mb_freed = freed_bytes / (1024 * 1024)

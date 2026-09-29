@@ -265,19 +265,10 @@ def run_smart_go_tests(
     repo_root = REPO_ROOT
     inventory = build_or_update_test_inventory(repo_root, force=force)
     all_tests = inventory.get("tests", {})
-    if isinstance(all_tests, list):
-        tests = {
-            f"{t.get('package', '')}.{t.get('name', '')}": t
-            for t in all_tests
-            if isinstance(t, dict) and t.get("test_file", "").endswith(".go")
-        }
-    elif isinstance(all_tests, dict):
-        tests = {
-            k: v for k, v in all_tests.items()
-            if isinstance(v, dict) and v.get("test_file", "").endswith(".go")
-        }
-    else:
-        tests = {}
+    tests = {
+        k: v for k, v in all_tests.items()
+        if v.get("test_file", "").endswith(".go")
+    }
 
     if package_filter:
         queries = [package_filter] if isinstance(package_filter, str) else list(package_filter)
@@ -411,7 +402,6 @@ def run_smart_go_tests(
         elapsed, total_test_eta, 0.0, total_dirty, passed_count + failed_count
     )
 
-    inventory.setdefault("summary", {})
     inventory["summary"]["dirty"] = failed_count
     inventory["summary"]["cached"] = len(tests) - failed_count
     try:
