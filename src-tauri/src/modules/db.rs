@@ -263,6 +263,22 @@ fn inject_new_format(
     )
     .map_err(|e| format!("Failed to write onboarding flag: {}", e))?;
 
+    // Also inject antigravityAuth.token JSON entry for multi-tool compatibility and verification
+    let auth_token_json = serde_json::json!({
+        "accessToken": access_token,
+        "refreshToken": refresh_token,
+        "expiry": expiry,
+        "email": email,
+        "username": email
+    });
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
+        [
+            "antigravityAuth.token",
+            &serde_json::to_string(&auth_token_json).unwrap_or_default(),
+        ],
+    );
+
     // Fix for missing history: Delete the old format state to prevent the IDE from reading a stale UserID
     // which causes history fetching to fail.
     let _ = conn.execute(

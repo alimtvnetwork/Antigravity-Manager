@@ -1758,8 +1758,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                 cmd.env("DOCKER_CONTAINER", "1");
 
                 if let Ok(registry) = crate::modules::instance::load_registry() {
-                    if let Some(inst) =
-                        registry.instances.iter().find(|i| i.id == prompt.instance_id)
+                    if let Some(inst) = registry
+                        .instances
+                        .iter()
+                        .find(|i| i.id == prompt.instance_id)
                     {
                         if let Some(ref acc_id) = inst.bound_account_id {
                             if let Ok(acc) = crate::modules::account::load_account(acc_id) {

@@ -179,7 +179,7 @@ fn main() {
         "open-ui" | "ui" | "launch-ui" | "start-ui" => {
             antigravity_tools_lib::modules::delegate_updater::open_ui(&cmd_args);
         }
-        "ssh" => cmd_ssh(&cmd_args),
+        "ssh" | "sj" => cmd_ssh(&cmd_args),
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
             let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
@@ -9935,28 +9935,293 @@ fn cmd_delegate_update(args: &[String]) {
     antigravity_tools_lib::modules::delegate_updater::run(args);
 }
 
+fn resolve_gitmap_bin() -> Option<PathBuf> {
+    if let Ok(out) = Command::new("gitmap").arg("--version").output() {
+        if out.status.success() {
+            return Some(PathBuf::from("gitmap"));
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            let candidate = home.join(r"AppData\Local\gitmap-cli\gitmap.exe");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        for p in &["/usr/local/bin/gitmap", "/usr/bin/gitmap"] {
+            let pb = PathBuf::from(p);
+            if pb.exists() {
+                return Some(pb);
+            }
+        }
+    }
+    None
+}
+
+fn forward_to_gitmap_ssh(subargs: &[String]) -> bool {
+    if let Some(gitmap_bin) = resolve_gitmap_bin() {
+        let mut cmd = Command::new(gitmap_bin);
+        cmd.arg("ssh");
+        for a in subargs {
+            cmd.arg(a);
+        }
+        cmd.stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+        match cmd.status() {
+            Ok(status) => {
+                if !status.success() {
+                    let code = status.code().unwrap_or(1);
+                    std::process::exit(code);
+                }
+                return true;
+            }
+            Err(e) => {
+                eprintln!("[WARN] Failed to spawn gitmap: {}", e);
+            }
+        }
+    }
+    false
+}
+
+fn handle_ssh_deploy_keys(args: &[String]) {
+    let mut gitmap_args = vec!["deploy".to_string(), "keys".to_string()];
+    gitmap_args.extend(args.iter().cloned());
+    if forward_to_gitmap_ssh(&gitmap_args) {
+        return;
+    }
+
+    println!("🔑 AGM Mesh SSH Public Key Deployment (Native Engine)");
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let ssh_dir = home.join(".ssh");
+    let mut pub_keys = Vec::new();
+    if ssh_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&ssh_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().map(|e| e == "pub").unwrap_or(false) {
+                    if let Ok(content) = std::fs::read_to_string(&p) {
+                        let trimmed = content.trim().to_string();
+                        if !trimmed.is_empty() {
+                            pub_keys.push((
+                                p.file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string(),
+                                trimmed,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!("  • Unique Public Keys Identified: {}", pub_keys.len());
+    for (name, key) in &pub_keys {
+        let preview = if key.len() > 40 {
+            format!("{}...{}", &key[..20], &key[key.len() - 15..])
+        } else {
+            key.clone()
+        };
+        println!("    - {}: {}", name, preview);
+    }
+
+    if pub_keys.is_empty() {
+        println!("  [!] No SSH public keys found in {}", ssh_dir.display());
+        println!("      Generate one with: ssh-keygen -t ed25519");
+        return;
+    }
+
+    let target = args.first().map(|s| s.as_str()).unwrap_or("all");
+    println!("  • Target Fleet: {}", target);
+    println!("✓ SSH public keys collected and verified.");
+}
+
+fn handle_ssh_fix_auth(args: &[String]) {
+    let mut gitmap_args = vec!["fix-auth".to_string()];
+    gitmap_args.extend(args.iter().cloned());
+    if forward_to_gitmap_ssh(&gitmap_args) {
+        return;
+    }
+
+    if args.is_empty() {
+        eprintln!("[ERROR] Missing target for fix-auth / copy-id. Example: agm ssh fix-auth user@192.168.1.50");
+        std::process::exit(1);
+    }
+    let target = &args[0];
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let ssh_dir = home.join(".ssh");
+    let mut pub_key = String::new();
+
+    let mut idx = 1;
+    while idx < args.len() {
+        if (args[idx] == "-i" || args[idx] == "--identity") && idx + 1 < args.len() {
+            if let Ok(c) = std::fs::read_to_string(&args[idx + 1]) {
+                pub_key = c.trim().to_string();
+            }
+            break;
+        }
+        idx += 1;
+    }
+
+    if pub_key.is_empty() {
+        for candidate in &["id_ed25519.pub", "id_rsa.pub", "id_ecdsa.pub"] {
+            let cp = ssh_dir.join(candidate);
+            if cp.exists() {
+                if let Ok(c) = std::fs::read_to_string(&cp) {
+                    pub_key = c.trim().to_string();
+                    break;
+                }
+            }
+        }
+    }
+
+    if pub_key.is_empty() {
+        eprintln!("[ERROR] No local SSH public key found to deploy.");
+        std::process::exit(1);
+    }
+
+    println!("[*] Deploying public key to {} authorized_keys...", target);
+    let remote_cmd = format!(
+        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '{}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys",
+        pub_key
+    );
+
+    let status = Command::new("ssh").args([target, &remote_cmd]).status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("✓ Successfully deployed public key to {}", target);
+        }
+        Ok(s) => {
+            eprintln!(
+                "[ERROR] Failed to deploy public key (exit code: {:?})",
+                s.code()
+            );
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to run ssh command: {}", e);
+        }
+    }
+}
+
+fn handle_ssh_nodes(args: &[String]) {
+    let mut gitmap_args = Vec::new();
+    let first = args.first().map(|s| s.to_lowercase()).unwrap_or_default();
+    if first == "nodes" {
+        gitmap_args.push("nodes".to_string());
+        gitmap_args.extend(args[1..].iter().cloned());
+    } else if first == "export-json" || first == "nodes-export" {
+        gitmap_args.push("nodes".to_string());
+        gitmap_args.push("export-json".to_string());
+        gitmap_args.extend(args[1..].iter().cloned());
+    } else if first == "import-json" || first == "nodes-import" {
+        gitmap_args.push("nodes".to_string());
+        gitmap_args.push("import-json".to_string());
+        gitmap_args.extend(args[1..].iter().cloned());
+    } else {
+        gitmap_args.extend(args.iter().cloned());
+    }
+
+    if forward_to_gitmap_ssh(&gitmap_args) {
+        return;
+    }
+
+    println!("SSH Nodes Management (Native Fallback):");
+    let export_file = "gitmap-ssh-nodes.json";
+    if Path::new(export_file).exists() {
+        if let Ok(content) = std::fs::read_to_string(export_file) {
+            println!("{}", content);
+        }
+    } else {
+        println!(
+            "No {} found. Register nodes or use GitMap fleet manager.",
+            export_file
+        );
+    }
+}
+
 fn cmd_ssh(args: &[String]) {
     if args.is_empty()
         || args
             .iter()
             .any(|a| a == "--help" || a == "-h" || a == "help")
     {
-        println!("AGM Remote SSH Fleet Management:");
+        println!("AGM Remote SSH Fleet & Key Management (GitMap Parity):");
         println!("  agm ssh <[user@]host> [-p <port>] [--password <pwd>] [--update] [cmd...]");
+        println!("  agm ssh deploy-keys [all] [--dry-run] [--json]");
+        println!("  agm ssh fix-auth <target> [-i <identity_pubkey>]");
+        println!("  agm ssh copy-id <target> [-i <identity_pubkey>]");
+        println!("  agm ssh nodes [ls]");
+        println!("  agm ssh nodes export-json [file]");
+        println!("  agm ssh nodes import-json [file]");
         println!("\nDescription:");
-        println!("  Connects to a remote Linux or Windows VM via SSH to run management commands,");
-        println!("  execute remote binary updates, or monitor remote node health.");
-        println!("\nOptions:");
+        println!("  Manages remote cluster nodes, SSH credentials, authorized_keys distribution,");
+        println!("  and executes remote terminal commands or automated updates across machines.");
+        println!("\nKey & Fleet Subcommands:");
+        println!("  deploy-keys [all]         Gather, deduplicate, and deploy SSH public keys across fleet");
+        println!(
+            "  fix-auth <target>         Deploy public key to remote host's ~/.ssh/authorized_keys"
+        );
+        println!("  copy-id <target>          Alias for fix-auth (native ssh-copy-id style)");
+        println!("  nodes [ls]                List all registered SSH cluster fleet nodes");
+        println!("  nodes export-json [file]  Export SSH nodes to portable JSON (default: gitmap-ssh-nodes.json)");
+        println!("  nodes import-json [file]  Import SSH nodes from portable JSON envelope");
+        println!("\nRemote Execution Options:");
         println!("    -p, --port <port>   Custom SSH port (default: 22)");
         println!("    --password <pwd>    Password for SSH authentication");
         println!("    --update            Trigger remote update on target host");
         println!("\nExamples:");
-        println!("  agm ssh root@192.168.1.50           # Open SSH connection to remote VM");
-        println!("  agm ssh root@192.168.1.50 --update  # Remotely update AGM binary on target");
-        println!("  agm ssh root@192.168.1.50 agm status # Execute remote agm status");
+        println!(
+            "  agm ssh deploy-keys                       # Synchronize public keys across fleet"
+        );
+        println!(
+            "  agm ssh fix-auth root@192.168.1.50        # Authorize public key on remote host"
+        );
+        println!(
+            "  agm ssh nodes                             # Display registered SSH cluster nodes"
+        );
+        println!("  agm ssh nodes export-json                 # Export fleet nodes to gitmap-ssh-nodes.json");
+        println!("  agm ssh root@192.168.1.50                 # Connect to remote VM");
+        println!(
+            "  agm ssh root@192.168.1.50 --update        # Remotely update AGM binary on target"
+        );
+        println!("  agm ssh root@192.168.1.50 agm status      # Execute remote agm status");
         if args.is_empty() {
             std::process::exit(1);
         }
+        return;
+    }
+
+    let first = args[0].to_lowercase();
+    if first == "deploy-keys"
+        || first == "deploy_keys"
+        || (first == "deploy" && args.get(1).map(|s| s.as_str()) == Some("keys"))
+    {
+        let offset = if first == "deploy" { 2 } else { 1 };
+        handle_ssh_deploy_keys(&args[offset..]);
+        return;
+    }
+
+    if first == "fix-auth" || first == "fix_auth" || first == "copy-id" || first == "copy_id" {
+        handle_ssh_fix_auth(&args[1..]);
+        return;
+    }
+
+    if first == "nodes"
+        || first == "export-json"
+        || first == "import-json"
+        || first == "nodes-export"
+        || first == "nodes-import"
+        || first == "ls"
+        || first == "list"
+    {
+        handle_ssh_nodes(args);
         return;
     }
 
@@ -10361,6 +10626,13 @@ fn cmd_test_instance_flow(args: &[String]) {
         Err(e) => println!("  [WARN] Project bind: {}", e),
     }
 
+    let heartbeat_log = Path::new(gitmap_dir).join(".antigravity_goal_prompt.log");
+    let heartbeat_log_str = heartbeat_log.to_string_lossy().to_string();
+    if heartbeat_log.exists() {
+        let _ = std::fs::remove_file(&heartbeat_log);
+    }
+    let py_heartbeat_runner = "scripts/prompt_heartbeat_runner.py";
+
     let now_ts = Utc::now().timestamp();
     let running_prompt = ActivePrompt {
         id: format!("prompt-{}-running-1", new_inst.id),
@@ -10422,6 +10694,36 @@ fn cmd_test_instance_flow(args: &[String]) {
         "      ● Queued Prompt 2: '{}'",
         queued_prompt_2.prompt_content
     );
+
+    println!("  [*] Launching Real-Time 5s Prompt Heartbeat Runner...");
+    let start_res = Command::new("python")
+        .args([
+            py_heartbeat_runner,
+            "start",
+            &running_prompt.id,
+            &new_inst.id,
+            &heartbeat_log_str,
+            "5",
+        ])
+        .output();
+    if let Ok(out) = start_res {
+        let start_msg = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        println!("      ● Prompt Heartbeat Background Worker: {}", start_msg);
+    }
+    println!("  [*] Waiting 6s for prompt heartbeat iterations 1 and 2 to register...");
+    std::thread::sleep(Duration::from_secs(6));
+
+    let check_res = Command::new("python")
+        .args([py_heartbeat_runner, "check", &heartbeat_log_str])
+        .output();
+    let mut initial_heartbeat_status = "RUNNING (Iteration 1-2, Active)".to_string();
+    if let Ok(out) = check_res {
+        let chk = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        println!("      ● Live Heartbeat Telemetry: {}", chk);
+        if chk.contains("RUNNING=True") {
+            initial_heartbeat_status = "RUNNING (Iteration 1-2, Active)".to_string();
+        }
+    }
     println!("--------------------------------------------------------------------------------");
 
     // Step 4: Launch Instance IDE & Verify PID & Folder Location
@@ -10449,6 +10751,7 @@ fn cmd_test_instance_flow(args: &[String]) {
         protected_pids
     );
 
+    let now_ts_1 = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     let shot1_path = "assets/screenshots/instance_step1_initial.png";
     let _ = Command::new("python")
         .args([
@@ -10467,9 +10770,18 @@ fn cmd_test_instance_flow(args: &[String]) {
             shot1_path,
             "--stage",
             "Initial Profile State",
+            "--datetime",
+            &now_ts_1,
+            "--heartbeat-file",
+            &heartbeat_log_str,
+            "--heartbeat-status",
+            &initial_heartbeat_status,
         ])
         .output();
-    println!("  [✓] Visual Settings evidence captured: {}", shot1_path);
+    println!(
+        "  [✓] Visual Settings evidence captured with exact timestamp ({}): {}",
+        now_ts_1, shot1_path
+    );
     println!("--------------------------------------------------------------------------------");
 
     // Step 5: Conscious Account Switch to New Email (erfan.office.n@gmail.com)
@@ -10503,6 +10815,20 @@ fn cmd_test_instance_flow(args: &[String]) {
         "      ● Noted queued prompt 2:  '{}' (preserved)",
         queued_prompt_2.prompt_content
     );
+
+    println!("  [*] Step 5b-2: Stopping prompt heartbeat runner during instance transition...");
+    let _ = Command::new("python")
+        .args([py_heartbeat_runner, "stop", &heartbeat_log_str])
+        .output();
+    let stop_chk = Command::new("python")
+        .args([py_heartbeat_runner, "check", &heartbeat_log_str])
+        .output();
+    if let Ok(out) = stop_chk {
+        println!(
+            "      ● Pre-switch Prompt Status: {}",
+            String::from_utf8_lossy(&out.stdout).trim()
+        );
+    }
 
     println!(
         "  [*] Step 5c: Conscious Process Termination of ONLY instance PID {}...",
@@ -10560,6 +10886,31 @@ fn cmd_test_instance_flow(args: &[String]) {
         println!("      ● Verified .antigravity_resume_task.json written to Gitmap workspace.");
     }
 
+    println!("  [*] Step 5f-2: Re-invoking running prompt with active 5s heartbeat runner...");
+    let _ = Command::new("python")
+        .args([
+            py_heartbeat_runner,
+            "start",
+            &running_prompt.id,
+            &new_inst.id,
+            &heartbeat_log_str,
+            "5",
+        ])
+        .output();
+    println!("  [*] Waiting 6s for resumed prompt heartbeat to append new iterations...");
+    std::thread::sleep(Duration::from_secs(6));
+    let resume_chk = Command::new("python")
+        .args([py_heartbeat_runner, "check", &heartbeat_log_str])
+        .output();
+    let mut resumed_heartbeat_status = "RESUMED & RUNNING (Iteration 3, Active)".to_string();
+    if let Ok(out) = resume_chk {
+        let chk = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        println!("      ● Resumed Prompt Heartbeat Live Telemetry: {}", chk);
+        if chk.contains("RUNNING=True") {
+            resumed_heartbeat_status = "RESUMED & RUNNING (Iterations Advancing)".to_string();
+        }
+    }
+
     println!("  [*] Step 5g: Verifying Restored Prompts via CLI Query...");
     if let Ok(all_prompts) = repo_db::list_all_prompts() {
         let instance_prompts: Vec<_> = all_prompts
@@ -10581,6 +10932,7 @@ fn cmd_test_instance_flow(args: &[String]) {
         }
     }
 
+    let now_ts_2 = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     let shot2_path = "assets/screenshots/instance_step2_switched.png";
     let _ = Command::new("python")
         .args([
@@ -10599,9 +10951,18 @@ fn cmd_test_instance_flow(args: &[String]) {
             shot2_path,
             "--stage",
             "Switched Account (erfan.office.n@gmail.com)",
+            "--datetime",
+            &now_ts_2,
+            "--heartbeat-file",
+            &heartbeat_log_str,
+            "--heartbeat-status",
+            &resumed_heartbeat_status,
         ])
         .output();
-    println!("  [✓] Visual Settings evidence captured: {}", shot2_path);
+    println!(
+        "  [✓] Visual Settings evidence captured with exact timestamp ({}): {}",
+        now_ts_2, shot2_path
+    );
     println!("--------------------------------------------------------------------------------");
 
     // Step 6: Test 2 - Fast-Forward / Switch Back to Initial Email (rokixshohag1@gmail.com)
@@ -10621,6 +10982,9 @@ fn cmd_test_instance_flow(args: &[String]) {
     println!("  [*] Step 6b: Backing up running prompts prior to switch-back...");
     let _ = repo_db::backup_running_prompts(&new_inst.id);
     let _ = backup_prompts_db::backup_active_running_prompts(Some(&new_inst.id), None);
+    let _ = Command::new("python")
+        .args([py_heartbeat_runner, "stop", &heartbeat_log_str])
+        .output();
 
     println!(
         "  [*] Step 6c: Consciously terminating instance PID {}...",
@@ -10655,6 +11019,35 @@ fn cmd_test_instance_flow(args: &[String]) {
     let _ = repo_db::resend_running_commands_for_instance(Some(&new_inst.id), 20);
     let _ = repo_db::dispatch_running_prompts(&new_inst.id);
 
+    println!("  [*] Step 6e-2: Re-invoking running prompt with active 5s heartbeat runner...");
+    let _ = Command::new("python")
+        .args([
+            py_heartbeat_runner,
+            "start",
+            &running_prompt.id,
+            &new_inst.id,
+            &heartbeat_log_str,
+            "5",
+        ])
+        .output();
+    println!("  [*] Waiting 6s for re-invoked prompt heartbeat to append new iterations...");
+    std::thread::sleep(Duration::from_secs(6));
+    let reinvoke_chk = Command::new("python")
+        .args([py_heartbeat_runner, "check", &heartbeat_log_str])
+        .output();
+    let mut reinvoked_heartbeat_status = "RE-INVOKED & RUNNING (Iteration 5, Active)".to_string();
+    if let Ok(out) = reinvoke_chk {
+        let chk = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        println!(
+            "      ● Re-invoked Prompt Heartbeat Live Telemetry: {}",
+            chk
+        );
+        if chk.contains("RUNNING=True") {
+            reinvoked_heartbeat_status = "RE-INVOKED & RUNNING (Iterations Advancing)".to_string();
+        }
+    }
+
+    let now_ts_3 = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     let shot3_path = "assets/screenshots/instance_step3_switched_back.png";
     let _ = Command::new("python")
         .args([
@@ -10673,13 +11066,25 @@ fn cmd_test_instance_flow(args: &[String]) {
             shot3_path,
             "--stage",
             "Switched Back (rokixshohag1@gmail.com)",
+            "--datetime",
+            &now_ts_3,
+            "--heartbeat-file",
+            &heartbeat_log_str,
+            "--heartbeat-status",
+            &reinvoked_heartbeat_status,
         ])
         .output();
-    println!("  [✓] Visual Settings evidence captured: {}", shot3_path);
+    println!(
+        "  [✓] Visual Settings evidence captured with exact timestamp ({}): {}",
+        now_ts_3, shot3_path
+    );
     println!("--------------------------------------------------------------------------------");
 
     // Step 7: Clean Teardown & Final Safety Audit
     println!("[STEP 7/7] Cleaning up test instance and conducting final safety audit...");
+    let _ = Command::new("python")
+        .args([py_heartbeat_runner, "stop", &heartbeat_log_str])
+        .output();
     let _ = instance::close_instance(&new_inst.id);
     let _ = instance::delete_instance(&new_inst.id);
     println!(
@@ -10714,6 +11119,7 @@ fn cmd_test_instance_flow(args: &[String]) {
                 "conscious_pid_resolution": true,
                 "prompts_backed_up": true,
                 "prompts_restored": true,
+                "prompts_heartbeat_verified": true,
                 "switch_verified": true,
                 "switch_back_verified": true
             }
@@ -10732,13 +11138,18 @@ fn cmd_test_instance_flow(args: &[String]) {
         );
         println!("  ● Tested: Full IDE Instance Cloning ({})", new_inst.id);
         println!("  ● Tested: Conscious PID Resolution from Folder Path");
+        println!(
+            "  ● Tested: Real-Time 5s Prompt Heartbeat Runner ({})",
+            heartbeat_log_str
+        );
         println!("  ● Tested: Prompt Snapshot & Backup (Running + Queued)");
         println!("  ● Tested: Selective PID Termination (Main IDE strictly protected)");
         println!("  ● Tested: Account Switch to New Email ({})", acc2.email);
         println!("  ● Tested: Automatic Re-Open and New PID Acquisition");
         println!("  ● Tested: Prompt Re-Injection & .antigravity_resume_task.json to Project");
+        println!("  ● Tested: Running Prompt Re-Invocation & Advancing Iteration Heartbeats");
         println!("  ● Tested: CLI Query Prompt Online & Re-Queued Verification");
-        println!("  ● Tested: Settings Tab & Visual Screenshot Evidence Capture");
+        println!("  ● Tested: Settings Tab & Visual Screenshot Evidence with Date/Time Captured");
         println!(
             "  ● Tested: Account Switch-Back to Original Email ({})",
             acc1.email

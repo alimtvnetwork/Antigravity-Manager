@@ -92,3 +92,4 @@ docs/CODEBASE_ALIGNMENT_ANALYSIS.md
 # Captured payload samples
 testJson/
 .antigravity_resume_task.json
+gitmap*.json

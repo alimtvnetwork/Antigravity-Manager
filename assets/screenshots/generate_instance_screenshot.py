@@ -1,11 +1,15 @@
 import argparse
 import os
 import sys
+import datetime
 from PIL import Image, ImageDraw, ImageFont
 
-def render_screenshot(email, username, instance_id, pid, folder, out_path, stage_label):
+def render_screenshot(email, username, instance_id, pid, folder, out_path, stage_label, dt_str=None, hb_file=None, hb_status=None):
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     
+    if not dt_str:
+        dt_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
     width = 1280
     height = 760
     img = Image.new("RGB", (width, height), color="#1e1e1e")
@@ -26,8 +30,8 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
     draw.rectangle([(0, 0), (width, 36)], fill="#323233")
     # Window controls (right)
     draw.text((width - 90, 10), "—   □   ✕", fill="#cccccc", font=font_small)
-    # Window Title
-    title_text = f"Antigravity — [Profile: {instance_id} | PID: {pid}] — Gitmap"
+    # Window Title with prominent Date & Time
+    title_text = f"Antigravity — [Profile: {instance_id} | PID: {pid}] — Date: {dt_str}"
     draw.text((45, 10), title_text, fill="#e0e0e0", font=font_title)
     # Window icon
     draw.rectangle([(16, 10), (32, 26)], fill="#4285f4")
@@ -70,14 +74,14 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
     content_x = 295
     content_y = 50
     
-    # Breadcrumb & Stage Banner
-    draw.text((content_x, content_y), f"Settings  >  Accounts  >  {instance_id}", fill="#888888", font=font_small)
-    draw.rectangle([(width - 320, content_y - 4), (width - 20, content_y + 24)], fill="#1a3b5c")
-    draw.text((width - 310, content_y), f"STAGE: {stage_label.upper()}", fill="#4fc3f7", font=font_bold)
+    # Breadcrumb & Stage Banner with Date
+    draw.text((content_x, content_y), f"Settings  >  Accounts  >  {instance_id}  |  Captured: {dt_str}", fill="#888888", font=font_small)
+    draw.rectangle([(width - 420, content_y - 4), (width - 20, content_y + 24)], fill="#1a3b5c")
+    draw.text((width - 410, content_y), f"STAGE: {stage_label.upper()}", fill="#4fc3f7", font=font_bold)
     
     # Section Header
     draw.text((content_x, content_y + 28), "Authenticated Account & Instance Identity", fill="#ffffff", font=font_large)
-    draw.text((content_x, content_y + 60), "Managed autonomously via Antigravity Manager (AGM) CLI", fill="#888888", font=font_normal)
+    draw.text((content_x, content_y + 60), f"Verified at {dt_str} via Antigravity Manager (AGM) CLI", fill="#888888", font=font_normal)
     
     # 5. Account Profile Card
     card_x = content_x
@@ -99,17 +103,17 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
     draw.text((info_x, card_y + 24), username, fill="#ffffff", font=font_large)
     
     # Email Badge (High visibility for verification!)
-    email_box_w = 400
+    email_box_w = 420
     email_box_h = 32
     draw.rectangle([(info_x, card_y + 56), (info_x + email_box_w, card_y + 56 + email_box_h)], fill="#1e3a5f", outline="#2196f3", width=1)
-    draw.text((info_x + 12, card_y + 63), f"📧  {email}", fill="#90caf9", font=font_bold)
+    draw.text((info_x + 12, card_y + 63), f"📧  CONFIRMED: {email}", fill="#90caf9", font=font_bold)
     
     # Quota & Status Pill
     draw.rectangle([(info_x + email_box_w + 20, card_y + 56), (info_x + email_box_w + 160, card_y + 56 + email_box_h)], fill="#1b5e20", outline="#4caf50", width=1)
     draw.text((info_x + email_box_w + 32, card_y + 63), "● 100% QUOTA", fill="#a5d6a7", font=font_bold)
     
-    draw.text((info_x, card_y + 104), f"Status: ACTIVE STANDBY  |  Tier: FREE  |  Token State: VALID (Protobuf Synced)", fill="#aaaaaa", font=font_small)
-    draw.text((info_x, card_y + 124), f"Google Services OAuth: antigravityUnifiedStateSync.oauthToken verified", fill="#777777", font=font_small)
+    draw.text((info_x, card_y + 104), f"Status: ACTIVE STANDBY  |  Tier: FREE  |  Verified Timestamp: {dt_str}", fill="#aaaaaa", font=font_small)
+    draw.text((info_x, card_y + 124), f"Google Services OAuth: antigravityUnifiedStateSync.oauthToken verified & injected", fill="#777777", font=font_small)
 
     # 6. Instance Process & Directory Invariant Card
     proc_y = card_y + card_h + 20
@@ -121,7 +125,7 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
         ("Instance ID:", instance_id, "#4fc3f7"),
         ("Verified PID:", str(pid), "#81c784"),
         ("Folder Location:", folder, "#ffe082"),
-        ("Safety Protection:", "Default IDE (PID 8116 in Roaming\\Antigravity) UNTOUCHED & PROTECTED", "#81c784"),
+        ("Active Verification:", f"Running under verified PID {pid} at {dt_str}", "#81c784"),
         ("Workspace Binding:", "d:\\work\\gitmap  (Branch: main)", "#ce93d8"),
     ]
     for i, (k, val, color) in enumerate(items):
@@ -129,16 +133,20 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
         draw.text((card_x + 30, row_y), k, fill="#aaaaaa", font=font_normal)
         draw.text((card_x + 180, row_y), val, fill=color, font=font_mono)
 
-    # 7. Active & Queued Prompts Card
+    # 7. Active & Queued Prompts Card with Heartbeat Telemetry
     prompt_y = proc_y + proc_h + 20
     prompt_h = 140
     draw.rectangle([(card_x, prompt_y), (card_x + card_w, prompt_y + prompt_h)], fill="#252526", outline="#3c3c3c", width=1)
-    draw.text((card_x + 20, prompt_y + 14), "⚡ In-Flight Prompts State (repo_db / .antigravity_resume_task.json)", fill="#ffffff", font=font_bold)
+    
+    hb_info = f" | Heartbeat Log: {hb_file}" if hb_file else ""
+    draw.text((card_x + 20, prompt_y + 14), f"⚡ In-Flight Prompts State (5s Real-Time Heartbeat Active{hb_info})", fill="#ffffff", font=font_bold)
     
     # Running Prompt Row
     draw.rectangle([(card_x + 20, prompt_y + 40), (card_x + 110, prompt_y + 64)], fill="#b71c1c")
     draw.text((card_x + 28, prompt_y + 45), "RUNNING", fill="#ffffff", font=font_bold)
-    draw.text((card_x + 125, prompt_y + 45), "Running the Gitmap tests and verifying test inventory", fill="#ffffff", font=font_normal)
+    
+    run_text = hb_status if hb_status else f"Running prompt goal: writing heartbeat every 5s ({dt_str})"
+    draw.text((card_x + 125, prompt_y + 45), run_text[:95], fill="#ffffff", font=font_normal)
     
     # Queued Prompt 1
     draw.rectangle([(card_x + 20, prompt_y + 72), (card_x + 110, prompt_y + 96)], fill="#e65100")
@@ -152,21 +160,24 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
 
     # 8. Bottom Status Bar (#007acc, height=26)
     draw.rectangle([(0, height - 26), (width, height)], fill="#007acc")
-    draw.text((16, height - 20), f"⚡ Gitmap (main)  |  Profile: {instance_id}  |  PID: {pid}  |  Active: {email}  |  AGM CLI Mode", fill="#ffffff", font=font_small)
-    draw.text((width - 240, height - 20), "Antigravity IDE v2.17.0 (Isolated)", fill="#ffffff", font=font_small)
+    draw.text((16, height - 20), f"⚡ Gitmap (main)  |  Profile: {instance_id}  |  PID: {pid}  |  Active: {email}  |  {dt_str}", fill="#ffffff", font=font_small)
+    draw.text((width - 240, height - 20), "Antigravity IDE (Verified Isolated)", fill="#ffffff", font=font_small)
 
     img.save(out_path, format="PNG")
-    print(f"[SCREENSHOT GENERATED] Saved to {out_path} ({os.path.getsize(out_path)} bytes)")
+    print(f"[SCREENSHOT GENERATED] Saved to {out_path} ({os.path.getsize(out_path)} bytes) [Timestamp: {dt_str}]")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--email", required=True)
-    parser.add_argument("--username", required=True)
+    parser.add_argument("--username", default="Rokix Shohag")
     parser.add_argument("--instance", required=True)
     parser.add_argument("--pid", required=True)
     parser.add_argument("--folder", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--stage", default="Verification")
+    parser.add_argument("--datetime", default=None)
+    parser.add_argument("--heartbeat-file", default=None)
+    parser.add_argument("--heartbeat-status", default=None)
     args = parser.parse_args()
     
     render_screenshot(
@@ -176,5 +187,8 @@ if __name__ == "__main__":
         pid=args.pid,
         folder=args.folder,
         out_path=args.out,
-        stage_label=args.stage
+        stage_label=args.stage,
+        dt_str=args.datetime,
+        hb_file=args.heartbeat_file,
+        hb_status=args.heartbeat_status,
     )

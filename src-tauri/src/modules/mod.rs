@@ -37,6 +37,7 @@ pub mod quota;
 pub mod repo_db;
 pub mod scheduler;
 pub mod security_db;
+pub mod ssh_manager;
 pub mod supabase_client;
 pub mod supabase_command_queue;
 pub mod supabase_pruner;

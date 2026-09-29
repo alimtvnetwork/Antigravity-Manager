@@ -197,6 +197,60 @@ pub fn update_instance_app_storage(
             let _ = fs::write(&target, content);
         }
     }
+
+    // Also update <data_dir>/User/settings.json so the IDE window title bar visibly displays the bound account email
+    if let Some(email) = bound_email.map(str::trim).filter(|e| !e.is_empty()) {
+        let user_dir = data_dir.join("User");
+        let _ = fs::create_dir_all(&user_dir);
+        let settings_path = user_dir.join("settings.json");
+        let mut settings_map: serde_json::Map<String, serde_json::Value> = if settings_path.exists()
+        {
+            fs::read_to_string(&settings_path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            serde_json::Map::new()
+        };
+        settings_map.insert(
+            "window.title".to_string(),
+            serde_json::Value::String(format!(
+                "Antigravity — Account: {} — ${{rootName}} ${{activeEditorShort}}",
+                email
+            )),
+        );
+        settings_map.insert(
+            "workbench.startupEditor".to_string(),
+            serde_json::Value::String("none".to_string()),
+        );
+        settings_map.insert(
+            "security.workspace.trust.enabled".to_string(),
+            serde_json::Value::Bool(false),
+        );
+        if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
+            let _ = fs::write(&settings_path, pretty);
+        }
+    }
+
+    // Pre-seed User/globalStorage/state.vscdb from default instance if it doesn't exist yet so workbench layout/onboarding is initialized
+    let inst_db = data_dir
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if !inst_db.exists() {
+        let default_db = get_default_antigravity_data_dir()
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        if default_db.exists() && default_db != inst_db {
+            if let Some(p) = inst_db.parent() {
+                let _ = fs::create_dir_all(p);
+            }
+            let _ = fs::copy(&default_db, &inst_db);
+            let _ = crate::modules::db::sanitize_session(&inst_db);
+        }
+    }
+
     Ok(())
 }
 
@@ -489,14 +543,34 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || name.contains("utility")
             || args_str.contains("utility");
 
+        let inst_id_opt = if clean_target.contains("/instances/") {
+            clean_target
+                .split("/instances/")
+                .nth(1)
+                .and_then(|s| s.split('/').next())
+        } else {
+            None
+        };
+
+        let matches_cloned_exe = if let Some(inst_id) = inst_id_opt {
+            let marker = format!("antigravity-{}", inst_id.to_lowercase());
+            exe.contains(&marker) || name.contains(&marker)
+        } else {
+            false
+        };
+
         let has_user_data_arg = args_str.contains("--user-data-dir");
         let has_instance_marker = args_str.contains(".antigravity_tools")
             || args_str.contains("/instances/")
-            || args_str.contains("\\instances\\");
+            || args_str.contains("\\instances\\")
+            || exe.contains(".antigravity_tools")
+            || matches_cloned_exe;
 
-        if has_user_data_arg && has_instance_marker && !is_helper {
+        if (has_user_data_arg && has_instance_marker && !is_helper)
+            || (matches_cloned_exe && !is_helper)
+        {
             instance_root_pids.insert(pid_u32);
-            if args_str.contains(clean_target) {
+            if args_str.contains(clean_target) || matches_cloned_exe {
                 matched_pids.push(pid_u32);
             }
         } else if is_default && !has_instance_marker && !is_helper {
@@ -1922,7 +1996,12 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .join(" ");
                 let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
                 let clean_data = norm_data.trim_end_matches('/');
-                if is_default_inst || args_str.contains(clean_data) {
+                let inst_id_lower = instance_id.to_lowercase();
+                if is_default_inst
+                    || args_str.contains(clean_data)
+                    || proc_exe.contains(&inst_id_lower)
+                    || proc_name.contains(&inst_id_lower)
+                {
                     pids.push(saved_pid);
                 } else {
                     crate::modules::logger::log_warn(&format!(
@@ -1941,14 +2020,21 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         let inst_marker_slash = format!("instances/{}", inst_id_lower);
         let inst_marker_bslash = format!("instances\\{}", inst_id_lower);
 
-        let matches_instance = |args: &str| -> bool {
+        let matches_instance = |args: &str, exe_path: &str, p_name: &str| -> bool {
             args.contains(clean_data)
                 || args.contains(&inst_marker_slash)
                 || args.contains(&inst_marker_bslash)
+                || exe_path.contains(&inst_id_lower)
+                || p_name.contains(&inst_id_lower)
         };
 
         pids.retain(|&pid| {
             if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
+                let p_name = proc.name().to_string_lossy().to_lowercase();
+                let p_exe = proc
+                    .exe()
+                    .map(|p| p.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
                 let args_str = proc
                     .cmd()
                     .iter()
@@ -1956,7 +2042,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .collect::<Vec<String>>()
                     .join(" ");
 
-                if matches_instance(&args_str) {
+                if matches_instance(&args_str, &p_exe, &p_name) {
                     return true;
                 }
 
@@ -1975,7 +2061,12 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                                 .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                                 .collect::<Vec<String>>()
                                 .join(" ");
-                            if matches_instance(&parent_args) {
+                            let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
+                            let parent_exe = parent_proc
+                                .exe()
+                                .map(|p| p.to_string_lossy().to_lowercase())
+                                .unwrap_or_default();
+                            if matches_instance(&parent_args, &parent_exe, &parent_name) {
                                 return true;
                             }
                         }

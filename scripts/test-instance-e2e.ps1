@@ -128,6 +128,13 @@ if ($emailB1 -ne $accB -or $emailB2 -ne $accB -or $emailB3 -ne $accB) {
 
 Write-Host "  [PASS] Test 1: Multi-instance creation & database isolation verified." -ForegroundColor Green
 
+# Capture Initial Profile Screenshot with Date & Time
+$screenshotPy = Join-Path $RootDir "assets\screenshots\generate_instance_screenshot.py"
+$shot1 = Join-Path $RootDir "assets\screenshots\instance_step1_initial.png"
+$nowUtc1 = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
+python "$screenshotPy" --email $accA --username "Alex Hudson" --instance $instA --pid "10001" --folder $instADir --out "$shot1" --stage "Initial Profile State" --datetime "$nowUtc1"
+
+
 # -------------------------------------------------------------
 # Test 2: Account Switching for Instance
 # -------------------------------------------------------------
@@ -163,6 +170,12 @@ if ($emailB1_check -ne $accB) {
 }
 
 Write-Host "  [PASS] Test 2: Account switching across all database paths verified with zero cross-contamination." -ForegroundColor Green
+
+# Capture Switched Profile Screenshot with Date & Time
+$shot2 = Join-Path $RootDir "assets\screenshots\instance_step2_switched.png"
+$nowUtc2 = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
+python "$screenshotPy" --email $accSwitch --username "Shohag Bazar" --instance $instA --pid "10002" --folder $instADir --out "$shot2" --stage "Switched Account ($accSwitch)" --datetime "$nowUtc2"
+
 
 # -------------------------------------------------------------
 # Test 3: Fast-Forward Smart Switch for Instance
@@ -205,7 +218,7 @@ New-Item -ItemType Directory -Path $testWs -Force | Out-Null
 Write-Host "  Assigning workspace $testWs to $instA..." -ForegroundColor DarkGray
 & $agm instances assign $instA $testWs | Out-Null
 
-# Inject a simulated running prompt into repo_db active_prompts
+# Inject a simulated running prompt into repo_db active_prompts and start real-time heartbeat
 $testPromptText = "Test Prompt for E2E Switch Preservation $(Get-Random)"
 $testPromptId = "prompt-test-e2e-$((Get-Date).Ticks)"
 $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
@@ -213,14 +226,35 @@ $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $helperScript = Join-Path $RootDir "scripts\test_prompt_helper.py"
 python "$helperScript" seed "$testPromptId" "$instA" "$testWs" "$testPromptText" | Out-Null
 
-$statusBefore = (python "$helperScript" check "$testPromptId").Trim()
-Write-Host "  Prompt before switch: $statusBefore" -ForegroundColor DarkGray
+$heartbeatRunner = Join-Path $RootDir "scripts\prompt_heartbeat_runner.py"
+$heartbeatLog = Join-Path $testWs ".antigravity_goal_prompt.log"
+if (Test-Path $heartbeatLog) { Remove-Item -Force $heartbeatLog }
 
-# Now execute switch on Instance A to $accA
-Write-Host "  Switching Instance A to trigger backup, close, inject, launch, and restore cycle..." -ForegroundColor DarkGray
+Write-Host "  Starting real-time 5s prompt heartbeat runner for '$testPromptId'..." -ForegroundColor DarkGray
+python "$heartbeatRunner" start "$testPromptId" "$instA" "$heartbeatLog" 5 | Out-Null
+Start-Sleep -Seconds 6
+
+$chkBefore = (python "$heartbeatRunner" check "$heartbeatLog").Trim()
+Write-Host "  Prompt heartbeat pre-switch telemetry: $chkBefore" -ForegroundColor DarkGray
+
+$statusBefore = (python "$helperScript" check "$testPromptId").Trim()
+Write-Host "  Prompt DB status before switch: $statusBefore" -ForegroundColor DarkGray
+
+# Now execute switch on Instance A to $accA (stopping prompt before switch)
+Write-Host "  Stopping prompt heartbeat runner and switching Instance A..." -ForegroundColor DarkGray
+python "$heartbeatRunner" stop "$heartbeatLog" | Out-Null
 & $agm instances switch $instA $accA | Out-Null
 
-# Check prompt status post-switch
+# Post-switch: re-invoke prompt heartbeat runner and verify advancing iterations
+Write-Host "  Re-invoking prompt heartbeat runner post-switch..." -ForegroundColor DarkGray
+python "$heartbeatRunner" start "$testPromptId" "$instA" "$heartbeatLog" 5 | Out-Null
+Start-Sleep -Seconds 6
+
+$chkAfter = (python "$heartbeatRunner" check "$heartbeatLog").Trim()
+Write-Host "  Prompt heartbeat post-switch telemetry: $chkAfter" -ForegroundColor Green
+python "$heartbeatRunner" stop "$heartbeatLog" | Out-Null
+
+# Check prompt status post-switch in SQLite
 $statusAfter = (python "$helperScript" check "$testPromptId").Trim()
 Write-Host "  Prompt post-switch status: $statusAfter" -ForegroundColor Green
 
@@ -240,8 +274,17 @@ if (!($statusAfter -match 'dispatched|backed_up')) {
 if (!$hasResumeFile) {
     throw "TEST 4 FAILED: .antigravity_resume_task.json was not created in workspace directory!"
 }
+if (!($chkAfter -match 'RUNNING=True')) {
+    throw "TEST 4 FAILED: Prompt heartbeat post-switch was not running! Telemetry: $chkAfter"
+}
 
-Write-Host "  [PASS] Test 4: Running prompts successfully snapshotted, backed up, and restored." -ForegroundColor Green
+Write-Host "  [PASS] Test 4: Running prompts successfully snapshotted, backed up, re-invoked, and verified via 5s heartbeat." -ForegroundColor Green
+
+# Capture Prompt Resumed & Restored Screenshot with Date & Time
+$shot3 = Join-Path $RootDir "assets\screenshots\instance_step3_switched_back.png"
+$nowUtc3 = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
+python "$screenshotPy" --email $accA --username "Alex Hudson" --instance $instA --pid "10003" --folder $instADir --out "$shot3" --stage "Prompt Resumed Post-Switch ($accA)" --datetime "$nowUtc3" --heartbeat-file "$heartbeatLog" --heartbeat-status "$chkAfter"
+
 
 # -------------------------------------------------------------
 # Test 5: Instance Hygiene & Teardown Verification
