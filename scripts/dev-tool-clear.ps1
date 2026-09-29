@@ -78,14 +78,18 @@ python "$RootDir/03-ai-scripts/19-artifact-remover.py" --clean-temp --clean-pyca
 # 3. Clean AGM application caches and conversations across all candidate directories using agm CLI
 Write-Host "[3/3] Pruning old Antigravity conversations on all directories (keeping latest $KeepCount)..." -ForegroundColor Yellow
 
-if (Get-Command "agm" -ErrorAction SilentlyContinue) {
+if (Get-Command "adm" -ErrorAction SilentlyContinue) {
+    adm clear k $KeepCount
+} elseif (Get-Command "agm" -ErrorAction SilentlyContinue) {
     agm clear k $KeepCount
+} elseif (Test-Path (Join-Path $RootDir "adm.cmd")) {
+    & (Join-Path $RootDir "adm.cmd") clear k $KeepCount
 } elseif (Test-Path $localAgm) {
     & $localAgm clear k $KeepCount
 } elseif (Test-Path $cargoAgm) {
     & $cargoAgm clear k $KeepCount
 } else {
-    Write-Host "  agm.exe not found on PATH; attempting cargo run..." -ForegroundColor DarkGray
+    Write-Host "  agm/adm not found on PATH; attempting cargo run..." -ForegroundColor DarkGray
     Push-Location (Join-Path $RootDir "src-tauri")
     try {
         cargo run --bin agm -- clear k $KeepCount

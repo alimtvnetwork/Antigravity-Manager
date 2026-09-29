@@ -256,7 +256,11 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
 
         // If checking default (target_ide != Some("ide") and not starting with instance:),
         // we MUST ignore any process whose command line points to an isolated sandbox instance
-        if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
+        if target_ide != Some("ide")
+            && !target_ide
+                .map(|t| t.starts_with("instance:"))
+                .unwrap_or(false)
+        {
             let is_instance_sandbox = args_str.contains(".antigravity_tools")
                 || args_str.contains("/instances/")
                 || args_str.contains("\\instances\\");
@@ -391,6 +395,45 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             }
         }
 
+        let args = process.cmd();
+        let args_str = args
+            .iter()
+            .map(|arg| arg.to_string_lossy().to_lowercase().replace('\\', "/"))
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        let is_instance_sandbox = args_str.contains(".antigravity_tools")
+            || args_str.contains("/instances/")
+            || args_str.contains("--user-data-dir");
+
+        // Target discrimination: Protect instances from default operations and default from instance operations
+        if let Some(t) = target_ide {
+            if let Some(inst_id) = t.strip_prefix("instance:") {
+                if inst_id == "default" {
+                    if is_instance_sandbox {
+                        continue;
+                    }
+                } else {
+                    let id_norm = inst_id.to_lowercase();
+                    let needle = format!("/instances/{}/", id_norm);
+                    let needle_alt = format!("/instances/{}", id_norm);
+                    let matches_inst = args_str.contains(&needle) || args_str.contains(&needle_alt);
+                    if !matches_inst || !args_str.contains("--user-data-dir") {
+                        continue;
+                    }
+                }
+            } else if t == "ide" {
+                if is_instance_sandbox {
+                    continue;
+                }
+            }
+        } else {
+            // Default target (target_ide == None): NEVER match isolated sandbox instances!
+            if is_instance_sandbox {
+                continue;
+            }
+        }
+
         // Recognition ref IDE manual path: If the process exactly matches the configured IDE path,
         // NEVER add it to kill list regardless of target_ide
         if let (Some(ref ide_m_path), Some(p_exe)) = (&ide_manual_path, process.exe()) {
@@ -431,7 +474,6 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
                 if matches {
                     #[cfg(target_os = "macos")]
                     let is_main = {
-                        let args = process.cmd();
                         let is_helper_by_args = args
                             .iter()
                             .any(|arg| arg.to_string_lossy().contains("--type="));
@@ -479,25 +521,7 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             .to_lowercase();
 
         // Common helper process exclusion logic
-        let args = process.cmd();
-        let args_str = args
-            .iter()
-            .map(|arg| arg.to_string_lossy().to_lowercase())
-            .collect::<Vec<String>>()
-            .join(" ");
-
         let is_helper = is_helper_process(&name, &args_str, &exe_path);
-
-        // If checking default (target_ide != Some("ide") and not starting with instance:),
-        // NEVER match isolated sandbox instances so we don't kill running instances
-        if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
-            let is_instance_sandbox = args_str.contains(".antigravity_tools")
-                || args_str.contains("/instances/")
-                || args_str.contains("\\instances\\");
-            if is_instance_sandbox {
-                continue;
-            }
-        }
 
         // Check if the process matches target_ide
         let is_ide_match = if target_ide == Some("ide") {
@@ -544,50 +568,55 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
         candidate_dirs.push(user_data_dir);
     }
 
-    // 2) Standard platform folders
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            let appdata_path = std::path::PathBuf::from(appdata);
-            candidate_dirs.push(appdata_path.join("Antigravity"));
-            candidate_dirs.push(appdata_path.join("Antigravity IDE"));
-            candidate_dirs.push(appdata_path.join("antigravity"));
-            candidate_dirs.push(appdata_path.join("antigravity-ide"));
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        if let Some(home) = dirs::home_dir() {
-            let app_sup = home.join("Library/Application Support");
-            candidate_dirs.push(app_sup.join("Antigravity"));
-            candidate_dirs.push(app_sup.join("Antigravity IDE"));
-            candidate_dirs.push(app_sup.join("antigravity"));
-            candidate_dirs.push(app_sup.join("antigravity-ide"));
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(home) = dirs::home_dir() {
-            let config_dir = home.join(".config");
-            candidate_dirs.push(config_dir.join("Antigravity"));
-            candidate_dirs.push(config_dir.join("Antigravity IDE"));
-            candidate_dirs.push(config_dir.join("antigravity"));
-            candidate_dirs.push(config_dir.join("antigravity-ide"));
-        }
-    }
-
-    // Also include registered instance data directories
-    if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
-        if let Ok(entries) = std::fs::read_dir(&instances_dir) {
-            for entry in entries.flatten() {
-                if let Ok(ft) = entry.file_type() {
-                    if ft.is_dir() {
-                        candidate_dirs.push(entry.path().join("data"));
-                        candidate_dirs.push(entry.path());
-                    }
+    // If targeting a specific instance, only clean that instance's directories and return
+    if let Some(t) = target_ide {
+        if let Some(inst_id) = t.strip_prefix("instance:") {
+            if inst_id != "default" {
+                if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
+                    let inst_root = instances_dir.join(inst_id);
+                    candidate_dirs.push(inst_root.join("data"));
+                    candidate_dirs.push(inst_root);
                 }
+            }
+        }
+    }
+
+    // 2) Standard platform folders (for default client or IDE)
+    let is_specific_instance = target_ide
+        .map(|t| t.starts_with("instance:") && t != "instance:default")
+        .unwrap_or(false);
+
+    if !is_specific_instance {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let appdata_path = std::path::PathBuf::from(appdata);
+                candidate_dirs.push(appdata_path.join("Antigravity"));
+                candidate_dirs.push(appdata_path.join("Antigravity IDE"));
+                candidate_dirs.push(appdata_path.join("antigravity"));
+                candidate_dirs.push(appdata_path.join("antigravity-ide"));
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(home) = dirs::home_dir() {
+                let app_sup = home.join("Library/Application Support");
+                candidate_dirs.push(app_sup.join("Antigravity"));
+                candidate_dirs.push(app_sup.join("Antigravity IDE"));
+                candidate_dirs.push(app_sup.join("antigravity"));
+                candidate_dirs.push(app_sup.join("antigravity-ide"));
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(home) = dirs::home_dir() {
+                let config_dir = home.join(".config");
+                candidate_dirs.push(config_dir.join("Antigravity"));
+                candidate_dirs.push(config_dir.join("Antigravity IDE"));
+                candidate_dirs.push(config_dir.join("antigravity"));
+                candidate_dirs.push(config_dir.join("antigravity-ide"));
             }
         }
     }
@@ -648,6 +677,13 @@ pub fn sweep_orphan_language_servers() {
             && !exe_path.contains("antigravity ide")
             && !exe_path.contains("antigravity-ide")
         {
+            if let Some(parent) = process.parent() {
+                if system.process(parent).is_some() {
+                    // Parent process is still active; this language_server is not an orphan
+                    continue;
+                }
+            }
+
             let pid_u32 = pid.as_u32();
             crate::modules::logger::log_info(&format!(
                 "Sweeping orphan language_server process (PID: {}, Path: {})",
@@ -827,16 +863,14 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
             sweep_orphan_language_servers();
         }
 
-        // Safety fallback: sweep any lingering Antigravity image trees
-        let image_name = if target_ide == Some("ide") {
-            "Antigravity IDE.exe"
-        } else {
-            "Antigravity.exe"
-        };
-        let _ = Command::new("taskkill")
-            .args(["/F", "/T", "/IM", image_name])
-            .creation_flags(0x08000000)
-            .output();
+        // Safety fallback: re-sweep any lingering target PIDs if needed
+        let remaining_pids = get_antigravity_pids(target_ide);
+        for pid in remaining_pids {
+            let _ = Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000)
+                .output();
+        }
 
         // Drain verification loop: wait up to 2500ms for all processes to completely exit
         let start_wait = std::time::Instant::now();
@@ -1478,18 +1512,16 @@ pub fn clean_and_restart_workspace(target_ide: Option<&str>) -> Result<String, S
     // 1. Force tree-kill all Antigravity processes
     let _ = close_antigravity(5, target_ide);
 
-    // 2. Extra safety sweep: purge any remaining image processes on Windows
+    // 2. Extra safety sweep: purge any remaining target PIDs on Windows
     #[cfg(target_os = "windows")]
     {
-        let image_name = if target_ide == Some("ide") {
-            "Antigravity IDE.exe"
-        } else {
-            "Antigravity.exe"
-        };
-        let _ = Command::new("taskkill")
-            .args(["/F", "/T", "/IM", image_name])
-            .creation_flags(0x08000000)
-            .output();
+        let remaining_pids = get_antigravity_pids(target_ide);
+        for pid in remaining_pids {
+            let _ = Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000)
+                .output();
+        }
     }
 
     // 3. Purge all lockfiles
@@ -1560,8 +1592,36 @@ fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Op
             let path = Some(exe.to_path_buf());
             let args = Some(clean_args);
 
-            // Is the process a match for target_ide?
-            if target_ide != Some("ide") && !target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false) {
+            // Target discrimination: Protect instances from default operations and default from instance operations
+            if let Some(t) = target_ide {
+                if let Some(inst_id) = t.strip_prefix("instance:") {
+                    if inst_id == "default" {
+                        let is_instance_sandbox = args_str.contains(".antigravity_tools")
+                            || args_str.contains("/instances/")
+                            || args_str.contains("\\instances\\");
+                        if is_instance_sandbox {
+                            continue;
+                        }
+                    } else {
+                        let id_norm = inst_id.to_lowercase();
+                        let needle = format!("/instances/{}/", id_norm);
+                        let needle_alt = format!("/instances/{}", id_norm);
+                        let matches_inst =
+                            args_str.contains(&needle) || args_str.contains(&needle_alt);
+                        if !matches_inst || !args_str.contains("--user-data-dir") {
+                            continue;
+                        }
+                    }
+                } else if t == "ide" {
+                    let is_instance_sandbox = args_str.contains(".antigravity_tools")
+                        || args_str.contains("/instances/")
+                        || args_str.contains("\\instances\\");
+                    if is_instance_sandbox {
+                        continue;
+                    }
+                }
+            } else {
+                // Default target (target_ide == None): NEVER match isolated sandbox instances!
                 let is_instance_sandbox = args_str.contains(".antigravity_tools")
                     || args_str.contains("/instances/")
                     || args_str.contains("\\instances\\");
@@ -1627,7 +1687,9 @@ pub fn get_args_from_running_process(target_ide: Option<&str>) -> Option<Vec<Str
 
 /// Get --user-data-dir argument value (if exists)
 pub fn get_user_data_dir_from_process(target_ide: Option<&str>) -> Option<std::path::PathBuf> {
-    let is_instance_target = target_ide.map(|t| t.starts_with("instance:")).unwrap_or(false);
+    let is_instance_target = target_ide
+        .map(|t| t.starts_with("instance:"))
+        .unwrap_or(false);
 
     // Prefer getting startup arguments from config
     if let Ok(config) = crate::modules::config::load_app_config() {

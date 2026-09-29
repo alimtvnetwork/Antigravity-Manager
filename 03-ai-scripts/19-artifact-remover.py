@@ -272,7 +272,7 @@ def collect_matching_artifacts(
             for f in files:
                 p_file = Path(r) / f
                 ext = os.path.splitext(f)[1].lower()
-                if ext in {".pdb", ".d", ".o"} and ("target" in p_file.parts):
+                if (ext in {".pdb", ".d", ".o"} and ("target" in p_file.parts)) or (f == ".cargo-lock" and ("target" in p_file.parts)):
                     candidates.append(p_file)
 
     # 6. Extensible Custom Extension Filter (--add-ext)

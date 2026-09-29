@@ -393,7 +393,8 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
             Ok(_) => {
                 pruned_bytes += sz;
                 let conv_base_opt = db_src.parent().and_then(|p| p.parent());
-                let brain_src_opt = conv_base_opt.map(|b| b.join("brain").join(&conv.conversation_id));
+                let brain_src_opt =
+                    conv_base_opt.map(|b| b.join("brain").join(&conv.conversation_id));
                 let mut brain_staged_str = None;
                 let mut brain_orig_str = None;
 

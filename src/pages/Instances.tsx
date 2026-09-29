@@ -21,11 +21,15 @@ import {
     Circle,
     Sparkles,
     Star,
+    ToggleLeft,
+    ToggleRight,
+    ArrowRightLeft,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
+import type { InstanceStatus } from '../services/instanceService';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
@@ -102,10 +106,12 @@ export default function Instances() {
         wipeSession,
         launchInstance,
         cloneInstanceExecutable,
-        closeInstance,
+        stopInstance,
+        fastForwardInstance,
+        toggleAutoSwitcher,
         setActiveInstance,
         setDefaultInstance,
-        smartRotateProfileAccount,
+        switchAccountToInstance,
         cleanAndRestartWorkspace,
     } = useInstanceStore();
 
@@ -119,6 +125,11 @@ export default function Instances() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState('');
+    const [newInstanceBoundAccount, setNewInstanceBoundAccount] = useState<string>('');
+    const [newInstanceFromInstance, setNewInstanceFromInstance] = useState<string>('');
+    const [newInstanceLaunchImmediately, setNewInstanceLaunchImmediately] = useState<boolean>(false);
+    const [switchTargetInstance, setSwitchTargetInstance] = useState<InstanceStatus | null>(null);
+    const [accountSearchQuery, setAccountSearchQuery] = useState<string>('');
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [copyInstanceName, setCopyInstanceName] = useState('');
     const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
@@ -153,10 +164,24 @@ export default function Instances() {
         if (!newInstanceName.trim()) return;
         setActionError(null);
         try {
-            const created = await createInstance(newInstanceName.trim());
+            const created = await createInstance(
+                newInstanceName.trim(),
+                newInstanceBoundAccount ? newInstanceBoundAccount : undefined,
+                newInstanceFromInstance ? newInstanceFromInstance : undefined
+            );
             await setActiveInstance(created.id);
+            if (newInstanceLaunchImmediately) {
+                await launchInstance(created.id);
+            }
             setNewInstanceName('');
+            setNewInstanceBoundAccount('');
+            setNewInstanceFromInstance('');
+            setNewInstanceLaunchImmediately(false);
             setIsCreateOpen(false);
+            showToast(
+                `Created profile '${created.name}'${newInstanceLaunchImmediately ? ' & launched' : ''}`,
+                'success'
+            );
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to create instance');
         }
@@ -222,7 +247,7 @@ export default function Instances() {
         setActionError(null);
         try {
             const cloned = await cloneInstanceExecutable(id);
-            alert(`Executable cloned successfully:\n${cloned}`);
+            showToast(`Executable cloned successfully: ${cloned}`, 'success');
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to clone executable');
         }
@@ -283,6 +308,52 @@ export default function Instances() {
                     >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span className="hidden md:inline">Clean & Restart</span>
+                    </button>
+                    <button
+                        onClick={async () => {
+                            try {
+                                await toggleAutoSwitcher();
+                                showToast(
+                                    switcherStatus?.is_running
+                                        ? 'Auto-Switcher disabled'
+                                        : 'Auto-Switcher enabled',
+                                    'success'
+                                );
+                            } catch (e: any) {
+                                setActionError(e?.toString() || 'Failed to toggle Auto Switcher');
+                            }
+                        }}
+                        disabled={isLoading}
+                        className={cn(
+                            "btn btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer border",
+                            switcherStatus?.is_running
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                : "btn-ghost border-gray-200 dark:border-base-100 text-gray-600 dark:text-gray-400"
+                        )}
+                        title="Toggle background auto-profile switcher daemon"
+                    >
+                        {switcherStatus?.is_running ? (
+                            <ToggleRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                            <ToggleLeft className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span>Auto-Switch: {switcherStatus?.is_running ? 'ON' : 'OFF'}</span>
+                    </button>
+                    <button
+                        onClick={async () => {
+                            try {
+                                const msg = await triggerManualRotation();
+                                showToast(msg || 'Evaluated quota across instances!', 'success');
+                            } catch (e: any) {
+                                setActionError(e?.toString() || 'Failed to trigger quota evaluation');
+                            }
+                        }}
+                        disabled={isLoading}
+                        className="btn btn-ghost border border-gray-200 dark:border-base-100 text-gray-600 dark:text-gray-400 btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer hover:text-blue-600"
+                        title="Evaluate rolling quota across all monitored instances and auto-rotate any low quota accounts"
+                    >
+                        <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
+                        <span className="hidden lg:inline">Eval Quota</span>
                     </button>
                     <button
                         onClick={() => {
@@ -349,7 +420,7 @@ export default function Instances() {
                         onClick={async () => {
                             try {
                                 const msg = await triggerManualRotation();
-                                alert(msg);
+                                showToast(msg || 'Rotated to next best profile!', 'success');
                             } catch (e: any) {
                                 setActionError(e?.toString() || 'Rotation failed');
                             }
@@ -729,12 +800,12 @@ export default function Instances() {
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             {inst.is_running ? (
                                                 <button
-                                                    onClick={() => closeInstance(inst.config.id)}
+                                                    onClick={() => stopInstance(inst.config.id)}
                                                     className="btn btn-xs btn-error btn-outline gap-1 cursor-pointer"
-                                                    title="Gracefully close this instance window"
+                                                    title="Gracefully stop this instance window"
                                                 >
                                                     <Square className="w-3 h-3" />
-                                                    <span>Close</span>
+                                                    <span>Stop</span>
                                                 </button>
                                             ) : (
                                                 <button
@@ -746,28 +817,30 @@ export default function Instances() {
                                                     <span>Launch</span>
                                                 </button>
                                             )}
-                                            {/* Smart Switch Button with Process Teardown & Candidate Refill Runway */}
+                                            {/* Explicit Switch Account Button */}
+                                            <button
+                                                onClick={() => setSwitchTargetInstance(inst)}
+                                                className="btn btn-xs btn-outline btn-info gap-1 cursor-pointer"
+                                                title="Explicitly select and switch this instance to any registered account"
+                                            >
+                                                <ArrowRightLeft className="w-3 h-3" />
+                                                <span>Switch</span>
+                                            </button>
+                                            {/* Fast Forward Button */}
                                             <button
                                                 onClick={async () => {
                                                     try {
-                                                        const result = await smartRotateProfileAccount(inst.config.id);
-                                                        const runwayInfo = result.daysUntilRefill > 0 ? ` (${result.daysUntilRefill}d refill runway)` : '';
-                                                        const resumeInfo = (result.resumedProjectsCount ?? 0) > 0
-                                                            ? ` · Auto-resumed ${result.resumedProjectsCount} active project(s) (<1h)`
-                                                            : '';
-                                                        showToast(
-                                                            `Closed process & switched ${result.instanceName} to ${result.accountEmail}${runwayInfo}${resumeInfo}`,
-                                                            'success'
-                                                        );
+                                                        const msg = await fastForwardInstance(inst.config.id);
+                                                        showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
                                                     } catch (e: any) {
-                                                        setActionError(e?.toString() || 'Smart switch failed');
+                                                        setActionError(e?.toString() || 'Fast forward failed');
                                                     }
                                                 }}
                                                 className="btn btn-xs btn-primary btn-outline gap-1 cursor-pointer"
-                                                title="Smart Switch: Close process, pick account with longest refill runway, and switch"
+                                                title="Fast Forward: Automatically rotate to the next healthiest profile in pool"
                                             >
                                                 <FastForward className="w-3 h-3" />
-                                                <span>Smart Switch</span>
+                                                <span>FF</span>
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -827,18 +900,72 @@ export default function Instances() {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                             Creates an isolated Antigravity profile folder with its own SQLite token store, extensions, and configuration.
                         </p>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Profile Name
+                        </label>
                         <input
                             type="text"
                             placeholder={t('instances.name_placeholder', 'Profile name (e.g., Personal, Client Work)')}
                             value={newInstanceName}
                             onChange={(e) => setNewInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-5 text-sm"
+                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-sm"
                             autoFocus
                         />
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Initial Account (Optional)
+                        </label>
+                        <select
+                            value={newInstanceBoundAccount}
+                            onChange={(e) => setNewInstanceBoundAccount(e.target.value)}
+                            className="select select-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-xs"
+                        >
+                            <option value="">Auto-assign next available account</option>
+                            {accounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>
+                                    {acc.email} ({acc.quota?.subscription_tier || 'FREE'})
+                                </option>
+                            ))}
+                        </select>
+
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Clone Settings & Extensions From (Optional)
+                        </label>
+                        <select
+                            value={newInstanceFromInstance}
+                            onChange={(e) => setNewInstanceFromInstance(e.target.value)}
+                            className="select select-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-xs"
+                        >
+                            <option value="">Blank profile (clean isolated sandbox)</option>
+                            {instances.map(inst => (
+                                <option key={inst.config.id} value={inst.config.id}>
+                                    {inst.config.name} {inst.config.is_default ? '(Default)' : ''}
+                                </option>
+                            ))}
+                        </select>
+
+                        <div className="flex items-center gap-2 mb-5">
+                            <input
+                                type="checkbox"
+                                id="launch-immediately-check"
+                                checked={newInstanceLaunchImmediately}
+                                onChange={(e) => setNewInstanceLaunchImmediately(e.target.checked)}
+                                className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer"
+                            />
+                            <label htmlFor="launch-immediately-check" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                                Launch Antigravity window immediately after creation
+                            </label>
+                        </div>
+
                         <div className="flex justify-end gap-2.5">
                             <button
-                                onClick={() => setIsCreateOpen(false)}
+                                onClick={() => {
+                                    setIsCreateOpen(false);
+                                    setNewInstanceName('');
+                                    setNewInstanceBoundAccount('');
+                                    setNewInstanceFromInstance('');
+                                    setNewInstanceLaunchImmediately(false);
+                                }}
                                 className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
                             >
                                 {t('common.cancel', 'Cancel')}
@@ -849,6 +976,153 @@ export default function Instances() {
                                 className="btn btn-primary btn-sm"
                             >
                                 {t('common.create', 'Create Profile')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Switch Account Modal */}
+            {switchTargetInstance && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100 dark:border-base-100 max-h-[85vh] flex flex-col">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100">
+                            <div className="flex items-center gap-2.5">
+                                <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+                                <div>
+                                    <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                        Switch Account for {switchTargetInstance.config.name}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        Currently bound: <span className="font-mono font-medium">{switchTargetInstance.config.bound_email || 'None'}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSwitchTargetInstance(null);
+                                    setAccountSearchQuery('');
+                                }}
+                                className="btn btn-ghost btn-xs btn-circle"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="pt-2 pb-1">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={accountSearchQuery}
+                                    onChange={(e) => setAccountSearchQuery(e.target.value)}
+                                    placeholder="Filter accounts by email or ID..."
+                                    className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-base-content"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="overflow-y-auto py-2 space-y-2 flex-1 my-1 pr-1">
+                            {accounts.filter(a => {
+                                const q = accountSearchQuery.toLowerCase().trim();
+                                if (!q) return true;
+                                return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
+                            }).length === 0 ? (
+                                <p className="text-xs text-gray-400 text-center py-4">No accounts matching filter.</p>
+                            ) : (
+                                accounts
+                                    .filter(a => {
+                                        const q = accountSearchQuery.toLowerCase().trim();
+                                        if (!q) return true;
+                                        return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
+                                    })
+                                    .map((acc) => {
+                                    const isCurrent = switchTargetInstance.config.bound_account_id === acc.id ||
+                                        (switchTargetInstance.config.bound_email && switchTargetInstance.config.bound_email.toLowerCase() === acc.email.toLowerCase());
+                                    const proModel = findQuotaModel(acc.quota?.models, 'gemini-pro');
+                                    const flashModel = findQuotaModel(acc.quota?.models, 'gemini-flash');
+                                    const model = proModel || flashModel;
+                                    const pct = model ? Math.min(100, Math.max(0, model.percentage)) : 0;
+                                    const tier = (acc.quota?.subscription_tier || 'FREE').toUpperCase();
+
+                                    return (
+                                        <div
+                                            key={acc.id}
+                                            className={cn(
+                                                "p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors",
+                                                isCurrent
+                                                    ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
+                                                    : "bg-gray-50/60 dark:bg-base-100/60 border-gray-100 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-300"
+                                            )}
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-mono text-xs font-semibold text-gray-900 dark:text-base-content truncate">
+                                                        {acc.email}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "text-[9px] font-bold px-1.5 py-0.5 rounded",
+                                                        tier.includes('ULTRA') ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" :
+                                                        tier.includes('PRO') ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+                                                        "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400"
+                                                    )}>
+                                                        {tier}
+                                                    </span>
+                                                    {isCurrent ? (
+                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                                            Active
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                                                    <span>Quota: {pct}%</span>
+                                                    <div className="w-24 h-1.5 bg-gray-200 dark:bg-base-300 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={cn(
+                                                                "h-full rounded-full",
+                                                                pct >= 50 ? "bg-emerald-500" : pct >= 20 ? "bg-amber-500" : "bg-rose-500"
+                                                            )}
+                                                            style={{ width: `${pct}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                disabled={isCurrent || isLoading}
+                                                onClick={async () => {
+                                                    setActionError(null);
+                                                    try {
+                                                        await switchAccountToInstance(acc.id, switchTargetInstance.config.id);
+                                                        showToast(`Switched ${switchTargetInstance.config.name} to ${acc.email}`, 'success');
+                                                        setSwitchTargetInstance(null);
+                                                        setAccountSearchQuery('');
+                                                    } catch (e: any) {
+                                                        setActionError(e?.toString() || 'Failed to switch account');
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "btn btn-xs",
+                                                    isCurrent ? "btn-disabled opacity-50" : "btn-primary"
+                                                )}
+                                            >
+                                                {isCurrent ? 'Current' : 'Select'}
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-base-100">
+                            <button
+                                onClick={() => {
+                                    setSwitchTargetInstance(null);
+                                    setAccountSearchQuery('');
+                                }}
+                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
+                            >
+                                {t('common.close', 'Close')}
                             </button>
                         </div>
                     </div>

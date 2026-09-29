@@ -681,22 +681,36 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
     Ok(())
 }
 
-/// 辅助方法：同步写入本地文件凭据 (~/.gemini/oauth_creds.json, ~/.gemini/google_accounts.json, 以及 ~/.gemini/jetski-standalone-oauth-token)
-/// 用于在 SSH 会话、容器环境或无系统 Keyring / D-Bus 的场景下保障 CLI/工具/Worker 的凭据兼容性
-pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), String> {
-    let home = match dirs::home_dir() {
-        Some(h) => h,
-        None => return Err("Failed to resolve user home directory".to_string()),
-    };
-    let gemini_dir = home.join(".gemini");
+/// 辅助方法：同步写入指定目录下的本地文件凭据 (<base_home>/.gemini/oauth_creds.json, google_accounts.json, jetski-standalone-oauth-token)
+pub fn write_to_file_credentials_at(
+    base_home: &std::path::Path,
+    account: &crate::models::Account,
+) -> Result<(), String> {
+    let gemini_dir = base_home.join(".gemini");
 
     if !gemini_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(&gemini_dir) {
             crate::modules::logger::log_warn(&format!(
-                "[Desktop] Failed to create .gemini directory: {}",
-                e
+                "[Desktop] Failed to create .gemini directory at {:?}: {}",
+                gemini_dir, e
             ));
             return Err(format!("Failed to create .gemini directory: {}", e));
+        }
+    }
+
+    // Also copy installation_id if it exists from global .gemini/antigravity/installation_id
+    if let Some(global_home) = dirs::home_dir() {
+        let global_inst_id = global_home
+            .join(".gemini")
+            .join("antigravity")
+            .join("installation_id");
+        if global_inst_id.exists() {
+            let target_antigravity = gemini_dir.join("antigravity");
+            let _ = std::fs::create_dir_all(&target_antigravity);
+            let target_inst_id = target_antigravity.join("installation_id");
+            if !target_inst_id.exists() {
+                let _ = std::fs::copy(&global_inst_id, &target_inst_id);
+            }
         }
     }
 
@@ -736,8 +750,8 @@ pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(),
 
     if let Err(e) = std::fs::write(&creds_path, json_str) {
         crate::modules::logger::log_warn(&format!(
-            "[Desktop] Failed to write oauth_creds.json: {}",
-            e
+            "[Desktop] Failed to write oauth_creds.json at {:?}: {}",
+            creds_path, e
         ));
         return Err(format!("Failed to write oauth_creds.json: {}", e));
     }
@@ -791,11 +805,21 @@ pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(),
     }
 
     crate::modules::logger::log_info(&format!(
-        "[Desktop] Successfully synced file-based credentials to ~/.gemini/ for: {}",
-        account.email
+        "[Desktop] Successfully synced file-based credentials to {:?} for: {}",
+        gemini_dir, account.email
     ));
 
     Ok(())
+}
+
+/// 辅助方法：同步写入本地文件凭据 (~/.gemini/oauth_creds.json, ~/.gemini/google_accounts.json, 以及 ~/.gemini/jetski-standalone-oauth-token)
+/// 用于在 SSH 会话、容器环境或无系统 Keyring / D-Bus 的场景下保障 CLI/工具/Worker 的凭据兼容性
+pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), String> {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return Err("Failed to resolve user home directory".to_string()),
+    };
+    write_to_file_credentials_at(&home, account)
 }
 
 /// 辅助方法：从本地文件凭据 (~/.gemini/oauth_creds.json) 读取 Token 作为跨平台回退

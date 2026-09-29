@@ -28,8 +28,16 @@ export async function listInstances(): Promise<InstanceStatus[]> {
     return await invoke('list_instances');
 }
 
-export async function createInstance(name: string): Promise<InstanceConfig> {
-    return await invoke('create_instance', { name });
+export async function createInstance(
+    name: string,
+    boundAccountId?: string,
+    fromInstanceId?: string
+): Promise<InstanceConfig> {
+    return await invoke('create_instance', {
+        name,
+        boundAccountId: boundAccountId || null,
+        fromInstanceId: fromInstanceId || null,
+    });
 }
 
 export async function copyInstance(
@@ -99,6 +107,14 @@ export async function setInstanceExecutable(instanceId: string, executablePath?:
 
 export async function closeInstance(instanceId: string): Promise<void> {
     return await invoke('close_instance', { instanceId });
+}
+
+export async function stopInstance(instanceId: string): Promise<void> {
+    return await invoke('stop_instance', { instanceId });
+}
+
+export async function fastForwardInstance(instanceId: string): Promise<string> {
+    return await invoke('fast_forward_instance', { instanceId });
 }
 
 export async function cleanAndRestartWorkspace(): Promise<string> {
@@ -220,6 +236,14 @@ export interface AutoSwitcherStatus {
 
 export async function getAutoSwitcherStatus(): Promise<AutoSwitcherStatus> {
     return await invoke('get_auto_switcher_status');
+}
+
+export async function getAutoSwitcherConfig(): Promise<AutoProfileSwitcherConfig> {
+    return await invoke('get_auto_switcher_config');
+}
+
+export async function toggleAutoSwitcher(): Promise<boolean> {
+    return await invoke('toggle_auto_switcher');
 }
 
 export async function updateAutoSwitcherConfig(config: AutoProfileSwitcherConfig): Promise<void> {

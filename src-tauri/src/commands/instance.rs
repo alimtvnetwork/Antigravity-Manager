@@ -7,8 +7,40 @@ pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
 }
 
 #[tauri::command]
-pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
-    instance::create_instance(name)
+pub fn create_instance(
+    name: String,
+    bound_account_id: Option<String>,
+    from_instance_id: Option<String>,
+) -> Result<InstanceConfig, String> {
+    let mut cfg = if let Some(ref source) = from_instance_id {
+        let resolved_src = instance::resolve_instance_id(source).unwrap_or_else(|_| source.clone());
+        instance::copy_instance(&resolved_src, name.clone(), Some("full"))?
+    } else {
+        instance::create_instance_with_account(name, bound_account_id.as_deref())?
+    };
+
+    if let Some(ref acc_id) = bound_account_id {
+        if from_instance_id.is_some() {
+            let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+            let _ = rt.block_on(instance::switch_account_to_instance(acc_id, Some(&cfg.id)));
+            if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                cfg.bound_account_id = Some(acc.id);
+                cfg.bound_email = Some(acc.email);
+            }
+        }
+    }
+
+    Ok(cfg)
+}
+
+#[tauri::command]
+pub fn stop_instance(instance_id: String) -> Result<(), String> {
+    instance::stop_instance(&instance_id)
+}
+
+#[tauri::command]
+pub async fn fast_forward_instance(instance_id: String) -> Result<String, String> {
+    crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id)).await
 }
 
 #[tauri::command]
@@ -89,6 +121,27 @@ pub async fn switch_account_to_instance(
     instance_id: Option<String>,
 ) -> Result<(), String> {
     instance::switch_account_to_instance(&account_id, instance_id.as_deref()).await
+}
+
+#[tauri::command]
+pub fn get_auto_switcher_config() -> Result<crate::models::config::AutoProfileSwitcherConfig, String>
+{
+    let app_config = crate::modules::config::load_app_config()?;
+    Ok(app_config.auto_profile_switcher)
+}
+
+#[tauri::command]
+pub fn toggle_auto_switcher() -> Result<bool, String> {
+    let mut app_config = crate::modules::config::load_app_config()?;
+    let new_val = !app_config.auto_profile_switcher.is_enabled;
+    app_config.auto_profile_switcher.is_enabled = new_val;
+    crate::modules::config::save_app_config(&app_config)?;
+    if new_val {
+        tokio::spawn(async move {
+            let _ = crate::modules::auto_switcher::check_and_rotate_if_needed().await;
+        });
+    }
+    Ok(new_val)
 }
 
 #[tauri::command]

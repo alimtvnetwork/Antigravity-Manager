@@ -19,6 +19,17 @@ pub fn get_instances_dir() -> Result<PathBuf, String> {
     Ok(instances_dir)
 }
 
+/// Resolve or create the isolated home directory for an instance
+pub fn get_instance_home_dir(instance_id: &str) -> Result<PathBuf, String> {
+    let instances_root = get_instances_dir()?;
+    let home_dir = instances_root.join(instance_id).join("home");
+    if !home_dir.exists() {
+        fs::create_dir_all(&home_dir)
+            .map_err(|e| format!("Failed to create instance home directory: {}", e))?;
+    }
+    Ok(home_dir)
+}
+
 /// Path to instances.json registry
 pub fn get_registry_path() -> Result<PathBuf, String> {
     let dir = get_instances_dir()?;
@@ -428,8 +439,11 @@ pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
     Ok(statuses)
 }
 
-/// Create a new isolated profile
-pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
+/// Create a new isolated profile with optional specific account binding
+pub fn create_instance_with_account(
+    name: String,
+    target_acc: Option<&str>,
+) -> Result<InstanceConfig, String> {
     let mut registry = load_registry()?;
     let trimmed_name = name.trim();
     if trimmed_name.is_empty() {
@@ -448,9 +462,12 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 
     let instances_root = get_instances_dir()?;
     let instance_data_dir = instances_root.join(&instance_id).join("data");
+    let instance_home_dir = instances_root.join(&instance_id).join("home");
 
     fs::create_dir_all(&instance_data_dir)
         .map_err(|e| format!("Failed to create instance directory: {}", e))?;
+    fs::create_dir_all(&instance_home_dir)
+        .map_err(|e| format!("Failed to create instance home directory: {}", e))?;
 
     let user_dir = instance_data_dir.join("User");
     let _ = fs::create_dir_all(&user_dir);
@@ -477,14 +494,30 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
             .iter()
             .filter_map(|i| i.bound_account_id.clone())
             .collect();
-        let candidate = accounts
-            .iter()
-            .find(|a| !bound_ids.contains(&a.id))
-            .or_else(|| accounts.first());
+
+        let candidate = if let Some(query) = target_acc.map(str::trim).filter(|q| !q.is_empty()) {
+            let q_lower = query.to_lowercase();
+            accounts
+                .iter()
+                .find(|a| {
+                    a.id == query
+                        || a.email.to_lowercase() == q_lower
+                        || a.email.to_lowercase().contains(&q_lower)
+                })
+                .or_else(|| accounts.first())
+        } else {
+            accounts
+                .iter()
+                .find(|a| !bound_ids.contains(&a.id))
+                .or_else(|| accounts.first())
+        };
 
         if let Some(acc) = candidate {
             bound_acc_id = Some(acc.id.clone());
             bound_acc_email = Some(acc.email.clone());
+
+            let _ =
+                crate::modules::integration::write_to_file_credentials_at(&instance_home_dir, acc);
 
             let db_dir = instance_data_dir.join("User").join("globalStorage");
             let _ = fs::create_dir_all(&db_dir);
@@ -508,8 +541,7 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
                 .unwrap_or_else(crate::modules::device::generate_profile);
             let storage_path = db_dir.join("storage.json");
             let _ = crate::modules::device::write_profile(&storage_path, &profile);
-            let _ =
-                crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
         }
     }
 
@@ -532,6 +564,16 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
     save_registry(&registry)?;
 
     Ok(config)
+}
+
+/// Create a new isolated profile (defaults to next available account)
+pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
+    create_instance_with_account(name, None)
+}
+
+/// Stop an instance process cleanly
+pub fn stop_instance(instance_id: &str) -> Result<(), String> {
+    close_instance(instance_id)
 }
 
 /// Copy/clone an existing profile (full directory copy by default, or profile only)
@@ -581,6 +623,11 @@ pub fn copy_instance(
             let _ = crate::modules::db::sanitize_session(&cloned_db);
             if let Some(ref acc_id) = new_instance.bound_account_id {
                 if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                    if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {
+                        let _ = crate::modules::integration::write_to_file_credentials_at(
+                            &new_home, &acc,
+                        );
+                    }
                     let _ = crate::modules::db::inject_token(
                         &cloned_db,
                         &acc.token.access_token,
@@ -924,13 +971,14 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             crate::error::AppError::Config(format!("Instance {} not found", instance_id))
         })?;
 
-    let config = &mut registry.instances[pos];
-    config.last_used = chrono::Utc::now().timestamp();
-    let data_dir = config.data_dir.clone();
-    let is_default = config.is_default;
-    let custom_exe = config.executable_path.clone();
-    let extensions_dir = config.extensions_dir.clone();
-    let bound_acc = config.bound_account_id.clone();
+    let data_dir = registry.instances[pos].data_dir.clone();
+    let is_default = registry.instances[pos].is_default;
+    let custom_exe = registry.instances[pos].executable_path.clone();
+    let extensions_dir = registry.instances[pos].extensions_dir.clone();
+    let bound_acc = registry.instances[pos].bound_account_id.clone();
+    let bound_email = registry.instances[pos].bound_email.clone();
+    registry.instances[pos].last_used = chrono::Utc::now().timestamp();
+    registry.active_instance_id = instance_id.to_string();
     save_registry(&registry).map_err(crate::error::AppError::Config)?;
 
     let target_data_path = PathBuf::from(&data_dir);
@@ -989,47 +1037,71 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
     }
 
     // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb and system keyring AFTER process exit.
-    if let Some(ref account_id) = bound_acc {
-        if let Ok(account) = crate::modules::account::load_account(account_id) {
+    let resolved_account = if let Some(ref account_id) = bound_acc {
+        crate::modules::account::load_account(account_id)
+            .ok()
+            .or_else(|| {
+                bound_email.as_ref().and_then(|em| {
+                    crate::modules::account::get_account_by_email(em)
+                        .ok()
+                        .flatten()
+                })
+            })
+    } else if let Some(ref email) = bound_email {
+        crate::modules::account::get_account_by_email(email)
+            .ok()
+            .flatten()
+    } else if is_default {
+        crate::modules::account::get_current_account()
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+
+    if let Some(account) = resolved_account {
+        if is_default {
             let _ = crate::modules::integration::write_to_system_keyring(&account);
             let _ = crate::modules::integration::write_to_file_credentials(&account);
             let _ = crate::modules::account::set_current_account_id(&account.id);
+        }
+        if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, &account);
+        }
 
-            let db_dir = target_data_path.join("User").join("globalStorage");
-            let has_db_dir = db_dir.exists();
-            if !has_db_dir {
-                let _ = fs::create_dir_all(&db_dir);
-            }
-            let db_path = db_dir.join("state.vscdb");
-            let _ = crate::modules::db::inject_token(
-                &db_path,
-                &account.token.access_token,
-                &account.token.refresh_token,
-                account.token.expiry_timestamp,
-                &account.email,
-                account.token.is_gcp_tos,
-                account.token.project_id.as_deref(),
-                account.token.id_token.as_deref(),
-                account.token.oauth_client_key.as_deref(),
-                None,
-            );
+        let db_dir = target_data_path.join("User").join("globalStorage");
+        let has_db_dir = db_dir.exists();
+        if !has_db_dir {
+            let _ = fs::create_dir_all(&db_dir);
+        }
+        let db_path = db_dir.join("state.vscdb");
+        let _ = crate::modules::db::inject_token(
+            &db_path,
+            &account.token.access_token,
+            &account.token.refresh_token,
+            account.token.expiry_timestamp,
+            &account.email,
+            account.token.is_gcp_tos,
+            account.token.project_id.as_deref(),
+            account.token.id_token.as_deref(),
+            account.token.oauth_client_key.as_deref(),
+            None,
+        );
 
-            if let Some(ref profile) = account.device_profile {
-                let _ =
-                    crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
-                let storage_path = db_dir.join("storage.json");
-                let _ = crate::modules::device::write_profile(&storage_path, profile);
-            }
+        if let Some(ref profile) = account.device_profile {
+            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            let storage_path = db_dir.join("storage.json");
+            let _ = crate::modules::device::write_profile(&storage_path, profile);
+        }
 
-            // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
-            let local_storage = target_data_path.join("Local Storage");
-            if local_storage.exists() {
-                let _ = fs::remove_dir_all(&local_storage);
-            }
-            let session_storage = target_data_path.join("Session Storage");
-            if session_storage.exists() {
-                let _ = fs::remove_dir_all(&session_storage);
-            }
+        // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
+        let local_storage = target_data_path.join("Local Storage");
+        if local_storage.exists() {
+            let _ = fs::remove_dir_all(&local_storage);
+        }
+        let session_storage = target_data_path.join("Session Storage");
+        if session_storage.exists() {
+            let _ = fs::remove_dir_all(&session_storage);
         }
     }
 
@@ -1047,6 +1119,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+                let _ = fs::create_dir_all(&inst_home);
+                cmd.env("HOME", &inst_home);
+            }
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1066,6 +1142,14 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             ))
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
+            Some(instance_id),
+            false,
+            None,
+        );
+        let _ =
+            crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
+        let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
         return Ok(());
     }
 
@@ -1077,6 +1161,23 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+                let _ = fs::create_dir_all(&inst_home);
+                #[cfg(target_os = "windows")]
+                {
+                    let home_str = inst_home.to_string_lossy().to_string();
+                    cmd.env("USERPROFILE", &home_str);
+                    cmd.env("HOME", &home_str);
+                    if home_str.len() >= 2 && &home_str[1..2] == ":" {
+                        cmd.env("HOMEDRIVE", &home_str[..2]);
+                        cmd.env("HOMEPATH", &home_str[2..]);
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    cmd.env("HOME", &inst_home);
+                }
+            }
         }
         if let Some(ref ext_dir) = extensions_dir {
             cmd.arg(format!("--extensions-dir={}", ext_dir));
@@ -1103,6 +1204,14 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
+            Some(instance_id),
+            false,
+            None,
+        );
+        let _ =
+            crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
+        let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
         Ok(())
     }
 }
@@ -1287,7 +1396,22 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             let is_antigravity =
                 proc_name.contains("antigravity") || proc_exe.contains("antigravity");
             if is_antigravity && !pids.contains(&saved_pid) {
-                pids.push(saved_pid);
+                let args_str = proc
+                    .cmd()
+                    .iter()
+                    .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
+                let clean_data = norm_data.trim_end_matches('/');
+                if is_default_inst || args_str.contains(clean_data) {
+                    pids.push(saved_pid);
+                } else {
+                    crate::modules::logger::log_warn(&format!(
+                        "[Instance] Saved PID {} does not match data_dir '{}' (args: {}), skipping to protect running sessions",
+                        saved_pid, config.data_dir, args_str
+                    ));
+                }
             }
         }
     }
@@ -1395,6 +1519,45 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
 /// Get currently active instance ID
 pub fn get_active_instance_id() -> Result<String, String> {
     let registry = load_registry()?;
+
+    // 1. If active_instance_id is a non-default instance and it's currently running, that's active!
+    if registry.active_instance_id != "default" && registry.active_instance_id != "__default__" {
+        if let Some(active_inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == registry.active_instance_id)
+        {
+            if is_instance_running(&active_inst.id, &active_inst.data_dir, active_inst.pid) {
+                return Ok(active_inst.id.clone());
+            }
+        }
+    }
+
+    // 2. Check all non-default running instances, picking the one most recently used
+    let mut running_non_defaults: Vec<&InstanceConfig> = registry
+        .instances
+        .iter()
+        .filter(|i| !i.is_default && i.id != "default" && i.id != "__default__")
+        .filter(|i| is_instance_running(&i.id, &i.data_dir, i.pid))
+        .collect();
+
+    if !running_non_defaults.is_empty() {
+        running_non_defaults.sort_by_key(|i| std::cmp::Reverse(i.last_used));
+        return Ok(running_non_defaults[0].id.clone());
+    }
+
+    // 3. If default instance is running, return default
+    if let Some(def_inst) = registry
+        .instances
+        .iter()
+        .find(|i| i.is_default || i.id == "default")
+    {
+        if is_instance_running(&def_inst.id, &def_inst.data_dir, def_inst.pid) {
+            return Ok(def_inst.id.clone());
+        }
+    }
+
+    // 4. Fallback: if active_instance_id exists in registry, return it
     let active_exists = registry
         .instances
         .iter()
@@ -1402,13 +1565,7 @@ pub fn get_active_instance_id() -> Result<String, String> {
     if active_exists {
         return Ok(registry.active_instance_id);
     }
-    // Fallback: check if any instance is currently running
-    for inst in &registry.instances {
-        let is_running = is_instance_running(&inst.id, &inst.data_dir, inst.pid);
-        if is_running {
-            return Ok(inst.id.clone());
-        }
-    }
+
     Ok("default".to_string())
 }
 
@@ -1460,7 +1617,7 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     let registry = load_registry()?;
     let clean = specifier.trim();
     if clean.is_empty() || clean.eq_ignore_ascii_case("active") {
-        return Ok(registry.active_instance_id);
+        return get_active_instance_id();
     }
     if clean.eq_ignore_ascii_case("default") {
         if let Some(def) = registry
@@ -1533,7 +1690,7 @@ pub async fn switch_account_to_instance(
     let registry = load_registry()?;
     let target_id = match target_instance_id {
         Some(s) => resolve_instance_id(s).unwrap_or_else(|_| s.to_string()),
-        None => registry.active_instance_id.clone(),
+        None => get_active_instance_id().unwrap_or_else(|_| registry.active_instance_id.clone()),
     };
 
     let instance = registry
@@ -1608,8 +1765,13 @@ pub async fn switch_account_to_instance(
 
     // Helper closure to inject credentials into all relevant state.vscdb & storage.json & OS keyring locations
     let inject_all_credentials = |acc: &crate::models::Account| -> Result<(), String> {
-        let _ = crate::modules::integration::write_to_system_keyring(acc);
-        let _ = crate::modules::integration::write_to_file_credentials(acc);
+        if is_default_inst {
+            let _ = crate::modules::integration::write_to_system_keyring(acc);
+            let _ = crate::modules::integration::write_to_file_credentials(acc);
+        }
+        if let Ok(inst_home) = get_instance_home_dir(&instance.id) {
+            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, acc);
+        }
 
         crate::modules::db::inject_token(
             &db_path,
@@ -1720,7 +1882,9 @@ pub async fn switch_account_to_instance(
     // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let _ = set_active_instance_id(&instance.id);
-    let _ = crate::modules::account::set_current_account_id(&account.id);
+    if is_default_inst {
+        let _ = crate::modules::account::set_current_account_id(&account.id);
+    }
 
     account.update_last_used();
     let _ = crate::modules::account::save_account(&account);
@@ -1758,11 +1922,11 @@ pub async fn switch_account_to_instance(
     }
 
     // 5.5. [Step 5/5] Restore from backup DB and re-inject running prompts strictly for THIS instance
+    let _ =
+        crate::modules::backup_prompts_db::restore_running_prompts(Some(&instance.id), false, None);
     let resent =
         crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
             .unwrap_or_default();
-    let _ =
-        crate::modules::backup_prompts_db::restore_running_prompts(Some(&instance.id), false, None);
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
 
     // 6. Dispatch unified Email and Telegram switch notifications

@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.97.0)**
+**Bar 2: Version-Based Installation (v4.98.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.97.0**：为发布流水线 `publish-release` 补齐 `actions: write` 权限并根除 `34-purge-github-actions-artifacts.py` 产物清理无限重试死循环（防止耗尽 GITHUB_TOKEN API 配额，释放 2.15 GB 存储空间），完成新建沙箱实例连续两轮即时快进切号（自动抓取在途会话 Prompt、关闭 IDE、轮换账号、重启 IDE 握手 DevTools、连续生成 `.antigravity_resume_task.json`）与 Supabase 双云端点 HTTP 200 同步实测验证。
+> 最新版本 **v4.98.0**：彻底解决多实例模式下由于环境变量缺失导致 `language_server` 串读 Default 账号的根本缺陷，显式注入实例级隔离主目录；重构进程靶向识别门禁（`get_antigravity_pids` 与 `get_process_info`）及命令行目录二次校验，确保默认操作与实例操作互不波及，绝对保护主会话进程安全；支持细粒度独立实例锁文件清理，全面重构 `agm instances` 与 `agm auto-switch` CLI 套件与前端实例控制面板，升级开发者 Rust 增量缓存清理与对话历史修剪器。
 
 👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
 

@@ -1,5 +1,5 @@
 {
-  "version": "4.97.0",
+  "version": "4.98.0",
   "name": "agm-alim",
   "description": "Antigravity Manager Tools - Maintained by Alim, Sponsored by RISEUP ASIA LLC",
   "author": "Alim (Sponsored by RISEUP ASIA LLC)",
@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "bump": "node scripts/bump-version.mjs",
     "tauri": "tauri",
@@ -20,7 +20,8 @@
     "clean:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
     "dev:clean": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
     "dev-tool-clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
-    "clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1"
+    "clear": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1",
+    "clean:demo": "powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 --cargo-only"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

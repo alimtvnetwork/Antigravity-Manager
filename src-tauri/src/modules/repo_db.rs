@@ -930,16 +930,26 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
 
+    let is_default =
+        instance_id == "default" || instance_id == "__default__" || instance_id.is_empty();
+
+    let instance_projects = detect_running_projects(instance_id).unwrap_or_default();
+    let instance_repo_paths: HashSet<String> = instance_projects
+        .iter()
+        .map(|proj| normalize_path_for_compare(&proj.repo_path))
+        .collect();
+
     let mut stmt = conn
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             WHERE instance_id = ? AND status = 'backed_up'",
+             WHERE status = 'backed_up'
+             ORDER BY updated_at DESC",
         )
         .map_err(|e| format!("Failed to prepare dispatch query: {}", e))?;
 
-    let prompts = stmt
-        .query_map([instance_id], |row| {
+    let all_backed_up = stmt
+        .query_map([], |row| {
             Ok(ActivePrompt {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
@@ -957,6 +967,21 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         .map_err(|e| format!("Failed to query backed-up prompts: {}", e))?
         .flatten()
         .collect::<Vec<ActivePrompt>>();
+
+    let prompts: Vec<ActivePrompt> = all_backed_up
+        .into_iter()
+        .filter(|p| {
+            if is_default {
+                p.instance_id == "default"
+                    || p.instance_id == "__default__"
+                    || p.instance_id.is_empty()
+                    || instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
+            } else {
+                p.instance_id == instance_id
+                    || instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
+            }
+        })
+        .collect();
 
     let mut dispatched_count = 0;
 
@@ -1700,6 +1725,20 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
 
+        if prompt.instance_id != "default" && !prompt.instance_id.is_empty() {
+            if let Ok(inst_home) =
+                crate::modules::instance::get_instance_home_dir(&prompt.instance_id)
+            {
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.env("USERPROFILE", &inst_home);
+                }
+                cmd.env("HOME", &inst_home);
+                cmd.env("SSH_CONNECTION", "127.0.0.1 1 127.0.0.1 1");
+                cmd.env("SSH_CLIENT", "127.0.0.1 1 1");
+            }
+        }
+
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
@@ -1772,6 +1811,15 @@ pub fn resend_running_commands_for_instance(
         .flatten()
         .collect::<Vec<ActivePrompt>>();
 
+    let instance_projects = match instance_id {
+        Some(id) if id != "all" => detect_running_projects(id).unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    let instance_repo_paths: HashSet<String> = instance_projects
+        .iter()
+        .map(|proj| normalize_path_for_compare(&proj.repo_path))
+        .collect();
+
     let prompts: Vec<ActivePrompt> = all_prompts
         .into_iter()
         .filter(|p| match instance_id {
@@ -1780,8 +1828,12 @@ pub fn resend_running_commands_for_instance(
                 p.instance_id == "default"
                     || p.instance_id == "__default__"
                     || p.instance_id.is_empty()
+                    || instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
             }
-            Some(inst) => p.instance_id == inst,
+            Some(inst) => {
+                p.instance_id == inst
+                    || instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
+            }
         })
         .take(limit)
         .collect();

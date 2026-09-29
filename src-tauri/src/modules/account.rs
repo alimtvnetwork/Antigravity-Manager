@@ -1180,6 +1180,21 @@ pub fn load_account(account_id: &str) -> Result<Account, String> {
     load_account_at_path(&account_path)
 }
 
+/// Find an account by its email address
+pub fn get_account_by_email(email: &str) -> Result<Option<Account>, String> {
+    let index = load_account_index()?;
+    let target = email.trim();
+    if let Some(summary) = index
+        .accounts
+        .iter()
+        .find(|a| a.email.trim().eq_ignore_ascii_case(target))
+    {
+        load_account(&summary.id).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
 /// Save account data at specific file path (thread-safe and atomic)
 fn save_account_at_path(account_path: &PathBuf, account: &Account) -> Result<(), String> {
     let _lock = get_account_lock(&account.id);

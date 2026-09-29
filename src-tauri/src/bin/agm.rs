@@ -50,10 +50,17 @@ fn main() {
     match subcommand.as_str() {
         "status" | "credits" | "credit" | "status/credits" => cmd_status(&cmd_args),
         "instances" | "instance" | "ls" => cmd_instances(&cmd_args),
+        "create" | "create-instance" | "create_instance" | "instance-create" => {
+            let mut forward_args = vec!["create".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
         "instances-all" => cmd_instances_all(&cmd_args),
         "doctor" | "check" => cmd_doctor(&cmd_args),
         "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
-        "switch" => cmd_switch(&cmd_args),
+        "switch" | "switch-account" | "switch_account" | "account-switch" => {
+            cmd_switch(&cmd_args);
+        }
         "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
             cmd_switch_if_low_credit(&cmd_args);
         }
@@ -144,7 +151,8 @@ fn main() {
         "email" => cmd_email(&cmd_args),
         "logs" | "log" => cmd_logs(&cmd_args),
         "ff" | "smart-switch" | "fast-forward" => cmd_fast_forward(&cmd_args),
-        "test-switcher" | "test-auto-switch" | "auto-switch" | "auto-swtich" => {
+        "test-switcher" | "test-auto-switch" | "auto-switch" | "auto-swtich" | "auto"
+        | "autoswitch" | "auto_switch" | "switcher" => {
             cmd_auto_switch(&cmd_args);
         }
         "test-email" | "email-test" | "check-email" => cmd_test_email(&cmd_args),
@@ -313,16 +321,28 @@ fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("    status, credits [--json]");
     println!("        Show node status, immediate & weekly credits, active account");
-    println!("    ff, smart-switch, fast-forward");
-    println!("        Trigger fast-forward rotation to freshest 100% quota account");
+    println!("    ff, smart-switch, fast-forward [instance]");
+    println!("        Trigger fast-forward rotation to freshest 100% quota account (for instance or all)");
+    println!("    switch, switch-account <email|prefix|id|#seq> [--instance <id|alias>]");
+    println!(
+        "        Directly switch active profile (or specified instance) without GUI intervention"
+    );
+    println!("    switch <instance> <account>");
+    println!("        Positional switch: switch specified instance profile to account");
+    println!(
+        "    auto-switch, auto [status|enable|disable|toggle|run|threshold|interval|model|test]"
+    );
+    println!(
+        "        Inspect, toggle, configure, or evaluate rolling 4-hour quota auto-switcher daemon"
+    );
     println!("    switch-if-low-credit, swlc, sfc [-t <pct>] [--json] [-f [file]] [--force]");
     println!("        Check live quota; rotate if quota <= threshold (default: 15.0%)");
     println!("    is-low-credit-for-switch, ilc [-t <pct>] [--json]");
     println!("        Check if active quota <= threshold (outputs true/false or JSON)");
     println!("    accounts, acc [--active] [--json]");
     println!("        List registered accounts, tiers, and remaining quotas");
-    println!("    switch <email|prefix|id>");
-    println!("        Switch active profile directly without GUI");
+    println!("    account switch <email|id|#seq> [--instance <id>]");
+    println!("        Switch account profile via accounts subcommand");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  UPDATE, REPO SYNC & FLEET ORCHESTRATION");
@@ -362,14 +382,24 @@ fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("    instances [ls] [--json]");
     println!("        List all sandbox profiles, bound accounts, and running PIDs");
+    println!("    instances create <name> [--account <email|id>] [--from <inst>] [--data-only] [--launch]");
+    println!(
+        "        Create an isolated sandbox instance profile directory with dedicated credentials"
+    );
+    println!("    instances switch <seq|id|alias> <account>");
+    println!("        Switch an instance profile's bound account credentials directly");
+    println!("    instances launch <seq|id|alias>");
+    println!("        Launch Antigravity IDE for the specified instance profile");
+    println!("    instances stop <seq|id|alias>");
+    println!("        Safely stop running Antigravity IDE process for specified instance");
     println!("    instances assign <seq|id|alias> <repo_path...>");
     println!("        Bind/assign one or more project workspaces to a specific sandbox instance");
     println!("    instances <seq|id|alias> ff");
     println!("        Fast-forward rotate account for specific sandbox instance");
     println!("    instances-all ff");
     println!("        Fast-forward rotate accounts across ALL sandbox instances");
-    println!("    instances create \"<name>\" [--data-only]");
-    println!("        Create an isolated sandbox instance profile directory");
+    println!("    instances auto-switch [status|enable|disable|toggle|run]");
+    println!("        Inspect or control background auto-profile switcher for instances");
     println!("    instances rm <seq|id|alias> [--force]");
     println!("        Remove a specific sandbox instance profile");
     println!("    instances rm-all");
@@ -429,8 +459,15 @@ fn print_help() {
     println!("    gitmap backup-running-prompts && gitmap restore-running-prompts");
     println!("    agm agy fpug ls && agm agy sug ls");
     println!();
-    println!("    # 4. Multi-Instance Creation, Multi-Project Binding & Account Swapping:");
-    println!("    agm instances create \"Worker-2\"");
+    println!("    # 4. Multi-Instance Creation, Account Switching & Auto-Switching:");
+    println!("    agm instances create \"Worker-2\" -a dev@gmail.com");
+    println!("    agm create \"QA-Test\" --data-only --launch");
+    println!("    agm switch #2 dev2@gmail.com");
+    println!("    agm switch dev2@gmail.com --instance Worker-2");
+    println!("    agm auto-switch status");
+    println!("    agm auto-switch enable");
+    println!("    agm auto-switch toggle");
+    println!("    agm auto-switch run");
     println!("    agm instances assign #2 d:\\work\\Antigravity-Manager d:\\work\\gitmap-v28");
     println!("    agm instances #2 ff");
     println!();
@@ -456,6 +493,24 @@ fn print_commands_table() {
         "ACTION / GOAL", "EMAIL REPLY SUBJECT", "CLI EQUIVALENT"
     );
     println!("  {}", "-".repeat(98));
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Create Instance Profile",
+        format!("cmd: {} | agm create", node_alias),
+        "agm instances create \"<name>\""
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Switch Account Profile",
+        format!("cmd: {} | agm switch", node_alias),
+        "agm switch <account|#seq>"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Toggle Auto-Switcher",
+        format!("cmd: {} | agm auto toggle", node_alias),
+        "agm auto-switch toggle"
+    );
     println!(
         "  {:<26} {:<36} {:<32}",
         "Send Prompt to Project",
@@ -789,27 +844,48 @@ fn check_is_in_path() -> bool {
 }
 
 fn cmd_accounts(args: &[String]) {
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("switch") || s.eq_ignore_ascii_case("use"))
+        .unwrap_or(false)
+    {
+        let forward_args: Vec<String> = args
+            .iter()
+            .filter(|a| !a.eq_ignore_ascii_case("switch") && !a.eq_ignore_ascii_case("use"))
+            .cloned()
+            .collect();
+        cmd_switch(&forward_args);
+        return;
+    }
+
     if args
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help")
     {
-        println!("AGM Accounts Listing:");
-        println!("  agm accounts [--active] [--json]");
+        println!("AGM Accounts & Quota CLI:");
+        println!("  agm accounts [ls] [--active] [--json]");
+        println!("  agm account switch <email|prefix|id|#seq> [--instance <id|alias>]");
+        println!("  agm account switch <instance> <email>");
         println!("\nDescription:");
         println!("  Lists all authenticated Google Gemini profiles in the credential vault,");
         println!("  their bound email, tier, 4-hour window quota, weekly quota, and active state.");
+        println!(
+            "  Allows direct switching of accounts across default or multi-instance profiles."
+        );
         println!("\nAliases: agm accounts, agm account, agm acc");
+        println!("\nSubcommands & Actions:");
+        println!("  ls, list            Display table of all configured accounts (default)");
+        println!("  switch, use <query> Switch active account (or instance account) directly");
         println!("\nOptions:");
-        println!("    --active            Show only the currently active account profile");
-        println!("    --json, -j          Output account list in structured JSON format");
+        println!("    --active          Show only the currently active account profile");
+        println!("    --json, -j        Output account list in structured JSON format");
         println!("\nExamples:");
-        println!(
-            "  agm accounts                        # Display table of all configured accounts"
-        );
-        println!("  agm accounts --active               # Show currently selected active account");
-        println!(
-            "  agm accounts --json                 # Export accounts and quota matrix as JSON"
-        );
+        println!("  agm accounts                                # Display table of all configured accounts");
+        println!("  agm accounts --active                       # Show currently selected active account");
+        println!("  agm accounts --json                         # Export accounts and quota matrix as JSON");
+        println!("  agm account switch dev.user@gmail.com       # Switch active profile to dev.user@gmail.com");
+        println!("  agm account switch #2 dev.user@gmail.com    # Switch instance #2 to dev.user@gmail.com");
         return;
     }
 
@@ -920,80 +996,190 @@ fn cmd_accounts(args: &[String]) {
 }
 
 fn cmd_switch(args: &[String]) {
-    if args.is_empty()
-        || args
-            .iter()
-            .any(|a| a == "--help" || a == "-h" || a == "help")
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
     {
-        println!("AGM Profile Switch:");
-        println!("  agm switch <email|prefix|id>");
+        println!("AGM Account & Profile Switch CLI:");
+        println!("  agm switch <account> [--instance <id|alias>] [--json]");
+        println!("  agm switch <instance> <account> [--json]");
+        println!("  agm switch <email|prefix|id|#seq>");
         println!("\nDescription:");
-        println!("  Directly switches the active Google Gemini profile to the specified account.");
-        println!("  Searches by email address, email prefix, or internal account ID without GUI intervention.");
+        println!("  Directly switches authenticated Google Gemini account credentials for an");
+        println!(
+            "  Antigravity IDE profile (or the active/default profile) without GUI intervention."
+        );
+        println!("  Automatically injects tokens, updates profile configurations, and preserves running prompts.");
+        println!("\nAliases: agm switch, agm switch-account, agm account switch");
+        println!("\nArguments & Options:");
+        println!("  <account>                   Account email, email prefix, account ID, or account number (#1, #2)");
+        println!("  <instance>                  Instance name, ID, sequence number (#1, #2), or 'default' / 'active'");
+        println!("  --instance, -i <id|alias>   Target instance profile to switch (defaults to active instance)");
+        println!("  --json, -j                  Output switch outcome in structured JSON format");
         println!("\nExamples:");
-        println!("  agm switch dev.user@gmail.com       # Switch using full email address");
-        println!("  agm switch dev.user                 # Switch using email prefix");
-        println!("  agm switch acc_01j7x8a              # Switch using exact account ID");
-        if args.is_empty() {
-            std::process::exit(1);
-        }
+        println!("  agm switch dev.user@gmail.com                        # Switch active profile to dev.user@gmail.com");
+        println!("  agm switch dev.user                                  # Switch by email prefix");
+        println!("  agm switch #2 dev.user@gmail.com                     # Switch instance #2 to dev.user@gmail.com");
+        println!("  agm switch dev.user@gmail.com --instance #2          # Same: specify target instance with flag");
+        println!("  agm switch Worker-1 dev.user@gmail.com               # Switch instance named 'Worker-1'");
+        println!("  agm switch acc_01j7x8a                               # Switch using exact internal account ID");
+        println!("  agm switch #2                                        # Switch active profile to account #2 in list");
         return;
     }
 
-    let query = args[0].trim().to_lowercase();
-    let index = match account::load_account_index() {
-        Ok(idx) => idx,
-        Err(e) => {
-            eprintln!("[ERROR] Failed to load accounts: {}", e);
-            std::process::exit(1);
-        }
-    };
-
-    let matches: Vec<_> = index
-        .accounts
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let non_flag_args: Vec<&String> = args
         .iter()
         .filter(|a| {
-            let email_l = a.email.to_lowercase();
-            let id_l = a.id.to_lowercase();
-            email_l.contains(&query) || id_l.contains(&query)
+            !a.starts_with('-')
+                && !a.eq_ignore_ascii_case("switch")
+                && !a.eq_ignore_ascii_case("use")
         })
         .collect();
 
-    if matches.is_empty() {
-        eprintln!("[ERROR] No account found matching '{}'.", query);
-        eprintln!("Run 'agm accounts' to list all registered accounts.");
-        std::process::exit(1);
-    }
-
-    let target = if matches.len() == 1 {
-        matches[0]
-    } else {
-        if let Some(exact) = matches.iter().find(|a| a.email.to_lowercase() == query) {
-            *exact
-        } else {
-            eprintln!("[ERROR] Query '{}' matched multiple accounts:", query);
-            for m in matches {
-                eprintln!("  - {} (ID: {})", m.email, m.id);
-            }
-            eprintln!("Please specify a more precise email or ID.");
+    let index = match account::load_account_index() {
+        Ok(idx) => idx,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load accounts index: {}", e);
             std::process::exit(1);
         }
     };
 
-    let prev_email = match account::get_current_account() {
-        Ok(Some(curr)) => curr.email,
-        _ => "(None / Standby)".to_string(),
-    };
+    if non_flag_args.is_empty() {
+        let curr = account::get_current_account().ok().flatten();
+        let active_inst =
+            instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+        println!("AGM Profile Switch:");
+        println!("  Current active instance: {}", active_inst);
+        println!(
+            "  Current active account:  {}",
+            curr.as_ref().map(|a| a.email.as_str()).unwrap_or("(none)")
+        );
+        println!("\nUsage: agm switch <email|id|#seq> [--instance <id>]");
+        println!("       agm switch <instance> <account>");
+        println!("Run 'agm switch --help' for full guide or 'agm accounts' to list accounts.");
+        std::process::exit(1);
+    }
 
-    let target_instance_opt = args
+    let explicit_inst_opt = args
         .iter()
         .position(|a| a == "--instance" || a == "-i")
         .and_then(|pos| args.get(pos + 1).map(|s| s.as_str()));
 
-    println!(
-        "[*] Switching account to '{}' (ID: {})...",
-        target.email, target.id
-    );
+    // Determine target instance specifier and account query
+    let (target_inst_spec, acc_query) = if non_flag_args.len() >= 2 {
+        // Check if first arg resolves to an instance
+        let first_is_instance = instance::resolve_instance_id(non_flag_args[0]).is_ok();
+        let second_is_instance = instance::resolve_instance_id(non_flag_args[1]).is_ok();
+
+        if first_is_instance && !second_is_instance {
+            (Some(non_flag_args[0].as_str()), non_flag_args[1].as_str())
+        } else if second_is_instance && !first_is_instance {
+            (Some(non_flag_args[1].as_str()), non_flag_args[0].as_str())
+        } else if explicit_inst_opt.is_some() {
+            (explicit_inst_opt, non_flag_args[0].as_str())
+        } else {
+            (Some(non_flag_args[0].as_str()), non_flag_args[1].as_str())
+        }
+    } else {
+        (explicit_inst_opt, non_flag_args[0].as_str())
+    };
+
+    let query_lower = acc_query.trim().to_lowercase();
+
+    // Check if query is an account index like #1, #2, 1, 2
+    let index_match =
+        if query_lower.starts_with('#') || query_lower.chars().all(|c| c.is_ascii_digit()) {
+            let num_str = query_lower.trim_start_matches('#');
+            if let Ok(num) = num_str.parse::<usize>() {
+                if num >= 1 && num <= index.accounts.len() {
+                    Some(&index.accounts[num - 1])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+    let target_account = if let Some(acc) = index_match {
+        acc
+    } else {
+        let matches: Vec<_> = index
+            .accounts
+            .iter()
+            .filter(|a| {
+                let email_l = a.email.to_lowercase();
+                let id_l = a.id.to_lowercase();
+                email_l == query_lower
+                    || id_l == query_lower
+                    || email_l.starts_with(&query_lower)
+                    || email_l.contains(&query_lower)
+                    || id_l.contains(&query_lower)
+            })
+            .collect();
+
+        if matches.is_empty() {
+            eprintln!("[ERROR] No account found matching '{}'.", acc_query);
+            eprintln!("Run 'agm accounts' to view registered accounts.");
+            std::process::exit(1);
+        }
+
+        if matches.len() == 1 {
+            matches[0]
+        } else if let Some(exact) = matches
+            .iter()
+            .find(|a| a.email.to_lowercase() == query_lower)
+        {
+            *exact
+        } else {
+            eprintln!("[ERROR] Query '{}' matched multiple accounts:", acc_query);
+            for m in matches {
+                eprintln!("  - {} (ID: {})", m.email, m.id);
+            }
+            eprintln!("Please specify a more precise email or account ID.");
+            std::process::exit(1);
+        }
+    };
+
+    // Resolve target instance details
+    let resolved_inst_id = match target_inst_spec {
+        Some(spec) => match instance::resolve_instance_id(spec) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!("[ERROR] Could not resolve instance '{}': {}", spec, e);
+                std::process::exit(1);
+            }
+        },
+        None => instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string()),
+    };
+
+    let all_insts = instance::list_instances().unwrap_or_default();
+    let target_inst_info = all_insts.iter().find(|i| i.config.id == resolved_inst_id);
+    let target_inst_name = target_inst_info
+        .map(|i| i.config.name.clone())
+        .unwrap_or_else(|| resolved_inst_id.clone());
+    let prev_bound = if resolved_inst_id == "default" || resolved_inst_id == "__default__" {
+        account::get_current_account()
+            .ok()
+            .flatten()
+            .map(|a| a.email)
+            .unwrap_or_else(|| "(none)".to_string())
+    } else {
+        target_inst_info
+            .and_then(|i| i.config.bound_email.clone())
+            .unwrap_or_else(|| "(none)".to_string())
+    };
+
+    if !is_json {
+        println!(
+            "[*] Switching instance '{}' ({}) to account '{}' (ID: {})...",
+            target_inst_name, resolved_inst_id, target_account.email, target_account.id
+        );
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(r) => r,
         Err(e) => {
@@ -1003,16 +1189,37 @@ fn cmd_switch(args: &[String]) {
     };
 
     if let Err(e) = rt.block_on(instance::switch_account_to_instance(
-        &target.id,
-        target_instance_opt,
+        &target_account.id,
+        Some(&resolved_inst_id),
     )) {
-        eprintln!("[ERROR] Failed to switch active account: {}", e);
+        eprintln!("[ERROR] Failed to switch account: {}", e);
         std::process::exit(1);
     }
 
-    println!("[SUCCESS] Active account switched:");
-    println!("          Previous: {}", prev_email);
-    println!("          Active:   {} (ID: {})", target.email, target.id);
+    if is_json {
+        let result = serde_json::json!({
+            "success": true,
+            "instance_id": resolved_inst_id,
+            "instance_name": target_inst_name,
+            "account_id": target_account.id,
+            "email": target_account.email,
+            "previous_email": prev_bound,
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&result).unwrap_or_default()
+        );
+    } else {
+        println!(
+            "[SUCCESS] Switched account for instance '{}' ({}):",
+            target_inst_name, resolved_inst_id
+        );
+        println!("          Previous: {}", prev_bound);
+        println!(
+            "          Active:   {} (ID: {})",
+            target_account.email, target_account.id
+        );
+    }
 }
 
 fn derive_current_repo_slug() -> String {
@@ -2498,10 +2705,79 @@ fn cmd_auto_switch(args: &[String]) {
         }
     };
 
-    if let Some(first) = args.first() {
-        let first_lower = first.to_lowercase();
-        if first_lower == "threshold" || first_lower == "thresehold" || first_lower == "thresh" {
-            if let Some(val_str) = args.get(1) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Auto-Switch & Intelligent Rotator CLI:");
+        println!("  agm auto-switch [status] [--json]");
+        println!("  agm auto-switch enable | on");
+        println!("  agm auto-switch disable | off");
+        println!("  agm auto-switch toggle");
+        println!("  agm auto-switch run | trigger | eval");
+        println!("  agm auto-switch threshold [N]    (Query or set low quota threshold %)");
+        println!("  agm auto-switch interval [N]     (Query or set check interval in seconds)");
+        println!("  agm auto-switch model [name]     (Query or set target model)");
+        println!("  agm auto-switch test [N]         (Run immediate test with optional test threshold %)");
+        println!("\nDescription:");
+        println!(
+            "  Inspects, configures, toggles, or triggers the autonomous background auto-profile"
+        );
+        println!("  switcher that monitors rolling 4-hour quota windows across running instances");
+        println!("  and proactively rotates accounts before depletion.");
+        println!("\nAliases: agm auto-switch, agm auto, agm autoswitch, agm auto_switch, agm switcher, agm test-switcher");
+        println!("\nExamples:");
+        println!(
+            "  agm auto-switch status           # Show auto-switcher status & monitored instances"
+        );
+        println!("  agm auto-switch enable           # Turn ON background auto-switch daemon");
+        println!("  agm auto-switch disable          # Turn OFF background auto-switch daemon");
+        println!("  agm auto-switch toggle           # Toggle auto-switch daemon state");
+        println!(
+            "  agm auto-switch run              # Trigger immediate quota evaluation & rotation"
+        );
+        println!("  agm auto-switch threshold 20     # Set low quota threshold to 20%");
+        println!("  agm auto-switch interval 60      # Set polling interval to 60 seconds");
+        println!("  agm auto-switch model gemini-2.5-pro # Set evaluation target model");
+        println!("  agm auto-switch test 90          # Test simulation with 90% threshold");
+        return;
+    }
+
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let sub = non_flag_args.first().map(|s| s.to_lowercase());
+
+    match sub.as_deref() {
+        Some("enable") | Some("on") => {
+            app_cfg.auto_profile_switcher.is_enabled = true;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!("[SUCCESS] Auto-profile switcher daemon is now ENABLED.");
+        }
+        Some("disable") | Some("off") => {
+            app_cfg.auto_profile_switcher.is_enabled = false;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!("[SUCCESS] Auto-profile switcher daemon is now DISABLED.");
+        }
+        Some("toggle") => {
+            let new_val = !app_cfg.auto_profile_switcher.is_enabled;
+            app_cfg.auto_profile_switcher.is_enabled = new_val;
+            if let Err(e) = config::save_app_config(&app_cfg) {
+                eprintln!("[ERROR] Failed to save config: {}", e);
+                std::process::exit(1);
+            }
+            println!(
+                "[SUCCESS] Auto-profile switcher daemon is now {}.",
+                if new_val { "ENABLED" } else { "DISABLED" }
+            );
+        }
+        Some("threshold") | Some("thresh") => {
+            if let Some(val_str) = non_flag_args.get(1) {
                 if let Ok(val) = val_str.parse::<f64>() {
                     let clamped = val.clamp(0.0, 100.0);
                     app_cfg.auto_profile_switcher.low_quota_threshold_percent = clamped;
@@ -2513,7 +2789,6 @@ fn cmd_auto_switch(args: &[String]) {
                         "[SUCCESS] Auto-switch low quota threshold set to {:.1}% (default: 15.0%).",
                         clamped
                     );
-                    return;
                 } else {
                     eprintln!("[ERROR] Invalid numeric threshold value: '{}'", val_str);
                     std::process::exit(1);
@@ -2523,23 +2798,143 @@ fn cmd_auto_switch(args: &[String]) {
                     "Current auto-switch low quota threshold: {:.1}%",
                     app_cfg.auto_profile_switcher.low_quota_threshold_percent
                 );
+            }
+        }
+        Some("interval") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                if let Ok(val) = val_str.parse::<u32>() {
+                    let clamped = val.clamp(10, 86400);
+                    app_cfg.auto_profile_switcher.check_interval_seconds = clamped;
+                    if let Err(e) = config::save_app_config(&app_cfg) {
+                        eprintln!("[ERROR] Failed to save config: {}", e);
+                        std::process::exit(1);
+                    }
+                    println!(
+                        "[SUCCESS] Auto-switch check interval set to {}s (default: 300s).",
+                        clamped
+                    );
+                } else {
+                    eprintln!("[ERROR] Invalid numeric interval seconds: '{}'", val_str);
+                    std::process::exit(1);
+                }
+            } else {
+                println!(
+                    "Current auto-switch check interval: {}s",
+                    app_cfg.auto_profile_switcher.check_interval_seconds
+                );
+            }
+        }
+        Some("model") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                app_cfg.auto_profile_switcher.target_model = val_str.to_string();
+                if let Err(e) = config::save_app_config(&app_cfg) {
+                    eprintln!("[ERROR] Failed to save config: {}", e);
+                    std::process::exit(1);
+                }
+                println!("[SUCCESS] Auto-switch target model set to '{}'.", val_str);
+            } else {
+                println!(
+                    "Current auto-switch target model: {}",
+                    app_cfg.auto_profile_switcher.target_model
+                );
+            }
+        }
+        Some("run") | Some("trigger") | Some("eval") => {
+            println!("[*] Triggering immediate auto-switch evaluation across instances...");
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("Failed to initialize async runtime: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            match rt.block_on(auto_switcher::check_and_rotate_if_needed()) {
+                Ok(Some(reason)) => {
+                    println!("[SUCCESS] Auto-switch rotation triggered: {}", reason);
+                }
+                Ok(None) => {
+                    println!("[INFO] Quota healthy across all monitored instances. No rotation required.");
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Auto-switch evaluation failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("test") => {
+            let test_args: Vec<String> =
+                non_flag_args.iter().skip(1).map(|s| (*s).clone()).collect();
+            cmd_test_auto_switch(&test_args);
+        }
+        _ => {
+            let status = auto_switcher::get_status();
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&status).unwrap_or_default()
+                );
                 return;
             }
-        } else if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
-            println!("AGM Auto-Switch Management:");
-            println!("  agm auto-switch threshold [N]    Set or query auto-switch low quota threshold (default: 15%)");
-            println!("  agm auto-switch [threshold]      Run manual auto-switcher test check with optional threshold");
-            println!("\nExamples:");
-            println!("  agm auto-switch threshold        # Query current threshold");
-            println!("  agm auto-switch threshold 15     # Set threshold to 15%");
+
+            println!("\nAGM Auto-Profile Switcher Status:");
             println!(
-                "  agm auto-switch 15               # Evaluate auto-switch now with 15% threshold"
+                "  Daemon Active:       {}",
+                if app_cfg.auto_profile_switcher.is_enabled {
+                    "ENABLED (monitoring)"
+                } else {
+                    "DISABLED"
+                }
             );
-            return;
+            println!(
+                "  Target Model:        {}",
+                app_cfg.auto_profile_switcher.target_model
+            );
+            println!(
+                "  Low Quota Threshold: {:.1}%",
+                app_cfg.auto_profile_switcher.low_quota_threshold_percent
+            );
+            println!(
+                "  Check Interval:      {}s",
+                app_cfg.auto_profile_switcher.check_interval_seconds
+            );
+            println!("  Active Instance:     {}", status.active_instance_id);
+            println!(
+                "  Active Account:      {}",
+                status.active_account_email.as_deref().unwrap_or("none")
+            );
+            println!(
+                "  Current Quota:       {:.1}%",
+                status.current_quota_percent.unwrap_or(100.0)
+            );
+            println!("  Monitored Instances: {}", status.monitored_instance_count);
+
+            if !status.monitored_instances.is_empty() {
+                println!("\nMonitored Instance Quotas:");
+                println!(
+                    "{:<16} {:<24} {:<12} {:<12} RESET TIME",
+                    "INSTANCE", "BOUND EMAIL", "QUOTA", "STATUS"
+                );
+                println!("{}", "-".repeat(80));
+                for inst in &status.monitored_instances {
+                    let quota_str = inst
+                        .quota_percent
+                        .map(|q| format!("{:.1}%", q))
+                        .unwrap_or_else(|| "N/A".to_string());
+                    let run_str = if inst.is_running { "Running" } else { "Idle" };
+                    let reset_str = inst.reset_time_iso.as_deref().unwrap_or("unknown");
+                    println!(
+                        "{:<16} {:<24} {:<12} {:<12} {}",
+                        inst.instance_name,
+                        inst.bound_email.as_deref().unwrap_or("unassigned"),
+                        quota_str,
+                        run_str,
+                        reset_str
+                    );
+                }
+            }
+            println!();
         }
     }
-
-    cmd_test_auto_switch(args);
 }
 
 fn cmd_backup_running_prompts(args: &[String]) {
@@ -5430,21 +5825,42 @@ fn cmd_clean(args: &[String]) {
         }
     }
 
-    // 2. Clean build-demo and target-demo directories if present
-    for demo_name in &["build-demo", "target-demo", "src-tauri/build-demo", "src-tauri/target-demo"] {
-        let demo_p = PathBuf::from(demo_name);
-        if demo_p.is_dir() {
-            if let Ok(meta) = fs::metadata(&demo_p) {
+    // 2. Clean build-demo, target-demo, and Cargo incremental compiler caches
+    for target_name in &[
+        "build-demo",
+        "target-demo",
+        "src-tauri/build-demo",
+        "src-tauri/target-demo",
+        "src-tauri/target/debug/incremental",
+        "src-tauri/target/release/incremental",
+        "src-tauri/target/debug/.fingerprint",
+        "src-tauri/target/release/.fingerprint",
+        "target/debug/incremental",
+        "target/release/incremental",
+        "target/debug/.fingerprint",
+        "target/release/.fingerprint",
+    ] {
+        let target_p = PathBuf::from(target_name);
+        if target_p.is_dir() {
+            if let Ok(meta) = fs::metadata(&target_p) {
                 reclaimed_bytes += meta.len();
             }
-            if fs::remove_dir_all(&demo_p).is_ok() {
+            if fs::remove_dir_all(&target_p).is_ok() {
                 removed_dirs += 1;
             }
         }
     }
 
+    // 2.5. Clean stale cargo locks or temporary debug outputs
+    for lock_path in &["src-tauri/target/.cargo-lock", "target/.cargo-lock"] {
+        let p = PathBuf::from(lock_path);
+        if p.is_file() {
+            let _ = fs::remove_file(p);
+        }
+    }
+
     println!(
-        "    [✓] Temporary test and build-demo artifacts removed: {} folder(s)",
+        "    [✓] Temporary test, build-demo, and Cargo caches removed: {} folder(s)",
         removed_dirs
     );
     println!("    [✓] Safety invariant verified: all database vaults strictly protected.");
@@ -6431,7 +6847,9 @@ fn cmd_clear_cache(args: &[String]) {
                 keep_count = val.parse::<usize>().unwrap_or(10);
             }
         } else if (arg_lower.starts_with("-k") && arg_lower.len() > 2)
-            || (arg_lower.starts_with('k') && arg_lower.len() > 1 && arg_lower[1..].chars().all(|c| c.is_ascii_digit()))
+            || (arg_lower.starts_with('k')
+                && arg_lower.len() > 1
+                && arg_lower[1..].chars().all(|c| c.is_ascii_digit()))
         {
             let num_str = arg_lower.trim_start_matches("-k").trim_start_matches('k');
             if let Ok(n) = num_str.parse::<usize>() {
@@ -6485,58 +6903,177 @@ fn cmd_clear_cache(args: &[String]) {
 }
 
 fn cmd_instances(args: &[String]) {
-    if args
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let is_help = args
         .iter()
-        .any(|a| a == "--help" || a == "-h" || a == "help")
+        .any(|a| a == "--help" || a == "-h" || a == "help");
+
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| s.eq_ignore_ascii_case("create") || s.eq_ignore_ascii_case("add"))
+            .unwrap_or(false)
     {
-        println!("AGM Instances Management:");
-        println!("  agm instances [ls] [--json]");
-        println!("  agm instances create <name> [--data-only]");
-        println!("  agm instances assign <id|#seq|name> <repo_paths...>");
-        println!("  agm instances rm <id|name> [--force]");
-        println!("  agm instances <id> ff");
-        println!("  agm instances all ff");
-        println!("  agm instances rm-all");
+        println!("AGM Instance Create CLI:");
+        println!("  agm instances create <name> [options]");
+        println!("  agm create <name> [options]");
         println!("\nDescription:");
-        println!(
-            "  Creates, lists, assigns projects, rotates, and destroys isolated Antigravity multi-instance"
-        );
-        println!(
-            "  sandbox profiles with dedicated configuration, keychain, and state directories."
-        );
-        println!("\nAliases: agm instances, agm instance, agm ls");
-        println!("\nSubcommands:");
-        println!("  ls, list            List all registered profiles, statuses, and bound emails (default)");
-        println!("  create, add <name>  Create a new isolated sandbox instance profile");
-        println!(
-            "  assign, bind <i> <p> Bind one or more project workspace folders to an instance"
-        );
-        println!(
-            "  rm, delete <id>     Remove a specific instance profile and its local configuration"
-        );
-        println!(
-            "  <id> ff             Trigger fast-forward account rotation for a specific instance"
-        );
-        println!(
-            "  all ff              Trigger fast-forward account rotation across ALL instances"
-        );
-        println!("  rm-all              Remove all non-default sandbox instances");
+        println!("  Creates an isolated Antigravity IDE profile directory with its own SQLite token store,");
+        println!("  machine fingerprints, extensions, and configuration without cross-contaminating Default or sibling instances.");
         println!("\nOptions:");
-        println!("  --json, -j          Output instance list in JSON format");
-        println!("  --data-only, --do   Create instance directory structure without launching UI");
-        println!("  --force, -f         Bypass confirmation prompt for destructive actions");
+        println!("  --account, -a <email|id>          Bind a specific account by email or ID (defaults to next available unbound)");
+        println!("  --from, -f <source_instance>      Clone settings and extensions from an existing instance");
+        println!("  --data-only, --do                 Create isolated data directory structure without cloning executable");
+        println!("  --launch, -l                      Immediately launch the instance window after creation");
+        println!("  --json, -j                        Output result in structured JSON format");
         println!("\nExamples:");
-        println!("  agm instances                       # List all instances");
-        println!("  agm instances create \"test-sandbox\" # Create new sandbox instance profile");
-        println!("  agm instances assign #2 d:\\work\\repo # Bind workspace folder to instance #2");
-        println!("  agm instances test-sandbox ff       # Rotate account for test-sandbox");
-        println!("  agm instances rm test-sandbox       # Delete test-sandbox profile");
-        println!("  agm instances rm-all                # Clean up all sandbox instances");
+        println!("  agm instances create \"Worker-2\"                      # Create instance with next available account");
+        println!("  agm instances create \"QA-Test\" -a dev@gmail.com     # Create instance bound to dev@gmail.com");
+        println!("  agm instances create \"Stage-Clone\" --from #1         # Clone settings from instance #1");
+        println!("  agm instances create \"Fast-Worker\" -a dev@gmail.com -l # Create and immediately launch");
+        println!(
+            "  agm create \"Backend-Dev\" --data-only                # Create data-only profile"
+        );
         return;
     }
 
-    let is_json = args.iter().any(|a| a == "--json");
-    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| s.eq_ignore_ascii_case("switch") || s.eq_ignore_ascii_case("use"))
+            .unwrap_or(false)
+    {
+        println!("AGM Instance Switch Account CLI:");
+        println!("  agm instances switch <instance> <account> [--json]");
+        println!("  agm switch <instance> <account>");
+        println!("\nDescription:");
+        println!("  Switches an instance profile's bound account credentials directly without GUI intervention.");
+        println!("  Snapshots and restores active running prompts for the target instance.");
+        println!("\nArguments:");
+        println!("  <instance>                        Target instance name, ID, or sequence number (#1, #2)");
+        println!("  <account>                         Account email, prefix, ID, or account list number (#1, #2)");
+        println!("\nExamples:");
+        println!("  agm instances switch #2 dev2@gmail.com                # Switch instance #2 to dev2@gmail.com");
+        println!("  agm instances switch Worker-1 dev2@gmail.com          # Switch Worker-1 to dev2@gmail.com");
+        println!("  agm instances switch a-6650 acc-12345                 # Switch by IDs");
+        return;
+    }
+
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| {
+                s.eq_ignore_ascii_case("auto-switch")
+                    || s.eq_ignore_ascii_case("auto")
+                    || s.eq_ignore_ascii_case("autoswitch")
+            })
+            .unwrap_or(false)
+    {
+        cmd_auto_switch(&["--help".to_string()]);
+        return;
+    }
+
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| {
+                s.eq_ignore_ascii_case("ff")
+                    || s.eq_ignore_ascii_case("fast-forward")
+                    || s.eq_ignore_ascii_case("rotate")
+            })
+            .unwrap_or(false)
+    {
+        println!("AGM Instance Fast-Forward Account Rotation CLI:");
+        println!("  agm instances ff [instance]");
+        println!("  agm instances all ff");
+        println!("\nDescription:");
+        println!("  Evaluates rolling 4-hour quota windows and automatically rotates the instance");
+        println!("  to the freshest account in the pool with maximum remaining quota and longest refill runway.");
+        println!("  Immediately snapshots active prompts before rotation and restores them upon completion.");
+        println!("\nArguments:");
+        println!("  [instance]                        Target instance name, ID, sequence number (#1, #2), or 'all' (defaults to active)");
+        println!("\nExamples:");
+        println!(
+            "  agm instances ff #2               # Fast-forward rotate account for instance #2"
+        );
+        println!("  agm instances ff Worker-1         # Fast-forward rotate account for Worker-1");
+        println!("  agm instances all ff              # Fast-forward rotate accounts for ALL running instances");
+        return;
+    }
+
+    if is_help {
+        println!("AGM Multi-Instance & Profile CLI:");
+        println!("  agm instances [ls] [--json]");
+        println!("  agm instances create <name> [--account <email|id>] [--from <inst>] [--data-only] [--launch]");
+        println!("  agm instances switch <instance> <account>");
+        println!("  agm instances ff [instance]");
+        println!("  agm instances all ff");
+        println!("  agm instances auto-switch [status|enable|disable|toggle|run]");
+        println!("  agm instances launch <instance>");
+        println!("  agm instances stop <instance>");
+        println!("  agm instances rm <instance> [--force]");
+        println!("  agm instances rm-all [--force]");
+        println!("  agm instances assign <instance> <repo_paths...>");
+        println!("\nDescription:");
+        println!(
+            "  Creates, lists, manages, launches, switches accounts, auto-rotates, and isolates"
+        );
+        println!(
+            "  Antigravity multi-instance IDE profiles with dedicated configuration, keychain,"
+        );
+        println!("  and state databases without cross-contaminating Default or sibling instances.");
+        println!("\nAliases: agm instances, agm instance, agm ls");
+        println!("\nSubcommands:");
+        println!("  ls, list                          List all registered instance profiles, statuses, and bound emails (default)");
+        println!(
+            "  create, add <name> [options]      Create a new isolated sandbox instance profile"
+        );
+        println!("  switch, use <inst> <account>      Switch an instance profile's bound account credentials directly");
+        println!("  ff, rotate [inst]                 Fast-forward / smart-rotate account for an instance (or all)");
+        println!("  auto-switch [action]              Inspect or configure background auto-profile switcher");
+        println!("  launch, start <inst>              Launch Antigravity IDE for the specified instance profile");
+        println!("  stop, kill, close <inst>          Safely close the running process for the specified instance");
+        println!("  rm, delete <inst> [--force]       Remove an instance profile, its data directory, and executable");
+        println!("  rm-all [--force]                  Remove all non-default sandbox instances");
+        println!("  assign, bind <inst> <paths...>    Bind one or more project workspace folders to an instance");
+        println!("\nCreate Options:");
+        println!("  --account, -a <email|id>          Bind a specific account by email or ID (defaults to next available unbound)");
+        println!("  --from, -f <source_instance>      Clone settings and extensions from an existing instance");
+        println!("  --data-only, --do                 Create isolated data directory structure without cloning executable");
+        println!("  --launch, -l                      Immediately launch the instance window after creation");
+        println!("\nGeneral Options:");
+        println!("  --json, -j                        Output result in structured JSON format");
+        println!("  --force, -f                       Bypass confirmation prompt for destructive actions");
+        println!("\nExamples:");
+        println!("  agm instances                                          # List all instances and running statuses");
+        println!("  agm instances create \"backend-dev\"                     # Create instance with next available account");
+        println!("  agm instances create \"qa-test\" -a dev@gmail.com       # Create instance bound to dev@gmail.com");
+        println!("  agm instances create \"stage-clone\" --from a-6650       # Clone settings from a-6650");
+        println!("  agm instances switch #2 dev2@gmail.com                 # Switch instance #2 to dev2@gmail.com");
+        println!("  agm instances switch a-6650 acc-12345                  # Switch instance a-6650 to acc-12345");
+        println!("  agm instances ff #2                                    # Fast-forward rotate account for instance #2");
+        println!("  agm instances auto-switch status                       # Check auto-switcher daemon status");
+        println!("  agm instances auto-switch toggle                       # Toggle auto-switcher daemon");
+        println!("  agm instances launch #2                                # Launch instance #2");
+        println!(
+            "  agm instances stop #2                                  # Safely close instance #2"
+        );
+        println!("  agm instances rm qa-test --force                       # Force delete qa-test");
+        println!("  agm instances all ff                                   # Fast-forward switch all running instances");
+        return;
+    }
+
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    // Subcommand: agm instances auto-switch [sub]
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("auto-switch")
+            || non_flag_args[0].eq_ignore_ascii_case("auto")
+            || non_flag_args[0].eq_ignore_ascii_case("autoswitch"))
+    {
+        cmd_auto_switch(&args[1..]);
+        return;
+    }
 
     // Subcommand: agm instances assign <target_inst> <repo_path...>
     if non_flag_args.len() >= 3
@@ -6568,7 +7105,9 @@ fn cmd_instances(args: &[String]) {
     if non_flag_args.len() >= 2
         && non_flag_args[0].eq_ignore_ascii_case("all")
         && (non_flag_args[1].eq_ignore_ascii_case("ff")
-            || non_flag_args[1].eq_ignore_ascii_case("switch"))
+            || non_flag_args[1].eq_ignore_ascii_case("fast-forward")
+            || non_flag_args[1].eq_ignore_ascii_case("switch")
+            || non_flag_args[1].eq_ignore_ascii_case("rotate"))
     {
         cmd_instances_all(args);
         return;
@@ -6601,7 +7140,7 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances create "name" [--data-only | --do | do]
+    // Subcommand: agm instances create <name> [options]
     if non_flag_args
         .first()
         .map(|s| s.eq_ignore_ascii_case("create") || s.eq_ignore_ascii_case("add"))
@@ -6614,15 +7153,58 @@ fn cmd_instances(args: &[String]) {
                 || a.eq_ignore_ascii_case("-do")
                 || a.eq_ignore_ascii_case("do")
         });
+
+        let should_launch = args.iter().any(|a| {
+            a.eq_ignore_ascii_case("--launch")
+                || a.eq_ignore_ascii_case("-launch")
+                || a.eq_ignore_ascii_case("-l")
+        });
+
+        // Parse optional account query: --account <email|id> or -a <email|id>
+        let mut target_account: Option<String> = None;
+        let mut from_instance: Option<String> = None;
+        let mut i = 0;
+        while i < args.len() {
+            let arg_lower = args[i].to_lowercase();
+            if (arg_lower == "--account" || arg_lower == "-a" || arg_lower == "--acc")
+                && i + 1 < args.len()
+            {
+                target_account = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+            if (arg_lower == "--from" || arg_lower == "-f") && i + 1 < args.len() {
+                from_instance = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+            i += 1;
+        }
+
         let name = non_flag_args
             .iter()
             .skip(1)
-            .find(|s| !s.eq_ignore_ascii_case("do"))
+            .find(|s| {
+                !s.eq_ignore_ascii_case("do")
+                    && !target_account
+                        .as_ref()
+                        .map(|a| a.eq_ignore_ascii_case(s))
+                        .unwrap_or(false)
+                    && !from_instance
+                        .as_ref()
+                        .map(|f| f.eq_ignore_ascii_case(s))
+                        .unwrap_or(false)
+            })
             .map(|s| (*s).clone())
             .unwrap_or_else(|| format!("Instance-{}", chrono::Utc::now().timestamp() % 1000));
 
-        let create_res = instance::copy_instance("default", name.clone(), Some("full"))
-            .or_else(|_| instance::create_instance(name));
+        let create_res = if let Some(ref source) = from_instance {
+            let resolved_src =
+                instance::resolve_instance_id(source).unwrap_or_else(|_| source.clone());
+            instance::copy_instance(&resolved_src, name.clone(), Some("full"))
+        } else {
+            instance::create_instance_with_account(name.clone(), target_account.as_deref())
+        };
 
         match create_res {
             Ok(mut cfg) => {
@@ -6631,21 +7213,143 @@ fn cmd_instances(args: &[String]) {
                         cfg.executable_path = Some(exe_path);
                     }
                 }
+
+                if let Some(ref acc_query) = target_account {
+                    if from_instance.is_some() {
+                        // Reseed cloned instance with explicit account
+                        let rt =
+                            tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+                        if let Ok(index) = account::load_account_index() {
+                            let q_lower = acc_query.to_lowercase();
+                            if let Some(target) = index.accounts.iter().find(|a| {
+                                a.id == *acc_query
+                                    || a.email.to_lowercase() == q_lower
+                                    || a.email.to_lowercase().contains(&q_lower)
+                            }) {
+                                let _ = rt.block_on(instance::switch_account_to_instance(
+                                    &target.id,
+                                    Some(&cfg.id),
+                                ));
+                                cfg.bound_account_id = Some(target.id.clone());
+                                cfg.bound_email = Some(target.email.clone());
+                            }
+                        }
+                    }
+                }
+
+                if should_launch {
+                    let _ = instance::launch_instance(&cfg.id);
+                }
+
                 if is_json {
                     println!("{}", serde_json::to_string_pretty(&cfg).unwrap_or_default());
                 } else {
                     println!(
-                        "[SUCCESS] Created instance #{}: '{}' (ID: {}, data_only: {}, dir: {})",
+                        "[SUCCESS] Created instance #{}: '{}' (ID: {}, bound: {}, data_only: {}, dir: {})",
                         cfg.seq_num.unwrap_or(1),
                         cfg.name,
                         cfg.id,
+                        cfg.bound_email.as_deref().unwrap_or("none"),
                         is_data_only,
                         cfg.data_dir
                     );
+                    if should_launch {
+                        println!("  [✓] Launched instance '{}' window", cfg.id);
+                    }
                 }
             }
             Err(e) => {
                 eprintln!("[ERROR] Failed to create instance: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // Subcommand: agm instances launch <target> OR agm instances start <target> OR agm instances <target> launch
+    if non_flag_args.len() >= 2
+        && (non_flag_args[0].eq_ignore_ascii_case("launch")
+            || non_flag_args[0].eq_ignore_ascii_case("start")
+            || non_flag_args[1].eq_ignore_ascii_case("launch")
+            || non_flag_args[1].eq_ignore_ascii_case("start"))
+    {
+        let target_spec = if non_flag_args[0].eq_ignore_ascii_case("launch")
+            || non_flag_args[0].eq_ignore_ascii_case("start")
+        {
+            non_flag_args[1]
+        } else {
+            non_flag_args[0]
+        };
+
+        let resolved_id = match instance::resolve_instance_id(target_spec) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Could not resolve instance '{}': {}",
+                    target_spec, e
+                );
+                std::process::exit(1);
+            }
+        };
+
+        println!(
+            "[*] Launching instance '{}' (resolved from '{}')...",
+            resolved_id, target_spec
+        );
+        match instance::launch_instance(&resolved_id) {
+            Ok(_) => {
+                println!(
+                    "[SUCCESS] Launched instance '{}' successfully.",
+                    resolved_id
+                );
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to launch instance '{}': {}", resolved_id, e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // Subcommand: agm instances stop <target> OR agm instances kill <target> OR agm instances close <target>
+    if non_flag_args.len() >= 2
+        && (non_flag_args[0].eq_ignore_ascii_case("stop")
+            || non_flag_args[0].eq_ignore_ascii_case("kill")
+            || non_flag_args[0].eq_ignore_ascii_case("close")
+            || non_flag_args[1].eq_ignore_ascii_case("stop")
+            || non_flag_args[1].eq_ignore_ascii_case("kill")
+            || non_flag_args[1].eq_ignore_ascii_case("close"))
+    {
+        let target_spec = if non_flag_args[0].eq_ignore_ascii_case("stop")
+            || non_flag_args[0].eq_ignore_ascii_case("kill")
+            || non_flag_args[0].eq_ignore_ascii_case("close")
+        {
+            non_flag_args[1]
+        } else {
+            non_flag_args[0]
+        };
+
+        let resolved_id = match instance::resolve_instance_id(target_spec) {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Could not resolve instance '{}': {}",
+                    target_spec, e
+                );
+                std::process::exit(1);
+            }
+        };
+
+        println!(
+            "[*] Stopping instance '{}' (resolved from '{}')...",
+            resolved_id, target_spec
+        );
+        match instance::close_instance(&resolved_id) {
+            Ok(_) => {
+                println!("[SUCCESS] Stopped instance '{}' process(es).", resolved_id);
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to stop instance '{}': {}", resolved_id, e);
                 std::process::exit(1);
             }
         }
@@ -6658,7 +7362,8 @@ fn cmd_instances(args: &[String]) {
             || non_flag_args[0].eq_ignore_ascii_case("remove")
             || non_flag_args[0].eq_ignore_ascii_case("delete")
             || non_flag_args[1].eq_ignore_ascii_case("rm")
-            || non_flag_args[1].eq_ignore_ascii_case("remove"))
+            || non_flag_args[1].eq_ignore_ascii_case("remove")
+            || non_flag_args[1].eq_ignore_ascii_case("delete"))
     {
         let target_spec = if non_flag_args[0].eq_ignore_ascii_case("rm")
             || non_flag_args[0].eq_ignore_ascii_case("remove")
@@ -6690,10 +7395,24 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances <seq|id|alias> switch <account_query>
-    if non_flag_args.len() >= 3 && non_flag_args[1].eq_ignore_ascii_case("switch") {
-        let target_spec = non_flag_args[0];
-        let acc_query = non_flag_args[2].trim().to_lowercase();
+    // Subcommand: agm instances switch <target> <account> OR agm instances <target> switch <account>
+    let is_switch_order1 =
+        non_flag_args.len() >= 3 && non_flag_args[0].eq_ignore_ascii_case("switch");
+    let is_switch_order2 =
+        non_flag_args.len() >= 3 && non_flag_args[1].eq_ignore_ascii_case("switch");
+    if is_switch_order1 || is_switch_order2 {
+        let (target_spec, acc_query) = if is_switch_order1 {
+            (
+                non_flag_args[1].as_str(),
+                non_flag_args[2].trim().to_lowercase(),
+            )
+        } else {
+            (
+                non_flag_args[0].as_str(),
+                non_flag_args[2].trim().to_lowercase(),
+            )
+        };
+
         let resolved_id = match instance::resolve_instance_id(target_spec) {
             Ok(id) => id,
             Err(e) => {
@@ -6759,16 +7478,23 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances <seq|id|alias> [switch] ff
-    if non_flag_args.len() >= 2 {
-        let last_arg = non_flag_args.last().unwrap().to_lowercase();
-        let second_arg = non_flag_args[1].to_lowercase();
-        if last_arg == "ff"
-            || last_arg == "fast-forward"
-            || second_arg == "ff"
-            || second_arg == "switch"
-        {
-            let target_spec = non_flag_args[0];
+    // Subcommand: agm instances ff [target] OR agm instances <target> ff
+    if !non_flag_args.is_empty() {
+        let is_ff_first = non_flag_args[0].eq_ignore_ascii_case("ff")
+            || non_flag_args[0].eq_ignore_ascii_case("fast-forward")
+            || non_flag_args[0].eq_ignore_ascii_case("rotate");
+        let is_ff_second = non_flag_args.len() >= 2
+            && (non_flag_args[1].eq_ignore_ascii_case("ff")
+                || non_flag_args[1].eq_ignore_ascii_case("fast-forward")
+                || non_flag_args[1].eq_ignore_ascii_case("rotate"));
+
+        if is_ff_first || is_ff_second {
+            let target_spec = if is_ff_first {
+                non_flag_args.get(1).map(|s| s.as_str()).unwrap_or("active")
+            } else {
+                non_flag_args[0].as_str()
+            };
+
             let resolved_id = match instance::resolve_instance_id(target_spec) {
                 Ok(id) => id,
                 Err(e) => {
@@ -6784,7 +7510,6 @@ fn cmd_instances(args: &[String]) {
                 resolved_id, target_spec
             );
             let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
-            // Snapshot & backup running prompts before rotation
             let _ = repo_db::backup_running_prompts(&resolved_id);
             match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
                 &resolved_id,
@@ -7015,33 +7740,30 @@ fn cmd_fast_forward(args: &[String]) {
         }
     };
 
-    let target_instance = target_opt
-        .map(|target| instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string()))
-        .unwrap_or_else(|| "default".to_string());
+    let target_instance = match target_opt {
+        Some(target) => {
+            instance::resolve_instance_id(target).unwrap_or_else(|_| target.to_string())
+        }
+        None => instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string()),
+    };
 
     // Snapshot & backup running prompts before rotation
     let _ = repo_db::backup_running_prompts(&target_instance);
 
-    let result = if target_opt.is_some() {
-        if !is_json {
-            println!(
-                "[*] Triggering fast-forward account rotation for instance '{}'...",
-                target_instance
-            );
-        }
-        rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
-            &target_instance,
-        )))
-    } else {
-        if !is_json {
-            println!("[*] Triggering fast-forward account rotation...");
-        }
-        rt.block_on(auto_switcher::trigger_manual_rotation())
-    };
+    if !is_json {
+        println!(
+            "[*] Triggering fast-forward account rotation for instance '{}'...",
+            target_instance
+        );
+    }
+    let result = rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
+        &target_instance,
+    )));
 
     if result.is_ok() {
-        // Immediately restore and dispatch running prompts
-        let _ = repo_db::resend_all_running_commands(20);
+        // Immediately restore and dispatch running prompts for target instance
+        let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
+        let _ = repo_db::dispatch_running_prompts(&target_instance);
     }
 
     let status_after = auto_switcher::get_status();
@@ -8491,10 +9213,12 @@ fn cmd_install(args: &[String]) {
         }
         println!("  [OK] Binary copied to {:?}", target_exe);
 
-        // Create agm.cmd helper wrapper
+        // Create agm.cmd and adm.cmd helper wrappers
         let cmd_wrapper = target_dir.join("agm.cmd");
+        let adm_wrapper = target_dir.join("adm.cmd");
         let cmd_content = "@echo off\r\n\"%~dp0agm.exe\" %*\r\n";
         let _ = fs::write(&cmd_wrapper, cmd_content);
+        let _ = fs::write(&adm_wrapper, cmd_content);
 
         // Add to User PATH via registry if missing
         let target_dir_str = target_dir.to_string_lossy().to_string();
@@ -8514,8 +9238,8 @@ fn cmd_install(args: &[String]) {
         // Register function in PowerShell profile
         register_powershell_profile_function(&target_exe);
 
-        println!("[SUCCESS] AGM CLI installed successfully!");
-        println!("          You can now run 'agm' from any Command Prompt or PowerShell window.");
+        println!("[SUCCESS] AGM & ADM CLI installed successfully!");
+        println!("          You can now run 'agm' or 'adm' from any Command Prompt or PowerShell window.");
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -8524,11 +9248,13 @@ fn cmd_install(args: &[String]) {
         let target_dir = PathBuf::from(home).join(".local").join("bin");
         let _ = fs::create_dir_all(&target_dir);
         let target_exe = target_dir.join("agm");
+        let adm_exe = target_dir.join("adm");
         if let Err(e) = fs::copy(&current_exe, &target_exe) {
             eprintln!("[ERROR] Failed to copy binary to {:?}: {}", target_exe, e);
             std::process::exit(1);
         }
-        println!("[SUCCESS] AGM CLI installed to {:?}", target_exe);
+        let _ = fs::copy(&current_exe, &adm_exe);
+        println!("[SUCCESS] AGM & ADM CLI installed to {:?}", target_exe);
     }
 }
 
@@ -8539,7 +9265,7 @@ fn register_powershell_profile_function(exe_path: &Path) {
          if ($profilePath -and (Test-Path -Path $profilePath)) {{ \
              $content = Get-Content -LiteralPath $profilePath -Raw; \
              if ($content -notmatch 'function agm\\b') {{ \
-                 $entry = \"`n# agm command wrapper`nfunction agm {{ & '{exe}' @args }}`n\"; \
+                 $entry = \"`n# agm & adm command wrappers`nfunction agm {{ & '{exe}' @args }}`nfunction adm {{ & '{exe}' @args }}`n\"; \
                  Add-Content -LiteralPath $profilePath -Value $entry; \
              }} \
          }}",

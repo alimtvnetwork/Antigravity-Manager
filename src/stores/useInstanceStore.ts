@@ -21,7 +21,7 @@ interface InstanceState {
     fetchSwitcherStatus: () => Promise<void>;
     updateSwitcherConfig: (config: AutoProfileSwitcherConfig) => Promise<void>;
     triggerManualRotation: () => Promise<string>;
-    createInstance: (name: string) => Promise<InstanceConfig>;
+    createInstance: (name: string, boundAccountId?: string, fromInstanceId?: string) => Promise<InstanceConfig>;
     copyInstance: (sourceId: string, targetName: string, cloneMode?: string) => Promise<InstanceConfig>;
     renameInstance: (instanceId: string, newName: string) => Promise<InstanceConfig>;
     deleteInstance: (instanceId: string) => Promise<void>;
@@ -30,6 +30,9 @@ interface InstanceState {
     cloneInstanceExecutable: (instanceId: string) => Promise<string>;
     setInstanceExecutable: (instanceId: string, executablePath?: string) => Promise<void>;
     closeInstance: (instanceId: string) => Promise<void>;
+    stopInstance: (instanceId: string) => Promise<void>;
+    fastForwardInstance: (instanceId: string) => Promise<string>;
+    toggleAutoSwitcher: () => Promise<void>;
     setActiveInstance: (instanceId: string) => Promise<void>;
     setDefaultInstance: (instanceId: string) => Promise<void>;
     switchAccountToInstance: (accountId: string, instanceId?: string) => Promise<void>;
@@ -112,10 +115,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         }
     },
 
-    createInstance: async (name: string) => {
+    createInstance: async (name: string, boundAccountId?: string, fromInstanceId?: string) => {
         set({ isLoading: true, error: null });
         try {
-            const config = await instanceService.createInstance(name);
+            const config = await instanceService.createInstance(name, boundAccountId, fromInstanceId);
             await get().fetchInstances(true);
             set({ isLoading: false });
             return config;
@@ -233,6 +236,46 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         }
     },
 
+    stopInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            await instanceService.stopInstance(instanceId);
+            await get().fetchInstances(true);
+            set({ isLoading: false });
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to stop instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.stopInstance' });
+            throw err;
+        }
+    },
+
+    fastForwardInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const msg = await instanceService.fastForwardInstance(instanceId);
+            await Promise.all([
+                get().fetchInstances(true),
+                get().fetchSwitcherStatus(),
+            ]);
+            set({ isLoading: false });
+            return msg;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to fast forward instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.fastForwardInstance' });
+            throw err;
+        }
+    },
+
+    toggleAutoSwitcher: async () => {
+        try {
+            await instanceService.toggleAutoSwitcher();
+            await get().fetchSwitcherStatus();
+        } catch (err: any) {
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.toggleAutoSwitcher' });
+            throw err;
+        }
+    },
+
     setActiveInstance: async (instanceId: string) => {
         set({ isLoading: true, error: null });
         try {
@@ -261,15 +304,13 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     switchAccountToInstance: async (accountId: string, instanceId?: string) => {
         set({ isLoading: true, error: null });
         try {
-            let targetIde: string | undefined;
-            if (instanceId) {
-                if (instanceId !== 'default') {
-                    targetIde = `instance:${instanceId}`;
-                }
-            }
+            await instanceService.switchAccountToInstance(accountId, instanceId);
             const { useAccountStore } = await import('./useAccountStore');
-            await useAccountStore.getState().switchAccount(accountId, targetIde);
-            await get().fetchInstances(true);
+            await Promise.all([
+                get().fetchInstances(true),
+                useAccountStore.getState().fetchAccounts(),
+                useAccountStore.getState().fetchCurrentAccount(),
+            ]);
             set({ isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to switch account to instance' });
