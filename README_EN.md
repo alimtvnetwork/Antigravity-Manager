@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.98.0)
+> Professional AI Account Management & Protocol Proxy System (v4.99.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.98.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.99.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.98.0**: Resolved the root-cause credential bleed where `language_server` inherited global `USERPROFILE` causing sandbox instances to read default account credentials, enforced strict process targeting and command-line verification preventing active sessions (PID 7872) from accidental termination, scoped lockfile cleaning strictly to target instance directories, rebuilt `agm instances` and `agm auto-switch` CLI suites with rich examples, upgraded frontend instance management with auto-switch toggles, initial account assignment, and stop controls, and upgraded developer Rust cache cleaning and conversation pruning.
+> Latest version **v4.99.0**: Resolved root-cause credential bleed where non-default sandbox instances inherited default account credentials by reverse-engineering Go `language_server` and injecting `SSH_CONNECTION` to trigger `shouldBypassKeyring` towards private file tokens with `id_token` completion, redirected Windows AppData to isolated sandbox partitions, enforced strict PID command-line and folder path gates guaranteeing the primary user IDE session (PID 7748) is never terminated, added high-quota fallback for auto-switcher and fast-forward, and extended multi-directory conversation pruning across all registered sandboxes.
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

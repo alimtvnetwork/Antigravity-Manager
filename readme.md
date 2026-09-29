@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.98.0)**
+**Bar 2: Version-Based Installation (v4.99.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.98.0**：彻底解决多实例模式下由于环境变量缺失导致 `language_server` 串读 Default 账号的根本缺陷，显式注入实例级隔离主目录；重构进程靶向识别门禁（`get_antigravity_pids` 与 `get_process_info`）及命令行目录二次校验，确保默认操作与实例操作互不波及，绝对保护主会话进程安全；支持细粒度独立实例锁文件清理，全面重构 `agm instances` 与 `agm auto-switch` CLI 套件与前端实例控制面板，升级开发者 Rust 增量缓存清理与对话历史修剪器。
+> 最新版本 **v4.99.0**：彻底解决非默认沙箱实例因 Windows 凭据管理器导致 `language_server` 串读 Default 账号的痛点，注入 `SSH_CONNECTION` 强制语言服务器绕过 Keyring 读取沙箱私有文件凭据并补全 `id_token`，同步隔离漫游 AppData；建立进程命令行与目录双重安全过滤门禁，绝对保证正在运行的用户主会话（PID 7748）不受波及；放开自动切号/快进对高额度候选账号的弹性选取，扩展跨实例多目录会话深度清理与在途任务实例级严格作用域隔离。
 
 👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
 
