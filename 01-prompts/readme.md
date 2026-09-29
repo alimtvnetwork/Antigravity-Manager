@@ -2,14 +2,15 @@
 
 This directory hosts the canonical, production-grade prompts library for the Prompt Architect meta-repository and all connected repositories.
 
-## Architecture: Version Segregation (V1 & V2)
+## Architecture: Version Segregation (V1, V2, & V3)
 
-To maintain 100% backward compatibility while delivering 10x-100x performance acceleration, prompts are segregated into two distinct release tiers:
+To maintain 100% backward compatibility while delivering 10x-100x performance acceleration and interactive workflow links, prompts are segregated into three distinct release tiers:
 
 | Tier | Directory | Primary Acceleration Engine | Fallback Engine | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **V1** | [`v1/`](v1/) | Python Toolchain (`03-ai-scripts/`) | Agent Built-ins | Original classic battle-tested prompts |
 | **V2** | [`v2/`](v2/) | **GitMap AUM Engine** (`gitmap` CLI) | Python Scripts (`03-ai-scripts/`) | Modernized ultra-fast prompts with GitMap AUM as primary |
+| **V3** | [`v3/`](v3/) | **Antigravity Slash Command Links** + **GitMap AUM Engine** | Python Scripts (`03-ai-scripts/`) | Interactive slash command links (`[/goal](slashCommand:goal)`, `[/learn](slashCommand:learn)`) + GitMap AUM |
 
 ---
 
@@ -36,7 +37,7 @@ To maintain 100% backward compatibility while delivering 10x-100x performance ac
 
 ## Directory Index
 
-Both `v1/` and `v2/` mirror the 22 canonical prompt categories:
+All three tiers (`v1/`, `v2/`, and `v3/`) mirror the 22 canonical prompt categories:
 
 ```text
 01-prompts/
@@ -63,7 +64,12 @@ Both `v1/` and `v2/` mirror the 22 canonical prompt categories:
 │   ├── 19-old-execute-prompts/
 │   ├── 20-ai-fix-script-prompts/
 │   └── 21-temp-end-to-end-tests/
-└── v2/                                 # Modernized prompts (GitMap AUM Primary)
+├── v2/                                 # Modernized prompts (GitMap AUM Primary)
+│   ├── 00-folder-structure/
+│   ├── 01-prompt-library-setup/
+│   ├── ... (all 22 categories)
+│   └── 21-temp-end-to-end-tests/
+└── v3/                                 # Interactive Slash Command Prompts ([/goal], [/learn])
     ├── 00-folder-structure/
     ├── 01-prompt-library-setup/
     ├── ... (all 22 categories)
