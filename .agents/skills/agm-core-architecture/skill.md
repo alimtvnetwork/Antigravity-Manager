@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 20 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 22 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -80,6 +80,7 @@ When modifying any component in the repository, refer to the corresponding skill
 | `src-tauri/src/modules/supabase_schema.rs`, `workspace_lease_manager.rs` | PostgreSQL cluster sync, 90s TTL distributed workspace leases | [`agm-supabase-sync-cluster`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-supabase-sync-cluster/skill.md) |
 | `src-tauri/src/modules/security_db.rs`, `user_token_db.rs` | Reverse proxy IP firewall, CIDR whitelist/blacklist, curfew windows | [`agm-security-network-guard`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-security-network-guard/skill.md) |
 | `src-tauri/src/modules/email_sender.rs`, `email_vault_db.rs` | AES-256-GCM encrypted password vault, machine GUID salt | [`agm-email-template-syntax`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-email-template-syntax/skill.md) |
+| `src-tauri/src/modules/ssh_manager.rs` | Native SSH key generation, mesh deployment, managed `~/.ssh/config` | [`agm-ssh-key-management-parity`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-ssh-key-management-parity/skill.md) |
 | Fast-Forward Shortcut Engine | Dynamic keybindings, active window restore, crash watchdog | [`agm-fast-forward-shortcuts`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-fast-forward-shortcuts/skill.md) |
 | Split SQLite Architecture (`repo_prompts.db`, `proxy_logs.db`, etc.) | WAL mode concurrency, 5000ms busy timeout, schema migrations | [`agm-split-sqlite-architecture`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-split-sqlite-architecture/skill.md) |
 
@@ -115,6 +116,11 @@ Every change made to this repository MUST strictly uphold the following invarian
 8. **Universal Two-Tier JSON Envelope**:
    - File exports and sync payloads must follow the `{ "attributes": { "type", "version", ... }, "data": ... }` schema via `json_envelope.rs`.
    - Imports must support `unpack_envelope()` with backward-compatible legacy flat JSON fallback.
+9. **SSH Fleet Key Parity & Windows ACL Hardening**:
+   - Managed `~/.ssh/config` modifications must be bounded strictly within `# --- BEGIN AGM MANAGED SSH CONFIG ---` blocks, with daemon directives sanitized.
+   - On Windows, administrator keys must install to `%ProgramData%\ssh\administrators_authorized_keys` with `icacls` ACL permissions restricted to `SYSTEM` and `BUILTIN\Administrators`.
+10. **Real-Time Task Heartbeat Liveness**:
+    - Running tasks must execute the 5-second prompt heartbeat runner (`scripts/prompt_heartbeat_runner.py`), updating `.antigravity_goal_prompt.log` and tracking PID files before and after account rotations.
 
 ---
 

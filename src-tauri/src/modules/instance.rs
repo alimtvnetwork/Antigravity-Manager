@@ -1655,6 +1655,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            cmd.arg("--remote-debugging-port=0");
             let inst_home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
             if let Some(ref inst_home) = inst_home_opt {
@@ -1710,6 +1711,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            cmd.arg("--remote-debugging-port=0");
             let inst_home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
 

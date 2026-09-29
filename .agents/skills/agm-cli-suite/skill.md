@@ -60,6 +60,17 @@ flowchart TD
 ### 5. Format Inspection & Bulk Operations
 - `agm which-format <files...>`: Two-tier JSON envelope inspector classifying files into canonical schemas (`agm/accounts-export`, `agm/supabase-endpoints`, etc.) and generating single-line copy-pasteable import commands.
 
+### 6. Mesh SSH & Fleet Management (`agm ssh ...`)
+- `agm ssh <target> [cmd...]`: Connects or runs commands on remote nodes, preferentially forwarding to `gitmap ssh` or falling back to the native `ssh_manager` engine.
+- `agm ssh deploy-keys [all] [--dry-run]`: Executes parallel 2-phase mesh deployment of public keys across the cluster.
+- `agm ssh fix-auth <target> [-i <pubkey>]` / `agm ssh copy-id <target>`: Repairs remote authorization by appending public keys.
+- `agm ssh keys [ls|create|cat|config]`: Discovers, generates (`ed25519`/`rsa`), and configures local SSH keys with managed `~/.ssh/config` injection.
+- `agm ssh nodes [ls|export-json|import-json]`: Inspects and synchronizes the cluster node fleet using portable two-tier JSON envelopes.
+
+### 7. Autonomous Instance Flow & Verification
+- `agm test-instance-flow` (`tif`): Autonomous local verification flow exercising sandbox creation, conscious PID termination, account rotation, prompt restoration, and CDP visual snapshot generation.
+- `agm test-training`: Verification harness validating model prompt instruction tuning and recovery.
+
 ## Key Invariants & Rules
 
 1. **Headless Early Interception**: Administrative commands (`delegate-update`, `open-ui`, `update`, `which-format`) must execute before initializing any graphical or windowing subsystem.

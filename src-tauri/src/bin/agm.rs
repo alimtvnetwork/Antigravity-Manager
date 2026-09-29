@@ -10,7 +10,7 @@ use antigravity_tools_lib::modules::repo_db::ActivePrompt;
 use antigravity_tools_lib::modules::{
     account, agy_cleaner, auto_switcher, backup_prompts_db, config, email_inbound, email_io,
     email_sender, email_vault_db, email_watcher, instance, json_envelope, notification_hub,
-    proxy_db, repo_db, security_db, supabase_client, supabase_schema, supabase_sync,
+    proxy_db, repo_db, security_db, ssh_manager, supabase_client, supabase_schema, supabase_sync,
     telegram_inbound, training_api, workspace_lease_manager,
 };
 use chrono::Utc;
@@ -179,7 +179,15 @@ fn main() {
         "open-ui" | "ui" | "launch-ui" | "start-ui" => {
             antigravity_tools_lib::modules::delegate_updater::open_ui(&cmd_args);
         }
-        "ssh" | "sj" => cmd_ssh(&cmd_args),
+        "ssh" | "sj" | "se" => {
+            let mut f = if subcommand == "se" {
+                vec!["exec".to_string()]
+            } else {
+                Vec::new()
+            };
+            f.extend(cmd_args);
+            cmd_ssh(&f);
+        }
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
             let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
@@ -7747,23 +7755,50 @@ fn cmd_instances(args: &[String]) {
             std::process::exit(1);
         };
 
-        println!(
-            "[*] Switching instance '{}' to account '{}' (ID: {})...",
-            resolved_id, target_acc.email, target_acc.id
-        );
+        let previous_email = instance::load_registry()
+            .ok()
+            .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
+            .and_then(|i| i.bound_email)
+            .unwrap_or_default();
+
+        if !is_json {
+            println!(
+                "[*] Switching instance '{}' to account '{}' (ID: {})...",
+                resolved_id, target_acc.email, target_acc.id
+            );
+        }
         let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         match rt.block_on(instance::switch_account_to_instance(
             &target_acc.id,
             Some(&resolved_id),
         )) {
             Ok(_) => {
-                println!(
-                    "[SUCCESS] Instance '{}' successfully switched to '{}'.",
-                    resolved_id, target_acc.email
-                );
+                if is_json {
+                    let res = serde_json::json!({
+                        "success": true,
+                        "instance": resolved_id,
+                        "email": target_acc.email,
+                        "previous_email": previous_email,
+                        "account_id": target_acc.id
+                    });
+                    println!("{}", serde_json::to_string(&res).unwrap_or_default());
+                } else {
+                    println!(
+                        "[SUCCESS] Instance '{}' successfully switched to '{}'.",
+                        resolved_id, target_acc.email
+                    );
+                }
             }
             Err(e) => {
-                eprintln!("[ERROR] Instance switch failed: {}", e);
+                if is_json {
+                    let err = serde_json::json!({
+                        "success": false,
+                        "error": e
+                    });
+                    println!("{}", serde_json::to_string(&err).unwrap_or_default());
+                } else {
+                    eprintln!("[ERROR] Instance switch failed: {}", e);
+                }
                 std::process::exit(1);
             }
         }
@@ -7797,10 +7832,17 @@ fn cmd_instances(args: &[String]) {
                     std::process::exit(1);
                 }
             };
-            println!(
-                "[*] Fast-forward rotating account for instance '{}' (resolved from '{}')...",
-                resolved_id, target_spec
-            );
+            let prev_email = instance::load_registry()
+                .ok()
+                .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
+                .and_then(|i| i.bound_email)
+                .unwrap_or_default();
+            if !is_json {
+                println!(
+                    "[*] Fast-forward rotating account for instance '{}' (resolved from '{}')...",
+                    resolved_id, target_spec
+                );
+            }
             let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
             let _ = repo_db::backup_running_prompts(&resolved_id);
             match rt.block_on(auto_switcher::trigger_manual_rotation_for_instance(Some(
@@ -7808,10 +7850,34 @@ fn cmd_instances(args: &[String]) {
             ))) {
                 Ok(msg) => {
                     let _ = repo_db::resend_running_commands_for_instance(Some(&resolved_id), 20);
-                    println!("[SUCCESS] {}", msg);
+                    if is_json {
+                        let active_acc = instance::load_registry()
+                            .ok()
+                            .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
+                            .and_then(|i| i.bound_email)
+                            .unwrap_or_default();
+                        let res = serde_json::json!({
+                            "success": true,
+                            "instance": resolved_id,
+                            "selected_email": active_acc,
+                            "previous_email": prev_email,
+                            "message": msg
+                        });
+                        println!("{}", serde_json::to_string(&res).unwrap_or_default());
+                    } else {
+                        println!("[SUCCESS] {}", msg);
+                    }
                 }
                 Err(e) => {
-                    eprintln!("[ERROR] Instance fast-forward failed: {}", e);
+                    if is_json {
+                        let err_res = serde_json::json!({
+                            "success": false,
+                            "error": e
+                        });
+                        println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                    } else {
+                        eprintln!("[ERROR] Instance fast-forward failed: {}", e);
+                    }
                     std::process::exit(1);
                 }
             }
@@ -8109,8 +8175,10 @@ fn cmd_fast_forward(args: &[String]) {
                     "local_ip": local_ip,
                     "tool_version": format!("v{}", VERSION),
                     "previous_account": prev_email,
+                    "previous_email": prev_email,
                     "predicted_next_account": predicted_email,
                     "selected_account": selected_email,
+                    "selected_email": selected_email,
                     "active_account": status_after.active_account_email,
                     "credit_before_switch": status_before.current_quota_percent,
                     "current_quota_percent": status_after.current_quota_percent,
@@ -9996,50 +10064,61 @@ fn handle_ssh_deploy_keys(args: &[String]) {
     }
 
     println!("🔑 AGM Mesh SSH Public Key Deployment (Native Engine)");
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let ssh_dir = home.join(".ssh");
-    let mut pub_keys = Vec::new();
-    if ssh_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&ssh_dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.extension().map(|e| e == "pub").unwrap_or(false) {
-                    if let Ok(content) = std::fs::read_to_string(&p) {
-                        let trimmed = content.trim().to_string();
-                        if !trimmed.is_empty() {
-                            pub_keys.push((
-                                p.file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy()
-                                    .to_string(),
-                                trimmed,
-                            ));
-                        }
-                    }
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    let except = args
+        .iter()
+        .position(|a| a == "--except")
+        .and_then(|idx| args.get(idx + 1).map(|s| s.as_str()));
+    let target = args
+        .iter()
+        .find(|a| {
+            !a.starts_with('-') && *a != "keys" && *a != "deploy" && Some(a.as_str()) != except
+        })
+        .map(|s| s.as_str())
+        .unwrap_or("all");
+
+    match ssh_manager::deploy_mesh_keys(target, except, dry_run) {
+        Ok(summary) => {
+            println!(
+                "  • Unique Public Keys Identified: {}",
+                summary.gathered_keys.len()
+            );
+            for k in &summary.gathered_keys {
+                let preview = if k.public_key.len() > 40 {
+                    format!(
+                        "{}...{}",
+                        &k.public_key[..20],
+                        &k.public_key[k.public_key.len() - 15..]
+                    )
+                } else {
+                    k.public_key.clone()
+                };
+                println!("    - {} ({}): {}", k.key_name, k.source_node, preview);
+            }
+            println!("  • Target Fleet: {}", target);
+            if dry_run {
+                println!("  [DRY-RUN] No remote authorized_keys were modified.");
+            } else {
+                println!(
+                    "  • Local authorized_keys updated: {}",
+                    summary.local_files_updated
+                );
+                for rep in &summary.node_reports {
+                    let mark = if rep.online && rep.batch_auth_verified {
+                        "✓"
+                    } else {
+                        "✗"
+                    };
+                    println!(
+                        "    {} {} ({}) - {}",
+                        mark, rep.alias, rep.ip_address, rep.detail
+                    );
                 }
             }
+            println!("✓ SSH public key mesh deployment complete.");
         }
+        Err(e) => eprintln!("[ERROR] Deploy mesh keys failed: {}", e),
     }
-
-    println!("  • Unique Public Keys Identified: {}", pub_keys.len());
-    for (name, key) in &pub_keys {
-        let preview = if key.len() > 40 {
-            format!("{}...{}", &key[..20], &key[key.len() - 15..])
-        } else {
-            key.clone()
-        };
-        println!("    - {}: {}", name, preview);
-    }
-
-    if pub_keys.is_empty() {
-        println!("  [!] No SSH public keys found in {}", ssh_dir.display());
-        println!("      Generate one with: ssh-keygen -t ed25519");
-        return;
-    }
-
-    let target = args.first().map(|s| s.as_str()).unwrap_or("all");
-    println!("  • Target Fleet: {}", target);
-    println!("✓ SSH public keys collected and verified.");
 }
 
 fn handle_ssh_fix_auth(args: &[String]) {
@@ -10110,6 +10189,167 @@ fn handle_ssh_fix_auth(args: &[String]) {
     }
 }
 
+fn handle_ssh_keys(args: &[String]) {
+    let subcmd = args
+        .first()
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "ls".to_string());
+    let gitmap_args = match subcmd.as_str() {
+        "ls" | "list" => vec!["list".to_string()],
+        "create" | "add" | "gen" => {
+            let mut v = vec!["create".to_string()];
+            v.extend(args.get(1..).unwrap_or(&[]).iter().cloned());
+            v
+        }
+        "copy" | "cp" => {
+            let mut v = vec!["copy".to_string()];
+            v.extend(args.get(1..).unwrap_or(&[]).iter().cloned());
+            v
+        }
+        "cat" | "view" => {
+            let mut v = vec!["cat".to_string()];
+            v.extend(args.get(1..).unwrap_or(&[]).iter().cloned());
+            v
+        }
+        "rm" | "delete" => {
+            let mut v = vec!["delete".to_string()];
+            v.extend(args.get(1..).unwrap_or(&[]).iter().cloned());
+            v
+        }
+        "config" => vec!["config".to_string()],
+        "export" | "export-json" | "export-bundle" | "import" | "import-json" | "import-bundle"
+        | "authorize" | "auth" | "install" | "deploy" | "distribute" => Vec::new(),
+        _ => vec!["list".to_string()],
+    };
+
+    if !gitmap_args.is_empty() && forward_to_gitmap_ssh(&gitmap_args) {
+        return;
+    }
+
+    match subcmd.as_str() {
+        "create" | "add" | "gen" => {
+            let name = args.get(1).map(|s| s.as_str()).unwrap_or("agm_ed25519");
+            let comment = args.get(2).map(|s| s.as_str());
+            match ssh_manager::create_ssh_key(name, comment) {
+                Ok(rec) => {
+                    println!(
+                        "[SUCCESS] Created SSH key pair '{}' ({})",
+                        rec.name, rec.key_type
+                    );
+                    println!("  ● Public Path:  {}", rec.public_path);
+                    println!("  ● Private Path: {}", rec.private_path);
+                    println!("  ● Fingerprint:  {}", rec.fingerprint);
+                }
+                Err(e) => eprintln!("[ERROR] Failed to create SSH key: {}", e),
+            }
+        }
+        "delete" | "rm" => {
+            if let Some(name) = args.get(1) {
+                match ssh_manager::delete_ssh_key(name) {
+                    Ok(msg) => println!("[SUCCESS] {}", msg),
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                }
+            } else {
+                eprintln!(
+                    "[ERROR] Missing key name to delete. Example: agm ssh keys rm id_ed25519"
+                );
+            }
+        }
+        "copy" | "cp" => {
+            let name = args.get(1).map(|s| s.as_str());
+            match ssh_manager::copy_ssh_public_key(name) {
+                Ok(rec) => {
+                    println!("[SUCCESS] Copied public key '{}' to clipboard!", rec.name);
+                    println!("  ● Key: {}", rec.public_key);
+                }
+                Err(e) => eprintln!("[ERROR] Failed to copy key: {}", e),
+            }
+        }
+        "cat" | "view" => {
+            let name = args.get(1).map(|s| s.as_str());
+            match ssh_manager::copy_ssh_public_key(name) {
+                Ok(rec) => println!("{}", rec.public_key),
+                Err(e) => eprintln!("[ERROR] Failed to read key: {}", e),
+            }
+        }
+        "config" => match ssh_manager::update_ssh_config(false) {
+            Ok(msg) => println!("[SUCCESS] {}", msg),
+            Err(e) => eprintln!("[ERROR] Failed to update ssh config: {}", e),
+        },
+        "export" | "export-json" | "export-bundle" => {
+            let dir_opt = args.get(1).map(|s| s.as_str());
+            match ssh_manager::export_all_bundle(dir_opt) {
+                Ok((path, keys_cnt, nodes_cnt)) => {
+                    println!("[SUCCESS] Exported SSH bundle to {}:", path.display());
+                    println!("  ● Public Keys Exported: {}", keys_cnt);
+                    println!("  ● Fleet Nodes Exported: {}", nodes_cnt);
+                }
+                Err(e) => eprintln!("[ERROR] Failed to export SSH bundle: {}", e),
+            }
+        }
+        "import" | "import-json" | "import-bundle" => {
+            let dir_opt = args.get(1).map(|s| s.as_str());
+            match ssh_manager::import_all_bundle(dir_opt) {
+                Ok((keys_installed, stats)) => {
+                    println!("[SUCCESS] Imported SSH bundle:");
+                    println!("  ● Authorized Keys Installed Locally: {}", keys_installed);
+                    println!(
+                        "  ● Fleet Nodes Synced: Total: {}, Inserted: {}, Updated: {}, Unchanged: {}",
+                        stats.total, stats.inserted, stats.updated, stats.unchanged
+                    );
+                }
+                Err(e) => eprintln!("[ERROR] Failed to import SSH bundle: {}", e),
+            }
+        }
+        "authorize" | "auth" | "install" => {
+            if let Some(target) = args.get(1) {
+                match ssh_manager::install_authorized_key_local(target) {
+                    Ok(updated_files) => {
+                        if updated_files.is_empty() {
+                            println!("[SUCCESS] Public key already authorized in ~/.ssh/authorized_keys (deduplicated).");
+                        } else {
+                            println!(
+                                "[SUCCESS] Installed authorized key into: {:?}",
+                                updated_files
+                            );
+                        }
+                    }
+                    Err(e) => eprintln!("[ERROR] Failed to install authorized key: {}", e),
+                }
+            } else {
+                eprintln!("[ERROR] Missing public key string or .pub file path. Example: agm ssh keys authorize ~/.ssh/id_ed25519.pub");
+            }
+        }
+        "deploy" | "distribute" => {
+            handle_ssh_deploy_keys(&args[1..]);
+        }
+        _ => match ssh_manager::discover_local_ssh_keys() {
+            Ok(keys) => {
+                println!("\n  Managed Local SSH Keys ({} total):", keys.len());
+                println!("  --------------------------------------------------------------------------------");
+                println!(
+                    "  {:<20} {:<10} {:<30} {:<20}",
+                    "NAME", "TYPE", "FINGERPRINT", "CREATED"
+                );
+                println!("  --------------------------------------------------------------------------------");
+                for k in &keys {
+                    let fp = if k.fingerprint.len() > 28 {
+                        &k.fingerprint[..28]
+                    } else {
+                        &k.fingerprint
+                    };
+                    println!(
+                        "  {:<20} {:<10} {:<30} {:<20}",
+                        k.name, k.key_type, fp, k.created_at
+                    );
+                }
+                println!("  --------------------------------------------------------------------------------\n");
+            }
+            Err(e) => eprintln!("[ERROR] Failed to list SSH keys: {}", e),
+        },
+    }
+}
+
 fn handle_ssh_nodes(args: &[String]) {
     let mut gitmap_args = Vec::new();
     let first = args.first().map(|s| s.to_lowercase()).unwrap_or_default();
@@ -10132,17 +10372,99 @@ fn handle_ssh_nodes(args: &[String]) {
         return;
     }
 
-    println!("SSH Nodes Management (Native Fallback):");
-    let export_file = "gitmap-ssh-nodes.json";
-    if Path::new(export_file).exists() {
-        if let Ok(content) = std::fs::read_to_string(export_file) {
-            println!("{}", content);
+    let is_export = args.iter().any(|a| a == "export-json" || a == "export");
+    let is_import = args.iter().any(|a| a == "import-json" || a == "import");
+    let file_arg = args
+        .iter()
+        .find(|a| {
+            !a.starts_with('-')
+                && *a != "nodes"
+                && *a != "export-json"
+                && *a != "import-json"
+                && *a != "ls"
+                && *a != "list"
+        })
+        .map(|s| s.as_str());
+
+    if is_export {
+        match ssh_manager::export_nodes_json(file_arg) {
+            Ok(p) => println!("[SUCCESS] Exported SSH nodes to {}", p.0.display()),
+            Err(e) => eprintln!("[ERROR] Failed to export nodes: {}", e),
         }
-    } else {
-        println!(
-            "No {} found. Register nodes or use GitMap fleet manager.",
-            export_file
-        );
+        return;
+    }
+
+    if is_import {
+        match ssh_manager::import_nodes_json(file_arg, None) {
+            Ok((source, stats)) => {
+                println!(
+                    "[SUCCESS] Imported SSH nodes from {}. Total: {}, Inserted: {}, Updated: {}, Unchanged: {}",
+                    source, stats.total, stats.inserted, stats.updated, stats.unchanged
+                );
+            }
+            Err(e) => eprintln!("[ERROR] Failed to import nodes: {}", e),
+        }
+        return;
+    }
+
+    match ssh_manager::load_ssh_connections() {
+        Ok(conns) => {
+            println!("\n  Registered SSH Fleet Nodes ({} total):", conns.len());
+            println!("  --------------------------------------------------------------------------------");
+            println!(
+                "  {:<15} {:<22} {:<15} {:<10}",
+                "ALIAS", "HOST (IP)", "USER", "OS"
+            );
+            println!("  --------------------------------------------------------------------------------");
+            for c in &conns {
+                println!(
+                    "  {:<15} {:<22} {:<15} {:<10}",
+                    c.alias, c.ip_address, c.username, c.os
+                );
+            }
+            println!("  --------------------------------------------------------------------------------\n");
+        }
+        Err(e) => eprintln!("[ERROR] Failed to load SSH nodes: {}", e),
+    }
+}
+
+fn handle_ssh_exec(args: &[String]) {
+    let mut gitmap_args = vec!["exec".to_string()];
+    gitmap_args.extend(args.iter().cloned());
+    if forward_to_gitmap_ssh(&gitmap_args) {
+        return;
+    }
+
+    if args.is_empty() {
+        println!("Execute remote commands across SSH machines with automatic liveness checks.");
+        println!("\nUsage:");
+        println!("  agm ssh exec [target] \"<command>\" [flags]");
+        println!("  agm se [target] \"<command>\" [flags]");
+        println!("\nExamples:");
+        println!("  agm ssh exec \"uptime\"");
+        println!("  agm ssh exec devbox \"uname -a && df -h\"");
+        println!("  agm ssh exec all gitmap --version");
+        return;
+    }
+
+    let target = args[0].as_str();
+    let cmd_slice = if args.len() > 1 { &args[1..] } else { args };
+    match ssh_manager::exec_ssh_command(target, cmd_slice, None, None, None) {
+        Ok(results) => {
+            for r in results {
+                println!(
+                    "\n--- [{}] ({}) exit: {} ({}ms) ---",
+                    r.alias, r.ip_address, r.exit_code, r.duration_ms
+                );
+                if !r.stdout.is_empty() {
+                    print!("{}", r.stdout);
+                }
+                if !r.stderr.is_empty() {
+                    eprint!("{}", r.stderr);
+                }
+            }
+        }
+        Err(e) => eprintln!("[ERROR] Remote execution failed: {}", e),
     }
 }
 
@@ -10154,35 +10476,47 @@ fn cmd_ssh(args: &[String]) {
     {
         println!("AGM Remote SSH Fleet & Key Management (GitMap Parity):");
         println!("  agm ssh <[user@]host> [-p <port>] [--password <pwd>] [--update] [cmd...]");
+        println!("  agm ssh exec [target] \"<command>\" [--json]");
         println!("  agm ssh deploy-keys [all] [--dry-run] [--json]");
         println!("  agm ssh fix-auth <target> [-i <identity_pubkey>]");
         println!("  agm ssh copy-id <target> [-i <identity_pubkey>]");
+        println!("  agm ssh keys [ls|create|copy|cat|rm|config]");
         println!("  agm ssh nodes [ls]");
         println!("  agm ssh nodes export-json [file]");
         println!("  agm ssh nodes import-json [file]");
+        println!("  agm ssh bundle export|import [dir]");
         println!("\nDescription:");
         println!("  Manages remote cluster nodes, SSH credentials, authorized_keys distribution,");
         println!("  and executes remote terminal commands or automated updates across machines.");
         println!("\nKey & Fleet Subcommands:");
+        println!("  exec [target] \"<cmd>\"     Execute remote command across fleet machines (alias: se)");
         println!("  deploy-keys [all]         Gather, deduplicate, and deploy SSH public keys across fleet");
         println!(
             "  fix-auth <target>         Deploy public key to remote host's ~/.ssh/authorized_keys"
         );
         println!("  copy-id <target>          Alias for fix-auth (native ssh-copy-id style)");
+        println!("  keys [ls|create|copy|rm]  Manage local SSH key pairs and ~/.ssh/config");
         println!("  nodes [ls]                List all registered SSH cluster fleet nodes");
         println!("  nodes export-json [file]  Export SSH nodes to portable JSON (default: gitmap-ssh-nodes.json)");
         println!("  nodes import-json [file]  Import SSH nodes from portable JSON envelope");
+        println!(
+            "  bundle export|import      Export/import all keys, nodes, and public key bundle"
+        );
         println!("\nRemote Execution Options:");
         println!("    -p, --port <port>   Custom SSH port (default: 22)");
         println!("    --password <pwd>    Password for SSH authentication");
         println!("    --update            Trigger remote update on target host");
         println!("\nExamples:");
         println!(
+            "  agm ssh exec all \"uname -a\"               # Execute command across all nodes"
+        );
+        println!(
             "  agm ssh deploy-keys                       # Synchronize public keys across fleet"
         );
         println!(
             "  agm ssh fix-auth root@192.168.1.50        # Authorize public key on remote host"
         );
+        println!("  agm ssh keys                              # List all managed local SSH keys");
         println!(
             "  agm ssh nodes                             # Display registered SSH cluster nodes"
         );
@@ -10199,6 +10533,11 @@ fn cmd_ssh(args: &[String]) {
     }
 
     let first = args[0].to_lowercase();
+    if first == "exec" || first == "se" {
+        handle_ssh_exec(&args[1..]);
+        return;
+    }
+
     if first == "deploy-keys"
         || first == "deploy_keys"
         || (first == "deploy" && args.get(1).map(|s| s.as_str()) == Some("keys"))
@@ -10213,11 +10552,43 @@ fn cmd_ssh(args: &[String]) {
         return;
     }
 
+    if first == "keys" || first == "key" {
+        handle_ssh_keys(&args[1..]);
+        return;
+    }
+
+    if first == "bundle" {
+        let sub = args.get(1).map(|s| s.as_str()).unwrap_or("export");
+        let dir = args.get(2).map(|s| s.as_str());
+        if sub == "import" {
+            match ssh_manager::import_all_bundle(dir) {
+                Ok((keys, stats)) => println!(
+                    "[SUCCESS] Imported SSH bundle: {} key(s) installed, {} node(s) synced",
+                    keys, stats.total
+                ),
+                Err(e) => eprintln!("[ERROR] Failed to import SSH bundle: {}", e),
+            }
+        } else {
+            match ssh_manager::export_all_bundle(dir) {
+                Ok((p, keys, nodes)) => println!(
+                    "[SUCCESS] Exported SSH bundle to {}: {} key(s), {} node(s)",
+                    p.display(),
+                    keys,
+                    nodes
+                ),
+                Err(e) => eprintln!("[ERROR] Failed to export SSH bundle: {}", e),
+            }
+        }
+        return;
+    }
+
     if first == "nodes"
         || first == "export-json"
         || first == "import-json"
         || first == "nodes-export"
         || first == "nodes-import"
+        || first == "export"
+        || first == "import"
         || first == "ls"
         || first == "list"
     {
@@ -10540,6 +10911,11 @@ fn cmd_test_instance_flow(args: &[String]) {
     if let Ok(instances) = instance::list_instances() {
         for inst in instances {
             if inst.config.is_default || inst.config.id == "default" {
+                continue;
+            }
+            if !inst.config.id.starts_with("test-cli-flow")
+                && !inst.config.id.starts_with("test-diag")
+            {
                 continue;
             }
             if let Some(pid) = inst.pid {
@@ -11080,17 +11456,17 @@ fn cmd_test_instance_flow(args: &[String]) {
     );
     println!("--------------------------------------------------------------------------------");
 
-    // Step 7: Clean Teardown & Final Safety Audit
-    println!("[STEP 7/7] Cleaning up test instance and conducting final safety audit...");
-    let _ = Command::new("python")
-        .args([py_heartbeat_runner, "stop", &heartbeat_log_str])
-        .output();
-    let _ = instance::close_instance(&new_inst.id);
-    let _ = instance::delete_instance(&new_inst.id);
+    // Step 7: Preserve Instance for Live Operator Observation & Final Safety Audit
+    println!("[STEP 7/7] Preserving instance for live operator observation & conducting final safety audit...");
     println!(
-        "  [✓] Test instance '{}' safely closed and deleted.",
+        "  [SUCCESS] Test instance '{}' is PRESERVED and KEPT OPEN for operator observation.",
         new_inst.id
     );
+    println!("            ● Instance ID:     {}", new_inst.id);
+    println!("            ● Folder Location: {}", new_inst.data_dir);
+    println!("            ● Verified PID:    {}", final_pid);
+    println!("            ● Active Email:    {}", acc1.email);
+    println!("            ● Heartbeat File:  {}", heartbeat_log_str);
 
     let final_main_pids: std::collections::HashSet<u32> =
         instance::find_pids_for_data_dir(&default_data_dir_str, true)

@@ -51,8 +51,19 @@ Before launching an IDE instance post-switch:
 - The IDE or developer bootstrap script picks up this task on launch.
 
 ### 4. Real-Time Heartbeat Logging (`scripts/prompt_heartbeat_runner.py`)
-- Emits 5-second heartbeats into `.antigravity_goal_prompt.log` containing UTC timestamps, sequence numbers, and active process PIDs.
-- Automatically halts when the parent IDE exits and resumes when the process restarts.
+A dedicated Python daemon monitors task execution vitality and verifies zero-loss continuity during account rotations:
+- **CLI Commands**:
+  - `python scripts/prompt_heartbeat_runner.py start <prompt_id> <instance_id> <log_path> [interval=5.0]`: Spawns a detached background runner (`DETACHED_PROCESS` on Windows, background fork on Unix) and writes its PID to `<log_path>.pid`.
+  - `python scripts/prompt_heartbeat_runner.py check <log_path>`: Verifies runner process liveness via OS tables (`tasklist` on Windows, `kill(pid, 0)` on Unix) and validates heartbeat freshness (`age_sec <= 10.0`).
+  - `python scripts/prompt_heartbeat_runner.py stop <log_path>`: Gracefully terminates the runner and unlinks `<log_path>.pid`.
+  - `python scripts/prompt_heartbeat_runner.py latest <log_path>`: Dumps the most recent heartbeat line and age in seconds.
+- **Log Entry Standard (`.antigravity_goal_prompt.log`)**:
+  ```text
+  [2026-09-30 01:45:00 UTC] [PID: 12345] Instance: default | Prompt: prompt-uuid | Iteration: 42 | Status: RUNNING | Goal: Long-running task active
+  ```
+- **Lifecycle Integration**:
+  - Automatically halted before conscious PID termination of an instance.
+  - Automatically resumed post-switch, verifying that iteration counters advance continuously from before to after the rotation.
 
 ## Key Invariants & Rules
 

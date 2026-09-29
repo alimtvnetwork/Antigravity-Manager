@@ -47,6 +47,18 @@ Executes an on-demand 6-stage lifecycle verification:
 - Extracts `antigravityUnifiedStateSync.oauthToken` blob.
 - Decodes protobuf wire format without third-party dependencies, extracting authenticated email and token expiration for test assertions.
 
+### 4. 5-Second Real-Time Heartbeat Verification (`scripts/prompt_heartbeat_runner.py`)
+- Integrated into E2E Stage 5/6: launches the heartbeat daemon alongside simulated prompts.
+- Confirms that `.antigravity_goal_prompt.log` records sequential ticks (`Iteration: 1`, `2`, ...).
+- Verifies that the heartbeat halts prior to conscious PID killing, and cleanly resumes post-switch with incrementing iterations.
+
+### 5. CDP Visual Snapshot Verification (`assets/screenshots/generate_instance_screenshot.py`)
+- Connects to running instance via Chrome DevTools Protocol (CDP port 9222/9223) to capture high-fidelity window screenshots before and after account switching.
+- Provides Pillow rendering fallback to generate synthetic UI verification cards when running in headless environments.
+
+### 6. Active Prompt Helper (`scripts/test_prompt_helper.py`)
+- Directly seeds `active_prompts` table in `repo_prompts.db` with sample multi-modal tasks, ensuring repeatable prompt resumption assertions without requiring manual IDE interaction.
+
 ## Key Invariants & Rules
 
 1. **Zero-CI Quarantine Standard (Spec 72)**: Heavy local E2E tests must be marked `#[ignore = "local_only_e2e"]` and require explicit `RUN_TEMP_E2E=1` environment activation. They must NEVER execute during routine CI/CD pipelines.
