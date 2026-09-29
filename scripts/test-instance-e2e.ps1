@@ -43,24 +43,10 @@ foreach ($oldInst in @($instA, $instB, "test-diag-1-8492")) {
 
 # Helper to query SQLite value in a state.vscdb
 function Get-VscdbEmail($dbPath) {
-    if (!(Test-Path $dbPath)) { return $null }
-    $pythonCmd = @"
-import sqlite3, sys
-try:
-    conn = sqlite3.connect(r'$dbPath')
-    c = conn.cursor()
-    c.execute("SELECT value FROM ItemTable WHERE key = 'antigravityAuth.token'")
-    row = c.fetchone()
-    if row and row[0]:
-        import json
-        data = json.loads(row[0])
-        print(data.get('email') or data.get('username') or '')
-    else:
-        print('')
-except Exception as e:
-    print('')
-"@
-    return (python -c $pythonCmd).Trim()
+    if (!(Test-Path $dbPath)) { return "" }
+    $cmd = 'import sqlite3, sys, json; conn = sqlite3.connect(sys.argv[1]); c = conn.cursor(); c.execute("SELECT value FROM ItemTable WHERE key = ''antigravityAuth.token''"); r = c.fetchone(); print(json.loads(r[0]).get("email", "") if r and r[0] else "")'
+    $res = python -c $cmd "$dbPath" 2>$null
+    if ($res) { return $res.Trim() } else { return "" }
 }
 
 function Get-AppStorageEmail($jsonPath) {
@@ -89,6 +75,9 @@ if ($createA.bound_email -ne $accA) {
 if ($createB.bound_email -ne $accB) {
     throw "TEST 1 FAILED: Instance B bound email '$($createB.bound_email)' != '$accB'"
 }
+
+$instA = $createA.id
+$instB = $createB.id
 
 $instADir = $createA.data_dir
 $instBDir = $createB.data_dir
