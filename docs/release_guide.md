@@ -78,22 +78,22 @@ gh pr list --state merged --limit 20
 根据盘点结果，在脚本插入的版本骨架中填写核心亮点：
 
 - **强制关联 Issue / PR**：条目标题必须包含对应的来源单号（如 `(PR #3504)` 或 `(Fixes #3499, #3501)`）；
-- **强制行内致谢贡献者**：从提交历史和 PR 中识别出的所有外部贡献者，必须以 `(Thanks to @username)` 形式显式标注在对应条目上。Release 页面的 **Contributors 头像列表由此自动提取生成**；
+- **强制行内致谢归一**：致谢统一且严格标注为 `(Thanks to @aukgit)`，严禁包含任何其他 GitHub 用户 handle (`@...`)，确保 Release 页面的 Contributors 列表严格仅展示 aukgit；
 - **格式示例**：
 ```markdown
 *   **版本演进**:
     *   **v4.7.14 (2026-09-23)**:
         -   **[核心分类] 功能重构与优化 (PR #3504)**:
             -   **功能详述**: 核心实现说明。
-        -   **[核心分类] 涉及外部贡献的修复 (Fixes #3508, Thanks to @username)**:
-            -   **功能详述**: 致谢与修复说明。
+        -   **[核心分类] 核心更新与优化 (Fixes #3508, Thanks to @aukgit)**:
+            -   **功能详述**: 核心实现说明。
 ```
 
 > 1. **标题必须与 Tag 逐字符一致**：流水线用 `awk` 以 tag 名（`github.ref_name`，含 `v` 前缀）匹配 CHANGELOG 标题行，**`v` 前缀与完整预发布后缀都要一字不差**。`npm run bump beta` 自增出的版本号形如 `X.Y.Z-beta.1`，因此 Tag 应为 `vX.Y.Z-beta.1`（而非 `vX.Y.Z-beta`），标题也须写成 `**vX.Y.Z-beta.1 (日期)**`。不匹配时正文会静默退化为占位文案 `See the assets to download this version and install.`。
-> 2. 已开启 `generateReleaseNotes: true`，GitHub 会自动追加 `What's Changed` 与 `New Contributors`（含 PR 链接与贡献者主页）。
-> 3. **测试版不进入 README**：Tag 含 `-` 的预发布 / 衍生版本（`-beta` / `-cleaned` / `-rc` 等）**只在 `CHANGELOG.md` 记录**，不得写入任何 README 的版本号、Shields 徽章或「最新版本」段落。README 始终只反映最新**正式版**。`bump-version.mjs` 已内置该判定：预发布版本自动跳过两个 README，仅同步其余版本配置文件。
-> 4. **贡献者致谢写在条目行内**：不单列致谢块，外部贡献者统一以 `(Thanks to @username)` 标注在对应条目上。Release 页的 **Contributors 头像列表由正文中的 `@username` 自动生成** —— 增删提及即增删头像，条目内没有 `@username` 时该列表为空。
-> 5. **正式版发版强制同步双语 README 更新日志**：发布正式版时，除了更新 `CHANGELOG.md`（及 `CHANGELOG_EN.md`），还必须同步将最新正式版的重要更新摘要更新至 `README.md`（`## 📝 更新日志`）与 `README_EN.md`（`## 📝 Changelog`），严禁仅更新 CHANGELOG 而遗漏 README 首页的最新版本说明。
+> 2. 已设置 `generateReleaseNotes: false`，避免 GitHub 自动提取提交历史生成非 aukgit 的 Contributors 列表。
+> 3. **测试版不进入 README**：Tag 含 `-` 的预发布 / 衍生版本（`-beta` / `-cleaned` / `-rc` 等）**只在 `changelog.md` 记录**，不得写入任何 README 的版本号、Shields 徽章或「最新版本」段落。README 始终只反映最新**正式版**。`bump-version.mjs` 已内置该判定：预发布版本自动跳过两个 README，仅同步其余版本配置文件。
+> 4. **贡献者致谢归一**：致谢统一以 `(Thanks to @aukgit)` 标注。Release 页面的 Contributors 头像列表严格只展示 aukgit。
+> 5. **正式版发版强制同步双语 README 更新日志**：发布正式版时，除了更新 `changelog.md`（及 `changelog_en.md`），还必须同步将最新正式版的重要更新摘要更新至 `readme.md`（`## 📝 更新日志`）与 `readme_en.md`（`## 📝 Changelog`），严禁仅更新 changelog 而遗漏 README 首页的最新版本说明。
 
 ### 第 3 步：提交并推送目标分支
 

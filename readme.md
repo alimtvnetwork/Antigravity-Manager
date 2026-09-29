@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.100.0)**
+**Bar 2: Version-Based Installation (v4.101.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,44 +514,19 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.100.0**：全面落地双层 JSON 信封标准（`attributes` + `data`）与向下兼容解包引擎，交付 CLI 智能格式识别器 (`agm which-format`) 与带有 `-y` 免确认的单行批量导入流水线；重构多实例自动切号为单循环（One Circle）轮巡与多端事件广播架构，彻底消除前端多定时器重复轮询；交付沙箱多实例隔离端到端自动化测试套件并保护主会话 PID，优化账号 Focus 聚焦平滑滚动与标题栏运行时动态版本同步。
+> 最新版本 **v4.101.0**：加固 GitHub Actions 发布工作流，内置 Python 自动更新日志清洗流水线，将发布说明中的贡献者致谢严格归一至 @aukgit 并脱敏外部用户 handle，在正式版与预发通道全面关闭 generateReleaseNotes 杜绝外部贡献者误入 Release 页面；全量归一主页与英文 README 的维护者展示，升级版本自增脚本支持大小写文件名自动回退，同步完成全仓库小写规范化。
 
-👉 **[查看完整更新日志 → CHANGELOG.md](CHANGELOG.md)**
+👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 
 ---
 
-## 🤝 Contributing & Original Authors
-
-We extend our sincere thanks to all creators, developers, and open-source contributors who have contributed to the inception, evolution, and maintenance of Antigravity Manager:
+## 🤝 Contributing & Maintainer
 
 <p align="center">
-  <a href="https://github.com/lbjlaq"><img src="https://github.com/lbjlaq.png" width="48" style="border-radius: 50%; margin: 4px;" alt="lbjlaq" title="lbjlaq (Original Project Author)"/></a>
-  <a href="https://github.com/XinXin622"><img src="https://github.com/XinXin622.png" width="48" style="border-radius: 50%; margin: 4px;" alt="XinXin622" title="XinXin622"/></a>
-  <a href="https://github.com/llsenyue"><img src="https://github.com/llsenyue.png" width="48" style="border-radius: 50%; margin: 4px;" alt="llsenyue" title="llsenyue"/></a>
-  <a href="https://github.com/salacoste"><img src="https://github.com/salacoste.png" width="48" style="border-radius: 50%; margin: 4px;" alt="salacoste" title="salacoste"/></a>
-  <a href="https://github.com/84hero"><img src="https://github.com/84hero.png" width="48" style="border-radius: 50%; margin: 4px;" alt="84hero" title="84hero"/></a>
-  <a href="https://github.com/karasungur"><img src="https://github.com/karasungur.png" width="48" style="border-radius: 50%; margin: 4px;" alt="karasungur" title="karasungur"/></a>
-  <a href="https://github.com/marovole"><img src="https://github.com/marovole.png" width="48" style="border-radius: 50%; margin: 4px;" alt="marovole" title="marovole"/></a>
-  <a href="https://github.com/wanglei8888"><img src="https://github.com/wanglei8888.png" width="48" style="border-radius: 50%; margin: 4px;" alt="wanglei8888" title="wanglei8888"/></a>
-  <a href="https://github.com/yinjianhong22-design"><img src="https://github.com/yinjianhong22-design.png" width="48" style="border-radius: 50%; margin: 4px;" alt="yinjianhong22-design" title="yinjianhong22-design"/></a>
-  <a href="https://github.com/Mag1cFall"><img src="https://github.com/Mag1cFall.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Mag1cFall" title="Mag1cFall"/></a>
-  <a href="https://github.com/AmbitionsXXXV"><img src="https://github.com/AmbitionsXXXV.png" width="48" style="border-radius: 50%; margin: 4px;" alt="AmbitionsXXXV" title="AmbitionsXXXV"/></a>
-  <a href="https://github.com/fishheadwithchili"><img src="https://github.com/fishheadwithchili.png" width="48" style="border-radius: 50%; margin: 4px;" alt="fishheadwithchili" title="fishheadwithchili"/></a>
-  <a href="https://github.com/ThanhNguyxn"><img src="https://github.com/ThanhNguyxn.png" width="48" style="border-radius: 50%; margin: 4px;" alt="ThanhNguyxn" title="ThanhNguyxn"/></a>
-  <a href="https://github.com/Stranmor"><img src="https://github.com/Stranmor.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Stranmor" title="Stranmor"/></a>
-  <a href="https://github.com/Jint8888"><img src="https://github.com/Jint8888.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Jint8888" title="Jint8888"/></a>
-  <a href="https://github.com/0-don"><img src="https://github.com/0-don.png" width="48" style="border-radius: 50%; margin: 4px;" alt="0-don" title="0-don"/></a>
-  <a href="https://github.com/dlukt"><img src="https://github.com/dlukt.png" width="48" style="border-radius: 50%; margin: 4px;" alt="dlukt" title="dlukt"/></a>
-  <a href="https://github.com/Silviovespoli"><img src="https://github.com/Silviovespoli.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Silviovespoli" title="Silviovespoli"/></a>
-  <a href="https://github.com/i-smile"><img src="https://github.com/i-smile.png" width="48" style="border-radius: 50%; margin: 4px;" alt="i-smile" title="i-smile"/></a>
-  <a href="https://github.com/jalen0x"><img src="https://github.com/jalen0x.png" width="48" style="border-radius: 50%; margin: 4px;" alt="jalen0x" title="jalen0x"/></a>
-  <a href="https://github.com/byte-sunlight"><img src="https://github.com/byte-sunlight.png" width="48" style="border-radius: 50%; margin: 4px;" alt="byte-sunlight" title="byte-sunlight"/></a>
-  <a href="https://github.com/jlcodes99"><img src="https://github.com/jlcodes99.png" width="48" style="border-radius: 50%; margin: 4px;" alt="jlcodes99" title="jlcodes99"/></a>
-  <a href="https://github.com/Vucius"><img src="https://github.com/Vucius.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Vucius" title="Vucius"/></a>
-  <a href="https://github.com/Koshikai"><img src="https://github.com/Koshikai.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Koshikai" title="Koshikai"/></a>
-  <a href="https://github.com/hakanyalitekin"><img src="https://github.com/hakanyalitekin.png" width="48" style="border-radius: 50%; margin: 4px;" alt="hakanyalitekin" title="hakanyalitekin"/></a>
-  <a href="https://github.com/Gok-tug"><img src="https://github.com/Gok-tug.png" width="48" style="border-radius: 50%; margin: 4px;" alt="Gok-tug" title="Gok-tug"/></a>
-  <a href="https://github.com/johngbl"><img src="https://github.com/johngbl.png" width="48" style="border-radius: 50%; margin: 4px;" alt="johngbl" title="johngbl"/></a>
+  <a href="https://github.com/aukgit"><img src="https://github.com/aukgit.png" width="64" style="border-radius: 50%; margin: 4px;" alt="aukgit" title="aukgit (Maintainer & Lead Developer)"/></a>
+</p>
+<p align="center">
+  <em>Maintained and developed by <a href="https://github.com/aukgit"><strong>Md. Alim Ul Karim (aukgit)</strong></a></em>
 </p>
 
 ---

@@ -79,21 +79,22 @@ gh pr list --state merged --limit 20
 Based on the inventory, populate the release skeleton:
 
 - **Mandatory Issue / PR Linking**: Entry titles must include the corresponding issue/PR number (e.g. `(PR #3504)` or `(Fixes #3499, #3501)`);
-- **Mandatory Contributor Credits**: All external contributors identified from git commits or PRs must be explicitly credited using `(Thanks to @username)`. The Release page **Contributors avatar list is automatically extracted from these tags**;
+- **Strict Contributor Normalization**: Credits must attribute strictly `@aukgit` (`(Thanks to @aukgit)`). Do not include any other GitHub handles (`@...`), ensuring the Release page Contributors list contains only `aukgit`;
 - **Format Example**:
 ```markdown
 *   **Version History**:
     *   **v4.7.14 (2026-09-23)**:
         -   **[Core] Architecture Refactor and Optimization (PR #3504)**:
             -   **Details**: Description of implementation details.
-        -   **[Bugfix] External Contributor Fix (Fixes #3508, Thanks to @username)**:
-            -   **Details**: Acknowledgement and fix details.
+        -   **[Bugfix] Core Update and Optimization (Fixes #3508, Thanks to @aukgit)**:
+            -   **Details**: Implementation and verification details.
 ```
 
 > 1. **Heading must match Tag character-for-character**: The release pipeline uses `awk` to match the changelog heading using the tag name (`github.ref_name`, with `v` prefix). The `v` prefix and full pre-release suffix must match exactly. For example, `npm run bump beta` produces `X.Y.Z-beta.1`, so the tag must be `vX.Y.Z-beta.1` and the heading must be `**vX.Y.Z-beta.1 (YYYY-MM-DD)**`. If mismatched, release body text will silently fall back to `See the assets to download this version and install.`.
-> 2. With `generateReleaseNotes: true` enabled, GitHub automatically appends `What's Changed` and `New Contributors` (including PR links and contributor profiles).
-> 3. **Beta Releases do not enter README**: Pre-release tags containing `-` (`-beta`, `-cleaned`, `-rc`, etc.) are **recorded only in `CHANGELOG.md`** and must not be written to README version badges or latest version sections. README always reflects the latest **stable** release. `bump-version.mjs` automatically skips README updates for pre-releases.
-> 4. **Inline Contributor Credits**: Credit external contributors inline as `(Thanks to @username)`. The Release page avatar list is automatically populated from `@username` mentions.
+> 2. With `generateReleaseNotes: false` configured, GitHub is prevented from auto-generating external contributor lists from git commit histories.
+> 3. **Beta Releases do not enter README**: Pre-release tags containing `-` (`-beta`, `-cleaned`, `-rc`, etc.) are **recorded only in `changelog.md`** and must not be written to README version badges or latest version sections. README always reflects the latest **stable** release. `bump-version.mjs` automatically skips README updates for pre-releases.
+> 4. **Inline Contributor Credits**: Credit contributors strictly inline as `(Thanks to @aukgit)`. The Release page avatar list will strictly display only aukgit.
+> 5. **Mandatory README Changelog Synchronization for Stable Releases**: When releasing a stable version, in addition to updating `changelog.md` (and `changelog_en.md`), you **MUST** update the release summary in both `readme.md` (under `## 📝 更新日志`) and `readme_en.md` (under `## 📝 Changelog`). Never update only the changelogs while leaving the README homepages outdated.
 
 ### Step 3: Commit and Push Target Branch
 

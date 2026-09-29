@@ -312,7 +312,7 @@ const TARGET_FILES = [
                 return content;
             }
             const eol = content.includes('\r\n') ? '\r\n' : '\n';
-            const newBlock = `    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit external contributors inline as \`(Thanks to @username)\`.${eol}${eol}`;
+            const newBlock = `    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}${eol}`;
             const historyAnchor = '*   **Version History**:';
             if (content.includes(historyAnchor)) {
                 return content.replace(historyAnchor, `${historyAnchor}${eol}${newBlock}`);
@@ -342,7 +342,7 @@ const TARGET_FILES = [
                 return content;
             }
             const eol = content.includes('\r\n') ? '\r\n' : '\n';
-            const newBlock = `*   **Version History**:${eol}    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit external contributors inline as \`(Thanks to @username)\`.${eol}`;
+            const newBlock = `*   **Version History**:${eol}    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}`;
             return content.replace(anchor, newBlock);
         },
     },
@@ -365,10 +365,15 @@ for (const target of TARGET_FILES) {
         continue;
     }
 
-    const fullPath = path.join(ROOT_DIR, target.relPath);
+    let fullPath = path.join(ROOT_DIR, target.relPath);
     if (!fs.existsSync(fullPath)) {
-        warn(`Target file ${target.relPath} not found; skipping.`);
-        continue;
+        const lowerPath = path.join(ROOT_DIR, target.relPath.toLowerCase());
+        if (fs.existsSync(lowerPath)) {
+            fullPath = lowerPath;
+        } else {
+            warn(`Target file ${target.relPath} not found; skipping.`);
+            continue;
+        }
     }
 
     const oldContent = fs.readFileSync(fullPath, 'utf8');
@@ -420,7 +425,7 @@ if (isPrerelease) {
     console.log(`
 ${colors.bold}${colors.green}🎉 Pre-release version upgraded to v${newVersion}!${colors.reset}
 ${colors.cyan}[Beta Channel] Next steps:${colors.reset}
-  1. In ${colors.cyan}CHANGELOG.md${colors.reset}, document pre-release updates (credit contributors inline as (Thanks to @username))
+  1. In ${colors.cyan}CHANGELOG.md${colors.reset}, document pre-release updates (credit contributors inline as (Thanks to @aukgit))
   2. Commit release prep: ${colors.cyan}git commit -am "chore(release): bump version to ${newVersion} and update changelog"${colors.reset}
   3. Push branch and tag: ${colors.cyan}git push origin beta && git tag v${newVersion} && git push origin v${newVersion}${colors.reset}
 
@@ -430,7 +435,7 @@ ${colors.yellow}🛡️ Isolation: Beta pipeline builds are marked as Pre-releas
     console.log(`
 ${colors.bold}${colors.green}🎉 Production version upgraded to v${newVersion}!${colors.reset}
 ${colors.cyan}[Main Channel] Next steps:${colors.reset}
-  1. In ${colors.cyan}CHANGELOG.md${colors.reset}, document release highlights (credit contributors inline as (Thanks to @username))
+  1. In ${colors.cyan}CHANGELOG.md${colors.reset}, document release highlights (credit contributors inline as (Thanks to @aukgit))
   2. Commit release prep: ${colors.cyan}git commit -am "chore(release): bump version to ${newVersion} and update changelog"${colors.reset}
   3. Push branch and tag: ${colors.cyan}git push origin main && git tag v${newVersion} && git push origin v${newVersion}${colors.reset}
 

@@ -27,11 +27,11 @@
   - **Standard Release Workflow**:
     1. **Atomic Version Sync**: Run `npm run bump <patch|minor|beta|version>` to synchronize all project manifests and generate changelog skeletons.
     2. **Documentation & Attribution**:
-       - Audit Git history (`<last-tag>..HEAD`) and merged PRs to summarize all authors, co-authors, and linked Issues/PRs (`Fixes #xxx`, `PR #xxx`). Attribute every contributor inline (`Thanks to @username`) in `CHANGELOG.md` (and `CHANGELOG_EN.md`).
+       - Audit Git history (`<last-tag>..HEAD`). Attribution must attribute strictly `@aukgit` (`(Thanks to @aukgit)`) in `changelog.md` and `changelog_en.md`. Do NOT include any other GitHub user handles (`@...`) in release changelogs or release notes, ensuring the GitHub release page contributors list only contains `aukgit` and none else.
        - **Synchronize README Changelog (同步首页更新日志)**: For stable releases, you **MUST** update the release summary in both `README.md` (under "## 📝 更新日志") and `README_EN.md` (under "## 📝 Changelog"). Never update only `CHANGELOG.md` while leaving `README.md` / `README_EN.md` with outdated release notes. Pre-release / beta versions remain exclusively in changelogs; stable releases require full synchronization across both README files.
     3. **Pre-flight before Tagging**: Run the Pre-flight Checks above on the exact commit to be tagged.
     4. **Commit, Tag & Push**: Push stable releases to `main` (`git tag vX.Y.Z && git push origin vX.Y.Z`), reserving `beta` exclusively for pre-releases (`git tag vX.Y.Z-beta.N && git push origin vX.Y.Z-beta.N`). The release gate strictly intercepts cross-branch misplacement. Tags must match `CHANGELOG.md` headings character-for-character (including `v` prefix and pre-release suffix).
-  - *Full procedure*: See `docs/RELEASE_GUIDE.md` for bump options, changelog templates, and rollback steps.
+  - *Full procedure*: See `docs/release_guide.md` for bump options, changelog templates, and rollback steps.
 - **Thinking Cache Invalidation Control (发版清理建议)**:
   - File: `src/components/common/SuggestionDeleteThinkingModal.tsx`
   - Routine releases (no prompt): Keep `SUGGESTION_DELETE_THINKING_STORE = false`.
@@ -47,7 +47,7 @@
   - **Single Problem Scope**: A PR represents a cohesive collection of fixes or features dedicated to a single problem class. Keep unrelated concerns (such as governance, release tooling, or documentation) in isolated PRs.
   - **Self-Contained & Individually Revertable**: A PR may contain multiple commits, but each commit must represent an independent, self-contained functional unit that is individually revertable, avoiding messy or tangled changesets.
   - **Local Convergence & Final-State Commits**: Commit freely during local debugging on development branches; however, before opening or merging a PR, audit and consolidate scattered iterative attempts into clean, high-quality units. Each consolidated commit must describe only its successful final state and rationale, eliminating intermediate trial-and-error noise.
-  - **Review & Template Alignment**: Route every PR through peer review and complete `.github/PULL_REQUEST_TEMPLATE.md` (problem classification, behavior alterations, unverified paths, and rollback strategy).
+  - **Review & Template Alignment**: Route every PR through peer review and complete `.github/pull_request_template.md` (problem classification, behavior alterations, unverified paths, and rollback strategy).
 - **Contributor Respect & Attribution**:
   - Preserve authorship by preferring the contributor's own PR for squash commits, or attaching explicit `Co-authored-by:` trailers on merge commits and proxy PRs.
   - Disclose costs before merging: highlight affected existing behaviors and unverified paths alongside improvements.
@@ -58,4 +58,4 @@
   - Order side effects to fail before the point of no return: write credentials before killing a process, validate before deleting.
   - Detect broadly, act narrowly: a matcher may recognize a whole class of problems, while its effect stays inside the intended data — not across line breaks, tags, or other clauses. Bound every wait with a timeout.
 
-Maintained by @jeikl
+Maintained by @aukgit
