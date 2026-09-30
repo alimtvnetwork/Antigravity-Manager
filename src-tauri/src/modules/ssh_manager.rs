@@ -60,7 +60,11 @@ pub struct SshConnectionRecord {
     pub os_group: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "osVersion")]
     pub os_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "buildVersion")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "buildVersion"
+    )]
     pub build_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "firstRunAt")]
     pub first_run_at: Option<String>,
@@ -304,8 +308,13 @@ pub fn decode_connections_from_json(raw: &str) -> Result<Vec<SshConnectionRecord
     }
 
     if let Ok(parsed_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        let (attrs_opt, unwrapped) = crate::modules::json_envelope::unpack_envelope(parsed_val.clone());
-        let effective_val = if attrs_opt.is_some() { unwrapped } else { parsed_val };
+        let (attrs_opt, unwrapped) =
+            crate::modules::json_envelope::unpack_envelope(parsed_val.clone());
+        let effective_val = if attrs_opt.is_some() {
+            unwrapped
+        } else {
+            parsed_val
+        };
 
         let mut extracted_nodes = Vec::new();
         if let Some(main_obj) = effective_val.get("mainMachine") {
@@ -325,14 +334,17 @@ pub fn decode_connections_from_json(raw: &str) -> Result<Vec<SshConnectionRecord
         }
 
         if let Some(conns_arr) = effective_val.get("connections").and_then(|c| c.as_array()) {
-            if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(serde_json::Value::Array(conns_arr.clone())) {
+            if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(
+                serde_json::Value::Array(conns_arr.clone()),
+            ) {
                 if !conns.is_empty() {
                     return Ok(conns);
                 }
             }
         }
 
-        if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(effective_val.clone()) {
+        if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(effective_val.clone())
+        {
             return Ok(conns);
         }
 

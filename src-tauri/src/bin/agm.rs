@@ -908,7 +908,10 @@ fn cmd_accounts_export(args: &[String]) {
                 if let Err(e) = fs::write(target_file, &json_str) {
                     eprintln!("[ERROR] Failed to write accounts to {}: {}", target_file, e);
                 } else {
-                    println!("✅ Successfully exported accounts envelope to {}", target_file);
+                    println!(
+                        "✅ Successfully exported accounts envelope to {}",
+                        target_file
+                    );
                 }
             } else {
                 println!("{}", json_str);
@@ -938,7 +941,11 @@ fn cmd_accounts_import(args: &[String]) {
     let raw_json = match fs::read_to_string(&resolved_path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[ERROR] Failed to read file '{}': {}", resolved_path.display(), e);
+            eprintln!(
+                "[ERROR] Failed to read file '{}': {}",
+                resolved_path.display(),
+                e
+            );
             return;
         }
     };
@@ -1023,8 +1030,12 @@ fn cmd_accounts(args: &[String]) {
         println!("    --json, -j        Output account list in structured JSON format");
         println!("\nExamples:");
         println!("  agm accounts                                # Display table of all configured accounts");
-        println!("  agm accounts export --file accounts.json    # Export accounts envelope to file");
-        println!("  agm accounts import accounts.json           # Import accounts envelope from file");
+        println!(
+            "  agm accounts export --file accounts.json    # Export accounts envelope to file"
+        );
+        println!(
+            "  agm accounts import accounts.json           # Import accounts envelope from file"
+        );
         println!("  agm accounts --active                       # Show currently selected active account");
         println!("  agm accounts --json                         # Export accounts and quota matrix as JSON");
         println!("  agm account switch dev.user@gmail.com       # Switch active profile to dev.user@gmail.com");
@@ -4964,7 +4975,10 @@ fn cmd_telegram(args: &[String]) {
                         if let Err(e) = fs::write(target_file, &json_str) {
                             eprintln!("[ERROR] Failed to write to {}: {}", target_file, e);
                         } else {
-                            println!("✅ Successfully exported Telegram configuration to {}", target_file);
+                            println!(
+                                "✅ Successfully exported Telegram configuration to {}",
+                                target_file
+                            );
                         }
                     } else {
                         println!("{}", json_str);
@@ -4980,7 +4994,9 @@ fn cmd_telegram(args: &[String]) {
                 let resolved_path = json_envelope::resolve_relative_json_path(path_str);
                 match fs::read_to_string(&resolved_path) {
                     Ok(raw_json) => {
-                        match json_envelope::extract_payload::<telegram_inbound::TelegramConfig>(&raw_json) {
+                        match json_envelope::extract_payload::<telegram_inbound::TelegramConfig>(
+                            &raw_json,
+                        ) {
                             Ok((imported_cfg, attrs)) => {
                                 match telegram_inbound::save_config(&imported_cfg) {
                                     Ok(_) => {
@@ -4990,13 +5006,19 @@ fn cmd_telegram(args: &[String]) {
                                             attrs.version
                                         );
                                     }
-                                    Err(e) => eprintln!("[ERROR] Failed to save Telegram config: {}", e),
+                                    Err(e) => {
+                                        eprintln!("[ERROR] Failed to save Telegram config: {}", e)
+                                    }
                                 }
                             }
                             Err(e) => eprintln!("[ERROR] Failed to parse Telegram config: {}", e),
                         }
                     }
-                    Err(e) => eprintln!("[ERROR] Failed to read file '{}': {}", resolved_path.display(), e),
+                    Err(e) => eprintln!(
+                        "[ERROR] Failed to read file '{}': {}",
+                        resolved_path.display(),
+                        e
+                    ),
                 }
             } else {
                 eprintln!("Usage: agm telegram import <file_path>");
@@ -5643,26 +5665,27 @@ fn cmd_supabase(args: &[String]) {
         "test" => cmd_supabase_test(&rt, sub_args),
         "set-endpoint" | "set" | "add" => cmd_supabase_set_endpoint(sub_args),
         "load-json" | "import" => cmd_supabase_load_json(sub_args),
-        "export" => {
-            match supabase_sync::export_config_json() {
-                Ok(json_str) => {
-                    let file_arg = sub_args
-                        .iter()
-                        .position(|a| a == "--file" || a == "-o")
-                        .and_then(|idx| sub_args.get(idx + 1));
-                    if let Some(target_file) = file_arg {
-                        if let Err(e) = fs::write(target_file, &json_str) {
-                            eprintln!("[ERROR] Failed to write to {}: {}", target_file, e);
-                        } else {
-                            println!("✅ Successfully exported Supabase configuration to {}", target_file);
-                        }
+        "export" => match supabase_sync::export_config_json() {
+            Ok(json_str) => {
+                let file_arg = sub_args
+                    .iter()
+                    .position(|a| a == "--file" || a == "-o")
+                    .and_then(|idx| sub_args.get(idx + 1));
+                if let Some(target_file) = file_arg {
+                    if let Err(e) = fs::write(target_file, &json_str) {
+                        eprintln!("[ERROR] Failed to write to {}: {}", target_file, e);
                     } else {
-                        println!("{}", json_str);
+                        println!(
+                            "✅ Successfully exported Supabase configuration to {}",
+                            target_file
+                        );
                     }
+                } else {
+                    println!("{}", json_str);
                 }
-                Err(e) => eprintln!("[ERROR] Failed to export Supabase configuration: {}", e),
             }
-        }
+            Err(e) => eprintln!("[ERROR] Failed to export Supabase configuration: {}", e),
+        },
         "schema" => cmd_supabase_schema(sub_args),
         "sync" => cmd_supabase_sync(&rt),
         "enable" => {
@@ -8063,9 +8086,15 @@ fn cmd_instances_export(args: &[String]) {
                 .and_then(|idx| args.get(idx + 1));
             if let Some(target_file) = file_arg {
                 if let Err(e) = fs::write(target_file, &json_str) {
-                    eprintln!("[ERROR] Failed to write instances to {}: {}", target_file, e);
+                    eprintln!(
+                        "[ERROR] Failed to write instances to {}: {}",
+                        target_file, e
+                    );
                 } else {
-                    println!("✅ Successfully exported instances envelope to {}", target_file);
+                    println!(
+                        "✅ Successfully exported instances envelope to {}",
+                        target_file
+                    );
                 }
             } else {
                 println!("{}", json_str);

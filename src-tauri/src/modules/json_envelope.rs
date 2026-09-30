@@ -21,7 +21,9 @@ pub struct WorkDirectoryConfig {
     pub is_enforced: bool,
 }
 
-fn deserialize_work_directory<'de, D>(deserializer: D) -> Result<Option<WorkDirectoryConfig>, D::Error>
+fn deserialize_work_directory<'de, D>(
+    deserializer: D,
+) -> Result<Option<WorkDirectoryConfig>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -62,11 +64,23 @@ pub struct JsonAttributes {
         alias = "gitmap_version"
     )]
     pub agm_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "importCommand")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "importCommand"
+    )]
     pub import_command: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "exportCommand")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "exportCommand"
+    )]
     pub export_command: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "helpCommand")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "helpCommand"
+    )]
     pub help_command: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
@@ -79,11 +93,23 @@ pub struct JsonAttributes {
         deserialize_with = "deserialize_work_directory"
     )]
     pub work_directory: Option<WorkDirectoryConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "defaultWorkDirectory")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "defaultWorkDirectory"
+    )]
     pub default_work_directory: Option<String>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not", alias = "isWorkDirectoryApplied")]
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        alias = "isWorkDirectoryApplied"
+    )]
     pub is_work_directory_applied: bool,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not", alias = "isWorkDirectoryEnforced")]
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        alias = "isWorkDirectoryEnforced"
+    )]
     pub is_work_directory_enforced: bool,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "createdAt")]
     pub created_at: Option<String>,
@@ -127,7 +153,14 @@ pub fn resolve_relative_json_path(input: &str) -> PathBuf {
     direct
 }
 
-pub fn default_commands_for_type(dtype: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+pub fn default_commands_for_type(
+    dtype: &str,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
     let lower = dtype.to_lowercase();
     if lower.contains("supabase-endpoints") || lower.contains("supabase_endpoints") {
         (
@@ -186,12 +219,7 @@ pub fn default_commands_for_type(dtype: &str) -> (Option<String>, Option<String>
             Some("SSH cluster fleet nodes configuration. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else {
-        (
-            None,
-            None,
-            Some("agm which-format".to_string()),
-            None,
-        )
+        (None, None, Some("agm which-format".to_string()), None)
     }
 }
 
@@ -396,9 +424,9 @@ pub fn unpack_envelope(value: Value) -> (Option<JsonAttributes>, Value) {
     if let Value::Object(ref map) = value {
         if let (Some(attrs_val), Some(data_val)) = (map.get("attributes"), map.get("data")) {
             if let Ok(mut attrs) = serde_json::from_value::<JsonAttributes>(attrs_val.clone()) {
-                let top_vars = map.get("variables").and_then(|v| {
-                    serde_json::from_value::<HashMap<String, Value>>(v.clone()).ok()
-                });
+                let top_vars = map
+                    .get("variables")
+                    .and_then(|v| serde_json::from_value::<HashMap<String, Value>>(v.clone()).ok());
                 let merged = merge_variables(top_vars.as_ref(), None);
 
                 if let Some(ref mut wcfg) = attrs.work_directory {
@@ -605,10 +633,7 @@ pub fn inspect_json_value(root: &Value, path: &Path) -> FormatInspectionResult {
         let (human_name, mutation, default_cmd, count) =
             describe_format(&known, &data_val, &file_name, false);
 
-        let final_cmd = attrs
-            .import_command
-            .clone()
-            .unwrap_or_else(|| default_cmd);
+        let final_cmd = attrs.import_command.clone().unwrap_or_else(|| default_cmd);
 
         let vars_count = if let Value::Object(ref m) = root {
             m.get("variables")
@@ -1044,7 +1069,8 @@ mod tests {
             },
             "data": { "ok": true }
         }"#;
-        let (_, attrs) = extract_payload::<Value>(raw_str).expect("extract flat workDirectory string");
+        let (_, attrs) =
+            extract_payload::<Value>(raw_str).expect("extract flat workDirectory string");
         assert_eq!(
             attrs.work_directory.map(|w| w.path),
             Some("D:\\custom\\path".to_string())
