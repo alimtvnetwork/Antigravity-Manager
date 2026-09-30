@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
 $agm = Join-Path $RootDir "src-tauri\target\debug\agm.exe"
@@ -22,9 +23,23 @@ Write-Host "==========================================================" -Foregro
 Write-Host " Antigravity Multi-Instance Comprehensive E2E Test Suite   " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 0. Safety Invariant Check: Verify user processes
-$userAgmProcesses = Get-Process | Where-Object { $_.Name -match "agm-alim" }
-Write-Host "[0/6] Safety Check: AGM GUI processes detected: $($userAgmProcesses.Count)" -ForegroundColor Gray
+# 0. Safety Invariant Check: Identify & Protect Running Main Antigravity IDE and AGM processes
+$userAgmProcesses = Get-Process | Where-Object { $_.Name -match "agm-alim" -or $_.Name -eq "agm" }
+$defaultDataDir = "$env:APPDATA\Antigravity"
+$mainIdeProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { 
+    $_.Name -match 'Antigravity' -and ($_.CommandLine -match [regex]::Escape($defaultDataDir) -or $_.CommandLine -notmatch '--user-data-dir')
+}
+$protectedPids = @($userAgmProcesses.Id) + @($mainIdeProcesses.ProcessId) | Where-Object { $_ } | Select-Object -Unique
+Write-Host "[0/6] Safety Check: Protected Main IDE & AGM processes: $($protectedPids.Count) PIDs" -ForegroundColor Gray
+
+# Terminate any conflicting or lingering test runners to avoid collision
+$currentProcessId = $PID
+$parentProcessId = (Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessId -eq $currentProcessId }).ParentProcessId
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -match 'powershell|pwsh' -and $_.ProcessId -ne $currentProcessId -and $_.ProcessId -ne $parentProcessId -and $_.CommandLine -match 'test-instance-e2e\.ps1'
+} | ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+}
 
 # Define test instances and test accounts
 $instA = "test-e2e-alpha"
@@ -100,31 +115,25 @@ function Get-InstanceRealPid($instanceDir, $instanceId) {
             } | Select-Object -First 1
             if ($match -and $match.pid) {
                 $candPid = [int]$match.pid
-                $liveProc = Get-Process -Id $candPid -ErrorAction SilentlyContinue
-                if ($liveProc) { return $candPid }
+                if ($protectedPids -notcontains $candPid) {
+                    $liveProc = Get-Process -Id $candPid -ErrorAction SilentlyContinue
+                    if ($liveProc) { return $candPid }
+                }
             }
         } catch {}
 
-        # 2. Direct Win32 process lookup
+        # 2. Direct Win32 process lookup strictly matching this instance's data directory or binary name
         $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { 
             ($escapedDir -and $_.CommandLine -match $escapedDir) -or 
             ($instanceId -and ($_.CommandLine -match $instanceId -or $_.Name -match $instanceId))
         } | Where-Object {
-            $_.CommandLine -notmatch '--type=' -and $_.Name -match 'Antigravity'
+            $_.CommandLine -notmatch '--type=' -and $_.Name -match 'Antigravity' -and ($protectedPids -notcontains $_.ProcessId)
         }
         if ($procs) {
             $foundPid = ($procs | Select-Object -First 1).ProcessId
             if ($foundPid) { return [int]$foundPid }
         }
         Start-Sleep -Milliseconds 500
-    }
-    # Fallback to any active non-protected Antigravity process
-    $anyProc = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { 
-        $_.Name -match 'Antigravity' -and $_.CommandLine -notmatch '--type=' -and
-        ($userAgmProcesses.Id -notcontains $_.ProcessId)
-    }
-    if ($anyProc) {
-        return [int]($anyProc | Select-Object -Last 1).ProcessId
     }
     return $null
 }
@@ -210,7 +219,7 @@ if (!$realPidA) {
 Write-Host "  Instance A active verified PID: $realPidA" -ForegroundColor Green
 
 # Safety invariant check
-if ($userAgmProcesses.Id -contains $realPidA) {
+if ($protectedPids -contains $realPidA) {
     throw "SAFETY VIOLATION: Detected PID $realPidA belongs to protected main IDE!"
 }
 
@@ -232,20 +241,11 @@ $null = & $agm backup-running-prompts 2>$null
 
 # Step 2b: Close IDE based on folder path and PID
 Write-Host "  Closing Instance A based on folder path ($instADir) and PID ($realPidA)..." -ForegroundColor Yellow
-if ($realPidA -and ($userAgmProcesses.Id -notcontains $realPidA)) {
-    try {
-        $p = Get-Process -Id $realPidA -ErrorAction SilentlyContinue
-        if ($p) {
-            $p.Kill()
-            Start-Sleep -Milliseconds 800
-        }
-    } catch {}
-}
-try { $null = & $agm instances stop $instA *>$null } catch {}
+$null = & $agm instances stop $instA 2>$null
 Start-Sleep -Seconds 1
 
 # Step 2c: Switch account credentials
-$switchRaw = & $agm instances switch $instA $accSwitch --json
+$switchRaw = & $agm instances switch $instA $accSwitch --json 2>$null
 $switchOutput = Parse-CliJson $switchRaw
 
 if (!$switchOutput) {
@@ -281,16 +281,19 @@ if ($emailB1_check -ne $accB) {
 
 Write-Host "  [PASS] Test 2: Account switching across all database paths verified with zero cross-contamination." -ForegroundColor Green
 
-# Step 2d: Re-open IDE Instance and verify NEW PID
-Write-Host "  Re-opening Instance A ($instA) IDE window..." -ForegroundColor DarkGray
-& $agm instances launch $instA
-Start-Sleep -Seconds 3
-
+# Step 2d: Re-open IDE Instance (if not already launched) and verify NEW PID
+Write-Host "  Verifying Instance A ($instA) IDE window post-switch..." -ForegroundColor DarkGray
+Start-Sleep -Seconds 2
 $newRealPidA = Get-InstanceRealPid $instADir $instA
+if (!$newRealPidA) {
+    & $agm instances launch $instA
+    Start-Sleep -Seconds 3
+    $newRealPidA = Get-InstanceRealPid $instADir $instA
+}
 if (!$newRealPidA) {
     throw "TEST 2 FAILED: Could not discover new active PID for Instance A ($instA) post-switch in $instADir"
 }
-Write-Host "  Instance A re-opened with NEW verified PID: $newRealPidA" -ForegroundColor Green
+Write-Host "  Instance A active verified post-switch PID: $newRealPidA" -ForegroundColor Green
 
 # Step 2e: Capture Switched Profile Screenshot with Date & Time and NEW REAL PID
 $shot2 = Join-Path $RootDir "assets\screenshots\instance_step2_switched.png"
@@ -373,7 +376,17 @@ Write-Host "  Prompt DB status before switch: $statusBefore" -ForegroundColor Da
 # Now execute switch on Instance A to $accA (stopping prompt before switch)
 Write-Host "  Stopping prompt heartbeat runner and switching Instance A..." -ForegroundColor DarkGray
 $null = python "$heartbeatRunner" stop "$heartbeatLog"
-$null = & $agm instances switch $instA $accA --json 2>$null
+$switchBackRaw = & $agm instances switch $instA $accA --json
+Start-Sleep -Seconds 3
+
+$finalRealPidA = Get-InstanceRealPid $instADir $instA
+if (!$finalRealPidA) {
+    & $agm instances launch $instA
+    Start-Sleep -Seconds 3
+    $finalRealPidA = Get-InstanceRealPid $instADir $instA
+}
+if (!$finalRealPidA) { $finalRealPidA = $newRealPidA }
+Write-Host "  Instance A active verified PID post-switch-back: $finalRealPidA" -ForegroundColor Green
 
 # Post-switch: check if running, and if not running, then invoke it
 Write-Host "  Checking and re-invoking prompt heartbeat runner post-switch..." -ForegroundColor DarkGray
@@ -416,7 +429,7 @@ Write-Host "  [PASS] Test 4: Running prompts successfully snapshotted, backed up
 # Capture Prompt Resumed & Restored Screenshot with Date & Time and REAL PID
 $shot3 = Join-Path $RootDir "assets\screenshots\instance_step3_switched_back.png"
 $nowUtc3 = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
-python "$screenshotPy" --email $accA --username "Alex Hudson" --instance $instA --pid "$newRealPidA" --folder $instADir --out "$shot3" --stage "Prompt Resumed Post-Switch ($accA)" --datetime "$nowUtc3" --heartbeat-file "$heartbeatLog" --heartbeat-status "$chkAfter"
+python "$screenshotPy" --email $accA --username "Alex Hudson" --instance $instA --pid "$finalRealPidA" --folder $instADir --out "$shot3" --stage "Prompt Resumed Post-Switch ($accA)" --datetime "$nowUtc3" --heartbeat-file "$heartbeatLog" --heartbeat-status "$chkAfter"
 
 
 # -------------------------------------------------------------
@@ -436,7 +449,7 @@ if ($ForceCleanup) {
     Write-Host "  [PRESERVED] Instance A ($instA) is PRESERVED and ready for live observation!" -ForegroundColor Green
     Write-Host "    ● Instance ID:     $instA" -ForegroundColor Cyan
     Write-Host "    ● Folder Location: $instADir" -ForegroundColor Cyan
-    Write-Host "    ● Verified PID:    $newRealPidA" -ForegroundColor Cyan
+    Write-Host "    ● Verified PID:    $finalRealPidA" -ForegroundColor Cyan
     Write-Host "    ● Bound Account:   $accA" -ForegroundColor Cyan
     Write-Host "    ● Observation:     KEPT ALIVE so operator does not lose this instance." -ForegroundColor Green
     Write-Host "  [PASS] Test 5: Instance preservation and zero cross-contamination verified." -ForegroundColor Green

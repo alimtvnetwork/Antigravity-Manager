@@ -17,12 +17,14 @@ def get_devtools_port(folder):
             os.path.join(folder, "DevToolsActivePort"),
             os.path.join(folder, "data", "DevToolsActivePort"),
             os.path.join(os.path.dirname(folder), "DevToolsActivePort"),
+            os.path.join(os.path.dirname(folder), "data", "DevToolsActivePort"),
             os.path.join(folder, "home", "AppData", "Roaming", "Antigravity", "DevToolsActivePort"),
             os.path.join(os.path.dirname(folder), "home", "AppData", "Roaming", "Antigravity", "DevToolsActivePort"),
         ])
-    appdata = os.environ.get("APPDATA", "")
-    if appdata:
-        candidates.append(os.path.join(appdata, "Antigravity", "DevToolsActivePort"))
+    else:
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            candidates.append(os.path.join(appdata, "Antigravity", "DevToolsActivePort"))
 
     for dt_file in candidates:
         if os.path.exists(dt_file):
@@ -41,7 +43,7 @@ def get_devtools_port(folder):
                 pass
     return None
 
-def capture_screenshot_from_cdp(port, click_settings=True, timeout=10):
+def capture_screenshot_from_cdp(port, click_settings=True, expected_email=None, timeout=10):
     ws_url = None
     for _ in range(8):
         try:
@@ -68,14 +70,85 @@ def capture_screenshot_from_cdp(port, click_settings=True, timeout=10):
         return None
 
     try:
-        ws = websocket.create_connection(ws_url, suppress_origin=True, timeout=timeout)
+        ws = websocket.create_connection(ws_url, suppress_origin=True, timeout=3.0)
+        ws.settimeout(2.0)
     except Exception:
         return None
 
+    def ws_send_cmd(cmd_dict, wait_reply=True, reply_timeout=1.5):
+        try:
+            ws.settimeout(reply_timeout)
+            cmd_id = cmd_dict.get("id")
+            ws.send(json.dumps(cmd_dict))
+            if not wait_reply:
+                return None
+            start = time.time()
+            while time.time() - start < reply_timeout:
+                try:
+                    raw = ws.recv()
+                    msg = json.loads(raw)
+                    if msg.get("id") == cmd_id:
+                        return msg
+                except Exception:
+                    break
+        except Exception:
+            pass
+        return None
+
+    # Guard against accidentally attaching to host IDE
+    if expected_email and expected_email.lower() != "robinh6625@gmail.com":
+        msg = ws_send_cmd({
+            "id": 98,
+            "method": "Runtime.evaluate",
+            "params": {"expression": "document.body ? document.body.innerText : ''", "returnByValue": True}
+        }, wait_reply=True, reply_timeout=1.5)
+        if msg:
+            body_text = msg.get("result", {}).get("result", {}).get("value", "")
+            if "robinh6625@gmail.com" in body_text:
+                print(f"[WARN] Port {port} belongs to host IDE (robinh6625@gmail.com), not target {expected_email}. Aborting live capture to prevent cross-profile leak.", file=sys.stderr)
+                try:
+                    ws.close()
+                except Exception:
+                    pass
+                return None
+
     if click_settings:
         try:
-            # Send Ctrl+, (Control + Comma) to open Settings modal in Antigravity / VS Code
-            ws.send(json.dumps({
+            # 1. Advance through any onboarding or welcome modals if present
+            advance_js = (
+                "(() => {"
+                "  const btns = Array.from(document.querySelectorAll('button, a'));"
+                "  for (const b of btns) {"
+                "    const txt = (b.innerText || '').trim().toLowerCase();"
+                "    if (txt === 'next' || txt === 'continue' || txt === 'agree' || txt === 'get started') {"
+                "      b.click();"
+                "      return 'clicked ' + txt;"
+                "    }"
+                "  }"
+                "  return 'none';"
+                "})()"
+            )
+            ws_send_cmd({"id": 99, "method": "Runtime.evaluate", "params": {"expression": advance_js}}, wait_reply=True, reply_timeout=1.0)
+            time.sleep(0.4)
+
+            # 2. Try clicking Settings directly if visible
+            click_settings_js = (
+                "(() => {"
+                "  const els = Array.from(document.querySelectorAll('*'));"
+                "  for (const el of els) {"
+                "    if (el.children.length === 0 && (el.textContent || '').trim() === 'Settings') {"
+                "      el.click();"
+                "      return 'clicked settings';"
+                "    }"
+                "  }"
+                "  return 'none';"
+                "})()"
+            )
+            ws_send_cmd({"id": 100, "method": "Runtime.evaluate", "params": {"expression": click_settings_js}}, wait_reply=True, reply_timeout=1.0)
+            time.sleep(0.4)
+
+            # 3. Send Ctrl+, (Control + Comma) to open Settings modal in Antigravity / VS Code
+            ws_send_cmd({
                 "id": 101,
                 "method": "Input.dispatchKeyEvent",
                 "params": {
@@ -85,12 +158,8 @@ def capture_screenshot_from_cdp(port, click_settings=True, timeout=10):
                     "code": "Comma",
                     "key": ","
                 }
-            }))
-            try:
-                ws.recv()
-            except Exception:
-                pass
-            ws.send(json.dumps({
+            }, wait_reply=False)
+            ws_send_cmd({
                 "id": 102,
                 "method": "Input.dispatchKeyEvent",
                 "params": {
@@ -100,26 +169,17 @@ def capture_screenshot_from_cdp(port, click_settings=True, timeout=10):
                     "code": "Comma",
                     "key": ","
                 }
-            }))
-            try:
-                ws.recv()
-            except Exception:
-                pass
-            time.sleep(1.5)
+            }, wait_reply=False)
+            time.sleep(1.0)
         except Exception as e:
             print(f"[WARN] Error dispatching Ctrl+,: {e}", file=sys.stderr)
 
-    # Capture screenshot
+    # Capture screenshot with strict 4s timeout
     img_data = None
     try:
-        ws.send(json.dumps({"id": 103, "method": "Page.captureScreenshot", "params": {"format": "png"}}))
-        start_t = time.time()
-        while time.time() - start_t < timeout:
-            raw = ws.recv()
-            msg = json.loads(raw)
-            if msg.get("id") == 103 and "result" in msg:
-                img_data = msg["result"].get("data")
-                break
+        reply = ws_send_cmd({"id": 103, "method": "Page.captureScreenshot", "params": {"format": "png"}}, wait_reply=True, reply_timeout=4.0)
+        if reply and "result" in reply:
+            img_data = reply["result"].get("data")
     except Exception:
         pass
 
@@ -181,7 +241,7 @@ def try_capture_live_cdp(folder, out_path, instance_id, pid, email, stage_label,
     if not port:
         return False
     print(f"[*] Live CDP endpoint discovered on port {port}. Capturing live Antigravity window...")
-    img_bytes = capture_screenshot_from_cdp(port, click_settings=True)
+    img_bytes = capture_screenshot_from_cdp(port, click_settings=True, expected_email=email)
     if not img_bytes:
         return False
 
@@ -199,17 +259,78 @@ def try_capture_live_cdp(folder, out_path, instance_id, pid, email, stage_label,
     print(f"[LIVE SCREENSHOT CAPTURED] Saved real window to {out_path} ({os.path.getsize(out_path)} bytes) [Timestamp: {dt_str}]")
     return True
 
+def try_capture_live_win32(pid, out_path, instance_id, email, stage_label, dt_str, hb_status=None):
+    if sys.platform != "win32" or not pid or pid <= 0:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        from PIL import ImageGrab
+
+        user32 = ctypes.windll.user32
+        target_hwnd = None
+
+        def enum_windows_callback(hwnd, _):
+            nonlocal target_hwnd
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            proc_id = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
+            if proc_id.value == pid:
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, buf, length + 1)
+                    title = buf.value.lower()
+                    if "antigravity" in title or "visual studio" in title or "code" in title:
+                        target_hwnd = hwnd
+                        return False
+            return True
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+
+        if not target_hwnd:
+            return False
+
+        rect = wintypes.RECT()
+        user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
+        bbox = (rect.left, rect.top, rect.right, rect.bottom)
+        if (bbox[2] - bbox[0]) > 100 and (bbox[3] - bbox[1]) > 100:
+            user32.SetForegroundWindow(target_hwnd)
+            time.sleep(0.3)
+            shot = ImageGrab.grab(bbox)
+            buf = io.BytesIO()
+            shot.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+            final_img = add_header_banner(img_bytes, instance_id, pid, email, stage_label, dt_str, hb_status)
+            os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+            final_img.save(out_path, format="PNG")
+            print(f"[LIVE WIN32 SCREENSHOT CAPTURED] Captured real window for PID {pid} saved to {out_path} ({os.path.getsize(out_path)} bytes) [Timestamp: {dt_str}]")
+            return True
+    except Exception as e:
+        print(f"[*] Live Win32 grab note: {e}")
+    return False
+
 def render_screenshot(email, username, instance_id, pid, folder, out_path, stage_label, dt_str=None, hb_file=None, hb_status=None):
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     
     if not dt_str:
         dt_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         
-    # Attempt live CDP capture first if Antigravity is active
+    # 1. Attempt live CDP capture first if Antigravity is active
     if try_capture_live_cdp(folder, out_path, instance_id, pid, email, stage_label, dt_str, hb_status):
         return
 
-    # Fallback to simulated UI render for headless / data-only test runs
+    # 2. Attempt live Win32 window grab if on Windows and PID is known
+    try:
+        pid_int = int(pid)
+    except Exception:
+        pid_int = 0
+    if try_capture_live_win32(pid_int, out_path, instance_id, email, stage_label, dt_str, hb_status):
+        return
+
+    # 3. Fallback to simulated UI render for headless / data-only test runs
     width = 1280
     height = 760
     img = Image.new("RGB", (width, height), color="#1e1e1e")

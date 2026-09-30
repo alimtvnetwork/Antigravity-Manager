@@ -59,6 +59,9 @@ fn main() {
             cmd_instances(&forward_args);
         }
         "instances-all" => cmd_instances_all(&cmd_args),
+        "observe" | "inspect" | "watch" => {
+            cmd_observe(&cmd_args);
+        }
         "test-instance-flow"
         | "test-instance-switching"
         | "instance-flow"
@@ -1528,6 +1531,18 @@ fn cmd_prompts(args: &[String]) {
             cmd_prompts_import(&args[1..]);
             return;
         }
+        if first_lower == "goal-worker" || first_lower == "gw" {
+            cmd_prompt_goal_worker(&args[1..]);
+            return;
+        }
+        if first_lower == "start-goal" || first_lower == "sg" {
+            cmd_prompt_start_goal(&args[1..]);
+            return;
+        }
+        if first_lower == "check-goal" || first_lower == "cg" {
+            cmd_prompt_check_goal(&args[1..]);
+            return;
+        }
     }
 
     let is_ls = args
@@ -2025,6 +2040,252 @@ fn cmd_prompts_import(args: &[String]) {
         total_imported,
         files_to_import.len()
     );
+}
+
+fn cmd_prompt_goal_worker(args: &[String]) {
+    let mut instance_id = "default".to_string();
+    let mut data_dir = String::new();
+    let mut repo_path = ".".to_string();
+    let mut heartbeat_file = ".antigravity_goal_prompt.log".to_string();
+    let mut interval = 5u64;
+    let mut prompt = "Continuous 5-second prompt goal heartbeat verification".to_string();
+
+    let mut idx = 0;
+    while idx < args.len() {
+        let arg = &args[idx];
+        if arg == "--instance" && idx + 1 < args.len() {
+            instance_id = args[idx + 1].clone();
+            idx += 2;
+        } else if (arg == "--user-data-dir" || arg == "--data-dir") && idx + 1 < args.len() {
+            data_dir = args[idx + 1].clone();
+            idx += 2;
+        } else if arg.starts_with("--user-data-dir=") {
+            data_dir = arg.trim_start_matches("--user-data-dir=").to_string();
+            idx += 1;
+        } else if (arg == "--project" || arg == "--workspace" || arg == "--repo")
+            && idx + 1 < args.len()
+        {
+            repo_path = args[idx + 1].clone();
+            idx += 2;
+        } else if arg == "--heartbeat-file" && idx + 1 < args.len() {
+            heartbeat_file = args[idx + 1].clone();
+            idx += 2;
+        } else if arg == "--interval" && idx + 1 < args.len() {
+            interval = args[idx + 1].parse().unwrap_or(5);
+            idx += 2;
+        } else if arg == "--prompt" && idx + 1 < args.len() {
+            prompt = args[idx + 1].clone();
+            idx += 2;
+        } else {
+            idx += 1;
+        }
+    }
+
+    if data_dir.is_empty() {
+        if let Ok(registry) = instance::load_registry() {
+            if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+                data_dir = inst.data_dir.clone();
+            }
+        }
+    }
+
+    repo_db::run_prompt_goal_worker_loop(
+        &instance_id,
+        &data_dir,
+        &repo_path,
+        &heartbeat_file,
+        interval,
+        &prompt,
+    );
+}
+
+fn cmd_prompt_start_goal(args: &[String]) {
+    let mut instance_id = "default".to_string();
+    let mut data_dir = String::new();
+    let mut repo_path = ".".to_string();
+    let mut heartbeat_file = ".antigravity_goal_prompt.log".to_string();
+    let mut interval = 5u64;
+    let mut prompt = "Continuous 5-second prompt goal heartbeat verification".to_string();
+
+    let mut idx = 0;
+    while idx < args.len() {
+        let arg = &args[idx];
+        if arg == "--instance" && idx + 1 < args.len() {
+            instance_id = args[idx + 1].clone();
+            idx += 2;
+        } else if (arg == "--user-data-dir" || arg == "--data-dir") && idx + 1 < args.len() {
+            data_dir = args[idx + 1].clone();
+            idx += 2;
+        } else if (arg == "--project" || arg == "--workspace" || arg == "--repo")
+            && idx + 1 < args.len()
+        {
+            repo_path = args[idx + 1].clone();
+            idx += 2;
+        } else if arg == "--heartbeat-file" && idx + 1 < args.len() {
+            heartbeat_file = args[idx + 1].clone();
+            idx += 2;
+        } else if arg == "--interval" && idx + 1 < args.len() {
+            interval = args[idx + 1].parse().unwrap_or(5);
+            idx += 2;
+        } else if arg == "--prompt" && idx + 1 < args.len() {
+            prompt = args[idx + 1].clone();
+            idx += 2;
+        } else {
+            idx += 1;
+        }
+    }
+
+    if data_dir.is_empty() {
+        if let Ok(registry) = instance::load_registry() {
+            if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+                data_dir = inst.data_dir.clone();
+            }
+        }
+    }
+
+    match repo_db::start_prompt_goal_heartbeat(
+        &instance_id,
+        &data_dir,
+        &repo_path,
+        &heartbeat_file,
+        &prompt,
+        interval,
+    ) {
+        Ok(cfg) => {
+            println!(
+                "[SUCCESS] Prompt goal heartbeat started for instance '{}':",
+                instance_id
+            );
+            println!("  ● Heartbeat File: {}", cfg.heartbeat_file);
+            println!("  ● Interval:       {} seconds", cfg.interval_secs);
+            println!("  ● Prompt Goal:    {}", cfg.prompt_content);
+            println!("  ● Config:         .antigravity_goal_heartbeat.json");
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to start prompt goal heartbeat: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_prompt_check_goal(args: &[String]) {
+    let mut instance_id = "default".to_string();
+    let mut repo_path = ".".to_string();
+
+    let mut idx = 0;
+    while idx < args.len() {
+        let arg = &args[idx];
+        if arg == "--instance" && idx + 1 < args.len() {
+            instance_id = args[idx + 1].clone();
+            idx += 2;
+        } else if (arg == "--project" || arg == "--workspace" || arg == "--repo")
+            && idx + 1 < args.len()
+        {
+            repo_path = args[idx + 1].clone();
+            idx += 2;
+        } else if !arg.starts_with('-') {
+            instance_id = arg.clone();
+            idx += 1;
+        } else {
+            idx += 1;
+        }
+    }
+
+    let (is_alive, hb_file, last_line) =
+        repo_db::inspect_prompt_goal_status(&instance_id, &[repo_path.clone()]);
+    println!(
+        "Prompt Goal Status for Instance '{}' (workspace: '{}'):",
+        instance_id, repo_path
+    );
+    println!(
+        "  ● Active/Fresh: {}",
+        if is_alive {
+            "YES (RUNNING)"
+        } else {
+            "NO (STOPPED or Stale)"
+        }
+    );
+    if let Some(f) = hb_file {
+        println!("  ● Heartbeat File: {}", f);
+    }
+    if let Some(l) = last_line {
+        println!("  ● Latest Record:  {}", l);
+    }
+}
+
+fn cmd_observe(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let target = args
+        .iter()
+        .find(|a| !a.starts_with('-'))
+        .map(|s| s.as_str())
+        .unwrap_or("active");
+
+    let resolved = match instance::resolve_instance_id(target) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to resolve instance '{}': {}", target, e);
+            std::process::exit(1);
+        }
+    };
+
+    match instance::observe_instance(&resolved) {
+        Ok(obs) => {
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&obs).unwrap_or_default());
+            } else {
+                println!("================================================================================");
+                println!(
+                    "  AGM Instance Live Observation: '{}' ({})",
+                    obs.name, obs.instance_id
+                );
+                println!("================================================================================");
+                println!(
+                    "  ● Status:                 {}",
+                    if obs.is_running {
+                        format!("RUNNING (PIDs: {:?})", obs.pids)
+                    } else {
+                        "STOPPED".to_string()
+                    }
+                );
+                println!("  ● Data Directory:         {}", obs.data_dir);
+                println!(
+                    "  ● Bound Account Email:    {}",
+                    obs.bound_account_email.as_deref().unwrap_or("None")
+                );
+                println!(
+                    "  ● Injected state.vscdb:   {}",
+                    obs.injected_email_in_db.as_deref().unwrap_or("None")
+                );
+                println!("  ● Active Prompts Queue:   {}", obs.active_prompts_count);
+                println!(
+                    "  ● Prompt Goal Running:    {}",
+                    if obs.prompt_goal_running {
+                        "YES (5s Heartbeat Active)"
+                    } else {
+                        "NO / IDLE"
+                    }
+                );
+                if let Some(ref last_ts) = obs.last_heartbeat_timestamp {
+                    println!("  ● Last Verified At:       {}", last_ts);
+                }
+                if let Some(ref last_line) = obs.last_heartbeat_line {
+                    println!("  ● Heartbeat Telemetry:    {}", last_line);
+                }
+                if !obs.workspace_folders.is_empty() {
+                    println!(
+                        "  ● Bound Workspaces:       {}",
+                        obs.workspace_folders.join(", ")
+                    );
+                }
+                println!("================================================================================");
+            }
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to observe instance '{}': {}", resolved, e);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn resolve_prompt_template(category_or_name: &str) -> Option<String> {
@@ -7346,6 +7607,16 @@ fn cmd_instances(args: &[String]) {
     }
 
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    // Subcommand: agm instances observe [target]
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("observe")
+            || non_flag_args[0].eq_ignore_ascii_case("inspect")
+            || non_flag_args[0].eq_ignore_ascii_case("watch"))
+    {
+        cmd_observe(&args[1..]);
+        return;
+    }
 
     // Subcommand: agm instances test-flow
     if !non_flag_args.is_empty()

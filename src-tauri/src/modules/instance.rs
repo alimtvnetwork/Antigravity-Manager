@@ -1528,9 +1528,10 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         let _ = update_instance_app_storage(&target_data_path, Some(&account.email), is_tos);
         purge_volatile_instance_sessions(&target_data_path);
 
+        // Unconditionally sync credentials to system keyring and credential file so active Antigravity instance reads the bound account
+        let _ = crate::modules::integration::write_to_system_keyring(account);
+        let _ = crate::modules::integration::write_to_file_credentials(account);
         if is_default {
-            let _ = crate::modules::integration::write_to_system_keyring(account);
-            let _ = crate::modules::integration::write_to_file_credentials(account);
             let _ = crate::modules::account::set_current_account_id(&account.id);
         }
         if let Ok(inst_home) = get_instance_home_dir(instance_id) {
@@ -1700,6 +1701,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         let _ =
             crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
         let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         return Ok(());
     }
 
@@ -1730,40 +1732,11 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                 let _ =
                     update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
 
-                #[cfg(target_os = "windows")]
-                {
-                    let home_str = inst_home.to_string_lossy().to_string();
-                    let roaming = inst_home.join("AppData").join("Roaming");
-                    let local = inst_home.join("AppData").join("Local");
-                    let _ = fs::create_dir_all(&roaming);
-                    let _ = fs::create_dir_all(&local);
-
-                    cmd.env("USERPROFILE", &home_str);
-                    cmd.env("HOME", &home_str);
-                    if home_str.len() >= 2 && &home_str[1..2] == ":" {
-                        cmd.env("HOMEDRIVE", &home_str[..2]);
-                        cmd.env("HOMEPATH", &home_str[2..]);
-                    }
-                    let appdata_dir = PathBuf::from(&data_dir).join("AppData").join("Roaming");
-                    let localappdata_dir = PathBuf::from(&data_dir).join("AppData").join("Local");
-                    let _ = fs::create_dir_all(&appdata_dir);
-                    let _ = fs::create_dir_all(&localappdata_dir);
-                    cmd.env("APPDATA", &appdata_dir.to_string_lossy().to_string());
-                    cmd.env(
-                        "LOCALAPPDATA",
-                        &localappdata_dir.to_string_lossy().to_string(),
-                    );
-                }
                 #[cfg(not(target_os = "windows"))]
                 {
                     cmd.env("HOME", inst_home);
                 }
             }
-            cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
-            cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
-            cmd.env("SSH_TTY", "pty/0");
-            cmd.env("WSL_DISTRO_NAME", "antigravity-isolated");
-            cmd.env("DOCKER_CONTAINER", "1");
             if let Some(ref acc) = resolved_account {
                 cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
                 cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
@@ -1776,9 +1749,8 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             for folder in &workspace_folders {
                 cmd.arg(folder);
             }
-        } else {
-            cmd.arg("--new-window");
         }
+        cmd.arg("--new-window");
 
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -1786,7 +1758,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
 
         #[cfg(target_os = "windows")]
         {
-            cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+            cmd.creation_flags(0x00000200 | 0x08000000); // CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
         }
 
         #[cfg(target_os = "linux")]
@@ -1806,6 +1778,7 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
         let _ =
             crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
         let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         Ok(())
     }
 }
@@ -2089,6 +2062,11 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         });
     }
 
+    let _ = crate::modules::repo_db::stop_prompt_goal_workers_for_instance(
+        instance_id,
+        &config.data_dir,
+    );
+
     if pids.is_empty() {
         let _ = mark_instance_stopped(instance_id);
         return Ok(());
@@ -2105,7 +2083,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .args(["/F", "/PID", &pid.to_string()])
                 .creation_flags(0x08000000)
                 .output();
         }
@@ -2284,6 +2262,73 @@ pub fn bind_account_to_instance(
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ObservedInstanceState {
+    pub instance_id: String,
+    pub name: String,
+    pub data_dir: String,
+    pub is_running: bool,
+    pub pids: Vec<u32>,
+    pub bound_account_id: Option<String>,
+    pub bound_account_email: Option<String>,
+    pub injected_email_in_db: Option<String>,
+    pub workspace_folders: Vec<String>,
+    pub active_prompts_count: usize,
+    pub prompt_goal_running: bool,
+    pub last_heartbeat_timestamp: Option<String>,
+    pub last_heartbeat_line: Option<String>,
+}
+
+/// Observe an instance's complete operational state: running status, conscious PIDs, bound vs injected credentials, active prompt queue, and prompt goal heartbeats
+pub fn observe_instance(instance_id: &str) -> Result<ObservedInstanceState, String> {
+    let registry = load_registry()?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .ok_or_else(|| format!("Instance '{}' not found", instance_id))?;
+
+    let is_running = is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+    let pids = find_pids_for_data_dir(&inst.data_dir, inst.id == "default");
+    let workspaces = get_instance_workspace_folders(&inst.id, &inst.data_dir);
+
+    let target_data_path = PathBuf::from(&inst.data_dir);
+    let db_path = target_data_path
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    let injected_email = crate::modules::db::read_injected_email(&db_path);
+
+    let (goal_running, _hb_file, last_line) =
+        crate::modules::repo_db::inspect_prompt_goal_status(&inst.id, &workspaces);
+
+    let active_prompts = crate::modules::repo_db::list_all_prompts()
+        .map(|list| list.iter().filter(|p| p.instance_id == inst.id).count())
+        .unwrap_or(0);
+
+    let now_str = if goal_running {
+        Some(chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
+    } else {
+        None
+    };
+
+    Ok(ObservedInstanceState {
+        instance_id: inst.id.clone(),
+        name: inst.name.clone(),
+        data_dir: inst.data_dir.clone(),
+        is_running,
+        pids,
+        bound_account_id: inst.bound_account_id.clone(),
+        bound_account_email: inst.bound_email.clone(),
+        injected_email_in_db: injected_email,
+        workspace_folders: workspaces,
+        active_prompts_count: active_prompts,
+        prompt_goal_running: goal_running,
+        last_heartbeat_timestamp: now_str,
+        last_heartbeat_line: last_line,
+    })
+}
+
 /// Resolve an instance query string (seq_num like "1", ID like "inst-xyz", name like "Instance 1", or "default"/"active")
 /// to a valid concrete instance ID.
 pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
@@ -2444,10 +2489,8 @@ pub async fn switch_account_to_instance(
         let _ = update_instance_app_storage(&target_data_path, Some(&acc.email), is_tos);
         purge_volatile_instance_sessions(&target_data_path);
 
-        if is_default_inst {
-            let _ = crate::modules::integration::write_to_system_keyring(acc);
-            let _ = crate::modules::integration::write_to_file_credentials(acc);
-        }
+        let _ = crate::modules::integration::write_to_system_keyring(acc);
+        let _ = crate::modules::integration::write_to_file_credentials(acc);
 
         let inst_home_opt = get_instance_home_dir(&instance.id).ok();
         if let Some(ref inst_home) = inst_home_opt {

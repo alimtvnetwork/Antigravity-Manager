@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 22 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 23 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -83,6 +83,7 @@ When modifying any component in the repository, refer to the corresponding skill
 | `src-tauri/src/modules/ssh_manager.rs` | Native SSH key generation, mesh deployment, managed `~/.ssh/config` | [`agm-ssh-key-management-parity`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-ssh-key-management-parity/skill.md) |
 | Fast-Forward Shortcut Engine | Dynamic keybindings, active window restore, crash watchdog | [`agm-fast-forward-shortcuts`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-fast-forward-shortcuts/skill.md) |
 | Split SQLite Architecture (`repo_prompts.db`, `proxy_logs.db`, etc.) | WAL mode concurrency, 5000ms busy timeout, schema migrations | [`agm-split-sqlite-architecture`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-split-sqlite-architecture/skill.md) |
+| `assets/screenshots/generate_instance_screenshot.py` | CDP WebSocket automation, Pillow synthetic audit cards, system timestamp proof | [`agm-visual-evidence-verification`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-visual-evidence-verification/skill.md) |
 
 ---
 

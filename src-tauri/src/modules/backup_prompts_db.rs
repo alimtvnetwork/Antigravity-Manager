@@ -600,6 +600,7 @@ pub fn restore_running_prompts_for_instance(
 
     // Automatically trigger resend and execute restored prompts via CLI scoped to this instance
     let _ = repo_db::resend_running_commands_for_instance(Some(target_inst), 20);
+    let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
 
     Ok(records)
 }

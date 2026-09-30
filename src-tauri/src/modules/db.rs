@@ -375,3 +375,50 @@ pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
     ));
     Ok(())
 }
+
+/// Extract authenticated email from an isolated state.vscdb
+pub fn read_injected_email(db_path: &std::path::Path) -> Option<String> {
+    use base64::Engine;
+    if !db_path.exists() {
+        return None;
+    }
+    let conn =
+        Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
+
+    // 1. Try direct userStatus key
+    let mut stmt = conn
+        .prepare("SELECT value FROM ItemTable WHERE key = 'antigravityUnifiedStateSync.userStatus'")
+        .ok()?;
+    let val_str: Result<String, _> = stmt.query_row([], |row| row.get(0));
+    if let Ok(b64) = val_str {
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
+            let text = String::from_utf8_lossy(&bytes);
+            if let Ok(re) = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+") {
+                if let Some(mat) = re.find(&text) {
+                    return Some(mat.as_str().to_string());
+                }
+            }
+        }
+    }
+
+    // 2. Fallback: scan any rows in ItemTable containing email pattern
+    if let Ok(mut stmt_all) = conn.prepare("SELECT value FROM ItemTable") {
+        if let Ok(rows) = stmt_all.query_map([], |row| row.get::<_, String>(0)) {
+            if let Ok(re) = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+") {
+                for r in rows.flatten() {
+                    // Try decoding base64 or inspecting raw string
+                    if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&r) {
+                        let text = String::from_utf8_lossy(&bytes);
+                        if let Some(mat) = re.find(&text) {
+                            return Some(mat.as_str().to_string());
+                        }
+                    } else if let Some(mat) = re.find(&r) {
+                        return Some(mat.as_str().to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
