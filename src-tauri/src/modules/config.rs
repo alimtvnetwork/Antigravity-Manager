@@ -140,9 +140,12 @@ pub fn load_app_config() -> Result<AppConfig, String> {
         }
     };
 
-    let modified = migrate_config_value(&mut v);
+    let (attrs_opt, unwrapped_v) = crate::modules::json_envelope::unpack_envelope(v.clone());
+    let mut target_v = if attrs_opt.is_some() { unwrapped_v } else { v };
 
-    let config: AppConfig = serde_json::from_value(v)
+    let modified = migrate_config_value(&mut target_v);
+
+    let config: AppConfig = serde_json::from_value(target_v)
         .map_err(|e| format!("failed_to_convert_config_after_migration: {}", e))?;
 
     // If migration occurred, auto-save once to clean up the file
@@ -152,6 +155,14 @@ pub fn load_app_config() -> Result<AppConfig, String> {
     }
 
     Ok(config)
+}
+
+/// Export AppConfig wrapped in standard JSON envelope with variable section
+pub fn export_app_config_envelope(config: &AppConfig) -> Result<String, String> {
+    let envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/config-backup", config.clone());
+    serde_json::to_string_pretty(&envelope)
+        .map_err(|e| format!("failed_to_serialize_config_envelope: {}", e))
 }
 
 /// Migrate configuration JSON values across versions.

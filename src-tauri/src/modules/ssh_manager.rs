@@ -26,43 +26,45 @@ fn default_auth_method() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshNodeExportItem {
-    #[serde(default)]
+    #[serde(default, alias = "workerId")]
     pub worker_id: String,
     #[serde(rename = "id", default)]
     pub numeric_id: usize,
     pub alias: String,
+    #[serde(alias = "ipAddress")]
     pub ip_address: String,
     pub username: String,
     #[serde(default = "default_ssh_port")]
     pub port: u16,
     #[serde(default = "default_os_type")]
     pub os: String,
-    #[serde(default = "default_auth_method")]
+    #[serde(default = "default_auth_method", alias = "authMethod")]
     pub auth_method: String,
-    #[serde(default)]
+    #[serde(default, alias = "keyPath")]
     pub key_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshConnectionRecord {
     pub alias: String,
+    #[serde(alias = "ipAddress")]
     pub ip_address: String,
     pub username: String,
-    #[serde(default)]
+    #[serde(default, alias = "encryptedPassword")]
     pub encrypted_password: String,
-    #[serde(default)]
+    #[serde(default, alias = "keyPath")]
     pub key_path: String,
     #[serde(default = "default_os_type")]
     pub os: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "osGroup")]
     pub os_group: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "osVersion")]
     pub os_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "buildVersion")]
     pub build_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "firstRunAt")]
     pub first_run_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "createdAt")]
     pub created_at: Option<String>,
 }
 
@@ -301,6 +303,44 @@ pub fn decode_connections_from_json(raw: &str) -> Result<Vec<SshConnectionRecord
         return Err("Empty JSON input".to_string());
     }
 
+    if let Ok(parsed_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        let (attrs_opt, unwrapped) = crate::modules::json_envelope::unpack_envelope(parsed_val.clone());
+        let effective_val = if attrs_opt.is_some() { unwrapped } else { parsed_val };
+
+        let mut extracted_nodes = Vec::new();
+        if let Some(main_obj) = effective_val.get("mainMachine") {
+            if let Ok(item) = serde_json::from_value::<SshNodeExportItem>(main_obj.clone()) {
+                extracted_nodes.push(item);
+            }
+        }
+        if let Some(nodes_arr) = effective_val.get("nodes").and_then(|n| n.as_array()) {
+            for n_val in nodes_arr {
+                if let Ok(item) = serde_json::from_value::<SshNodeExportItem>(n_val.clone()) {
+                    extracted_nodes.push(item);
+                }
+            }
+        }
+        if !extracted_nodes.is_empty() {
+            return Ok(nodes_to_connections(&extracted_nodes));
+        }
+
+        if let Some(conns_arr) = effective_val.get("connections").and_then(|c| c.as_array()) {
+            if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(serde_json::Value::Array(conns_arr.clone())) {
+                if !conns.is_empty() {
+                    return Ok(conns);
+                }
+            }
+        }
+
+        if let Ok(conns) = serde_json::from_value::<Vec<SshConnectionRecord>>(effective_val.clone()) {
+            return Ok(conns);
+        }
+
+        if let Ok(nodes) = serde_json::from_value::<Vec<SshNodeExportItem>>(effective_val) {
+            return Ok(nodes_to_connections(&nodes));
+        }
+    }
+
     if let Ok(env) = serde_json::from_str::<SshNodesExportEnvelope>(trimmed) {
         if !env.connections.is_empty() {
             return Ok(env.connections);
@@ -451,7 +491,9 @@ pub fn export_nodes_json(
         }
     }
 
-    let pretty = serde_json::to_string_pretty(&envelope)
+    let full_envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/ssh-nodes", envelope.clone());
+    let pretty = serde_json::to_string_pretty(&full_envelope)
         .map_err(|e| format!("Failed to serialize SSH nodes JSON: {}", e))?;
     fs::write(&target_file, &pretty)
         .map_err(|e| format!("Failed to write {}: {}", target_file.display(), e))?;

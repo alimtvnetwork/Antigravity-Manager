@@ -430,14 +430,11 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
 
     let content = fs::read_to_string(&registry_path)
         .map_err(|e| format!("Failed to read instances registry: {}", e))?;
-    let mut registry: InstanceRegistry = serde_json::from_str(&content)
-        .or_else(|_| {
-            serde_json::from_str::<crate::modules::json_envelope::JsonEnvelope<InstanceRegistry>>(
-                &content,
-            )
-            .map(|env| env.data)
-        })
-        .map_err(|e| format!("Failed to parse instances registry: {}", e))?;
+    let mut registry: InstanceRegistry =
+        crate::modules::json_envelope::extract_payload::<InstanceRegistry>(&content)
+            .map(|(data, _)| data)
+            .or_else(|_| serde_json::from_str(&content))
+            .map_err(|e| format!("Failed to parse instances registry: {}", e))?;
 
     let has_default = registry.instances.iter().any(|i| i.id == "default");
     if !has_default {
@@ -492,6 +489,15 @@ pub fn save_registry(registry: &InstanceRegistry) -> Result<(), String> {
     fs::write(&registry_path, json)
         .map_err(|e| format!("Failed to write instances registry: {}", e))?;
     Ok(())
+}
+
+/// Export instances registry wrapped in standard JSON envelope with variable section
+pub fn export_instances_envelope() -> Result<String, String> {
+    let registry = load_registry()?;
+    let envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/instances-export", registry);
+    serde_json::to_string_pretty(&envelope)
+        .map_err(|e| format!("Failed to serialize instances envelope: {}", e))
 }
 
 /// Inspect running Antigravity processes matching an instance data_dir

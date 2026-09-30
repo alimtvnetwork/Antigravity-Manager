@@ -974,13 +974,10 @@ fn load_account_index_in_dir(data_dir: &PathBuf) -> Result<AccountIndex, String>
         return Ok(recovered);
     }
 
-    // Try to parse sanitized content (flat or enveloped)
-    let parsed_result = serde_json::from_str::<AccountIndex>(&sanitized).or_else(|_| {
-        serde_json::from_str::<crate::modules::json_envelope::JsonEnvelope<AccountIndex>>(
-            &sanitized,
-        )
-        .map(|env| env.data)
-    });
+    // Try to parse sanitized content (flat or enveloped with variable expansion)
+    let parsed_result = crate::modules::json_envelope::extract_payload::<AccountIndex>(&sanitized)
+        .map(|(data, _)| data)
+        .or_else(|_| serde_json::from_str::<AccountIndex>(&sanitized));
     match parsed_result {
         Ok(index) => {
             crate::modules::logger::log_info(&format!(
@@ -1010,6 +1007,14 @@ fn save_account_index_in_dir(data_dir: &PathBuf, index: &AccountIndex) -> Result
 
     crate::utils::fs::write_atomic(&index_path, content.as_bytes())
         .map_err(|e| format!("failed_to_save_account_index: {}", e))
+}
+
+/// Export account index wrapped in standard JSON envelope with variable section
+pub fn export_accounts_envelope() -> Result<String, String> {
+    let index = load_account_index()?;
+    let envelope = crate::modules::json_envelope::JsonEnvelope::new("agm/accounts-export", index);
+    serde_json::to_string_pretty(&envelope)
+        .map_err(|e| format!("failed_to_serialize_accounts_envelope: {}", e))
 }
 
 /// Rebuild AccountIndex by scanning accounts/*.json files in specific directory

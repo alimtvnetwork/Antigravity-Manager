@@ -75,7 +75,9 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
             if alt_path.exists() {
                 if let Ok(data) = fs::read_to_string(&alt_path) {
                     let clean = data.trim_start_matches('\u{feff}');
-                    if let Ok(mut config) = serde_json::from_str::<SupabaseConfig>(clean) {
+                    if let Ok((mut config, _)) =
+                        crate::modules::json_envelope::extract_payload::<SupabaseConfig>(clean)
+                    {
                         for ep in &mut config.endpoints {
                             ep.url = normalize_supabase_url(&ep.url);
                         }
@@ -91,12 +93,24 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
     }
     let data = fs::read_to_string(&path).map_err(|e| AppError::Io(e))?;
     let clean = data.trim_start_matches('\u{feff}');
-    let mut config: SupabaseConfig = serde_json::from_str(clean)
-        .map_err(|e| AppError::Config(format!("Failed to parse Supabase config: {}", e)))?;
+    let mut config: SupabaseConfig =
+        match crate::modules::json_envelope::extract_payload::<SupabaseConfig>(clean) {
+            Ok((cfg, _)) => cfg,
+            Err(_) => serde_json::from_str(clean)
+                .map_err(|e| AppError::Config(format!("Failed to parse Supabase config: {}", e)))?,
+        };
     for ep in &mut config.endpoints {
         ep.url = normalize_supabase_url(&ep.url);
     }
     Ok(config)
+}
+
+/// Export configuration as standard portable JSON envelope
+pub fn export_config_json(config: &SupabaseConfig) -> Result<String, AppError> {
+    let envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/supabase-endpoints", config.clone());
+    serde_json::to_string_pretty(&envelope)
+        .map_err(|e| AppError::Config(format!("Failed to serialize Supabase config: {}", e)))
 }
 
 /// Save configuration to disk

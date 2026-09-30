@@ -100,9 +100,21 @@ pub fn load_config() -> Result<TelegramConfig, AppError> {
     }
     let data = fs::read_to_string(&path).map_err(AppError::Io)?;
     let clean_data = data.trim_start_matches('\u{FEFF}');
-    let config: TelegramConfig = serde_json::from_str(clean_data)
-        .map_err(|e| AppError::Config(format!("Failed to parse Telegram config: {}", e)))?;
+    let config: TelegramConfig =
+        match crate::modules::json_envelope::extract_payload::<TelegramConfig>(clean_data) {
+            Ok((cfg, _)) => cfg,
+            Err(_) => serde_json::from_str(clean_data)
+                .map_err(|e| AppError::Config(format!("Failed to parse Telegram config: {}", e)))?,
+        };
     Ok(config)
+}
+
+/// Export Telegram configuration as standard portable JSON envelope
+pub fn export_config_json(config: &TelegramConfig) -> Result<String, AppError> {
+    let envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/telegram-config", config.clone());
+    serde_json::to_string_pretty(&envelope)
+        .map_err(|e| AppError::Config(format!("Failed to serialize Telegram config: {}", e)))
 }
 
 /// Save configuration to disk

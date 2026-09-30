@@ -897,6 +897,70 @@ fn check_is_in_path() -> bool {
     false
 }
 
+fn cmd_accounts_export(args: &[String]) {
+    match account::export_accounts_envelope() {
+        Ok(json_str) => {
+            let file_arg = args
+                .iter()
+                .position(|a| a == "--file" || a == "-o")
+                .and_then(|idx| args.get(idx + 1));
+            if let Some(target_file) = file_arg {
+                if let Err(e) = fs::write(target_file, &json_str) {
+                    eprintln!("[ERROR] Failed to write accounts to {}: {}", target_file, e);
+                } else {
+                    println!("✅ Successfully exported accounts envelope to {}", target_file);
+                }
+            } else {
+                println!("{}", json_str);
+            }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to export accounts envelope: {}", e),
+    }
+}
+
+fn cmd_accounts_import(args: &[String]) {
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let target_file = if non_flag_args.len() > 1 {
+        Some(non_flag_args[1].as_str())
+    } else {
+        None
+    };
+
+    let path_str = match target_file {
+        Some(p) => p,
+        None => {
+            eprintln!("Usage: agm accounts import <file_path>");
+            return;
+        }
+    };
+
+    let raw_json = match fs::read_to_string(path_str) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
+            return;
+        }
+    };
+
+    match json_envelope::extract_payload::<account::AccountIndex>(&raw_json) {
+        Ok((imported_index, attrs)) => {
+            let count = imported_index.accounts.len();
+            match account::save_account_index(&imported_index) {
+                Ok(_) => {
+                    println!(
+                        "✅ Successfully imported {} accounts from '{}' (Envelope v{}).",
+                        count,
+                        path_str,
+                        attrs.version.as_deref().unwrap_or("2.0")
+                    );
+                }
+                Err(e) => eprintln!("[ERROR] Failed to save accounts index: {}", e),
+            }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to parse accounts envelope: {}", e),
+    }
+}
+
 fn cmd_accounts(args: &[String]) {
     let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
     if non_flag_args
@@ -913,12 +977,32 @@ fn cmd_accounts(args: &[String]) {
         return;
     }
 
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("export"))
+        .unwrap_or(false)
+    {
+        cmd_accounts_export(args);
+        return;
+    }
+
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("import") || s.eq_ignore_ascii_case("load-json"))
+        .unwrap_or(false)
+    {
+        cmd_accounts_import(args);
+        return;
+    }
+
     if args
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help")
     {
         println!("AGM Accounts & Quota CLI:");
         println!("  agm accounts [ls] [--active] [--json]");
+        println!("  agm accounts export [--file <path>]");
+        println!("  agm accounts import <path>");
         println!("  agm account switch <email|prefix|id|#seq> [--instance <id|alias>]");
         println!("  agm account switch <instance> <email>");
         println!("\nDescription:");
@@ -930,12 +1014,16 @@ fn cmd_accounts(args: &[String]) {
         println!("\nAliases: agm accounts, agm account, agm acc");
         println!("\nSubcommands & Actions:");
         println!("  ls, list            Display table of all configured accounts (default)");
+        println!("  export [--file]     Export accounts wrapped in standard JSON envelope");
+        println!("  import <path>       Import accounts from standard JSON envelope file");
         println!("  switch, use <query> Switch active account (or instance account) directly");
         println!("\nOptions:");
         println!("    --active          Show only the currently active account profile");
         println!("    --json, -j        Output account list in structured JSON format");
         println!("\nExamples:");
         println!("  agm accounts                                # Display table of all configured accounts");
+        println!("  agm accounts export --file accounts.json    # Export accounts envelope to file");
+        println!("  agm accounts import accounts.json           # Import accounts envelope from file");
         println!("  agm accounts --active                       # Show currently selected active account");
         println!("  agm accounts --json                         # Export accounts and quota matrix as JSON");
         println!("  agm account switch dev.user@gmail.com       # Switch active profile to dev.user@gmail.com");
@@ -4860,6 +4948,57 @@ fn cmd_telegram(args: &[String]) {
             println!("  agm telegram send, notify \"<message>\"   Send custom notification message to Telegram chat");
             println!("  agm telegram poll, watch [--once]       Poll & execute inbound Telegram commands");
             println!("  agm telegram cmds, commands             List supported inbound Telegram slash commands");
+            println!("  agm telegram export [--file <path>]     Export telegram config wrapped in standard JSON envelope");
+            println!("  agm telegram import <path>              Import telegram config from standard JSON envelope file");
+            return;
+        }
+        if first_lower == "export" {
+            match telegram_inbound::export_config_json(&t_cfg) {
+                Ok(json_str) => {
+                    let file_arg = args
+                        .iter()
+                        .position(|a| a == "--file" || a == "-o")
+                        .and_then(|idx| args.get(idx + 1));
+                    if let Some(target_file) = file_arg {
+                        if let Err(e) = fs::write(target_file, &json_str) {
+                            eprintln!("[ERROR] Failed to write to {}: {}", target_file, e);
+                        } else {
+                            println!("✅ Successfully exported Telegram configuration to {}", target_file);
+                        }
+                    } else {
+                        println!("{}", json_str);
+                    }
+                }
+                Err(e) => eprintln!("[ERROR] Failed to export Telegram configuration: {}", e),
+            }
+            return;
+        }
+        if first_lower == "import" || first_lower == "load-json" {
+            let target_path = args.get(1);
+            if let Some(path_str) = target_path {
+                match fs::read_to_string(path_str) {
+                    Ok(raw_json) => {
+                        match json_envelope::extract_payload::<telegram_inbound::TelegramConfig>(&raw_json) {
+                            Ok((imported_cfg, attrs)) => {
+                                match telegram_inbound::save_config(&imported_cfg) {
+                                    Ok(_) => {
+                                        println!(
+                                            "✅ Successfully imported Telegram configuration from '{}' (Envelope v{}).",
+                                            path_str,
+                                            attrs.version.as_deref().unwrap_or("2.0")
+                                        );
+                                    }
+                                    Err(e) => eprintln!("[ERROR] Failed to save Telegram config: {}", e),
+                                }
+                            }
+                            Err(e) => eprintln!("[ERROR] Failed to parse Telegram config: {}", e),
+                        }
+                    }
+                    Err(e) => eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e),
+                }
+            } else {
+                eprintln!("Usage: agm telegram import <file_path>");
+            }
             return;
         }
         if first_lower == "set"
@@ -5502,6 +5641,26 @@ fn cmd_supabase(args: &[String]) {
         "test" => cmd_supabase_test(&rt, sub_args),
         "set-endpoint" | "set" | "add" => cmd_supabase_set_endpoint(sub_args),
         "load-json" | "import" => cmd_supabase_load_json(sub_args),
+        "export" => {
+            match supabase_sync::export_config_json() {
+                Ok(json_str) => {
+                    let file_arg = sub_args
+                        .iter()
+                        .position(|a| a == "--file" || a == "-o")
+                        .and_then(|idx| sub_args.get(idx + 1));
+                    if let Some(target_file) = file_arg {
+                        if let Err(e) = fs::write(target_file, &json_str) {
+                            eprintln!("[ERROR] Failed to write to {}: {}", target_file, e);
+                        } else {
+                            println!("✅ Successfully exported Supabase configuration to {}", target_file);
+                        }
+                    } else {
+                        println!("{}", json_str);
+                    }
+                }
+                Err(e) => eprintln!("[ERROR] Failed to export Supabase configuration: {}", e),
+            }
+        }
         "schema" => cmd_supabase_schema(sub_args),
         "sync" => cmd_supabase_sync(&rt),
         "enable" => {
@@ -5606,6 +5765,7 @@ fn print_supabase_help() {
     println!("   agm supabase set <id> <name> <url> <key> <role> [notes] [tags]");
     println!("                                          Configure/update endpoint directly from command line");
     println!("   agm supabase load-json <file>          Ingest and merge endpoints from JSON file");
+    println!("   agm supabase export [--file <path>]    Export Supabase configuration wrapped in JSON envelope");
     println!("   agm supabase sync                      Trigger immediate local node & instance profile sync");
     println!("   agm supabase schema [root|secondary]   Output SQL schema script for Supabase SQL Editor");
     println!("   agm supabase enable / disable          Toggle Supabase synchronization");
@@ -6128,11 +6288,16 @@ fn cmd_which_format(args: &[String]) {
         );
         for (i, m) in matched.iter().enumerate() {
             let env_badge = if m.is_envelope {
-                "Envelope v1.0"
+                let ver = m.envelope_version.as_deref().unwrap_or("2.0");
+                if m.variables_count > 0 {
+                    format!("Envelope v{} ({} variables)", ver, m.variables_count)
+                } else {
+                    format!("Envelope v{}", ver)
+                }
             } else if m.is_legacy {
-                "Legacy Flat (Auto-Compatible)"
+                "Legacy Flat (Auto-Compatible)".to_string()
             } else {
-                "Custom"
+                "Custom".to_string()
             };
             println!(
                 "  #{:<2} [{}] ({})",
@@ -6141,8 +6306,17 @@ fn cmd_which_format(args: &[String]) {
                 env_badge
             );
             println!("      Path:     {}", m.file_path);
+            if let Some(ref wd) = m.work_directory {
+                println!("      WorkDir:  {}", wd);
+            }
+            if let Some(ref note) = m.notes {
+                println!("      Notes:    {}", note);
+            }
             println!("      Changes:  {}", m.mutation_summary);
             println!("      Command:  {}", m.recommended_command);
+            if let Some(ref exp) = m.export_command {
+                println!("      Export:   {}", exp);
+            }
             println!();
         }
     }
@@ -7875,10 +8049,90 @@ fn cmd_clear_cache(args: &[String]) {
             }
         }
     }
+fn cmd_instances_export(args: &[String]) {
+    match instance::export_instances_envelope() {
+        Ok(json_str) => {
+            let file_arg = args
+                .iter()
+                .position(|a| a == "--file" || a == "-o")
+                .and_then(|idx| args.get(idx + 1));
+            if let Some(target_file) = file_arg {
+                if let Err(e) = fs::write(target_file, &json_str) {
+                    eprintln!("[ERROR] Failed to write instances to {}: {}", target_file, e);
+                } else {
+                    println!("✅ Successfully exported instances envelope to {}", target_file);
+                }
+            } else {
+                println!("{}", json_str);
+            }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to export instances envelope: {}", e),
+    }
+}
+
+fn cmd_instances_import(args: &[String]) {
+    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let target_file = if non_flag_args.len() > 1 {
+        Some(non_flag_args[1].as_str())
+    } else {
+        None
+    };
+
+    let path_str = match target_file {
+        Some(p) => p,
+        None => {
+            eprintln!("Usage: agm instances import <file_path>");
+            return;
+        }
+    };
+
+    let raw_json = match fs::read_to_string(path_str) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
+            return;
+        }
+    };
+
+    match json_envelope::extract_payload::<instance::InstanceRegistry>(&raw_json) {
+        Ok((imported_reg, attrs)) => {
+            let count = imported_reg.instances.len();
+            match instance::save_registry(&imported_reg) {
+                Ok(_) => {
+                    println!(
+                        "✅ Successfully imported {} instances from '{}' (Envelope v{}).",
+                        count,
+                        path_str,
+                        attrs.version.as_deref().unwrap_or("2.0")
+                    );
+                }
+                Err(e) => eprintln!("[ERROR] Failed to save instances registry: {}", e),
+            }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to parse instances envelope: {}", e),
+    }
 }
 
 fn cmd_instances(args: &[String]) {
     let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("export"))
+        .unwrap_or(false)
+    {
+        cmd_instances_export(args);
+        return;
+    }
+
+    if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("import") || s.eq_ignore_ascii_case("load-json"))
+        .unwrap_or(false)
+    {
+        cmd_instances_import(args);
+        return;
+    }
+
     let is_help = args
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help");
@@ -8011,6 +8265,8 @@ fn cmd_instances(args: &[String]) {
         println!("  rm, delete <inst> [--force]       Remove an instance profile, its data directory, and executable");
         println!("  rm-all [--force]                  Remove all non-default sandbox instances");
         println!("  assign, bind <inst> <paths...>    Bind one or more project workspace folders to an instance");
+        println!("  export [--file <path>]            Export sandbox instances wrapped in standard JSON envelope");
+        println!("  import <path>                     Import sandbox instances from standard JSON envelope file");
         println!("\nCreate Options:");
         println!("  --account, -a <email|id>          Bind a specific account by email or ID (defaults to next available unbound)");
         println!("  --from, -f <source_instance>      Clone settings and extensions from an existing instance");

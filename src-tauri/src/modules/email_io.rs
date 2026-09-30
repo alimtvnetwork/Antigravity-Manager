@@ -92,7 +92,7 @@ pub fn export_to_json() -> Result<String, String> {
     }
 
     let bundle = EmailExportBundle {
-        version: "4.49.0".to_string(),
+        version: "2.0".to_string(),
         exported_at: Utc::now().timestamp(),
         accounts,
         recipients,
@@ -100,13 +100,18 @@ pub fn export_to_json() -> Result<String, String> {
         credentials,
     };
 
-    serde_json::to_string_pretty(&bundle).map_err(|e| format!("Failed to serialize JSON: {}", e))
+    let envelope =
+        crate::modules::json_envelope::JsonEnvelope::new("agm/email-credentials", bundle);
+    serde_json::to_string_pretty(&envelope).map_err(|e| format!("Failed to serialize JSON: {}", e))
 }
 
 /// Import email configuration from structured JSON
 pub fn import_from_json(payload: &str) -> Result<ImportSummary, String> {
     let bundle: EmailExportBundle =
-        serde_json::from_str(payload).map_err(|e| format!("Invalid JSON format: {}", e))?;
+        crate::modules::json_envelope::extract_payload::<EmailExportBundle>(payload)
+            .map(|(b, _)| b)
+            .or_else(|_| serde_json::from_str::<EmailExportBundle>(payload))
+            .map_err(|e| format!("Invalid JSON format: {}", e))?;
 
     let mut summary = ImportSummary {
         accounts_imported: 0,
