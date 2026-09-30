@@ -8609,7 +8609,11 @@ fn cmd_instances_import(args: &[String]) {
 }
 
 fn cmd_instances(args: &[String]) {
-    let non_flag_args: Vec<String> = args.iter().filter(|a| !a.starts_with('-')).cloned().collect();
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
     if non_flag_args
         .first()
         .map(|s| s.eq_ignore_ascii_case("export"))
