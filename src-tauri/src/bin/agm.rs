@@ -187,7 +187,7 @@ fn main() {
             {
                 cmd_clear_terminal(&cmd_args);
             } else {
-                cmd_clear_terminal(&cmd_args);
+                cmd_clear_cache(&cmd_args);
             }
         }
         "recreate-project" => cmd_recreate_project(&cmd_args),
@@ -8447,6 +8447,7 @@ fn suggest_agm_commands(input: &str) -> Vec<String> {
         "clean",
         "prune",
         "clear-cache",
+        "clear",
         "failed-commands",
         "fc",
         "install",
@@ -8608,7 +8609,7 @@ fn cmd_instances_import(args: &[String]) {
 }
 
 fn cmd_instances(args: &[String]) {
-    let non_flag_args: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let non_flag_args: Vec<String> = args.iter().filter(|a| !a.starts_with('-')).cloned().collect();
     if non_flag_args
         .first()
         .map(|s| s.eq_ignore_ascii_case("export"))
@@ -9025,12 +9026,12 @@ fn cmd_instances(args: &[String]) {
         let target_spec = if non_flag_args[0].eq_ignore_ascii_case("launch")
             || non_flag_args[0].eq_ignore_ascii_case("start")
         {
-            non_flag_args[1]
+            non_flag_args[1].clone()
         } else {
-            non_flag_args[0]
+            non_flag_args[0].clone()
         };
 
-        let resolved_id = match instance::resolve_instance_id(target_spec) {
+        let resolved_id = match instance::resolve_instance_id(&target_spec) {
             Ok(id) => id,
             Err(e) => {
                 eprintln!(
@@ -9073,12 +9074,12 @@ fn cmd_instances(args: &[String]) {
             || non_flag_args[0].eq_ignore_ascii_case("kill")
             || non_flag_args[0].eq_ignore_ascii_case("close")
         {
-            non_flag_args[1]
+            non_flag_args[1].clone()
         } else {
-            non_flag_args[0]
+            non_flag_args[0].clone()
         };
 
-        let resolved_id = match instance::resolve_instance_id(target_spec) {
+        let resolved_id = match instance::resolve_instance_id(&target_spec) {
             Ok(id) => id,
             Err(e) => {
                 eprintln!(
@@ -9118,12 +9119,12 @@ fn cmd_instances(args: &[String]) {
             || non_flag_args[0].eq_ignore_ascii_case("remove")
             || non_flag_args[0].eq_ignore_ascii_case("delete")
         {
-            non_flag_args[1]
+            non_flag_args[1].clone()
         } else {
-            non_flag_args[0]
+            non_flag_args[0].clone()
         };
 
-        let resolved_id = match instance::resolve_instance_id(target_spec) {
+        let resolved_id = match instance::resolve_instance_id(&target_spec) {
             Ok(id) => id,
             Err(e) => {
                 eprintln!(
@@ -9168,7 +9169,7 @@ fn cmd_instances(args: &[String]) {
             };
 
             // Case A: target resolves to an instance profile -> switch active instance!
-            if let Ok(resolved_id) = instance::resolve_instance_id(target_spec) {
+            if let Ok(resolved_id) = instance::resolve_instance_id(&target_spec) {
                 let reg = instance::load_registry().ok();
                 let inst_name = reg
                     .as_ref()
@@ -9274,7 +9275,7 @@ fn cmd_instances(args: &[String]) {
         // Two-or-more arguments switch: agm instances switch <instance> <account>
         let (target_spec, acc_query) = if is_switch_order1 {
             // Check if non_flag_args[1] is an instance
-            if instance::resolve_instance_id(non_flag_args[1]).is_ok() {
+            if instance::resolve_instance_id(&non_flag_args[1]).is_ok() {
                 (
                     non_flag_args[1].clone(),
                     non_flag_args[2..].join(" ").trim().to_lowercase(),

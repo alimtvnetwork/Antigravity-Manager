@@ -1753,6 +1753,12 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
                 {
                     cmd.env("HOME", inst_home);
                 }
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.env("USERPROFILE", inst_home);
+                    cmd.env("APPDATA", inst_home.join("AppData").join("Roaming"));
+                    cmd.env("LOCALAPPDATA", inst_home.join("AppData").join("Local"));
+                }
             }
             if let Some(ref acc) = resolved_account {
                 cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
@@ -2449,7 +2455,9 @@ pub async fn switch_account_to_instance(
         service.switch_account(account_id, None).await?;
         bind_account_to_instance("default", &account.id, &account.email)?;
         let registry_after = load_registry().unwrap_or_default();
-        if registry_after.active_instance_id.is_empty() || registry_after.active_instance_id == "default" {
+        if registry_after.active_instance_id.is_empty()
+            || registry_after.active_instance_id == "default"
+        {
             let _ = set_active_instance_id("default");
         }
         return Ok(());
@@ -2708,7 +2716,9 @@ pub async fn switch_account_to_instance(
     // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
     let registry_after = load_registry().unwrap_or_default();
-    if registry_after.active_instance_id.is_empty() || registry_after.active_instance_id == instance.id {
+    if registry_after.active_instance_id.is_empty()
+        || registry_after.active_instance_id == instance.id
+    {
         let _ = set_active_instance_id(&instance.id);
     }
     if is_default_inst {

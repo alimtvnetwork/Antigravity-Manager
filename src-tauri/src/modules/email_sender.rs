@@ -780,12 +780,12 @@ pub fn wrap_html_email_card(
   a:hover {{ color: #0284c7 !important; }}
   .btn-link, td a.btn, p a.btn {{ background: #0284c7; color: #ffffff !important; padding: 6px 14px; border-radius: 8px; text-decoration: none; display: inline-block; font-size: 16px; font-weight: bold; border: 1px solid #0369a1; }}
   .btn-link:hover, td a.btn:hover, p a.btn:hover {{ background: #0369a1; color: #ffffff !important; }}
-  @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: dark) {{
     body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
     td {{ color: #e2e8f0 !important; }}
     a {{ color: #38bdf8 !important; }}
     a:visited {{ color: #7dd3fc !important; }}
-  }
+  }}
 </style>
 </head>
 <body style="margin: 0; padding: 28px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7; color: #0f172a;">
@@ -930,12 +930,12 @@ pub fn render_node_credits_status_table_html(
   a:hover {{ color: #0284c7 !important; }}
   .btn-link, td a.btn, p a.btn {{ background: #0284c7; color: #ffffff !important; padding: 4px 10px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; border: 1px solid #0369a1; }}
   .btn-link:hover, td a.btn:hover, p a.btn:hover {{ background: #0369a1; color: #ffffff !important; }}
-  @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: dark) {{
     body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
     td {{ color: #e2e8f0 !important; }}
     a {{ color: #38bdf8 !important; }}
     a:visited {{ color: #7dd3fc !important; }}
-  }
+  }}
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">

@@ -40,6 +40,13 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.109.0 (2026-09-30)**:
+        -   **[Bug Fix] 实例配置切换和提示词恢复改进**:
+            -   **Description**: 修复了多实例切换（如快进）时会丢失当前正在运行的提示词并错误继承默认账号的 Bug。目前已确保运行中的提示词自动备份与恢复，并严格强制执行独立环境隔离的账号身份。（Thanks to @aukgit）
+        -   **[Feature] AGM CLI 缓存清理扩展**:
+            -   **Description**: 新增 `agm clear` 命令别名支持 N-limit 自动保留条数设置，并扩展自动清理 Rust (Cargo target) 编译缓存。（Thanks to @aukgit）
+
+
     *   **v4.103.0 (2026-09-30)**:
         -   **[Release v4.103.0: 多实例切换防弹回粘性保障、UI 弹窗互斥与高对比度高亮、对话清理运行中会话与活跃项目安全门禁、电报与邮件项目名去重及 200 词提示词预览] 彻底修复多实例切换中因后台轮询覆盖导致回弹至 worker-alpha 的核心缺陷，实现实例选择器与对话清理弹窗独立关闭按钮、Esc 键与遮罩关闭及全局互斥机制；重构对话会话清理器以严格保护所有运行中/排队中提示词及每个活跃项目最近 5 轮会话，CLI 提供 `agm prune` 预览与撤销回滚；彻底去重切号邮件与 Telegram 遥测中的重复项目名称，修复电报 HTML 标签 400 报错并支持 `/update` 远程更新，切号邮件与命令行全面支持 200 词提示词摘要预览 (Thanks to @aukgit)**:
             -   **多实例切换防弹回与粘性持久化 (`src-tauri/src/modules/instance.rs`)**: 修复 `get_active_instance_id()` 在周期性 4 秒轮询时因检查后台实例运行状态而错误回退至 `worker-alpha` 的根本缺陷，优先严格遵循注册表用户所选 `registry.active_instance_id`；切换时即时更新 `last_used` 时间戳，并在 Windows 启动参数中注入 `CREATE_NEW_PROCESS_GROUP` 隔离会话；

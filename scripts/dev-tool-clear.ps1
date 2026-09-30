@@ -64,7 +64,8 @@ $demoDirs = @(
     (Join-Path $RootDir "build-demo"),
     (Join-Path $RootDir "target-demo"),
     (Join-Path $RootDir "src-tauri\build-demo"),
-    (Join-Path $RootDir "src-tauri\target-demo")
+    (Join-Path $RootDir "src-tauri\target-demo"),
+    (Join-Path $RootDir "src-tauri\target")
 )
 foreach ($dir in $demoDirs) {
     if (Test-Path $dir) {

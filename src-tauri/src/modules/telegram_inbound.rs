@@ -730,6 +730,9 @@ pub fn format_observe_report() -> String {
         String,
         (String, Vec<(String, usize, String)>),
     > = std::collections::BTreeMap::new();
+    let mut seen_prompt_ids = std::collections::HashSet::new();
+    let mut idle_names = Vec::new();
+    let mut running_items = Vec::new();
 
     for p in &projects {
         let short_name = shorten_project_name(&p.repo_name);
@@ -859,7 +862,6 @@ pub fn format_observe_report() -> String {
         .map(|s| {
             !s.last_known_version.is_empty()
                 && crate::modules::update_checker::compare_versions(&s.last_known_version, &ver)
-                    == std::cmp::Ordering::Greater
         })
         .unwrap_or(false);
 

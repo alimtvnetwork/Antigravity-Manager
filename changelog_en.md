@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.109.0 (2026-09-30)**:
+        -   **[Bug Fix] Instance Profile Switching and Prompt Persistence Improvements**:
+            -   **Description**: Fixed issue where fast-forward instance switching discarded the active prompt and reused default credentials. Running prompts are now correctly persisted, and isolated IDE accounts strictly enforce their bound credentials. (Thanks to @aukgit)
+        -   **[Feature] AGM CLI clear-cache functionality**:
+            -   **Description**: Added `agm clear` alias with N-limit retention, supporting automated Rust and Cargo target cleanup. (Thanks to @aukgit)
+
     *   **v4.103.0 (2026-09-30)**:
         -   **[Release v4.103.0: Multi-Instance Switching Integrity, UI Modal Exclusivity & High-Contrast Highlight, Conversation Pruner Safety Gate, Telemetry Project Deduplication & 200-Word Prompt Previews] Fixed the multi-instance switching bounce-back bug reverting to worker-alpha during background polling, added explicit close 'X' buttons, Esc key & backdrop dismissal, and global mutual exclusivity across dropdowns and modals; reinforced the conversation cleaner safety gate protecting running prompts and retaining the top 5 sessions per active workspace with CLI `agm prune` dry-run and undo rollback; deduplicated project names across switch emails and Telegram telemetry, repaired Telegram HTML 400 parsing errors, added `/update` bot remote execution, and provided 200-word prompt previews in emails and CLI (Thanks to @aukgit)**:
             -   **Multi-Instance Switching Persistence & Stickiness (`src-tauri/src/modules/instance.rs`)**: Fixed `get_active_instance_id()` from prematurely falling back to `worker-alpha` during periodic 4-second polling when background instances are evaluated; strictly honored user-selected `registry.active_instance_id`, updated `last_used` timestamps, and injected `CREATE_NEW_PROCESS_GROUP` on Windows spawns;
