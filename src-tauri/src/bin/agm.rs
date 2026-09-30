@@ -8116,7 +8116,9 @@ fn cmd_clear_terminal(_args: &[String]) {
 
 fn cmd_failed_commands(args: &[String]) {
     let main_cmd = std::env::args().nth(1).unwrap_or_default().to_lowercase();
-    let is_count_sub = args.iter().any(|a| a == "count" || a == "-c" || a == "--count" || a == "stats");
+    let is_count_sub = args
+        .iter()
+        .any(|a| a == "count" || a == "-c" || a == "--count" || a == "stats");
     let is_count_main = main_cmd == "fcc" || main_cmd == "failed-commands-count";
     let is_count = is_count_main || is_count_sub;
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
@@ -8141,7 +8143,9 @@ fn cmd_failed_commands(args: &[String]) {
         return;
     }
 
-    let is_clear = args.iter().any(|a| a == "clear" || a == "-y" || a == "--clear");
+    let is_clear = args
+        .iter()
+        .any(|a| a == "clear" || a == "-y" || a == "--clear");
     if is_clear {
         match repo_db::clear_failed_commands() {
             Ok(cleared) => {
@@ -8159,59 +8163,64 @@ fn cmd_failed_commands(args: &[String]) {
         .iter()
         .find_map(|a| a.parse::<usize>().ok())
         .unwrap_or(20);
-            match repo_db::list_failed_commands(limit) {
-                Ok(records) => {
-                    if is_json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&records).unwrap_or_default()
-                        );
-                    } else if records.is_empty() {
-                        println!(
-                            "\n  ✓ No failed commands recorded. All entered commands were successfully recognized!\n"
-                        );
-                    } else {
-                        let (distinct, total) = repo_db::count_failed_commands()
-                            .unwrap_or((records.len() as i64, records.len() as i64));
-                        println!("================================================================================");
-                        println!(
-                            "  AGM Failed / Undetected Commands Inspector (Distinct: {}, Total Hits: {})",
-                            distinct, total
-                        );
-                        println!("================================================================================");
-                        println!(
-                            "  {:<4} {:<24} {:<8} {:<10} {}",
-                            "#", "COMMAND", "HITS", "DOMAIN", "SUGGESTION"
-                        );
-                        println!("  ------------------------------------------------------------------------------");
-                        for (i, r) in records.iter().enumerate() {
-                            println!(
-                                "  {:<4} {:<24} {:<8} {:<10} {}",
-                                i + 1,
-                                r.command,
-                                r.hit_count,
-                                r.domain,
-                                r.suggestions
-                            );
-                        }
-                        println!("================================================================================");
-                        println!("  • Check count only: agm failed-commands count");
-                        println!("  • Clear history:    agm failed-commands clear\n");
-                    }
+    match repo_db::list_failed_commands(limit) {
+        Ok(records) => {
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&records).unwrap_or_default()
+                );
+            } else if records.is_empty() {
+                println!(
+                    "\n  ✓ No failed commands recorded. All entered commands were successfully recognized!\n"
+                );
+            } else {
+                let (distinct, total) = repo_db::count_failed_commands()
+                    .unwrap_or((records.len() as i64, records.len() as i64));
+                println!("================================================================================");
+                println!(
+                    "  AGM Failed / Undetected Commands Inspector (Distinct: {}, Total Hits: {})",
+                    distinct, total
+                );
+                println!("================================================================================");
+                println!(
+                    "  {:<4} {:<24} {:<8} {:<10} {}",
+                    "#", "COMMAND", "HITS", "DOMAIN", "SUGGESTION"
+                );
+                println!("  ------------------------------------------------------------------------------");
+                for (i, r) in records.iter().enumerate() {
+                    println!(
+                        "  {:<4} {:<24} {:<8} {:<10} {}",
+                        i + 1,
+                        r.command,
+                        r.hit_count,
+                        r.domain,
+                        r.suggestions
+                    );
                 }
-                Err(e) => eprintln!("[ERROR] Failed to list failed commands: {}", e),
+                println!("================================================================================");
+                println!("  • Check count only: agm failed-commands count");
+                println!("  • Clear history:    agm failed-commands clear\n");
             }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to list failed commands: {}", e),
+    }
 }
 
 fn cmd_gitignore(args: &[String]) {
-    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
         println!("AGM Gitignore & Resume Task Hygiene:");
         println!("  agm gitignore [agm|agy] [path] [flags]");
         println!("\nDescription:");
         println!("  Untrack, delete, and ignore antigravity-resume_task.json across");
         println!("  repositories, committing deletion and .gitignore updates.");
         println!("\nExamples:");
-        println!("  agm gitignore agm                   # Untrack, delete, and ignore in current repo");
+        println!(
+            "  agm gitignore agm                   # Untrack, delete, and ignore in current repo"
+        );
         println!("  agm gitignore agm D:\\work           # Remediate repos in target directory\n");
         return;
     }
