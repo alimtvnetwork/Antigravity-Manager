@@ -8254,7 +8254,10 @@ fn remediate_repo_gitignore_native(args: &[String]) {
         ".antigravity-resume_task.json",
     ];
 
-    println!("[*] Remediating resume task files and .gitignore in {:?}...", target_dir);
+    println!(
+        "[*] Remediating resume task files and .gitignore in {:?}...",
+        target_dir
+    );
 
     let mut tracked_files: Vec<String> = Vec::new();
     for tf in &target_files {
@@ -8464,14 +8467,7 @@ fn handle_unknown_command(cmd: &str, full_args: &[String]) {
     let suggestions = suggest_agm_commands(cmd);
     let full_str = full_args.join(" ");
     let msg = format!("Unknown command: 'agm {}'", cmd);
-    let _ = repo_db::log_failed_command(
-        cmd,
-        &full_str,
-        "root",
-        "E1001",
-        &msg,
-        &suggestions,
-    );
+    let _ = repo_db::log_failed_command(cmd, &full_str, "root", "E1001", &msg, &suggestions);
 
     eprintln!("\n❌ Unknown command: 'agm {}'", cmd);
     if !suggestions.is_empty() {
@@ -8481,7 +8477,9 @@ fn handle_unknown_command(cmd: &str, full_args: &[String]) {
         }
     }
     eprintln!("\n  Run 'agm help' for available commands.");
-    eprintln!("  Run 'agm failed-commands' (or 'agm fc') to view failed command history & suggestions.\n");
+    eprintln!(
+        "  Run 'agm failed-commands' (or 'agm fc') to view failed command history & suggestions.\n"
+    );
     std::process::exit(1);
 }
 
@@ -11613,7 +11611,10 @@ fn handle_ssh_fix_auth(args: &[String]) {
                 println!("\n  💡 Next Steps & Key Deployment Suggestions:");
                 println!("    • Connect without password:  agm ssh {}", target);
                 println!("    • Verify public key status:  agm ssh nodes");
-                println!("    • Execute remote test:       agm ssh exec {} \"whoami\"", target);
+                println!(
+                    "    • Execute remote test:       agm ssh exec {} \"whoami\"",
+                    target
+                );
                 println!("    • Inspect Failed Commands:   agm failed-commands\n");
             }
         }
@@ -12341,7 +12342,10 @@ fn cmd_ssh(args: &[String]) {
             if code != 0 {
                 eprintln!("[*] SSH session exited with code: {}", code);
                 eprintln!("\n  💡 SSH Troubleshooting Suggestions:");
-                eprintln!("    • Deploy public key to host: agm ssh deploy-keys {}", effective_target);
+                eprintln!(
+                    "    • Deploy public key to host: agm ssh deploy-keys {}",
+                    effective_target
+                );
                 eprintln!("    • Install SSH public key:    agm ssh add-key <key>");
                 eprintln!("    • Check remote fleet nodes:  agm ssh nodes");
                 eprintln!("    • Diagnose via GitMap:       gitmap ssh health\n");
@@ -12351,7 +12355,10 @@ fn cmd_ssh(args: &[String]) {
             eprintln!("[ERROR] Failed to execute 'ssh': {}", e);
             eprintln!("Ensure OpenSSH client is installed and accessible in your system PATH.");
             eprintln!("\n  💡 Suggestions:");
-            eprintln!("    • Use native GitMap SSH:     gitmap ssh {}", effective_target);
+            eprintln!(
+                "    • Use native GitMap SSH:     gitmap ssh {}",
+                effective_target
+            );
             eprintln!("    • Check system doctor:       agm doctor\n");
         }
     }
