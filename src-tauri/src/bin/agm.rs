@@ -8052,6 +8052,8 @@ fn cmd_clear_cache(args: &[String]) {
             }
         }
     }
+}
+
 fn cmd_instances_export(args: &[String]) {
     match instance::export_instances_envelope() {
         Ok(json_str) => {
