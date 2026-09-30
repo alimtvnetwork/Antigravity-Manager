@@ -934,10 +934,11 @@ fn cmd_accounts_import(args: &[String]) {
         }
     };
 
-    let raw_json = match fs::read_to_string(path_str) {
+    let resolved_path = json_envelope::resolve_relative_json_path(path_str);
+    let raw_json = match fs::read_to_string(&resolved_path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
+            eprintln!("[ERROR] Failed to read file '{}': {}", resolved_path.display(), e);
             return;
         }
     };
@@ -950,8 +951,8 @@ fn cmd_accounts_import(args: &[String]) {
                     println!(
                         "✅ Successfully imported {} accounts from '{}' (Envelope v{}).",
                         count,
-                        path_str,
-                        attrs.version.as_deref().unwrap_or("2.0")
+                        resolved_path.display(),
+                        attrs.version
                     );
                 }
                 Err(e) => eprintln!("[ERROR] Failed to save accounts index: {}", e),
@@ -4976,7 +4977,8 @@ fn cmd_telegram(args: &[String]) {
         if first_lower == "import" || first_lower == "load-json" {
             let target_path = args.get(1);
             if let Some(path_str) = target_path {
-                match fs::read_to_string(path_str) {
+                let resolved_path = json_envelope::resolve_relative_json_path(path_str);
+                match fs::read_to_string(&resolved_path) {
                     Ok(raw_json) => {
                         match json_envelope::extract_payload::<telegram_inbound::TelegramConfig>(&raw_json) {
                             Ok((imported_cfg, attrs)) => {
@@ -4984,8 +4986,8 @@ fn cmd_telegram(args: &[String]) {
                                     Ok(_) => {
                                         println!(
                                             "✅ Successfully imported Telegram configuration from '{}' (Envelope v{}).",
-                                            path_str,
-                                            attrs.version.as_deref().unwrap_or("2.0")
+                                            resolved_path.display(),
+                                            attrs.version
                                         );
                                     }
                                     Err(e) => eprintln!("[ERROR] Failed to save Telegram config: {}", e),
@@ -4994,7 +4996,7 @@ fn cmd_telegram(args: &[String]) {
                             Err(e) => eprintln!("[ERROR] Failed to parse Telegram config: {}", e),
                         }
                     }
-                    Err(e) => eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e),
+                    Err(e) => eprintln!("[ERROR] Failed to read file '{}': {}", resolved_path.display(), e),
                 }
             } else {
                 eprintln!("Usage: agm telegram import <file_path>");
@@ -6088,7 +6090,8 @@ fn cmd_supabase_load_json(args: &[String]) {
     let mut total_creds_added = 0;
 
     for path_str in paths {
-        let content = match fs::read_to_string(path_str) {
+        let resolved_path = json_envelope::resolve_relative_json_path(path_str);
+        let content = match fs::read_to_string(&resolved_path) {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
@@ -6288,7 +6291,7 @@ fn cmd_which_format(args: &[String]) {
         );
         for (i, m) in matched.iter().enumerate() {
             let env_badge = if m.is_envelope {
-                let ver = m.envelope_version.as_deref().unwrap_or("2.0");
+                let ver = m.version.as_deref().unwrap_or("2.0");
                 if m.variables_count > 0 {
                     format!("Envelope v{} ({} variables)", ver, m.variables_count)
                 } else {
@@ -8086,7 +8089,8 @@ fn cmd_instances_import(args: &[String]) {
         }
     };
 
-    let raw_json = match fs::read_to_string(path_str) {
+    let resolved_path = json_envelope::resolve_relative_json_path(path_str);
+    let raw_json = match fs::read_to_string(&resolved_path) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("[ERROR] Failed to read file '{}': {}", path_str, e);
@@ -8102,8 +8106,8 @@ fn cmd_instances_import(args: &[String]) {
                     println!(
                         "✅ Successfully imported {} instances from '{}' (Envelope v{}).",
                         count,
-                        path_str,
-                        attrs.version.as_deref().unwrap_or("2.0")
+                        resolved_path.display(),
+                        attrs.version
                     );
                 }
                 Err(e) => eprintln!("[ERROR] Failed to save instances registry: {}", e),

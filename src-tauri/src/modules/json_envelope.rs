@@ -8,7 +8,7 @@ fn default_version() -> String {
     "2.0".to_string()
 }
 
-/// Structured work directory configuration with optional variable map.
+/// Structured work directory configuration using root variables.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkDirectoryConfig {
@@ -19,8 +19,6 @@ pub struct WorkDirectoryConfig {
     pub is_applied: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_enforced: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variables: Option<HashMap<String, Value>>,
 }
 
 fn deserialize_work_directory<'de, D>(deserializer: D) -> Result<Option<WorkDirectoryConfig>, D::Error>
@@ -36,7 +34,6 @@ where
             default_path: None,
             is_applied: true,
             is_enforced: false,
-            variables: None,
         })),
         Some(Value::Object(_)) => serde_json::from_value::<WorkDirectoryConfig>(val.unwrap())
             .map(Some)
@@ -100,69 +97,99 @@ pub struct JsonAttributes {
     pub description: Option<String>,
 }
 
+/// Resolves a relative JSON filename against CWD and common relative subdirectories.
+pub fn resolve_relative_json_path(input: &str) -> PathBuf {
+    let trimmed = input.trim();
+    let direct = PathBuf::from(trimmed);
+    if direct.exists() {
+        return direct;
+    }
+    let base_name = direct
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(trimmed);
+    let search_dirs = [
+        ".",
+        "vault",
+        "instances",
+        "vault/instances",
+        "02-antigravity-manager/vault",
+        "02-antigravity-and-event-manager/vault",
+        "02-antigravity-and-event-manager/vault/instances",
+        "01-gitmap",
+    ];
+    for dir in &search_dirs {
+        let candidate = Path::new(dir).join(base_name);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    direct
+}
+
 pub fn default_commands_for_type(dtype: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
     let lower = dtype.to_lowercase();
     if lower.contains("supabase-endpoints") || lower.contains("supabase_endpoints") {
         (
-            Some("agm supabase load-json <file> -y".to_string()),
-            Some("agm supabase export <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm supabase load-json supabase_config.json -y".to_string()),
+            Some("agm supabase export --file supabase_config.json".to_string()),
+            Some("agm which-format supabase_config.json".to_string()),
             Some("Supabase multi-node endpoints configuration for AGM fleet. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("supabase-credentials") || lower.contains("supabase_credentials") {
         (
-            Some("agm supabase load-json <file> -y".to_string()),
-            Some("agm supabase export <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm supabase load-json supabase_config.json -y".to_string()),
+            Some("agm supabase export --file supabase_config.json".to_string()),
+            Some("agm which-format supabase_config.json".to_string()),
             Some("Supabase fleet REST authentication credentials and service tokens. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("accounts") {
         (
-            Some("agm accounts import <file> -y".to_string()),
-            Some("agm accounts --json".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm accounts import accounts.json".to_string()),
+            Some("agm accounts export --file accounts.json".to_string()),
+            Some("agm which-format accounts.json".to_string()),
             Some("Google Gemini accounts and quota matrix. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("instances") {
         (
-            Some("agm instances import <file> -y".to_string()),
-            Some("agm instances --json".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm instances import instances.json".to_string()),
+            Some("agm instances export --file instances.json".to_string()),
+            Some("agm which-format instances.json".to_string()),
             Some("Sandbox instance profiles and directory bindings for AGM fleet. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("email") {
         (
-            Some("agm email config import <file> -y".to_string()),
-            Some("agm email export <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm email import email-credentials.json".to_string()),
+            Some("agm email export --file email-credentials.json".to_string()),
+            Some("agm which-format email-credentials.json".to_string()),
             Some("Inbound IMAP & outbound SMTP fleet email credentials configuration. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("telegram") {
         (
-            Some("agm telegram config import <file> -y".to_string()),
-            Some("agm telegram config export <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm telegram import telegram_config.json".to_string()),
+            Some("agm telegram export --file telegram_config.json".to_string()),
+            Some("agm which-format telegram_config.json".to_string()),
             Some("Telegram bot configuration for remote AGM commands and alerts. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("config") {
         (
-            Some("agm config restore <file> -y".to_string()),
-            Some("agm config export <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm config restore gui_config.json -y".to_string()),
+            Some("agm config export --file gui_config.json".to_string()),
+            Some("agm which-format gui_config.json".to_string()),
             Some("Antigravity Manager system configuration backup. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else if lower.contains("ssh") || lower.contains("nodes") {
         (
-            Some("agm ssh nodes import-json <file> -y".to_string()),
-            Some("agm ssh nodes export-json <file>".to_string()),
-            Some("agm which-format <file>".to_string()),
+            Some("agm ssh nodes import-json gitmap-ssh-nodes.json -y".to_string()),
+            Some("agm ssh nodes export-json gitmap-ssh-nodes.json".to_string()),
+            Some("agm which-format gitmap-ssh-nodes.json".to_string()),
             Some("SSH cluster fleet nodes configuration. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
     } else {
         (
             None,
             None,
-            Some("agm which-format <file>".to_string()),
+            Some("agm which-format".to_string()),
             None,
         )
     }
@@ -172,21 +199,12 @@ impl JsonAttributes {
     pub fn new(data_type: impl Into<String>) -> Self {
         let dtype = data_type.into();
         let cur_time = chrono::Utc::now().to_rfc3339();
-        let cwd = std::env::current_dir()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| ".".to_string());
 
         let work_cfg = WorkDirectoryConfig {
             path: "${workDir}".to_string(),
-            default_path: Some(cwd.clone()),
+            default_path: Some("D:\\work".to_string()),
             is_applied: true,
             is_enforced: false,
-            variables: Some({
-                let mut m = HashMap::new();
-                m.insert("workDir".to_string(), Value::String(cwd.clone()));
-                m
-            }),
         };
 
         let (import_cmd, export_cmd, help_cmd, notes) = default_commands_for_type(&dtype);
@@ -196,14 +214,14 @@ impl JsonAttributes {
             version: default_version(),
             source: Some("agm-cli".to_string()),
             how: export_cmd.clone(),
-            agm_version: Some("4.102.2".to_string()),
+            agm_version: Some("4.103.0".to_string()),
             import_command: import_cmd,
             export_command: export_cmd,
             help_command: help_cmd,
             notes,
             timestamp: Some(cur_time.clone()),
             work_directory: Some(work_cfg),
-            default_work_directory: Some(cwd),
+            default_work_directory: Some("D:\\work".to_string()),
             is_work_directory_applied: true,
             is_work_directory_enforced: false,
             created_at: Some(cur_time),
@@ -227,9 +245,16 @@ pub struct JsonEnvelope<T> {
 
 impl<T> JsonEnvelope<T> {
     pub fn new(data_type: impl Into<String>, data: T) -> Self {
+        let mut vars = HashMap::new();
+        vars.insert("workDir".to_string(), Value::String("D:\\work".to_string()));
+        vars.insert(
+            "repoDir".to_string(),
+            Value::String("${workDir}\\antigravity-manager".to_string()),
+        );
+        vars.insert("secretsDir".to_string(), Value::String(".".to_string()));
         Self {
             attributes: JsonAttributes::new(data_type),
-            variables: None,
+            variables: Some(vars),
             data,
         }
     }
@@ -250,7 +275,13 @@ impl<T> JsonEnvelope<T> {
     }
 
     pub fn with_source(mut self, src: impl Into<String>) -> Self {
-        self.attributes.source = Some(src.into());
+        let raw = src.into();
+        let clean = std::path::Path::new(&raw)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&raw)
+            .to_string();
+        self.attributes.source = Some(clean);
         self
     }
 }
@@ -368,11 +399,7 @@ pub fn unpack_envelope(value: Value) -> (Option<JsonAttributes>, Value) {
                 let top_vars = map.get("variables").and_then(|v| {
                     serde_json::from_value::<HashMap<String, Value>>(v.clone()).ok()
                 });
-                let work_vars = attrs
-                    .work_directory
-                    .as_ref()
-                    .and_then(|w| w.variables.as_ref());
-                let merged = merge_variables(top_vars.as_ref(), work_vars);
+                let merged = merge_variables(top_vars.as_ref(), None);
 
                 if let Some(ref mut wcfg) = attrs.work_directory {
                     if wcfg.path.contains('$') {
@@ -504,13 +531,14 @@ pub struct FormatInspectionResult {
 
 /// Inspect a JSON file path and determine its schema type and mutation impact.
 pub fn inspect_json_file(path: &Path) -> FormatInspectionResult {
-    let file_name = path
+    let resolved = resolve_relative_json_path(&path.to_string_lossy());
+    let file_name = resolved
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown.json".to_string());
-    let path_str = path.to_string_lossy().to_string();
+    let path_str = resolved.to_string_lossy().to_string();
 
-    let content = match fs::read_to_string(path) {
+    let content = match fs::read_to_string(&resolved) {
         Ok(c) => c,
         Err(e) => {
             return FormatInspectionResult {
@@ -560,7 +588,7 @@ pub fn inspect_json_file(path: &Path) -> FormatInspectionResult {
         }
     };
 
-    inspect_json_value(&parsed, path)
+    inspect_json_value(&parsed, &resolved)
 }
 
 /// Inspect an already-parsed JSON value against both envelope schema and legacy signatures.
@@ -575,7 +603,7 @@ pub fn inspect_json_value(root: &Value, path: &Path) -> FormatInspectionResult {
     if let (Some(attrs), data_val) = unpack_envelope(root.clone()) {
         let known = KnownDataType::from_type_str(&attrs.data_type);
         let (human_name, mutation, default_cmd, count) =
-            describe_format(&known, &data_val, &path_str, false);
+            describe_format(&known, &data_val, &file_name, false);
 
         let final_cmd = attrs
             .import_command
@@ -583,9 +611,10 @@ pub fn inspect_json_value(root: &Value, path: &Path) -> FormatInspectionResult {
             .unwrap_or_else(|| default_cmd);
 
         let vars_count = if let Value::Object(ref m) = root {
-            let top_count = m.get("variables").and_then(|v| v.as_object()).map(|o| o.len()).unwrap_or(0);
-            let work_count = attrs.work_directory.as_ref().and_then(|w| w.variables.as_ref()).map(|o| o.len()).unwrap_or(0);
-            top_count + work_count
+            m.get("variables")
+                .and_then(|v| v.as_object())
+                .map(|o| o.len())
+                .unwrap_or(0)
         } else {
             0
         };
@@ -615,7 +644,7 @@ pub fn inspect_json_value(root: &Value, path: &Path) -> FormatInspectionResult {
 
     // 2. Fallback to signature detection for legacy flat JSONs
     if let Some((known, data_val, count)) = detect_legacy_signature(root) {
-        let (human_name, mutation, cmd, _) = describe_format(&known, &data_val, &path_str, true);
+        let (human_name, mutation, cmd, _) = describe_format(&known, &data_val, &file_name, true);
         return FormatInspectionResult {
             file_path: path_str,
             file_name,
@@ -917,7 +946,7 @@ pub fn build_bulk_import_command(results: &[FormatInspectionResult]) -> Option<S
     for r in &matched_results {
         if let Some(ref dtype) = r.detected_type {
             if dtype.contains("supabase") {
-                supabase_files.push(r.file_path.replace('\\', "/"));
+                supabase_files.push(r.file_name.clone());
             } else {
                 other_cmds.push(r.recommended_command.clone());
             }
@@ -928,11 +957,7 @@ pub fn build_bulk_import_command(results: &[FormatInspectionResult]) -> Option<S
     if !supabase_files.is_empty() {
         parts.push(format!(
             "agm supabase load-json {} -y",
-            supabase_files
-                .iter()
-                .map(|f| format!("\"{}\"", f))
-                .collect::<Vec<_>>()
-                .join(" ")
+            supabase_files.join(" ")
         ));
     }
     for cmd in other_cmds {
@@ -977,23 +1002,29 @@ mod tests {
                 "version": "2.0",
                 "workDirectory": {
                     "path": "${workDir}",
-                    "variables": {
-                        "workDir": "D:\\work\\antigravity-manager"
-                    }
+                    "defaultPath": "D:\\work",
+                    "isApplied": true,
+                    "isEnforced": false
                 }
             },
             "variables": {
+                "workDir": "D:\\work",
+                "repoDir": "${workDir}\\antigravity-manager",
                 "baseUrl": "https://pezjuuddecbyfmqxytrv.supabase.co",
                 "restUrl": "${baseUrl}/rest/v1/"
             },
             "data": {
                 "endpoint": "${restUrl}",
-                "dir": "${workDir}"
+                "dir": "${repoDir}"
             }
         }"#;
 
         let (data, attrs) = extract_payload::<Value>(raw).expect("extract_payload");
         assert_eq!(attrs.version, "2.0");
+        assert_eq!(
+            attrs.work_directory.map(|w| w.path),
+            Some("D:\\work".to_string())
+        );
         assert_eq!(
             data["endpoint"].as_str().unwrap(),
             "https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/"
@@ -1023,18 +1054,21 @@ mod tests {
             "attributes": {
                 "type": "agm/test",
                 "workDirectory": {
-                    "path": "${dir}",
-                    "defaultPath": "D:\\default",
+                    "path": "${workDir}",
+                    "defaultPath": "D:\\work",
                     "isApplied": true,
-                    "variables": { "dir": "D:\\expanded" }
+                    "isEnforced": false
                 }
+            },
+            "variables": {
+                "workDir": "D:\\work"
             },
             "data": { "ok": true }
         }"#;
         let (_, attrs2) = extract_payload::<Value>(raw_obj).expect("extract obj workDirectory");
         assert_eq!(
             attrs2.work_directory.map(|w| w.path),
-            Some("D:\\expanded".to_string())
+            Some("D:\\work".to_string())
         );
     }
 }
