@@ -1,12 +1,7 @@
 import { create } from 'zustand';
+import { parseStackLine, type StackFrame } from '../lib/stack-frame-parser';
 
-export interface StackFrame {
-  function: string;
-  file: string;
-  line: number;
-  column?: number;
-  isInternal: boolean;
-}
+export type { StackFrame };
 
 export interface ClickEvent {
   id: string;
@@ -148,36 +143,6 @@ export function parseFullStackTrace(stack?: string): {
 
   const primary = frames.find((f) => !f.isInternal) || frames[0] || null;
   return { frames, primaryFrame: primary, invocationChain: chain.slice(0, 8) };
-}
-
-function parseStackLine(line: string): StackFrame | null {
-  const match = line.match(/^at\s+(?:async\s+)?([^\s(]+)?\s*\(?([^:)]+):(\d+):(\d+)\)?$/);
-  if (!match) {
-    return null;
-  }
-  const fnName = match[1] || '<anonymous>';
-  const filePath = match[2] || '';
-  const lineNum = parseInt(match[3], 10) || 0;
-  const colNum = parseInt(match[4], 10) || 0;
-  const isInternal = checkIsInternalFrame(filePath);
-
-  return {
-    function: fnName,
-    file: filePath,
-    line: lineNum,
-    column: colNum,
-    isInternal,
-  };
-}
-
-function checkIsInternalFrame(path: string): boolean {
-  return (
-    path.includes('node_modules') ||
-    path.includes('@tauri-apps') ||
-    path.includes('react-dom') ||
-    path.includes('react.development') ||
-    path.includes('scheduler')
-  );
 }
 
 function extractErrorCode(raw: string): string {

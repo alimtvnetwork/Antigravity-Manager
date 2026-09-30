@@ -13,7 +13,7 @@ citations:
 target_files:
   - src/stores/error-store.ts — `parseStackLine`, `StackFrame` (extract to `src/lib/stack-frame-parser.ts`)
   - src/lib/error-report-generator.ts — consumer of parsed frames (read only, confirm no shape change)
-status: pending
+status: completed
 ---
 
 # 001 — Fix stack frame parsing for URL-only frames

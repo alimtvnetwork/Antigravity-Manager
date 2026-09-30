@@ -13,7 +13,7 @@ citations:
 target_files:
   - src/lib/__tests__/stack-frame-parser.test.ts (new, standalone assertion script like the existing tests)
   - scripts/run-frontend-tests.mjs (existing runner, `npm run test`)
-status: pending
+status: completed
 ---
 
 # 002 — Add regression tests for the stack frame parser

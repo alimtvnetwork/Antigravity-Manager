@@ -93,6 +93,11 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                     onClose();
                 }
             };
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                }
+            };
             window.addEventListener('agm:dropdown-open', handleDropdownOpen);
             window.addEventListener('keydown', handleKeyDown);
             return () => {

@@ -58,7 +58,9 @@ fn default_true() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSettings {
+    #[serde(default = "default_true")]
     pub auto_check: bool,
+    #[serde(default)]
     pub last_check_time: u64,
     #[serde(default = "default_check_interval")]
     pub check_interval_hours: u64,
@@ -1014,5 +1016,20 @@ mod tests {
 
         settings.auto_check = false;
         assert!(!should_check_for_updates(&settings));
+    }
+
+    #[test]
+    fn update_settings_deserialize_missing_auto_check_and_last_check_time() {
+        let json = r#"{
+  "check_interval_hours": 24,
+  "notify_on_update": true,
+  "notify_via_email": true,
+  "notify_via_telegram": true,
+  "last_known_version": "4.108.0",
+  "update_channel": "stable"
+}"#;
+        let settings: UpdateSettings = serde_json::from_str(json).expect("partial settings JSON");
+        assert!(settings.auto_check);
+        assert_eq!(settings.last_check_time, 0);
     }
 }

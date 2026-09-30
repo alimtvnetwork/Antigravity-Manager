@@ -15,8 +15,6 @@ Fixes six frontend-facing defects: stack frame parsing (T02), missing PRO badges
 
 
 
-**Known build errors on main (2026-09-30, not caused by this work).** `npx tsc --noEmit` reports 4 errors: `Accounts.tsx` (~L157, fixed in step 009) and `src/components/modals/agy-clean-modal.tsx` L97 and L99 (`handleKeyDown` is not defined). The second file has no step yet; fix it in the first frontend step that runs `npm run build` (it blocks the build gate) and record it in the status table.
-
 **Mandatory reading.** Before any step, read `.ai-memory/coding-guidelines.md`, `.ai-memory/strictly-avoid.md`, and `.ai-memory/folder-structure.md`. Project rules in `AGENTS.md` apply: pipeline-first fixes, headless/CLI parity, cross-platform, root-cause fixes, no release except on explicit command, PR = one problem class with individually revertable commits.
 
 **Release policy (verbatim, law).**
@@ -52,8 +50,8 @@ then:
 
 | # | Step | Title | Status |
 | :--- | :--- | :--- | :--- |
-| `001` | [001-stack-frame-parser-regex.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/001-stack-frame-parser-regex.md) | Fix stack frame parsing for URL-only frames | `pending` |
-| `002` | [002-stack-frame-parser-tests.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/002-stack-frame-parser-tests.md) | Add regression tests for the stack frame parser | `pending` |
+| `001` | [001-stack-frame-parser-regex.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/001-stack-frame-parser-regex.md) | Fix stack frame parsing for URL-only frames | `done` |
+| `002` | [002-stack-frame-parser-tests.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/002-stack-frame-parser-tests.md) | Add regression tests for the stack frame parser | `done` |
 | `003` | [003-tier-fetch-backend-and-persistence.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/003-tier-fetch-backend-and-persistence.md) | Fetch and persist subscription tier independent of project id | `pending` |
 | `004` | [004-shared-tier-badge-component.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/004-shared-tier-badge-component.md) | Shared TierBadge with an explicit unknown state | `pending` |
 | `005` | [005-agm-accounts-refresh-tier-cli.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/005-agm-accounts-refresh-tier-cli.md) | CLI command and startup backfill for tier | `pending` |

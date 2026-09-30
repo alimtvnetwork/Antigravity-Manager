@@ -110,52 +110,6 @@ function Accounts() {
   const [errorAccountId, setErrorAccountId] = useState<string | null>(null);
   const [focusedAccountId, setFocusedAccountId] = useState<string | null>(null);
 
-  // Auto-scroll and high-contrast highlight watcher for focused account
-  useEffect(() => {
-    if (!focusedAccountId) return;
-    let attempts = 0;
-    const maxAttempts = 20; // Check over 2 seconds (100ms intervals)
-    const interval = setInterval(() => {
-      attempts++;
-      const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
-      const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
-      const targetEl = cardEl || rowEl;
-      if (targetEl) {
-        clearInterval(interval);
-        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        targetEl.classList.add(
-          "ring-4",
-          "ring-blue-500",
-          "dark:ring-amber-400",
-          "ring-offset-2",
-          "dark:ring-offset-slate-900",
-          "shadow-2xl",
-          "scale-[1.01]",
-          "transition-all",
-          "duration-300"
-        );
-        const timer = setTimeout(() => {
-          targetEl.classList.remove(
-            "ring-4",
-            "ring-blue-500",
-            "dark:ring-amber-400",
-            "ring-offset-2",
-            "dark:ring-offset-slate-900",
-            "shadow-2xl",
-            "scale-[1.01]"
-          );
-          setFocusedAccountId(null);
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
-        setFocusedAccountId(null);
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [focusedAccountId, currentPage, filter, searchQuery]);
-
   const handleWarmup = async (accountId: string) => {
     setRefreshingIds((prev) => {
       const next = new Set(prev);
@@ -244,6 +198,52 @@ function Accounts() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Auto-scroll and high-contrast highlight watcher for focused account
+  useEffect(() => {
+    if (!focusedAccountId) return;
+    let attempts = 0;
+    const maxAttempts = 20; // Check over 2 seconds (100ms intervals)
+    const interval = setInterval(() => {
+      attempts++;
+      const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
+      const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
+      const targetEl = cardEl || rowEl;
+      if (targetEl) {
+        clearInterval(interval);
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        targetEl.classList.add(
+          "ring-4",
+          "ring-blue-500",
+          "dark:ring-amber-400",
+          "ring-offset-2",
+          "dark:ring-offset-slate-900",
+          "shadow-2xl",
+          "scale-[1.01]",
+          "transition-all",
+          "duration-300"
+        );
+        const timer = setTimeout(() => {
+          targetEl.classList.remove(
+            "ring-4",
+            "ring-blue-500",
+            "dark:ring-amber-400",
+            "ring-offset-2",
+            "dark:ring-offset-slate-900",
+            "shadow-2xl",
+            "scale-[1.01]"
+          );
+          setFocusedAccountId(null);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        setFocusedAccountId(null);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [focusedAccountId, currentPage, filter, searchQuery]);
   const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
     const saved = localStorage.getItem("accounts_page_size");
     return saved ? parseInt(saved) : null;
