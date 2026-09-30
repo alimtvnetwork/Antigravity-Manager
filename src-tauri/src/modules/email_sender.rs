@@ -775,11 +775,17 @@ pub fn wrap_html_email_card(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; font-size: 16px; }}
-  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; background: #2563eb; padding: 5px 12px; border-radius: 6px; font-size: 16px; }}
-  a:visited {{ color: #ffffff !important; }}
-  a:hover {{ color: #ffffff !important; background: #1d4ed8; }}
-  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 5px 12px; border-radius: 6px; text-decoration: underline; display: inline-block; font-size: 16px; font-weight: bold; }}
-  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
+  a {{ color: #0284c7 !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #0369a1 !important; }}
+  a:hover {{ color: #0284c7 !important; }}
+  .btn-link, td a.btn, p a.btn {{ background: #0284c7; color: #ffffff !important; padding: 6px 14px; border-radius: 8px; text-decoration: none; display: inline-block; font-size: 16px; font-weight: bold; border: 1px solid #0369a1; }}
+  .btn-link:hover, td a.btn:hover, p a.btn:hover {{ background: #0369a1; color: #ffffff !important; }}
+  @media (prefers-color-scheme: dark) {
+    body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
+    td {{ color: #e2e8f0 !important; }}
+    a {{ color: #38bdf8 !important; }}
+    a:visited {{ color: #7dd3fc !important; }}
+  }
 </style>
 </head>
 <body style="margin: 0; padding: 28px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7; color: #0f172a;">
@@ -919,11 +925,17 @@ pub fn render_node_credits_status_table_html(
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
-  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
-  a:visited {{ color: #ffffff !important; }}
-  a:hover {{ color: #e0f2fe !important; }}
-  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
-  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
+  a {{ color: #0284c7 !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #0369a1 !important; }}
+  a:hover {{ color: #0284c7 !important; }}
+  .btn-link, td a.btn, p a.btn {{ background: #0284c7; color: #ffffff !important; padding: 4px 10px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; border: 1px solid #0369a1; }}
+  .btn-link:hover, td a.btn:hover, p a.btn:hover {{ background: #0369a1; color: #ffffff !important; }}
+  @media (prefers-color-scheme: dark) {
+    body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
+    td {{ color: #e2e8f0 !important; }}
+    a {{ color: #38bdf8 !important; }}
+    a:visited {{ color: #7dd3fc !important; }}
+  }
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">
