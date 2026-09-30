@@ -9,7 +9,7 @@ citations:
   coding_guidelines: ../../../coding-guidelines.md
   strictly_avoid: ../../../strictly-avoid.md
   issue_rca: ../../../issues/50-instance-switch-loses-running-prompt-rca.md
-  ambiguity: ../../../ambiguous-questions/01-new-ambiguity/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
+  ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
 target_files:
   - src-tauri/src/modules/repo_db.rs — `verify_prompts_running` (~L1081-1130)
   - src-tauri/src/bin/agm.rs — `ff` (~L9705) and switch commands output
@@ -52,7 +52,7 @@ cd src-tauri && cargo test modules::repo_db
 - [ ] JSON of the switch commands contains the verification result.
 
 ## 8. Ambiguities and interim defaults
-- Ambiguity 03 defaults apply.
+- Resolved (ambiguity 03) applies.
 
 ---
 

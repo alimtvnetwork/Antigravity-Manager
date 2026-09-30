@@ -9,7 +9,7 @@ citations:
   coding_guidelines: ../../../coding-guidelines.md
   strictly_avoid: ../../../strictly-avoid.md
   issue_rca: ../../../issues/54-focus-button-dual-scroll-mechanism-rca.md
-  ambiguity: ../../../ambiguous-questions/01-new-ambiguity/07-focus-button-target-account.md
+  ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/07-focus-button-target-account.md
 target_files:
   - src/pages/Accounts.tsx — focus effect (~L113-157), `handleFocusActiveAccount` (~L629-664), `currentAccountId` props (~L1131, ~L1162)
   - src/lib/resolve-focus-target.ts (new, pure)
@@ -19,13 +19,14 @@ status: pending
 # 009 — Focus scrolls to the selected instance's account
 
 ## 1. Context
-Two mechanisms scroll (handler and effect); the target is the global current account, not the selected instance's account; filters and pagination can hide the row.
+Decision (ambiguity 07): target the selected instance's bound account, fall back to the global current account. Two mechanisms scroll (handler and effect); the target is the global current account, not the selected instance's account; filters and pagination can hide the row.
 
 ## 2. Target files and symbols
 - src/pages/Accounts.tsx — focus effect (~L113-157), `handleFocusActiveAccount` (~L629-664), `currentAccountId` props (~L1131, ~L1162)
 - src/lib/resolve-focus-target.ts (new, pure)
 
 ## 3. Steps
+0. Fix the existing TypeScript error first: the focus effect in `Accounts.tsx` (~L157) reads `currentPage` before its declaration (TS2448/TS2454, found by `npx tsc --noEmit` on 2026-09-30). Move the declaration above the effect; this is likely part of why Focus fails.
 1. Add `resolveFocusTarget(selectedInstanceAccountId, currentAccountId)` returning the bound account id, else the current account id, else null.
 2. In `Accounts.tsx`, make the Focus handler only set `focusedAccountId` (and clear filters/search, navigate to the page that holds the row).
 3. Keep one effect that scrolls the row into view once it is rendered, pulses a highlight for about 2 seconds, then clears `focusedAccountId`.
@@ -53,7 +54,7 @@ npm run build
 - [ ] `npm run build` passes.
 
 ## 8. Ambiguities and interim defaults
-- Ambiguity 07 default: selected instance's bound account, fallback to the global current account.
+- None open for this step.
 
 ---
 

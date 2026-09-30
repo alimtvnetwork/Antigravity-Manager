@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
+    "test": "node scripts/run-frontend-tests.mjs",
     "bump": "node scripts/bump-version.mjs",
     "tauri": "tauri",
     "tauri:debug": "RUST_LOG=debug npm run tauri dev",

@@ -1,7 +1,7 @@
 # Which repo-secrets vault folder holds the Supabase/AGM config, and what alias should this machine get?
 
 Slug: vault-folder-and-machine-alias-for-supabase
-Status: open
+Status: resolved
 Raised: 2026-09-30
 Blocking: 88 (subtasks 005, 007, 010)
 
@@ -21,3 +21,9 @@ Loading the wrong file would point the machine at the wrong endpoint or register
 
 ## Interim provisional default
 Option A with fallback to `03-supabase/01-own/`; alias taken from `-Alias`, else the existing stored alias, else the hostname. The script never invents a numeric alias.
+
+## Resolution
+
+Answered: 2026-09-30
+Answer: The Supabase keys are imported through the AGM CLI from an explicit vault path (`--vault <path>` or `AGM_SUPABASE_VAULT`). No auto-discovery of vault folders. No machine alias: do not set, read, or print an alias anywhere. The existing PowerShell scripts in the vault repo are fine; the deliverable is a one-liner PowerShell file that calls the AGM CLI.
+Applied solution: Plan 88: `agm supabase push-settings --vault <path>`, `scripts/setup-supabase.ps1` reduced to a one-liner wrapper, alias steps removed.

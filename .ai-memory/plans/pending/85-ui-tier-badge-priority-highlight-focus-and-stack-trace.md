@@ -11,9 +11,11 @@ Related: [86](./86-update-integrity-asset-verification-and-release-gates.md), [8
 
 **Request.** The full verbatim user request is in the spec under "User Request (Verbatim)". This plan covers the tasks listed below; sibling plans cover the rest.
 
-Fixes six frontend-facing defects: stack frame parsing (T02), missing PRO badges and the backend tier gap behind them (T01), priority badge hide/edit (T06), selected-state highlight with three options for the user to pick (T05), and the Focus button (T04).
+Fixes six frontend-facing defects: stack frame parsing (T02), missing PRO badges and the backend tier gap behind them (T01), priority badge hide/edit (T06), selected-state highlight, Option A (T05), and the Focus button (T04).
 
 
+
+**Known build errors on main (2026-09-30, not caused by this work).** `npx tsc --noEmit` reports 4 errors: `Accounts.tsx` (~L157, fixed in step 009) and `src/components/modals/agy-clean-modal.tsx` L97 and L99 (`handleKeyDown` is not defined). The second file has no step yet; fix it in the first frontend step that runs `npm run build` (it blocks the build gate) and record it in the status table.
 
 **Mandatory reading.** Before any step, read `.ai-memory/coding-guidelines.md`, `.ai-memory/strictly-avoid.md`, and `.ai-memory/folder-structure.md`. Project rules in `AGENTS.md` apply: pipeline-first fixes, headless/CLI parity, cross-platform, root-cause fixes, no release except on explicit command, PR = one problem class with individually revertable commits.
 
@@ -33,10 +35,10 @@ then:
 - Update release notes.
 - Pin the new version in the root `readme.md`.
 
-**Open ambiguities.**
-- [04-frontend-unit-test-runner.md](../../ambiguous-questions/01-new-ambiguity/04-frontend-unit-test-runner.md)
-- [05-selected-state-highlight-option-choice.md](../../ambiguous-questions/01-new-ambiguity/05-selected-state-highlight-option-choice.md)
-- [07-focus-button-target-account.md](../../ambiguous-questions/01-new-ambiguity/07-focus-button-target-account.md)
+**Ambiguities (all resolved 2026-09-30).**
+- [04-frontend-unit-test-runner.md](../../ambiguous-questions/02-ambiguity-resolved/04-frontend-unit-test-runner.md)
+- [05-selected-state-highlight-option-choice.md](../../ambiguous-questions/02-ambiguity-resolved/05-selected-state-highlight-option-choice.md)
+- [07-focus-button-target-account.md](../../ambiguous-questions/02-ambiguity-resolved/07-focus-button-target-account.md)
 
 ## Execution Model (RULE 0C)
 
@@ -56,12 +58,12 @@ then:
 | `004` | [004-shared-tier-badge-component.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/004-shared-tier-badge-component.md) | Shared TierBadge with an explicit unknown state | `pending` |
 | `005` | [005-agm-accounts-refresh-tier-cli.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/005-agm-accounts-refresh-tier-cli.md) | CLI command and startup backfill for tier | `pending` |
 | `006` | [006-priority-badge-hide-default-and-inline-edit.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/006-priority-badge-hide-default-and-inline-edit.md) | Hide Priority at 50 and edit on double-click | `pending` |
-| `007` | [007-selected-highlight-options-preview.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/007-selected-highlight-options-preview.md) | Render the three selected-state options for user review | `pending` |
-| `008` | [008-apply-selected-highlight.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/008-apply-selected-highlight.md) | Apply the chosen selected-state design everywhere | `pending` |
+| `007` | [007-selected-state-shared-style.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/007-selected-state-shared-style.md) | Shared selected-state style (Option A: dark slate with amber rail) | `pending` |
+| `008` | [008-apply-selected-highlight.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/008-apply-selected-highlight.md) | Apply the selected-state style everywhere | `pending` |
 | `009` | [009-focus-button-target-and-single-scroll.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/009-focus-button-target-and-single-scroll.md) | Focus scrolls to the selected instance's account | `pending` |
 
 ## Order and Dependencies
-001 then 002. 003 before 004 and 005. 006 and 009 are independent. 007 precedes 008; 008 is blocked until the user chooses an option (ambiguity 05).
+001 then 002. 003 before 004 and 005. 006 and 009 are independent. 007 precedes 008.
 
 ## Acceptance
 See the spec section "Acceptance Criteria"; this plan owns the items named in its summary.

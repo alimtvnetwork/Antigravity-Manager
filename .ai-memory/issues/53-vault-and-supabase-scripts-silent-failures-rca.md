@@ -18,10 +18,10 @@ Running `connect-supabase.ps1`, `push-settings.ps1`, `scripts/setup-supabase.ps1
 Scripts were run once by hand and never verified by an exit-code-checked run.
 
 ## 5. Fix (planned)
-Shared guard helpers, path resolution relative to the script, exit-code checks, native `agm supabase push-settings`, a verified one-liner, keys only from vault or environment. See plan 88 subtasks 004-010.
+Native `agm supabase push-settings --vault <path>` imports the keys through the AGM CLI, a one-liner PowerShell file wraps it and is verified live, and keys are never embedded. The vault repo scripts are outside this fix at the user's direction ("the PowerShells are fine"); their defects are recorded above for the owner. See plan 88 subtasks 004-007.
 
 ## 6. Prevention
 Every script ends with a verification step whose failure exits non-zero; no key literals in committed scripts.
 
 ## 7. Regression check
-Run the one-liner against the vault; `agm supabase status` shows the alias and connected endpoints; exit code 0.
+Run the one-liner against the vault path; `agm supabase status` shows the connected endpoints; exit code 0.

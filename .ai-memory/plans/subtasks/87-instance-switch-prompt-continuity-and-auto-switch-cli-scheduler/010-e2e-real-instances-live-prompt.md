@@ -9,7 +9,7 @@ citations:
   coding_guidelines: ../../../coding-guidelines.md
   strictly_avoid: ../../../strictly-avoid.md
   issue_rca: ../../../issues/50-instance-switch-loses-running-prompt-rca.md
-  ambiguity: ../../../ambiguous-questions/01-new-ambiguity/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
+  ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
 target_files:
   - scripts/test-instance-e2e.ps1
   - scripts/e2e_test_instance.ps1

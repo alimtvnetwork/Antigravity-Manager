@@ -1,7 +1,7 @@
 # Which selected-state design (A slate and amber rail, B dark card with amber frame, C navy gradient) should ship?
 
 Slug: selected-state-highlight-option-choice
-Status: open
+Status: resolved
 Raised: 2026-09-30
 Blocking: 85 (subtask 008 only)
 
@@ -19,3 +19,9 @@ Wrong pick costs one more UI pass; nothing else depends on it.
 
 ## Interim provisional default
 Subtask 007 renders all three for review; subtask 008 stays blocked until the user picks. No default is applied.
+
+## Resolution
+
+Answered: 2026-09-30
+Answer: User asked not to be asked and to see options inline. Chosen by the assistant: Option A, dark slate row with a thick amber left rail and an amber ACTIVE pill, matching the request for a yellow line with dark colors. Changeable later by editing one module.
+Applied solution: Plan 85 steps 007 (shared style module) and 008 (apply). No preview step.

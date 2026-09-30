@@ -9,7 +9,7 @@ citations:
   coding_guidelines: ../../../coding-guidelines.md
   strictly_avoid: ../../../strictly-avoid.md
   issue_rca: ../../../issues/50-instance-switch-loses-running-prompt-rca.md
-  ambiguity: ../../../ambiguous-questions/01-new-ambiguity/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
+  ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
 target_files:
   - src-tauri/src/modules/repo_db.rs — resend path (~L2113-2145)
   - src-tauri/src/modules/instance.rs (~L2763 resend call)
@@ -58,7 +58,7 @@ cd src-tauri && cargo test modules::repo_db
 - [ ] A timeout leaves prompts recoverable.
 
 ## 8. Ambiguities and interim defaults
-- Ambiguity 03 default signal: DB `dispatched` plus heartbeat within timeout, else typed unverified.
+- Resolved (ambiguity 03) signal: DB `dispatched` plus heartbeat within timeout, else typed unverified.
 
 ---
 

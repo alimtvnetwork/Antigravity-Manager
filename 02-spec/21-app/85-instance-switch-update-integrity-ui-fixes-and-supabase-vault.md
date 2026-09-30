@@ -1,6 +1,6 @@
 # 85 — Instance Switch Prompt Continuity, Update Integrity, UI Fixes, Email Dedupe, and Supabase/Vault Scripts
 
-Status: planned (no application code written yet)
+Status: planned; all open questions resolved 2026-09-30 (see "Decisions Confirmed"); frontend test runner already added
 Raised: 2026-09-30
 Owner plans: [85](../../.ai-memory/plans/pending/85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [86](../../.ai-memory/plans/pending/86-update-integrity-asset-verification-and-release-gates.md), [87](../../.ai-memory/plans/pending/87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md), [88](../../.ai-memory/plans/pending/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md)
 Related: [01 unified switch](./01-unified-switch-fast-forward-autoswitch-spec.md), [71 supabase hierarchy](./71-supabase-multi-machine-hierarchy-and-cli-e2e.md), [72 local E2E](./72-local-e2e-instance-switching-and-prompt-restore.md), [73 heartbeat](./73-real-time-running-prompt-heartbeat-instance-e2e-and-ssh-key-management.md), [74 UI/email fixes](./74-ui-email-telegram-fixes-revisit.md), pending plan [75](../../.ai-memory/plans/pending/75-multi-instance-switching-prompt-backup-and-hygiene.md)
@@ -158,21 +158,23 @@ Can you please read the code base and the planning mode, how to create a plan in
 | T02 | Stack trace parsing is wrong (function/file split mid-URL) | 85 | 001, 002 |
 | T03 | Update announced but CI was not green and binaries are missing; checker and installer must detect beforehand, skip, tell the user, offer another release | 86 | 001–009 |
 | T04 | Focus button must scroll to the selected/current account and does not | 85 | 009 |
-| T05 | Selected instance/profile and account rows have no real distinction; bright high-contrast (yellow line, dark colors), 2–3 options to pick from | 85 | 007, 008 |
+| T05 | Selected instance/profile and account rows have no real distinction; bright high-contrast (yellow line, dark colors). Option A chosen | 85 | 007, 008 |
 | T06 | `Priority: 50` badge: double-click to edit, hide when it is the default 50, explain the benefit | 85 | 006 |
 | T07 | Instance switch / fast-forward loses the running prompt: back up to SQLite via CLI, close only that instance (PID to instance path), switch, relaunch, re-inject, verify with real test instances | 87 | 001–006, 010 |
-| T08 | Supabase: load the repo-secrets config into the tool, share the run command, "push settings", alias this machine | 88 | 004–010 |
+| T08 | Supabase: import the repo-secrets keys into the tool through the AGM CLI, share the run command, "push settings" (no machine alias) | 88 | 004–007 |
 | T09 | Email import must not re-add a notification email that already exists | 88 | 001–003 |
 | T10 | Auto-switch does not work; read the spec, raise ambiguity | 87 | 007–009 |
-| T11 | (Message 2) Improve the vault script and the scripts in general so these failures do not recur; Supabase as a runnable one-liner PowerShell file that is verified | 88 | 006–010 |
+| T11 | (Message 2) Supabase as a runnable one-liner PowerShell file that imports keys through the AGM CLI and is verified. Existing vault PowerShell scripts are fine (follow-up message) | 88 | 006–007 |
 
 ## Decisions Confirmed by the User (Message 2)
 
 1. **Auto-switch requires a strict candidate.** A candidate below 100% quota is never selected. The sub-100% fallback is removed.
 2. **The CLI is the actor; two triggers.** One CLI command performs the switch. It is invoked by (a) a reactive trigger (quota refresh or UI threshold change, asynchronous) and (b) a small separate scheduled checker that runs about every minute and decides how soon a switch is needed. Both call the same routine.
 3. **Email:** if the notification email is already added, do not add it again. Confirmed.
-4. **Vault script:** make the `repo-secrets` Supabase/vault script better, and make scripts in general safer so these failures do not recur.
-5. **Supabase** is integrated as native `agm` commands plus a one-liner PowerShell file that is executed and verified to work.
+4. **Vault and Supabase (follow-up message, supersedes the earlier "make the vault script better"):** the existing PowerShell scripts are fine. What is wanted is a one-liner PowerShell file that imports the Supabase keys through the AGM CLI, run and verified. The vault path is passed explicitly. No machine alias.
+5. **Test runner:** fix it. Done: `npm run test` (`scripts/run-frontend-tests.mjs`, tsx via npx, no new dependency).
+6. **Highlight:** Option A. **Focus target:** selected instance's bound account, fallback to the current account. **Native prompt detection:** per-instance directories, DB `dispatched` plus heartbeat. **Branch:** work on `main`.
+7. **Working style for future runs:** questions come first, numbered, with the options written inline; after that the run completes end to end (build, tests, live verification) without stopping to ask. Permission to commit and push means do it without waiting.
 
 ## Findings (root causes, from reading the code)
 
@@ -206,10 +208,9 @@ Candidate selection in `auto_switcher.rs` falls back to sub-100% accounts; the d
 No normalization/uniqueness on the recipients table; each import path inserts on its own (`email_vault_db.rs::add_notify_recipient`, `email_io.rs`, `commands/email.rs`, `agm.rs` email commands, `EmailNotificationSettings.tsx`). Spec 74 claimed deduplication; it covered display, not storage.
 
 ### T08/T11 — Supabase and vault scripts
-- `agm supabase load-json` does not apply `node_alias` or sync flags; there is no `push-settings` subcommand (there is a `set-alias`).
-- `repo-secrets` `03-supabase/connect-supabase.ps1` derives its repo root one level too high, falls back to a hardcoded absolute path, never checks `$LASTEXITCODE`, never sets the alias, and does not verify after loading.
-- `repo-secrets` `02-antigravity-and-event-manager/push-settings.ps1`: the gitmap branch builds an archive but never uploads or extracts it; verification steps swallow errors (`try { … } catch { }`); local deploy targets `~/.antigravity_tools` and must be checked against the data directory the app really reads.
-- `scripts/setup-supabase.ps1` and `scripts/supabase-setup.ps1` in this repo embed default endpoint keys as parameter defaults. Keys must come from the vault or environment, never from committed defaults.
+- There is no `agm supabase push-settings` subcommand; importing the vault keys takes several manual commands.
+- `scripts/setup-supabase.ps1` and `scripts/supabase-setup.ps1` in this repo embed default endpoint keys as parameter defaults and duplicate each other. Keys must come from the vault through the AGM CLI, never from committed defaults.
+- Observations about the sibling vault repo scripts (`connect-supabase.ps1` root resolution and unchecked exit codes; `push-settings.ps1` gitmap branch that builds an archive and never uploads it) are recorded in issue 53 for the owner. The user said those scripts are fine, so this plan does not edit them.
 
 ## Contracts
 
@@ -231,13 +232,13 @@ Publishing requires every expected platform artifact to exist. `updater.json` is
 | `agm auto tick [--explain] [--json]` | Small checker: decides whether and how soon a switch is due; invokes the actor when due. |
 | `agm auto schedule install \| remove \| status` | Registers the 1-minute tick with Task Scheduler, cron, or a systemd user timer. |
 | `agm email dedupe [--apply]` | Reports (default) or merges existing duplicate recipients. |
-| `agm supabase push-settings [--vault <dir>] [--alias <name>] [--json]` | Load vault config, apply alias and sync flags, sync, test. |
+| `agm supabase push-settings --vault <path> [--json]` | Import the Supabase config and keys from the explicit vault path, sync, test. No alias. |
 
 Every GUI setting introduced or changed here has a config-file field and an environment override (headless parity). Names are chosen in the subtasks.
 
 ### Selected-state design options (T05; user picks one, subtask 008 applies it)
 Tokens are Tailwind utility families already used in the project.
-- **Option A — slate with amber rail:** `bg-slate-900` row, 6 px `amber-400` left bar, `text-white`, amber `ACTIVE` pill. Quietest; works in light theme with `bg-slate-100` and the same rail.
+- **Option A (chosen) — slate with amber rail:** `bg-slate-900` row, 6 px `amber-400` left bar, `text-white`, amber `ACTIVE` pill. Quietest; works in light theme with `bg-slate-100` and the same rail.
 - **Option B — dark card with amber frame:** `bg-slate-950`, 2 px `amber-400` border, check icon, soft `shadow-amber-400/30` glow. Strongest separation in long lists.
 - **Option C — navy gradient with hairlines:** `bg-gradient-to-r from-slate-900 to-indigo-950`, amber top/bottom hairlines, filled amber dot. Most decorative; best for the popover.
 The same choice is applied to the popover selected profile, the Instances page active card, and the accounts `CURRENT` row. Contrast must meet WCAG AA (4.5:1) for text in both themes.
@@ -257,16 +258,16 @@ Lower number is tried first when several accounts are in the same tier and have 
 8. Switching or fast-forwarding an instance with a running prompt: the prompt is backed up to SQLite for that instance, only that instance's processes are closed, credentials switch, the IDE relaunches and is ready, the prompt is injected exactly once, and verification reports success or a typed failure. Proven by an E2E run with two real test instances that are removed afterwards.
 9. Auto-switch selects only 100% candidates; the reactive trigger and the scheduled tick call the same actor; `agm auto tick --explain` states why a switch did or did not happen; GUI and headless behave the same.
 10. Adding or importing an existing notification email (any case or surrounding whitespace) does not create a row; the import summary shows how many were skipped.
-11. `agm supabase push-settings` and the one-liner PowerShell file load the vault config, set the alias, sync, and test; the run is verified with real output and exit code 0. No secret is printed, committed, or hardcoded.
-12. Repo scripts fail loudly (exit codes checked, no swallowed errors), resolve paths relative to their own location, and never embed keys.
+11. `agm supabase push-settings` and the one-liner PowerShell file import the vault config and keys through the AGM CLI, sync, and test; the run is verified with real output and exit code 0. No secret is printed, committed, or hardcoded. No alias is involved.
+12. Scripts written in this work check exit codes, never swallow errors, and never embed keys.
 
 ## Verification Matrix
 
 | Area | Local (targeted) | CI |
 | :--- | :--- | :--- |
 | Rust | `cd src-tauri && cargo fmt -- --check`; `cargo clippy --all-targets --all-features`; targeted `cargo test <module>` | compile tests, full run |
-| Frontend | `npm run build` | build |
-| Scripts | run each script once with `-WhatIf`/dry mode, then live against a test vault | none |
+| Frontend | `npm run test`; `npm run build` | build |
+| Scripts | run the one-liner live against the vault JSON, twice, plus once with a missing path | none |
 | Switch E2E | `scripts/test-instance-e2e.ps1` (local only, opt-in) | not run |
 
 ## Risks and Mitigations
@@ -286,4 +287,4 @@ Four screenshots were supplied in chat. They are not committed: at least one sho
 
 ## Release Policy
 
-No release, version bump, changelog entry, or release-notes edit occurs on any individual task. A release happens only when an entire plan is finished and the user explicitly asks for it. Stable goes through `beta` first when the maintainer confirms (see ambiguity `06`).
+No release, version bump, changelog entry, or release-notes edit occurs on any individual task. A release happens only when an entire plan is finished and the user explicitly asks for it. Work is on `main` (resolved ambiguity `06`).

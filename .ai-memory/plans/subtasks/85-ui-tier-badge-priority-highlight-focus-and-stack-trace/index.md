@@ -12,8 +12,8 @@ Order follows data flow: contracts and scaffolds first, callers after, UI and sc
 | `004` | [004-shared-tier-badge-component.md](./004-shared-tier-badge-component.md) | Shared TierBadge with an explicit unknown state | `pending` |
 | `005` | [005-agm-accounts-refresh-tier-cli.md](./005-agm-accounts-refresh-tier-cli.md) | CLI command and startup backfill for tier | `pending` |
 | `006` | [006-priority-badge-hide-default-and-inline-edit.md](./006-priority-badge-hide-default-and-inline-edit.md) | Hide Priority at 50 and edit on double-click | `pending` |
-| `007` | [007-selected-highlight-options-preview.md](./007-selected-highlight-options-preview.md) | Render the three selected-state options for user review | `pending` |
-| `008` | [008-apply-selected-highlight.md](./008-apply-selected-highlight.md) | Apply the chosen selected-state design everywhere | `pending` |
+| `007` | [007-selected-state-shared-style.md](./007-selected-state-shared-style.md) | Shared selected-state style (Option A: dark slate with amber rail) | `pending` |
+| `008` | [008-apply-selected-highlight.md](./008-apply-selected-highlight.md) | Apply the selected-state style everywhere | `pending` |
 | `009` | [009-focus-button-target-and-single-scroll.md](./009-focus-button-target-and-single-scroll.md) | Focus scrolls to the selected instance's account | `pending` |
 
 ---

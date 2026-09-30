@@ -33,9 +33,9 @@ then:
 - Update release notes.
 - Pin the new version in the root `readme.md`.
 
-**Open ambiguities.**
-- [03-native-ide-prompt-detection-scope-and-acceptance-signal.md](../../ambiguous-questions/01-new-ambiguity/03-native-ide-prompt-detection-scope-and-acceptance-signal.md)
-- [06-beta-staging-before-main.md](../../ambiguous-questions/01-new-ambiguity/06-beta-staging-before-main.md)
+**Ambiguities (all resolved 2026-09-30).**
+- [03-native-ide-prompt-detection-scope-and-acceptance-signal.md](../../ambiguous-questions/02-ambiguity-resolved/03-native-ide-prompt-detection-scope-and-acceptance-signal.md)
+- [06-beta-staging-before-main.md](../../ambiguous-questions/02-ambiguity-resolved/06-beta-staging-before-main.md)
 
 ## Execution Model (RULE 0C)
 

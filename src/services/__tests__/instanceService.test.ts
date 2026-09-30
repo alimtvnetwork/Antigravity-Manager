@@ -112,13 +112,13 @@ test('extractWeeklyQuotaPercent extracts bottleneck from quota_groups', () => {
 test('calculateMultiplicativeScore computes active * tier * weeklyQuota', () => {
     const accA = makeSyntheticAccount('synth_user_a', 'synth_a@test.local', 'pro', 100, 100);
     const scoreA = calculateMultiplicativeScore(accA, []);
-    // S_active=1, M_tier=3, Q_weekly=100 -> 300
-    assertEqual(scoreA.score, 300);
+    // S_active=1, M_tier=3, Q_weekly=100 -> 300 / 1000 (normalized) = 0.3
+    assertEqual(scoreA.score, 0.3);
 
     const accB = makeSyntheticAccount('synth_user_b', 'synth_b@test.local', 'pro', 21, 100);
     const scoreB = calculateMultiplicativeScore(accB, []);
-    // S_active=1, M_tier=3, Q_weekly=21 -> 63
-    assertEqual(scoreB.score, 63);
+    // S_active=1, M_tier=3, Q_weekly=21 -> 63 / 1000 (normalized) = 0.063
+    assertEqual(scoreB.score, 0.063);
 
     // In-use account: S_active=0 -> score 0
     const inUseScore = calculateMultiplicativeScore(accA, ['synth_user_a']);
@@ -138,9 +138,9 @@ test('rankSmartCandidates ranks 100% weekly quota over 21% weekly quota', () => 
     const ranked = rankSmartCandidates([accB, accA], []);
     assertEqual(ranked.length, 2);
     assertEqual(ranked[0].account.id, 'synth_user_a');
-    assertEqual(ranked[0].score, 300);
+    assertEqual(ranked[0].score, 0.3);
     assertEqual(ranked[1].account.id, 'synth_user_b');
-    assertEqual(ranked[1].score, 63);
+    assertEqual(ranked[1].score, 0.063);
 });
 
 if (failed > 0) {

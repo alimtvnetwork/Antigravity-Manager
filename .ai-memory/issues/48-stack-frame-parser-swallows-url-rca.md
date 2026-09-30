@@ -24,4 +24,4 @@ Parse with two explicit shapes (named frame with parentheses; bare location) in 
 Pure parser in its own module with table-driven tests including URL-only, `async`, `eval`, and Windows paths.
 
 ## 7. Regression check
-Frontend unit test for `parseStackLine` (runner decision: ambiguity 04).
+`npm run test -- stack-frame-parser` (runner added; ambiguity 04 resolved).

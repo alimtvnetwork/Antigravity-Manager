@@ -32,8 +32,9 @@ status: pending
 ## 4. Constraints
 - US English spelling; boolean names use `is`/`has`; never write `== true`.
 - Function and file size follow `02-spec/02-coding-guidelines/02-canonical-size-tier.md`.
-- Relative paths only. The secrets repo is a sibling repository at `../repo-secrets/`; it has its own git history and is committed separately.
+- Relative paths only. The secrets repo is a sibling repository at `../repo-secrets/`; it is read, not edited, by this plan.
 - NEVER print, log, echo, or commit a secret, token, key, password, or email. Print key names and counts only.
+- No machine alias handling anywhere (resolved ambiguity 02).
 
 ## 5. Out of scope
 - Version bump, changelog, release notes, readme version pin (release fires only when the whole plan is complete and the user commands it).

@@ -1,7 +1,7 @@
 # Should the changes be staged on `beta` before `main`?
 
 Slug: beta-staging-before-main
-Status: open
+Status: resolved
 Raised: 2026-09-30
 Blocking: none (release step only)
 
@@ -21,3 +21,9 @@ Skipping staging on risky paths can push a bad update gate to stable users.
 
 ## Interim provisional default
 Option B. No branch is created or pushed until the user commands implementation.
+
+## Resolution
+
+Answered: 2026-09-30
+Answer: Work directly on `main`; the user has been committing plan changes there and asked not to wait for confirmation.
+Applied solution: No branch created. Plan 86 keeps a post-publish verification job as its safety net.

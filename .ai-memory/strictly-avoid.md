@@ -384,3 +384,18 @@ Allowed work:
 **NEVER ignore a native command's exit code, write an empty `catch`, or report success for a step that was not verified.** Scripts resolve paths from their own location, never embed keys or absolute paths, and end with a verification step whose failure exits non-zero.
 
 **Why:** Vault and Supabase scripts reported success while nothing was loaded or transferred (see `.ai-memory/issues/53-vault-and-supabase-scripts-silent-failures-rca.md`).
+
+## Questions With Hidden Options or Mid-Run Blocking — TOTAL BAN
+
+**NEVER ask a question whose options are only written in a file, and NEVER stop a run midway to wait for an answer that could have been asked up front.**
+
+Forbidden:
+- Writing "pick A, B or C" in chat when A, B and C are defined elsewhere.
+- Blocking a step on an open question the user was not shown in full.
+- Waiting for a second confirmation after the user has given permission to commit and push.
+
+Allowed work:
+- Ask at the start of the run, numbered 1, 2, 3, with every option written inline, then finish the task end to end (build, tests, live verification).
+- When the user says stop asking, apply a stated default, record it, and continue.
+
+**Why:** The user could not find options that lived only in the spec and had to explain the same point twice.

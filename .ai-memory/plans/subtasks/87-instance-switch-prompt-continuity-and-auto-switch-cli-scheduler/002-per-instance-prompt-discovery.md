@@ -9,7 +9,7 @@ citations:
   coding_guidelines: ../../../coding-guidelines.md
   strictly_avoid: ../../../strictly-avoid.md
   issue_rca: ../../../issues/50-instance-switch-loses-running-prompt-rca.md
-  ambiguity: ../../../ambiguous-questions/01-new-ambiguity/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
+  ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/03-native-ide-prompt-detection-scope-and-acceptance-signal.md
 target_files:
   - src-tauri/src/modules/repo_db.rs — `discover_running_prompts_from_antigravity` (~L572-745), `detect_running_projects` (~L423-519)
 status: pending
@@ -25,7 +25,7 @@ Discovery reads the default/global Gemini/Antigravity state, so a cloned instanc
 
 ## 3. Steps
 1. Change both functions to take `&InstanceScope` and read only `scope.home_dir`/`scope.storage_dirs` for that instance.
-2. Allow the global location only when `scope.is_default` (ambiguity 03 default B).
+2. Allow the global location only when `scope.is_default` (resolved ambiguity 03).
 3. Return `Vec<RunningPrompt>` with the instance id attached; log counts per location at debug level without prompt text.
 4. Tests with fixture conversation directories for two instances: each sees only its own prompt.
 
@@ -53,7 +53,7 @@ cd src-tauri && cargo test modules::repo_db
 - [ ] Tests pass.
 
 ## 8. Ambiguities and interim defaults
-- Ambiguity 03 default: per-instance dirs; global only for the default instance.
+- Resolved (ambiguity 03): per-instance dirs; global only for the default instance.
 
 ---
 

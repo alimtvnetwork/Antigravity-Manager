@@ -13,7 +13,7 @@ Related: [85](./85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [
 
 Makes the update checker, `agm update`, both installers, and the release workflow agree that an update exists only when an installable asset exists for this platform (T03). The user is told which versions were skipped and why, and another verified release is offered.
 
-**Risk note.** This plan changes the update path that stable users depend on; stage it on `beta` first if the maintainer agrees (ambiguity 06, default: yes for this plan).
+**Branch.** Work directly on `main` (resolved ambiguity 06). This plan changes the update path that stable users depend on, so the post-publish verification job (step 009) is the safety net.
 
 **Mandatory reading.** Before any step, read `.ai-memory/coding-guidelines.md`, `.ai-memory/strictly-avoid.md`, and `.ai-memory/folder-structure.md`. Project rules in `AGENTS.md` apply: pipeline-first fixes, headless/CLI parity, cross-platform, root-cause fixes, no release except on explicit command, PR = one problem class with individually revertable commits.
 
@@ -33,8 +33,8 @@ then:
 - Update release notes.
 - Pin the new version in the root `readme.md`.
 
-**Open ambiguities.**
-- [06-beta-staging-before-main.md](../../ambiguous-questions/01-new-ambiguity/06-beta-staging-before-main.md)
+**Ambiguities (all resolved 2026-09-30).**
+- [06-beta-staging-before-main.md](../../ambiguous-questions/02-ambiguity-resolved/06-beta-staging-before-main.md)
 
 ## Execution Model (RULE 0C)
 

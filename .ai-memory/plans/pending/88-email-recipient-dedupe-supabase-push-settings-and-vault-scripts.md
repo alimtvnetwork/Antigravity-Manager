@@ -1,4 +1,4 @@
-# Plan 88: Email Recipient Dedupe, Supabase push-settings, and Hardened Vault Scripts
+# Plan 88: Email Recipient Dedupe and Supabase push-settings One-Liner
 
 Status: pending
 Raised: 2026-09-30
@@ -11,9 +11,9 @@ Related: [85](./85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [
 
 **Request.** The full verbatim user request is in the spec under "User Request (Verbatim)". This plan covers the tasks listed below; sibling plans cover the rest.
 
-Stops notification emails from being re-added (T09), adds native `agm supabase push-settings` (T08), removes committed default keys, and hardens the vault scripts (`connect-supabase.ps1`, `push-settings.ps1`) with a shared guard library and a verified one-liner (T11).
+Stops notification emails from being re-added (T09), adds native `agm supabase push-settings` (T08), and replaces the key-embedding setup scripts with a one-liner PowerShell file that imports the vault Supabase keys through the AGM CLI, verified live (T08, T11). No machine alias is used.
 
-**Two repositories.** Steps 007-010 edit the sibling `../repo-secrets/` repository (separate git history, commit there separately). Steps 001-006 edit this repository. Secret values are never printed, logged, or committed.
+**Two repositories.** The sibling `../repo-secrets/` repository is only read (its vault JSON is the input); its scripts are fine and are not edited. Secret values are never printed, logged, or committed.
 
 **Mandatory reading.** Before any step, read `.ai-memory/coding-guidelines.md`, `.ai-memory/strictly-avoid.md`, and `.ai-memory/folder-structure.md`. Project rules in `AGENTS.md` apply: pipeline-first fixes, headless/CLI parity, cross-platform, root-cause fixes, no release except on explicit command, PR = one problem class with individually revertable commits.
 
@@ -33,9 +33,8 @@ then:
 - Update release notes.
 - Pin the new version in the root `readme.md`.
 
-**Open ambiguities.**
-- [02-vault-folder-and-machine-alias-for-supabase.md](../../ambiguous-questions/01-new-ambiguity/02-vault-folder-and-machine-alias-for-supabase.md)
-- [06-beta-staging-before-main.md](../../ambiguous-questions/01-new-ambiguity/06-beta-staging-before-main.md)
+**Ambiguities (all resolved 2026-09-30).**
+- [02-vault-folder-and-machine-alias-for-supabase.md](../../ambiguous-questions/02-ambiguity-resolved/02-vault-folder-and-machine-alias-for-supabase.md)
 
 ## Execution Model (RULE 0C)
 
@@ -52,16 +51,13 @@ then:
 | `001` | [001-recipient-normalized-upsert-and-unique-index.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/001-recipient-normalized-upsert-and-unique-index.md) | Normalized upsert-or-skip for notification recipients | `pending` |
 | `002` | [002-route-all-email-paths-through-helper.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/002-route-all-email-paths-through-helper.md) | Every add/import path uses the helper and reports skipped counts | `pending` |
 | `003` | [003-existing-duplicates-report-and-merge.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/003-existing-duplicates-report-and-merge.md) | `agm email dedupe` for rows that already exist | `pending` |
-| `004` | [004-supabase-load-json-merge-node-alias-and-flags.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/004-supabase-load-json-merge-node-alias-and-flags.md) | `load-json` applies `node_alias` and sync flags | `pending` |
-| `005` | [005-agm-supabase-push-settings.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/005-agm-supabase-push-settings.md) | `agm supabase push-settings` | `pending` |
-| `006` | [006-remove-committed-default-keys-from-repo-scripts.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/006-remove-committed-default-keys-from-repo-scripts.md) | Remove endpoint keys from `scripts/setup-supabase.ps1` and `scripts/supabase-setup.ps1` | `pending` |
-| `007` | [007-connect-supabase-ps1-hardening.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/007-connect-supabase-ps1-hardening.md) | Harden `connect-supabase.ps1` in the vault repo | `pending` |
-| `008` | [008-push-settings-ps1-fixes.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/008-push-settings-ps1-fixes.md) | Fix `push-settings.ps1` remote transfer and verification | `pending` |
-| `009` | [009-shared-script-guard-helpers.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/009-shared-script-guard-helpers.md) | Shared guard helpers and vault self-check | `pending` |
-| `010` | [010-one-liner-and-live-verification.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/010-one-liner-and-live-verification.md) | Verified one-liner for Supabase on this machine | `pending` |
+| `004` | [004-supabase-load-json-applies-sync-flag-from-vault.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/004-supabase-load-json-applies-sync-flag-from-vault.md) | `load-json` imports keys and applies the sync flag from the vault file | `pending` |
+| `005` | [005-agm-supabase-push-settings.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/005-agm-supabase-push-settings.md) | `agm supabase push-settings --vault <path>` | `pending` |
+| `006` | [006-one-liner-powershell-file-uses-agm-cli.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/006-one-liner-powershell-file-uses-agm-cli.md) | One-liner PowerShell file that imports keys through the AGM CLI | `pending` |
+| `007` | [007-live-verification-of-supabase-one-liner.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/007-live-verification-of-supabase-one-liner.md) | Run and verify the one-liner on this machine | `pending` |
 
 ## Order and Dependencies
-001 -> 002 -> 003 (email). 004 -> 005 (CLI). 006 after 005. 007 -> 008 -> 009 -> 010 (scripts, in the vault repo); 010 is the live proof.
+001 -> 002 -> 003 (email). 004 -> 005 (CLI). 006 after 005. 007 is the live proof and is last.
 
 ## Acceptance
 See the spec section "Acceptance Criteria"; this plan owns the items named in its summary.

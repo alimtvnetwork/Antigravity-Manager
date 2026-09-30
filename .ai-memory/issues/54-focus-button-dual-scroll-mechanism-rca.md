@@ -12,7 +12,7 @@ Clicking Focus does not bring the intended account row into view.
 Focus pressed while the account is on another page or hidden by a filter, or when the selected instance is bound to a different account than the global current account.
 
 ## 3. Root cause
-`Accounts.tsx::handleFocusActiveAccount` targets the global `currentAccount`, and a separate state-driven effect also scrolls; the two race and neither clears the filter or navigates the page first.
+`Accounts.tsx::handleFocusActiveAccount` targets the global `currentAccount`, and a separate state-driven effect also scrolls; the two race and neither clears the filter or navigates the page first. In addition `tsc` reports `currentPage` used before its declaration in that effect (`Accounts.tsx` ~L157, TS2448/TS2454).
 
 ## 4. Why it escaped
 Plan 74 added scroll polling but tested only the same-page case.
