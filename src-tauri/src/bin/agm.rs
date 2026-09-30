@@ -5665,7 +5665,9 @@ fn cmd_supabase(args: &[String]) {
         "test" => cmd_supabase_test(&rt, sub_args),
         "set-endpoint" | "set" | "add" => cmd_supabase_set_endpoint(sub_args),
         "load-json" | "import" => cmd_supabase_load_json(sub_args),
-        "export" => match supabase_sync::export_config_json() {
+        "export" => match supabase_sync::export_config_json(
+            &supabase_sync::load_config().unwrap_or_default(),
+        ) {
             Ok(json_str) => {
                 let file_arg = sub_args
                     .iter()

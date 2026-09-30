@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::models::{
+pub use crate::models::{
     Account, AccountIndex, AccountSummary, DeviceProfile, DeviceProfileVersion, QuotaData,
     TokenData,
 };

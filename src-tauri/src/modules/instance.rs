@@ -1,4 +1,4 @@
-use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
+pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
