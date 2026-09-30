@@ -55,6 +55,31 @@ Verified locally: the hook blocks a deliberately unformatted staged line (exit 1
 - Editing `.github/workflows/*` requires pushing with a `workflow`-scoped token; a `repo`-only token is rejected with "refusing to allow a Personal Access Token to create or update workflow". Keep workflow edits in their own commit so the rest of a fix can still ship.
 - After a fresh clone, run `npm install` (or `npm run hooks:install`) so the pre-commit guard is active. Confirm with `git config core.hooksPath`, which should print `.githooks`.
 
-## 5. Related RCAs
+## 5. Failures Hidden Behind the First Failing Step
+
+`Check Rust Code` runs its steps in order: `Check Rust formatting` → `Run Clippy` → `Check Rust compilation`. While rustfmt failed (from `bf491cfd` onward), Clippy never executed, so its status on those commits was unknown. Fixing the first red step does not prove the job is green.
+
+- After fixing any CI step, confirm the **whole** run for the new SHA completes `success`, not just the step you fixed. Run `36748958091` (`09338155`) was the first where Clippy ran again, and it passed.
+- Do not treat local Clippy on this 8 GB Windows host as authoritative: `cargo clippy --all-targets --all-features` aborted with `handle_alloc_error` / `STATUS_STACK_BUFFER_OVERRUN` (out of memory). Only CI runners give a trustworthy Clippy result here.
+- The crate has no `#![deny]`, no `[lints]` table, and CI passes no `-D warnings`, so Clippy warnings such as `collapsible_if` do not fail CI. Only deny-level lints or compile errors do.
+
+## 6. Current Status (2026-10-01)
+
+| Gate | State | Evidence |
+|------|-------|----------|
+| `agm.rs` formatting | Pushed | `fb86a734`; CI green on `09338155`, `ade10b48`, `9b9b8dc7`, `bd60e569` |
+| `.githooks/pre-commit` + `npm prepare` installer | Pushed | `09338155` |
+| `release.yml` rustfmt gate | **Committed locally, not pushed** | push rejected: token scopes `gist`, `read:org`, `repo` (no `workflow`). Tracked as open issue [56](../issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md) |
+
+Until issue 56 is closed, a tag pushed on a commit with red CI can still publish. The pre-commit hook is the only enforced gate in the meantime.
+
+## 7. Announced CI Deadlines (not failures yet)
+
+Seen as annotations on every run; each will break CI on a known date if ignored:
+
+- **Node 20 actions:** `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 and are already forced onto Node 24 (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`). Bump them to a Node 24-native major before GitHub removes the override.
+- **`ubuntu-latest` moves to Ubuntu 26 starting 2026-10-19.** The Linux Tauri build installs WebKitGTK and system `-dev` packages by name. If package names change, `Build Tauri App (ubuntu-latest)` and the release Linux job fail. Either pin `ubuntu-24.04` or verify the package list on Ubuntu 26 before that date. Both are workflow edits and need a `workflow`-scoped token (see issue 56).
+
+## 8. Related RCAs
 
 Rustfmt drift: 02, 12, 16, 18, 20, 22, 27, 28, 29, 34 (all documentation-only remediations; superseded by the enforced gates above). Releases with missing or invalid artifacts: 39.

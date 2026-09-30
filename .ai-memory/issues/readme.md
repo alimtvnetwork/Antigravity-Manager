@@ -11,9 +11,12 @@ This directory contains active issue tracking and bug reports.
 - [52-email-recipient-duplicates-rca.md](./52-email-recipient-duplicates-rca.md)
 - [53-vault-and-supabase-scripts-silent-failures-rca.md](./53-vault-and-supabase-scripts-silent-failures-rca.md)
 - [54-focus-button-dual-scroll-mechanism-rca.md](./54-focus-button-dual-scroll-mechanism-rca.md)
-- [55-update-settings-missing-auto-check-rca.md](./55-update-settings-missing-auto-check-rca.md)
+
+## Open (blocked)
+- [56-release-fmt-gate-blocked-by-token-workflow-scope.md](./56-release-fmt-gate-blocked-by-token-workflow-scope.md): release rustfmt gate committed locally; push needs a `workflow`-scoped token (maintainer action).
 
 ## Resolved & Historical Application Issues
+- [55-update-settings-missing-auto-check-rca.md](./55-update-settings-missing-auto-check-rca.md) (fixed 2026-09-30, `c4983761`)
 - [01-instance-launch-and-user-isolation-rca.md](./01-instance-launch-and-user-isolation-rca.md)
 - [02-instance-launch-and-profile-isolation-rca.md](./02-instance-launch-and-profile-isolation-rca.md)
 - [03-installer-update-failure-rca.md](./03-installer-update-failure-rca.md)
@@ -22,4 +25,4 @@ This directory contains active issue tracking and bug reports.
 - [46-email-html-replies-node-identity-smart-rotator-rca.md](./46-email-html-replies-node-identity-smart-rotator-rca.md)
 
 ## CI/CD Pipeline Issues & RCAs
-For all CI/CD pipeline issues and RCAs (01 through 40), see [.ai-memory/cicd-issues/](../cicd-issues/readme.md) and the comprehensive index in [.ai-memory/cicd-index.md](../cicd-index.md).
+For all CI/CD pipeline issues and RCAs (01 through 41), see [.ai-memory/cicd-issues/](../cicd-issues/readme.md) and the comprehensive index in [.ai-memory/cicd-index.md](../cicd-index.md).

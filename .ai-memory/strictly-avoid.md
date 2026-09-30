@@ -423,3 +423,24 @@ Allowed work:
 - ✅ Run `cargo fmt --all` or `cargo fmt -- --check` in `src-tauri/` before committing.
 
 **Why:** Rustfmt strictly enforces a 100-character line width cap. Single-line iterator chains cause `cargo fmt -- --check` to fail across all multi-OS matrix runners (Ubuntu, Windows, macOS), blocking CI workflows (see `.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md`).
+
+---
+
+## Bypassing CI Gates or Tagging on Unverified CI — TOTAL BAN
+
+🔴 **The long-line ban above treats one symptom. The failure that recurred 11 times was process: nothing enforced the formatting rule, and releases shipped while CI was red.**
+
+Forbidden:
+- ❌ `git commit --no-verify` to get past `.githooks/pre-commit`. If it blocks, run `cd src-tauri && cargo fmt`, re-stage, and commit again.
+- ❌ Putting code edits inside an `npm run bump` / `chore(release)` / `chore(version)` commit. The rustfmt drift in RCA 40 arrived in bump commit `d606ae20`.
+- ❌ Pushing a release tag before the CI run for that exact SHA shows `success`. A `cancelled` run is not green; neither is a run from an earlier SHA.
+- ❌ Declaring CI fixed after only the step you touched turns green. Later steps (Clippy, compilation) may have been hidden behind it.
+- ❌ Reading CI with bare `gh run list` in this clone. It defaults to `upstream` (`lbjlaq/Antigravity-Manager`) and shows that repo's green runs.
+- ❌ Recording a workflow change as "enforced" or "done" in memory before `git log origin/main -- .github/workflows/` shows it. A `repo`-only token cannot push workflow files (issue 56).
+
+Allowed work:
+- ✅ `gh run list -R alimtvnetwork/Antigravity-Manager --commit <sha>` to confirm the exact SHA is green before tagging.
+- ✅ After a fresh clone, `npm install` (or `npm run hooks:install`), then check that `git config core.hooksPath` prints `.githooks`.
+- ✅ Keep workflow edits in their own commit so the rest of a fix can ship with a `repo`-only token.
+
+**Why:** Documentation-only gates failed 11 times (RCAs 02–34, 40), and four releases (`v4.109.1`–`v4.109.4`) published from commits with red CI (see `.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md`).

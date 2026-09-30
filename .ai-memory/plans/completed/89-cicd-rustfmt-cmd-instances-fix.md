@@ -1,8 +1,10 @@
 # Plan 89: CI/CD Rustfmt `cmd_instances` Formatting Drift & Pipeline Recovery
 
 > **Spec Reference:** [02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md](../../../02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md)  
-> **Target Subsystems:** `src-tauri/src/bin/agm.rs`, `.ai-memory/cicd-issues/`, `.ai-memory/strictly-avoid.md`, `.github/workflows/ci.yml`.  
-> **Status:** COMPLETED  
+> **Target Subsystems:** `src-tauri/src/bin/agm.rs`, `.githooks/pre-commit`, `scripts/install-git-hooks.mjs`, `package.json`, `.github/workflows/release.yml`, `.ai-memory/cicd-issues/`, `.ai-memory/cicd-index.md`, `.ai-memory/issues/`, `.ai-memory/strictly-avoid.md`, `.ai-memory/what-to-read.md`.  
+> **Status:** COMPLETED except Subtask 06 (BLOCKED: issue 56, `workflow` token scope)  
+> **How it started:** User reported CI breaking on `main`; every completed CI run from `db5a3787` to `2fe82117` was red. Re-invoked 2026-10-01 with the V4 N-step orchestrator prompt; that run continued from this plan (resume rule) with `SOLO_FALLBACK: invoke_subagent absent`.  
+> **Steps (re-run ledger):** 34 of 300 (Phase 1: 12 of 150, Phase 2: 22 of 150).  
 
 ---
 
@@ -31,6 +33,22 @@ adn make sure issues are listed in theissues and rerrun so that mistakesa rte no
   - Staged with explicit paths (R8).
   - Pushed atomic commit to `origin/main`.
   - Remote CI workflow run verified green across all matrix targets (`windows-2022`, `ubuntu-latest`, `macos-latest`).
+- **Subtask 05**: Enforce rustfmt locally via tracked pre-commit hook -> [DONE]
+  - `.githooks/pre-commit`, `scripts/install-git-hooks.mjs`, `package.json` (`prepare`, `hooks:install`) in `09338155`.
+  - Hook test: drifted staged file exit 1; clean tree exit 0.
+- **Subtask 06**: Gate `release.yml` on `cargo fmt -- --check` -> [BLOCKED]
+  - Committed locally as `ci(release): gate release on cargo fmt --check`; push rejected because the token lacks the `workflow` scope. Tracked in `.ai-memory/issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md`.
+- **Subtask 07**: Memory accuracy audit (re-run 2026-10-01) -> [DONE]
+  - `cicd-index.md`: rows 35–39 added, dead row-32 link marked, RCA 40 set to partial, recurring-class table added.
+  - `strictly-avoid.md`: appended "Bypassing CI Gates or Tagging on Unverified CI" ban (existing entries untouched).
+  - `what-to-read.md`: corrected the false "enforced rustfmt gate in `release.yml`" claim.
+  - Issue 56 opened; issue 55 moved to resolved in `.ai-memory/issues/readme.md`.
+  - RCA 40: sections 5–7 (masked failures, gate status, announced CI deadlines).
+  - `cicd-index.md`: seven dead `resolved-issues/01–07` links repointed to renumbered files `02–08`.
+- **Subtask 08**: Fix change-recording tool crash (RCA 41) -> [DONE]
+  - `03-ai-scripts/33-test-inventory-generator.py`: `normalize_inventory_tests()` for list-or-dict `tests`; epoch `updated_at` accepted.
+  - `--record` exit 0; `--check-age --json` reports age instead of an error; `py_compile` exit 0.
+  - RCA `.ai-memory/cicd-issues/41-test-inventory-generator-schema-mismatch-rca.md`, indexed.
 
 ---
 
