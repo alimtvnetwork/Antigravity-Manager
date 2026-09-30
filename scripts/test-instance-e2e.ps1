@@ -12,6 +12,10 @@ $ErrorActionPreference = "Continue"
 $PSNativeCommandUseErrorActionPreference = $false
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
+$buildDemoDir = Join-Path $RootDir "build-demo"
+if (!(Test-Path $buildDemoDir)) {
+    New-Item -ItemType Directory -Path $buildDemoDir -Force | Out-Null
+}
 $agm = Join-Path $RootDir "src-tauri\target\debug\agm.exe"
 
 if (!(Test-Path $agm)) {
@@ -264,7 +268,7 @@ Write-Host "`n[3/6] TEST 2: Switching Instance A to new account ($accSwitch)..."
 
 # Step 2a: Note and backup running prompts before closing
 Write-Host "  Backing up running prompts for Instance A..." -ForegroundColor DarkGray
-$null = & $agm backup-running-prompts 2>$null
+$null = & $agm backup-running-prompts --instance $instA 2>$null
 
 # Step 2b: Close IDE based on folder path and PID
 Write-Host "  Closing Instance A based on folder path ($instADir) and PID ($realPidA)..." -ForegroundColor Yellow
