@@ -504,6 +504,9 @@ export function InstanceSelector() {
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                             {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
+                        <button type="button" onClick={() => setIsOpen(false)} className="p-1 ml-auto mr-2 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" title="Close Panel">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
                         <div className="flex items-center gap-1 relative">
                             {/* Create New Profile Button */}
                             <button

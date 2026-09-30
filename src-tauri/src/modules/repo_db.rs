@@ -3642,7 +3642,7 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
             #[cfg(target_os = "windows")]
             {
                 let _ = Command::new("taskkill")
-                    .args(["/F", "/PID", &pid_u32.to_string()])
+                    .args(["/F", "/T", "/PID", &pid_u32.to_string()])
                     .creation_flags(0x08000000)
                     .output();
             }

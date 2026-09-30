@@ -2100,7 +2100,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             let _ = Command::new("taskkill")
-                .args(["/F", "/PID", &pid.to_string()])
+                .args(["/F", "/T", "/PID", &pid.to_string()])
                 .creation_flags(0x08000000)
                 .output();
         }
@@ -2448,7 +2448,10 @@ pub async fn switch_account_to_instance(
         let service = crate::modules::account_service::AccountService::new(integration);
         service.switch_account(account_id, None).await?;
         bind_account_to_instance("default", &account.id, &account.email)?;
-        let _ = set_active_instance_id("default");
+        let registry_after = load_registry().unwrap_or_default();
+        if registry_after.active_instance_id.is_empty() || registry_after.active_instance_id == "default" {
+            let _ = set_active_instance_id("default");
+        }
         return Ok(());
     }
 
@@ -2704,7 +2707,10 @@ pub async fn switch_account_to_instance(
 
     // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
-    let _ = set_active_instance_id(&instance.id);
+    let registry_after = load_registry().unwrap_or_default();
+    if registry_after.active_instance_id.is_empty() || registry_after.active_instance_id == instance.id {
+        let _ = set_active_instance_id(&instance.id);
+    }
     if is_default_inst {
         let _ = crate::modules::account::set_current_account_id(&account.id);
     }
