@@ -1,3 +1,9 @@
+## v4.104.0 — 2026-09-30 (enforce relative JSON envelope commands, root workDir/repoDir variables, and relative path resolution)
+
+**Scope:** Version bump. enforce relative JSON envelope commands, root workDir/repoDir variables, and relative path resolution.
+
+---
+
 ## v4.65.0 — 2026-09-23 (Update installed app branding to Antigravity Manager Tools and bump to v4.65.0)
 
 **Scope:** Version bump. Update installed app branding to Antigravity Manager Tools and bump to v4.65.0.

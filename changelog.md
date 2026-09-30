@@ -1,3 +1,12 @@
+# Changelog
+
+## [v4.104.0] - 2026-09-30
+
+### Added
+- enforce relative JSON envelope commands, root workDir/repoDir variables, and relative path resolution
+
+---
+
 # 📝 更新日志 (Changelog)
 
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
@@ -11,7 +20,6 @@
             -   **通知中心项目名去重与 200 词提示词预览 (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/bin/agm.rs`)**: 实现 `deduplicate_names()`，杜绝邮件与 Telegram 切号通知中出现重复的项目名称；新增 `extract_words_preview()` 在切号邮件与 Telegram 消息中展示多达 200 词的运行中提示词预览；CLI `agm prompts ls` 新增 `--words <N>` 统一预览参数；
             -   **Telegram 机器人 HTML 错误自愈与远程更新 (`src-tauri/src/modules/telegram_inbound.rs`)**: 增加 `strip_telegram_html_tags()`，在 Telegram API 遭遇 400 Bad Request（非法 HTML 实体或标签）时自动剥离标签并转义重试，根除消息发送失败与 raw 标签乱码；新增 `/update` 与 `/upgrade` 远程更新指令，在 `/status` 中即时呈现版本更新状态；
             -   **前端组件构建韧性保障 (`src/components/proxy/CliSyncCard.tsx`, `src/components/proxy/HermesSyncModal.tsx`)**: 修复 `@lobehub/icons` 缺失图标导入导致的编译报错，平滑回退至 Lucide 矢量图标并保障前端构建 100% 成功。
-
 
     *   **v4.102.0 (2026-09-29)**:
         -   **[Release v4.102.0: 发布流水线预发通道门禁加固、多语言贡献者清洗管道、macOS 通用产物打包与 Keyring 旁路会话隔离] 彻底修复 GitHub Actions 发布工作流中的预发通道判定与 CLI 降级兜底预发参数，增强发布说明多语言致谢正则严格归一至 @aukgit 并脱敏外部用户 handle，自动完成 macOS 通用应用包打包归档，深化多实例 Keyring 旁路标记与凭据独立会话隔离，修复 Clippy 文档注释警告与 Windows 清单路径规范化 (Thanks to @aukgit)**:
@@ -3699,7 +3707,6 @@
             -   **Quarantined Local-Only End-to-End Test Suite (`src-tauri/src/modules/instance.rs`, `02-spec/21-app/72-local-e2e-instance-switching-and-prompt-restore.md`)**: Implemented dual skip-by-default isolation (`#[ignore = "local_only_e2e"]` and `RUN_TEMP_E2E=1`) verifying the complete instance lifecycle (instance cloning, `state.vscdb` creation, workspace binding, prompt seeding, conscious PID shutdown, credential swap asserting email change to `erfan.office.n@gmail.com`, and prompt restoration to `.antigravity_resume_task.json`) with zero impact on host IDE PIDs (`2464`, `1724`, `5140`) and zero CI/CD overhead;
             -   **Frontend UX & Polish (`src/components/accounts/`, `src/components/layout/TitleBar.tsx`, `src/pages/Accounts.tsx`)**: Added Focus button for active and selected account cards with smooth auto-scrolling and visual highlight; enhanced theme selection border contrast; replaced hardcoded titlebar version with dynamic runtime version retrieval.
 
-
     *   **v4.99.0 (2026-09-29)**:
         -   **[Release v4.99.0: Complete System Keyring Bypass via SSH Session Emulation, Double-Gated PID & Path Process Protection Preserving Active Sessions, Multi-Directory Conversation Pruning & Resilient High-Quota Fallback] Resolved the root-cause credential bleed where non-default sandbox instances inherited the default account from Windows Credential Manager by reverse-engineering Go `language_server`'s `compositeTokenStorage` and injecting `SSH_CONNECTION` to trigger `shouldBypassKeyring` towards private file-based token storage with full `id_token` fidelity, redirected Windows Roaming/Local AppData to per-instance sandboxes, enforced strict command-line argument and parent-child topology gates guaranteeing the user's primary IDE session (PID 7748) is completely untouched, enabled resilient quota fallback for auto-switch and fast-forward when 100% profiles are unavailable, and extended cross-instance multi-directory conversation clearing across all registered sandboxes (Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
             -   **Low-Level Keyring Bypass & Private File Credential Fidelity (`src-tauri/src/modules/instance.rs`, `src-tauri/src/modules/integration.rs`)**: Reverse-engineered the Go language server's `compositeTokenStorage` authentication pipeline and discovered its Win32 `CredReadW("gemini:antigravity")` fallback caused cross-instance profile bleeding. Injected `SSH_CONNECTION` and `SSH_CLIENT` environment variables when spawning sandbox instances to trigger its internal `shouldBypassKeyring` flag, forcing it to read file-based token storage at `%USERPROFILE%\.gemini\jetski-standalone-oauth-token`; supplemented missing `id_token` in `write_to_file_credentials_at` to guarantee 100% upstream authorization and display the correct account in the IDE;
@@ -3716,14 +3723,12 @@
             -   **Comprehensive Multi-Instance & Auto-Switch CLI Suite (`src-tauri/src/bin/agm.rs`, `src-tauri/src/commands/instance.rs`)**: Expanded `agm instances` CLI (`ls`, `create`, `switch`, `ff`, `launch`, `stop`, `rm`, `rm-all`, `assign`) with flags (`--account`, `--from`, `--data-only`, `--launch`) and 11 clear examples. Implemented `agm auto-switch` / `agm auto` CLI suite (`status`, `enable`, `disable`, `toggle`, `run`, `threshold`, `interval`, `model`, `test`). Upgraded frontend Instances page with global Auto-Switch toggle button, account selector during instance creation, per-instance Stop buttons, and explicit Switch Account modals;
             -   **Developer Hygiene & Conversation Pruner (`scripts/dev-tool-clear.ps1`, `src-tauri/src/bin/agm.rs`)**: Upgraded `scripts/dev-tool-clear.ps1` and `agm clean` / `agm clear` to clear Cargo/Rust incremental caches and prune conversations to the latest N sessions (default 10, configurable via `-k <N>`).
 
-
     *   **v4.97.0 (2026-09-29)**:
         -   **[Release v4.97.0: GitHub Actions Artifact Purge Infinite Loop & Permission Fix, 2-Round Live Consecutive Switch E2E Verification & Dual Supabase Sync Validation] Added `actions: write` permission to `publish-release` in `release.yml`, eliminated the infinite retry loop in `34-purge-github-actions-artifacts.py` when artifact deletions fail (preventing 1,000 req/hr GITHUB_TOKEN rate-limit exhaustion), and completed live 2-round consecutive fast-forward switch E2E verification (automatic active conversation prompt capture, IDE shutdown, credential rotation, IDE restart, and `.antigravity_resume_task.json` restoration) alongside dual-endpoint Supabase HTTP 200 sync validation (Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
             -   **Release Workflow Permissions & Fallback Hardening (`.github/workflows/release.yml`)**: Granted `actions: write` permission to `publish-release` so post-release artifact cleanup has authorization to delete artifacts; explicitly bound `tag: "${{ github.ref_name }}"` on `ncipollo/release-action@v1` and hardened CLI fallback error handling;
             -   **Artifact & Cache Purge Loop Circuit-Breaker (`03-ai-scripts/34-purge-github-actions-artifacts.py`)**: Filtered out expired artifacts (`select(.expired == false)`), tracked `attempted_ids`, and added an explicit `if batch_deleted == 0: break` circuit breaker in both `purge_repo_artifacts` and `purge_repo_caches`, eliminating infinite loops and API rate-limit exhaustion and purging all 71 stored artifacts (~2.15 GB freed);
             -   **Live 2-Round Consecutive Fast-Forward Switch & Automatic Active Session Recovery (`src-tauri/src/modules/integration.rs`, `src-tauri/src/modules/repo_db.rs`)**: Created live sandbox instance `e2e-live-verify-9800-4113` on the active repository and executed two back-to-back `agm instances <id> ff` switches, verifying that the active conversation prompt (`prompt-d58c5517-d8ad-437e-ab7c-e506b0322383`) is automatically detected from `.gemini/antigravity/brain/`, backed up to SQLite, IDE closed, account rotated (`harry.dev.riseup` -> `ashleyescobarzu`), IDE restarted with DevTools handshake, and `.antigravity_resume_task.json` regenerated across both consecutive switches;
             -   **Supabase Dual-Endpoint Connectivity & Unit Test Validation**: Verified all 14 unit tests in `cargo test --lib supabase` pass 100% and confirmed live HTTP 200 responses and node/instance synchronization via `agm supabase test` and `agm supabase sync` across both Root Lovable and Secondary endpoints.
-
 
     *   **v4.96.0 (2026-09-28)**:
         -   **[Release v4.96.0: Full Root (Lovable) & Secondary Supabase Integration, Multi-Machine Parent-Child Topology, PowerShell One-Liner Automation & Bidirectional Sync] Fully integrated Root Supabase (Lovable) and Secondary fallback endpoints, delivered parent table `nodes` with cascading foreign keys to `instance_profiles` and `workspace_leases` preventing cross-machine account collisions, implemented comprehensive `agm supabase help` CLI guidance, PowerShell one-liner automation script with dual-directory writing, and verified 100% green PostgREST HTTP 200 connectivity (Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
@@ -3733,7 +3738,6 @@
             -   **CLI Guided Assistance & Bidirectional Self-Healing Sync (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/supabase_sync.rs`)**: Added detailed `agm supabase help` outputting config paths, local machine ID, local IPv4, relational schema topology, and subcommands; implemented automatic fallback and cross-directory mirror sync in the Rust core;
             -   **End-to-End PostgREST HTTP 200 Verification**: Verified live connectivity against both Lovable Root and Secondary endpoints via `agm supabase test` and `scripts/supabase-setup.ps1`, confirming HTTP 200 PostgREST health and seamless local node state reporting via `agm supabase sync`.
 
-
     *   **v4.95.0 (2026-09-28)**:
         -   **[Release v4.95.0: Unified Desktop Integration across Headless & CLI, In-Flight Task Restoration Cache Bypass, Atomic Supabase Command Claims & Verified Consecutive Fast-Forward] Unified DesktopIntegration to operate without GUI handles and routed headless/CLI switches through the complete 5-step non-destructive lifecycle (Backup -> Kill IDE -> Swap Token -> Relaunch -> Re-inject), resolved cache shadowing in repo_db that suppressed prompt task restoration, added atomic claim_next_command stored function to Supabase secondary schema with all 14 tests passing, and verified multi-round consecutive fast-forward switching with 100% prompt recovery (Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
             -   **Unified 5-Step Switch Lifecycle across CLI and Headless (`src-tauri/src/modules/integration.rs`, `src-tauri/src/bin/agm.rs`)**: Refactored `DesktopIntegration.app_handle` into `Option<tauri::AppHandle>` and routed `HeadlessIntegration::on_account_switch` to delegate directly to `DesktopIntegration { app_handle: None }`, eliminating the critical defect where CLI commands like `agm instances <id> ff` only updated memory without shutting down the IDE or restoring prompts;
@@ -3742,14 +3746,12 @@
             -   **Atomic Supabase Command Claims & 100% Green Test Suite (`src-tauri/src/modules/supabase_schema.rs`)**: Added the PostgreSQL `FOR UPDATE SKIP LOCKED` stored function `claim_next_command(p_node_id TEXT)` to `SECONDARY_DB_SCHEMA_SQL`, passing all 14 unit test suites across Supabase client, schema, sync, and lease management;
             -   **Consecutive Fast-Forward Stress Verification**: Verified across consecutive fast-forward rotations on a live sandbox instance with active prompts (ashleyescobarzu -> harry.dev.riseup), confirming prompt backup, process termination, account swap, IDE restart, and `.antigravity_resume_task.json` restoration across back-to-back cycles.
 
-
     *   **v4.94.0 (2026-09-28)**:
         -   **[Release v4.94.0: End-to-End Switch Mode & Prompt Lifecycle Verification, Dual Supabase Distributed Sync, Upstream Pipeline Merge with Tool Call ID Normalization & Protobuf Self-Healing] Verified end-to-end 5-step non-destructive account switching and prompt recovery lifecycle on real sandbox instances, validated dual Supabase endpoints (Lovable root + secondary) and distributed multi-node sync, merged upstream lbjlaq/main v4.8.4 pipeline enhancements (Tool Call ID canonicalization, Claude Protobuf signature in-place self-healing, Hermes/OpenClaw sync), and polished concise status indicators with distinct tri-field account telemetry (PR #5, Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
             -   **End-to-End 5-Step Prompt Lifecycle Verification (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/integration.rs`, `src/services/instanceService.ts`)**: Executed and verified complete end-to-end prompt preservation on a local sandbox instance (`e2e-test-sandbox-314`): running prompt backup -> graceful IDE shutdown -> credential swap -> IDE relaunch with workspace args -> DevTools WebSocket reconnection and prompt restoration, guaranteeing zero lost prompts;
             -   **Dual Supabase Integration & Multi-Node Sync (`src-tauri/src/modules/supabase_sync.rs`, `src-tauri/src/bin/agm.rs`)**: Verified connectivity across Root Lovable and Secondary Supabase endpoints with HTTP 200 health responses; validated multi-machine node registration, instance profile sync (`agm supabase sync`), and active lease tracking;
             -   **Upstream lbjlaq/main (v4.8.4) Integration (`src-tauri/src/proxy/`, `src/components/proxy/`)**: Merged upstream PR #5, incorporating inbound pipeline Tool Call ID normalization (`call_<digits>`) to eliminate Google 400 missing thought signature errors, Claude adapter Protobuf binary signature preservation with in-place SQLite self-healing write-back, removal of artificial placeholder thinking blocks, and Hermes / OpenClaw CLI synchronization cards;
             -   **Concise Status Indicators & Distinct Tri-Field Telemetry (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/notification_hub.rs`)**: Streamlined CLI status output by replacing wordy badges with clean green indicators and suppressing noisy Node hashes; enforced strict mutual exclusivity among `previous_email`, `selected_email`, and `predicted_email`, displaying `(none / pool exhausted)` when next candidate pool is empty.
-
 
     *   **v4.93.0 (2026-09-28)**:
         -   **[Release v4.93.0: Unified Switch & Prompt Lifecycle Architecture, Normalized Candidate Scoring, Remote Lease Auto-Eviction & Distinct Multi-Role Telemetry] Overhauled auto-switch and fast-forward architecture, normalized candidate scoring (divided by 1000 to produce 0.0000..0.5000) with strict 0-score rule for <100% quota, enforced 6h–10h Supabase remote lease staleness auto-eviction, verified the 5-step non-destructive prompt lifecycle (Backup -> Kill IDE -> Swap Token -> Relaunch -> Re-inject), and eliminated duplicate previous/selected/predicted email telemetry (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -3765,23 +3767,19 @@
             -   **Native CLI Management Suite & Schema Help (`src-tauri/src/bin/agm.rs`)**: Added `agm supabase` subcommand family (`help`, `status`, `list-leases`, `test`, `set`, `load-json`, `sync`, `schema`, `enable`, `disable`, `set-alias`), surfacing target config file locations, JSON format guides, DB relational hierarchy diagrams, and migration DDL; fully integrated with `agm help` and `agm help --json`.
             -   **PowerShell Automation & JSON Ingestion Suite (`scripts/setup-supabase.ps1`, `scripts/supabase-endpoints.json`)**: Delivered automated PowerShell setup scripts and companion JSON templates supporting one-liner execution and immediate live HTTP connectivity testing.
 
-
     *   **v4.91.1 (2026-09-28)**:
         -   **[Release v4.91.1: Auto-Sync Login State Modal Suppression, Failed Token Caching & Silent Graceful Fallback] Eliminated intrusive E9001 global error diagnostic popups triggered by background account sync when local IDE or Keyring holds expired/revoked OAuth tokens, added failed token caching to prevent recurring queries, and enforced background probe modal suppression (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Failed Token Caching & Silent Fallback (`src-tauri/src/commands/mod.rs`, `src-tauri/src/proxy/server.rs`)**: Implemented `LAST_FAILED_SYNC_TOKEN` in `sync_account_from_db` to cache tokens that fail local import, skipping expensive repeated OAuth queries; handled `import_from_db` errors gracefully by logging informative messages and returning `Ok(None)` / `Ok(Json(None))` instead of bubbling fatal errors across the IPC bridge.
             -   **Frontend Diagnostic Modal Suppression (`src/services/accountService.ts`)**: Added `{ _suppressGlobalModal: true }` to `syncAccountFromDb()` Tauri IPC invocation, preventing speculative background account synchronization tasks from ever triggering intrusive full-screen red error modals in the UI.
             -   **Migration Logging & Observability (`src-tauri/src/modules/migration.rs`)**: Enhanced logging in `import_all_local_accounts` to provide clear warnings when candidate Keyring or SQLite DB OAuth tokens fail refresh due to expiration or revocation.
 
-
     *   **v4.91.0 (2026-09-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.90.0 (2026-09-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.89.0 (2026-09-28)**:
         -   **[Release v4.89.0: Account Switch 98% Simulation E2E, Parallel Prompt Backup & Restoration, Multi-VM Collision Shielding & Sandbox Lifecycle Verification] Validated end-to-end 98% simulated failover, pre-switch live API quota refresh probe, multi-workspace parallel prompt snapshot to split SQLite with human names & image payloads, fast-forward button delegation, automatic prompt resumption, Supabase lease & IMAP collision avoidance, sandbox instance lifecycle verification, comprehensive CLI help polish, and 15.0% production standard alignment (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -3804,7 +3802,6 @@
             -   **Sandbox Instance Lifecycle E2E (`src-tauri/src/modules/instance.rs`, `src-tauri/src/bin/agm.rs`)**: Created isolated sandbox instance profile (`agm instances create test-sandbox-e2e`), verified rotation and prompt backup/restore in isolation, and cleanly removed it via `agm instances rm test-sandbox-e2e --force` with zero leftover processes.
             -   **Production Standard Default Quota Threshold (15.0%) (`src-tauri/src/models/config.rs`, `src/components/settings/AutoSwitcherSettings.tsx`, `src/components/common/BackgroundTaskRunner.tsx`)**: Restored and strictly enforced the 15.0% production standard default threshold across backend models and frontend configuration fallbacks.
 
-
     *   **v4.87.0 (2026-09-28)**:
         -   **[Release v4.87.0: Fleet-Wide Update-All Pure JSON Mode, CLI/UI Help Polish, and Full Prompt Tracking E2E Verification] Introduced zero-noise `agm update all` / `ua` JSON automation, overhauled CLI Part 2 double-box help layout, added 15% production standard and 98% simulation presets with CLI quick reference in UI, verified live prompt injection and parallel backup/restore (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **`agm update all` / `ua` Zero-Noise JSON Mode & Interactive Visual Dashboard (`src-tauri/src/bin/agm.rs`)**: Added `update all`, `update-all`, and `ua` command routes. Implemented strict `--json` mode emitting pure, unpolluted JSON without ANSI escapes or ASCII banners for reliable remote machine automation over SSH and clusters; interactive terminals render a structured system update card reporting binary target, version comparison, release links, git repository pull status, and node identity.
@@ -3812,7 +3809,6 @@
             -   **Frontend UI Threshold 1-Click Presets & CLI Quick Reference Panel (`src/components/settings/AutoSwitcherSettings.tsx`, `src/pages/Settings.tsx`)**: Added `[🛡️ 15% (Production Standard)]` and `[🧪 98% (Simulation / Testing)]` 1-click preset buttons with dynamic context explaining why 15% is standard production and how 98% is used for fast-failover simulation; added an "AGM CLI & Fleet Automation Quick Reference" panel in Advanced settings.
             -   **Live Prompt Injection & Workspace Tracking Verification (`src-tauri/src/bin/agm.rs`)**: Dispatched test prompts via `agm prompt` and verified immediate registration in SQLite and detection in `agm prompts ls` / `agm prompts ls --json` under the project directory.
             -   **Multi-Project Parallel Prompt Backup & Restoration E2E (`src-tauri/src/bin/agm.rs`)**: Verified `agm backup`, `agm backup ls`, and `agm restore`, confirming running prompts across workspaces are safely snapshotted to split SQLite (`backup-prompts.db`) and restored back into active execution queues.
-
 
     *   **v4.86.0 (2026-09-28)**:
         -   **[Release v4.86.0: End-to-End Account Switch Verification, Multi-Project Parallel Prompt Backup & Restoration, Multi-VM Collision Prevention, and 15% Default Threshold Alignment] Simulated 98% High Quota Rotation, Parallel Workspace Prompt Snapshots with Human-Friendly Project Naming, Supabase Distributed Leases & IMAP Telemetry Collision Shielding, and Production-Standard 15.0% Low Quota Threshold (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -3823,7 +3819,6 @@
             -   **CLI Help Polish with Copy-Pasteable Syntax Examples (`src-tauri/src/bin/agm.rs`)**: Overhauled `agm --help`, `agm backup --help`, `agm restore --help`, `agm auto-switch --help`, and `agm switch-if-low-credit --help` with structured flag descriptions, aliases, and copy-pasteable real-world examples.
             -   **Standardized 15.0% Default Quota Threshold Alignment (`src-tauri/src/models/config.rs`, `src-tauri/src/modules/config.rs`, `src/pages/Settings.tsx`)**: Realigned production defaults for `low_quota_threshold_percent`, `critical_threshold_percent`, and `quota_protection.threshold_percentage` to 15.0% / 15 with automatic migration from legacy 10%/12%/25% configurations.
 
-
     *   **v4.85.0 (2026-09-27)**:
         -   **[Release v4.85.0: Windows Runner Build Acceleration, Pipeline Fast-Forwarding, and Contributor Attribution Normalization] Accelerated Windows CI/CD and release pipelines, eliminated runner memory starvation and heap exhaustion via concurrency bounding, migrated to windows-2022 with comprehensive Defender exclusions, and normalized repository codeownership (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Windows Build Acceleration & Concurrency Bounding (`.github/workflows/release.yml`, `.github/workflows/ci.yml`)**: Fixed the root cause of Windows runner jobs running for 56+ minutes and dying with `The hosted runner lost communication with the server`. Implemented strict concurrency bounding via `CARGO_BUILD_JOBS: 4` and `CMAKE_BUILD_PARALLEL_LEVEL: 4`, completely eliminating MSVC `cl.exe` heap space exhaustion (`error C1060`) and OS error 1455 pagefile exhaustion during BoringSSL monolithic compilation.
@@ -3831,14 +3826,12 @@
             -   **Rust Cache Target Retention & Fast-Forwarding (`.github/workflows/release.yml`, `.github/workflows/ci.yml`)**: Configured `cache-all-crates: "true"` and `cache-targets: "true"` in `Swatinem/rust-cache@v2`, ensuring intermediate C/C++ and Rust dependencies are restored from cache in seconds rather than recompiling from scratch on every release run.
             -   **Codeownership & Contributor Attribution Normalization (`.github/CODEOWNERS`, `AGENTS.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`)**: Restored sole repository ownership to `@alimtvnetwork` / alim (`devorg.bd@gmail.com`, `@aukgit`) across `CODEOWNERS`, `AGENTS.md`, and all release notes, ensuring proper contributor attribution on GitHub release pages.
 
-
     *   **v4.84.0 (2026-09-27)**:
         -   **[Release v4.84.0: Native Telegram Chat CLI Management, Human-Friendly Workspace Naming, Smart Prompt Preview Sanitization, and /projects CLI/Bot Parity] Added automated `agm telegram chat` and `setup` CLI workflow, eliminated cryptic internal UUID workspace hashes in observation reports, implemented intelligent noise stripping for user prompts, and enabled seamless slash-prefixed CLI commands (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Native Telegram Chat CLI Setup & Interactive Discovery (`agm telegram chat`, `agm telegram setup`) (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/telegram_inbound.rs`)**: Introduced native `agm telegram chat <BOT_TOKEN> [CHAT_ID]` and `agm telegram setup` commands with built-in `--auto-detect` support. Provides comprehensive `--help` documentation detailing the three discovery methods (sending `/start` to bot, querying `@userinfobot`, or group negative chat IDs), persists credentials cleanly without UTF-8 BOM, registers slash commands with Telegram via `setMyCommands`, and fires immediate welcome telemetry cards.
             -   **Human-Friendly Workspace Naming & Git Branch Resolution (`src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/telegram_inbound.rs`)**: Fixed the root cause of workspace displays showing cryptic internal IDE hashes (e.g. `antigravity-manager-d58c5517`). Corrected the SQLite insertion in `running_projects` where `project_id` was erroneously saved into `repo_name`, implemented zero-subprocess `.git/HEAD` branch resolution (`get_git_branch_for_path`), and resolved conversation titles (`lookup_conversation_title`) from `conversation_summaries.db`, outputting intuitive labels like `Antigravity-Manager (main) [AGM]` and `gitmap (main)`.
             -   **Smart Prompt Preview Sanitization & Noise Elimination (`src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/telegram_inbound.rs`)**: Eliminated telemetry reports showing raw `<USER_REQUEST>\n808e0172...` commit SHAs and directory paths. Implemented `extract_smart_prompt_summary` to filter out XML tags, 40-hex commit hashes, filesystem paths, and markdown headers, extracting the substantive human directive.
             -   **Full CLI & Telegram `/projects` Command Interoperability (`src-tauri/src/bin/agm.rs`)**: Permitted leading slash prefixes across all terminal CLI commands (`agm /projects`, `agm /nodes`, `agm /status`), aligning CLI syntax 100% with Telegram slash commands.
-
 
     *   **v4.83.0 (2026-09-27)**:
         -   **[Release v4.83.0: Total Elimination of Upstream Fork Fallback in Installers, Telegram 4096-Char Message Chunking, Cluster VM Nodes Topology, and Cross-Node Remote Prompt Injection] Completely eradicated lbjlaq fallback 404 errors during Windows installation, implemented newline-boundary Telegram message slicing, aggregated GitMap and Supabase cluster VM nodes into unified status cards, and delivered full CLI/Telegram parity for remote prompt injection (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -3848,21 +3841,17 @@
             -   **Node-Scoped Prompts & Workspaces/Prompts Catalog (`/nodes <alias> prompts`, `/projects`, `/prompts`) (`src-tauri/src/modules/telegram_inbound.rs`)**: Enabled operators to query running prompts scoped to specific VM nodes (`/nodes <alias> prompts`), view all active local workspaces and Project IDs (`/projects`), and inspect queued tasks in the state database (`/prompts`).
             -   **Telegram Remote Prompt Injection & AGM CLI Parity (`src-tauri/src/modules/telegram_inbound.rs`, `src-tauri/src/bin/agm.rs`)**: Supported direct prompt dispatch via `/prompt <node> <proj> <text>` targeting local `repo_db` or remote VM nodes. Achieved 100% CLI parity via `agm telegram nodes`, `agm telegram projects`, `agm telegram prompts [node]`, and `agm telegram prompt`.
 
-
     *   **v4.82.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.81.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.80.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.79.0 (2026-09-27)**:
         -   **[Release v4.79.0: Idle Sensor False-Positive Root Cause Fix, GitMap CLI/Email Telemetry Parity, Enlarged Ubuntu Typography with Pure White Links, and Command/Project/Prompt Cheat Sheet Integration] Eliminated False Idle Alerts During Active Runs, Matched GitMap Git Metadata Across Binaries & Emails, and Integrated Comprehensive Workspaces & Prompts Queue Tables**:
@@ -3871,7 +3860,6 @@
             -   **Enlarged Typography, Ubuntu Font Stack & High-Contrast White Links (`src-tauri/src/modules/email_sender.rs`)**: Overhauled HTML email styling with 28px titles, 16px body, 14-15px tables/code, and an explicit Ubuntu / Segoe UI / system-ui font stack. Styled all interactive action and target links with pure `#ffffff` text on pill badges, ensuring effortless readability across email clients.
             -   **Commands Cheat Sheet, Live Workspaces Table & Prompt Queue in CLI & Email (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`, `repo_db.rs`)**: Integrated three comprehensive tables across both the `agm` CLI default output and idle alert emails: (1) categorized command reference with syntax examples; (2) discovered workspaces with live status, paths, and copy-pasteable email reply targets (`sub: <NODE> | proj-<id>`); (3) recent prompt tasks and in-flight queue inventory.
 
-
     *   **v4.78.0 (2026-09-27)**:
         -   **[Release v4.78.0: Multi-Channel System Update Notifications (Default Enabled), Email Remote Syntax Manual Upgrade, Zero-Loss Prompt Resumption Across Profile Switches, and Active-Only Low Credit Alerts] Automated Update Receipts via Email & Telegram, Ubuntu High-Contrast Typography, Resumption Without Reinjection Loops, and Targeted Quota Alerts**:
             -   **Configurable Multi-Channel System Update Notifications (`src-tauri/src/modules/notification_hub.rs`, `update_checker.rs`, `email_vault_db.rs`, `telegram_inbound.rs`, `Settings.tsx`)**: Added comprehensive update receipt dispatch across Email and Telegram. Application startup automatically detects version upgrades by comparing `last_known_version` with `CARGO_PKG_VERSION` and issues release telemetry receipts regardless of upgrade method (GUI installer, CLI, or manual). General Settings, Sensor Notification Triggers, and Telegram Bot panels include toggle controls, **all enabled (`true`) by default**.
@@ -3879,21 +3867,17 @@
             -   **Auto-Switch Prompt Backup, Resumption, and Reinjection Prevention (`src-tauri/src/proxy/auto_switcher.rs`, `src-tauri/src/bin/agm.rs`, `backup_prompts_db.rs`)**: Resolved prompt stall during account rotation by taking atomic snapshots of running prompts prior to switching, resuming execution immediately once the new instance is active, and establishing rigorous prompt hash deduplication to eliminate repeated reinjection loops.
             -   **Active-Account Low Credit Alert Targeting (`src-tauri/src/modules/notification_hub.rs`, `email_watcher.rs`)**: Refined low credit alert evaluation so notifications only dispatch if the low-quota account is actively in use, suppressing noise from idle standby accounts.
 
-
     *   **v4.77.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.76.0 (2026-09-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.75.0 (2026-09-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.74.0 (2026-09-25)**:
         -   **[Release v4.74.0: Sponsor & Author Metadata Alignment, Single-Account 429 Adaptive GraceRetry Infinite Loop Fix, and GitMap LLM Chained Discovery Curriculum] Canonical Author Email alim.karim@riseup-asia.com, Single-Account GraceRetry State Contract Guard, and GitMap Autonomous Skill Generation**:
@@ -3909,7 +3893,6 @@
         -   **[Release v4.73.1: Windows Manifest Embedded Resource Alignment & comctl32.dll Entry Point 0xc0000139 Elimination] Common-Controls 6.0 Embedded in All Binaries**:
             -   **Embedded Common-Controls 6.0 Manifest for Test Binaries & App (`src-tauri/build.rs`, `windows-test.manifest`)**: Embedded application manifest containing Microsoft.Windows.Common-Controls 6.0 into test and release executables via `/MANIFEST:EMBED` to prevent `0xc0000139` entry point missing errors on modern Windows runners.
 
-
     *   **v4.72.0 (2026-09-24)**:
         -   **[Release v4.72.0: Two-Bar Release Page Installation, Release Workflow Version Stamping, PowerShell History Pinned Version Resolution, and Win32/WebView2 DWM Blank UI Elimination] Dedicated Latest vs Pinned Installation Code Blocks, Strict Pinned Version Queue Adherence Without Drift, and Complete Taskbar Thumbnail/Window Occlusion Redraw Pipeline**:
             -   **Release Page Two-Bar Installation Layout (`02-spec/21-app/45-two-bar-installer-and-dwm-blank-ui-fix.md`)**: Replaced merged, single-block installation instructions with two distinct copyable code blocks ("bars") in GitHub release notes and project documentation. Users can now copy **Bar 1 (Latest Version)** for auto-updating bleeding-edge installations or **Bar 2 (Version-Based Installation)** with `-Version "<VER>"` explicitly bound to that exact tag.
@@ -3919,21 +3902,17 @@
             -   **Win32 DWM Frame Recalculation & WebView2 Blank UI Elimination**: Permanently eradicated the intermittent blank gray window and blank taskbar thumbnail previews on Windows 10/11. Added `--disable-features=CalculateNativeWinOcclusion,CalculateNativeWindowOcclusion` and background throttling flags to `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in `src-tauri/src/lib.rs`. In `force_restore_and_focus_win32`, invoked Win32 `SetWindowPos` with `SWP_FRAMECHANGED` and `RedrawWindow` with `RDW_INVALIDATE | RDW_INTERNALPAINT | RDW_UPDATENOW | RDW_ALLCHILDREN` to force DWM redirection bitmap composition. Evaluated `window.dispatchEvent(new Event('resize'))` and added frontend window restoration listeners in `src/App.tsx`.
             -   **Root Cause Analysis & Canonical Spec**: Published canonical specification `02-spec/21-app/45-two-bar-installer-and-dwm-blank-ui-fix.md` and 4-part RCA `02-spec/22-app-issues/10-blank-ui-dwm-occlusion-and-versioned-installer-rca.md`.
 
-
     *   **v4.71.4 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.71.3 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.71.2 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.71.1 (2026-09-24)**:
         -   **[Release v4.71.1: Settings UI/UX Menu Overhaul, Machine Training REST API, and Full IDE Credential Injection] Concise Settings Tabs & Action Buttons, Redundant Debug Tab Consolidation to Titlebar Bug Icon, Machine Training Telemetry REST Endpoints, and Smart Rotator Deep Injection**:
@@ -3941,7 +3920,6 @@
             -   **Redundant Debug Tab Removal & Titlebar Bug Icon Integration**: Completely removed the redundant Debug option from the settings tab strip, centralizing all debug console controls into the permanent **Bug icon** in the top navigation titlebar. Added an unobtrusive quick-access card inside the Advanced tab for fast inspection of IPC calls and runtime logs.
             -   **Machine Training REST API Endpoints**: Exposed comprehensive REST endpoints for external training systems and model self-learning: `/api/v1/training`, `/api/v1/status`, `/api/v1/training/telemetry`, `/api/v1/training/learn`, `/api/v1/training/machines`, and `/api/v1/training/modify`. External agents can seek into full node telemetry (healthy accounts, instance runtimes, prompt status) and ingest reinforcement learning feedback to dynamically optimize model routing. Guarded by the `training_api_enabled` toggle in General Settings.
             -   **Remote Machine Modification & Complete IDE Account Injection**: Hardened the training API's `switch_account` and `trigger_rotation` actions to invoke `switch_account_to_instance(&target.id, Some(&inst_id))` and `trigger_manual_rotation_for_instance(req.instance_id.as_deref())`. This executes full OAuth token refresh, encrypted injection into the IDE sandbox database (`state.vscdb`), OS keyring synchronization, and instance process restart for 100% active credential adoption.
-
 
     *   **v4.71.0 (2026-09-24)**:
         -   **[Release v4.71.0: Modern Responsive HTML Email Cards, Origin Node Alias & Local IP in Subject, Flexible Whitespace Pipe Parsing, and Deep IDE Smart Account Injection] RFC 2046 Dual MIME Email Responses, Origin Node Identification Prefix, Zero/Single/Multi-Space Pipe Tokenization, Smart Rotator Candidate Scoring, and Comprehensive IDE Credential Injection**:
@@ -3959,26 +3937,21 @@
             -   **Window Focus Stealing Eradication & Passive Crash Recovery**: Defaulted `auto_focus_window` to `false`. Refactored `check_and_recover_crashed_instance` into a purely passive watchdog that cleans lockfiles without launching unexpected foreground IDE windows or triggering forced rotations. Documented comprehensive root cause analysis in `02-spec/22-app-issues/04-instance-delete-open-close-loop-and-focus-stealing-rca.md`.
             -   **100% Plaintext Subject-Driven Emails & Telegram Alignment**: Stripped all HTML tags from outgoing notification emails, enforcing pure plaintext format. Standardized subject-driven commands (`* | prompt | proj-...` or `* | ps | ...`) with pure prompts in the email body. Inbound email processing strips markdown footers and terminal prefixes (`powershell:`). Aligned Telegram Bot Token and Chat ID inputs horizontally (`items-end`) and provided `03-ai-scripts/telegram-bot-helper.ps1`.
 
-
     *   **v4.69.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.68.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.67.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.66.0 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.65.3 (2026-09-24)**:
         -   **[Release v4.65.3: Mailbox Multi-Format Visual Export, Single-Account Import/Export & Embedded JSON AI Syntax] Interactive Export Preview Modal, Native OS File Saving, Single Account Form Drawer & Embedded JSON AI Instructions**:
@@ -3989,16 +3962,13 @@
             -   **Embedded JSON Syntax in AI Configuration Segment**: Refactored the AI Mailbox Configuration banner to embed the exact JSON schema syntax directly inside the prompt text, accompanied by a `View JSON Format` toggle to preview the active JSON structure.
             -   **Global AI Templates & YAML Bulk Ingestion**: Embedded JSON schemas and added a dedicated YAML Schema tab in `ai-sample-templates-modal.tsx`, while introducing YAML radio selection and fallback parsing to the general Import dialog.
 
-
     *   **v4.65.2 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
 
-
     *   **v4.65.1 (2026-09-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit external contributors inline as `(Thanks to @username)`.
-
 
     *   **v4.65.0 (2026-09-23)**:
         -   **[Release v4.65.0] Update installed app branding to Antigravity Manager Tools and bump to v4.65.0**:
