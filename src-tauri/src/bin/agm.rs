@@ -152,6 +152,18 @@ fn main() {
         "pull" => cmd_pull(&cmd_args),
         "clean" | "purge" => cmd_clean(&cmd_args),
         "prune" | "pr" | "clear-cache" | "cache-clear" => cmd_clear_cache(&cmd_args),
+        "clear-terminal" | "clean-terminal" => cmd_clear_terminal(&cmd_args),
+        "failed-commands"
+        | "failed-command"
+        | "fc"
+        | "unknown-commands"
+        | "unknown-command"
+        | "failed-to-detect"
+        | "failed-to-detect-commands"
+        | "failed-commands-count"
+        | "fcc" => {
+            cmd_failed_commands(&cmd_args);
+        }
         "clear" => {
             if cmd_args
                 .first()
@@ -164,8 +176,14 @@ fn main() {
                     Vec::new()
                 };
                 cmd_clear_cache(&rest);
+            } else if cmd_args
+                .first()
+                .map(|s| s.eq_ignore_ascii_case("terminal"))
+                .unwrap_or(false)
+            {
+                cmd_clear_terminal(&cmd_args);
             } else {
-                cmd_clear_cache(&cmd_args);
+                cmd_clear_terminal(&cmd_args);
             }
         }
         "recreate-project" => cmd_recreate_project(&cmd_args),
@@ -218,9 +236,7 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("Unknown command: '{}'", args[1]);
-            eprintln!("Run 'agm help' for available commands.");
-            std::process::exit(1);
+            handle_unknown_command(&args[1], &args);
         }
     }
 }
@@ -6907,11 +6923,16 @@ fn cmd_clean(args: &[String]) {
         "    [✓] Temporary test, build-demo, and Cargo caches removed: {} folder(s)",
         removed_dirs
     );
-    println!("    [✓] Safety invariant verified: all database vaults strictly protected.");
     println!(
         "[SUCCESS] Cleanup finished. Space reclaimed: {} KB.",
         reclaimed_bytes / 1024
     );
+    println!("\n  💡 Optimization & Next Steps Suggestions:");
+    println!("    • Clear Terminal Session:    agm clear-terminal");
+    println!("    • Clear AGM Cache Only:      agm clear-cache");
+    println!("    • Verify SSH Fleet Health:   agm ssh nodes");
+    println!("    • Deploy Public Keys:        agm ssh deploy-keys");
+    println!("    • Inspect Failed Commands:   agm failed-commands\n");
 }
 
 fn cmd_logs(args: &[String]) {
@@ -8077,6 +8098,222 @@ fn cmd_clear_cache(args: &[String]) {
             }
         }
     }
+}
+
+fn cmd_clear_terminal(_args: &[String]) {
+    print!("\x1B[2J\x1B[1;1H\x1B[3J");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+
+    println!("✔ Terminal screen cleared and session refreshed.");
+    println!("\n  💡 Optimization & Next Step Suggestions:");
+    println!("    • Inspect JSON Formats:     agm which-format .");
+    println!("    • Inspect Failed Commands:  agm failed-commands");
+    println!("    • SSH Fleet Status:         agm ssh nodes");
+    println!("    • Sync Cluster SSH Keys:    agm ssh deploy-keys");
+    println!("    • Clean Artifacts & Caches: agm clean\n");
+}
+
+fn cmd_failed_commands(args: &[String]) {
+    let main_cmd = std::env::args().nth(1).unwrap_or_default().to_lowercase();
+    let is_count_sub = args.iter().any(|a| a == "count" || a == "-c" || a == "--count" || a == "stats");
+    let is_count_main = main_cmd == "fcc" || main_cmd == "failed-commands-count";
+    let is_count = is_count_main || is_count_sub;
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    if is_count {
+        match repo_db::count_failed_commands() {
+            Ok((distinct, total)) => {
+                if is_json {
+                    println!(
+                        r#"{{"distinctCommands":{},"totalHits":{}}}"#,
+                        distinct, total
+                    );
+                } else {
+                    println!("\n  📊 Failed / Undetected Commands Count:");
+                    println!("    • Distinct failed commands: {}", distinct);
+                    println!("    • Total failed attempts:   {}", total);
+                    println!();
+                }
+            }
+            Err(e) => eprintln!("[ERROR] Failed to count failed commands: {}", e),
+        }
+        return;
+    }
+
+    let is_clear = args.iter().any(|a| a == "clear" || a == "-y" || a == "--clear");
+    if is_clear {
+        match repo_db::clear_failed_commands() {
+            Ok(cleared) => {
+                println!(
+                    "✅ Cleared {} recorded failed commands from database.",
+                    cleared
+                );
+            }
+            Err(e) => eprintln!("[ERROR] Failed to clear failed commands: {}", e),
+        }
+        return;
+    }
+
+    let limit = args
+        .iter()
+        .find_map(|a| a.parse::<usize>().ok())
+        .unwrap_or(20);
+            match repo_db::list_failed_commands(limit) {
+                Ok(records) => {
+                    if is_json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&records).unwrap_or_default()
+                        );
+                    } else if records.is_empty() {
+                        println!(
+                            "\n  ✓ No failed commands recorded. All entered commands were successfully recognized!\n"
+                        );
+                    } else {
+                        let (distinct, total) = repo_db::count_failed_commands()
+                            .unwrap_or((records.len() as i64, records.len() as i64));
+                        println!("================================================================================");
+                        println!(
+                            "  AGM Failed / Undetected Commands Inspector (Distinct: {}, Total Hits: {})",
+                            distinct, total
+                        );
+                        println!("================================================================================");
+                        println!(
+                            "  {:<4} {:<24} {:<8} {:<10} {}",
+                            "#", "COMMAND", "HITS", "DOMAIN", "SUGGESTION"
+                        );
+                        println!("  ------------------------------------------------------------------------------");
+                        for (i, r) in records.iter().enumerate() {
+                            println!(
+                                "  {:<4} {:<24} {:<8} {:<10} {}",
+                                i + 1,
+                                r.command,
+                                r.hit_count,
+                                r.domain,
+                                r.suggestions
+                            );
+                        }
+                        println!("================================================================================");
+                        println!("  • Check count only: agm failed-commands count");
+                        println!("  • Clear history:    agm failed-commands clear\n");
+                    }
+                }
+                Err(e) => eprintln!("[ERROR] Failed to list failed commands: {}", e),
+            }
+        }
+    }
+}
+
+fn suggest_agm_commands(input: &str) -> Vec<String> {
+    let known_commands = [
+        "accounts",
+        "email",
+        "telegram",
+        "instances",
+        "supabase",
+        "config",
+        "ssh",
+        "sj",
+        "se",
+        "proxy",
+        "doctor",
+        "version",
+        "help",
+        "which-format",
+        "clear-terminal",
+        "clean",
+        "prune",
+        "clear-cache",
+        "failed-commands",
+        "fc",
+        "install",
+        "nodes",
+        "deploy-keys",
+        "add-key",
+    ];
+
+    let low = input.to_lowercase();
+    let mut scored: Vec<(usize, &str)> = Vec::new();
+
+    for &cmd in &known_commands {
+        let cmd_low = cmd.to_lowercase();
+        if cmd_low == low {
+            return vec![cmd.to_string()];
+        }
+        if cmd_low.starts_with(&low) || low.starts_with(&cmd_low) {
+            scored.push((1, cmd));
+            continue;
+        }
+        if cmd_low.contains(&low) || low.contains(&cmd_low) {
+            scored.push((2, cmd));
+            continue;
+        }
+        let dist = strsim_levenshtein(&low, &cmd_low);
+        if dist <= 2 || (low.len() > 4 && dist <= 3) {
+            scored.push((10 + dist, cmd));
+        }
+    }
+
+    scored.sort_by_key(|&(score, cmd)| (score, cmd.len()));
+    scored
+        .into_iter()
+        .map(|(_, cmd)| cmd.to_string())
+        .take(4)
+        .collect()
+}
+
+fn strsim_levenshtein(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let (m, n) = (a_chars.len(), b_chars.len());
+    let mut dp = vec![vec![0; n + 1]; m + 1];
+
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+
+    dp[m][n]
+}
+
+fn handle_unknown_command(cmd: &str, full_args: &[String]) {
+    let suggestions = suggest_agm_commands(cmd);
+    let full_str = full_args.join(" ");
+    let msg = format!("Unknown command: 'agm {}'", cmd);
+    let _ = repo_db::log_failed_command(
+        cmd,
+        &full_str,
+        "root",
+        "E1001",
+        &msg,
+        &suggestions,
+    );
+
+    eprintln!("\n❌ Unknown command: 'agm {}'", cmd);
+    if !suggestions.is_empty() {
+        eprintln!("\n  💡 It is not there, but here is a suggestion you can try:");
+        for s in &suggestions {
+            eprintln!("    • agm {}", s);
+        }
+    }
+    eprintln!("\n  Run 'agm help' for available commands.");
+    eprintln!("  Run 'agm failed-commands' (or 'agm fc') to view failed command history & suggestions.\n");
+    std::process::exit(1);
 }
 
 fn cmd_instances_export(args: &[String]) {
@@ -10613,6 +10850,12 @@ fn cmd_install(args: &[String]) {
         let _ = fs::copy(&current_exe, &adm_exe);
         println!("[SUCCESS] AGM & ADM CLI installed to {:?}", target_exe);
     }
+
+    println!("\n  💡 Next Steps & Setup Suggestions:");
+    println!("    • Verify Installation:       agm version");
+    println!("    • Inspect System Health:     agm doctor");
+    println!("    • Explore Fleet SSH Nodes:   agm ssh nodes");
+    println!("    • Clear Terminal Session:    agm clear-terminal\n");
 }
 
 #[cfg(target_os = "windows")]
@@ -11121,6 +11364,12 @@ fn handle_ssh_deploy_keys(args: &[String]) {
                 }
             }
             println!("✓ SSH public key mesh deployment complete.");
+            println!("\n  💡 SSH Key Deploy & Fleet Optimization Suggestions:");
+            println!("    • Verify Remote Access:      agm ssh <alias>");
+            println!("    • Check Fleet Nodes:         agm ssh nodes");
+            println!("    • Test Fleet Command:        agm ssh exec all \"uname -a\"");
+            println!("    • Health Probe Fleet:        gitmap ssh health (or agm ssh nodes)");
+            println!("    • Inspect Failed Commands:   agm failed-commands\n");
         }
         Err(e) => eprintln!("[ERROR] Deploy mesh keys failed: {}", e),
     }
@@ -11191,6 +11440,13 @@ fn handle_ssh_fix_auth(args: &[String]) {
             if !any_success && !reports.is_empty() {
                 std::process::exit(1);
             }
+            if any_success {
+                println!("\n  💡 Next Steps & Key Deployment Suggestions:");
+                println!("    • Connect without password:  agm ssh {}", target);
+                println!("    • Verify public key status:  agm ssh nodes");
+                println!("    • Execute remote test:       agm ssh exec {} \"whoami\"", target);
+                println!("    • Inspect Failed Commands:   agm failed-commands\n");
+            }
         }
         Err(e) => {
             eprintln!("[ERROR] Deploy public key failed: {}", e);
@@ -11246,6 +11502,10 @@ fn handle_ssh_auth(args: &[String]) {
                                 updated_files
                             );
                         }
+                        println!("\n  💡 Next Steps & Key Deployment Suggestions:");
+                        println!("    • Deploy keys to mesh nodes: agm ssh deploy-keys");
+                        println!("    • Verify SSH Fleet Nodes:    agm ssh nodes");
+                        println!("    • Inspect Failed Commands:   agm failed-commands\n");
                     }
                     Err(e) => {
                         eprintln!("[ERROR] Failed to install authorized key: {}", e);
@@ -11566,8 +11826,25 @@ fn handle_ssh_nodes(args: &[String]) {
                 );
             }
             println!("  --------------------------------------------------------------------------------\n");
+            if conns.is_empty() {
+                println!("  (No SSH nodes currently enrolled)\n");
+            }
+            println!("  💡 SSH Fleet Optimization & Key Management Suggestions:");
+            println!("    • Deploy & Sync SSH Keys:  agm ssh deploy-keys [alias] (or gitmap ssh deploy-keys)");
+            println!("    • Add Key to Remote Host:  agm ssh add-key <alias> [key-path]");
+            println!("    • Copy ID to Remote Host:  agm ssh copy-id <alias>");
+            println!("    • Execute Fleet Command:   agm ssh exec all \"uptime\"");
+            println!("    • Backup Fleet Registry:   agm ssh nodes export-json");
+            println!("    • Clear Terminal:          agm clear-terminal");
+            println!("    • Inspect Failed Commands: agm failed-commands\n");
         }
-        Err(e) => eprintln!("[ERROR] Failed to load SSH nodes: {}", e),
+        Err(e) => {
+            eprintln!("[ERROR] Failed to load SSH nodes: {}", e);
+            eprintln!("\n  💡 Troubleshooting Suggestions:");
+            eprintln!("    • Check SSH registry:      gitmap ssh ls");
+            eprintln!("    • Re-import SSH nodes:     agm ssh nodes import-json <file>");
+            eprintln!("    • Inspect Failed Commands: agm failed-commands\n");
+        }
     }
 }
 
@@ -11787,6 +12064,11 @@ fn cmd_ssh(args: &[String]) {
 
     if target.is_empty() {
         eprintln!("[ERROR] Missing SSH host target.");
+        eprintln!("\n  💡 It is not there, but here is a suggestion you can try:");
+        eprintln!("    • List available SSH nodes:  agm ssh nodes");
+        eprintln!("    • Deploy keys to all nodes:  agm ssh deploy-keys");
+        eprintln!("    • Connect by alias or IP:    agm ssh <alias|user@ip>");
+        eprintln!("    • Run command across fleet:  agm ssh exec all \"uptime\"\n");
         std::process::exit(1);
     }
 
@@ -11889,11 +12171,19 @@ fn cmd_ssh(args: &[String]) {
             let code = s.code().unwrap_or(0);
             if code != 0 {
                 eprintln!("[*] SSH session exited with code: {}", code);
+                eprintln!("\n  💡 SSH Troubleshooting Suggestions:");
+                eprintln!("    • Deploy public key to host: agm ssh deploy-keys {}", effective_target);
+                eprintln!("    • Install SSH public key:    agm ssh add-key <key>");
+                eprintln!("    • Check remote fleet nodes:  agm ssh nodes");
+                eprintln!("    • Diagnose via GitMap:       gitmap ssh health\n");
             }
         }
         Err(e) => {
             eprintln!("[ERROR] Failed to execute 'ssh': {}", e);
             eprintln!("Ensure OpenSSH client is installed and accessible in your system PATH.");
+            eprintln!("\n  💡 Suggestions:");
+            eprintln!("    • Use native GitMap SSH:     gitmap ssh {}", effective_target);
+            eprintln!("    • Check system doctor:       agm doctor\n");
         }
     }
 }
