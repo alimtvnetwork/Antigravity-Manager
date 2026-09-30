@@ -269,7 +269,11 @@ pub fn log_failed_command(
     let conn = connect_db()?;
     let cmd_trimmed = command.trim();
     let domain_trimmed = if domain.is_empty() { "root" } else { domain };
-    let err_code = if error_code.is_empty() { "E1001" } else { error_code };
+    let err_code = if error_code.is_empty() {
+        "E1001"
+    } else {
+        error_code
+    };
     let sugg_str = suggestions.join(", ");
     let working_dir = std::env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
@@ -280,10 +284,10 @@ pub fn log_failed_command(
         .prepare("SELECT id, hit_count FROM failed_commands WHERE LOWER(command) = LOWER(?1) AND LOWER(domain) = LOWER(?2) LIMIT 1")
         .map_err(|e| e.to_string())?;
 
-    let existing: Result<(i64, i64), _> = stmt.query_row(
-        rusqlite::params![cmd_trimmed, domain_trimmed],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    );
+    let existing: Result<(i64, i64), _> = stmt
+        .query_row(rusqlite::params![cmd_trimmed, domain_trimmed], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        });
 
     if let Ok((id, _)) = existing {
         conn.execute(
@@ -298,7 +302,15 @@ pub fn log_failed_command(
                 is_resolved = 0,
                 last_seen_at = CURRENT_TIMESTAMP
             WHERE id = ?7",
-            rusqlite::params![full_args, err_code, message, sugg_str, working_dir, agm_version, id],
+            rusqlite::params![
+                full_args,
+                err_code,
+                message,
+                sugg_str,
+                working_dir,
+                agm_version,
+                id
+            ],
         )
         .map_err(|e| e.to_string())?;
         return Ok(id);
@@ -308,7 +320,16 @@ pub fn log_failed_command(
         "INSERT INTO failed_commands (
             command, full_args, domain, error_code, message, suggestions, hit_count, working_dir, agm_version, is_resolved
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, 0)",
-        rusqlite::params![cmd_trimmed, full_args, domain_trimmed, err_code, message, sugg_str, working_dir, agm_version],
+        rusqlite::params![
+            cmd_trimmed,
+            full_args,
+            domain_trimmed,
+            err_code,
+            message,
+            sugg_str,
+            working_dir,
+            agm_version
+        ],
     )
     .map_err(|e| e.to_string())?;
 
