@@ -1,6 +1,6 @@
 # Boolean Principles — Quick reference table, common mistakes
 
-> **Parent:** [Boolean Principles](./01-index.md)
+> **Parent:** [Boolean Principles](./readme.md)
 > **Version:** 2.6.0
 > **Updated:** 2026-03-31
 
@@ -22,8 +22,9 @@
 | `fn(true)` | `fnWithOption()` | P5: Explicit params |
 | `isX && !isY` | `isConflict` (extracted) | P6: No mixed polarity |
 | `if x := fn(); x > 0` | Separate assignment | P7: No inline statements |
-| `os.Stat(path)` | `pathutil.IsDir(path)` | P8: No raw filesystem |
 | `if ($x == true)` | `if ($isX)` | P9: No explicit true checks |
+| `!isEmpty` / `!res.IsEmpty()` | `isDefined` / `res.IsDefined()` | Mandatory replacement for `!isEmpty` |
+| `val, ok := userMap[id]` | `val, isFound := userMap[id]` or `val, isUserExist := userMap[id]` | Map lookup canonical naming (do not use `isDefined`) |
 
 ---
 
@@ -115,8 +116,8 @@ if _, err := os.Stat(dir); err == nil {
 }
 
 // ✅ CORRECT — separate computation from condition
-isProjectExists := pathutil.IsDir(dir)
-if isProjectExists {
+isProjectDirDefined := pathutil.IsDir(dir)
+if isProjectDirDefined {
     fmt.Println("exists")
 }
 ```
@@ -146,9 +147,9 @@ if _, err := os.Stat(projectDir); isProjectConflict {
 }
 
 // ✅ CORRECT — all rules applied
-isProjectExists := pathutil.IsDir(projectDir)
+isProjectDirDefined := pathutil.IsDir(projectDir)
 isReadOnly := !isOverwrite
-isProjectConflict := isProjectExists && isReadOnly
+isProjectConflict := isProjectDirDefined && isReadOnly
 
 if isProjectConflict {
     return apperror.FailNew[ProjectResult](

@@ -10,7 +10,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `01-connection-status-enum.md` | ✅ Present |
 | 3 | `02-entity-status-enum.md` | ✅ Present |
 | 4 | `03-execution-status-enum.md` | ✅ Present |

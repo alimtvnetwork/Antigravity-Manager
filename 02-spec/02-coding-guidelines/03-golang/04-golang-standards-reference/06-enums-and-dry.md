@@ -1,6 +1,6 @@
 # Golang Coding Standards — Typed constants, enums, DRY enforcement
 
-> **Parent:** [Golang Coding Standards](./01-index.md)
+> **Parent:** [Golang Coding Standards](./readme.md)
 > **Version:** 3.7.0
 > **Updated:** 2026-03-31
 
@@ -8,10 +8,10 @@
 
 ## Typed Constants & Enums
 
-> **Canonical source:** [Go Enum Specification](../01-enum-specification/01-index.md) — core pattern, required methods, folder structure
+> **Canonical source:** [Go Enum Specification](../01-enum-specification/readme.md) — core pattern, required methods, folder structure
 > **Cross-language reference:** [Enum Naming Quick Reference](../../06-ai-optimization/07-enum-naming-quick-reference.md) — Go, TypeScript, PHP comparison
 
-All Go enum rules (byte type, `Invalid` zero value, `iota`, `variantLabels`, required methods, folder structure) are defined in the [Go Enum Specification](../01-enum-specification/01-index.md). Do not duplicate here.
+All Go enum rules (byte type, `Invalid` zero value, `iota`, `variantLabels`, required methods, folder structure) are defined in the [Go Enum Specification](../01-enum-specification/readme.md). Do not duplicate here.
 
 ### Zero Magic Strings/Numbers
 

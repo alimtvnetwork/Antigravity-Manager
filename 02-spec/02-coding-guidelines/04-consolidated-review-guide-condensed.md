@@ -193,7 +193,7 @@ function bad(): number {
 
 ## File Naming
 
-- **Markdown files**: lowercase with numeric prefix — `01-index.md`, `01-setup.md`, `readme.md`
+- **Markdown files**: lowercase with numeric prefix — `readme.md`, `01-setup.md`, `readme.md`
 - **All other files/values**: PascalCase (types, enums, JSON keys, DB columns)
 
 ## Caching — CODE RED 🔴
@@ -209,4 +209,4 @@ function bad(): number {
 
 - **Spec first → code second**
 - **Bug → issue file first** (`02-spec/.../03-issues/{NN}-{name}.md`) → root cause → fix
-- Follow folder naming: `01-index.md` + `99-consistency-report.md`
+- Follow folder naming: `readme.md` + `99-consistency-report.md`

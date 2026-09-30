@@ -2,7 +2,7 @@
 
 **Version:** 3.3.0
 **Updated:** 2026-04-16
-**Source Module:** [`02-spec/18-wp-plugin-how-to/`](../18-wp-plugin-how-to/01-index.md)
+**Source Module:** [`02-spec/18-wp-plugin-how-to/`](../18-wp-plugin-how-to/readme.md)
 
 ---
 
@@ -539,7 +539,7 @@ plugin-slug/                      ← ZIP root
 └── vendor/                       ← Composer autoloader (production only)
 ```
 
-**Excluded from ZIP:** `.git/`, `.github/`, `.ai-instructions`, `tests/`, `phpunit.xml`, `phpstan.neon`, `composer.lock`, `spec/`, `*.log`, `node_modules/`
+**Excluded from ZIP:** `.git/`, `.github/`, `.ai-instructions`, `tests/`, `phpunit.xml`, `phpstan.neon`, `composer.lock`, `02-spec/`, `*.log`, `node_modules/`
 
 ### ZIP Integrity Requirements
 

@@ -1,6 +1,6 @@
 # Generic Return Types — No interface{}/any/object Returns
 
-> **Parent:** [Cross-Language Overview](./01-index.md)
+> **Parent:** [Cross-Language Overview](./readme.md)
 > **Version:** 1.0.0
 > **Updated:** 2026-04-02
 > **AI Confidence:** Production-Ready

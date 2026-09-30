@@ -130,6 +130,6 @@ MyProject/                       ← PascalCase
 
 | Reference | Location |
 |-----------|----------|
-| Rust Standards | [../05-rust/01-index.md](../05-rust/01-index.md) |
-| C# Standards | [../07-csharp/01-index.md](../07-csharp/01-index.md) |
+| Rust Standards | [../05-rust/readme.md](../05-rust/readme.md) |
+| C# Standards | [../07-csharp/readme.md](../07-csharp/readme.md) |
 | Cross-Language Rules | [./01-cross-language.md](./02-cross-language.md) |

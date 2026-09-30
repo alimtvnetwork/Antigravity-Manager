@@ -36,13 +36,13 @@
 - [No Raw Negations](../12-no-negatives.md) — Positive guard functions instead of `!` (all languages)
 - [Function Naming](../10-function-naming.md) — No boolean flag parameters (all languages)
 - [Strict Typing](../13-strict-typing.md) — Type declarations, max 3 parameters (all languages)
-- [Boolean Principles](../02-boolean-principles/01-index.md) — P1–P6 boolean naming rules (all languages)
-- [Go Enum Specification](../../03-golang/01-enum-specification/01-index.md) — Go enum pattern, required methods, folder structure
-- [TypeScript Enums](../../02-typescript/01-index.md) — TypeScript string enum definitions and usage patterns
+- [Boolean Principles](../02-boolean-principles/readme.md) — P1–P6 boolean naming rules (all languages)
+- [Go Enum Specification](../../03-golang/01-enum-specification/readme.md) — Go enum pattern, required methods, folder structure
+- [TypeScript Enums](../../02-typescript/readme.md) — TypeScript string enum definitions and usage patterns
 - [PHP Enum Classes](../../04-php/02-enums.md) — PHP backed enum patterns
-- [PHP Coding Standards](../../04-php/07-php-standards-reference/01-index.md) — PHP-specific rules that reference this spec
+- [PHP Coding Standards](../../04-php/07-php-standards-reference/readme.md) — PHP-specific rules that reference this spec
 - [PHP Forbidden Patterns](../../04-php/03-forbidden-patterns.md) — PHP checklist
 
 ---
 
-*Part of [Code Style](./01-index.md)*
+*Part of [Code Style](./readme.md)*

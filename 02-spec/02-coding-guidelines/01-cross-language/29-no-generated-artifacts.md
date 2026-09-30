@@ -39,3 +39,13 @@ Under no circumstances should any generated code (e.g., ORM models, gRPC stubs, 
 ## Enforcement
 
 This rule is enforced globally via `.gitignore` patterns. If a new type of artifact is introduced, you must update `.gitignore` before committing anything else.
+
+---
+
+## 🧹 Storage Hygiene, Temp Directory Isolation & Pre-Build Cleanup
+
+1. **Repository-Scoped OS Temp**: Any execution requiring the host OS/user temporary directory (`os.TempDir()`, `tempfile.gettempdir()`, `$env:TEMP`, `$TMPDIR`) must strictly namespace operations within `<temp_dir>/gitmap/<category>/` (e.g. `build/`, `test/`, `purge/`, `downloads/`). Un-namespaced files or loose directories in the root of OS temp are strictly forbidden.
+2. **Mandatory Pre-Build Cleanup**: Before executing compilation (`go build`, `npm run build`), previous build artifacts in the target build directory must be deleted. Storage reuse must be strictly maintained to prevent disk exhaustion.
+3. **Workspace Isolation**: In-repository temporary artifacts must reside exclusively inside `.ai-memory/temp/`. Creating `.tmp/` at the repository root is banned.
+4. **GitHub Actions Zero Storage (Total Ban on `upload-artifact` in CI)**: Never use `actions/upload-artifact` in CI pipelines. Free accounts are capped at 0.5 GB (500 MB) across the account. CI builds are ephemeral compilation verifications; binary artifacts belong exclusively in GitHub Releases via `release.yml`, never in Actions artifact storage. See `02-spec/02-coding-guidelines/01-cross-language/30-actions-zero-storage.md`.
+

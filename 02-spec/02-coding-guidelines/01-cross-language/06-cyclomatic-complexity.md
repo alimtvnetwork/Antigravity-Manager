@@ -310,7 +310,7 @@ This spec works in concert with:
 |------|-------------|
 | [Rule 2: Zero Nested `if`](./04-code-style/02-braces-and-nesting.md) | Enforces the same principle at the syntax level |
 | [Rule 6: 15-Line Function Limit](./04-code-style/05-function-and-type-size.md) | Guards keep functions short — if too many guards, extract a `validate()` helper |
-| [Boolean Principles](./02-boolean-principles/01-index.md) | Guards use `is`/`has` named booleans for clarity |
+| [Boolean Principles](./02-boolean-principles/readme.md) | Guards use `is`/`has` named booleans for clarity |
 | [No Raw Negations](./12-no-negatives.md) | Guards use positive names (`isFileMissing`) not `!fileExists()` |
 
 ---
@@ -330,8 +330,8 @@ This spec works in concert with:
 
 ## Cross-References
 
-- [Code Style — Rules 2, 6, 7](./04-code-style/01-index.md) — Zero nesting, 15-line limit
-- [Boolean Principles](./02-boolean-principles/01-index.md) — Named boolean variables
+- [Code Style — Rules 2, 6, 7](./04-code-style/readme.md) — Zero nesting, 15-line limit
+- [Boolean Principles](./02-boolean-principles/readme.md) — Named boolean variables
 - [No Raw Negations](./12-no-negatives.md) — Positive guard function names
 - [Function Naming](./10-function-naming.md) — Explicit method names over boolean flags
 

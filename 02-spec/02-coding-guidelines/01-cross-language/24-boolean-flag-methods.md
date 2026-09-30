@@ -1,6 +1,6 @@
 # Boolean Flag Method Splitting
 
-> **Parent:** [Cross-Language Overview](./01-index.md)
+> **Parent:** [Cross-Language Overview](./readme.md)
 > **Version:** 1.0.0
 > **Updated:** 2026-04-02
 > **AI Confidence:** Production-Ready
@@ -187,7 +187,7 @@ func finalizeOrder(order Order) error { /* ... */ }
 
 ## Cross-References
 
-- [Boolean Principles](./02-boolean-principles/01-index.md) — P5: No boolean parameters
+- [Boolean Principles](./02-boolean-principles/readme.md) — P5: No boolean parameters
 - [Function Naming](./10-function-naming.md) — naming conventions for split methods
 - [Cyclomatic Complexity](./06-cyclomatic-complexity.md) — flag splitting reduces branching
 - [SOLID Principles](./23-solid-principles.md) — Single Responsibility applied to methods

@@ -22,13 +22,13 @@ All notable changes to the `16-static-analysis/` subfolder.
 ### Changed
 
 - All 8 language specs bumped to v1.1.0 — standardized Keywords/Scoring sections, integration checklist format, and added missing SonarQube rules (S1126, S4144)
-- `01-index.md` bumped to v1.1.0 — added CI pipeline to inventory
+- `readme.md` bumped to v1.1.0 — added CI pipeline to inventory
 
 ## [1.0.0] — 2026-03-31
 
 ### Added
 
-- `01-index.md` — subfolder overview with document inventory and rule mapping table
+- `readme.md` — subfolder overview with document inventory and rule mapping table
 - `02-go-golangci-lint.md` — Go static analysis spec
 - `03-php-phpcs-phpstan.md` — PHP static analysis spec
 - `04-csharp-stylecop.md` — C# static analysis spec

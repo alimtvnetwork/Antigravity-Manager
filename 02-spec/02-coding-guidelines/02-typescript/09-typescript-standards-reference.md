@@ -254,7 +254,7 @@ type ActivityMetadata = PublishMetadata | SnapshotMetadata | PluginMetadata | Co
 
 ## 5. Function Size — Max 15 Lines
 
-> **Canonical source:** [Cross-Language Code Style](../01-cross-language/04-code-style/01-index.md) — Rule 6
+> **Canonical source:** [Cross-Language Code Style](../01-cross-language/04-code-style/readme.md) — Rule 6
 
 Every function/method body must be **15 lines or fewer**. Extract logic into small, well-named helper functions.
 
@@ -277,7 +277,7 @@ const handleSubmit = async (data: FormData) => {
 
 ## 6. Zero Nested `if` — Absolute Ban
 
-> **Canonical source:** [Cross-Language Code Style](../01-cross-language/04-code-style/01-index.md) — Rule 2 & 7
+> **Canonical source:** [Cross-Language Code Style](../01-cross-language/04-code-style/readme.md) — Rule 2 & 7
 
 Nested `if` blocks are **absolutely forbidden** — zero tolerance, no exceptions. Flatten with early returns or combined conditions.
 
@@ -352,7 +352,7 @@ if (isFileMissing(path)) { throw new Error('Missing'); }
 
 ## 9. `isDefined()` and `isDefinedAndValid()` — Positive Null/Existence Guards
 
-> **Cross-language parity:** [Go Standards §IsDefined](../03-golang/04-golang-standards-reference/01-index.md)
+> **Cross-language parity:** [Go Standards §IsDefined](../03-golang/04-golang-standards-reference/readme.md)
 
 Raw `!== null` / `!== undefined` combined with negation or nested validity checks creates cognitive overhead. Use positive guard functions that express intent clearly.
 
@@ -569,7 +569,7 @@ All standardized TypeScript enums for the frontend. Each enum has a dedicated sp
 | Enum | Values | Spec File | Go Equivalent |
 |------|--------|-----------|---------------|
 | `HttpMethod` | `Get`, `Head`, `Post`, `Put`, `Patch`, `Delete`, `Options` | [http-method-enum.md](./06-http-method-enum.md) | `pkg/enums/httpmethodtype` |
-| `ExecutionStatus` | `Idle`, `Running`, `Paused`, `Completed`, `Failed`, `Cancelled` | [execution-status-enum.md](./04-execution-status-enum.md) | `pkg/enums/executionstatustype` |
+| `ExecutionStatus` | `Idle`, `Running`, `Paused`, `Completed`, `Failed`, `canceled` | [execution-status-enum.md](./04-execution-status-enum.md) | `pkg/enums/executionstatustype` |
 | `ConnectionStatus` | `Connected`, `Disconnected`, `Connecting`, `Reconnecting`, `Error` | [connection-status-enum.md](./02-connection-status-enum.md) | `pkg/enums/connectionstatustype` |
 | `ExportStatus` | `Pending`, `Processing`, `Completed`, `Failed` | [export-status-enum.md](./05-export-status-enum.md) | `pkg/enums/exportstatustype` |
 | `MessageStatus` | `Pending`, `Streaming`, `Completed`, `Error` | [message-status-enum.md](./07-message-status-enum.md) | `pkg/enums/messagestatustype` |
@@ -582,12 +582,12 @@ All standardized TypeScript enums for the frontend. Each enum has a dedicated sp
 ## Cross-References
 
 - [No Raw Negations](../01-cross-language/12-no-negatives.md) — Positive guard functions (all languages)
-- [Cross-Language Code Style](../01-cross-language/04-code-style/01-index.md) — Braces, nesting & spacing rules (canonical)
+- [Cross-Language Code Style](../01-cross-language/04-code-style/readme.md) — Braces, nesting & spacing rules (canonical)
 - [Function Naming](../01-cross-language/10-function-naming.md) — No boolean flag parameters (all languages)
 - [Boolean Flag Method Splitting](../01-cross-language/24-boolean-flag-methods.md) — Split bool-flag methods into two named methods
 - [Strict Typing](../01-cross-language/13-strict-typing.md) — Type declarations & docblock rules (all languages)
 - [DRY Principles](../01-cross-language/08-dry-principles.md)
-- [Golang Standards](../03-golang/04-golang-standards-reference/01-index.md)
+- [Golang Standards](../03-golang/04-golang-standards-reference/readme.md)
 - [Response Envelope Spec](../../03-error-manage/02-error-architecture/05-response-envelope/envelope.schema.json)
 
 ---

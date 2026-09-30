@@ -203,4 +203,4 @@ Every struct, class, or interface definition (including its methods in the same 
 
 ---
 
-*Part of [Code Style](./01-index.md) — Rules 6, 17*
+*Part of [Code Style](./readme.md) — Rules 6, 17*

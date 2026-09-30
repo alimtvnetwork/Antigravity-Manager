@@ -28,7 +28,7 @@ All notable changes to the Coding Guidelines specification are documented here.
 
 #### Changed
 
-- `15-master-coding-guidelines/01-index.md` bumped to **v2.0.0**
+- `15-master-coding-guidelines/readme.md` bumped to **v2.0.0**
 - Added 7 new sections (§14–§20): Lazy Evaluation, Regex Usage, Code Mutation Avoidance, Null Pointer Safety, Nesting Resolution, Newline Styling, Defer Rules (Go)
 - Expanded Quick Checklist with 7 new items covering mutation, regex, lazy eval, defer, nesting, newlines, null safety
 - Added cross-references to Phase 4 spec files (16–21) in "How to Use" section

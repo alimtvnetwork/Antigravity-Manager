@@ -401,4 +401,4 @@ if err != nil {
 
 ---
 
-*Part of [Code Style](./01-index.md) — Rules 4, 5, 10*
+*Part of [Code Style](./readme.md) — Rules 4, 5, 10*

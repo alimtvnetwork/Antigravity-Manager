@@ -7,7 +7,7 @@
 
 ## Purpose
 
-The current root README is comprehensive but has grown to **1354 lines**. New visitors — both humans and AI agents — need 3–5 seconds to understand what the repo does, who it's for, and how to install the piece they want. This file lists concrete, prioritised improvements I can apply on request.
+The current root README is comprehensive but has grown to **1354 lines**. New visitors — both humans and AI agents — need 3–5 seconds to understand what the repo does, who it's for, and how to install the piece they want. This file lists concrete, prioritized improvements I can apply on request.
 
 The two new GIFs (`coding-guidelines-walkthrough.gif`, `install-flow.gif`) and the **Bundle Installers** matrix were already added in v3.55.0. Everything below is what comes next.
 
@@ -59,7 +59,7 @@ The two new GIFs (`coding-guidelines-walkthrough.gif`, `install-flow.gif`) and t
 
 | # | Suggestion | Priority |
 |---|---|---|
-| 17 | Add a `## For AI Agents` section right after the H1 summary listing the canonical entry points: `llm.md`, `bundles.json`, `02-spec/17-consolidated-guidelines/01-index.md`, `.ai-memory/memory/01-index.md`. | 🔴 |
+| 17 | Add a `## For AI Agents` section right after the H1 summary listing the canonical entry points: `llm.md`, `bundles.json`, `02-spec/17-consolidated-guidelines/readme.md`, `.ai-memory/memory/readme.md`. | 🔴 |
 | 18 | Publish a `bundles.schema.json`-validated table of contents so an AI can answer "which bundle do I need?" with a single fetch instead of crawling the whole repo. | 🟡 |
 | 19 | Add a one-line `# coding-guidelines-v24` topic to the GitHub repo metadata so cross-project AI search picks it up. (Repo-side, not file-side.) | 🟢 |
 

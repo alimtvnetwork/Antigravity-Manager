@@ -128,7 +128,7 @@ interface WsState { status: 'connected' | 'disconnected'; }
 |------|------|--------|
 | `ConnectionStatus` | `01-connection-status-enum.md` | Connected, Disconnected, Connecting, Reconnecting, Error |
 | `EntityStatus` | `02-entity-status-enum.md` | Active, Inactive, Pending, Archived |
-| `ExecutionStatus` | `03-execution-status-enum.md` | Pending, Running, Completed, Failed, Cancelled |
+| `ExecutionStatus` | `03-execution-status-enum.md` | Pending, Running, Completed, Failed, canceled |
 | `ExportStatus` | `04-export-status-enum.md` | Pending, Processing, Completed, Failed |
 | `HttpMethod` | `05-http-method-enum.md` | Get, Post, Put, Patch, Delete |
 | `MessageStatus` | `06-message-status-enum.md` | Pending, Streaming, Completed, Error |
@@ -287,11 +287,11 @@ Before generating any enum-related code:
 
 ## Cross-References
 
-- [Go Enum Specification](../03-golang/01-enum-specification/01-index.md) — Full Go enum pattern, methods, folder structure
-- [TypeScript Enums](../02-typescript/01-index.md) — All TypeScript enum definitions
+- [Go Enum Specification](../03-golang/01-enum-specification/readme.md) — Full Go enum pattern, methods, folder structure
+- [TypeScript Enums](../02-typescript/readme.md) — All TypeScript enum definitions
 - [PHP Enums](../04-php/02-enums.md) — PHP backed enum patterns and rules
 - [Rust Naming Conventions](../05-rust/02-naming-conventions.md) — Rust hybrid naming strategy and enum string rules
-- [Code Style — Switch Exemption](../01-cross-language/04-code-style/01-index.md) — Switch-based enum parser exemption from nesting ban
+- [Code Style — Switch Exemption](../01-cross-language/04-code-style/readme.md) — Switch-based enum parser exemption from nesting ban
 - [AI Quick Reference Checklist](./03-ai-quick-reference-checklist.md) — Broader code validation checklist
 
 ---

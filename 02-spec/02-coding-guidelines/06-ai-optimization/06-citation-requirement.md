@@ -2,7 +2,7 @@
 
 ## Mandatory Citation & Relative Path Rule (CODE RED)
 
-Whenever an AI agent generates code, creates plans (`.ai-memory/plans/pending/`), breaks tasks into subtasks (`.ai-memory/plans/subtasks/`), writes memory logs (`.ai-memory/memory/issues/`), explains design decisions, or enforces standards, it **MUST** cite the specific `spec/` or `.ai-memory/` markdown file and line/section that justifies the action using **STRICTLY RELATIVE PATHS FROM THE GIT REPOSITORY ROOT**.
+Whenever an AI agent generates code, creates plans (`.ai-memory/plans/pending/`), breaks tasks into subtasks (`.ai-memory/plans/subtasks/`), writes memory logs (`.ai-memory/memory/issues/`), explains design decisions, or enforces standards, it **MUST** cite the specific `02-spec/` or `.ai-memory/` markdown file and line/section that justifies the action using **STRICTLY RELATIVE PATHS FROM THE GIT REPOSITORY ROOT**.
 
 ### 1. Total Ban on Absolute Paths & `file:///` URIs in Repository Files
 
@@ -22,10 +22,11 @@ Whenever an AI agent generates code, creates plans (`.ai-memory/plans/pending/`)
 #### ✅ VALID (Strict Relative Git Path):
 
 ```markdown
-- [SSH Commands](02-spec/13-generic-cli/01-index.md) — Why: Defines required behavior.
+- [SSH Commands](02-spec/13-generic-cli/readme.md) — Why: Defines required behavior.
 - [App Error Docs](02-spec/05-coding-guidelines/04-error-handling.md) — Why: Standards for returning results.
 - [cmd/main.go](cmd/main.go) — Why: Target file.
 ```
+
 ### Why This is Required
 
 - It prevents agents from blending external training data with this repository's strict conventions.
@@ -34,7 +35,7 @@ Whenever an AI agent generates code, creates plans (`.ai-memory/plans/pending/`)
 ### Examples of Valid Citations
 
 - *"Implementing this as an early return to avoid nesting, per `02-spec/02-coding-guidelines/01-cross-language/01-zero-nesting.md`."*
-- *"Returning a structured error with context, per `02-spec/03-error-manage/02-error-architecture/01-index.md`."*
+- *"Returning a structured error with context, per `02-spec/03-error-manage/02-error-architecture/readme.md`."*
 
 ### Violations
 

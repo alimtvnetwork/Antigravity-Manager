@@ -126,7 +126,34 @@ File writing operations must be safe, flexible, and concurrency-guarded:
 1. **Unified Writing Entry Point:** Provide a generic `Write(path, payload, perm)` that accepts any payload (struct, map, array, string, bytes) and routes through the standalone converter.
 2. **Dedicated Typed Writers:** Provide explicit helpers (`WriteJSON`, `WriteLines`, `WriteString`, `WriteBytes`).
 3. **File-Path Based Mutex Locking:** File writes in concurrent contexts must support locked variants (`WriteLocked`, `WriteJSONLocked`, etc.) resolving a path-level `sync.RWMutex`.
-4. **Zero Memory Leak Policy:** Path mutexes must use reference counting and be evicted upon release when the reference count drops to 0 (`ReleaseFileLock(path)`).
+
+### Rule 7: Branch Immutability & Constructor Helper Return Pattern (TOTAL BAN on In-Place Branch Mutation)
+
+Never mutate fields on an existing struct or object instance across conditional branches (`if`/`else` ladders or `switch` cases).
+
+```go
+// ❌ WRONG — mutating fields across branching conditions
+if len(items) >= 2 && !isValid(items[0]) && isValid(items[1]) {
+    cfg.Target = items[1]
+    if cfg.Alias == "" {
+        cfg.Alias = items[0]
+    }
+    return cfg, nil
+}
+```
+
+Instead, decompose branching paths so each branch calls a pure constructor or builder helper that constructs and returns a complete, immutable struct instance directly:
+
+```go
+// ✅ CORRECT — pure construction with dedicated helpers
+if isAlternateOrder {
+    return buildAlternateConfig(items, baseConfig), nil
+}
+
+return buildStandardConfig(items, baseConfig), nil
+```
+
+See [32-branch-immutability-and-clean-construction.md](./32-branch-immutability-and-clean-construction.md) for full architecture and cross-language specifications.
 
 ---
 
@@ -170,7 +197,7 @@ func (r *Receiver) SetValue(v string) {
 
 - [Lazy Evaluation Patterns](./16-lazy-evaluation-patterns.md) — Exempted mutation for caching
 - [DRY Principles](./08-dry-principles.md) — Constructor-based initialization
-- [Master Coding Guidelines](./15-master-coding-guidelines/01-index.md) — §7 Type Safety
+- [Master Coding Guidelines](./15-master-coding-guidelines/readme.md) — §7 Type Safety
 
 ---
 

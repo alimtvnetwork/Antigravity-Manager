@@ -25,7 +25,7 @@ It complements:
 Add a linter only when **all** of the following are true:
 
 1. The rule is **machine-checkable** (no human judgement required).
-2. The rule has a **stable spec section** under `spec/` it can cite.
+2. The rule has a **stable spec section** under `02-spec/` it can cite.
 3. The rule produces **zero false positives** on the current repo (or
    every false positive can be allowlisted with written justification).
 4. No existing linter already covers the rule (check `§34` first).

@@ -213,10 +213,10 @@ See [How to Reduce Code Nested Branching in Go](https://hackmd.io/@akarimevatix/
 
 ## 5. Cross-References
 
-- [Code Style §R2](./04-code-style/01-index.md) — Zero nested `if` rule
+- [Code Style §R2](./04-code-style/readme.md) — Zero nested `if` rule
 - [Cyclomatic Complexity](./06-cyclomatic-complexity.md) — Complexity limits
-- [Boolean Principles](./02-boolean-principles/01-index.md) — Named boolean extraction
-- [Master Coding Guidelines §5](./15-master-coding-guidelines/01-index.md) — Formatting rules
+- [Boolean Principles](./02-boolean-principles/readme.md) — Named boolean extraction
+- [Master Coding Guidelines §5](./15-master-coding-guidelines/readme.md) — Formatting rules
 
 ---
 

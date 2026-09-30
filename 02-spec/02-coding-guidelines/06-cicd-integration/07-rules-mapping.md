@@ -97,4 +97,4 @@ version bump of the linter pack and a deprecation note in
 
 ---
 
-*Part of [CI/CD Integration](./01-index.md)*
+*Part of [CI/CD Integration](./readme.md)*

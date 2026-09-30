@@ -88,8 +88,8 @@ Moving regex from inside a function to a package-level `var` can yield significa
 
 ## 6. Cross-References
 
-- [Code Style](./04-code-style/01-index.md) — Performance considerations
-- [Master Coding Guidelines](./15-master-coding-guidelines/01-index.md) — §8 Magic Strings (regex patterns are not magic strings)
+- [Code Style](./04-code-style/readme.md) — Performance considerations
+- [Master Coding Guidelines](./15-master-coding-guidelines/readme.md) — §8 Magic Strings (regex patterns are not magic strings)
 
 ---
 

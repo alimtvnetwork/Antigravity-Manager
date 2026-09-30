@@ -325,13 +325,13 @@ Raw negation is **only** acceptable for:
 
 ## Cross-References
 
-- [Boolean Principles Overview](./02-boolean-principles/01-index.md) — Is/Has prefix rules and parent index
+- [Boolean Principles Overview](./02-boolean-principles/readme.md) — Is/Has prefix rules and parent index
 - [Database Naming — Rule 9 (Inverted Fields)](../../04-database-conventions/02-naming-conventions.md#rule-9-auto-generated-inverted-computed-fields-in-code) — DB-side inverse contract + codegen
 - [PHP Boolean Logic](../04-php/07-php-standards-reference/04-initialization-and-booleans.md#boolean-logic) — PHP-specific helpers
 - [PHP Forbidden Patterns](../04-php/03-forbidden-patterns.md) — Pattern 4.x
-- [Cross-Language Code Style](./04-code-style/01-index.md) — Braces, nesting, spacing
+- [Cross-Language Code Style](./04-code-style/readme.md) — Braces, nesting, spacing
 - [TypeScript Standards](../02-typescript/09-typescript-standards-reference.md)
-- [Golang Standards](../03-golang/04-golang-standards-reference/01-index.md)
+- [Golang Standards](../03-golang/04-golang-standards-reference/readme.md)
 
 ---
 

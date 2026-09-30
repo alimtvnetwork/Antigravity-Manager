@@ -1,6 +1,6 @@
 # Golang Coding Standards — Concurrency, forbidden patterns, imports, common mistakes
 
-> **Parent:** [Golang Coding Standards](./01-index.md)
+> **Parent:** [Golang Coding Standards](./readme.md)
 > **Version:** 3.7.0
 > **Updated:** 2026-03-31
 

@@ -310,4 +310,4 @@ return apperror.Fail[Plugin](appErr)
 
 ---
 
-*Part of [Code Style](./01-index.md) — Rules 9, 11, apperror multi-line*
+*Part of [Code Style](./readme.md) — Rules 9, 11, apperror multi-line*

@@ -1,6 +1,6 @@
 # C# Naming and Conventions
 
-> **Parent:** [C# Coding Standards](./01-index.md)
+> **Parent:** [C# Coding Standards](./readme.md)
 > **Version:** 1.0.0
 > **Updated:** 2026-04-02
 
@@ -88,8 +88,8 @@ namespace RiseupAsia.Domain.Models;
 
 ## Cross-References
 
-- [Cross-Language Abbreviation Casing](../01-cross-language/04-code-style/01-index.md)
-- [Boolean Principles](../01-cross-language/02-boolean-principles/01-index.md)
+- [Cross-Language Abbreviation Casing](../01-cross-language/04-code-style/readme.md)
+- [Boolean Principles](../01-cross-language/02-boolean-principles/readme.md)
 - [Variable Naming Conventions](../01-cross-language/22-variable-naming-conventions.md)
 
 ---

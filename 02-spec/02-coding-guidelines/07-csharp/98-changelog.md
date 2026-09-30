@@ -8,7 +8,7 @@
 
 ### Added
 
-- `01-index.md` — C# coding standards overview with cross-references
+- `readme.md` — C# coding standards overview with cross-references
 - `01-naming-and-conventions.md` — PascalCase methods, `I` prefix interfaces, abbreviation casing, boolean naming
 - `02-method-design.md` — Boolean flag splitting, function size limits, async patterns, LINQ usage
 - `03-error-handling.md` — Specific exception catching, guard clauses, nullable reference types

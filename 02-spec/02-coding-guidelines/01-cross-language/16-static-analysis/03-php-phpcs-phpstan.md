@@ -17,7 +17,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | AI Confidence assigned | ✅ |
 | Ambiguity assigned | ✅ |
 | Keywords present | ✅ |
@@ -52,7 +52,7 @@ Maps every cross-language coding guideline to its **PHP_CodeSniffer (PHPCS)** an
 | No `else` after return | [Code Style §R7](../04-code-style/02-braces-and-nesting.md) | `SlevomatCodingStandard.ControlStructures.EarlyExit` | (enabled) |
 | Max 15-line functions | [Code Style §R6](../04-code-style/05-function-and-type-size.md) | `Generic.Metrics.FunctionLength` | `maxLength: 15` |
 | Blank line before return | [Code Style §R4](../04-code-style/04-blank-lines-and-spacing.md) | `SlevomatCodingStandard.ControlStructures.JumpStatementsSpacing` | `linesCountBeforeFirst: 1` |
-| No dead code | [Code Style §R5](../04-code-style/01-index.md) | `SlevomatCodingStandard.Functions.UnusedInheritedVariablePassedToClosure` | (enabled) |
+| No dead code | [Code Style §R5](../04-code-style/readme.md) | `SlevomatCodingStandard.Functions.UnusedInheritedVariablePassedToClosure` | (enabled) |
 | Max 400-line files | [File Rules](../04-code-style/05-function-and-type-size.md) | `Generic.Files.LineLength` + `Generic.Metrics.ClassLength` | custom |
 | Braces on same line | [Code Style §R1](../04-code-style/02-braces-and-nesting.md) | `PSR12.ControlStructures.ControlStructureSpacing` | PSR-12 default |
 
@@ -60,7 +60,7 @@ Maps every cross-language coding guideline to its **PHP_CodeSniffer (PHPCS)** an
 
 | Guideline | Spec Source | PHPCS Sniff | Setting |
 |-----------|-------------|-------------|---------|
-| Boolean naming (`is/has only (all other prefixes banned)`) | [Boolean Principles](../02-boolean-principles/01-index.md) | `SlevomatCodingStandard.Variables.UnusedVariable` + custom sniff | regex pattern |
+| Boolean naming (`is/has only (all other prefixes banned)`) | [Boolean Principles](../02-boolean-principles/readme.md) | `SlevomatCodingStandard.Variables.UnusedVariable` + custom sniff | regex pattern |
 | PascalCase keys (API/DB) | [Key Naming](../11-key-naming-pascalcase.md) | custom sniff | `PascalCase` enforcement |
 | No boolean flag params | [Function Naming](../10-function-naming.md) | `SlevomatCodingStandard.Functions.FunctionLength` | code review |
 | No raw negation (`!fn()`) | [No Negatives](../12-no-negatives.md) | custom sniff | `!$this->isValid()` detection |
@@ -84,7 +84,7 @@ PHPStan at **level 9** (strictest) enforces type safety:
 | No `mixed` type (equiv. of `any`) | [Strict Typing](../13-strict-typing.md) | Level 9 | All types must be explicit |
 | No unsafe member access | [Strict Typing](../13-strict-typing.md) | Level 6+ | Property/method access on mixed |
 | No unsafe return | [Strict Typing](../13-strict-typing.md) | Level 7+ | Return type must match declaration |
-| No unused parameters | [Dead Code](../04-code-style/01-index.md) | `phpstan-strict-rules` | Unused parameter detection |
+| No unused parameters | [Dead Code](../04-code-style/readme.md) | `phpstan-strict-rules` | Unused parameter detection |
 | No magic `__get`/`__set` | [Strict Typing](../13-strict-typing.md) | Level 9 | Force typed properties |
 | Max 3 parameters | [Strict Typing](../13-strict-typing.md) | `phpstan-strict-rules` | Custom rule |
 | Null safety | [Null Safety](../19-null-pointer-safety.md) | Level 8+ | Null pointer detection |
@@ -203,9 +203,9 @@ rules:
 
 ## Cross-References
 
-- [Static Analysis Overview](./01-index.md) — Cross-language analyzer guide
-- [Cross-Language Code Style](../04-code-style/01-index.md) — Formatting rules
-- [Boolean Principles](../02-boolean-principles/01-index.md) — Boolean naming rules
+- [Static Analysis Overview](./readme.md) — Cross-language analyzer guide
+- [Cross-Language Code Style](../04-code-style/readme.md) — Formatting rules
+- [Boolean Principles](../02-boolean-principles/readme.md) — Boolean naming rules
 - [Strict Typing](../13-strict-typing.md) — Type safety rules
 - [DRY Principles](../08-dry-principles.md) — Deduplication rules
 

@@ -45,7 +45,7 @@
 
 ## Cross-References
 
-- [Overview](./01-index.md)
+- [Overview](./readme.md)
 - [Naming Conventions](../../01-spec-authoring-guide/03-naming-conventions.md)
 - [Error Handling](./03-error-handling.md)
 - [Async Patterns](./04-async-patterns.md)

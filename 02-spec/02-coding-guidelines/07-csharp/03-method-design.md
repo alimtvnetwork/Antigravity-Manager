@@ -1,6 +1,6 @@
 # C# Method Design
 
-> **Parent:** [C# Coding Standards](./01-index.md)
+> **Parent:** [C# Coding Standards](./readme.md)
 > **Version:** 1.0.0
 > **Updated:** 2026-04-02
 

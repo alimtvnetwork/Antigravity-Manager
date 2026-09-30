@@ -148,7 +148,7 @@ if g.Members().Length() > 0 { ... }
 
 - [Code Mutation Avoidance](./18-code-mutation-avoidance.md) — Lazy fields are an exempted mutation case
 - [Cyclomatic Complexity](./06-cyclomatic-complexity.md) — Lazy getters keep callers simple
-- [Master Coding Guidelines](./15-master-coding-guidelines/01-index.md) — §7 Type Safety
+- [Master Coding Guidelines](./15-master-coding-guidelines/readme.md) — §7 Type Safety
 
 ---
 

@@ -119,14 +119,14 @@ func anyBytesSafePtr() *[]byte {
 | PHP | `if ($x === null)` | `if ($x->isDefined())` (preferred) |
 | TypeScript | `if (x === null \|\| x === undefined)` | `if (isDefined(x))` (preferred) |
 
-See [Master Coding Guidelines §3.1](./15-master-coding-guidelines/01-index.md) for the full `isDefined`/`isDefinedAndValid` guard pattern.
+See [Master Coding Guidelines §3.1](./15-master-coding-guidelines/readme.md) for the full `isDefined`/`isDefinedAndValid` guard pattern.
 
 ---
 
 ## 4. Cross-References
 
-- [Boolean Principles](./02-boolean-principles/01-index.md) — Positive null guards (`isDefined`)
-- [Master Coding Guidelines §3.1](./15-master-coding-guidelines/01-index.md) — Guard table
+- [Boolean Principles](./02-boolean-principles/readme.md) — Positive null guards (`isDefined`)
+- [Master Coding Guidelines §3.1](./15-master-coding-guidelines/readme.md) — Guard table
 - [Casting Elimination Patterns](./04-casting-elimination-patterns.md) — Type-safe access
 
 ---

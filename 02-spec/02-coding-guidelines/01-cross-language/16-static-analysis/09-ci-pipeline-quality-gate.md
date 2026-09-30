@@ -17,7 +17,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | AI Confidence assigned | ✅ |
 | Ambiguity assigned | ✅ |
 | Keywords present | ✅ |
@@ -440,7 +440,7 @@ When a rule must be suppressed:
 
 ## Cross-References
 
-- [Static Analysis Overview](./01-index.md) — Parent document
+- [Static Analysis Overview](./readme.md) — Parent document
 - [TypeScript ESLint Enforcement](../../02-typescript/12-eslint-enforcement.md) — TS linter config
 - [Go golangci-lint](./02-go-golangci-lint.md) — Go linter config
 - [PHP PHPCS + PHPStan](./03-php-phpcs-phpstan.md) — PHP linter config
@@ -449,7 +449,7 @@ When a rule must be suppressed:
 - [VB.NET Analyzers](./06-vb-dotnet-analyzers.md) — VB.NET linter config
 - [Node.js ESLint](./07-nodejs-eslint.md) — Node.js linter config
 - [Python Ruff](./08-python-ruff.md) — Python linter config
-- [Cross-Language Code Style](../04-code-style/01-index.md) — Source rules
+- [Cross-Language Code Style](../04-code-style/readme.md) — Source rules
 
 ---
 

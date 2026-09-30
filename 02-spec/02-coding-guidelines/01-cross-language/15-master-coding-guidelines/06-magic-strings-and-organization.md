@@ -1,6 +1,6 @@
 # Master Coding Guidelines — Magic strings, file organization, array keys
 
-> **Parent:** [Master Coding Guidelines](./01-index.md)
+> **Parent:** [Master Coding Guidelines](./readme.md)
 > **Version:** 2.1.0
 > **Updated:** 2026-03-31
 

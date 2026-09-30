@@ -1,6 +1,6 @@
 # Master Coding Guidelines — Boolean standards, isDefined guards, enum standards
 
-> **Parent:** [Master Coding Guidelines](./01-index.md)
+> **Parent:** [Master Coding Guidelines](./readme.md)
 > **Version:** 2.1.0
 > **Updated:** 2026-03-31
 
@@ -8,7 +8,7 @@
 
 ## 3. Boolean Standards — Positive Logic
 
-> Full reference: [boolean-principles.md](../02-boolean-principles/01-index.md) and [no-negatives.md](../12-no-negatives.md)
+> Full reference: [boolean-principles.md](../02-boolean-principles/readme.md) and [no-negatives.md](../12-no-negatives.md)
 
 ### 6 Non-Negotiable Principles
 
@@ -86,7 +86,7 @@ These Go patterns are **exempt** from the no-negation rule:
 
 ## 3.1 `isDefined` / `isDefinedAndValid` — Positive Null/Existence Guards
 
-> Language-specific details: [Go Standards](../../03-golang/04-golang-standards-reference/01-index.md) · [PHP Standards](../../04-php/07-php-standards-reference/01-index.md) · [TypeScript Standards](../../02-typescript/09-typescript-standards-reference.md)
+> Language-specific details: [Go Standards](../../03-golang/04-golang-standards-reference/readme.md) · [PHP Standards](../../04-php/07-php-standards-reference/readme.md) · [TypeScript Standards](../../02-typescript/09-typescript-standards-reference.md)
 
 Raw `!== null` / `!= nil` combined with validity checks creates cognitive overhead. Use positive guard methods/functions that express intent as a single word.
 
@@ -160,9 +160,9 @@ if (isDefined(config)) {
 ## 4. Enum Standards
 
 > **Canonical cross-language reference:** [Enum Naming Quick Reference](../../06-ai-optimization/07-enum-naming-quick-reference.md) — declaration, naming, methods, folder structure for Go, TypeScript, and PHP
-> **Go-specific:** [Go Enum Specification](../../03-golang/01-enum-specification/01-index.md)
+> **Go-specific:** [Go Enum Specification](../../03-golang/01-enum-specification/readme.md)
 > **PHP-specific:** [PHP Enums](../../04-php/02-enums.md)
-> **TypeScript-specific:** [TypeScript Enums](../../02-typescript/01-index.md)
+> **TypeScript-specific:** [TypeScript Enums](../../02-typescript/readme.md)
 
 **Key rules (all languages):**
 

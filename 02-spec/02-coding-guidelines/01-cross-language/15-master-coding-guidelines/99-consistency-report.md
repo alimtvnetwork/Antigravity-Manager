@@ -10,7 +10,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `01-naming-and-database.md` | ✅ Present |
 | 3 | `02-boolean-and-enum.md` | ✅ Present |
 | 4 | `03-code-style-and-errors.md` | ✅ Present |

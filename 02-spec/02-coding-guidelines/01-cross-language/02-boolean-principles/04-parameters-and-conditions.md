@@ -1,6 +1,6 @@
 # Boolean Principles — P5: explicit params, P6: no mixed booleans, P7: no inline statements, P8: no raw system calls
 
-> **Parent:** [Boolean Principles](./01-index.md)
+> **Parent:** [Boolean Principles](./readme.md)
 > **Version:** 2.6.0
 > **Updated:** 2026-03-31
 
@@ -63,13 +63,13 @@ if isCacheHit {
 
 ```go
 // ❌ FORBIDDEN — Mixed polarity: positive + negative
-if isProjectExists && !isOverwrite {
+if isProjectDirDefined && !isOverwrite {
     return fmt.Errorf("conflict")
 }
 
 // ✅ REQUIRED — Extract negation to positive counterpart, then compose
 isReadOnly := !isOverwrite
-isConflict := isProjectExists && isReadOnly
+isConflict := isProjectDirDefined && isReadOnly
 
 if isConflict {
     return fmt.Errorf("conflict")
@@ -120,6 +120,35 @@ if (isUnauthorized) {
 2. **Always extract** the combined condition into a named boolean with a positive semantic name
 3. The named boolean should express the **intent** (e.g., `isConflict`, `isAccessDenied`, `isPending`, `isCacheHit`) — not just restate the logic
 
+### Principle 6.1: Ban on Compound Negative Chains (`!a || !b || c`)
+
+Chaining inverted negative checks (such as `!state.IsDefined || !state.IsEmpty || state.IsRepo`) obscures which exact predicate failed and violates positive boolean design.
+
+- **In Test Assertions:** Never bundle assertions with `||`. Write discrete assertions with isolated error logs:
+  ```go
+  if !state.IsDefined { t.Errorf("expected defined: %+v", state) }
+  if !state.IsEmpty { t.Errorf("expected empty: %+v", state) }
+  if state.IsRepo { t.Errorf("expected non-repo: %+v", state) }
+  ```
+- **In Application Logic:** Extract an affirmative composite boolean or guard clause:
+  ```go
+  isCloneTargetFresh := !params.State.IsDefined || params.State.IsEmpty
+  if isCloneTargetFresh {
+      performFreshClone(params)
+  }
+  ```
+
+### Principle 6.2: Ban on 3+ Compound Conditions & Mixed Polarity Logic Chains
+
+- **Total Ban on 3+ Condition Conjunctions:** An `if` condition MUST NOT combine 3 or more logical clauses (e.g. `if len(items) >= 2 && !isValid(a) && isValid(b)`).
+- **Zero Mixed Polarity:** NEVER combine a positive check and a negative check in the same `if` condition.
+- **Affirmative Decomposition Mandate:**
+  1. Break down individual checks into explicit affirmative boolean variables using `is` or `has` prefixes (e.g. `hasEnoughItems`, `isFirstValid`, `isSecondValid`).
+  2. If an inversion is required, compute the inverted meaning into a semantic affirmative variable (`isFirstInvalid := !isFirstValid`).
+  3. Pre-compute the composite decision intent into a single affirmative boolean variable (`isAlternateOrder := hasEnoughItems && isSecondValid && isFirstInvalid`).
+  4. The `if` statement evaluates ONLY the single affirmative intent boolean: `if isAlternateOrder { ... }`.
+  5. See [32-branch-immutability-and-clean-construction.md](../32-branch-immutability-and-clean-construction.md) for full architecture and multi-language patterns.
+
 ---
 
 ---
@@ -137,8 +166,8 @@ if _, err := os.Stat(dir); err == nil {
 }
 
 // ✅ REQUIRED — separate computation
-isProjectExists := pathutil.IsDir(dir)
-if isProjectExists {
+isProjectDirDefined := pathutil.IsDir(dir)
+if isProjectDirDefined {
     // exists
 }
 ```
@@ -195,7 +224,7 @@ if _, err := os.Stat(projectDir); err == nil {
 }
 
 // ✅ REQUIRED — pathutil wrapper
-isProjectExists := pathutil.IsDir(projectDir)
+isProjectDirDefined := pathutil.IsDir(projectDir)
 ```
 
 ```php
@@ -243,9 +272,9 @@ if _, err := os.Stat(projectDir); isProjectConflict {
 //   2. P7: no inline statement; all variables computed before if
 //   3. P6: mixed polarity extracted to single-intent boolean
 //   4. apperror.FailNew returns structured *apperror.AppError
-isProjectExists := pathutil.IsDir(projectDir)
+isProjectDirDefined := pathutil.IsDir(projectDir)
 isReadOnly := !isOverwrite
-isProjectConflict := isProjectExists && isReadOnly
+isProjectConflict := isProjectDirDefined && isReadOnly
 
 if isProjectConflict {
     return apperror.FailNew[ProjectResult](
@@ -286,6 +315,17 @@ if (isReady && !isExpired) { ... }
 // ✅ REQUIRED - All positive
 if (isReady && isValid) { ... }
 ```
+
+## Principle 11: Mandatory `IsDefined` Replacement for Inverted `!isEmpty` (Total Ban on `!isEmpty`)
+
+Never check data, collections, or records presence using inverted empty checks (`!isEmpty`, `!res.IsEmpty()`). Negating an empty check forces mental double-negation and violates Affirmative Boolean Principles.
+
+- **The Anti-Pattern:** `if !isEmpty`, `if !res.IsEmpty()`, `if !state.IsEmpty`
+- **The Mandatory Replacement:** Always use `isDefined` or `res.IsDefined()`:
+  - ❌ **FORBIDDEN:** `if !res.IsEmpty() { process(res.Value()) }`
+  - ✅ **REQUIRED:** `if res.IsDefined() { process(res.Value()) }`
+- **When `isEmpty` is Allowed:** `isEmpty` is strictly reserved for affirmative handling of the empty or missing path: `if res.IsEmpty() { return ErrNotFound }`.
+- **Map Lookups vs `isDefined`:** For map lookups, the original canonical names are `val, isFound := userMap[id]` or `val, isUserExist := userMap[id]`. Do NOT use `isDefined` for map lookups; `isDefined` is strictly reserved for replacing inverted `!isEmpty`.
 
 ## Principle 9: No Explicit True Checks (TOTAL BAN)
 

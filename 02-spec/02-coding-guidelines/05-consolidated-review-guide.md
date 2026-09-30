@@ -28,7 +28,7 @@
 
 - **Spec first, code second.** Before any task, write/update the spec document.
 - **Bug? Issue file first.** Create `02-spec/.../03-issues/{NN}-{name}.md` with root cause analysis, then fix.
-- **Folder structure matters.** Follow `01-index.md` + `99-consistency-report.md` convention.
+- **Folder structure matters.** Follow `readme.md` + `99-consistency-report.md` convention.
 
 ---
 
@@ -166,6 +166,7 @@ When you need the opposite of a boolean, **do not negate** — use the inverse n
 To ensure these rules are not violated, the project's custom linter (e.g., `validate-guidelines.go`) MUST actively disable and flag the following patterns:
 
 #### 1. No Explicit True Checks
+
 Evaluating a boolean against `true` is completely forbidden. Booleans must be evaluated implicitly.
 ```go
 // ❌ LINTER MUST REJECT: Explicit == true
@@ -176,6 +177,7 @@ if isReady { ... }
 ```
 
 #### 2. No Mixed Polarity in Conditionals
+
 Combining positive and negative conditions in the same `if/else` block is strictly forbidden. It must be extracted into a clearly named variable.
 ```go
 // ❌ LINTER MUST REJECT: Mixed polarity

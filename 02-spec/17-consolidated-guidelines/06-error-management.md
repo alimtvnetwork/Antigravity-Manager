@@ -2,7 +2,7 @@
 
 **Version:** 3.3.0
 **Updated:** 2026-04-22
-**Source Module:** [`02-spec/03-error-manage/`](../03-error-manage/01-index.md)
+**Source Module:** [`02-spec/03-error-manage/`](../03-error-manage/readme.md)
 
 ---
 
@@ -83,7 +83,7 @@ React Frontend → Go Backend → Delegated Server (PHP/other)
 | Tier | Layer | Responsibility | Technology |
 |------|-------|----------------|------------|
 | 1 | Delegated Server (PHP) | Structured error responses with error codes, `TypedQuery` result envelopes | PHP `ResponseKeyType` enum, `DbResult<T>`, `DbResultSet<T>`, `DbExecResult` |
-| 2 | Backend (Go / Rust) | Error wrapping, stack traces, typed error codes, structured logging, Tokio async results | Go `apperror` (`Result[T]`), Rust `anyhow::Result` & `thiserror` (`AppResult<T>`) |
+| 2 | Go Backend | Error wrapping, stack traces, typed error codes, structured logging | `apperror` package with `Result[T]`, `Wrap()`, `WithContext()` |
 | 3 | Frontend | Error store, Global Error Modal, toast notifications, retry logic | React error boundary, Zustand error store, Sonner toasts |
 
 ---
@@ -229,91 +229,6 @@ return errors.New("file not found")  // WHICH file?
 // ✅ REQUIRED — always include context
 return apperror.Wrap(err, ErrFileNotFound, "read config").WithPath(configPath)
 ```
-
----
-
-## Rust / Tokio Error Architecture (`antigravity_tools_lib`)
-
-For native Rust services, Tokio async tasks, and Tauri desktop applications, error handling is structured across three core patterns:
-
-### 1. Internal Tokio Task Error Handling (`anyhow::Result`)
-Within internal asynchronous Tokio worker tasks, pipeline stages, and multi-threaded background workers, functions utilize `anyhow::Result<T>` with rich error context:
-
-```rust
-use anyhow::{Context, Result};
-
-pub async fn execute_proxy_pipeline(req: ProxyRequest) -> Result<ProxyResponse> {
-    let session = resolve_session(&req.session_id)
-        .await
-        .with_context(|| format!("failed to resolve session: {}", req.session_id))?;
-
-    let upstream = send_upstream_request(&session, &req)
-        .await
-        .context("upstream Antigravity RPC dispatch failed")?;
-
-    Ok(upstream)
-}
-```
-
-- **Context Enrichment:** Always chain `.with_context(|| ...)` or `.context(...)` when bubbling errors to preserve the operational call-site context.
-- **Zero Panic Rule:** Native worker threads and Tokio runtime loops MUST never call `.unwrap()` or `.expect()` on untrusted input or I/O operations.
-
-### 2. Domain-Typed Native Errors (`thiserror::Error`)
-Domain modules (database, network, account, oauth) use explicit typed enumerations via `thiserror`:
-
-```rust
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
-
-    #[error("Network error: {0} (status: {1:?})")]
-    Network(String, Option<u16>),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Tauri error: {0}")]
-    Tauri(#[from] tauri::Error),
-
-    #[error("OAuth error: {0}")]
-    OAuth(String),
-
-    #[error("Configuration error: {0}")]
-    Config(String),
-
-    #[error("Account error: {0}")]
-    Account(String),
-
-    #[error("Unknown error: {0}")]
-    Unknown(String),
-}
-
-pub type AppResult<T> = Result<T, AppError>;
-```
-
-### 3. Serializable IPC Error Envelopes (`Result<T, E>`)
-All Tauri commands invoked by the React frontend via IPC MUST return a serializable `Result<T, E>`:
-
-```rust
-#[tauri::command]
-pub async fn fetch_account_quota(
-    account_id: String,
-) -> Result<QuotaData, String> {
-    match modules::quota::fetch_quota_by_id(&account_id).await {
-        Ok(quota) => Ok(quota),
-        Err(err) => {
-            tracing::error!(account_id = %account_id, error = %err, "Quota fetch failed");
-            Err(format!("Failed to fetch quota for account {}: {}", account_id, err))
-        }
-    }
-}
-```
-
-- **Structured IPC Envelope:** IPC errors serialize cleanly across the binary bridge into the frontend `request()` wrapper in `src/utils/request.ts`, resolving into formatted toast alerts or the Global Error Modal.
-- **Audit Logging:** Every command error is recorded via `tracing::error!` with structured key-value attributes before returning to the UI.
 
 ---
 
@@ -934,10 +849,10 @@ Cross-cutting categories that every module inherits — never reallocate:
 
 | Generator | Reads | Emits | Language |
 |-----------|-------|-------|----------|
-| `gen-go-errcodes` | `spec/<module>/error-codes.json` | `internal/apperror/apperror_codes_generated.go` | Go |
-| `gen-php-errcodes` | `spec/<module>/error-codes.json` | `src/Errors/ErrorCode.php` | PHP |
-| `gen-ts-errcodes` | `spec/<module>/error-codes.json` | `src/lib/errors/errorCodes.generated.ts` | TypeScript |
-| `gen-rust-errcodes` | `spec/<module>/error-codes.json` | `src/errors/error_code_generated.rs` | Rust |
+| `gen-go-errcodes` | `02-spec/<module>/error-codes.json` | `internal/apperror/apperror_codes_generated.go` | Go |
+| `gen-php-errcodes` | `02-spec/<module>/error-codes.json` | `src/Errors/ErrorCode.php` | PHP |
+| `gen-ts-errcodes` | `02-spec/<module>/error-codes.json` | `src/lib/errors/errorCodes.generated.ts` | TypeScript |
+| `gen-rust-errcodes` | `02-spec/<module>/error-codes.json` | `src/errors/error_code_generated.rs` | Rust |
 
 **Invocation pattern** (run from repo root for each module):
 

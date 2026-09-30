@@ -1,6 +1,6 @@
 # Boolean Principles — P1: is/has prefixes, P2: no negative words
 
-> **Parent:** [Boolean Principles](./01-index.md)
+> **Parent:** [Boolean Principles](./readme.md)
 > **Version:** 2.6.0
 > **Updated:** 2026-03-31
 
@@ -66,6 +66,54 @@ $user->isAdmin();
 
 This mirrors industry best practices. For example, .NET's `char` type exposes `IsLetter`, `IsDigit`, `IsUpper`, `IsLower`, `IsNumber`, `IsPunctuation`, `IsSeparator`, `IsSymbol`, `IsControl`, `IsLetterOrDigit` — all boolean methods with the `Is` prefix.
 
+### Function & Method Parameters: Total Ban on Single-Letter & Bare Names
+
+Boolean parameters in function and method signatures (such as setters) MUST NEVER use lazy single-letter identifiers (`v bool`, `b bool`, `flag bool`) or bare unprefixed verbs (`stop bool`, `pause bool`). They must always carry an affirmative prefix describing the exact state being set:
+
+```go
+// ❌ FORBIDDEN: Single-letter parameter `v bool` or bare verb `stop bool`
+func (p *BatchProgress) SetStopOnFail(v bool) {
+    p.stopOnFail = v
+}
+
+func (w *Worker) SetStopped(stop bool) {
+    w.stop = stop
+}
+
+// ✅ REQUIRED: Meaningful, affirmative boolean parameter and property
+func (p *BatchProgress) SetStopOnFail(isStopOnFail bool) {
+    p.stopOnFail = isStopOnFail
+}
+
+func (w *Worker) SetStopped(isStopped bool) {
+    w.isStopped = isStopped
+}
+```
+
+### Struct Fields & State Properties: Total Ban on Bare Names (e.g. `defined` -> `isDefined`)
+
+Struct fields, class properties, and state flags representing boolean states MUST ALWAYS use affirmative `is*` or `has*` prefixes. A bare name such as `defined bool`, `ready bool`, `active bool` is strictly FORBIDDEN:
+
+```go
+// ❌ FORBIDDEN: Bare boolean field name in struct
+type Result[T any] struct {
+    value   T
+    err     *AppError
+    defined bool // VIOLATION: bare boolean without is/has prefix
+}
+
+// ✅ REQUIRED: Explicit affirmative boolean prefix
+type Result[T any] struct {
+    value     T
+    err       *AppError
+    isDefined bool // COMPLIANT: starts with affirmative 'is'
+}
+```
+
+### Ban on Awkward `isExists` (Use `isDefined` / `isFound`)
+
+"Exists" is a verb. Combining `is` with a verb (`isExists`, `IsExists`) without context is grammatically malformed and strictly banned for struct state flags. For map lookups, the canonical original names are `val, isFound := userMap[id]` or `val, isUserExist := userMap[id]`. NEVER use `isDefined` for map lookups; `isDefined` / `res.IsDefined()` is strictly reserved for replacing inverted `!isEmpty` / `!res.IsEmpty()`.
+
 ---
 
 ---
@@ -80,6 +128,7 @@ Double negatives (`!isNot...`, `!isNotBlocked`) are the worst form and must neve
 
 | ❌ Forbidden Name | ✅ Required Name | Semantic Meaning |
 |---|---|---|
+| `isExists` | `isDefined` / `isFound` | The resource or entity exists and is defined |
 | `isNotReady` | `isPending` | The order is waiting |
 | `isNotInList` | `isAbsentFromList` | The item is absent |
 | `isNoRecentErrors` | `isErrorListClear` | The error list is clean |
@@ -89,7 +138,10 @@ Double negatives (`!isNot...`, `!isNotBlocked`) are the worst form and must neve
 | `isNotBlocked` | `isActive` | The entity is active |
 | `isClassNotLoaded` | `isClassUnregistered` | The class is unregistered |
 | `hasNoPermission` | `isUnauthorized` | The user lacks access |
-| `isNotHonest` | `isDishonest` | Use the inverse naming instead of 'not' |
+| `!isEmpty` / `!res.IsEmpty()` | `isDefined` / `res.IsDefined()` | Mandatory replacement: use affirmative `isDefined` instead of inverted `!isEmpty` |
+| `isUndefined` / `isNotDefined` | `isDefined` / `IsDefined` | Try `IsDefined` instead of negatives; invert with `!isDefined` at guard |
+| `hasNoValue` / `isMissing` | `hasValue` / `isDefined` | Affirmative presence check; invert with `!hasValue` at guard |
+| `isNotValid` | `isValid` | Check positive validity; invert with `!isValid` at guard |
 
 ```typescript
 // ❌ FORBIDDEN — "not" in the variable name

@@ -1,6 +1,6 @@
 # PHP Coding Standards — Constructor rules, boolean logic, isDefined guards
 
-> **Parent:** [PHP Coding Standards](./01-index.md)
+> **Parent:** [PHP Coding Standards](./readme.md)
 > **Version:** 5.1.0
 > **Updated:** 2026-03-31
 
@@ -127,7 +127,7 @@ if ($hasPermission) { ... }
 
 ## `isDefined()` and `isDefinedAndValid()` — Positive Null/Existence Guards
 
-> **Cross-language parity:** [Go Standards §IsDefined](../../03-golang/04-golang-standards-reference/01-index.md)
+> **Cross-language parity:** [Go Standards §IsDefined](../../03-golang/04-golang-standards-reference/readme.md)
 
 Raw `!== null` combined with negation or nested validity checks creates cognitive overhead. Use positive guard methods that express intent clearly.
 

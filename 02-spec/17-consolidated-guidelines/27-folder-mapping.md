@@ -10,7 +10,7 @@
 
 ## Purpose
 
-This file is a **bidirectional index** between every numbered source-spec subfolder under `spec/` and the consolidated guideline files under `02-spec/17-consolidated-guidelines/`. It exists so that any AI handed the consolidated folder can answer two questions instantly:
+This file is a **bidirectional index** between every numbered source-spec subfolder under `02-spec/` and the consolidated guideline files under `02-spec/17-consolidated-guidelines/`. It exists so that any AI handed the consolidated folder can answer two questions instantly:
 
 1. **"Which source folder owns this rule?"** — given a topic, find the canonical spec.
 2. **"Where in the consolidated docs is this folder summarized?"** — given a source folder, find every consolidated reference and any blind-spots.
@@ -147,7 +147,7 @@ Each row in the master matrix below contains:
 |-----|------------------|--------|
 | `15-distribution-and-runner/` has no standalone consolidated file — merged into `20-self-update-app-update.md` | `15-distribution-and-runner/` | 🟡 Acceptable — referenced inline; promote to standalone if it grows beyond 5 files |
 | `16-generic-release/` folded into CI/CD consolidated rather than its own file | `16-generic-release/` | 🟡 Acceptable — overlaps heavily with `12-cicd-pipeline-workflows/` |
-| `10-research/` and `21-app/`, `22-app-issues/` are placeholder folders with only `01-index.md` | `10-research/`, `21-app/`, `22-app-issues/` | 🟡 Expected — content lives in app-* consolidated files |
+| `10-research/` and `21-app/`, `22-app-issues/` are placeholder folders with only `readme.md` | `10-research/`, `21-app/`, `22-app-issues/` | 🟡 Expected — content lives in app-* consolidated files |
 | `02-coding-guidelines/06-cicd-integration/` cross-references CI/CD specs but is not summarized in `05-coding-guidelines.md` | `02-coding-guidelines/06-cicd-integration/` | ✅ Covered via `18-cicd-pipeline-workflows.md` cross-ref |
 
 ---
@@ -166,7 +166,7 @@ When implementing **any** rule from the consolidated section:
 
 ## Cross-References
 
-- [`01-index.md`](./01-index.md) — file inventory and scoring
+- [`readme.md`](./readme.md) — file inventory and scoring
 - [`22-gap-analysis.md`](./22-gap-analysis.md) — formal gap analysis and implementability scores
 - [`99-consistency-report.md`](./99-consistency-report.md) — validation history
 - `../01-spec-authoring-guide/02-folder-structure.md` — canonical folder structure rules

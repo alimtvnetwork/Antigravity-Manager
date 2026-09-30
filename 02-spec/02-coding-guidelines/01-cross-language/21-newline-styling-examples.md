@@ -4,13 +4,13 @@
 **Updated:** 2026-04-16
 **Applies to:** All languages (Go examples)
 **Source:** Consolidated from `01-pre-code-review-guides/03-golang-code-review-guides.md`
-**Supplements:** [Code Style](./04-code-style/01-index.md) rules R4, R5, R10, R12, R13
+**Supplements:** [Code Style](./04-code-style/readme.md) rules R4, R5, R10, R12, R13
 
 ---
 
 ## 1. Purpose
 
-Detailed before/after examples for newline rules. These supplement the formal rules in [04-code-style.md](./04-code-style/01-index.md).
+Detailed before/after examples for newline rules. These supplement the formal rules in [04-code-style.md](./04-code-style/readme.md).
 
 ---
 
@@ -152,8 +152,8 @@ Use `constants.NewLineUnix` (`"\n"`) in 90% of cases. Only use `constants.NewLin
 
 ## 8. Cross-References
 
-- [Code Style](./04-code-style/01-index.md) — Formal rule definitions (R4, R5, R10, R12, R13)
-- [Master Coding Guidelines §5](./15-master-coding-guidelines/01-index.md) — Formatting rules summary
+- [Code Style](./04-code-style/readme.md) — Formal rule definitions (R4, R5, R10, R12, R13)
+- [Master Coding Guidelines §5](./15-master-coding-guidelines/readme.md) — Formatting rules summary
 
 ---
 

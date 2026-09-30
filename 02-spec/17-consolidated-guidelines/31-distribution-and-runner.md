@@ -49,7 +49,7 @@ is a release blocker.
 
 | Artifact | Source | Filename pattern | Purpose |
 |----------|--------|------------------|---------|
-| Spec + linters tree | `spec/`, `linters/`, `linter-scripts/`, `linters-cicd/` (main) | sourced via `codeload.github.com` archive (not a release asset) | Powers `install.sh` / `install.ps1` |
+| Spec + linters tree | `02-spec/`, `linters/`, `linter-scripts/`, `linters-cicd/` (main) | sourced via `codeload.github.com` archive (not a release asset) | Powers `install.sh` / `install.ps1` |
 | Linters CI/CD pack | `linters-cicd/` | `coding-guidelines-linters-vX.Y.Z.zip` | Drop-in CI artifact; consumed by `linters-install.sh` |
 | Slides deck | `slides-app/dist/` | `coding-guidelines-slides-vX.Y.Z.zip` | Offline trainer deck (double-click `index.html`) |
 | Bash installer | `install.sh` | `install.sh` | Linux/macOS one-liner |
@@ -237,7 +237,7 @@ the following:
 ## §10 — Cross-References
 
 - Source folder: [`02-spec/15-distribution-and-runner/`](../15-distribution-and-runner/)
-- Slides app spec: [`spec-slides/01-index.md`](../01-index.md)
+- Slides app spec: [`spec-slides/readme.md`](../readme.md)
 - CI/CD pipeline conventions: [`02-spec/12-cicd-pipeline-workflows/`](../12-cicd-pipeline-workflows/)
 - Generic CLI conventions: [`02-spec/13-generic-cli/`](../13-generic-cli/)
 - Generic release standard: [`02-spec/16-generic-release/`](../16-generic-release/)

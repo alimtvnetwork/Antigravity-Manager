@@ -214,6 +214,6 @@ function to_slug(string $input): string {
 
 | Reference | Location |
 |-----------|----------|
-| Cross-Language Overview | [./01-index.md](./01-index.md) |
+| Cross-Language Overview | [./readme.md](./readme.md) |
 | Variable Naming | [./22-variable-naming-conventions.md](./22-variable-naming-conventions.md) |
 | Key Naming PascalCase | [./11-key-naming-pascalcase.md](./11-key-naming-pascalcase.md) |

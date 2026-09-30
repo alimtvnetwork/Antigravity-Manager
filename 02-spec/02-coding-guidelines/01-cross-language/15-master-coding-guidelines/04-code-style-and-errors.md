@@ -1,6 +1,6 @@
 # Master Coding Guidelines — Code style formatting, error handling
 
-> **Parent:** [Master Coding Guidelines](./01-index.md)
+> **Parent:** [Master Coding Guidelines](./readme.md)
 > **Version:** 2.1.0
 > **Updated:** 2026-03-31
 
@@ -8,7 +8,7 @@
 
 ## 5. Code Style — Formatting Rules
 
-> Full reference: [code-style.md](../04-code-style/01-index.md)
+> Full reference: [code-style.md](../04-code-style/readme.md)
 
 | Rule | Description |
 |------|-------------|

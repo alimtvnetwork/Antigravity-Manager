@@ -10,7 +10,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `02-go-golangci-lint.md` | ✅ Present |
 | 3 | `03-php-phpcs-phpstan.md` | ✅ Present |
 | 4 | `04-csharp-stylecop.md` | ✅ Present |

@@ -757,9 +757,9 @@ final class ErrorType
 
 ## Cross-References
 
-- [PHP Coding Standards](./07-php-standards-reference/01-index.md) — Parent spec with forbidden patterns
+- [PHP Coding Standards](./07-php-standards-reference/readme.md) — Parent spec with forbidden patterns
 - [Naming Conventions](../../01-spec-authoring-guide/03-naming-conventions.md) — PascalCase for enums, camelCase for methods
-- [Golang Standards](../03-golang/04-golang-standards-reference/01-index.md) — Go equivalent patterns
+- [Golang Standards](../03-golang/04-golang-standards-reference/readme.md) — Go equivalent patterns
 
 ## Log Context Array Keys — camelCase
 

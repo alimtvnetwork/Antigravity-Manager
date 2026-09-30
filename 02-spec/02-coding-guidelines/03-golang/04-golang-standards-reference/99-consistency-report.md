@@ -10,7 +10,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `01-file-and-function-rules.md` | ✅ Present |
 | 3 | `02-type-safety-and-errors.md` | ✅ Present |
 | 4 | `03-database-and-structs.md` | ✅ Present |

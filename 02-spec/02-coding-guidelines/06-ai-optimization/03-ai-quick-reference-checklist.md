@@ -164,7 +164,7 @@ Check every generated code block against these rules before outputting.
 
 - [Anti-Hallucination Rules](./02-anti-hallucination-rules.md) — Detailed forbidden/required patterns
 - [Common AI Mistakes](./04-common-ai-mistakes.md) — Real mistake examples
-- [Master Coding Guidelines](../01-cross-language/15-master-coding-guidelines/01-index.md) — Full checklist at bottom
+- [Master Coding Guidelines](../01-cross-language/15-master-coding-guidelines/readme.md) — Full checklist at bottom
 - [Condensed Master Guidelines](./05-condensed-master-guidelines.md) — Sub-200-line AI context version
 
 ---

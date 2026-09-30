@@ -3,7 +3,7 @@
 **Version:** 3.2.0
 **Updated:** 2026-04-16
 **Applies to:** All languages (Go, TypeScript, PHP, Rust, C#)
-**Source:** Derived from `apperror` package patterns, content type conventions, and real-world `riseup-asia-uploader` codebase
+**Source:** Derived from `appfault` package patterns, content type conventions, and real-world `riseup-asia-uploader` codebase
 
 ---
 
@@ -80,29 +80,29 @@ When a generic type is used **3 or more times** with the same parameter, create 
 #### Go
 
 ```go
-// types/AppResults.go
+// types/app_results.go (or types.go)
 package types
 
-import "github.com/yourorg/apperror"
+import "coding-guidelines/common/pkg/result"
 
 // Common Result aliases — use these instead of repeating Result[T]
-type BoolResult = apperror.Result[bool]
-type StringResult = apperror.Result[string]
-type IntResult = apperror.Result[int]
-type Int64Result = apperror.Result[int64]
+type BoolResult = result.Result[bool]
+type StringResult = result.Result[string]
+type IntResult = result.Result[int]
+type Int64Result = result.Result[int64]
 
 // Domain-specific aliases (add as patterns emerge)
-// type PluginResult = apperror.Result[*Plugin]
-// type SiteResult = apperror.Result[*Site]
+// type PluginResult = result.Result[*Plugin]
+// type SiteResult = result.Result[*Site]
 ```
 
 ```go
 // Usage — clean, readable, consistent
-func (h *PluginHandler) EnablePlugin(siteId string, slug string) apperror.BoolResult {
+func (h *PluginHandler) EnablePlugin(siteId string, slug string) types.BoolResult {
     // ...
 }
 
-func (h *PluginHandler) GetName(siteId string) apperror.StringResult {
+func (h *PluginHandler) GetName(siteId string) types.StringResult {
     // ...
 }
 ```
@@ -396,14 +396,14 @@ req.Header.Set("Content-Type", ContentTypeJson.String())
 
 ```go
 // ❌ FORBIDDEN — Result[bool] repeated 15 times across codebase
-func Enable() apperror.Result[bool] { ... }
-func Disable() apperror.Result[bool] { ... }
-func Toggle() apperror.Result[bool] { ... }
+func Enable() result.Result[bool] { ... }
+func Disable() result.Result[bool] { ... }
+func Toggle() result.Result[bool] { ... }
 
-// ✅ CORRECT — alias defined once
-func Enable() apperror.BoolResult { ... }
-func Disable() apperror.BoolResult { ... }
-func Toggle() apperror.BoolResult { ... }
+// ✅ CORRECT — alias defined once in types.go or types/
+func Enable() types.BoolResult { ... }
+func Disable() types.BoolResult { ... }
+func Toggle() types.BoolResult { ... }
 ```
 
 ---

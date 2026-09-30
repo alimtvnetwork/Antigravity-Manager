@@ -63,4 +63,4 @@ A language graduates from "planned" to "shipping" when:
 
 ---
 
-*Part of [CI/CD Integration](./01-index.md)*
+*Part of [CI/CD Integration](./readme.md)*

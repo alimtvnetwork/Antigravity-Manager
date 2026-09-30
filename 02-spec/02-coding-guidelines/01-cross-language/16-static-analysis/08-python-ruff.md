@@ -17,7 +17,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | AI Confidence assigned | ✅ |
 | Ambiguity assigned | ✅ |
 | Keywords present | ✅ |
@@ -217,9 +217,9 @@ pip install ruff mypy
 
 ## Cross-References
 
-- [Static Analysis Overview](./01-index.md) — Parent document
-- [Cross-Language Code Style](../04-code-style/01-index.md) — Source rules
-- [Master Coding Guidelines](../15-master-coding-guidelines/01-index.md) — Full checklist
+- [Static Analysis Overview](./readme.md) — Parent document
+- [Cross-Language Code Style](../04-code-style/readme.md) — Source rules
+- [Master Coding Guidelines](../15-master-coding-guidelines/readme.md) — Full checklist
 - [Node.js ESLint Enforcement](./07-nodejs-eslint.md) — Sibling server-side spec
 
 ---

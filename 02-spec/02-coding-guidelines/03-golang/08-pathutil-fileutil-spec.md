@@ -3,7 +3,7 @@
 > **Version:** 1.0.0
 > **Updated:** 2026-03-31
 > **Applies to:** All Go backend code
-> **Cross-refs:** [no-negatives](../01-cross-language/12-no-negatives.md), [golang-standards-reference](./04-golang-standards-reference/01-index.md), [error-code-registry](../../03-error-manage/03-error-code-registry/02-registry.md#gen-700-file-system)
+> **Cross-refs:** [no-negatives](../01-cross-language/12-no-negatives.md), [golang-standards-reference](./04-golang-standards-reference/readme.md), [error-code-registry](../../03-error-manage/03-error-code-registry/02-registry.md#gen-700-file-system)
 
 ---
 

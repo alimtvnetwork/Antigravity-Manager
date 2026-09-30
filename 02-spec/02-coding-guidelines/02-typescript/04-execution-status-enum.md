@@ -23,7 +23,7 @@ export enum ExecutionStatus {
   Paused = "PAUSED",
   Completed = "COMPLETED",
   Failed = "FAILED",
-  Cancelled = "CANCELLED",
+  canceled = "canceled",
 }
 ```
 
@@ -71,7 +71,7 @@ interface ExecutionResult {
 const TERMINAL_STATES = new Set([
   ExecutionStatus.Completed,
   ExecutionStatus.Failed,
-  ExecutionStatus.Cancelled,
+  ExecutionStatus.canceled,
 ]);
 
 function isTerminal(status: ExecutionStatus): boolean {
@@ -101,7 +101,7 @@ function isTerminal(status: ExecutionStatus): boolean {
 |---------|-----|-----------|
 | Package | `pkg/enums/executionstatus` | `src/lib/enums/execution-status.ts` |
 | Type | `byte` iota | String enum |
-| Values | `Idle`, `Running`, `Paused`, `Completed`, `Failed`, `Cancelled` | Same |
+| Values | `Idle`, `Running`, `Paused`, `Completed`, `Failed`, `canceled` | Same |
 
 ---
 
@@ -110,7 +110,7 @@ function isTerminal(status: ExecutionStatus): boolean {
 - Issue #10 — Domain Status Magic Strings <!-- external: 02-spec/23-how-app-issues-track/10-domain-status-magic-strings.md -->
 - [HttpMethod Enum](./06-http-method-enum.md) — Sibling enum spec
 - [TypeScript Standards](./09-typescript-standards-reference.md) — Parent spec
-- [Master Coding Guidelines §8](../01-cross-language/15-master-coding-guidelines/01-index.md) — Magic strings zero tolerance
+- [Master Coding Guidelines §8](../01-cross-language/15-master-coding-guidelines/readme.md) — Magic strings zero tolerance
 
 ---
 

@@ -153,7 +153,7 @@ async function fetchData(): Promise<Result<Data>> {
 ## 6. Cross-References
 
 - [TypeScript Standards Reference](./09-typescript-standards-reference.md) — TS conventions
-- [Master Coding Guidelines §6](../01-cross-language/15-master-coding-guidelines/01-index.md) — Error handling
+- [Master Coding Guidelines §6](../01-cross-language/15-master-coding-guidelines/readme.md) — Error handling
 
 ---
 

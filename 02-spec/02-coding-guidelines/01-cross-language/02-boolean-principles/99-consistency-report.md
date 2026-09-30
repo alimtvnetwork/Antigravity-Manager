@@ -10,7 +10,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `01-naming-prefixes.md` | ✅ Present |
 | 3 | `02-guards-and-extraction.md` | ✅ Present |
 | 4 | `03-parameters-and-conditions.md` | ✅ Present |

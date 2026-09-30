@@ -1,6 +1,6 @@
 # Golang Coding Standards — File naming, size, function size, nesting ban
 
-> **Parent:** [Golang Coding Standards](./01-index.md)
+> **Parent:** [Golang Coding Standards](./readme.md)
 > **Version:** 3.7.0
 > **Updated:** 2026-03-31
 
@@ -40,7 +40,7 @@ Every `.go` file targets **300 lines**. Up to **400 lines is acceptable** but mu
 
 ## Function Size — Max 15 Lines
 
-> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/01-index.md) — Rule 6
+> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/readme.md) — Rule 6
 
 Every function body must be **15 lines or fewer**. Extract logic into small, well-named helpers.
 
@@ -71,7 +71,7 @@ func ProcessUpload(ctx context.Context, req UploadRequest) error {
 
 ## Zero Nested `if` — Absolute Ban
 
-> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/01-index.md) — Rule 2 & 7
+> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/readme.md) — Rule 2 & 7
 
 Nested `if` blocks are **absolutely forbidden** — zero tolerance. Flatten with combined conditions or early returns.
 
@@ -104,7 +104,7 @@ if hasIssue {
 
 ## Abbreviation Casing — First Letter Only
 
-> **Canonical source:** [Master Coding Guidelines §1.2](../../01-cross-language/15-master-coding-guidelines/01-index.md)
+> **Canonical source:** [Master Coding Guidelines §1.2](../../01-cross-language/15-master-coding-guidelines/readme.md)
 
 Abbreviations in identifiers are treated as regular words — only capitalize the first letter. This applies to struct fields, variables, function names, parameters, enum constants, and `variantLabels` values.
 

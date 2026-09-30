@@ -124,7 +124,7 @@ if ($order->status === 'completed') { ... }
 enum OrderStatus: string {
     case Pending = 'pending';
     case Completed = 'completed';
-    case Cancelled = 'cancelled';
+    case canceled = 'canceled';
 }
 
 if ($order->status->isEqual(OrderStatus::Completed)) { ... }
@@ -347,7 +347,7 @@ func buildResponse(data []byte) *Response {
 - [Code Mutation Avoidance](./18-code-mutation-avoidance.md) — Detailed mutation rules and mutex patterns
 - [Strict Typing](./13-strict-typing.md) — No `any`/`interface{}`/`object`
 - [Boolean Principles](./03-boolean-principles.md) — Named booleans prevent `if (flag === true)`
-- [Master Coding Guidelines](./15-master-coding-guidelines/01-index.md) — §7 Type Safety
+- [Master Coding Guidelines](./15-master-coding-guidelines/readme.md) — §7 Type Safety
 - [Generic Return Types](./25-generic-return-types.md) — Typed returns eliminate `any`
 
 ---

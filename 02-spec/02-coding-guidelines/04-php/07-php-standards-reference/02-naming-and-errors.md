@@ -1,6 +1,6 @@
 # PHP Coding Standards — Naming conventions, error handling, structured responses
 
-> **Parent:** [PHP Coding Standards](./01-index.md)
+> **Parent:** [PHP Coding Standards](./readme.md)
 > **Version:** 5.1.0
 > **Updated:** 2026-03-31
 

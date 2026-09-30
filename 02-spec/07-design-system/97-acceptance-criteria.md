@@ -81,4 +81,4 @@ Testable criteria for validating design system compliance across all components 
 
 | Reference | Location |
 |-----------|----------|
-| Full Design System | [01-index.md](./01-index.md) |
+| Full Design System | [readme.md](./readme.md) |

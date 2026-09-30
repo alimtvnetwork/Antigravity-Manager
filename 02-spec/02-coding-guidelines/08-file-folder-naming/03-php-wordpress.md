@@ -139,5 +139,5 @@ my-awesome-plugin/               ← kebab-case plugin slug
 
 | Reference | Location |
 |-----------|----------|
-| PHP Standards | [../04-php/01-index.md](../04-php/01-index.md) |
+| PHP Standards | [../04-php/readme.md](../04-php/readme.md) |
 | Cross-Language Rules | [./01-cross-language.md](./02-cross-language.md) |

@@ -117,7 +117,7 @@ if ($existingRunning !== null) {
 
 ## Cross-References
 
-- [Code Style](../01-cross-language/04-code-style/01-index.md) — Rules R4, R5, R10
+- [Code Style](../01-cross-language/04-code-style/readme.md) — Rules R4, R5, R10
 - [PHP Naming Conventions](../../01-spec-authoring-guide/03-naming-conventions.md) — Array key casing
 - [PHP Forbidden Patterns](./03-forbidden-patterns.md) — Banned patterns
 

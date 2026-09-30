@@ -363,11 +363,11 @@ describe.skipIf(process.env.CI !== 'true')('DatabaseSync', () => {
 
 ## Cross-References
 
-- [Code Style — Rule 6: 15-Line Limit](./04-code-style/01-index.md) — Test functions have a relaxed 20-line limit
+- [Code Style — Rule 6: 15-Line Limit](./04-code-style/readme.md) — Test functions have a relaxed 20-line limit
 - [Cyclomatic Complexity](./06-cyclomatic-complexity.md) — Tests must have 0–1 complexity
 - [Function Naming](./10-function-naming.md) — Test helpers follow the same no-boolean-flag rule
-- [Boolean Principles](./02-boolean-principles/01-index.md) — Table case fields use `is`/`has` prefixes for boolean columns
-- [Master Coding Guidelines — §13](./15-master-coding-guidelines/01-index.md) — Summary table in the master reference
+- [Boolean Principles](./02-boolean-principles/readme.md) — Table case fields use `is`/`has` prefixes for boolean columns
+- [Master Coding Guidelines — §13](./15-master-coding-guidelines/readme.md) — Summary table in the master reference
 
 ---
 

@@ -17,7 +17,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | AI Confidence assigned | ✅ |
 | Ambiguity assigned | ✅ |
 | Keywords present | ✅ |
@@ -197,10 +197,10 @@ dotnet_diagnostic.S907.severity = error
 
 ## Cross-References
 
-- [Static Analysis Overview](./01-index.md) — Parent document
+- [Static Analysis Overview](./readme.md) — Parent document
 - [C# StyleCop Enforcement](./04-csharp-stylecop.md) — Sibling .NET language
-- [Cross-Language Code Style](../04-code-style/01-index.md) — Source rules
-- [Master Coding Guidelines](../15-master-coding-guidelines/01-index.md) — Full checklist
+- [Cross-Language Code Style](../04-code-style/readme.md) — Source rules
+- [Master Coding Guidelines](../15-master-coding-guidelines/readme.md) — Full checklist
 
 ---
 

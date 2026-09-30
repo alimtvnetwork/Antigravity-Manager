@@ -1,6 +1,6 @@
 # PHP Coding Standards — Braces, nesting, spacing, function size
 
-> **Parent:** [PHP Coding Standards](./01-index.md)
+> **Parent:** [PHP Coding Standards](./readme.md)
 > **Version:** 5.1.0
 > **Updated:** 2026-03-31
 
@@ -9,7 +9,7 @@
 ## Code Style — Braces, Nesting, Spacing & Function Size
 
 > These rules apply across **all languages** (PHP, TypeScript, Go).
-> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/01-index.md) — this section repeats key rules with PHP-specific examples.
+> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/readme.md) — this section repeats key rules with PHP-specific examples.
 
 ### Rule 1: Always use braces — no single-line returns
 
@@ -209,7 +209,7 @@ add_action(Hook::Init->value, [$this, 'setup']);
 
 ### Rule 6: Maximum 15 lines per function
 
-> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/01-index.md) — Rule 6
+> **Canonical source:** [Cross-Language Code Style](../../01-cross-language/04-code-style/readme.md) — Rule 6
 
 Every function/method body must be **15 lines or fewer** (excluding blank lines, comments, and the signature). Extract logic into small, well-named helper functions.
 

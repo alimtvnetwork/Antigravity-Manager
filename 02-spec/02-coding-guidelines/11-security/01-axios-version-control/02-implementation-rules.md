@@ -1,6 +1,6 @@
 # Implementation Rules
 
-> **Parent:** [Axios Version Control Policy](./01-index.md)
+> **Parent:** [Axios Version Control Policy](./readme.md)
 > **Version:** 1.1.0
 > **Updated:** 2026-04-02
 
@@ -150,7 +150,7 @@ If a new Axios version needs to be adopted:
 2. **Changelog audit** — Read the full Axios changelog for breaking changes
 3. **Isolated testing** — Test in a branch with full integration test suite
 4. **Approval** — Get explicit sign-off from the project security lead
-5. **Update this spec** — Add the new version to the Approved list in `01-index.md`
+5. **Update this spec** — Add the new version to the Approved list in `readme.md`
 6. **Pin and deploy** — Update `package.json` with exact version, regenerate lock file
 
 > **No shortcut.** Every Axios upgrade follows this procedure.

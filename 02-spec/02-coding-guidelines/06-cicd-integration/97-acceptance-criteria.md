@@ -45,4 +45,4 @@ Verified by `linters-cicd/checks/_tests/test_exit_codes.sh`.
 
 ---
 
-*Part of [CI/CD Integration](./01-index.md)*
+*Part of [CI/CD Integration](./readme.md)*

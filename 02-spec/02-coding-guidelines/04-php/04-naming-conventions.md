@@ -413,4 +413,4 @@ $hashMd5 = md5($data);
 
 ---
 
-> **Reminder:** This is the PSR-12 baseline. Project-level specs (e.g., WordPress plugin conventions in this same folder's [readme.md](./07-php-standards-reference/01-index.md)) may override specific rules — those overrides take precedence.
+> **Reminder:** This is the PSR-12 baseline. Project-level specs (e.g., WordPress plugin conventions in this same folder's [readme.md](./07-php-standards-reference/readme.md)) may override specific rules — those overrides take precedence.

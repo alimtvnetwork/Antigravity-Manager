@@ -1,6 +1,6 @@
 # Security Notes — Axios Version Advisory
 
-> **Parent:** [Axios Version Control Policy](./01-index.md)
+> **Parent:** [Axios Version Control Policy](./readme.md)
 > **Version:** 1.1.0
 > **Updated:** 2026-04-02
 
@@ -93,7 +93,7 @@ If a new vulnerability is discovered:
 
 ### Q: Can I use Axios 1.14.2 or later?
 
-**A:** Not without going through the [Version Upgrade Procedure](./02-implementation-rules.md#5-version-upgrade-procedure). Any version not listed as approved in `01-index.md` is blocked by default.
+**A:** Not without going through the [Version Upgrade Procedure](./02-implementation-rules.md#5-version-upgrade-procedure). Any version not listed as approved in `readme.md` is blocked by default.
 
 ### Q: What if `npm audit` recommends upgrading Axios?
 

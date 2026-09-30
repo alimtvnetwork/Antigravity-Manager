@@ -17,7 +17,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | AI Confidence assigned | ✅ |
 | Ambiguity assigned | ✅ |
 | Keywords present | ✅ |
@@ -38,7 +38,7 @@ Source: `eslint-plugins/coding-guidelines/index.js`
 | Rule | Severity | Spec Source | Description |
 |------|----------|-------------|-------------|
 | `coding-guidelines/no-nested-if` | `error` | [Code Style §R2](../01-cross-language/04-code-style/02-braces-and-nesting.md) | Zero nested `if` — flatten with early returns |
-| `coding-guidelines/boolean-naming` | `error` | [Boolean Principles](../01-cross-language/02-boolean-principles/01-index.md) | Boolean vars must use `is/has only (all other prefixes banned)` prefix |
+| `coding-guidelines/boolean-naming` | `error` | [Boolean Principles](../01-cross-language/02-boolean-principles/readme.md) | Boolean vars must use `is/has only (all other prefixes banned)` prefix |
 | `coding-guidelines/no-magic-strings` | `warn` | [TS Standards §3](./09-typescript-standards-reference.md) | No raw string literals in `===`/`!==`/`switch` — use enum/constant |
 | `coding-guidelines/max-function-lines` | `error` | [Code Style §R6](../01-cross-language/04-code-style/05-function-and-type-size.md) | Max 15 lines per function body (non-blank, non-comment) |
 | `coding-guidelines/promise-all-independent` | `error` | [Promise Patterns §3](./10-promise-await-patterns.md) | Sequential `await` on independent promises → use `Promise.all` |
@@ -137,8 +137,8 @@ The canonical ESLint configuration lives at `eslint.config.js` in the project ro
 - [Custom Plugin Source](../../../eslint-plugins/coding-guidelines/index.js) — Rule implementations
 - [Promise Patterns](./10-promise-await-patterns.md) — Promise.all enforcement rationale
 - [TS Standards Reference](./09-typescript-standards-reference.md) — Full TypeScript rules
-- [Cross-Language Code Style](../01-cross-language/04-code-style/01-index.md) — Formatting rules
-- [Static Analysis Overview](../01-cross-language/16-static-analysis/01-index.md) — Cross-language analyzer guide
+- [Cross-Language Code Style](../01-cross-language/04-code-style/readme.md) — Formatting rules
+- [Static Analysis Overview](../01-cross-language/16-static-analysis/readme.md) — Cross-language analyzer guide
 
 ---
 

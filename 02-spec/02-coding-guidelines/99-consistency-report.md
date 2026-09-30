@@ -10,7 +10,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | `99-consistency-report.md` present | ✅ |
 | Lowercase kebab-case naming | ✅ All files compliant |
 | Unique numeric sequence prefixes | ✅ |
@@ -23,7 +23,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 00 | `01-index.md` | ✅ Present |
+| 00 | `readme.md` | ✅ Present |
 | — | `05-consolidated-review-guide.md` | ✅ Present |
 | — | `04-consolidated-review-guide-condensed.md` | ✅ Present |
 | 97 | `97-acceptance-criteria.md` | ✅ Present |

@@ -6,9 +6,9 @@
 
 Version: 1.5.0
 
-This is a standalone file. Follow every rule below without consulting any other document. If a `02-spec/02-coding-guidelines/` folder, a `02-spec/02-coding-guidelines/01-cross-language/01-index.md` file, or a `02-spec/03-error-manage/` folder exists in this repository, treat those as strictly binding extensions to this file, but this file alone is enough to write compliant code. The `error-manage` rules must be tightly followed.
+This is a standalone file. Follow every rule below without consulting any other document. If a `02-spec/02-coding-guidelines/` folder, a `02-spec/02-coding-guidelines/01-cross-language/readme.md` file, or a `02-spec/03-error-manage/` folder exists in this repository, treat those as strictly binding extensions to this file, but this file alone is enough to write compliant code. The `error-manage` rules must be tightly followed.
 
-**Before reading the rules below**, read the [AI Instruction Manual & Overview](../02-coding-guidelines/01-cross-language/01-index.md) to understand how to review code, interpret files, and maintain repository hygiene (e.g. updating `.gitignore`).
+**Before reading the rules below**, read the [AI Instruction Manual & Overview](../02-coding-guidelines/01-cross-language/readme.md) to understand how to review code, interpret files, and maintain repository hygiene (e.g. updating `.gitignore`).
 
 Canonical locations (all three must exist and match, byte-for-byte, via `scripts/sync-guidelines.mjs`):
 
@@ -69,6 +69,7 @@ auto-reject on the same tier as RULE 0.
 31. **Checker Interface Convention (`Checker` Suffix)**: All interfaces that evaluate boolean states or predicates MUST end with the `Checker` suffix (`IsSuccessChecker`, `IsFailureChecker`, `IsInvalidChecker`, `IsNullChecker`, `IsEmptyChecker`, `IsDefinedChecker`, `DefinableChecker`, `StatusChecker`). Never use generic suffixes like `Definer` or `Emptyer`.
 32. **High-Performance Fast-Path Typecasting (`typecast`)**: Dynamic reflection-based casting (`ReflectSetTo`) must implement fast-path type switches for primitive types (`string`, `int`, `int64`, `bool`, `float64`, `[]byte`) before allocating reflection objects. Compound types (JSON unmarshaling from `[]byte` and marshaling to `*[]byte`) must use direct type assertions.
 33. **Unified Result and Error Generic Casting**: Monadic result wrappers (`Result[T]`, `Wrap[T]`) and structured error representations (`*AppError`) must provide generic conversion helpers (`CastTo[T]`, `ReflectTo[T]`, `CastResult[T, U]`, `CastContextPayload[T]`) returning explicit `*AppError` wrappers on failure, ensuring type safety across boundaries without panic.
+34. **GitHub Actions Zero Storage (Total Ban on `actions/upload-artifact` in CI)**: Never use `actions/upload-artifact` in CI workflows (`ci.yml`, test runs, linting, matrix builds). GitHub accounts operate under strict storage quotas (e.g. 500 MB free quota), and multi-platform matrix builds uploading test binaries or artifacts quickly cause account-wide storage exhaustion, blocking all subsequent workflow runs. Build binaries in CI only to verify compilation (`go build`, `npm run build`), keeping execution completely ephemeral. If failure diagnostics or logs are strictly required, use `retention-days: 1` as a temporary override. Permanent release binaries belong exclusively on GitHub Releases (`release.yml` using `gh release upload`), which do not count against the Actions workflow artifact quota.
 
 ---
 
@@ -101,6 +102,7 @@ If this repository has a `02-spec/xx-error-manage/` folder, that folder is bindi
 - Never swallow. Every `catch` logs the operation name and the key inputs, then rethrows or returns a typed error.
 - Wrap, do not lose. Wrap the original error with an operation label and context (`appfault.Wrap(err, "op", ctx)` in Go, `throw new AppError(cause, { op, ctx })` in TS). The original stack must survive.
 - Go Return Type: Use `*appfault.AppError` (package `appfault`, struct `AppError`) for structured Go errors and `Result[T].AppError()` / `Result[T].Fault()`. Migrate legacy `*apperror.*` references to `pkg/appfault`.
+- Go Result Containers & types.go: Functions returning errors paired with collections or values must return `appfault.ResultMap[K, V]`, `appfault.ResultSlice[T]`, or `appfault.Result[T]`, with pointer-attached null safety (`*Result[T]`) and methods (`IsCountOtherThan`, `IsEmpty`, `HasRecord`, `IsDefined`). All domain payload structs and Result aliases MUST be declared in a dedicated `types.go` file within each package as a single reusable named type. Never scatter unexported structs or raw generic Result envelopes inline.
 - Every variable needs to be captured in a error log, path, value, numbers with meaningful ways to debug except for direct SQL injections.
 - Typed errors only. No `throw "string"`, no bare `panic("msg")`. Use a typed error class or result type with a registered code.
 - Registered codes. Every user-visible error has a stable code. No ad-hoc codes invented at the throw site.
@@ -242,7 +244,7 @@ The same rules apply to TypeScript, PHP, Rust, C#, PowerShell, and Python. Only 
   - **Never two blank lines in a row, anywhere**. No empty lines padded inside braces.
 - [ ] **Single Source of Truth for Versions**: Do not hardcode version numbers across files. Use a root-level JSON file (e.g. `version.json`) as the single source of truth and inject/read it dynamically.
 
-> **See Full Guide**: For complete rules and multi-language examples, see `02-spec/02-coding-guidelines/01-cross-language/01-index.md`
+> **See Full Guide**: For complete rules and multi-language examples, see `02-spec/02-coding-guidelines/01-cross-language/readme.md`
 
 # AI Code Review Guide — Naming, Signatures, Whitespace
 
@@ -1761,20 +1763,3 @@ R21: pass
 
 <full corrected file or unified diff>
 ```
-
----
-
-## 21. R22 — Standalone Installer Script Resilience & Release Code Block Standards
-
-All standalone installer scripts (`install.ps1`, `install.sh`) and release documentation MUST adhere to the following architecture (full spec: `02-spec/14-update/26-installer-multi-version-fallback-and-release-blocks.md`):
-
-1. **Decouple from Release Assets:** Standalone installer scripts reside at repository root and are fetched directly from GitHub raw content or git tags (`raw.githubusercontent.com/<owner>/<repo>/...`). They MUST NEVER be copied to `release-files/` or published as downloadable binary release assets.
-2. **Multi-Version Fallback Ladder (5 to 10 Candidates):** Installers MUST discover up to 10 release candidate versions via GitHub API and embedded historical fallbacks. If the latest or target candidate fails (network error, missing platform package, 404, checksum mismatch), the installer MUST automatically retreat to the previous release candidate in sequence until a verified package installs successfully.
-3. **Robust Pinned Version Resolution:** Support `-Version` / `--version` CLI flags, positional arguments, environment variables (`AGM_VERSION`, `VERSION`, `INSTALLER_VERSION`), and raw git tag URL pattern detection (`.../vX.Y.Z/install.ps1`).
-4. **Clean Aria2c Accelerator Delegation:** Emit an explicit delegation notice (`Delegating download request to aria2c accelerator...`), configure quiet parameters (`--summary-interval=0`, `--console-log-level=error`, `--show-console-readout=false`), and output concise single-line start and completion summaries without terminal progress dumps.
-5. **Separate Release Code Blocks:** Every release body MUST format install one-liners in isolated Markdown code blocks with independent copy buttons:
-   - Block 1: Windows (PowerShell) Direct Latest Install
-   - Block 2: Windows (PowerShell) Pinned Version Install
-   - Block 3: Linux / macOS (Bash) Direct Latest Install
-   - Block 4: Linux / macOS (Bash) Pinned Version Install
-

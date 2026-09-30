@@ -10,7 +10,7 @@
 
 | Criterion | Status |
 |-----------|--------|
-| `01-index.md` present | ✅ |
+| `readme.md` present | ✅ |
 | `97-acceptance-criteria.md` present | ✅ |
 | `99-consistency-report.md` present | ✅ |
 | Lowercase kebab-case naming | ✅ |
@@ -22,7 +22,7 @@
 
 | # | File | Status |
 |---|------|--------|
-| 00 | `01-index.md` | ✅ Present |
+| 00 | `readme.md` | ✅ Present |
 | 01 | `01-anti-hallucination-rules.md` | ✅ Present |
 | 02 | `02-ai-quick-reference-checklist.md` | ✅ Present |
 | 03 | `03-common-ai-mistakes.md` | ✅ Present |

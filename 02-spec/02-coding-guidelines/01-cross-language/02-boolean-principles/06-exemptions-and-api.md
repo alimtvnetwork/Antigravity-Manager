@@ -1,6 +1,6 @@
 # Boolean Principles — Static factory exemption, Result wrapper API
 
-> **Parent:** [Boolean Principles](./01-index.md)
+> **Parent:** [Boolean Principles](./readme.md)
 > **Version:** 2.7.0
 > **Updated:** 2026-04-19
 

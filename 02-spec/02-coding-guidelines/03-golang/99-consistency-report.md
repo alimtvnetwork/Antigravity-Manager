@@ -10,10 +10,10 @@
 
 | # | File | Status |
 |---|------|--------|
-| 1 | `01-index.md` | ✅ Present |
+| 1 | `readme.md` | ✅ Present |
 | 2 | `02-boolean-standards.md` | ✅ Present |
 | 3 | `03-httpmethod-enum.md` | ✅ Present |
-| 4 | `04-golang-standards-reference/01-index.md` | ✅ Present |
+| 4 | `04-golang-standards-reference/readme.md` | ✅ Present |
 | 5 | `05-defer-rules.md` | ✅ Present |
 | 6 | `06-string-slice-internals.md` | ✅ Present |
 | 7 | `07-code-severity-taxonomy.md` | ✅ Present |

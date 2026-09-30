@@ -305,8 +305,8 @@ type Project struct {
 
 ## Cross-Reference
 
-- [Cross-Language Code Style](./04-code-style/01-index.md) — Formatting rules
-- [PHP Naming Conventions](../04-php/01-index.md) — PHP-specific naming
-- [Go Coding Standards](../03-golang/04-golang-standards-reference/01-index.md) — Go-specific naming
-- [Master Coding Guidelines](./15-master-coding-guidelines/01-index.md) — Consolidated cross-language reference
+- [Cross-Language Code Style](./04-code-style/readme.md) — Formatting rules
+- [PHP Naming Conventions](../04-php/readme.md) — PHP-specific naming
+- [Go Coding Standards](../03-golang/04-golang-standards-reference/readme.md) — Go-specific naming
+- [Master Coding Guidelines](./15-master-coding-guidelines/readme.md) — Consolidated cross-language reference
 - [Issues & Fixes Log](./02-issues-and-fixes-log.md) — Full historical fixes

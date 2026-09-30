@@ -209,4 +209,4 @@ Trivial getters, setters, single-expression helpers, and any function whose name
 
 ---
 
-*Part of [Code Style](./01-index.md) — Rules 8, 14, 15, 16*
+*Part of [Code Style](./readme.md) — Rules 8, 14, 15, 16*
