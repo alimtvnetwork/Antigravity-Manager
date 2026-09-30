@@ -1,3 +1,9 @@
+## v4.108.0 — 2026-09-30 (exact rustfmt compliance and env!(CARGO_PKG_VERSION) fix for gitignore agm and telemetry)
+
+**Scope:** Version bump. exact rustfmt compliance and env!(CARGO_PKG_VERSION) fix for gitignore agm and telemetry.
+
+---
+
 ## v4.107.0 — 2026-09-30 (exact rustfmt compliance and gitignore agm command)
 
 **Scope:** Version bump. exact rustfmt compliance and gitignore agm command.
