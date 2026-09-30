@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.105.0] - 2026-09-30
+
+### Added
+- add failed_commands logging, suggestions, clear-terminal, and rich ssh/clean optimization suggestions
+
+---
+
 ## [v4.104.0] - 2026-09-30
 
 ### Added
