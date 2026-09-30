@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.107.0] - 2026-09-30
+
+### Added
+- exact rustfmt compliance and gitignore agm command
+
+---
+
 ## [v4.106.0] - 2026-09-30
 
 ### Added

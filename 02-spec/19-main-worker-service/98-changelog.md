@@ -1,3 +1,9 @@
+## v4.107.0 — 2026-09-30 (exact rustfmt compliance and gitignore agm command)
+
+**Scope:** Version bump. exact rustfmt compliance and gitignore agm command.
+
+---
+
 ## v4.106.0 — 2026-09-30 (add gitignore agm command and fix rustfmt formatting)
 
 **Scope:** Version bump. add gitignore agm command and fix rustfmt formatting.
