@@ -87,13 +87,18 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
             loadPreflight(keepCount);
             window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
 
-            const handleKeyDown = (e: KeyboardEvent) => {
-                if (e.key === 'Escape') {
+            const handleDropdownOpen = (e: Event) => {
+                const customEvent = e as CustomEvent<{ source?: string }>;
+                if (customEvent.detail?.source && customEvent.detail.source !== 'clean-modal') {
                     onClose();
                 }
             };
+            window.addEventListener('agm:dropdown-open', handleDropdownOpen);
             window.addEventListener('keydown', handleKeyDown);
-            return () => window.removeEventListener('keydown', handleKeyDown);
+            return () => {
+                window.removeEventListener('keydown', handleKeyDown);
+                window.removeEventListener('agm:dropdown-open', handleDropdownOpen);
+            };
         }
     }, [isOpen, keepCount, loadPreflight, onClose]);
 

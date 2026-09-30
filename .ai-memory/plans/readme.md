@@ -7,10 +7,11 @@
 | `02` | [02-completed-gitmap-agm-tree-instance-swap.md](./completed/02-completed-gitmap-agm-tree-instance-swap.md) | `COMPLETED` | GitMap AGY command parity (`fpug`, `sug`, `rerun`, `running-prompts`, `ssh`), Dual AGM/GitMap Bracketed Tree View (`[AGM:P001 \| GM:#1]` / `[AGM:C001 \| GM:<cid>]`), instance/node-scoped prompt injection, and multi-instance / multi-project account swap isolation. |
 | `26` | [26-instance-switching-ui-telegram-email-fix.md](./completed/26-instance-switching-ui-telegram-email-fix.md) | `COMPLETED` | Multi-instance switching integrity, modal exclusivity with close 'X' buttons, high-contrast selection & scroll-into-view, conversation pruner safety gate (running prompts + 5 sessions), project deduplication, Telegram HTML repair, /update & /prune bot commands, and 200-word prompt previews in email & CLI. |
 | `71` | [71-supabase-multi-machine-hierarchy-and-cli-e2e.md](./completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md) | `COMPLETED` | Supabase multi-machine relational hierarchy (`nodes` -> `instance_profiles` -> `workspace_leases`), native `agm supabase` CLI command suite, automated PowerShell one-liners, and repo-secrets vault synchronization. |
+| `74` | [74-ui-email-telegram-fixes-revisit.md](./completed/74-ui-email-telegram-fixes-revisit.md) | `COMPLETED` | Comprehensive UI fixes (modal 'X' close buttons, Escape key listener, auto-scroll, contrast polishing), Email deduplication & 200-word prompt previews, Telegram HTML tag balancing & /prune /query commands, and CLI router/help GitMap SSH parity. |
 | `83` | [83-local-e2e-instance-switching-and-prompt-restore.md](./completed/83-local-e2e-instance-switching-and-prompt-restore.md) | `COMPLETED` | Local-only on-demand E2E test suite for Antigravity IDE instance switching, conscious PID matching, prompt recovery, and visual settings verification with dual skip-by-default isolation. |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |
-*(None)*
+| `75` | [75-multi-instance-switching-prompt-backup-and-hygiene.md](./pending/75-multi-instance-switching-prompt-backup-and-hygiene.md) | `PENDING` | Multi-Instance credential isolation, account switch/fast-forward progression, running prompt backup & restoration, scripts/dev-tool-clear.ps1 Cargo/Rust hygiene, local E2E test verification, and minor release ceremony with CI/CD monitoring. |
 

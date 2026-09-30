@@ -446,15 +446,34 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
             })
             .count();
 
-        if let Some(p) = matched.first() {
-            running_prompt_id = Some(p.id.clone());
-            let (snippet, wc) = extract_words_preview(&p.prompt_content, 200);
-            running_prompt_snippet = Some(snippet);
-            running_prompt_project = Some(p.repo_path.clone());
+        let mut all_running_snippets: Vec<String> = Vec::new();
+        for p in matched.iter().filter(|p| {
+            p.status == "running"
+                || p.status == "backed_up"
+                || p.status == "dispatched"
+                || p.status == "executing"
+        }) {
+            if running_prompt_id.is_none() {
+                running_prompt_id = Some(p.id.clone());
+            }
+            if running_prompt_project.is_none() {
+                running_prompt_project = Some(p.repo_path.clone());
+            }
             if p.image_payload.is_some() {
                 has_images = true;
                 images_attached = true;
             }
+            let (snippet, wc) = extract_words_preview(&p.prompt_content, 200);
+            if !snippet.is_empty() {
+                let p_id_short = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
+                all_running_snippets.push(format!(
+                    "[Prompt #{}] ({}, {} words):\n{}",
+                    p_id_short, p.repo_path, wc, snippet
+                ));
+            }
+        }
+        if !all_running_snippets.is_empty() {
+            running_prompt_snippet = Some(all_running_snippets.join("\n\n---\n\n"));
         }
     }
 

@@ -17,6 +17,7 @@ interface AccountRowProps {
     isCurrent: boolean;
     isRefreshing: boolean;
     isSwitching?: boolean;
+    isFocused?: boolean;
     onSwitch: (target?: string) => void;
     onRefresh: () => void;
     onViewDevice: () => void;
@@ -29,7 +30,7 @@ interface AccountRowProps {
 
 
 
-function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice }: AccountRowProps) {
+function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice }: AccountRowProps) {
     const { t } = useTranslation();
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
     const { instances, activeInstanceId } = useInstanceStore();
@@ -89,16 +90,27 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
         }
     };
 
+    const rowRef = useRef<HTMLTableRowElement | null>(null);
+
+    useEffect(() => {
+        if (isFocused && rowRef.current) {
+            rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [isFocused]);
+
     return (
         <tr
             id={`account-row-${account.id}`}
+            ref={rowRef}
             className={cn(
-            "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
-            isCurrent
-                ? "bg-amber-500/15 dark:bg-amber-500/20 border-l-amber-500 dark:border-l-amber-400 font-semibold text-gray-900 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30 hover:shadow-xs"
+            "group transition-all duration-200 border-b border-gray-100 dark:border-slate-800 border-l-4",
+            isFocused
+                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2"
+                : isCurrent
+                ? "bg-amber-50/90 dark:bg-slate-800/95 border-l-amber-500 dark:border-l-amber-400 font-semibold text-gray-900 dark:text-white hover:bg-amber-100/80 dark:hover:bg-slate-750 hover:shadow-xs"
                 : selected
-                ? "bg-blue-500/10 dark:bg-blue-900/30 border-l-blue-500 dark:border-l-blue-400 font-medium text-gray-900 dark:text-blue-100 hover:bg-blue-500/20 dark:hover:bg-blue-900/40"
-                : "border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-l-stone-400 dark:hover:border-l-stone-500",
+                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 font-bold shadow-lg"
+                : "border-l-transparent hover:bg-stone-50 dark:hover:bg-slate-800/60 hover:border-l-stone-400 dark:hover:border-l-stone-500 text-gray-900 dark:text-gray-200",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
@@ -117,14 +129,18 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 <div className="flex items-center gap-3">
                     <span className={cn(
                         "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors",
-                        isCurrent ? "text-blue-700 dark:text-blue-400" : "text-gray-900 dark:text-base-content"
+                        isFocused || selected
+                            ? "text-slate-950 font-bold"
+                            : isCurrent
+                            ? "text-amber-950 dark:text-white font-bold"
+                            : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
                     </span>
 
                     <div className="flex items-center gap-1.5 shrink-0">
                         {isCurrent && (
-                            <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-bold shadow-sm border border-blue-200/50 dark:border-blue-800/50">
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[10px] font-bold shadow-sm border border-amber-300/60 dark:border-amber-400/40">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         )}

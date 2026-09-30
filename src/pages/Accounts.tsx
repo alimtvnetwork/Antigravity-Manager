@@ -108,6 +108,53 @@ function Accounts() {
   const [isWarmuping, setIsWarmuping] = useState(false);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [errorAccountId, setErrorAccountId] = useState<string | null>(null);
+  const [focusedAccountId, setFocusedAccountId] = useState<string | null>(null);
+
+  // Auto-scroll and high-contrast highlight watcher for focused account
+  useEffect(() => {
+    if (!focusedAccountId) return;
+    let attempts = 0;
+    const maxAttempts = 20; // Check over 2 seconds (100ms intervals)
+    const interval = setInterval(() => {
+      attempts++;
+      const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
+      const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
+      const targetEl = cardEl || rowEl;
+      if (targetEl) {
+        clearInterval(interval);
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        targetEl.classList.add(
+          "ring-4",
+          "ring-blue-500",
+          "dark:ring-amber-400",
+          "ring-offset-2",
+          "dark:ring-offset-slate-900",
+          "shadow-2xl",
+          "scale-[1.01]",
+          "transition-all",
+          "duration-300"
+        );
+        const timer = setTimeout(() => {
+          targetEl.classList.remove(
+            "ring-4",
+            "ring-blue-500",
+            "dark:ring-amber-400",
+            "ring-offset-2",
+            "dark:ring-offset-slate-900",
+            "shadow-2xl",
+            "scale-[1.01]"
+          );
+          setFocusedAccountId(null);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        setFocusedAccountId(null);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [focusedAccountId, currentPage, filter, searchQuery]);
 
   const handleWarmup = async (accountId: string) => {
     setRefreshingIds((prev) => {
@@ -601,8 +648,9 @@ function Accounts() {
       setSearchQuery("");
     }
 
-    // 3. Calculate page number if paginated
-    const targetIndex = (isVisibleInFilter ? filteredAccounts : accounts).findIndex(
+    // 3. Calculate target page number
+    const targetList = isVisibleInFilter ? filteredAccounts : accounts;
+    const targetIndex = targetList.findIndex(
       (a) => a.id === targetAccount.id
     );
     if (targetIndex >= 0) {
@@ -612,32 +660,8 @@ function Accounts() {
       }
     }
 
-    // 4. Scroll smoothly to target element and highlight it
-    setTimeout(() => {
-      const cardEl = document.getElementById(`account-card-${targetAccount.id}`);
-      const rowEl = document.getElementById(`account-row-${targetAccount.id}`);
-      const targetEl = cardEl || rowEl;
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        targetEl.classList.add(
-          "ring-4",
-          "ring-amber-400",
-          "dark:ring-amber-500",
-          "ring-offset-2",
-          "transition-all"
-        );
-        setTimeout(() => {
-          targetEl.classList.remove(
-            "ring-4",
-            "ring-amber-400",
-            "dark:ring-amber-500",
-            "ring-offset-2"
-          );
-        }, 2500);
-      } else {
-        showToast(targetAccount.email, "info");
-      }
-    }, 120);
+    // 4. Trigger state-based auto-scroll and luminous high-contrast highlight
+    setFocusedAccountId(targetAccount.id);
   };
 
   const exportAccountsToJson = async (accountsToExport: Account[]) => {
@@ -1124,6 +1148,7 @@ function Accounts() {
                 onUpdateLabel={handleUpdateLabel}
                 onViewError={(id: string) => setErrorAccountId(id)}
                 quotaWindow={quotaWindow}
+                focusedAccountId={focusedAccountId}
               />
             </div>
           </div>
@@ -1137,6 +1162,7 @@ function Accounts() {
               currentAccountId={currentAccount?.id || null}
               currentAccountEmail={currentAccount?.email || null}
               switchingAccountId={switchingAccountId}
+              focusedAccountId={focusedAccountId}
               onSwitch={handleSwitch}
               onRefresh={handleRefresh}
               onViewDevice={handleViewDevice}

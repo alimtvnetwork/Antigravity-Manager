@@ -1299,8 +1299,13 @@ pub fn render_idle_projects_email(
         pkg_ver, machine_name, machine_ip
     );
 
+    let mut seen_repos = std::collections::HashSet::new();
     let mut proj_rows = String::new();
     for p in projects {
+        let repo_clean = p.repo_name.trim().to_lowercase();
+        if !seen_repos.insert(repo_clean) {
+            continue;
+        }
         let is_running = p.status.to_uppercase().contains("RUNNING");
         let (badge_bg, badge_fg, badge_border, badge_text) = if is_running {
             ("#ecfdf5", "#047857", "#a7f3d0", "RUNNING")
@@ -1331,19 +1336,21 @@ pub fn render_idle_projects_email(
 
     let recent_prompts = crate::modules::repo_db::list_all_prompts().unwrap_or_default();
     let mut prompt_rows = String::new();
-    for p in recent_prompts.iter().take(5) {
-        let preview: String = p.prompt_content.chars().take(80).collect();
+    for p in recent_prompts.iter().take(6) {
+        let (preview, word_count) =
+            crate::modules::notification_hub::extract_words_preview(&p.prompt_content, 200);
         let preview_clean = escape_html_entities(&preview);
         prompt_rows.push_str(&format!(
             r#"<tr>
-  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 15px; color: #0284c7; font-weight: 700;">{}</td>
-  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; font-weight: 600;">{}</td>
-  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><span style="background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: 700;">{}</span></td>
-  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; color: #64748b;">{}...</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 15px; color: #0284c7; font-weight: 700; vertical-align: top;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; font-weight: 600; vertical-align: top;">{}</td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; vertical-align: top;"><span style="background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: 700;">{}</span><br><span style="font-size: 12px; color: #64748b; font-family: 'Ubuntu Mono', monospace;">({} words)</span></td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 15px; color: #334155; line-height: 1.6; font-family: 'Ubuntu Mono', monospace; vertical-align: top; max-width: 450px; word-break: break-word;">{}</td>
 </tr>"#,
             escape_html_entities(&p.id),
             escape_html_entities(&p.project_id),
             escape_html_entities(&p.status),
+            word_count,
             preview_clean,
         ));
     }
@@ -1351,15 +1358,15 @@ pub fn render_idle_projects_email(
     let prompts_section = if !prompt_rows.is_empty() {
         format!(
             r#"<div style="font-weight: 800; font-size: 20px; text-transform: uppercase; color: #0f172a; margin-top: 28px; margin-bottom: 14px; letter-spacing: 0.05em;">
-  Recent Prompt History &amp; Queue
+  Cached Prompts History &amp; Queue (≥200 Words Preview)
 </div>
 <table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 28px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
   <thead>
     <tr style="background: #334155; color: #ffffff;">
-      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Prompt ID</th>
-      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Target Project</th>
-      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Status</th>
-      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Snippet</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em; width: 140px;">Prompt ID</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em; width: 140px;">Target Project</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em; width: 120px;">Status</th>
+      <th style="padding: 16px 20px; text-align: left; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">Instruction (200 Words Preview)</th>
     </tr>
   </thead>
   <tbody>

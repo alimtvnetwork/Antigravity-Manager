@@ -7,7 +7,7 @@ import { isTauri } from '../../utils/env';
 import { useViewStore } from '../../stores/useViewStore';
 import { useErrorStore } from '../../stores/error-store';
 
-// useClickOutside Hook
+// useClickOutside Hook with Escape key dismissal
 export function useClickOutside(
     ref: React.RefObject<HTMLElement | null>,
     handler: () => void
@@ -23,8 +23,18 @@ export function useClickOutside(
             handler();
         };
 
+        const keyListener = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                handler();
+            }
+        };
+
         document.addEventListener('mousedown', listener);
-        return () => document.removeEventListener('mousedown', listener);
+        document.addEventListener('keydown', keyListener);
+        return () => {
+            document.removeEventListener('mousedown', listener);
+            document.removeEventListener('keydown', keyListener);
+        };
     }, [ref, handler]);
 }
 
@@ -48,6 +58,17 @@ export function LanguageDropdown({
 
     useClickOutside(menuRef, () => setIsOpen(false));
 
+    useEffect(() => {
+        const handleDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'language-dropdown') {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener('agm:dropdown-open', handleDropdownOpen);
+        return () => window.removeEventListener('agm:dropdown-open', handleDropdownOpen);
+    }, []);
+
     const handleLanguageChange = (langCode: string) => {
         setIsOpen(false);
         try {
@@ -68,7 +89,13 @@ export function LanguageDropdown({
         <div className={`relative ${className}`} ref={menuRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const next = !isOpen;
+                    setIsOpen(next);
+                    if (next) {
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'language-dropdown' } }));
+                    }
+                }}
                 className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 title={t('settings.general.language')}
                 aria-label="Language selection"
@@ -126,6 +153,17 @@ export function NavigationDropdown({
 
     useClickOutside(menuRef, () => setIsOpen(false));
 
+    useEffect(() => {
+        const handleDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'navigation-dropdown') {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener('agm:dropdown-open', handleDropdownOpen);
+        return () => window.removeEventListener('agm:dropdown-open', handleDropdownOpen);
+    }, []);
+
     const handleNavItemClick = () => {
         setIsOpen(false);
         onNavigate();
@@ -140,7 +178,13 @@ export function NavigationDropdown({
     return (
         <div className="relative" ref={menuRef}>
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const next = !isOpen;
+                    setIsOpen(next);
+                    if (next) {
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'navigation-dropdown' } }));
+                    }
+                }}
                 className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
             >
                 <CurrentIcon className="w-4 h-4 text-gray-700 dark:text-gray-300" />
@@ -202,6 +246,17 @@ export function MoreDropdown({
 
     useClickOutside(menuRef, () => setIsOpen(false));
 
+    useEffect(() => {
+        const handleDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source !== 'more-dropdown') {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener('agm:dropdown-open', handleDropdownOpen);
+        return () => window.removeEventListener('agm:dropdown-open', handleDropdownOpen);
+    }, []);
+
     const handleThemeToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
         setIsOpen(false);
         try {
@@ -243,7 +298,13 @@ export function MoreDropdown({
         <div className="relative" ref={menuRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const next = !isOpen;
+                    setIsOpen(next);
+                    if (next) {
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'more-dropdown' } }));
+                    }
+                }}
                 className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 title={t('nav.more', 'More')}
                 aria-label="More options"

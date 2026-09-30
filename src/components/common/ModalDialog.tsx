@@ -1,4 +1,5 @@
-import { AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
+import { useEffect } from 'react';
+import { AlertTriangle, CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -41,6 +42,17 @@ export default function ModalDialog({
     const handleConfirm = onConfirm || onClose || (() => {});
     const handleCancel = onCancel || onClose;
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !isLoading && handleCancel) {
+                handleCancel();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, isLoading, handleCancel]);
+
     if (!isOpen) return null;
 
     const getIcon = () => {
@@ -76,6 +88,18 @@ export default function ModalDialog({
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[110]" />
 
             <div className={`modal-box relative ${maxWidth} w-full max-h-[90vh] flex flex-col bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200`}>
+                {handleCancel && (
+                    <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={handleCancel}
+                        className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-base-200 transition-colors cursor-pointer z-20"
+                        title={t('common.close', 'Close')}
+                        aria-label="Close dialog"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
                 <div className="flex flex-col items-center text-center p-5 pt-6 sm:p-6 sm:pt-7 flex-1 min-h-0 overflow-hidden">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm shrink-0 ${getIconBg()}`}>
                         {getIcon()}

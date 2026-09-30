@@ -91,6 +91,7 @@ interface AccountTableProps {
     onReorder?: (accountIds: string[]) => void;
     onViewError: (accountId: string) => void;
     quotaWindow?: '5h' | 'weekly';
+    focusedAccountId?: string | null;
 }
 
 interface SortableRowProps {
@@ -98,6 +99,7 @@ interface SortableRowProps {
     selected: boolean;
     isRefreshing: boolean;
     isCurrent: boolean;
+    isFocused?: boolean;
     isSwitching: boolean;
     isDragging?: boolean;
     onSelect: () => void;
@@ -119,6 +121,7 @@ interface SortableRowProps {
 interface AccountRowContentProps {
     account: Account;
     isCurrent: boolean;
+    isFocused?: boolean;
     isRefreshing: boolean;
     isSwitching: boolean;
     isDisabled: boolean;
@@ -215,6 +218,7 @@ function SortableAccountRow({
     selected,
     isRefreshing,
     isCurrent,
+    isFocused = false,
     isSwitching,
     isDragging,
     onSelect,
@@ -233,6 +237,8 @@ function SortableAccountRow({
     modelFilter = 'both',
 }: SortableRowProps) {
     const { t } = useTranslation();
+    const rowRef = useRef<HTMLTableRowElement | null>(null);
+
     const {
         attributes,
         listeners,
@@ -241,6 +247,17 @@ function SortableAccountRow({
         transition,
         isDragging: isSortableDragging,
     } = useSortable({ id: account.id, disabled: isDragDisabled });
+
+    const setMergedRef = (node: HTMLTableRowElement | null) => {
+        setNodeRef(node);
+        rowRef.current = node;
+    };
+
+    useEffect(() => {
+        if (isFocused && rowRef.current) {
+            rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [isFocused]);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -251,13 +268,21 @@ function SortableAccountRow({
 
     return (
         <tr
-            ref={setNodeRef}
+            id={`account-row-${account.id}`}
+            ref={setMergedRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
-                isCurrent ? "bg-amber-500/10 dark:bg-blue-950/60 border-l-amber-400 dark:border-l-amber-400 font-medium" : "border-l-transparent",
-                isDragging ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg" : "",
-                !isDragging ? "hover:bg-amber-500/10 dark:hover:bg-blue-900/30 hover:border-l-amber-400/80" : ""
+                "group transition-all duration-200 border-b border-gray-100 dark:border-base-200 border-l-4",
+                isFocused
+                    ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2"
+                    : selected
+                    ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 font-bold shadow-lg"
+                    : isCurrent
+                    ? "bg-amber-50/90 dark:bg-slate-800/95 border-l-amber-500 dark:border-l-amber-400 font-semibold text-gray-900 dark:text-white"
+                    : isDragging
+                    ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
+                    : "border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-l-stone-400 dark:hover:border-l-stone-500",
+                !isDragging && !isFocused && !selected ? "hover:bg-amber-100/60 dark:hover:bg-slate-750 hover:border-l-amber-400/80" : ""
             )}
         >
             {/* 拖拽手柄 */}
@@ -289,6 +314,7 @@ function SortableAccountRow({
             <AccountRowContent
                 account={account}
                 isCurrent={isCurrent}
+                isFocused={isFocused}
                 isRefreshing={isRefreshing}
                 isSwitching={isSwitching}
                 isDisabled={Boolean(account.disabled)}
@@ -316,6 +342,7 @@ function SortableAccountRow({
 function AccountRowContent({
     account,
     isCurrent,
+    isFocused = false,
     isRefreshing,
     isSwitching,
     isDisabled,
@@ -514,14 +541,18 @@ function AccountRowContent({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className={cn(
                         "font-medium text-xs break-all transition-colors",
-                        isCurrent ? "text-blue-700 dark:text-blue-400 font-semibold" : "text-gray-900 dark:text-base-content"
+                        isFocused
+                            ? "text-slate-950 font-bold"
+                            : isCurrent
+                            ? "text-amber-950 dark:text-white font-bold"
+                            : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
                     </span>
 
                     <div className="flex items-center gap-1 shrink-0">
                         {isCurrent ? (
-                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold shadow-xs border border-blue-200/50 dark:border-blue-800/50">
+                            <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[9px] font-bold shadow-xs border border-amber-300/60 dark:border-amber-400/40">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         ) : null}
@@ -927,6 +958,7 @@ function AccountTable({
     currentAccountId,
     currentAccountEmail,
     switchingAccountId,
+    focusedAccountId,
     onSwitch,
     onRefresh,
     onViewDevice,
@@ -1176,6 +1208,7 @@ function AccountTable({
                                     selected={selectedIds.has(account.id)}
                                     isRefreshing={refreshingIds.has(account.id)}
                                     isCurrent={isAccountCurrent(account)}
+                                    isFocused={Boolean(focusedAccountId && account.id === focusedAccountId)}
                                     isSwitching={account.id === switchingAccountId}
                                     isDragging={account.id === activeId}
                                     onSelect={() => onToggleSelect(account.id)}

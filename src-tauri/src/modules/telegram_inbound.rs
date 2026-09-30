@@ -199,6 +199,8 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
             { "command": "api", "description": "Query local API proxy status & account bindings" },
             { "command": "backup", "description": "Backup running prompts to split SQLite DB" },
             { "command": "restore", "description": "Restore backed-up prompts to resume execution" },
+            { "command": "prune", "description": "Safely prune older conversations (e.g. /prune 5, /prune 10)" },
+            { "command": "query", "description": "Query cached SQLite prompts with ≥200-word preview" },
             { "command": "email", "description": "Check email status or send test/help email" },
             { "command": "ff", "description": "Fast-forward switch to highest-quota account" },
             { "command": "snapshot", "description": "View multi-node cluster status snapshot" },
@@ -293,33 +295,100 @@ pub async fn detect_telegram_chat_id(bot_token: &str) -> Result<TelegramDetected
     )))
 }
 
-/// Chunk text into pieces <= max_chars splitting at newline boundaries where possible
+/// Helper to inspect currently unclosed HTML tags in an HTML snippet
+fn get_unclosed_html_tags(s: &str) -> Vec<String> {
+    let mut stack: Vec<String> = Vec::new();
+    let mut in_tag = false;
+    let mut current_tag = String::new();
+
+    for c in s.chars() {
+        if c == '<' {
+            in_tag = true;
+            current_tag.clear();
+        } else if c == '>' {
+            in_tag = false;
+            let tag_content = current_tag.trim();
+            if tag_content.starts_with('/') {
+                let closing = tag_content[1..]
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_lowercase();
+                if let Some(pos) = stack.iter().rposition(|t| t == &closing) {
+                    stack.remove(pos);
+                }
+            } else if !tag_content.is_empty() && !tag_content.ends_with('/') {
+                let opening = tag_content
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_lowercase();
+                if [
+                    "b",
+                    "strong",
+                    "i",
+                    "em",
+                    "u",
+                    "ins",
+                    "s",
+                    "strike",
+                    "del",
+                    "span",
+                    "a",
+                    "code",
+                    "pre",
+                    "blockquote",
+                ]
+                .contains(&opening.as_str())
+                {
+                    stack.push(opening);
+                }
+            }
+        } else if in_tag {
+            current_tag.push(c);
+        }
+    }
+    stack
+}
+
+/// Chunk text into pieces <= max_chars splitting at newline boundaries where possible,
+/// ensuring HTML tags are balanced across chunks to prevent Telegram parse errors.
 pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     let limit = if max_chars == 0 { 3800 } else { max_chars };
     if text.len() <= limit {
         return vec![text.to_string()];
     }
 
-    let mut chunks = Vec::new();
+    let mut raw_chunks = Vec::new();
     let mut current_chunk = String::with_capacity(limit);
 
     for line in text.split_inclusive('\n') {
         if line.len() > limit {
             if !current_chunk.is_empty() {
-                chunks.push(current_chunk);
+                raw_chunks.push(current_chunk);
                 current_chunk = String::with_capacity(limit);
             }
             let mut remaining = line;
             while remaining.len() > limit {
-                let (slice, rest) = remaining.split_at(limit);
-                chunks.push(slice.to_string());
+                let mut split_pos = limit;
+                while split_pos > 0 && !remaining.is_char_boundary(split_pos) {
+                    split_pos -= 1;
+                }
+                let sub = &remaining[..split_pos];
+                if let Some(last_lt) = sub.rfind('<') {
+                    if !sub[last_lt..].contains('>') && last_lt > 0 {
+                        split_pos = last_lt;
+                    }
+                }
+                let (slice, rest) = remaining.split_at(split_pos);
+                raw_chunks.push(slice.to_string());
                 remaining = rest;
             }
             if !remaining.is_empty() {
                 current_chunk.push_str(remaining);
             }
         } else if current_chunk.len() + line.len() > limit {
-            chunks.push(current_chunk);
+            raw_chunks.push(current_chunk);
             current_chunk = String::with_capacity(limit);
             current_chunk.push_str(line);
         } else {
@@ -328,14 +397,39 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     if !current_chunk.is_empty() {
-        chunks.push(current_chunk);
+        raw_chunks.push(current_chunk);
     }
 
-    if chunks.is_empty() {
-        vec![text.to_string()]
-    } else {
-        chunks
+    if raw_chunks.is_empty() {
+        return vec![text.to_string()];
     }
+
+    let total = raw_chunks.len();
+    let mut balanced_chunks = Vec::with_capacity(total);
+    let mut carry_over_tags = Vec::new();
+
+    for (idx, mut chunk) in raw_chunks.into_iter().enumerate() {
+        if !carry_over_tags.is_empty() {
+            let mut prefix = String::new();
+            for tag in &carry_over_tags {
+                prefix.push_str(&format!("<{}>", tag));
+            }
+            chunk = format!("{}{}", prefix, chunk);
+        }
+
+        let unclosed = get_unclosed_html_tags(&chunk);
+        carry_over_tags = unclosed.clone();
+
+        if !unclosed.is_empty() && idx + 1 < total {
+            for tag in unclosed.iter().rev() {
+                chunk.push_str(&format!("</{}>", tag));
+            }
+        }
+
+        balanced_chunks.push(chunk);
+    }
+
+    balanced_chunks
 }
 
 /// Send a text message to a Telegram chat, automatically chunking messages longer than 3800 characters
@@ -631,11 +725,11 @@ pub fn format_observe_report() -> String {
     let projects = repo_db::get_live_project_execution_info();
     let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
 
-    let mut running_items: Vec<String> = Vec::new();
-    let mut idle_names: Vec<String> = Vec::new();
-    let mut seen_prompt_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut running_workspace_names: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    // Deduplicate running projects using a distinct dictionary/map
+    let mut project_map: std::collections::BTreeMap<
+        String,
+        (String, Vec<(String, usize, String)>),
+    > = std::collections::BTreeMap::new();
 
     for p in &projects {
         let short_name = shorten_project_name(&p.repo_name);
@@ -650,54 +744,37 @@ pub fn format_observe_report() -> String {
 
             if let Some(ap) = matched_prompt {
                 seen_prompt_ids.insert(ap.id.clone());
-                running_workspace_names.insert(short_name.clone());
                 let duration_str = format_running_duration(ap.created_at);
-                let duration_display = if !duration_str.is_empty() {
-                    format!(" {}", duration_str)
-                } else {
-                    String::new()
-                };
-                let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let (preview_txt, wc) =
-                    repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
+                    repo_db::extract_prompt_words_preview(&ap.prompt_content, 200);
+                let prompt_id_short = if ap.id.len() > 8 {
+                    ap.id[..8].to_string()
+                } else {
+                    ap.id.clone()
+                };
+                let entry = project_map
+                    .entry(short_name.clone())
+                    .or_insert_with(|| (duration_str.clone(), Vec::new()));
                 if !preview_txt.is_empty() {
-                    block.push_str(&format!(
-                        "   {} <i>({} words)</i>\n",
-                        clean_for_telegram_html(&preview_txt, 1500),
-                        wc
-                    ));
+                    entry.1.push((preview_txt, wc, prompt_id_short));
                 }
-                let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
-                block.push_str(&format!(
-                    "   <i>Expand: <code>/expand {}</code></i>\n",
-                    prompt_id_short
-                ));
-                running_items.push(block);
             } else if let Some(ref txt) = p.active_prompt {
-                running_workspace_names.insert(short_name.clone());
                 let duration_str = if p.last_detected_at > 0 {
                     format_running_duration(p.last_detected_at)
                 } else {
                     String::new()
                 };
-                let duration_display = if !duration_str.is_empty() {
-                    format!(" {}", duration_str)
-                } else {
-                    String::new()
-                };
-                let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-                let (preview_txt, wc) = repo_db::extract_prompt_words_preview(txt, 150);
+                let (preview_txt, wc) = repo_db::extract_prompt_words_preview(txt, 200);
+                let entry = project_map
+                    .entry(short_name.clone())
+                    .or_insert_with(|| (duration_str.clone(), Vec::new()));
                 if !preview_txt.is_empty() {
-                    block.push_str(&format!(
-                        "   {} <i>({} words)</i>\n",
-                        clean_for_telegram_html(&preview_txt, 1500),
-                        wc
-                    ));
+                    entry.1.push((preview_txt, wc, String::new()));
                 }
-                running_items.push(block);
-            } else if !running_workspace_names.contains(&short_name) {
-                running_workspace_names.insert(short_name.clone());
-                running_items.push(format!("• <b>{}</b> 🟢\n", short_name));
+            } else {
+                project_map
+                    .entry(short_name.clone())
+                    .or_insert_with(|| (String::new(), Vec::new()));
             }
         } else {
             idle_names.push(short_name);
@@ -714,32 +791,46 @@ pub fn format_observe_report() -> String {
             repo_db::format_friendly_workspace_label(&ap.project_id, "", &ap.repo_path);
         let short_name = shorten_project_name(&friendly_ws);
         seen_prompt_ids.insert(ap.id.clone());
-        running_workspace_names.insert(short_name.clone());
 
         let duration_str = format_running_duration(ap.created_at);
-        let duration_display = if !duration_str.is_empty() {
-            format!(" {}", duration_str)
+        let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 200);
+        let prompt_id_short = if ap.id.len() > 8 {
+            ap.id[..8].to_string()
+        } else {
+            ap.id.clone()
+        };
+        let entry = project_map
+            .entry(short_name.clone())
+            .or_insert_with(|| (duration_str.clone(), Vec::new()));
+        if !preview_txt.is_empty() {
+            entry.1.push((preview_txt, wc, prompt_id_short));
+        }
+    }
+
+    for (name, (dur, prompts)) in &project_map {
+        let dur_display = if !dur.is_empty() {
+            format!(" {}", dur)
         } else {
             String::new()
         };
-        let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-        let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
-        if !preview_txt.is_empty() {
+        let mut block = format!("• <b>{}</b> 🟢{}\n", name, dur_display);
+        for (preview_txt, wc, prompt_id) in prompts {
             block.push_str(&format!(
                 "   {} <i>({} words)</i>\n",
-                clean_for_telegram_html(&preview_txt, 1500),
+                clean_for_telegram_html(preview_txt, 2500),
                 wc
             ));
+            if !prompt_id.is_empty() {
+                block.push_str(&format!(
+                    "   <i>Expand: <code>/expand {}</code></i>\n",
+                    prompt_id
+                ));
+            }
         }
-        let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
-        block.push_str(&format!(
-            "   <i>Expand: <code>/expand {}</code></i>\n",
-            prompt_id_short
-        ));
         running_items.push(block);
     }
 
-    idle_names.retain(|name| !running_workspace_names.contains(name));
+    idle_names.retain(|name| !project_map.contains_key(name));
     idle_names.sort();
     idle_names.dedup();
 
@@ -760,18 +851,57 @@ pub fn format_observe_report() -> String {
         }
     }
 
+    let last_rel = git_info::get_last_release();
+    let current_ver = format!("v{}", ver);
+    let settings = crate::modules::update_checker::load_update_settings().ok();
+    let has_remote_newer = settings
+        .as_ref()
+        .map(|s| {
+            !s.last_known_version.is_empty()
+                && crate::modules::update_checker::compare_versions(&s.last_known_version, &ver)
+                    == std::cmp::Ordering::Greater
+        })
+        .unwrap_or(false);
+
+    let (update_badge, update_notice) = if has_remote_newer {
+        let latest_v = settings
+            .as_ref()
+            .map(|s| s.last_known_version.as_str())
+            .unwrap_or("latest");
+        (
+            format!("🚀 <b>Update Available:</b> <code>v{}</code> (current: <code>v{}</code> — Send <code>/update</code>)", latest_v, ver),
+            format!("\n🚀 <b>Update Available:</b> <code>v{}</code> (current: <code>v{}</code>) — Run <code>/update</code> to install\n", latest_v, ver),
+        )
+    } else if !last_rel.is_empty()
+        && last_rel != current_ver
+        && last_rel != ver
+        && last_rel != "unknown"
+    {
+        (
+            format!("🚀 <b>Update Available:</b> <code>{}</code> (current: <code>v{}</code> — Send <code>/update</code>)", last_rel, ver),
+            format!("\n🚀 <b>Update Available:</b> <code>{}</code> (current: <code>v{}</code>) — Run <code>/update</code> to install\n", last_rel, ver),
+        )
+    } else {
+        (
+            "<code>Up to date</code> (Send <code>/update</code> or <code>/upgrade</code>)"
+                .to_string(),
+            String::new(),
+        )
+    };
+
     format!(
-        "🤖 <b>AGM v{} Status</b>\n\n\
+        "🤖 <b>AGM v{} Status</b>{}\n\n\
         • <b>Machine:</b> {}\n\
         • <b>Alias:</b> {}\n\
         • <b>IP:</b> {}\n\
         • <b>Build:</b> v{} (commit {})\n\
         • <b>Active Account:</b> {} ({} total)\n\
         • <b>Quota / Tier:</b> {}\n\
-        • <b>Update Status:</b> <code>Up to date</code> (Send <code>/update</code> or <code>/upgrade</code>)\n\n\
+        • <b>Update Status:</b> {}\n\n\
         {}\n\
         💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
         clean_for_telegram_html(&ver, 24),
+        update_notice,
         clean_for_telegram_html(&machine_name, 64),
         clean_for_telegram_html(&display_alias, 64),
         clean_for_telegram_html(&local_ip, 48),
@@ -780,6 +910,7 @@ pub fn format_observe_report() -> String {
         clean_for_telegram_html(&active_email, 96),
         total_accounts,
         clean_for_telegram_html(&quota_summary, 128),
+        update_badge,
         body_sections
     )
 }
@@ -2779,6 +2910,71 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
     }
 }
 
+/// Download photo/screenshot from Telegram and persist to disk for future reuse
+pub async fn download_telegram_photo(bot_token: &str, msg: &Value) -> Option<PathBuf> {
+    let photo_arr = msg["photo"].as_array()?;
+    let best_photo = photo_arr.last()?;
+    let file_id = best_photo["file_id"].as_str()?;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .ok()?;
+
+    let get_file_url = format!(
+        "https://api.telegram.org/bot{}/getFile?file_id={}",
+        bot_token, file_id
+    );
+    let resp: Value = client
+        .get(&get_file_url)
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+    let file_path = resp["result"]["file_path"].as_str()?;
+
+    let download_url = format!(
+        "https://api.telegram.org/file/bot{}/{}",
+        bot_token, file_path
+    );
+    let img_bytes = client
+        .get(&download_url)
+        .send()
+        .await
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".to_string());
+    let target_dir = PathBuf::from(home)
+        .join(".antigravity_tools")
+        .join("saved_images");
+    let _ = fs::create_dir_all(&target_dir);
+
+    let ext = PathBuf::from(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_string();
+    let filename = format!(
+        "telegram_{}_{}.{}",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+        &file_id[..file_id.len().min(8)],
+        ext
+    );
+    let full_path = target_dir.join(&filename);
+    if fs::write(&full_path, &img_bytes).is_ok() {
+        Some(full_path)
+    } else {
+        None
+    }
+}
+
 /// Poll pending Telegram updates once, execute commands, reply, and advance update offset
 pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, AppError> {
     let mut config = load_config()?;
@@ -2822,8 +3018,15 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
 
             let msg = &update["message"];
             let chat_id = msg["chat"]["id"].as_i64().unwrap_or(0);
-            let text = msg["text"].as_str().unwrap_or("").trim();
-            if chat_id == 0 || text.is_empty() {
+            let text_raw = msg["text"]
+                .as_str()
+                .or_else(|| msg["caption"].as_str())
+                .unwrap_or("")
+                .trim();
+
+            let saved_photo_opt = download_telegram_photo(&clean_token, msg).await;
+
+            if chat_id == 0 || (text_raw.is_empty() && saved_photo_opt.is_none()) {
                 continue;
             }
 
@@ -2840,9 +3043,31 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
-            if let Some(reply) = process_telegram_command_text(text).await {
+            let reply_opt = if !text_raw.is_empty() {
+                let base_reply = process_telegram_command_text(text_raw).await;
+                if let Some(img_path) = saved_photo_opt.as_ref() {
+                    let banner = format!(
+                        "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                        img_path.display()
+                    );
+                    base_reply.map(|r| format!("{}{}", banner, r))
+                } else {
+                    base_reply
+                }
+            } else if let Some(img_path) = saved_photo_opt.as_ref() {
+                Some(format!(
+                    "📸 <b>Screenshot Saved Successfully</b>\n\n\
+                    • <b>Path:</b> <code>{}</code>\n\n\
+                    💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
+                    img_path.display()
+                ))
+            } else {
+                None
+            };
+
+            if let Some(reply) = reply_opt {
                 let _ = send_telegram_message(&clean_token, chat_id, &reply).await;
-                processed.push((chat_id, text.to_string(), reply));
+                processed.push((chat_id, text_raw.to_string(), reply));
             }
         }
     }
@@ -2931,9 +3156,18 @@ pub fn start_telegram_daemon() {
 
                                     let msg = &update["message"];
                                     let chat_id = msg["chat"]["id"].as_i64().unwrap_or(0);
-                                    let text = msg["text"].as_str().unwrap_or("").trim();
+                                    let text_raw = msg["text"]
+                                        .as_str()
+                                        .or_else(|| msg["caption"].as_str())
+                                        .unwrap_or("")
+                                        .trim();
 
-                                    if chat_id == 0 || text.is_empty() {
+                                    let saved_photo_opt =
+                                        download_telegram_photo(&config.bot_token, msg).await;
+
+                                    if chat_id == 0
+                                        || (text_raw.is_empty() && saved_photo_opt.is_none())
+                                    {
                                         continue;
                                     }
 
@@ -2952,11 +3186,34 @@ pub fn start_telegram_daemon() {
 
                                     {
                                         let mut st = LAST_TELEGRAM_STATUS.write().await;
-                                        st.last_message_received = Some(text.to_string());
+                                        st.last_message_received = Some(text_raw.to_string());
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    if let Some(reply) = process_telegram_command_text(text).await {
+                                    let reply_opt = if !text_raw.is_empty() {
+                                        let base_reply =
+                                            process_telegram_command_text(text_raw).await;
+                                        if let Some(img_path) = saved_photo_opt.as_ref() {
+                                            let banner = format!(
+                                                "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                                                img_path.display()
+                                            );
+                                            base_reply.map(|r| format!("{}{}", banner, r))
+                                        } else {
+                                            base_reply
+                                        }
+                                    } else if let Some(img_path) = saved_photo_opt.as_ref() {
+                                        Some(format!(
+                                            "📸 <b>Screenshot Saved Successfully</b>\n\n\
+                                            • <b>Path:</b> <code>{}</code>\n\n\
+                                            💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
+                                            img_path.display()
+                                        ))
+                                    } else {
+                                        None
+                                    };
+
+                                    if let Some(reply) = reply_opt {
                                         let _ = send_telegram_message(
                                             &config.bot_token,
                                             chat_id,

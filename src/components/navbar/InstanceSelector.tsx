@@ -13,6 +13,7 @@ import {
     Upload,
     AlertTriangle,
     Star,
+    Plus,
     X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -76,12 +77,15 @@ export function InstanceSelector() {
 
     useEffect(() => {
         if (isOpen) {
-            const timer = setTimeout(() => {
-                activeItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }, 60);
-            return () => clearTimeout(timer);
+            const frameId = requestAnimationFrame(() => {
+                const timer = setTimeout(() => {
+                    activeItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 80);
+                return () => clearTimeout(timer);
+            });
+            return () => cancelAnimationFrame(frameId);
         }
-    }, [isOpen]);
+    }, [isOpen, activeInstanceId]);
 
     useEffect(() => {
         const canRun = isTauri();
@@ -105,6 +109,10 @@ export function InstanceSelector() {
             if (e.key === 'Escape') {
                 setIsOpen(false);
                 setIsIoOpen(false);
+                setIsCreateOpen(false);
+                setIsCopyOpen(false);
+                setIsEditOpen(false);
+                setIsDeleteOpen(false);
             }
         };
         const handleOtherDropdownOpen = (e: Event) => {
@@ -497,6 +505,20 @@ export function InstanceSelector() {
                             {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
                         <div className="flex items-center gap-1 relative">
+                            {/* Create New Profile Button */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setNewInstanceName('');
+                                    setIsOpen(false);
+                                    setIsCreateOpen(true);
+                                }}
+                                className="p-1 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('instances.create_button', 'Create New Profile')}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={() => {
@@ -505,6 +527,7 @@ export function InstanceSelector() {
                                         setCopyTargetId(target.config.id);
                                         setCopyInstanceName(`${target.config.name} Copy`);
                                         setCloneMode('full');
+                                        setIsOpen(false);
                                         setIsCopyOpen(true);
                                     }
                                 }}
@@ -604,8 +627,8 @@ export function InstanceSelector() {
                                         className={cn(
                                             "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold shadow-md border-l-blue-600 dark:border-l-blue-600 ring-2 ring-blue-500/60 my-0.5 rounded-r-md"
-                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-stone-100/70 dark:hover:bg-slate-800/70 hover:border-l-stone-400 dark:hover:border-l-stone-500"
+                                                ? "bg-white dark:bg-white text-slate-950 dark:text-slate-950 font-bold shadow-md border-l-blue-600 dark:border-l-blue-600 ring-2 ring-blue-500/80 my-1 rounded-r-md"
+                                                : "border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-slate-800/90 hover:border-l-blue-400 dark:hover:border-l-blue-400 hover:text-slate-900 dark:hover:text-white"
                                         )}
                                     >
                                         <button
@@ -627,11 +650,11 @@ export function InstanceSelector() {
                                                 <div className="flex items-center gap-1.5 truncate">
                                                     <span className={cn(
                                                         "px-1.5 py-0.5 rounded text-[10px] font-black shrink-0",
-                                                        isSelected ? "bg-slate-900 text-white" : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25"
+                                                        isSelected ? "bg-blue-600 text-white" : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25"
                                                     )}>
                                                         #{seqNum}
                                                     </span>
-                                                    <span className={cn("truncate font-bold", isSelected ? "text-slate-900 dark:text-slate-950" : "text-gray-900 dark:text-gray-100")}>
+                                                    <span className={cn("truncate font-bold", isSelected ? "text-slate-950 dark:text-slate-950" : "text-gray-900 dark:text-gray-100")}>
                                                         {inst.config.name}
                                                     </span>
                                                     {isDefault && (
@@ -650,7 +673,7 @@ export function InstanceSelector() {
                                                         {displayEmail}
                                                     </span>
                                                 ) : (
-                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-500" : "text-gray-400/60 dark:text-gray-500/60")}>
+                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-600 dark:text-slate-600" : "text-gray-400/60 dark:text-gray-500/60")}>
                                                         {t('instances.unlinked', 'No account linked')}
                                                     </span>
                                                 )}
@@ -707,6 +730,7 @@ export function InstanceSelector() {
                                                     e.stopPropagation();
                                                     setEditTargetId(inst.config.id);
                                                     setEditInstanceName(inst.config.name);
+                                                    setIsOpen(false);
                                                     setIsEditOpen(true);
                                                 }}
                                                 className="w-6 h-6 p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200/60 dark:hover:bg-slate-800 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
@@ -723,6 +747,7 @@ export function InstanceSelector() {
                                                     setCopyTargetId(inst.config.id);
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCloneMode('full');
+                                                    setIsOpen(false);
                                                     setIsCopyOpen(true);
                                                 }}
                                                 className="w-6 h-6 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
@@ -765,6 +790,7 @@ export function InstanceSelector() {
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setDeleteTarget(inst);
+                                                        setIsOpen(false);
                                                         setIsDeleteOpen(true);
                                                     }}
                                                     className="w-6 h-6 p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
@@ -816,13 +842,29 @@ export function InstanceSelector() {
 
             {/* Create Instance Modal */}
             {isCreateOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Laptop className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.create_modal_title', 'Create New Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4"
+                    onClick={() => setIsCreateOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Laptop className="w-5 h-5 text-blue-600" />
+                                <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                    {t('instances.create_modal_title', 'Create New Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsCreateOpen(false)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
                         <input
                             type="text"
@@ -856,13 +898,29 @@ export function InstanceSelector() {
 
             {/* Duplicate Instance Modal with Full Directory Copy Toggle */}
             {isCopyOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4"
+                    onClick={() => setIsCopyOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                    {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsCopyOpen(false)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
 
                         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -947,13 +1005,29 @@ export function InstanceSelector() {
 
             {/* Edit / Rename Instance Modal */}
             {isEditOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Pencil className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.edit_modal_title', 'Rename Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4"
+                    onClick={() => setIsEditOpen(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Pencil className="w-5 h-5 text-blue-600" />
+                                <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                    {t('instances.edit_modal_title', 'Rename Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditOpen(false)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
                         <input
                             type="text"
@@ -987,13 +1061,35 @@ export function InstanceSelector() {
 
             {/* Delete Instance Modal */}
             {isDeleteOpen && deleteTarget && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800">
-                        <div className="flex items-center gap-2 mb-3 text-red-600">
-                            <AlertTriangle className="w-5 h-5" />
-                            <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                {t('instances.delete_modal_title', 'Delete Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4"
+                    onClick={() => {
+                        setDeleteTarget(null);
+                        setIsDeleteOpen(false);
+                    }}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-3 text-red-600">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" />
+                                <h3 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                    {t('instances.delete_modal_title', 'Delete Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDeleteTarget(null);
+                                    setIsDeleteOpen(false);
+                                }}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
                         <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
                             {t(

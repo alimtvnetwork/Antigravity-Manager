@@ -2381,13 +2381,10 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
         }
         return Ok("default".to_string());
     }
-    // Check if numeric seq_num (e.g. "1") or 1-based index
+    // Check if numeric seq_num (e.g. "1")
     if let Ok(num) = clean.parse::<u32>() {
         if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
             return Ok(inst.id.clone());
-        }
-        if num >= 1 && (num as usize) <= registry.instances.len() {
-            return Ok(registry.instances[(num as usize) - 1].id.clone());
         }
     }
     // Check clean number prefix like "ins-1", "instance-1", "#1"
@@ -2399,23 +2396,12 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
         if let Some(inst) = registry.instances.iter().find(|i| i.seq_num == Some(num)) {
             return Ok(inst.id.clone());
         }
-        if num >= 1 && (num as usize) <= registry.instances.len() {
-            return Ok(registry.instances[(num as usize) - 1].id.clone());
-        }
     }
-    // Check exact id match
+    // Check exact id or name match
     if let Some(inst) = registry
         .instances
         .iter()
-        .find(|i| i.id.eq_ignore_ascii_case(clean))
-    {
-        return Ok(inst.id.clone());
-    }
-    // Check name contains
-    if let Some(inst) = registry
-        .instances
-        .iter()
-        .find(|i| i.name.to_lowercase().contains(&clean.to_lowercase()))
+        .find(|i| i.id.eq_ignore_ascii_case(clean) || i.name.eq_ignore_ascii_case(clean))
     {
         return Ok(inst.id.clone());
     }
@@ -2523,9 +2509,6 @@ pub async fn switch_account_to_instance(
         let _ = update_instance_app_storage(&target_data_path, Some(&acc.email), is_tos);
         purge_volatile_instance_sessions(&target_data_path);
 
-        let _ = crate::modules::integration::write_to_system_keyring(acc);
-        let _ = crate::modules::integration::write_to_file_credentials(acc);
-
         let inst_home_opt = get_instance_home_dir(&instance.id).ok();
         if let Some(ref inst_home) = inst_home_opt {
             let _ = crate::modules::integration::write_to_file_credentials_at(inst_home, acc);
@@ -2545,6 +2528,10 @@ pub async fn switch_account_to_instance(
             write_keyring_bypass_markers(&target_data_path, None);
         }
         let _ = crate::modules::integration::write_to_file_credentials_at(&target_data_path, acc);
+        if is_default_inst {
+            let _ = crate::modules::integration::write_to_system_keyring(acc);
+            let _ = crate::modules::integration::write_to_file_credentials(acc);
+        }
 
         crate::modules::db::inject_token(
             &db_path,
