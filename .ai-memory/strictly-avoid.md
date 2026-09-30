@@ -399,3 +399,27 @@ Allowed work:
 - When the user says stop asking, apply a stated default, record it, and continue.
 
 **Why:** The user could not find options that lived only in the spec and had to explain the same point twice.
+
+---
+
+## Single-Line Long Iterator Chains in Rust (Rustfmt Formatting Drift) — TOTAL BAN
+
+🔴 **NEVER write single-line long iterator method chains in `src-tauri/` that exceed rustfmt column limits or fail `cargo fmt -- --check`.**
+
+Forbidden:
+- ❌ Writing single-line iterator chains exceeding 100 characters: `let non_flag_args: Vec<String> = args.iter().filter(|a| !a.starts_with('-')).cloned().collect();`
+- ❌ Chaining multiple iterator adapters (`.iter()`, `.filter()`, `.map()`, `.cloned()`, `.collect()`) on a single line when the resulting line approaches or exceeds 100 characters.
+- ❌ Committing Rust code in `src-tauri/` without running `cd src-tauri && cargo fmt -- --check`.
+
+Allowed work:
+- ✅ Format chained iterator calls across multiple lines with one method per line:
+  ```rust
+  let non_flag_args: Vec<String> = args
+      .iter()
+      .filter(|a| !a.starts_with('-'))
+      .cloned()
+      .collect();
+  ```
+- ✅ Run `cargo fmt --all` or `cargo fmt -- --check` in `src-tauri/` before committing.
+
+**Why:** Rustfmt strictly enforces a 100-character line width cap. Single-line iterator chains cause `cargo fmt -- --check` to fail across all multi-OS matrix runners (Ubuntu, Windows, macOS), blocking CI workflows (see `.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md`).

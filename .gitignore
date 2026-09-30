@@ -76,6 +76,7 @@ tmp/
 *.cache
 .gitmap/
 .ai-memory/cicd/
+.ai-memory/temp-agents/
 
 .gitmap/release-assets
 release-assets

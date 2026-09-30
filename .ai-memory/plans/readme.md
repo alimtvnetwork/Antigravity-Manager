@@ -9,6 +9,7 @@
 | `71` | [71-supabase-multi-machine-hierarchy-and-cli-e2e.md](./completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md) | `COMPLETED` | Supabase multi-machine relational hierarchy (`nodes` -> `instance_profiles` -> `workspace_leases`), native `agm supabase` CLI command suite, automated PowerShell one-liners, and repo-secrets vault synchronization. |
 | `74` | [74-ui-email-telegram-fixes-revisit.md](./completed/74-ui-email-telegram-fixes-revisit.md) | `COMPLETED` | Comprehensive UI fixes (modal 'X' close buttons, Escape key listener, auto-scroll, contrast polishing), Email deduplication & 200-word prompt previews, Telegram HTML tag balancing & /prune /query commands, and CLI router/help GitMap SSH parity. |
 | `83` | [83-local-e2e-instance-switching-and-prompt-restore.md](./completed/83-local-e2e-instance-switching-and-prompt-restore.md) | `COMPLETED` | Local-only on-demand E2E test suite for Antigravity IDE instance switching, conscious PID matching, prompt recovery, and visual settings verification with dual skip-by-default isolation. |
+| `89` | [89-cicd-rustfmt-cmd-instances-fix.md](./completed/89-cicd-rustfmt-cmd-instances-fix.md) | `COMPLETED` | CI/CD rustfmt compliance recovery, fixing line-length formatting drift in `src-tauri/src/bin/agm.rs:8612` (`cmd_instances`), documenting Root Cause Analysis 40 in `.ai-memory/cicd-issues/`, and verifying green CI pipeline. |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
