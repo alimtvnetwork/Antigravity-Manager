@@ -2,7 +2,7 @@
 
 > **Spec Reference:** [02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md](../../../02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md)  
 > **Target Subsystems:** `src-tauri/src/bin/agm.rs`, `.githooks/pre-commit`, `scripts/install-git-hooks.mjs`, `package.json`, `.github/workflows/release.yml`, `.ai-memory/cicd-issues/`, `.ai-memory/cicd-index.md`, `.ai-memory/issues/`, `.ai-memory/strictly-avoid.md`, `.ai-memory/what-to-read.md`.  
-> **Status:** COMPLETED except Subtask 06 (BLOCKED: issue 56, `workflow` token scope)  
+> **Status:** COMPLETED  
 > **How it started:** User reported CI breaking on `main`; every completed CI run from `db5a3787` to `2fe82117` was red. Re-invoked 2026-10-01 with the V4 N-step orchestrator prompt; that run continued from this plan (resume rule) with `SOLO_FALLBACK: invoke_subagent absent`.  
 > **Steps (re-run ledger):** 34 of 300 (Phase 1: 12 of 150, Phase 2: 22 of 150).  
 
@@ -36,8 +36,8 @@ adn make sure issues are listed in theissues and rerrun so that mistakesa rte no
 - **Subtask 05**: Enforce rustfmt locally via tracked pre-commit hook -> [DONE]
   - `.githooks/pre-commit`, `scripts/install-git-hooks.mjs`, `package.json` (`prepare`, `hooks:install`) in `09338155`.
   - Hook test: drifted staged file exit 1; clean tree exit 0.
-- **Subtask 06**: Gate `release.yml` on `cargo fmt -- --check` -> [BLOCKED]
-  - Committed locally as `ci(release): gate release on cargo fmt --check`; push rejected because the token lacks the `workflow` scope. Tracked in `.ai-memory/issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md`.
+- **Subtask 06**: Gate `release.yml` on `cargo fmt -- --check` -> [x]
+  - Pushed as `6b18ddc4` (`ci(release): gate release on cargo fmt --check`) after the maintainer granted the `workflow` scope; issue 56 resolved.
 - **Subtask 07**: Memory accuracy audit (re-run 2026-10-01) -> [DONE]
   - `cicd-index.md`: rows 35–39 added, dead row-32 link marked, RCA 40 set to partial, recurring-class table added.
   - `strictly-avoid.md`: appended "Bypassing CI Gates or Tagging on Unverified CI" ban (existing entries untouched).

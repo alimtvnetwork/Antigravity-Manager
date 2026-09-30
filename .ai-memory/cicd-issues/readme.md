@@ -45,6 +45,6 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 
 ## Recurring Failure Classes (read before committing)
 
-- **Rustfmt drift** (RCAs 02, 12, 16, 18, 20, 22, 27, 28, 29, 34, 40): now enforced by `.githooks/pre-commit` (installed via `npm install` / `npm run hooks:install`). The `release.yml` rustfmt gate is committed locally but unpushed until a `workflow`-scoped token is available ([issue 56](../issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md)). Never commit with `--no-verify`; never mix code edits into `npm run bump` commits.
+- **Rustfmt drift** (RCAs 02, 12, 16, 18, 20, 22, 27, 28, 29, 34, 40): now enforced by `.githooks/pre-commit` (installed via `npm install` / `npm run hooks:install`). `release.yml` → `verify-release-target` also runs `cargo fmt -- --check` before any build job (`6b18ddc4`). Never commit with `--no-verify`; never mix code edits into `npm run bump` commits.
 - **Test isolation / env concurrency** (RCAs 01, 04, 06, 14, 15, 17, 38): tests that touch data dirs, env vars, or shared account pools must use isolated temp dirs and serialize env mutation.
 - **Release shipping on red CI** (RCAs 39, 40): only tag after the CI run for that exact SHA is green; `cancelled` is not green. `gh` defaults to `upstream` here, so always pass `-R alimtvnetwork/Antigravity-Manager`.

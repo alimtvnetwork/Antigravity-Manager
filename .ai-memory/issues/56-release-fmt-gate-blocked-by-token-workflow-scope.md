@@ -1,6 +1,6 @@
 # Issue 56: Release rustfmt gate cannot be pushed (token lacks `workflow` scope)
 
-Status: open (blocked on credentials)
+Status: resolved 2026-10-01 (`6b18ddc4` on `origin/main`, pushed after the maintainer granted the `workflow` scope)
 Raised: 2026-10-01
 RCA: [cicd-issues/40](../cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md)
 Spec: [02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md](../../02-spec/21-app/89-cicd-rustfmt-cmd-instances-fix.md)

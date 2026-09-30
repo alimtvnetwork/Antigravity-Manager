@@ -45,7 +45,7 @@ Format the iterator chain across multiple lines:
 
 ### 2.3 Enforced Gates (root-cause fix)
 - **Local:** tracked `.githooks/pre-commit` runs `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` whenever staged files include `src-tauri/*.rs`, and blocks the commit. `scripts/install-git-hooks.mjs` sets `core.hooksPath=.githooks`, wired to `npm install` via `prepare` and to `npm run hooks:install`.
-- **Release:** `release.yml` → `verify-release-target` runs `cargo fmt -- --check` before any build job. Committed locally; push blocked by token scope ([issue 56](../../.ai-memory/issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md)).
+- **Release:** `release.yml` → `verify-release-target` runs `cargo fmt -- --check` before any build job. Pushed in `6b18ddc4` once the `workflow` token scope was granted ([issue 56](../../.ai-memory/issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md), resolved).
 
 ### 2.4 Memory Accuracy Audit (2026-10-01 re-run)
 - `.ai-memory/cicd-index.md`: added missing rows 35–39, marked the dead row-32 link, set RCA 40 to partial, added recurring-failure-class table.
@@ -69,6 +69,6 @@ Format the iterator chain across multiple lines:
 | AC-3 | Fix pushed to `main` | PASS | `fb86a734`, `09338155` on `origin/main` |
 | AC-4 | Remote CI green | PASS | CI `success` on `09338155`, `ade10b48`, `9b9b8dc7`, `bd60e569` |
 | AC-5 | Pre-commit hook blocks unformatted Rust | PASS | local test: drifted file exit 1, clean file exit 0 |
-| AC-6 | Release refuses unformatted tags | BLOCKED | issue 56 (needs `workflow` token scope) |
+| AC-6 | Release refuses unformatted tags | PASS | `6b18ddc4` on `origin/main` (issue 56 resolved) |
 | AC-7 | Change-recording tool works on committed manifest | PASS | `--record` exit 0 (11 files); `--check-age --json` returns `age_days: 13.21` |
 | AC-8 | Memory indexes have no dead links | PASS | `cicd-index.md` 23 links, 0 broken; changed files 86 links, 0 broken |

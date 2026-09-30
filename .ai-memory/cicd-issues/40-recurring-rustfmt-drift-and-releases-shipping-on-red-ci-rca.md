@@ -69,16 +69,16 @@ Verified locally: the hook blocks a deliberately unformatted staged line (exit 1
 |------|-------|----------|
 | `agm.rs` formatting | Pushed | `fb86a734`; CI green on `09338155`, `ade10b48`, `9b9b8dc7`, `bd60e569` |
 | `.githooks/pre-commit` + `npm prepare` installer | Pushed | `09338155` |
-| `release.yml` rustfmt gate | **Committed locally, not pushed** | push rejected: token scopes `gist`, `read:org`, `repo` (no `workflow`). Tracked as open issue [56](../issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md) |
+| `release.yml` rustfmt gate | Pushed | `6b18ddc4`, after the maintainer granted the `workflow` scope (issue [56](../issues/56-release-fmt-gate-blocked-by-token-workflow-scope.md), resolved) |
 
-Until issue 56 is closed, a tag pushed on a commit with red CI can still publish. The pre-commit hook is the only enforced gate in the meantime.
+The release gate checks formatting only. Other CI failures (Clippy, compile, frontend) are not re-checked at tag time, so "tag only after CI for that exact SHA is `success`" still applies.
 
 ## 7. Announced CI Deadlines (not failures yet)
 
 Seen as annotations on every run; each will break CI on a known date if ignored:
 
 - **Node 20 actions:** `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 and are already forced onto Node 24 (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`). Bump them to a Node 24-native major before GitHub removes the override.
-- **`ubuntu-latest` moves to Ubuntu 26 starting 2026-10-19.** The Linux Tauri build installs WebKitGTK and system `-dev` packages by name. If package names change, `Build Tauri App (ubuntu-latest)` and the release Linux job fail. Either pin `ubuntu-24.04` or verify the package list on Ubuntu 26 before that date. Both are workflow edits and need a `workflow`-scoped token (see issue 56).
+- **`ubuntu-latest` moves to Ubuntu 26 starting 2026-10-19.** The Linux Tauri build installs WebKitGTK and system `-dev` packages by name. If package names change, `Build Tauri App (ubuntu-latest)` and the release Linux job fail. Either pin `ubuntu-24.04` or verify the package list on Ubuntu 26 before that date. Both are workflow edits and need a `workflow`-scoped token (granted 2026-10-01; see issue 56).
 
 ## 8. Related RCAs
 

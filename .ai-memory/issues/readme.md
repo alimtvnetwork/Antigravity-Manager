@@ -12,10 +12,8 @@ This directory contains active issue tracking and bug reports.
 - [53-vault-and-supabase-scripts-silent-failures-rca.md](./53-vault-and-supabase-scripts-silent-failures-rca.md)
 - [54-focus-button-dual-scroll-mechanism-rca.md](./54-focus-button-dual-scroll-mechanism-rca.md)
 
-## Open (blocked)
-- [56-release-fmt-gate-blocked-by-token-workflow-scope.md](./56-release-fmt-gate-blocked-by-token-workflow-scope.md): release rustfmt gate committed locally; push needs a `workflow`-scoped token (maintainer action).
-
 ## Resolved & Historical Application Issues
+- [56-release-fmt-gate-blocked-by-token-workflow-scope.md](./56-release-fmt-gate-blocked-by-token-workflow-scope.md) (resolved 2026-10-01, `6b18ddc4`)
 - [55-update-settings-missing-auto-check-rca.md](./55-update-settings-missing-auto-check-rca.md) (fixed 2026-09-30, `c4983761`)
 - [01-instance-launch-and-user-isolation-rca.md](./01-instance-launch-and-user-isolation-rca.md)
 - [02-instance-launch-and-profile-isolation-rca.md](./02-instance-launch-and-profile-isolation-rca.md)
