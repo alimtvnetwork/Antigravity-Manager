@@ -278,7 +278,7 @@ pub fn log_failed_command(
     let working_dir = std::env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
-    let agm_version = crate::constants::VERSION;
+    let agm_version = env!("CARGO_PKG_VERSION");
 
     let mut stmt = conn
         .prepare("SELECT id, hit_count FROM failed_commands WHERE LOWER(command) = LOWER(?1) AND LOWER(domain) = LOWER(?2) LIMIT 1")

@@ -1,17 +1,17 @@
 ---
 name: agm-json-envelope-format-inspector
-description: Specialized skill for managing Antigravity-Manager two-tier JSON envelope schemas, legacy payload fallback, format inspection algorithms, and bulk import CLI generation.
+description: Specialized skill for managing Antigravity-Manager two-tier JSON envelope schemas (v2.0), variable interpolation (${workDir}, ${repoDir}), relative path enforcement, legacy payload fallback, format inspection algorithms, and bulk import CLI generation.
 ---
 
-# AGM Two-Tier JSON Envelope & Format Inspector Architecture
+# AGM Two-Tier JSON Envelope v2.0 & Variable Interpolation Engine
 
-This skill provides comprehensive architectural guidance, schema definitions, format detection algorithms, and CLI integration standards for the JSON Envelope and Format Inspector subsystem in Antigravity-Manager.
+Comprehensive architectural guidance, schema definitions, format detection algorithms, and CLI integration standards for the JSON Envelope v2.0 and Format Inspector subsystem in Antigravity-Manager (`src-tauri/src/modules/json_envelope.rs` and `src-tauri/src/bin/agm.rs`).
 
 ---
 
 ## 1. Subsystem Architecture Overview
 
-To eliminate ambiguity across configuration backups, credentials exports, and multi-machine sync files, Antigravity-Manager implements a two-tier JSON envelope standard (Plan 84 / Spec 02):
+To eliminate path rigidity, host environment dependency, and data ambiguity across backups, exports, and multi-machine sync files, Antigravity-Manager enforces the **Two-Tier JSON Envelope Schema v2.0**:
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -20,21 +20,32 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
                                              |
                                              v
 +-----------------------------------------------------------------------------------------+
-|                           Format Classifier & Inspector                                 |
+|                    Format Classifier & Variable Expansion Engine                        |
 |                     src-tauri/src/modules/json_envelope.rs                              |
-|  - Check for Tier 1 standard envelope: attributes.type                                  |
+|  - Check for Tier 1 standard envelope: attributes.type & attributes.version ("2.0")     |
+|  - 2-Pass Chained Variable Interpolation: ${workDir}, ${repoDir}, $variables.varName     |
+|  - Relative Path Resolution: resolve_relative_json_path (vault/, instances/, .)         |
 |  - Fallback to Tier 2 legacy signatures: detect top-level key patterns                  |
 +--------------------------------------------+--------------------------------------------+
                       |                                            |
                       v                                            v
-     [Tier 1: Standard Envelope]                    [Tier 2: Legacy Flat JSON]
+     [Tier 1: Standard Envelope v2.0]               [Tier 2: Legacy Flat JSON]
      {                                              {
        "attributes": {                                "active_instance_id": "...",
-         "type": "agm/accounts-export",               "instances": [ ... ]
-         "version": "1.0",                          }
-         "source": "agm-cli",
-         "created_at": "..."                        --> auto-classified into
-       },                                               agm/instances-export
+         "type": "agm/instances-export",               "instances": [ ... ]
+         "version": "2.0",                          }
+         "source": "instances.json",                --> auto-classified into
+         "workDirectory": {                             agm/instances-export
+           "path": "${workDir}",
+           "isApplied": true,
+           "isEnforced": false
+         },
+         "importCommand": "agm instances import instances.json"
+       },
+       "variables": {
+         "workDir": "D:\\work",
+         "repoDir": "${workDir}\\antigravity-manager"
+       },
        "data": { ... }
      }
                                              |
@@ -44,7 +55,7 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
 |  - Status: matched / unrecognized                                                       |
 |  - Detected Schema & Human-Friendly Description                                         |
 |  - Item Count & Mutation Summary                                                        |
-|  - Suggested AGM CLI Import Command (with -y non-interactive flag)                      |
+|  - Suggested AGM CLI Import Command (with relative path & -y non-interactive flag)      |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -54,8 +65,8 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
 
 | File Path | Core Responsibilities |
 |---|---|
-| `src-tauri/src/modules/json_envelope.rs` | Canonical envelope structs (`JsonEnvelope<T>`, `EnvelopeAttributes`), legacy format heuristics, `classify_format`, `inspect_json_file`, `resolve_json_targets`, and CLI command generator. |
-| `src-tauri/src/bin/agm.rs` | CLI integration: `agm which-format <file>` (aliases: `format`, `inspect-format`, `scan-format`), reporting detected type, item count, and copy-pasteable execution command. |
+| `src-tauri/src/modules/json_envelope.rs` | Canonical envelope structs (`JsonEnvelope<T>`, `JsonAttributes`, `WorkDirectoryConfig`), 2-pass variable interpolation engine (`expand_variables_in_value`, `resolve_chained_variables`), relative path resolver (`resolve_relative_json_path`), and format classifier. |
+| `src-tauri/src/bin/agm.rs` | CLI integration: `agm which-format <file>` (aliases: `format`, `inspect-format`, `scan-format`), reporting detected type, item count, and clean relative execution commands. |
 | `src/pages/Accounts.tsx` | Accounts page modal supporting drag-and-drop or paste of JSON envelopes with real-time format detection and preview. |
 | `tests/fixtures/json_envelope/` | Standardized test fixtures for all supported envelope schemas and unrecognized negative cases. |
 
@@ -76,35 +87,67 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
 
 ---
 
-## 4. Format Inspector CLI Usage (`agm which-format`)
+## 4. Variable Interpolation Engine (`src-tauri/src/modules/json_envelope.rs`)
 
-The `agm which-format` command inspects arbitrary JSON files without modifying system state:
+### Syntax Variants Supported
+1. `${varName}` (e.g. `${workDir}`)
+2. `${variables.varName}` (e.g. `${variables.repoDir}`)
+3. `$variables.varName` (e.g. `$variables.secretsDir`)
 
-```bash
-# Inspect a candidate JSON file
-agm which-format ./backup.json
+### 2-Pass Chained Resolution
+Chained variables resolve in dependency order:
+- `workDir`: `"D:\\work"`
+- `repoDir`: `"${workDir}\\antigravity-manager"` $\to$ `"D:\\work\\antigravity-manager"`
+- `dataDir`: `"${repoDir}\\instances"` $\to$ `"D:\\work\\antigravity-manager\\instances"`
 
-# Sample Output:
-# [FORMAT] Detected: agm/accounts-export (v1.0)
-# [ITEMS]  Found 4 accounts
-# [SOURCE] Created by agm-cli at 2026-09-29T19:40:00Z on node-1
-# [ACTION] To import, run:
-#          agm accounts import ./backup.json -y
-
-# Directory recursion and batch discovery
-agm which-format ./backups/
-```
-
-### Directory Traversal & Target Resolution (`resolve_json_targets`)
-When given directories or globs:
-- Recursively gathers all matching `*.json` files.
-- Inspects each candidate, skipping non-JSON or unparseable files without crashing.
-- `build_bulk_import_command` synthesizes a single composite one-line command (chaining with `&&` and `-y`) to import all detected schemas in one go.
+### Value Expansion (`expand_variables_in_value`)
+Recursively walks Serde JSON structures:
+- String scalars: string interpolation via `resolve_string_variable`.
+- Arrays: maps `expand_variables_in_value` over every element.
+- Objects: recursively expands all values in key-value pairs.
+- Numbers/Booleans/Null: returned untouched.
 
 ---
 
-## 5. Architectural Invariants for JSON Exporters & Importers
+## 5. Relative Path Enforcement & Resolution
 
-1. **Always Emit Envelopes**: All new export functions must wrap payloads inside `JsonEnvelope::new(payload, "agm/<domain>-export")`.
-2. **Never Break Legacy Reading**: Importers must always pass incoming JSON through `json_envelope::unpack_envelope`, ensuring legacy flat files from older AGM releases continue to import seamlessly.
-3. **No Interactive Prompts with `-y`**: When the user passes `-y` or `--yes`, CLI import handlers must execute non-interactively without prompting for stdin confirmation.
+All generated import commands strictly use clean relative paths rather than machine-specific absolute paths (e.g. `agm instances import instances.json` instead of `agm instances import D:\work\instances.json`).
+
+### Search Hierarchy (`resolve_relative_json_path`)
+When an import command receives a relative filename:
+1. Checks direct relative path in current working directory (`.`).
+2. Checks common fallback directories:
+   - `vault/`
+   - `instances/`
+   - `vault/instances/`
+   - `02-antigravity-manager/vault/`
+   - `01-gitmap/`
+3. Returns resolved absolute path if found, or returns original path for error reporting.
+
+---
+
+## 6. Format Inspector CLI Usage (`agm which-format`)
+
+```bash
+# Inspect a candidate JSON file
+agm which-format accounts.json
+
+# Sample Output:
+# [FORMAT] Detected: agm/accounts-export (v2.0)
+# [ITEMS]  Found 4 accounts
+# [SOURCE] Created by agm-cli at 2026-09-30 12:00:00 on worker-1
+# [ACTION] To import, run:
+#          agm accounts import accounts.json -y
+
+# Directory recursion and batch discovery
+agm which-format ./vault/ -y --run
+```
+
+---
+
+## 7. Key Invariants
+
+1. **Non-Destructive Inspection**: `agm which-format` MUST remain purely non-mutating unless `--run` (`-r`) is explicitly specified.
+2. **Backward Compatibility**: `unpack_envelope()` must seamlessly accept both Schema v2.0 envelopes and legacy flat JSON payloads without throwing errors.
+3. **Relative Path Generation**: Commands emitted by the inspector or export utilities must never hardcode absolute drive letters or home directories.
+4. **Idempotent Imports**: Bulk imports must identify duplicates by primary keys (e.g. account email or instance ID) and update existing records safely.

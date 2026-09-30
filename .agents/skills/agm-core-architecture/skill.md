@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 30 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 33 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -90,7 +90,11 @@ When modifying any component in the repository, refer to the corresponding skill
 | `src-tauri/src/proxy/upstream/` | 3-tier upstream ladder (Daily -> Sandbox -> Prod), rquest retries, quota circuit breaker | [`agm-upstream-fallback-resilience`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-upstream-fallback-resilience/skill.md) |
 | `scripts/bump-version.mjs`, `changelog.md`, `.github/workflows/release.yml` | 14-location atomic version bump, dual-channel release gates, @aukgit attribution | [`agm-release-lifecycle`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-release-lifecycle/skill.md) |
 | `scripts/prompt_heartbeat_runner.py`, `repo_db.rs::inspect_prompt_goal_status`, `agm observe` | 5s prompt goal heartbeat, iteration continuity, drift detection, AGM_INSTANCE_STATUS.md | [`agm-prompt-heartbeat-and-observer`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-prompt-heartbeat-and-observer/skill.md) |
-| `03-ai-scripts/06-cicd-local-runner.py`, `.github/workflows/`, pre-flight gates | Rust clippy gate, frontend build gate, Zero-CI quarantine standard, RCA generation | [`agm-cicd-and-preflight-gates`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-cicd-and-preflight-gates/skill.md) |
+| `src-tauri/src/bin/agm.rs`, `repo_db.rs` | Failed commands SQLite table & view, Levenshtein command suggester, terminal hygiene | [`agm-failed-commands-and-telemetry`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-failed-commands-and-telemetry/skill.md) |
+| `src-tauri/src/bin/agm.rs:8206` | Git tracking remediation for task resumption files, .gitignore sync, GitMap delegation | [`agm-gitignore-management`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-gitignore-management/skill.md) |
+| `src-tauri/src/bin/agm.rs`, `repo_db.rs` | Terminal self-healing suggestions, failed commands telemetry, session clearing, gitignore hygiene | [`agm-terminal-diagnostics-and-suggestions`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-terminal-diagnostics-and-suggestions/skill.md) |
+| `.github/workflows/`, `03-ai-scripts/06-cicd-local-runner.py` | Pre-flight quality gates, Zero-CI quarantine standards, GitHub Actions pipelines | [`agm-cicd-and-preflight-gates`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-cicd-and-preflight-gates/skill.md) |
+| `src-tauri/src/proxy/*sync.rs`, `cli_sync.rs` | External AI assistant sync (OpenCode, Hermes, OpenClaw, Droid) & CLI path discovery | [`agm-assistant-cli-sync`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-assistant-cli-sync/skill.md) |
 
 
 ---
@@ -133,6 +137,10 @@ Every change made to this repository MUST strictly uphold the following invarian
 11. **Dual-Channel Release Gate Discipline**:
     - Stable releases (`vX.Y.Z`) originate exclusively on `main` branch, updating production channels and synchronizing summaries across both `readme.md` and `readme_en.md`.
     - Preview releases (`vX.Y.Z-beta.N`) originate exclusively on `beta` branch, without altering production update channels or README files.
+12. **Variable Interpolation & Path Portability**:
+    - All exported JSON envelopes (v2.0) must use root variables (`${workDir}`, `${repoDir}`) and relative CLI import commands, resolving files dynamically via `resolve_relative_json_path()`.
+13. **Terminal Diagnostics & Ephemeral Resumption Privacy**:
+    - Unrecognized CLI commands log to SQLite `failed_commands` non-blockingly and output top-4 Levenshtein suggestions. Ephemeral task files (`.antigravity_resume_task.json`) must remain untracked and remediated via `agm gitignore agm`.
 
 ---
 

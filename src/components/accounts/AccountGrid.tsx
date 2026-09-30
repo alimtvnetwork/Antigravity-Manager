@@ -21,10 +21,11 @@ interface AccountGridProps {
     onUpdateLabel?: (accountId: string, label: string) => void;
     onViewError: (accountId: string) => void;
     quotaWindow?: '5h' | 'weekly';
+    focusedAccountId?: string | null;
 }
 
 
-function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountGridProps) {
+function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, focusedAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountGridProps) {
     const { t } = useTranslation();
 
     const isAccountCurrent = (acc: Account) => {
@@ -60,6 +61,7 @@ function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, cur
                     isRefreshing={refreshingIds.has(account.id)}
                     onSelect={() => onToggleSelect(account.id)}
                     isCurrent={isAccountCurrent(account)}
+                    isFocused={Boolean(focusedAccountId && account.id === focusedAccountId)}
                     isSwitching={account.id === switchingAccountId}
                     onSwitch={(targetIde?: string) => onSwitch(account.id, targetIde)}
                     onRefresh={() => onRefresh(account.id)}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Laptop,
     Play,
@@ -24,6 +24,7 @@ import {
     ToggleLeft,
     ToggleRight,
     ArrowRightLeft,
+    X,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -136,6 +137,29 @@ export default function Instances() {
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
+    const activeCardRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (activeInstanceId) {
+            const timer = setTimeout(() => {
+                activeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [activeInstanceId]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsCreateOpen(false);
+                setCopyTargetId(null);
+                setEditTargetId(null);
+                setSwitchTargetInstance(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     useEffect(() => {
         if (!isTauri()) return;
@@ -546,10 +570,11 @@ export default function Instances() {
                         return (
                             <div
                                 key={inst.config.id}
+                                ref={isActive ? activeCardRef : undefined}
                                 className={cn(
                                     "rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-base-200 overflow-hidden shadow-xs",
                                     isActive
-                                        ? "border-blue-500 shadow-md ring-2 ring-blue-500/20"
+                                        ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-slate-800/40"
                                         : "border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20"
                                 )}
                             >
@@ -570,7 +595,7 @@ export default function Instances() {
                                                 <span className="px-2 py-0.5 rounded-md text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
                                                     #{seqNumber}
                                                 </span>
-                                                <h3 className="font-bold text-sm text-gray-900 dark:text-base-content truncate" title={inst.config.name}>
+                                                <h3 className={cn("font-bold text-sm truncate", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
                                                 {inst.config.is_default ? (
@@ -597,7 +622,7 @@ export default function Instances() {
                                             </div>
                                             <div className="shrink-0 flex items-center gap-1">
                                                 {isActive ? (
-                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs tracking-wider">
                                                         Active Target
                                                     </span>
                                                 ) : (
@@ -889,13 +914,41 @@ export default function Instances() {
 
             {/* Create Instance Modal */}
             {isCreateOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <Laptop className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
-                                {t('instances.create_modal_title', 'Create New Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+                    onClick={() => {
+                        setIsCreateOpen(false);
+                        setNewInstanceName('');
+                        setNewInstanceBoundAccount('');
+                        setNewInstanceFromInstance('');
+                        setNewInstanceLaunchImmediately(false);
+                    }}
+                >
+                    <div
+                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <Laptop className="w-5 h-5 text-blue-600" />
+                                <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                    {t('instances.create_modal_title', 'Create New Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCreateOpen(false);
+                                    setNewInstanceName('');
+                                    setNewInstanceBoundAccount('');
+                                    setNewInstanceFromInstance('');
+                                    setNewInstanceLaunchImmediately(false);
+                                }}
+                                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                             Creates an isolated Antigravity profile folder with its own SQLite token store, extensions, and configuration.
@@ -1131,13 +1184,35 @@ export default function Instances() {
 
             {/* Copy / Duplicate Modal */}
             {copyTargetId && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                            <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
-                                {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+                    onClick={() => {
+                        setCopyTargetId(null);
+                        setCopyInstanceName('');
+                    }}
+                >
+                    <div
+                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <Copy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                    {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCopyTargetId(null);
+                                    setCopyInstanceName('');
+                                }}
+                                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
 
                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
@@ -1222,13 +1297,35 @@ export default function Instances() {
 
             {/* Edit Modal */}
             {editTargetId && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <Pencil className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
-                                {t('instances.edit_modal_title', 'Rename Profile')}
-                            </h3>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+                    onClick={() => {
+                        setEditTargetId(null);
+                        setEditInstanceName('');
+                    }}
+                >
+                    <div
+                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <Pencil className="w-5 h-5 text-blue-600" />
+                                <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                    {t('instances.edit_modal_title', 'Rename Profile')}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditTargetId(null);
+                                    setEditInstanceName('');
+                                }}
+                                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                             {t('instances.edit_modal_desc', 'Update display name for this isolated instance profile.')}

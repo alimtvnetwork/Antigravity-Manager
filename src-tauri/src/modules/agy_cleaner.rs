@@ -193,6 +193,7 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
     let candidate_dirs = get_gemini_candidate_dirs();
     let mut conversations = Vec::new();
     let mut seen_cids = std::collections::HashSet::new();
+    let mut active_db_cids = std::collections::HashSet::new();
 
     for base_dir in &candidate_dirs {
         let conv_dir = base_dir.join("conversations");
@@ -212,8 +213,8 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
                 &summaries_db_path,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
             ) {
-                let query = "SELECT conversation_id, title, preview, step_count, workspace_uris, last_modified_time FROM conversation_summaries";
-                if let Ok(mut stmt) = conn.prepare(query) {
+                let query_extended = "SELECT conversation_id, title, preview, step_count, workspace_uris, last_modified_time, COALESCE(status, ''), COALESCE(not_fully_idle, 0) FROM conversation_summaries";
+                if let Ok(mut stmt) = conn.prepare(query_extended) {
                     let rows = stmt.query_map([], |row| {
                         let cid: String = row.get(0)?;
                         let title: String = row.get(1).unwrap_or_default();
@@ -221,12 +222,46 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
                         let step_count: i64 = row.get(3).unwrap_or(0);
                         let uris: String = row.get(4).unwrap_or_default();
                         let last_mod: String = row.get(5).unwrap_or_default();
-                        Ok((cid, title, preview, step_count, uris, last_mod))
+                        let status: String = row.get(6).unwrap_or_default();
+                        let not_fully_idle: i32 = row.get(7).unwrap_or(0);
+                        Ok((
+                            cid,
+                            title,
+                            preview,
+                            step_count,
+                            uris,
+                            last_mod,
+                            status,
+                            not_fully_idle,
+                        ))
                     });
 
                     if let Ok(items) = rows {
                         for item in items.flatten() {
+                            if item.6.to_uppercase().contains("RUNNING") || item.7 != 0 {
+                                active_db_cids.insert(item.0.clone());
+                            }
                             summaries_map.insert(item.0, (item.1, item.2, item.3, item.4, item.5));
+                        }
+                    }
+                } else {
+                    let query = "SELECT conversation_id, title, preview, step_count, workspace_uris, last_modified_time FROM conversation_summaries";
+                    if let Ok(mut stmt) = conn.prepare(query) {
+                        let rows = stmt.query_map([], |row| {
+                            let cid: String = row.get(0)?;
+                            let title: String = row.get(1).unwrap_or_default();
+                            let preview: String = row.get(2).unwrap_or_default();
+                            let step_count: i64 = row.get(3).unwrap_or(0);
+                            let uris: String = row.get(4).unwrap_or_default();
+                            let last_mod: String = row.get(5).unwrap_or_default();
+                            Ok((cid, title, preview, step_count, uris, last_mod))
+                        });
+
+                        if let Ok(items) = rows {
+                            for item in items.flatten() {
+                                summaries_map
+                                    .insert(item.0, (item.1, item.2, item.3, item.4, item.5));
+                            }
                         }
                     }
                 }
@@ -303,11 +338,15 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
     // Safety Invariant: Protect conversations tied to active/queued prompts and retain latest 5 sessions of active projects
     let mut protected_cids = std::collections::HashSet::new();
 
+    // 0. Include active/running conversations detected directly from conversation_summaries.db
+    protected_cids.extend(active_db_cids);
+
     // 1. Collect conversation/session IDs from active or queued prompts in repo_db
     if let Ok(all_prompts) = crate::modules::repo_db::list_all_prompts() {
         for p in all_prompts {
             let is_active = p.status == "running"
                 || p.status == "queued"
+                || p.status == "pending"
                 || p.status == "backed_up"
                 || p.status == "dispatched"
                 || p.status == "executing";
@@ -317,6 +356,9 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
                     if !trimmed.is_empty() && trimmed != "-" {
                         protected_cids.insert(trimmed.to_string());
                     }
+                }
+                if !p.id.trim().is_empty() {
+                    protected_cids.insert(p.id.trim().to_string());
                 }
             }
         }

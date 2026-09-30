@@ -134,6 +134,9 @@ fn main() {
         "tree" => {
             cmd_tree(&cmd_args);
         }
+        "query" | "search" | "find" => {
+            cmd_prompts_query(&cmd_args);
+        }
         "active" | "running" => {
             if cmd_args.is_empty() {
                 cmd_tree(&[]);
@@ -314,6 +317,8 @@ fn print_help_json() {
                     { "name": "which-prompts-running", "aliases": ["wpr"], "flags": ["--json"], "description": "List running projects, conv IDs, and prompt queues" },
                     { "name": "prompts ls", "aliases": ["running-prompts ls"], "flags": ["[N]", "--json", "--words <W>"], "description": "Show N running prompts in ASC stack order (with friendly project names)" },
                     { "name": "prompt", "aliases": [], "flags": ["\"<text>\"", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt with git pull & 01-prompts templates" },
+                    { "name": "query", "aliases": ["search", "find", "prompts query"], "flags": ["[term]", "--words <W>", "--limit <N>", "--status <S>", "--json"], "description": "Query cached SQLite prompts with ≥200-word preview" },
+                    { "name": "prune", "aliases": ["pr", "clear-cache"], "flags": ["--keep <N>", "--preflight", "--undo", "--json"], "description": "Safely prune older conversations (guards active prompts & ≥5 sessions)" },
                     { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" }
                 ]
             },
@@ -401,8 +406,24 @@ fn print_help() {
     println!("        Synchronize local accounts, instances, and DB vaults");
     println!("    pull");
     println!("        Execute git pull origin main in repository root");
-    println!("    ssh <target> [options]");
-    println!("        Connect to remote VM via SSH or run remote command");
+    println!("    ssh <target> [options], sj, se");
+    println!("        Connect to remote VM via SSH, manage keys/nodes, or run remote command");
+    println!(
+        "        Subcommands: exec <node> \"<cmd>\", deploy-keys, fix-auth, copy-id, keys, nodes"
+    );
+    println!("        GitMap Parity Examples:");
+    println!(
+        "          agm ssh exec vm-01 \"gitmap aum status\"      # Run command on target machine"
+    );
+    println!(
+        "          agm ssh exec all \"agm update\"               # Update AGM across entire fleet"
+    );
+    println!(
+        "          agm ssh deploy-keys                         # Distribute SSH keys across nodes"
+    );
+    println!(
+        "          agm ssh nodes ls                            # List connected cluster nodes"
+    );
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  PARALLEL PROMPT BACKUP & WORKSPACE RESTORATION");
@@ -417,12 +438,18 @@ fn print_help() {
     println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
+    println!("    query, search [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
+    println!("        Query cached prompts in SQLite with ≥200-word preview, filtering by status or term");
     println!("    prompts query [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
     println!("        Query cached prompts in SQLite with ≥200-word preview, filtering by status or term");
     println!("    prompts show <id|seq> [--json]");
     println!("        Show full prompt instructions and metadata for specific ID or sequence");
     println!("    prompt [C001|P001|GM:#1|proj] \"<text>\" [--instance <id|#seq>] [--node <alias>] [--prefix C] [--suffix C]");
     println!("        Dispatch prompt by Dual AGM/GitMap Sequence ID, project, instance, or remote SSH node");
+    println!("        Examples:");
+    println!("          agm prompt C001 \"continue task\"               # Inject prompt locally into C001");
+    println!("          agm prompt P001 \"check build\" --node vm-01    # Select machine and dispatch via SSH");
+    println!("          gitmap ssh exec vm-01 \"agm status\"            # Query remote machine via GitMap SSH");
     println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
     println!("        Resend commands before close/switch & sync image paths to resume file");
     println!("    prune, pr [--keep <N>] [--json]");
@@ -544,15 +571,32 @@ fn print_help() {
     );
     println!("    agm clean-conversations --preflight # Dry-run preview of space to be reclaimed");
     println!();
-    println!("    # 7. Multi-Node SSH Execution & GitMap Key Deployment:");
+    println!("    # 7. Multi-Node SSH Fleet Execution & Machine Selection (GitMap & AGM):");
     println!("    agm ssh nodes                       # List registered SSH cluster nodes");
-    println!("    agm ssh exec \"agm status\"           # Run command across SSH cluster");
-    println!("    gitmap ssh nodes                    # List reachable SSH fleet nodes");
+    println!("    agm ssh check <node>                # Check SSH connectivity, port 22 & latency");
+    println!("    agm ssh exec \"agm status\"           # Run command across entire SSH cluster");
+    println!(
+        "    agm ssh <node> \"agm accounts\"        # Run AGM command on a specific remote machine"
+    );
+    println!("    agm prompt P001 \"Build\" --node <node> # Route prompt injection to a specific remote node");
+    println!("    gitmap ssh nodes                    # List reachable GitMap SSH fleet nodes");
+    println!("    gitmap ssh check <node>             # Diagnostic probe of remote node health");
     println!(
         "    gitmap ssh key export               # Export SSH public key for cluster deployment"
     );
     println!("    gitmap ssh key deploy <node>        # Deploy authorization key to remote node");
-    println!("    gitmap ssh <node> \"agm status\"      # Run AGM command on specific remote node");
+    println!("    gitmap ssh <node> \"agm status\"      # Run AGM command on specific remote machine via GitMap");
+    println!("    gitmap ssh exec \"gitmap pe\"         # Run pipeline evaluation across all cluster machines");
+    println!();
+    println!("    # 8. Query Cached Prompts from Terminal (SQLite Cache ≥200 Words Preview):");
+    println!("    agm prompts query                   # View latest prompts with 200-word preview");
+    println!(
+        "    agm prompts query \"pipeline\"        # Search cached prompts containing 'pipeline'"
+    );
+    println!("    agm prompts query -s running        # Filter only actively running prompts");
+    println!(
+        "    agm prompts query --words 300 -n 10 # Display top 10 prompts with 300 words each"
+    );
     println!();
 }
 
@@ -8116,7 +8160,9 @@ fn cmd_clear_terminal(_args: &[String]) {
 
 fn cmd_failed_commands(args: &[String]) {
     let main_cmd = std::env::args().nth(1).unwrap_or_default().to_lowercase();
-    let is_count_sub = args.iter().any(|a| a == "count" || a == "-c" || a == "--count" || a == "stats");
+    let is_count_sub = args
+        .iter()
+        .any(|a| a == "count" || a == "-c" || a == "--count" || a == "stats");
     let is_count_main = main_cmd == "fcc" || main_cmd == "failed-commands-count";
     let is_count = is_count_main || is_count_sub;
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
@@ -8141,7 +8187,9 @@ fn cmd_failed_commands(args: &[String]) {
         return;
     }
 
-    let is_clear = args.iter().any(|a| a == "clear" || a == "-y" || a == "--clear");
+    let is_clear = args
+        .iter()
+        .any(|a| a == "clear" || a == "-y" || a == "--clear");
     if is_clear {
         match repo_db::clear_failed_commands() {
             Ok(cleared) => {
@@ -8159,59 +8207,64 @@ fn cmd_failed_commands(args: &[String]) {
         .iter()
         .find_map(|a| a.parse::<usize>().ok())
         .unwrap_or(20);
-            match repo_db::list_failed_commands(limit) {
-                Ok(records) => {
-                    if is_json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&records).unwrap_or_default()
-                        );
-                    } else if records.is_empty() {
-                        println!(
-                            "\n  ✓ No failed commands recorded. All entered commands were successfully recognized!\n"
-                        );
-                    } else {
-                        let (distinct, total) = repo_db::count_failed_commands()
-                            .unwrap_or((records.len() as i64, records.len() as i64));
-                        println!("================================================================================");
-                        println!(
-                            "  AGM Failed / Undetected Commands Inspector (Distinct: {}, Total Hits: {})",
-                            distinct, total
-                        );
-                        println!("================================================================================");
-                        println!(
-                            "  {:<4} {:<24} {:<8} {:<10} {}",
-                            "#", "COMMAND", "HITS", "DOMAIN", "SUGGESTION"
-                        );
-                        println!("  ------------------------------------------------------------------------------");
-                        for (i, r) in records.iter().enumerate() {
-                            println!(
-                                "  {:<4} {:<24} {:<8} {:<10} {}",
-                                i + 1,
-                                r.command,
-                                r.hit_count,
-                                r.domain,
-                                r.suggestions
-                            );
-                        }
-                        println!("================================================================================");
-                        println!("  • Check count only: agm failed-commands count");
-                        println!("  • Clear history:    agm failed-commands clear\n");
-                    }
+    match repo_db::list_failed_commands(limit) {
+        Ok(records) => {
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&records).unwrap_or_default()
+                );
+            } else if records.is_empty() {
+                println!(
+                    "\n  ✓ No failed commands recorded. All entered commands were successfully recognized!\n"
+                );
+            } else {
+                let (distinct, total) = repo_db::count_failed_commands()
+                    .unwrap_or((records.len() as i64, records.len() as i64));
+                println!("================================================================================");
+                println!(
+                    "  AGM Failed / Undetected Commands Inspector (Distinct: {}, Total Hits: {})",
+                    distinct, total
+                );
+                println!("================================================================================");
+                println!(
+                    "  {:<4} {:<24} {:<8} {:<10} {}",
+                    "#", "COMMAND", "HITS", "DOMAIN", "SUGGESTION"
+                );
+                println!("  ------------------------------------------------------------------------------");
+                for (i, r) in records.iter().enumerate() {
+                    println!(
+                        "  {:<4} {:<24} {:<8} {:<10} {}",
+                        i + 1,
+                        r.command,
+                        r.hit_count,
+                        r.domain,
+                        r.suggestions
+                    );
                 }
-                Err(e) => eprintln!("[ERROR] Failed to list failed commands: {}", e),
+                println!("================================================================================");
+                println!("  • Check count only: agm failed-commands count");
+                println!("  • Clear history:    agm failed-commands clear\n");
             }
+        }
+        Err(e) => eprintln!("[ERROR] Failed to list failed commands: {}", e),
+    }
 }
 
 fn cmd_gitignore(args: &[String]) {
-    if args.iter().any(|a| a == "--help" || a == "-h" || a == "help") {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
         println!("AGM Gitignore & Resume Task Hygiene:");
         println!("  agm gitignore [agm|agy] [path] [flags]");
         println!("\nDescription:");
         println!("  Untrack, delete, and ignore antigravity-resume_task.json across");
         println!("  repositories, committing deletion and .gitignore updates.");
         println!("\nExamples:");
-        println!("  agm gitignore agm                   # Untrack, delete, and ignore in current repo");
+        println!(
+            "  agm gitignore agm                   # Untrack, delete, and ignore in current repo"
+        );
         println!("  agm gitignore agm D:\\work           # Remediate repos in target directory\n");
         return;
     }
@@ -9091,29 +9144,170 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances switch <target> <account> OR agm instances <target> switch <account>
-    let is_switch_order1 = non_flag_args.len() >= 3
+    // Subcommand: agm instances switch <target> [account] OR agm instances <target> switch [account]
+    let is_switch_order1 = !non_flag_args.is_empty()
         && (non_flag_args[0].eq_ignore_ascii_case("switch")
             || non_flag_args[0].eq_ignore_ascii_case("swtich")
             || non_flag_args[0].eq_ignore_ascii_case("use"));
-    let is_switch_order2 = non_flag_args.len() >= 3
+    let is_switch_order2 = non_flag_args.len() >= 2
         && (non_flag_args[1].eq_ignore_ascii_case("switch")
             || non_flag_args[1].eq_ignore_ascii_case("swtich")
             || non_flag_args[1].eq_ignore_ascii_case("use"));
     if is_switch_order1 || is_switch_order2 {
+        if non_flag_args.len() == 1 {
+            eprintln!("Usage: agm instances switch <instance> [account]");
+            std::process::exit(1);
+        }
+
+        // Single-argument switch: agm instances switch <target>
+        if non_flag_args.len() == 2 {
+            let target_spec = if is_switch_order1 {
+                non_flag_args[1].as_str()
+            } else {
+                non_flag_args[0].as_str()
+            };
+
+            // Case A: target resolves to an instance profile -> switch active instance!
+            if let Ok(resolved_id) = instance::resolve_instance_id(target_spec) {
+                let reg = instance::load_registry().ok();
+                let inst_name = reg
+                    .as_ref()
+                    .and_then(|r| r.instances.iter().find(|i| i.id == resolved_id))
+                    .map(|i| i.name.clone())
+                    .unwrap_or_else(|| resolved_id.clone());
+                let inst_email = reg
+                    .as_ref()
+                    .and_then(|r| r.instances.iter().find(|i| i.id == resolved_id))
+                    .and_then(|i| i.bound_email.clone());
+
+                if let Err(e) = instance::set_active_instance_id(&resolved_id) {
+                    eprintln!("[ERROR] Failed to switch active instance: {}", e);
+                    std::process::exit(1);
+                }
+
+                if is_json {
+                    let res = serde_json::json!({
+                        "success": true,
+                        "active_instance": resolved_id,
+                        "name": inst_name,
+                        "bound_email": inst_email
+                    });
+                    println!("{}", serde_json::to_string(&res).unwrap_or_default());
+                } else {
+                    println!(
+                        "[SUCCESS] Switched active instance to '{}' (ID: {}).",
+                        inst_name, resolved_id
+                    );
+                }
+                return;
+            }
+
+            // Case B: target is an account query -> switch account for currently active instance!
+            let acc_query = target_spec.trim().to_lowercase();
+            let index = match account::load_account_index() {
+                Ok(idx) => idx,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to load accounts: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            let matches: Vec<_> = index
+                .accounts
+                .iter()
+                .filter(|a| {
+                    let email_l = a.email.to_lowercase();
+                    let id_l = a.id.to_lowercase();
+                    email_l.contains(&acc_query) || id_l.contains(&acc_query)
+                })
+                .collect();
+
+            if !matches.is_empty() {
+                let target_acc = if matches.len() == 1 {
+                    matches[0]
+                } else if let Some(exact) =
+                    matches.iter().find(|a| a.email.to_lowercase() == acc_query)
+                {
+                    *exact
+                } else {
+                    matches[0]
+                };
+
+                let active_id =
+                    instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+                match rt.block_on(instance::switch_account_to_instance(
+                    &target_acc.id,
+                    Some(&active_id),
+                )) {
+                    Ok(_) => {
+                        let _ = instance::set_active_instance_id(&active_id);
+                        if is_json {
+                            let res = serde_json::json!({
+                                "success": true,
+                                "instance": active_id,
+                                "email": target_acc.email,
+                                "account_id": target_acc.id
+                            });
+                            println!("{}", serde_json::to_string(&res).unwrap_or_default());
+                        } else {
+                            println!(
+                                "[SUCCESS] Active instance '{}' successfully switched to '{}'.",
+                                active_id, target_acc.email
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Instance switch failed: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
+
+            eprintln!(
+                "[ERROR] Could not resolve '{}' as a valid instance profile or account query.",
+                target_spec
+            );
+            std::process::exit(1);
+        }
+
+        // Two-or-more arguments switch: agm instances switch <instance> <account>
         let (target_spec, acc_query) = if is_switch_order1 {
-            (
-                non_flag_args[1].as_str(),
-                non_flag_args[2].trim().to_lowercase(),
-            )
+            // Check if non_flag_args[1] is an instance
+            if instance::resolve_instance_id(non_flag_args[1]).is_ok() {
+                (
+                    non_flag_args[1].clone(),
+                    non_flag_args[2..].join(" ").trim().to_lowercase(),
+                )
+            } else if let Some(last) = non_flag_args.last() {
+                if instance::resolve_instance_id(last).is_ok() {
+                    (
+                        (*last).clone(),
+                        non_flag_args[1..non_flag_args.len() - 1]
+                            .join(" ")
+                            .trim()
+                            .to_lowercase(),
+                    )
+                } else {
+                    (
+                        non_flag_args[1].clone(),
+                        non_flag_args[2..].join(" ").trim().to_lowercase(),
+                    )
+                }
+            } else {
+                (
+                    non_flag_args[1].clone(),
+                    non_flag_args[2..].join(" ").trim().to_lowercase(),
+                )
+            }
         } else {
             (
-                non_flag_args[0].as_str(),
-                non_flag_args[2].trim().to_lowercase(),
+                non_flag_args[0].clone(),
+                non_flag_args[2..].join(" ").trim().to_lowercase(),
             )
         };
 
-        let resolved_id = match instance::resolve_instance_id(target_spec) {
+        let resolved_id = match instance::resolve_instance_id(&target_spec) {
             Ok(id) => id,
             Err(e) => {
                 eprintln!(
@@ -9173,6 +9367,7 @@ fn cmd_instances(args: &[String]) {
             Some(&resolved_id),
         )) {
             Ok(_) => {
+                let _ = instance::set_active_instance_id(&resolved_id);
                 if is_json {
                     let res = serde_json::json!({
                         "success": true,
@@ -10422,9 +10617,12 @@ fn recreate_single_workspace(target_spec: &str) {
     if let Some(ag_root) = agy_cleaner::get_gemini_base_dir() {
         let norm_target = clean_str.to_lowercase().replace('\\', "/");
         let repo_lower = repo_name.to_lowercase();
-        let all_convs = agy_cleaner::scan_conversations(0);
+        let all_convs = agy_cleaner::scan_conversations(5);
         let mut pruned_convs = 0usize;
         for conv in all_convs {
+            if conv.is_preserved {
+                continue;
+            }
             let uris_norm = conv
                 .workspace_uris
                 .to_lowercase()

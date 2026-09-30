@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, Diamond, Gem, Circle, ToggleLeft, ToggleRight, Fingerprint, Sparkles, Tag, X, Check, Clock, Bot, Repeat2, Terminal } from 'lucide-react';
 import { Account, ModelQuota } from '../../types/account';
 import { cn } from '../../utils/cn';
@@ -19,6 +19,7 @@ interface AccountCardProps {
     isCurrent: boolean;
     isRefreshing: boolean;
     isSwitching?: boolean;
+    isFocused?: boolean;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
     onViewDevice: () => void;
@@ -40,7 +41,7 @@ const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
     Icon: config.Icon
 }));
 
-function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountCardProps) {
+function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountCardProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
     const { instances } = useInstanceStore();
@@ -167,16 +168,27 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         if (!key) return false;
         return account.protected_models?.includes(key);
     };
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isFocused && cardRef.current) {
+            cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [isFocused]);
+
     return (
         <div
             id={`account-card-${account.id}`}
+            ref={cardRef}
             className={cn(
-            "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-150",
-            isCurrent
-                ? "bg-amber-500/15 dark:bg-amber-950/40 border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/50 font-medium shadow-sm hover:bg-amber-500/25 dark:hover:bg-amber-900/60 hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/40"
+            "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-200",
+            isFocused
+                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2 scale-[1.01]"
                 : selected
-                ? "bg-amber-500/10 dark:bg-amber-950/30 border-l-amber-400 border-amber-200 dark:border-amber-600/40 font-medium hover:bg-amber-500/20 dark:hover:bg-amber-900/50 hover:border-amber-400"
-                : "bg-white dark:bg-base-100 border-gray-200 dark:border-base-300 border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-gray-300 dark:hover:border-base-content/20 hover:border-l-stone-400 dark:hover:border-l-stone-500 hover:shadow-xs",
+                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 border-blue-400 dark:border-blue-400 font-bold shadow-xl ring-2 ring-blue-500"
+                : isCurrent
+                ? "bg-amber-50/90 dark:bg-slate-800/95 border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/50 font-medium shadow-sm hover:bg-amber-100/80 dark:hover:bg-slate-750 hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/50"
+                : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 border-l-transparent hover:bg-stone-50 dark:hover:bg-slate-800/60 hover:border-gray-300 dark:hover:border-slate-700 hover:border-l-stone-400 dark:hover:border-l-stone-500 hover:shadow-xs",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 
@@ -192,14 +204,18 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                 <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                     <h3 className={cn(
                         "font-semibold text-sm truncate w-full",
-                        isCurrent ? "text-blue-700 dark:text-blue-400" : "text-gray-900 dark:text-base-content"
+                        isFocused || selected
+                            ? "text-slate-950 font-bold"
+                            : isCurrent
+                            ? "text-amber-950 dark:text-white font-bold"
+                            : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
                     </h3>
                     <div className="flex items-center justify-between w-full gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {isCurrent && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[9px] font-bold shadow-sm border border-blue-200/50">
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[9px] font-bold shadow-sm border border-amber-300/60 dark:border-amber-400/40">
                                     {t('accounts.current').toUpperCase()}
                                 </span>
                             )}

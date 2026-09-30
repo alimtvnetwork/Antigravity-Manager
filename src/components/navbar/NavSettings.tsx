@@ -40,8 +40,18 @@ export function NavSettings({
                 setIsCleanModalOpen(false);
             }
         };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsPrefsOpen(false);
+                setIsCleanModalOpen(false);
+            }
+        };
         window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
-        return () => window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, []);
 
     useEffect(() => {
@@ -146,7 +156,11 @@ export function NavSettings({
             {/* 1. Antigravity Quick Clean (Recycle) Icon Button */}
             <button
                 type="button"
-                onClick={() => setIsCleanModalOpen(true)}
+                onClick={() => {
+                    setIsPrefsOpen(false);
+                    setIsCleanModalOpen(true);
+                    window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
+                }}
                 className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
                 title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
                 aria-label="Quick Clean"
@@ -178,7 +192,20 @@ export function NavSettings({
                 </button>
 
                 {isPrefsOpen && (
-                    <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
+                    <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
+                        <div className="flex items-center justify-between px-3 pb-1.5 mb-1 border-b border-gray-100 dark:border-slate-800">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                {t('nav.preferences', 'Preferences')}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsPrefsOpen(false)}
+                                className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                         <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
                             Appearance
                         </div>

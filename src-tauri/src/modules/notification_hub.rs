@@ -446,15 +446,34 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
             })
             .count();
 
-        if let Some(p) = matched.first() {
-            running_prompt_id = Some(p.id.clone());
-            let (snippet, wc) = extract_words_preview(&p.prompt_content, 200);
-            running_prompt_snippet = Some(snippet);
-            running_prompt_project = Some(p.repo_path.clone());
+        let mut all_running_snippets: Vec<String> = Vec::new();
+        for p in matched.iter().filter(|p| {
+            p.status == "running"
+                || p.status == "backed_up"
+                || p.status == "dispatched"
+                || p.status == "executing"
+        }) {
+            if running_prompt_id.is_none() {
+                running_prompt_id = Some(p.id.clone());
+            }
+            if running_prompt_project.is_none() {
+                running_prompt_project = Some(p.repo_path.clone());
+            }
             if p.image_payload.is_some() {
                 has_images = true;
                 images_attached = true;
             }
+            let (snippet, wc) = extract_words_preview(&p.prompt_content, 200);
+            if !snippet.is_empty() {
+                let p_id_short = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
+                all_running_snippets.push(format!(
+                    "[Prompt #{}] ({}, {} words):\n{}",
+                    p_id_short, p.repo_path, wc, snippet
+                ));
+            }
+        }
+        if !all_running_snippets.is_empty() {
+            running_prompt_snippet = Some(all_running_snippets.join("\n\n---\n\n"));
         }
     }
 
@@ -603,11 +622,17 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
 <style>
   body, table, td, p, div, span {{ font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
   code, pre {{ font-family: 'Ubuntu Mono', 'Consolas', 'Courier New', monospace; }}
-  a {{ color: #ffffff !important; text-decoration: underline; font-weight: bold; }}
-  a:visited {{ color: #ffffff !important; }}
-  a:hover {{ color: #e0f2fe !important; }}
-  td a, p a {{ background: #2563eb; color: #ffffff !important; padding: 2px 8px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; }}
-  td a:hover, p a:hover {{ background: #1d4ed8; color: #ffffff !important; }}
+  a {{ color: #0284c7 !important; text-decoration: underline; font-weight: bold; }}
+  a:visited {{ color: #0369a1 !important; }}
+  a:hover {{ color: #0284c7 !important; }}
+  .btn-action, td a.btn-action, p a.btn-action {{ background: #0284c7; color: #ffffff !important; padding: 4px 10px; border-radius: 6px; text-decoration: none; display: inline-block; font-size: 14px; font-weight: bold; border: 1px solid #0369a1; }}
+  .btn-action:hover, td a.btn-action:hover, p a.btn-action:hover {{ background: #0369a1; color: #ffffff !important; }}
+  @media (prefers-color-scheme: dark) {
+    body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
+    td {{ color: #e2e8f0 !important; }}
+    a {{ color: #38bdf8 !important; }}
+    a:visited {{ color: #7dd3fc !important; }}
+  }
 </style>
 </head>
 <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; color: #0f172a;">

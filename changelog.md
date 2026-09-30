@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.108.0] - 2026-09-30
+
+### Added
+- exact rustfmt compliance and env!(CARGO_PKG_VERSION) fix for gitignore agm and telemetry
+
+---
+
 ## [v4.107.0] - 2026-09-30
 
 ### Added
