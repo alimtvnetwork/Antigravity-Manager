@@ -93,6 +93,20 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
 
+      - name: Rust setup (rustfmt only)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Release gate - Rust formatting must match CI
+        shell: bash
+        run: |
+          cd src-tauri
+          if ! cargo fmt -- --check; then
+            echo "::error::[Release Gate Intercept] Tagged commit fails 'cargo fmt -- --check' (CI would be red). Run 'cd src-tauri && cargo fmt', commit, and re-tag."
+            exit 1
+          fi
+
   build-tauri:
     needs: verify-release-target
     permissions:
