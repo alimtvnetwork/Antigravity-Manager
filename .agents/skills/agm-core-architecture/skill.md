@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 23 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 30 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -84,6 +84,14 @@ When modifying any component in the repository, refer to the corresponding skill
 | Fast-Forward Shortcut Engine | Dynamic keybindings, active window restore, crash watchdog | [`agm-fast-forward-shortcuts`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-fast-forward-shortcuts/skill.md) |
 | Split SQLite Architecture (`repo_prompts.db`, `proxy_logs.db`, etc.) | WAL mode concurrency, 5000ms busy timeout, schema migrations | [`agm-split-sqlite-architecture`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-split-sqlite-architecture/skill.md) |
 | `assets/screenshots/generate_instance_screenshot.py` | CDP WebSocket automation, Pillow synthetic audit cards, system timestamp proof | [`agm-visual-evidence-verification`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-visual-evidence-verification/skill.md) |
+| `src-tauri/src/modules/device.rs` | Synthetic hardware fingerprints, machine GUID resolution, storage.json telemetry keys | [`agm-device-profile-fingerprint`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-device-profile-fingerprint/skill.md) |
+| `src-tauri/src/modules/supabase_command_queue.rs` | Secondary DB command queue, cascading failover, headless remote execution | [`agm-remote-command-queue`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-remote-command-queue/skill.md) |
+| `src/components/navbar/InstanceSelector.tsx`, modals | Modal exclusivity, X close buttons, high-contrast dark theme, scrollIntoView | [`agm-ui-modal-focus-accessibility`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-ui-modal-focus-accessibility/skill.md) |
+| `src-tauri/src/proxy/upstream/` | 3-tier upstream ladder (Daily -> Sandbox -> Prod), rquest retries, quota circuit breaker | [`agm-upstream-fallback-resilience`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-upstream-fallback-resilience/skill.md) |
+| `scripts/bump-version.mjs`, `changelog.md`, `.github/workflows/release.yml` | 14-location atomic version bump, dual-channel release gates, @aukgit attribution | [`agm-release-lifecycle`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-release-lifecycle/skill.md) |
+| `scripts/prompt_heartbeat_runner.py`, `repo_db.rs::inspect_prompt_goal_status`, `agm observe` | 5s prompt goal heartbeat, iteration continuity, drift detection, AGM_INSTANCE_STATUS.md | [`agm-prompt-heartbeat-and-observer`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-prompt-heartbeat-and-observer/skill.md) |
+| `03-ai-scripts/06-cicd-local-runner.py`, `.github/workflows/`, pre-flight gates | Rust clippy gate, frontend build gate, Zero-CI quarantine standard, RCA generation | [`agm-cicd-and-preflight-gates`](file:///d:/work/Antigravity-Manager/.agents/skills/agm-cicd-and-preflight-gates/skill.md) |
+
 
 ---
 
@@ -122,6 +130,9 @@ Every change made to this repository MUST strictly uphold the following invarian
    - On Windows, administrator keys must install to `%ProgramData%\ssh\administrators_authorized_keys` with `icacls` ACL permissions restricted to `SYSTEM` and `BUILTIN\Administrators`.
 10. **Real-Time Task Heartbeat Liveness**:
     - Running tasks must execute the 5-second prompt heartbeat runner (`scripts/prompt_heartbeat_runner.py`), updating `.antigravity_goal_prompt.log` and tracking PID files before and after account rotations.
+11. **Dual-Channel Release Gate Discipline**:
+    - Stable releases (`vX.Y.Z`) originate exclusively on `main` branch, updating production channels and synchronizing summaries across both `readme.md` and `readme_en.md`.
+    - Preview releases (`vX.Y.Z-beta.N`) originate exclusively on `beta` branch, without altering production update channels or README files.
 
 ---
 

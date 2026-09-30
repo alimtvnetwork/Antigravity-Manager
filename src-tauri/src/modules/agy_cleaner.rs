@@ -300,7 +300,86 @@ pub fn scan_conversations(keep_count: usize) -> Vec<ConversationItem> {
             .then_with(|| b.file_size.cmp(&a.file_size))
     });
 
-    // Mark top keep_count as preserved
+    // Safety Invariant: Protect conversations tied to active/queued prompts and retain latest 5 sessions of active projects
+    let mut protected_cids = std::collections::HashSet::new();
+
+    // 1. Collect conversation/session IDs from active or queued prompts in repo_db
+    if let Ok(all_prompts) = crate::modules::repo_db::list_all_prompts() {
+        for p in all_prompts {
+            let is_active = p.status == "running"
+                || p.status == "queued"
+                || p.status == "backed_up"
+                || p.status == "dispatched"
+                || p.status == "executing";
+            if is_active {
+                if let Some(ref sid) = p.session_id {
+                    let trimmed = sid.trim();
+                    if !trimmed.is_empty() && trimmed != "-" {
+                        protected_cids.insert(trimmed.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Identify running projects and retain their latest 5 conversation sessions
+    if let Ok(running_projs) = crate::modules::repo_db::list_running_projects() {
+        for proj in running_projs {
+            let p_norm = proj.repo_path.trim().to_lowercase().replace('\\', "/");
+            let p_id_norm = proj.id.trim().to_lowercase();
+            let p_name_norm = proj.repo_name.trim().to_lowercase();
+
+            // Check if .antigravity_resume_task.json exists and protect its session/conversation ID
+            if !proj.repo_path.trim().is_empty() {
+                let resume_file =
+                    PathBuf::from(&proj.repo_path).join(".antigravity_resume_task.json");
+                if resume_file.exists() {
+                    if let Ok(content) = fs::read_to_string(&resume_file) {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(cid) = val.get("conversation_id").and_then(|v| v.as_str()) {
+                                if !cid.trim().is_empty() {
+                                    protected_cids.insert(cid.trim().to_string());
+                                }
+                            }
+                            if let Some(sid) = val.get("session_id").and_then(|v| v.as_str()) {
+                                if !sid.trim().is_empty() {
+                                    protected_cids.insert(sid.trim().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Find matching conversations for this project (conversations is already sorted newest first)
+            let mut match_indices = Vec::new();
+            for (idx, c) in conversations.iter().enumerate() {
+                let uris_norm = c.workspace_uris.to_lowercase().replace('\\', "/");
+                let db_norm = c.db_path.to_lowercase().replace('\\', "/");
+                let is_match = (!p_norm.is_empty()
+                    && (uris_norm.contains(&p_norm) || db_norm.contains(&p_norm)))
+                    || (!p_id_norm.is_empty() && uris_norm.contains(&p_id_norm))
+                    || (!p_name_norm.is_empty() && uris_norm.contains(&p_name_norm));
+                if is_match {
+                    match_indices.push(idx);
+                }
+            }
+
+            // Retain up to 5 latest conversation sessions for this active project
+            for idx in match_indices.into_iter().take(5) {
+                conversations[idx].is_preserved = true;
+            }
+        }
+    }
+
+    // 3. Mark all active prompt conversation IDs as preserved
+    for conv in conversations.iter_mut() {
+        if protected_cids.contains(&conv.conversation_id) {
+            conv.is_preserved = true;
+        }
+    }
+
+    // 4. Mark top global keep_count as preserved
     for (idx, conv) in conversations.iter_mut().enumerate() {
         let is_within_keep = idx < keep_count;
         if is_within_keep {

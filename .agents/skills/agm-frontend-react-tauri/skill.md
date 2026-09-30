@@ -97,3 +97,39 @@ document.addEventListener('visibilitychange', () => {
 3. **Mismatched JSX Conditional Rendering — TOTAL BAN**:
    - Never mix logical AND (`&&`) with ternary null returns (`) : null}`).
    - Correct patterns: `{condition && <div>...</div>}` or `{condition ? <div>...</div> : null}`.
+
+---
+
+## 6. MiniView Dynamic Sizing, Bounds Memory & Self-Healing
+
+The compact 300px floating HUD (`src/components/layout/MiniView.tsx` & `src/utils/windowManager.ts`) implements:
+- **Dynamic Content Height**: Measures `containerRef.current.scrollHeight` and invokes `enterMiniMode(contentHeight)`. Sets Tauri window to `LogicalSize(300, contentHeight + 2)` with `alwaysOnTop: true`, `resizable: false`, and `decorations: false`.
+- **Prior Bounds Memory (`priorBounds`)**: Before entering mini mode, captures the user's outer window position and dimensions (`width > 350 && height > 250`) and persists to `useViewStore.savedBounds`. Upon `exitMiniMode`, restores exact coordinates and dimensions (or falls back to `1200x800` centered).
+- **Startup Self-Healing (`ensureFullViewState`)**: On mount in `App.tsx`, checks window coordinates. If the window was previously closed in mini mode or launched with negative/offscreen coordinates, centers and restores the window to standard full view.
+- **Real-Time Proxy Event Stream**: Listens to native Tauri event `proxy://request` via `@tauri-apps/api/event`, displaying the active model, input/output tokens, and request latency.
+
+---
+
+## 7. Unified Request Gateway & Modal Suppression (`src/utils/request.ts`)
+
+- **Route Parameter Interpolation**: Replaces tokens like `:accountId` with matching argument values, stripping the key from the request payload to prevent duplicate fields in the request body.
+- **Modal Suppression Flag (`_suppressGlobalModal`)**: When background polling runs (e.g. periodic quota checks), passing `_suppressGlobalModal: true` prevents error toast/modal popups from interrupting user interactions on non-critical failures.
+- **Debounced 401 Unauthorized Event**: On HTTP 401 responses, dispatches `abv-unauthorized` custom event with a 2,000ms debounce cooldown to prevent UI refresh storms.
+
+---
+
+## 8. Division of Labor in Background Tasks (`BackgroundTaskRunner.tsx`)
+
+- **Desktop Tauri Mode**: Guarded by `if (isTauri()) return;`. The native Rust background daemon (`start_auto_switcher` in `auto_switcher.rs`) acts as the single source of truth, performing quota evaluation, conscious PID matching, and emitting `account://auto-switched` events.
+- **Headless Web Mode**: `BackgroundTaskRunner.tsx` executes the client-side single-circle loop, evaluating `instancesToEvaluate`, applying 15s cooldowns, and calling `smartRotateProfileAccount`.
+
+---
+
+## 9. Account Focus & Highlight Pattern (`src/pages/Accounts.tsx`)
+
+`handleFocusActiveAccount()` locates the active account with high accessibility:
+1. Clears existing search filters (`setFilter("all")`, `setSearchQuery("")`).
+2. Jumps to the exact pagination page containing the active account.
+3. Dispatches `scrollIntoView({ behavior: "smooth", block: "center" })`.
+4. Applies a high-visibility amber highlight ring (`ring-4 ring-amber-400 dark:ring-amber-500 ring-offset-2`) that auto-fades after 2.5 seconds.
+

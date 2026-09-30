@@ -36,6 +36,9 @@ export function NavSettings({
             if (customEvent.detail?.source !== 'nav-settings') {
                 setIsPrefsOpen(false);
             }
+            if (customEvent.detail?.source === 'instance-selector') {
+                setIsCleanModalOpen(false);
+            }
         };
         window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
         return () => window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);

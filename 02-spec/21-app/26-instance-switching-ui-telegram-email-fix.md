@@ -1,0 +1,45 @@
+# Spec 26: Multi-Instance Switching, UI Overlap Fix, Conversation Prune Safety, Telegram Bot Enhancements & Email Telemetry Deduplication
+
+## 1. Overview & Problem Definition
+
+This specification defines the architectural remediation and feature enhancements for six core subsystems in Antigravity-Manager (AGM):
+1. **Multi-Instance Switching Integrity:** Resolving instance stickiness and fallback bugs where activating or switching to non-default instances reverts back to `worker-alpha` or gets trapped.
+2. **UI Modal Exclusivity & Dismissal:** Adding explicit close (`X`) buttons on both the `INSTANCES / PROFILES` modal and the `Antigravity Conversation Cleaner / Pruner` modal, preventing modal stacking/overlap.
+3. **Selection/Focus High Contrast & Scroll-Into-View:** Redesigning low-contrast dark-on-dark list selections to provide crisp, high-contrast highlighting (e.g. bright/light background with dark text or vibrant border badge) and automated `scrollIntoView` on focused elements.
+4. **Conversation Cleaner / Prune Safety Gate:** Protecting all running and queued prompts from deletion, and ensuring active projects retain at least the latest 3–5 conversation sessions, with full CLI (`agm prune`) and Telegram (`/prune`) command parity.
+5. **Email & Telegram Project Deduplication:** Replacing redundant repeated project lists (e.g. `Antigravity-Manager` repeated 30 times) with a clean, distinct set of active project names.
+6. **Telegram Bot HTML Formatting & AGM Update Commands:** Fixing broken raw HTML tags in Telegram notifications, displaying substantial running prompt snippets (>= 150-200 words), adding `/update` and `/prune` commands to the Telegram bot, and exposing update availability in `/status`.
+7. **Email 200-Word Running Prompts Preview & CLI Parity:** Caching extended prompt text in split SQLite (`backup-prompts.db`), including 200-word snippets in switch notification emails, and adding CLI `--words` query support with documented terminal help examples.
+
+## 2. User Request (Verbatim)
+
+```text
+Now there is a serious instance bug. That means if you have multiple instances, I cannot switch the instances. It seems like instances are stuck with one with another. So I think you need to fix that. And the Focus, if you did in Focus, Focus does not normally scroll to the position, and it doesn't have a proper coloring for the hover and selected. I asked you several times that it needs to have a different coloring so that it feels like it is highlighted. Okay, fully, this is the one I could understand clearly. So the color combination is very dark with the dark. It does not make any sense. Probably even maybe white background with the dark text, that would make it nice. You can give it a shot, I think. And also at the same time, there are UI bugs. For example, we just click on the instances and then also click on the parts section. Both of these comes up. There is no way to close it. And if you purge the, let's say, purge or clean up the conversation, it should always respect the last few conversation on the running projects. Okay? So that we can understand or get back to the ones that we're working on. Remember that running or queued prompts should not be removed. Remember to update this code in your clear and purge section, prune section. Please confirm that you understood that, and also try to fix the UI bug overlapping issue. There should be a close button to close these panels. Both of these just do not work properly. The instances issue that I cannot switch. I'm clicking on another instance, and again, come back to the worker alpha. I don't know why. So you need to work on it. Also do a git pull before the work, so that there is no inconsistencies. Okay, and make sure your testing is solid. And also there is one more issue I think I need to warn you. That's actually the email. The emails that you provide, the same name is repeated twice, same thing happening in the, let's say, Telegram bot. Same project name multiple times. Don't do that. Create a dictionary to have a distinct names. Okay, and Telegram SMS needs to be improved a lot. The same name repeated twice and many times. I think that is a serious problem that you need to fix. Also at the same time... So in the Telegram, there is same project name mentioned several times. There is a HTML broken down that also you need to fix. I'm just giving you the screenshot, okay, so that you can prioritize this. So I need to see more of the text for each one of the prompt that is running, which I don't see that is kind of bad. And also we should be able to do the AGM update from the Telegram bot. The commands needs to be there, so if there is an update that arrives, it should also put into the status section as well. And too many dark text. I wanted to have the white text, because in the dark, it creates a problem. So try to have this writing properly as much as possible so that the links and other stuff does not become blue under blue. Okay? Depending on the theme, try to understand that as well. Yes. I think I tried to also this stuff. You can have some command example from Git map as well, like the SSH notes. Sending something using Git SSH. Okay, also selecting the machine, how to do that. These type of commands needs to be in the Antigravity selection. Okay? Yeah. So a lot of things you need to improve, try to do that. And also we can merge and prune the conversation. That is the PR command that we could do from the UI. We should be able to do it from the CLI and also from the Telegram bot. Make sure of that. And also try to keep these images saved, okay, so that we can reuse them in the future, I believe. Yeah, I think these are on top of my head. So you can start working on this so that you don't miss anything for sure to respect. None of the image or anything should be missed. It should be UI fix, email fix, Telegram fix task. Okay. And make sure when we get the email, in the email, we should see some of the prompts that these are running, like prompts 200 words at least in the email together. That should be cached in the SQLite database in the future so that it easier to start from the database rather than querying all the time. So we should have query methods using our CLI so that we can do it from the terminal as well. There should be examples of this in the terminal help very clearly. And also this type of example needs to be in the Telegram bot as well so that we can run and test. Do you understand?
+```
+
+## 3. Visual Evidence References
+
+The following screenshots supplied by the operator have been ingested and stored in the repository:
+- `![Modal Overlap Bug](assets/screenshots/ui-fix-01-modal-overlap.png)`: Demonstrates `INSTANCES / PROFILES` modal stacking on top of `Antigravity Conversation Cleaner` with no close button.
+- `![Modal Stacking](assets/screenshots/ui-fix-02-modal-overlap-duplicate.png)`: Duplicate view confirming lack of panel dismissal controls.
+- `![Email Repeated Projects](assets/screenshots/ui-fix-03-email-telemetry-repeated-projects.png)`: Shows email telemetry with repeated project names (`Antigravity-Manager` repeated 30+ times).
+- `![Telegram Raw HTML](assets/screenshots/ui-fix-04-telegram-raw-html-and-repeats.png)`: Shows broken Telegram notification emitting raw unrendered `<b>` and `<code>` HTML tags.
+- `![Telegram Clean View](assets/screenshots/ui-fix-05-telegram-repeats-clean.png)`: Shows project list duplication in Telegram messages.
+
+## 4. Technical Architecture & Invariants
+
+### 4.1. Invariant I1: Instance Switching Exclusivity
+When the operator clicks an instance in the UI, the active instance ID must update atomically in `instances.json`, and if requested to launch, the target instance process must be launched while cleanly updating UI selection state. Reverting to `worker-alpha` is strictly prohibited.
+
+### 4.2. Invariant I2: Modal Exclusivity & Direct Dismissal
+Modals in `App.tsx` must maintain strict mutually exclusive visibility unless explicitly docked. Every modal must have a dedicated close (`X`) button in the header, respond to `Escape`, and close when clicking the outside backdrop.
+
+### 4.3. Invariant I3: Conversation Pruning Safety Gate
+1. All prompts in `repo_db` active_prompts with status `running` or `dispatched` must be preserved.
+2. For any project directory associated with active prompts or running instances, the latest 5 conversation session files (`*.json` / `.vscdb`) must be preserved.
+3. Only stale, inactive workspaces with zero running prompts may have older conversations purged.
+
+### 4.4. Invariant I4: Notification Deduplication & Formatting
+1. Project names in email and Telegram cards must be collected via `IndexSet` / `HashSet` to guarantee unique, non-repeating entries.
+2. Telegram messages using `parse_mode: "HTML"` must strictly escape special characters (`<`, `>`, `&`) in dynamic values to prevent Telegram parser fallback errors.
+3. Emails must include a preview table or block showing running prompts with up to 200 words snippet.

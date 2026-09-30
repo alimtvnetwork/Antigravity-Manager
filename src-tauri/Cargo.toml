@@ -105,6 +105,7 @@ tempfile = "3.10"
 
 [profile.dev]
 debug = 0
+incremental = false
 
 [profile.release]
 opt-level = 1

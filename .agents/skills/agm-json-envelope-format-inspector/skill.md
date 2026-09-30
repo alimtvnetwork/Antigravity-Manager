@@ -54,8 +54,8 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
 
 | File Path | Core Responsibilities |
 |---|---|
-| `src-tauri/src/modules/json_envelope.rs` | Canonical envelope structs (`JsonEnvelope<T>`, `EnvelopeAttributes`), legacy format heuristics, `classify_format`, `inspect_json_file`, and CLI command generator. |
-| `src-tauri/src/bin/agm.rs` | CLI integration: `agm which-format <file>` (aliases: `format`, `inspect-format`), reporting detected type, item count, and copy-pasteable execution command. |
+| `src-tauri/src/modules/json_envelope.rs` | Canonical envelope structs (`JsonEnvelope<T>`, `EnvelopeAttributes`), legacy format heuristics, `classify_format`, `inspect_json_file`, `resolve_json_targets`, and CLI command generator. |
+| `src-tauri/src/bin/agm.rs` | CLI integration: `agm which-format <file>` (aliases: `format`, `inspect-format`, `scan-format`), reporting detected type, item count, and copy-pasteable execution command. |
 | `src/pages/Accounts.tsx` | Accounts page modal supporting drag-and-drop or paste of JSON envelopes with real-time format detection and preview. |
 | `tests/fixtures/json_envelope/` | Standardized test fixtures for all supported envelope schemas and unrecognized negative cases. |
 
@@ -72,6 +72,7 @@ To eliminate ambiguity across configuration backups, credentials exports, and mu
 | `agm/config-backup` | System Config | Full application configuration (`gui_config.json`, proxy settings, switcher rules). |
 | `agm/prompt-backups` | Prompt Telemetry | Backed up running prompts and task recovery snapshots from `backup-prompts.db`. |
 | `agm/proxy-bindings` | Proxy Rules | Custom model redirect rules, thinking budgets, and upstream proxy pool assignments. |
+| `agm/ssh-nodes-export` | Cluster Nodes | Mesh nodes list, connection parameters, public keys, and node health statuses. |
 
 ---
 
@@ -89,7 +90,16 @@ agm which-format ./backup.json
 # [SOURCE] Created by agm-cli at 2026-09-29T19:40:00Z on node-1
 # [ACTION] To import, run:
 #          agm accounts import ./backup.json -y
+
+# Directory recursion and batch discovery
+agm which-format ./backups/
 ```
+
+### Directory Traversal & Target Resolution (`resolve_json_targets`)
+When given directories or globs:
+- Recursively gathers all matching `*.json` files.
+- Inspects each candidate, skipping non-JSON or unparseable files without crashing.
+- `build_bulk_import_command` synthesizes a single composite one-line command (chaining with `&&` and `-y`) to import all detected schemas in one go.
 
 ---
 

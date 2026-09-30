@@ -85,8 +85,17 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
     useEffect(() => {
         if (isOpen) {
             loadPreflight(keepCount);
+            window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
+
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                }
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
         }
-    }, [isOpen, keepCount, loadPreflight]);
+    }, [isOpen, keepCount, loadPreflight, onClose]);
 
     if (!isOpen) {
         return null;
@@ -159,7 +168,14 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
     const estFreedBytes = (preflight?.projected_reclaimed_bytes || 0) + (preflight?.cache_bytes || 0);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
             <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
@@ -314,6 +330,17 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                                 <div className="pt-1 text-[11px] font-mono text-gray-500 dark:text-gray-400 break-all">
                                     {preflight.staging_dir}
                                 </div>
+                            </div>
+
+                            {/* Active Running Prompts & Project Retention Guarantee */}
+                            <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-xs space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Active Workspaces &amp; Running Prompts Protected</span>
+                                </div>
+                                <p className="text-emerald-700 dark:text-emerald-300/90 leading-relaxed">
+                                    Running and queued prompts are NEVER deleted or purged. At least the latest 5 conversation sessions are automatically preserved for every active project workspace before global retention is applied.
+                                </p>
                             </div>
 
                             {/* OS Temp Caveat */}

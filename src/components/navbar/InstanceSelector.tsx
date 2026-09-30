@@ -13,6 +13,7 @@ import {
     Upload,
     AlertTriangle,
     Star,
+    X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../stores/useInstanceStore';
@@ -71,6 +72,16 @@ export function InstanceSelector() {
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const activeItemRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => {
+                activeItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 60);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         const canRun = isTauri();
@@ -90,6 +101,12 @@ export function InstanceSelector() {
                 setIsIoOpen(false);
             }
         };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsOpen(false);
+                setIsIoOpen(false);
+            }
+        };
         const handleOtherDropdownOpen = (e: Event) => {
             const customEvent = e as CustomEvent<{ source?: string }>;
             if (customEvent.detail?.source !== 'instance-selector') {
@@ -98,9 +115,11 @@ export function InstanceSelector() {
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
         window.addEventListener('agm:dropdown-open', handleOtherDropdownOpen);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('agm:dropdown-open', handleOtherDropdownOpen);
         };
     }, []);
@@ -533,6 +552,19 @@ export function InstanceSelector() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Explicit Close Button for Instance Selector */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    setIsIoOpen(false);
+                                }}
+                                className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-0.5"
+                                title={t('common.close', 'Close')}
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
                         </div>
                     </div>
 
@@ -568,17 +600,20 @@ export function InstanceSelector() {
                                 return (
                                     <div
                                         key={inst.config.id}
+                                        ref={isSelected ? activeItemRef : undefined}
                                         className={cn(
                                             "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? "bg-amber-500/15 dark:bg-amber-950/50 border-l-amber-500 dark:border-l-amber-400 text-amber-950 dark:text-amber-100 font-medium shadow-xs hover:bg-amber-500/25 dark:hover:bg-amber-900/60"
-                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-stone-100/70 dark:hover:bg-base-200/70 hover:border-l-stone-400 dark:hover:border-l-stone-500"
+                                                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold shadow-md border-l-blue-600 dark:border-l-blue-600 ring-2 ring-blue-500/60 my-0.5 rounded-r-md"
+                                                : "border-l-transparent text-gray-700 dark:text-gray-300 hover:bg-stone-100/70 dark:hover:bg-slate-800/70 hover:border-l-stone-400 dark:hover:border-l-stone-500"
                                         )}
                                     >
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setActiveInstance(inst.config.id);
+                                            onClick={async () => {
+                                                await setActiveInstance(inst.config.id);
+                                                await fetchInstances(true);
+                                                showToast(t('instances.switched_toast', `Active profile switched to #${seqNum} (${inst.config.name})`), 'success');
                                                 setIsOpen(false);
                                             }}
                                             className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer min-w-0 pr-2"
@@ -590,27 +625,32 @@ export function InstanceSelector() {
                                             />
                                             <div className="flex flex-col truncate min-w-0">
                                                 <div className="flex items-center gap-1.5 truncate">
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
+                                                    <span className={cn(
+                                                        "px-1.5 py-0.5 rounded text-[10px] font-black shrink-0",
+                                                        isSelected ? "bg-slate-900 text-white" : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25"
+                                                    )}>
                                                         #{seqNum}
                                                     </span>
-                                                    <span className="truncate font-semibold">{inst.config.name}</span>
+                                                    <span className={cn("truncate font-bold", isSelected ? "text-slate-900 dark:text-slate-950" : "text-gray-900 dark:text-gray-100")}>
+                                                        {inst.config.name}
+                                                    </span>
                                                     {isDefault && (
                                                         <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
                                                             DEFAULT
                                                         </span>
                                                     )}
                                                     {isSelected && (
-                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 dark:bg-amber-400/10 border border-amber-400/30 shrink-0">
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-blue-600 text-white shadow-xs shrink-0 tracking-wider">
                                                             ACTIVE
                                                         </span>
                                                     )}
                                                 </div>
                                                 {displayEmail ? (
-                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate font-mono">
+                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-slate-800 font-semibold" : "text-gray-500 dark:text-gray-400")}>
                                                         {displayEmail}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-[10px] text-gray-400/60 dark:text-gray-500/60 italic truncate">
+                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-500" : "text-gray-400/60 dark:text-gray-500/60")}>
                                                         {t('instances.unlinked', 'No account linked')}
                                                     </span>
                                                 )}

@@ -170,7 +170,7 @@ def capture_screenshot_from_cdp(port, click_settings=True, expected_email=None, 
                     "key": ","
                 }
             }, wait_reply=False)
-            time.sleep(1.0)
+            time.sleep(2.0)
         except Exception as e:
             print(f"[WARN] Error dispatching Ctrl+,: {e}", file=sys.stderr)
 
@@ -224,15 +224,15 @@ def add_header_banner(img_bytes, instance_id, pid, email, stage_label, dt_str=No
     email_text = f"Confirmed Account: {email}"
     draw.text((width // 2 - 120, 12), email_text, fill="#4ec9b0", font=font_bold)
 
-    draw.text((width - 240, 6), f"Date/Time: {dt_str}", fill="#dcdcaa", font=font_bold)
+    draw.text((width - 320, 6), f"Date/Time: {dt_str}", fill="#dcdcaa", font=font_bold)
     if hb_status:
-        draw.text((width - 240, 23), f"Telemetry: {hb_status[:35]}", fill="#9cdcfe", font=font_mono)
+        draw.text((width - 320, 23), f"Telemetry: {hb_status[:40]}", fill="#9cdcfe", font=font_mono)
 
     return new_img
 
 def try_capture_live_cdp(folder, out_path, instance_id, pid, email, stage_label, dt_str, hb_status=None):
     port = None
-    for _ in range(8):
+    for _ in range(15):
         port = get_devtools_port(folder)
         if port:
             break
@@ -241,7 +241,12 @@ def try_capture_live_cdp(folder, out_path, instance_id, pid, email, stage_label,
     if not port:
         return False
     print(f"[*] Live CDP endpoint discovered on port {port}. Capturing live Antigravity window...")
-    img_bytes = capture_screenshot_from_cdp(port, click_settings=True, expected_email=email)
+    img_bytes = None
+    for _ in range(3):
+        img_bytes = capture_screenshot_from_cdp(port, click_settings=True, expected_email=email)
+        if img_bytes:
+            break
+        time.sleep(1.0)
     if not img_bytes:
         return False
 
@@ -473,6 +478,18 @@ def render_screenshot(email, username, instance_id, pid, folder, out_path, stage
 
     img.save(out_path, format="PNG")
     print(f"[SCREENSHOT GENERATED] Saved to {out_path} ({os.path.getsize(out_path)} bytes) [Timestamp: {dt_str}]")
+
+    # Preserve historical screenshot copy so images can be reused in future audits without loss
+    try:
+        archive_dir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "history")
+        os.makedirs(archive_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(out_path))[0]
+        ts_clean = (dt_str or datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")).replace(" ", "_").replace(":", "-")
+        archive_path = os.path.join(archive_dir, f"{base_name}_{ts_clean}.png")
+        img.save(archive_path, format="PNG")
+        print(f"[SCREENSHOT ARCHIVED] Saved persistent historical copy: {archive_path}")
+    except Exception as e:
+        print(f"[WARN] Failed to archive screenshot copy: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

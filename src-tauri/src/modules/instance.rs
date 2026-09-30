@@ -63,6 +63,16 @@ pub fn open_instance_db() -> Result<rusqlite::Connection, String> {
     )
     .map_err(|e| format!("Failed to create instance_processes table: {}", e))?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS active_instance_selection (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            instance_id TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create active_instance_selection table: {}", e))?;
+
     Ok(conn)
 }
 
@@ -212,11 +222,12 @@ pub fn update_instance_app_storage(
         } else {
             serde_json::Map::new()
         };
+        let now_dt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
         settings_map.insert(
             "window.title".to_string(),
             serde_json::Value::String(format!(
-                "Antigravity — Account: {} — ${{rootName}} ${{activeEditorShort}}",
-                email
+                "Antigravity — Account: {} — Date: {} — ${{rootName}} ${{activeEditorShort}}",
+                email, now_dt
             )),
         );
         settings_map.insert(
@@ -2145,6 +2156,10 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         if code_lock.exists() {
             let _ = fs::remove_file(&code_lock);
         }
+        let dt_port = target_data_path.join("DevToolsActivePort");
+        if dt_port.exists() {
+            let _ = fs::remove_file(&dt_port);
+        }
         if let Ok(entries) = fs::read_dir(&target_data_path) {
             for entry in entries.flatten() {
                 let fname = entry.file_name().to_string_lossy().to_lowercase();
@@ -2171,20 +2186,31 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
 pub fn get_active_instance_id() -> Result<String, String> {
     let registry = load_registry()?;
 
-    // 1. If active_instance_id is a non-default instance and it's currently running, that's active!
-    if registry.active_instance_id != "default" && registry.active_instance_id != "__default__" {
-        if let Some(active_inst) = registry
+    // 1. If explicit active_instance_id is valid and exists in registry, ALWAYS honor it!
+    if !registry.active_instance_id.is_empty() {
+        if registry
             .instances
             .iter()
-            .find(|i| i.id == registry.active_instance_id)
+            .any(|i| i.id == registry.active_instance_id)
         {
-            if is_instance_running(&active_inst.id, &active_inst.data_dir, active_inst.pid) {
-                return Ok(active_inst.id.clone());
+            return Ok(registry.active_instance_id);
+        }
+    }
+
+    // 1b. Check active_instance_selection in SQLite DB
+    if let Ok(conn) = open_instance_db() {
+        if let Ok(selected_id) = conn.query_row(
+            "SELECT instance_id FROM active_instance_selection WHERE id = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        ) {
+            if registry.instances.iter().any(|i| i.id == selected_id) {
+                return Ok(selected_id);
             }
         }
     }
 
-    // 2. Check all non-default running instances, picking the one most recently used
+    // 2. Fallback: Check running non-default instances by most recently used
     let mut running_non_defaults: Vec<&InstanceConfig> = registry
         .instances
         .iter()
@@ -2197,24 +2223,13 @@ pub fn get_active_instance_id() -> Result<String, String> {
         return Ok(running_non_defaults[0].id.clone());
     }
 
-    // 3. If default instance is running, return default
+    // 3. Fallback: If default instance exists, return default
     if let Some(def_inst) = registry
         .instances
         .iter()
         .find(|i| i.is_default || i.id == "default")
     {
-        if is_instance_running(&def_inst.id, &def_inst.data_dir, def_inst.pid) {
-            return Ok(def_inst.id.clone());
-        }
-    }
-
-    // 4. Fallback: if active_instance_id exists in registry, return it
-    let active_exists = registry
-        .instances
-        .iter()
-        .any(|i| i.id == registry.active_instance_id);
-    if active_exists {
-        return Ok(registry.active_instance_id);
+        return Ok(def_inst.id.clone());
     }
 
     Ok("default".to_string())
@@ -2227,7 +2242,20 @@ pub fn set_active_instance_id(instance_id: &str) -> Result<(), String> {
         return Err(format!("Instance {} does not exist", instance_id));
     }
     registry.active_instance_id = instance_id.to_string();
+    if let Some(inst) = registry.instances.iter_mut().find(|i| i.id == instance_id) {
+        inst.last_used = chrono::Utc::now().timestamp();
+    }
     save_registry(&registry)?;
+
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(conn) = open_instance_db() {
+        let _ = conn.execute(
+            "INSERT INTO active_instance_selection (id, instance_id, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET instance_id = excluded.instance_id, updated_at = excluded.updated_at",
+            rusqlite::params![instance_id, now],
+        );
+    }
     Ok(())
 }
 
@@ -2730,6 +2758,7 @@ pub async fn switch_account_to_instance(
         crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
             .unwrap_or_default();
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
+    let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(&instance.id);
 
     // 6. Dispatch unified Email and Telegram switch notifications
     let (target_4h, target_weekly) =
@@ -2756,6 +2785,11 @@ pub async fn switch_account_to_instance(
     });
     let predicted_next_email = predicted_candidate.map(|c| c.email);
 
+    let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+    let unique_projs = crate::modules::notification_hub::deduplicate_names(
+        running_projs.into_iter().map(|p| p.repo_name),
+    );
+
     crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email.clone(),
@@ -2772,7 +2806,7 @@ pub async fn switch_account_to_instance(
             instance_mode: String::new(),
             reason: "Smart Rotator / Instance Account Switch".to_string(),
             is_auto: false,
-            backed_up_projects: Vec::new(),
+            backed_up_projects: unique_projs,
             backed_up_prompts_count: Some(backed_up_count),
             restored_prompts_count: Some(resent.len() + dispatched),
         },

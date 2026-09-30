@@ -350,23 +350,28 @@ pub fn backup_active_running_prompts_for_instance(
 
         if let Some(existing_rec_id) = existing_unrestored {
             let _ = conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3 WHERE id = ?4",
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0 WHERE id = ?4",
                 params![record.backup_batch_id, now, target_inst, existing_rec_id],
             );
             records.push(record);
             continue;
         }
 
-        // If already restored recently and not currently actively running in Antigravity, skip re-queuing
-        let already_restored_recently: bool = conn
+        // If previously restored for this instance, reactivate for this new switch batch
+        let existing_restored: Option<String> = conn
             .query_row(
-                "SELECT 1 FROM prompt_backups WHERE project_path = ?1 AND prompt_text = ?2 AND is_restored = 1 AND restored_at >= ?3 LIMIT 1",
-                params![record.project_path, record.prompt_text, freshness_cutoff],
-                |_| Ok(true),
+                "SELECT id FROM prompt_backups WHERE (prompt_id = ?1 OR (project_path = ?2 AND prompt_text = ?3)) AND (instance_id = ?4 OR instance_id IS NULL OR instance_id = '') LIMIT 1",
+                params![record.prompt_id, record.project_path, record.prompt_text, target_inst],
+                |r| r.get(0),
             )
-            .unwrap_or(false);
+            .ok();
 
-        if already_restored_recently && !is_live_prompt {
+        if let Some(existing_rec_id) = existing_restored {
+            let _ = conn.execute(
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL WHERE id = ?4",
+                params![record.backup_batch_id, now, target_inst, existing_rec_id],
+            );
+            records.push(record);
             continue;
         }
 

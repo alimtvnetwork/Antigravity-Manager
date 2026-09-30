@@ -1251,10 +1251,11 @@ pub async fn execute_profile_rotation_with_context(
     }
 
     let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+    let mut seen_projs = std::collections::HashSet::new();
     let proj_names: Vec<String> = running_projs
         .into_iter()
         .map(|p| p.repo_name)
-        .filter(|n| !n.is_empty())
+        .filter(|n| !n.is_empty() && seen_projs.insert(n.clone()))
         .collect();
     let backup_count_opt = backup_res.as_ref().ok().copied();
 

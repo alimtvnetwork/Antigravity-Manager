@@ -9,4 +9,6 @@
 | `83` | [83-local-e2e-instance-switching-and-prompt-restore.md](./completed/83-local-e2e-instance-switching-and-prompt-restore.md) | `COMPLETED` | Local-only on-demand E2E test suite for Antigravity IDE instance switching, conscious PID matching, prompt recovery, and visual settings verification with dual skip-by-default isolation. |
 
 ## Pending Plans (`pending/`)
-- *(None — all plans completed and consolidated)*
+| # | Plan File | Status | Summary |
+| :--- | :--- | :--- | :--- |
+| `26` | [26-instance-switching-ui-telegram-email-fix.md](./pending/26-instance-switching-ui-telegram-email-fix.md) | `PENDING` | Multi-instance switching stickiness fix, modal exclusivity with close 'X' buttons, high-contrast selection & scroll-into-view, conversation pruner safety gate (running prompts + 5 sessions), project deduplication, Telegram HTML repair, /update & /prune bot commands, and 200-word prompt previews in email & CLI. |

@@ -26,6 +26,45 @@ pub fn record_previous_email(email: &str) {
     }
 }
 
+/// Extract up to max_words words from prompt text and return (snippet, word_count)
+pub fn extract_words_preview(text: &str, max_words: usize) -> (String, usize) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return (String::new(), 0);
+    }
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    let count = words.len();
+    if count <= max_words {
+        (trimmed.to_string(), count)
+    } else {
+        (format!("{}...", words[..max_words].join(" ")), count)
+    }
+}
+
+/// Escape text for Telegram HTML parse_mode
+pub fn escape_telegram_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// Deduplicate project and resource names while preserving insertion order
+pub fn deduplicate_names<I, S>(items: I) -> Vec<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for it in items {
+        let s = it.as_ref().trim();
+        if !s.is_empty() && seen.insert(s.to_lowercase()) {
+            out.push(s.to_string());
+        }
+    }
+    out
+}
+
 fn resolve_switch_context(
     new_email: &str,
     instance_spec: &str,
@@ -409,11 +448,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
 
         if let Some(p) = matched.first() {
             running_prompt_id = Some(p.id.clone());
-            let snippet = if p.prompt_content.len() > 120 {
-                format!("{}...", &p.prompt_content[..120])
-            } else {
-                p.prompt_content.clone()
-            };
+            let (snippet, wc) = extract_words_preview(&p.prompt_content, 200);
             running_prompt_snippet = Some(snippet);
             running_prompt_project = Some(p.repo_path.clone());
             if p.image_payload.is_some() {
@@ -448,11 +483,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
                             if let Some(prompt_text) =
                                 val.get("prompt_content").and_then(|v| v.as_str())
                             {
-                                let snippet = if prompt_text.len() > 120 {
-                                    format!("{}...", &prompt_text[..120])
-                                } else {
-                                    prompt_text.to_string()
-                                };
+                                let (snippet, _wc) = extract_words_preview(prompt_text, 200);
                                 running_prompt_snippet = Some(snippet);
                                 running_prompt_id = val
                                     .get("prompt_id")
@@ -487,11 +518,13 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
     let prompts_resent = is_reinjecting;
     let now_ts = chrono::Utc::now().timestamp();
 
-    let default_projs = Vec::new();
     let effective_projects = if !details.backed_up_projects.is_empty() {
-        &details.backed_up_projects
+        deduplicate_names(&details.backed_up_projects)
     } else {
-        &default_projs
+        match crate::modules::repo_db::list_running_projects() {
+            Ok(projs) => deduplicate_names(projs.into_iter().map(|p| p.repo_name)),
+            Err(_) => Vec::new(),
+        }
     };
 
     let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
@@ -605,6 +638,10 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         <tr><td style="padding: 12px 18px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 600;">Origin Node</td><td style="padding: 10px 18px; border-bottom: 1px solid #f1f5f9;"><div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: 'Ubuntu Mono', monospace; user-select: all; -webkit-user-select: all;"><code>{} ({})</code></div></td></tr>
       </table>
       <div style="margin-top: 20px;">
+        <span style="font-size: 13px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.08em;">Active Running Prompts (≥ 200 Words Preview)</span>
+        <pre style="background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; margin-top: 8px; border: 1px solid #1e293b; white-space: pre-wrap; word-break: break-word; user-select: all; -webkit-user-select: all;">{}</pre>
+      </div>
+      <div style="margin-top: 20px;">
         <span style="font-size: 13px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.08em;">Machine Telemetry (JSON State Machine)</span>
         <pre style="background: #0f172a; color: #38bdf8; padding: 16px; border-radius: 10px; font-family: 'Ubuntu Mono', 'Consolas', monospace; font-size: 14px; line-height: 1.6; overflow-x: auto; margin-top: 8px; border: 1px solid #1e293b; user-select: all; -webkit-user-select: all;">{}</pre>
       </div>
@@ -633,6 +670,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         running_prompts_count,
         reinject_display,
         images_display,
+        running_prompt_display,
         running_prompt_display,
         m_name,
         m_ip,
@@ -700,7 +738,7 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
         "previous_quota_weekly": details.previous_quota_weekly,
         "trigger_mode": if details.is_auto { "Auto-Switch" } else { "Manual Switch" },
         "reason": details.reason,
-        "active_projects": &details.backed_up_projects,
+        "active_projects": deduplicate_names(&details.backed_up_projects),
         "prompts_backed_up": details.backed_up_prompts_count,
         "prompts_restored": details.restored_prompts_count,
     });
@@ -776,25 +814,22 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         .map(|t| format!("{:.1}%", t))
         .unwrap_or_else(|| "-".to_string());
 
-    let projects_display = if !details.backed_up_projects.is_empty() {
-        details.backed_up_projects.join(", ")
+    let raw_projects = if !details.backed_up_projects.is_empty() {
+        deduplicate_names(&details.backed_up_projects)
     } else {
         match crate::modules::repo_db::list_running_projects() {
             Ok(projs) if !projs.is_empty() => {
-                let names: Vec<String> = projs
-                    .into_iter()
-                    .map(|p| p.repo_name)
-                    .filter(|n| !n.is_empty())
-                    .collect();
+                let names = deduplicate_names(projs.into_iter().map(|p| p.repo_name));
                 if !names.is_empty() {
-                    names.join(", ")
+                    names
                 } else {
-                    "Antigravity-Manager".to_string()
+                    vec!["Antigravity-Manager".to_string()]
                 }
             }
-            _ => "Antigravity-Manager".to_string(),
+            _ => vec!["Antigravity-Manager".to_string()],
         }
     };
+    let projects_display = raw_projects.join(", ");
 
     let backup_stats = match (
         details.backed_up_prompts_count,
@@ -804,6 +839,29 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         (Some(b), None) => format!("{} captured", b),
         (None, Some(r)) => format!("{} re-injected", r),
         (None, None) => "preserved (SQLite split db)".to_string(),
+    };
+
+    let (prompt_preview_text, prompt_words_count) =
+        if let Ok(all_prompts) = crate::modules::repo_db::list_all_prompts() {
+            if let Some(p) = all_prompts.into_iter().find(|p| {
+                p.status == "running" || p.status == "backed_up" || p.status == "dispatched"
+            }) {
+                extract_words_preview(&p.prompt_content, 200)
+            } else {
+                (String::new(), 0)
+            }
+        } else {
+            (String::new(), 0)
+        };
+
+    let prompt_section = if !prompt_preview_text.is_empty() {
+        format!(
+            "\n💬 <b>Active Prompt:</b> ({} words)\n<code>{}</code>\n",
+            prompt_words_count,
+            crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
+        )
+    } else {
+        String::new()
     };
 
     let text = format!(
@@ -821,24 +879,25 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         🏷️ <b>Trigger:</b> {}\n\
         📝 <b>Reason:</b> {}\n\
         🖥️ <b>Host:</b> <code>{}</code> ({})\n\
-        ⏰ <b>Timestamp:</b> {}",
-        pkg_ver,
-        from_display,
-        prev_4h_str,
-        prev_weekly_str,
-        details.selected_email,
-        target_4h_str,
-        target_weekly_str,
-        threshold_display,
-        details.instance_name,
-        details.instance_id,
-        projects_display,
-        backup_stats,
-        trigger_label,
-        details.reason,
-        m_name,
-        m_ip,
-        now_str
+        ⏰ <b>Timestamp:</b> {}{}",
+        escape_telegram_html(&pkg_ver),
+        escape_telegram_html(&from_display),
+        escape_telegram_html(&prev_4h_str),
+        escape_telegram_html(&prev_weekly_str),
+        escape_telegram_html(&details.selected_email),
+        escape_telegram_html(&target_4h_str),
+        escape_telegram_html(&target_weekly_str),
+        escape_telegram_html(&threshold_display),
+        escape_telegram_html(&details.instance_name),
+        escape_telegram_html(&details.instance_id),
+        escape_telegram_html(&projects_display),
+        escape_telegram_html(&backup_stats),
+        escape_telegram_html(&trigger_label),
+        escape_telegram_html(&details.reason),
+        escape_telegram_html(&m_name),
+        escape_telegram_html(&m_ip),
+        escape_telegram_html(&now_str),
+        prompt_section
     );
 
     if let Err(e) = telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await
@@ -932,8 +991,9 @@ async fn dispatch_post_switch_prompt_telemetry(
         .format("%Y-%m-%d %H:%M:%S UTC")
         .to_string();
 
-    let projects_display = if !project_names.is_empty() {
-        project_names.join(", ")
+    let deduped = deduplicate_names(project_names);
+    let projects_display = if !deduped.is_empty() {
+        deduped.join(", ")
     } else {
         "Antigravity-Manager".to_string()
     };
@@ -958,7 +1018,14 @@ async fn dispatch_post_switch_prompt_telemetry(
                         🖥️ <b>Host:</b> <code>{}</code> ({})\n\
                         ⏰ <b>Timestamp:</b> {}\n\
                         ⚡ <b>Action:</b> Run <code>agm prompts status</code> or <code>agm prompts restore</code>.",
-                        pkg_ver, instance_id, backed_up_count, restored_count, projects_display, m_name, m_ip, now_str
+                        escape_telegram_html(&pkg_ver),
+                        escape_telegram_html(instance_id),
+                        backed_up_count,
+                        restored_count,
+                        escape_telegram_html(&projects_display),
+                        escape_telegram_html(&m_name),
+                        escape_telegram_html(&m_ip),
+                        escape_telegram_html(&now_str)
                     )
                 } else {
                     format!(
@@ -970,14 +1037,14 @@ async fn dispatch_post_switch_prompt_telemetry(
                         📁 <b>Active Projects:</b> <code>{}</code>\n\
                         🖥️ <b>Host:</b> <code>{}</code> ({})\n\
                         ⏰ <b>Timestamp:</b> {}",
-                        pkg_ver,
-                        instance_id,
+                        escape_telegram_html(&pkg_ver),
+                        escape_telegram_html(instance_id),
                         verified_running,
                         backed_up_count,
-                        projects_display,
-                        m_name,
-                        m_ip,
-                        now_str
+                        escape_telegram_html(&projects_display),
+                        escape_telegram_html(&m_name),
+                        escape_telegram_html(&m_ip),
+                        escape_telegram_html(&now_str)
                     )
                 };
 

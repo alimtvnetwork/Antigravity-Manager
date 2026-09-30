@@ -360,10 +360,11 @@ pub async fn send_telegram_message(
         match resp {
             Ok(r) if r.status().is_success() => continue,
             Ok(r) if r.status().as_u16() == 400 => {
-                // If HTML parse error occurred, retry sending chunk as plain text
+                // If HTML parse error occurred, strip HTML tags and retry sending chunk as clean plain text
+                let clean_plain = strip_telegram_html_tags(chunk);
                 let payload_plain = json!({
                     "chat_id": chat_id,
-                    "text": chunk
+                    "text": clean_plain
                 });
                 let retry_resp = client
                     .post(&url)
@@ -439,6 +440,25 @@ pub fn clean_for_telegram_html(input: &str, max_chars: usize) -> String {
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+/// Strip HTML tags and decode HTML entities for clean plain text fallback
+pub fn strip_telegram_html_tags(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut in_tag = false;
+    for c in input.chars() {
+        if c == '<' {
+            in_tag = true;
+        } else if c == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            out.push(c);
+        }
+    }
+    out.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
 }
 
 /// Helper to abbreviate project names (e.g. Antigravity-Manager -> AGM)
@@ -626,9 +646,9 @@ pub fn format_observe_report() -> String {
                     String::new()
                 };
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-                let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
-                if !clean.is_empty() {
-                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
+                let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
+                if !preview_txt.is_empty() {
+                    block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
                 }
                 let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
@@ -649,9 +669,9 @@ pub fn format_observe_report() -> String {
                     String::new()
                 };
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-                let clean = repo_db::extract_smart_prompt_summary(txt, 90);
-                if !clean.is_empty() {
-                    block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
+                let (preview_txt, wc) = repo_db::extract_prompt_words_preview(txt, 150);
+                if !preview_txt.is_empty() {
+                    block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
                 }
                 running_items.push(block);
             } else if !running_workspace_names.contains(&short_name) {
@@ -682,9 +702,9 @@ pub fn format_observe_report() -> String {
             String::new()
         };
         let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-        let clean = repo_db::extract_smart_prompt_summary(&ap.prompt_content, 90);
-        if !clean.is_empty() {
-            block.push_str(&format!("   {}\n", clean_for_telegram_html(&clean, 120)));
+        let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
+        if !preview_txt.is_empty() {
+            block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
         }
         let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
         block.push_str(&format!(
@@ -722,7 +742,8 @@ pub fn format_observe_report() -> String {
         • <b>IP:</b> {}\n\
         • <b>Build:</b> v{} (commit {})\n\
         • <b>Active Account:</b> {} ({} total)\n\
-        • <b>Quota / Tier:</b> {}\n\n\
+        • <b>Quota / Tier:</b> {}\n\
+        • <b>Update Status:</b> <code>Up to date</code> (Send <code>/update</code> or <code>/upgrade</code>)\n\n\
         {}\n\
         💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
         clean_for_telegram_html(&ver, 24),
@@ -809,6 +830,75 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
     }
 }
 
+/// Format prompts query report with ≥200 words preview for Telegram
+pub fn format_prompts_query_report(term: &str) -> String {
+    let all_prompts = match repo_db::list_all_prompts() {
+        Ok(p) => p,
+        Err(e) => {
+            return format!(
+                "⚠️ <b>Failed to query prompts:</b> <code>{}</code>",
+                clean_for_telegram_html(&e, 200)
+            );
+        }
+    };
+
+    if all_prompts.is_empty() {
+        return "⚠️ <b>No Prompts:</b> No prompts tracked in SQLite database.".to_string();
+    }
+
+    let q = term.trim().to_lowercase();
+    let matches: Vec<_> = all_prompts
+        .into_iter()
+        .filter(|p| {
+            if q.is_empty() || q == "*" || q == "all" {
+                return true;
+            }
+            p.prompt_content.to_lowercase().contains(&q)
+                || p.project_id.to_lowercase().contains(&q)
+                || p.repo_path.to_lowercase().contains(&q)
+                || p.id.to_lowercase().contains(&q)
+                || p.status.to_lowercase().contains(&q)
+        })
+        .take(5)
+        .collect();
+
+    if matches.is_empty() {
+        return format!(
+            "🔍 <b>Prompt Query:</b> No prompts matched <code>{}</code>.\n\
+            💡 Send <code>/query</code> to view recent prompts or <code>/observe</code> for live state.",
+            clean_for_telegram_html(term, 32)
+        );
+    }
+
+    let mut out = format!(
+        "🔍 <b>Prompts Query Results:</b> (Found {} matches)\n\n",
+        matches.len()
+    );
+
+    for (idx, p) in matches.iter().enumerate() {
+        let (preview, wc) = repo_db::extract_prompt_words_preview(&p.prompt_content, 200);
+        let friendly_ws = repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
+        let short_ws = shorten_project_name(&friendly_ws);
+        let badge = if p.status == "running" || p.status == "dispatched" { "🟢" } else { "⚪" };
+        let prompt_id_short = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
+
+        out.push_str(&format!(
+            "<b>#{}. {} {}</b> (<code>{}</code> | {} words)\n\
+            {}\n\
+            <i>Details: <code>/expand {}</code></i>\n\n",
+            idx + 1,
+            badge,
+            clean_for_telegram_html(&short_ws, 24),
+            clean_for_telegram_html(prompt_id_short, 12),
+            wc,
+            clean_for_telegram_html(&preview, 1200),
+            clean_for_telegram_html(prompt_id_short, 12)
+        ));
+    }
+
+    out
+}
+
 /// Format comprehensive Telegram command manual
 pub fn format_help_manual() -> String {
     let ver = git_info::get_app_version();
@@ -826,6 +916,7 @@ pub fn format_help_manual() -> String {
         • <code>/tree all</code> — Full tree of all workspaces &amp; conversations across all instances\n\
         • <code>/active</code> or <code>/running</code> — Active running prompts + Dual-Sequence Tree View\n\
         • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
+        • <code>/query &lt;term&gt;</code> or <code>/prompts query</code> — Search SQLite cached prompts (≥200w preview)\n\
         • <code>/expand &lt;id&gt;</code> — View full untruncated prompt instructions\n\
         • <code>/snapshot</code> — Multi-node cluster status snapshot\n\
         • <code>/projects</code> — List registered workspaces, AGM/GitMap Seq IDs &amp; sample syntax\n\
@@ -855,7 +946,9 @@ pub fn format_help_manual() -> String {
         • <code>/agy running-prompts restore</code> — Restore active AGY storage prompts via GitMap\n\
         • <code>/agy ccko</code> — Clean runtime cache keeping only 1 conversation\n\
         • <code>/agy cckf</code> — Clean runtime cache keeping top 5 conversations\n\
-        • <code>/agy cc --keep 10</code> — Clean runtime cache and prune conversation history\n\n\
+        • <code>/agy cc --keep 10</code> — Clean runtime cache and prune conversation history\n\
+        • <code>/prune [N]</code> or <code>/pr [N]</code> — Safely prune conversations (default: keep 10, guards active prompts &amp; ≥5 sessions)\n\
+        • <code>/clean</code> — Clean application runtime and build caches\n\n\
         🔄 <b>AGM &amp; GitMap Update Commands:</b>\n\
         • <code>/update</code> or <code>/update agm</code> — Self-update Antigravity-Manager (delegated updater)\n\
         • <code>/update gitmap</code> — Update GitMap CLI to latest release (<code>gitmap self-update</code>)\n\
@@ -1084,11 +1177,12 @@ pub fn execute_backup_command(args_str: &str) -> String {
         }
     } else if sub == "restore" || sub == "rrp" || sub == "resend" {
         let projs = repo_db::list_running_projects().unwrap_or_default();
-        let proj_names: Vec<String> = projs
-            .into_iter()
-            .map(|p| p.repo_name)
-            .filter(|n| !n.is_empty())
-            .collect();
+        let proj_names = crate::modules::notification_hub::deduplicate_names(
+            projs
+                .into_iter()
+                .map(|p| p.repo_name)
+                .filter(|n| !n.is_empty()),
+        );
         let proj_display = if !proj_names.is_empty() {
             proj_names.join(", ")
         } else {
@@ -1114,11 +1208,12 @@ pub fn execute_backup_command(args_str: &str) -> String {
         }
     } else {
         let projs = repo_db::list_running_projects().unwrap_or_default();
-        let proj_names: Vec<String> = projs
-            .into_iter()
-            .map(|p| p.repo_name)
-            .filter(|n| !n.is_empty())
-            .collect();
+        let proj_names = crate::modules::notification_hub::deduplicate_names(
+            projs
+                .into_iter()
+                .map(|p| p.repo_name)
+                .filter(|n| !n.is_empty()),
+        );
         let proj_display = if !proj_names.is_empty() {
             proj_names.join(", ")
         } else {
@@ -2371,7 +2466,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 Some(execute_gitmap_subcommand(&format!("ssh {}", sub)))
             }
         }
-        "update" => {
+        "update" | "upgrade" => {
             let sub = rest.trim().to_lowercase();
             if sub == "gitmap" || sub == "gm" {
                 Some(execute_gitmap_subcommand("self-update"))
@@ -2385,6 +2480,37 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 Some(execute_agm_subcommand("update"))
             }
         }
+        "prune" | "pr" | "clean" => {
+            let keep_count = rest
+                .trim()
+                .strip_prefix("--keep")
+                .or_else(|| rest.trim().strip_prefix("-k"))
+                .unwrap_or(rest.trim())
+                .trim()
+                .parse::<usize>()
+                .unwrap_or(10);
+            match crate::modules::agy_cleaner::prune_conversations_only(keep_count) {
+                Ok(res) => Some(format!(
+                    "🧹 <b>Antigravity Conversation Prune Completed</b>\n\
+                    ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                    • <b>Protected Prompts:</b> All running/queued prompts safely preserved\n\
+                    • <b>Protected Workspaces:</b> Top 5 sessions retained per active project\n\
+                    • <b>Global History Retained:</b> {} sessions\n\
+                    • <b>Deleted Sessions:</b> <code>{}</code>\n\
+                    • <b>Reclaimed Space:</b> <code>{:.2} MB</code>\n\
+                    • <b>Transaction ID:</b> <code>{}</code>",
+                    keep_count,
+                    res.pruned_count,
+                    res.total_freed_bytes as f64 / (1024.0 * 1024.0),
+                    res.transaction_id
+                )),
+                Err(e) => Some(format!(
+                    "❌ <b>Conversation Prune Failed:</b> {}",
+                    crate::modules::notification_hub::escape_telegram_html(&e.to_string())
+                )),
+            }
+        }
+        "query" | "search" => Some(format_prompts_query_report(rest)),
         "projects" | "workspaces" | "workspace" => Some(format_projects_list()),
         "prompts" | "prompt_queue" | "templates" => {
             let sub = rest.trim();
@@ -2392,6 +2518,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 Some(format_prompts_templates_report())
             } else if sub == "queue" || sub == "queues" {
                 Some(format_prompt_queues_report().await)
+            } else if sub.starts_with("query") || sub.starts_with("search") {
+                let term = sub.strip_prefix("query").or_else(|| sub.strip_prefix("search")).unwrap_or("").trim();
+                Some(format_prompts_query_report(term))
             } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())
             } else if sub.starts_with("expand") {
@@ -2419,11 +2548,12 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
             let projs = repo_db::list_running_projects().unwrap_or_default();
-            let proj_names: Vec<String> = projs
-                .into_iter()
-                .map(|p| p.repo_name)
-                .filter(|n| !n.is_empty())
-                .collect();
+            let proj_names = crate::modules::notification_hub::deduplicate_names(
+                projs
+                    .into_iter()
+                    .map(|p| p.repo_name)
+                    .filter(|n| !n.is_empty()),
+            );
             let proj_display = if !proj_names.is_empty() {
                 proj_names.join(", ")
             } else {
@@ -2477,11 +2607,12 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
             if lower_full.starts_with("ff:") {
                 let projs = repo_db::list_running_projects().unwrap_or_default();
-                let proj_names: Vec<String> = projs
-                    .into_iter()
-                    .map(|p| p.repo_name)
-                    .filter(|n| !n.is_empty())
-                    .collect();
+                let proj_names = crate::modules::notification_hub::deduplicate_names(
+                    projs
+                        .into_iter()
+                        .map(|p| p.repo_name)
+                        .filter(|n| !n.is_empty()),
+                );
                 let proj_display = if !proj_names.is_empty() {
                     proj_names.join(", ")
                 } else {

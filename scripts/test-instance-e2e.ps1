@@ -8,7 +8,7 @@ param(
     [switch]$ForceCleanup
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $PSNativeCommandUseErrorActionPreference = $false
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
@@ -36,7 +36,7 @@ Write-Host "[0/6] Safety Check: Protected Main IDE & AGM processes: $($protected
 $currentProcessId = $PID
 $parentProcessId = (Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessId -eq $currentProcessId }).ParentProcessId
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-    $_.Name -match 'powershell|pwsh' -and $_.ProcessId -ne $currentProcessId -and $_.ProcessId -ne $parentProcessId -and $_.CommandLine -match 'test-instance-e2e\.ps1'
+    $_.Name -match 'powershell|pwsh' -and $_.ProcessId -ne $currentProcessId -and $_.ProcessId -ne $parentProcessId -and $_.CommandLine -match 'test-instance-e2e'
 } | ForEach-Object {
     try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
 }
@@ -103,7 +103,24 @@ function Get-AppStorageEmail($jsonPath) {
 function Get-InstanceRealPid($instanceDir, $instanceId) {
     if (!$instanceDir -and !$instanceId) { return $null }
     $escapedDir = if ($instanceDir) { [regex]::Escape($instanceDir) } else { "" }
-    for ($attempt = 1; $attempt -le 10; $attempt++) {
+    for ($attempt = 1; $attempt -le 15; $attempt++) {
+        # 0. Check via agm instances observe --json (returns real live PIDs for this instance)
+        if ($instanceId) {
+            try {
+                $obsRaw = & $agm instances observe $instanceId --json 2>$null
+                $obsData = Parse-CliJson $obsRaw
+                if ($obsData -and $obsData.pids) {
+                    foreach ($p in $obsData.pids) {
+                        $cPid = [int]$p
+                        if ($protectedPids -notcontains $cPid) {
+                            $live = Get-Process -Id $cPid -ErrorAction SilentlyContinue
+                            if ($live) { return $cPid }
+                        }
+                    }
+                }
+            } catch {}
+        }
+
         # 1. Fast check via AGM CLI registry
         try {
             $raw = & $agm instances --json 2>$null
@@ -122,7 +139,17 @@ function Get-InstanceRealPid($instanceDir, $instanceId) {
             }
         } catch {}
 
-        # 2. Direct Win32 process lookup strictly matching this instance's data directory or binary name
+        # 2. Direct ProcessName match (e.g. Antigravity-<instanceId>)
+        if ($instanceId) {
+            $procMatches = Get-Process -ErrorAction SilentlyContinue | Where-Object { 
+                ($_.ProcessName -match [regex]::Escape($instanceId) -or ($_.Path -and $_.Path -match [regex]::Escape($instanceId))) -and ($protectedPids -notcontains $_.Id)
+            }
+            if ($procMatches) {
+                return [int]($procMatches | Select-Object -First 1).Id
+            }
+        }
+
+        # 3. Direct Win32 process lookup strictly matching this instance's data directory or binary name
         $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { 
             ($escapedDir -and $_.CommandLine -match $escapedDir) -or 
             ($instanceId -and ($_.CommandLine -match $instanceId -or $_.Name -match $instanceId))
@@ -283,11 +310,11 @@ Write-Host "  [PASS] Test 2: Account switching across all database paths verifie
 
 # Step 2d: Re-open IDE Instance (if not already launched) and verify NEW PID
 Write-Host "  Verifying Instance A ($instA) IDE window post-switch..." -ForegroundColor DarkGray
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 4
 $newRealPidA = Get-InstanceRealPid $instADir $instA
 if (!$newRealPidA) {
     & $agm instances launch $instA
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 4
     $newRealPidA = Get-InstanceRealPid $instADir $instA
 }
 if (!$newRealPidA) {

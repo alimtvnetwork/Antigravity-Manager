@@ -95,9 +95,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             className={cn(
             "group transition-all duration-150 border-b border-gray-100 dark:border-base-200 border-l-4",
             isCurrent
-                ? "bg-amber-500/15 dark:bg-amber-950/40 border-l-amber-500 dark:border-l-amber-400 font-medium hover:bg-amber-500/25 dark:hover:bg-amber-900/60 hover:shadow-xs"
+                ? "bg-amber-500/15 dark:bg-amber-500/20 border-l-amber-500 dark:border-l-amber-400 font-semibold text-gray-900 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30 hover:shadow-xs"
                 : selected
-                ? "bg-amber-500/10 dark:bg-amber-950/30 border-l-amber-400 font-medium hover:bg-amber-500/20 dark:hover:bg-amber-900/50"
+                ? "bg-blue-500/10 dark:bg-blue-900/30 border-l-blue-500 dark:border-l-blue-400 font-medium text-gray-900 dark:text-blue-100 hover:bg-blue-500/20 dark:hover:bg-blue-900/40"
                 : "border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-l-stone-400 dark:hover:border-l-stone-500",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>

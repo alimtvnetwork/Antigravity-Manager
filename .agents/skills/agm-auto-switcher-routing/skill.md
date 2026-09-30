@@ -51,6 +51,9 @@ $$\text{Score} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{weekly
 
 ## 3. Pre-Activation Validation & Fallback Ladder
 
-1. Before activating a candidate account, `AutoSwitcher` executes a live pre-activation probe via `fetch_account_quota`.
-2. If the candidate returns 429, 403, or invalid grant, it is marked as degraded and the switcher demotes the candidate and evaluates the next highest score.
-3. Once an account passes validation, tokens are written to `state.vscdb`, keyring is updated, and proxy accounts are reloaded.
+1. **Live Pre-Activation Probe**: Before activating a candidate account, `AutoSwitcher` executes a live pre-activation probe via `fetch_account_quota`. If the candidate returns 429, 403, or invalid grant, it is marked as degraded and demoted.
+2. **Two-Stage Candidate Selection (`select_and_verify_next_best_profile`)**:
+   - **Stage 1 (Strict 100% Preference)**: Any candidate confirming $\ge 100.0\%$ fresh 4-hour window quota (or `is_period_finished == true`) is selected immediately for the switch.
+   - **Stage 2 (Graceful Best-Available Fallback)**: If no verified account meets the 100% threshold, the switcher stages candidate profiles and selects the best available profile with the highest verified quota $> \text{threshold}$ (rather than aborting rotation).
+   - **Exhaustion Guard**: If zero candidates possess quota exceeding the trigger threshold, rotation safely aborts with a diagnostic warning.
+3. **Post-Validation Commit**: Once an account passes validation, tokens are written to `state.vscdb`, keyring is updated, and proxy accounts are reloaded.
