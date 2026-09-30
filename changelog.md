@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.106.0] - 2026-09-30
+
+### Added
+- add gitignore agm command and fix rustfmt formatting
+
+---
+
 ## [v4.105.0] - 2026-09-30
 
 ### Added
