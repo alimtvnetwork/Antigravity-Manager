@@ -38,3 +38,4 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [35-macos-universal-bundle-agm-missing-binary-rca.md](.ai-memory/cicd-issues/35-macos-universal-bundle-agm-missing-binary-rca.md)
 - [36-ci-windows-setup-node-transient-hang-and-runner-concurrency-rca.md](.ai-memory/cicd-issues/36-ci-windows-setup-node-transient-hang-and-runner-concurrency-rca.md)
 - [37-windows-test-manifest-entrypoint-and-rate-limit-rca.md](.ai-memory/cicd-issues/37-windows-test-manifest-entrypoint-and-rate-limit-rca.md)
+- [39-release-published-with-missing-artifacts-rca.md](.ai-memory/cicd-issues/39-release-published-with-missing-artifacts-rca.md)

@@ -364,3 +364,23 @@ Allowed work:
 - ✅ `{condition ? ( <div>...</div> ) : null}`
 
 **Why:** Causes `TS1005: '}' expected` and `TS1381: Unexpected token` during TypeScript compilation (`tsc && vite build`), breaking frontend and desktop CI/CD builds.
+
+## Announcing an Update Without a Verified Platform Asset — TOTAL BAN
+
+**NEVER report `has_update = true`, offer Install, or publish `updater.json` for a release unless an installable asset for the current platform was verified to exist (HTTP 2xx).**
+
+Forbidden:
+- Deciding an update exists from the version number alone.
+- Writing `updater.json` URLs from assumed file names instead of the uploaded asset list.
+- Publishing a release while any expected platform artifact is missing.
+
+Allowed work:
+- Walk releases newest to oldest, skip those without the asset, and tell the user which were skipped and why.
+
+**Why:** A release with missing binaries was announced to users and the install failed (see `.ai-memory/cicd-issues/39-release-published-with-missing-artifacts-rca.md`).
+
+## Silent Failure in Scripts — TOTAL BAN
+
+**NEVER ignore a native command's exit code, write an empty `catch`, or report success for a step that was not verified.** Scripts resolve paths from their own location, never embed keys or absolute paths, and end with a verification step whose failure exits non-zero.
+
+**Why:** Vault and Supabase scripts reported success while nothing was loaded or transferred (see `.ai-memory/issues/53-vault-and-supabase-scripts-silent-failures-rca.md`).
