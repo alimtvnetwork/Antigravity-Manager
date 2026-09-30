@@ -1,0 +1,21 @@
+#!/bin/sh
+# Blocks commits whose staged Rust sources would fail CI's `cargo fmt -- --check`.
+# Bypass (emergencies only): git commit --no-verify
+
+staged_rs=$(git diff --cached --name-only --diff-filter=ACMR -- 'src-tauri/*.rs')
+[ -z "$staged_rs" ] && exit 0
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "[pre-commit] WARNING: cargo not found on PATH; skipping rustfmt check." >&2
+    echo "[pre-commit] CI will still run 'cargo fmt -- --check' and fail on unformatted Rust." >&2
+    exit 0
+fi
+
+if ! cargo fmt --manifest-path src-tauri/Cargo.toml -- --check >/dev/null 2>&1; then
+    echo "[pre-commit] BLOCKED: Rust formatting drift detected (CI 'Check Rust formatting' would fail)." >&2
+    echo "[pre-commit] Fix with:  cd src-tauri && cargo fmt   then re-stage and commit." >&2
+    cargo fmt --manifest-path src-tauri/Cargo.toml -- --check 2>&1 | head -n 40 >&2
+    exit 1
+fi
+
+exit 0
