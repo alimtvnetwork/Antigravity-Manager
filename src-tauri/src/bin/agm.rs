@@ -400,14 +400,16 @@ fn print_help() {
     println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
-    println!("    prompts ls [N] [--json] [--words W]");
-    println!("        Show N running prompts in ASC stack order (with friendly project names)");
+    println!("    prompts query [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
+    println!("        Query cached prompts in SQLite with ≥200-word preview, filtering by status or term");
+    println!("    prompts show <id|seq> [--json]");
+    println!("        Show full prompt instructions and metadata for specific ID or sequence");
     println!("    prompt [C001|P001|GM:#1|proj] \"<text>\" [--instance <id|#seq>] [--node <alias>] [--prefix C] [--suffix C]");
     println!("        Dispatch prompt by Dual AGM/GitMap Sequence ID, project, instance, or remote SSH node");
     println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
     println!("        Resend commands before close/switch & sync image paths to resume file");
-    println!("    prune, clean-conversations [--keep <N>] [--preflight] [-y]");
-    println!("        Safely prune older conversations (guarantees ≥5 sessions per active workspace)");
+    println!("    prune, pr [--keep <N>] [--json]");
+    println!("        Safely prune older conversations (guards active prompts & guarantees ≥5 sessions per active workspace)");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  SANDBOX INSTANCES & PROFILE ISOLATION");
@@ -475,6 +477,9 @@ fn print_help() {
     );
     println!("    agm tree                            # Shows [AGM:P001 | GM:#1] & [AGM:C001 | GM:<cid>]");
     println!("    agm tree all --words 200");
+    println!(
+        "    agm running-prompts --words 200     # Query cached prompts with 200-word preview"
+    );
     println!("    gitmap agy active");
     println!();
     println!("    # 2. Inject Prompt by AGM or GitMap Sequence ID, Instance, or Remote SSH Node:");
@@ -510,16 +515,25 @@ fn print_help() {
     println!("    gitmap agm update -y        # Update AGM via GitMap installer");
     println!("    gitmap ssh update agm       # Update AGM across SSH fleet");
     println!();
-    println!("    # 6. Conversation Pruning & Hygiene (Preserves Active Prompts & Top 5 Sessions):");
-    println!("    agm prune                           # Safe prune keeping 10 latest conversations");
+    println!(
+        "    # 6. Conversation Pruning & Hygiene (Preserves Active Prompts & Top 5 Sessions):"
+    );
+    println!(
+        "    agm prune                           # Safe prune keeping 10 latest conversations"
+    );
     println!("    agm prune --keep 5                  # Prune keeping 5 latest conversations");
+    println!(
+        "    agm pr 5                            # Shorthand prune keeping 5 latest conversations"
+    );
     println!("    agm clean-conversations --preflight # Dry-run preview of space to be reclaimed");
     println!();
     println!("    # 7. Multi-Node SSH Execution & GitMap Key Deployment:");
     println!("    agm ssh nodes                       # List registered SSH cluster nodes");
     println!("    agm ssh exec \"agm status\"           # Run command across SSH cluster");
     println!("    gitmap ssh nodes                    # List reachable SSH fleet nodes");
-    println!("    gitmap ssh key export               # Export SSH public key for cluster deployment");
+    println!(
+        "    gitmap ssh key export               # Export SSH public key for cluster deployment"
+    );
     println!("    gitmap ssh key deploy <node>        # Deploy authorization key to remote node");
     println!("    gitmap ssh <node> \"agm status\"      # Run AGM command on specific remote node");
     println!();
@@ -1487,8 +1501,12 @@ fn cmd_prompts(args: &[String]) {
     if let Some(first) = args.first() {
         let first_lower = first.to_lowercase();
         if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
-            println!("AGM Prompts Management:");
+            println!("AGM Prompts Management & SQLite Caching:");
             println!("  agm prompts [ls] [N] [--words <W>] [--running] [--json]");
+            println!(
+                "  agm prompts query [term] [--words <W>] [--limit <N>] [--status <S>] [--json]"
+            );
+            println!("  agm prompts show <id|seq> [--json]");
             println!("  agm prompts backup [ls|clean] [-f <path.db>] [--json]");
             println!("  agm prompts restore [--keep] [--json] [-f <path.db>]");
             println!("  agm prompts status [--json]");
@@ -1496,14 +1514,18 @@ fn cmd_prompts(args: &[String]) {
             println!("  agm prompts import [-f <file.db>]");
             println!("\nDescription:");
             println!(
-                "  Inspects, snapshots, exports, imports, and restores active and queued prompts"
+                "  Inspects, snapshots, exports, imports, queries, and restores active and queued prompts"
             );
-            println!("  across all running Antigravity workspace projects.");
+            println!(
+                "  across all running Antigravity workspace projects with SQLite database caching."
+            );
             println!("\nAliases: agm prompts, agm running-prompts");
             println!("\nSubcommands:");
             println!(
                 "  ls, list            List running prompts in ASC stack order (oldest to newest)"
             );
+            println!("  query, search       Query cached prompts in SQLite with ≥200-word preview");
+            println!("  show                Display detailed prompt record and full word content");
             println!(
                 "  backup, brp         Parallel snapshot of active prompts to split SQLite DB"
             );
@@ -1516,6 +1538,17 @@ fn cmd_prompts(args: &[String]) {
             println!("  export, pe          Export prompts database to file or JSON");
             println!("  import, pi          Import prompts from file into local execution queue");
             println!("\nExamples:");
+            println!("  agm prompts query                   # Query recent prompts with 200-word previews");
+            println!("  agm prompts query \"cicd\"            # Search prompts containing 'cicd'");
+            println!(
+                "  agm prompts query --words 250 -n 5  # Show top 5 prompts with 250 words preview"
+            );
+            println!(
+                "  agm prompts query --status running  # Query only actively executing prompts"
+            );
+            println!(
+                "  agm prompts show P001               # Show detailed prompt for sequence P001"
+            );
             println!("  agm prompts                         # List latest 10 running prompts");
             println!("  agm prompts ls 5                    # Show latest 5 running prompts in ASC stack");
             println!("  agm prompts backup                  # Snapshot all running prompts before rotation");
@@ -1524,6 +1557,14 @@ fn cmd_prompts(args: &[String]) {
             println!(
                 "  agm prompts export -f backup.db     # Export prompts to specific SQLite file"
             );
+            return;
+        }
+        if first_lower == "query" || first_lower == "search" || first_lower == "find" {
+            cmd_prompts_query(&args[1..]);
+            return;
+        }
+        if first_lower == "show" {
+            cmd_prompts_show(&args[1..]);
             return;
         }
         if first_lower == "backup" || first_lower == "brp" {
@@ -1688,6 +1729,223 @@ fn cmd_prompts(args: &[String]) {
 
     if !is_ls {
         scan_prompt_templates();
+    }
+}
+
+fn cmd_prompts_query(args: &[String]) {
+    let mut search_term: Option<String> = None;
+    let mut max_words: usize = 200;
+    let mut limit_n: usize = 10;
+    let mut status_filter: Option<String> = None;
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    let is_help = args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help");
+    if is_help {
+        println!("AGM Prompts Query (SQLite Cached Prompts):");
+        println!("  agm prompts query [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
+        println!("\nDescription:");
+        println!("  Queries cached prompts in SQLite repo_prompts.db and backup_prompts.db");
+        println!("  with word-count previews (default: 200 words), filtering by status, term, or project.");
+        println!("\nOptions:");
+        println!("    --words, -w <W>     Preview word count (default: 200 words)");
+        println!("    --limit, -n <N>     Maximum number of results to display (default: 10)");
+        println!("    --status, -s <S>    Filter by status (running, queued, dispatched, backed_up, all)");
+        println!("    --json, -j          Output pure JSON payload");
+        println!("\nExamples:");
+        println!(
+            "  agm prompts query                   # View latest prompts with 200-word preview"
+        );
+        println!("  agm prompts query \"pipeline\"        # Search prompts containing 'pipeline'");
+        println!(
+            "  agm prompts query --words 250 -n 5  # Show top 5 prompts with 250 words preview"
+        );
+        println!("  agm prompts query -s running        # Query only actively executing prompts");
+        return;
+    }
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if (arg == "--words" || arg == "-w") && i + 1 < args.len() {
+            max_words = args[i + 1].parse().unwrap_or(200);
+            i += 2;
+            continue;
+        } else if (arg == "--limit" || arg == "-n") && i + 1 < args.len() {
+            limit_n = args[i + 1].parse().unwrap_or(10);
+            i += 2;
+            continue;
+        } else if (arg == "--status" || arg == "-s") && i + 1 < args.len() {
+            status_filter = Some(args[i + 1].to_lowercase());
+            i += 2;
+            continue;
+        } else if arg == "--json" || arg == "-j" {
+            i += 1;
+            continue;
+        } else if !arg.starts_with('-') && search_term.is_none() {
+            search_term = Some(arg.clone());
+        }
+        i += 1;
+    }
+
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let term_lower = search_term.as_ref().map(|s| s.to_lowercase());
+
+    let mut filtered: Vec<_> = all_prompts
+        .into_iter()
+        .filter(|p| {
+            if let Some(ref st) = status_filter {
+                if st != "all" && !p.status.to_lowercase().contains(st) {
+                    return false;
+                }
+            }
+            if let Some(ref term) = term_lower {
+                let in_content = p.prompt_content.to_lowercase().contains(term);
+                let in_proj = p.project_id.to_lowercase().contains(term)
+                    || p.repo_path.to_lowercase().contains(term);
+                let in_id = p.id.to_lowercase().contains(term);
+                let in_model = p
+                    .model
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_lowercase()
+                    .contains(term);
+                if !in_content && !in_proj && !in_id && !in_model {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    filtered.truncate(limit_n);
+
+    let mut results = Vec::new();
+    for (idx, p) in filtered.iter().enumerate() {
+        let (preview, word_count) =
+            repo_db::extract_prompt_words_preview(&p.prompt_content, max_words);
+        results.push(serde_json::json!({
+            "seq": idx + 1,
+            "id": p.id,
+            "project_id": p.project_id,
+            "instance_id": p.instance_id,
+            "repo_path": p.repo_path,
+            "status": p.status,
+            "model": p.model,
+            "word_count": word_count,
+            "preview_words_limit": max_words,
+            "prompt_preview": preview,
+            "has_images": p.image_payload.is_some(),
+            "updated_at": p.updated_at,
+        }));
+    }
+
+    if is_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&results).unwrap_or_else(|_| "[]".to_string())
+        );
+        return;
+    }
+
+    if results.is_empty() {
+        println!("No prompts found matching query criteria.");
+        return;
+    }
+
+    println!(
+        "\n[AGM Prompts Query: Found {} prompt(s) in SQLite (≥{} words preview)]",
+        results.len(),
+        max_words
+    );
+    println!(
+        "{:<5} {:<10} {:<20} {:<12} {:<8} PROMPT PREVIEW (≥{} WORDS)",
+        "SEQ", "ID", "PROJECT", "STATUS", "WORDS", max_words
+    );
+    println!("{}", "-".repeat(120));
+    for r in &results {
+        let seq = r["seq"].as_u64().unwrap_or(0);
+        let short_id: String = r["id"].as_str().unwrap_or("-").chars().take(8).collect();
+        let proj: String = r["project_id"]
+            .as_str()
+            .unwrap_or("-")
+            .chars()
+            .take(18)
+            .collect();
+        let status = r["status"].as_str().unwrap_or("-");
+        let wc = r["word_count"].as_u64().unwrap_or(0);
+        let preview = r["prompt_preview"].as_str().unwrap_or("");
+        println!(
+            "#{:<4} {:<10} {:<20} {:<12} {:<8} {}",
+            seq, short_id, proj, status, wc, preview
+        );
+    }
+    println!();
+}
+
+fn cmd_prompts_show(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let query_id = args
+        .iter()
+        .find(|a| !a.starts_with('-'))
+        .map(|s| s.as_str());
+
+    let Some(target) = query_id else {
+        eprintln!("Usage: agm prompts show <id|sequence> [--json]");
+        return;
+    };
+
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let q_lower = target.to_lowercase();
+
+    let matched = all_prompts.into_iter().find(|p| {
+        p.id.to_lowercase() == q_lower
+            || p.id.to_lowercase().starts_with(&q_lower)
+            || p.project_id.to_lowercase() == q_lower
+            || p.project_id.to_lowercase().contains(&q_lower)
+    });
+
+    if let Some(p) = matched {
+        let word_count = p.prompt_content.split_whitespace().count();
+        if is_json {
+            let out = serde_json::json!({
+                "id": p.id,
+                "project_id": p.project_id,
+                "instance_id": p.instance_id,
+                "repo_path": p.repo_path,
+                "status": p.status,
+                "model": p.model,
+                "session_id": p.session_id,
+                "word_count": word_count,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+                "has_images": p.image_payload.is_some(),
+                "prompt_content": p.prompt_content,
+            });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+        } else {
+            println!("\n=== Prompt Details ({}) ===", p.id);
+            println!("  Project:     {}", p.project_id);
+            println!("  Instance:    {}", p.instance_id);
+            println!("  Repo Path:   {}", p.repo_path);
+            println!("  Status:      {}", p.status);
+            println!("  Model:       {}", p.model.as_deref().unwrap_or("default"));
+            println!("  Word Count:  {} words", word_count);
+            println!(
+                "  Updated:     {}",
+                chrono::DateTime::from_timestamp(p.updated_at, 0)
+                    .map(|d| d.to_rfc3339())
+                    .unwrap_or_default()
+            );
+            println!("  Has Image:   {}", p.image_payload.is_some());
+            println!("\n--- Full Prompt Content ---\n{}\n", p.prompt_content);
+        }
+    } else {
+        eprintln!(
+            "[ERROR] Prompt with ID or project '{}' not found in repo_prompts.db",
+            target
+        );
     }
 }
 
@@ -2407,6 +2665,18 @@ fn cmd_prompt_dispatch(args: &[String]) {
             println!("  agm prompt P001 --instance default \"Run tests\"     # Target project sequence P001 on instance");
             println!("  agm prompt C001 --node vm-01 \"Check status\"        # Target C001 on remote SSH node");
             println!("  agm prompt \"Audit DB\" --prefix coding-standards    # Frame prompt with template");
+            println!("  agm prompt query [term]                            # Search SQLite cached prompts");
+            println!(
+                "  agm prompt show <id|seq>                           # Show full prompt record"
+            );
+            return;
+        }
+        if first_lower == "query" || first_lower == "search" || first_lower == "find" {
+            cmd_prompts_query(&args[1..]);
+            return;
+        }
+        if first_lower == "show" {
+            cmd_prompts_show(&args[1..]);
             return;
         }
         if first_lower == "ls" || first_lower == "list" || first_lower == "--running" {
@@ -3609,6 +3879,7 @@ fn cmd_running_prompts(args: &[String]) {
             println!("    -f, --file <path>   Specify custom SQLite storage file path");
             println!("\nExamples:");
             println!("  agm running-prompts                 # List active running prompts");
+            println!("  agm running-prompts --words 200     # Query prompts with 200-word preview");
             println!("  agm running-prompts backup          # Parallel snapshot running prompts before switch");
             println!(
                 "  agm running-prompts restore         # Re-inject backed-up prompts post-switch"
@@ -3654,11 +3925,24 @@ fn cmd_running_prompts(args: &[String]) {
             i += 2;
             continue;
         }
-        if (arg == "--wordcount" || arg == "--wc" || arg == "-w") && i + 1 < args.len() {
+        if (arg == "--words" || arg == "--wordcount" || arg == "--wc" || arg == "-w")
+            && i + 1 < args.len()
+        {
             if let Ok(w) = args[i + 1].parse::<usize>() {
                 max_words = w.max(1);
             }
             i += 2;
+            continue;
+        } else if arg.starts_with("--words=")
+            || arg.starts_with("--wordcount=")
+            || arg.starts_with("--wc=")
+        {
+            if let Some(val) = arg.split('=').nth(1) {
+                if let Ok(w) = val.parse::<usize>() {
+                    max_words = w.max(1);
+                }
+            }
+            i += 1;
             continue;
         }
         if !arg.starts_with('-') {
@@ -7348,25 +7632,47 @@ fn cmd_clear_cache(args: &[String]) {
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help")
     {
-        println!("AGM Cache & Conversation Pruner:");
-        println!("  agm clean [--keep <N>] [--preflight] [-y]");
-        println!("  agm clear-cache [--keep <N>] [--preflight] [-y]");
+        println!("AGM Cache & Conversation Pruner (Safety Gated):");
+        println!("  agm prune [--keep <N>] [--dry-run] [--undo [TX]] [--json]");
+        println!("  agm pr [N] [--dry-run] [--undo]");
+        println!("  agm clear-cache [--keep <N>] [--preflight] [--undo] [--json]");
+        println!("  agm clean [--keep <N>] [--preflight]");
         println!("\nDescription:");
         println!("  Safely prunes older conversation steps, developer logs, and build artifacts,");
         println!("  staging conversations into OS temp storage for undo recovery.");
-        println!("\nAliases: agm clean, agm clear-cache, agm cache-clear, agm purge");
+        println!("  Safety Invariant: Active/running prompts and up to 5 latest project sessions are strictly protected.");
+        println!(
+            "\nAliases: agm prune, agm pr, agm clear-cache, agm cache-clear, agm clean, agm purge"
+        );
         println!("\nOptions:");
         println!(
             "    --keep, -k <N>      Number of recent conversations to preserve (default: 10)"
         );
         println!("    --preflight, -p     Preview space reclamation without deleting files");
+        println!("    --dry-run           Alias for --preflight preview");
+        println!(
+            "    --undo [TX]         Rollback the most recent or specified pruning transaction"
+        );
+        println!("    --json, -j          Output pure machine-readable JSON");
         println!("    -y, --yes           Bypass interactive confirmation prompt");
         println!("\nExamples:");
         println!(
-            "  agm clean                           # Prune cache keeping 10 latest conversations"
+            "  agm prune                           # Prune cache keeping 10 latest conversations"
         );
         println!(
-            "  agm clean --keep 5                  # Prune cache keeping 5 latest conversations"
+            "  agm prune --keep 5                  # Prune cache keeping 5 latest conversations"
+        );
+        println!(
+            "  agm prune --dry-run                 # Dry-run inspection without deleting files"
+        );
+        println!(
+            "  agm prune --undo                    # Rollback the most recent pruning operation"
+        );
+        println!(
+            "  agm pr 5                            # Shorthand to prune keeping 5 conversations"
+        );
+        println!(
+            "  agm clean                           # Prune cache keeping 10 latest conversations"
         );
         println!(
             "  agm clean --preflight               # Dry-run preview of space to be reclaimed"
@@ -7374,13 +7680,68 @@ fn cmd_clear_cache(args: &[String]) {
         return;
     }
 
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let is_undo = args.iter().any(|a| a == "--undo" || a == "undo");
+    if is_undo {
+        let undo_target = args
+            .iter()
+            .position(|a| a == "--undo" || a == "undo")
+            .and_then(|idx| args.get(idx + 1))
+            .filter(|s| !s.starts_with('-'))
+            .map(|s| s.as_str());
+
+        match agy_cleaner::undo_prune(undo_target) {
+            Ok(res) => {
+                if is_json {
+                    println!("{}", serde_json::to_string_pretty(&res).unwrap_or_default());
+                } else {
+                    println!(
+                        "[✓] Successfully rolled back transaction: {}",
+                        res.transaction_id
+                    );
+                    println!("    Restored conversations: {}", res.restored_conversations);
+                    println!(
+                        "    Restored data: {:.2} MB",
+                        res.restored_bytes as f64 / 1024.0 / 1024.0
+                    );
+                    if !res.errors.is_empty() {
+                        println!("    Encountered warnings: {:?}", res.errors);
+                    }
+                }
+            }
+            Err(e) => {
+                if is_json {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({ "error": e }))
+                            .unwrap_or_default()
+                    );
+                } else {
+                    eprintln!("[ERROR] Failed to undo prune: {}", e);
+                }
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     let mut keep_count: usize = 10;
-    let is_json = args.iter().any(|a| a == "--json");
+    let is_preflight = args
+        .iter()
+        .any(|a| a == "--preflight" || a == "-p" || a == "--dry-run" || a == "dry-run");
 
     let mut i = 0;
     while i < args.len() {
         let arg = &args[i];
         let arg_lower = arg.to_lowercase();
+        if arg_lower == "--preflight"
+            || arg_lower == "-p"
+            || arg_lower == "--dry-run"
+            || arg_lower == "dry-run"
+        {
+            i += 1;
+            continue;
+        }
         if arg_lower == "--keep"
             || arg_lower == "-k"
             || arg_lower == "k"
@@ -7419,6 +7780,62 @@ fn cmd_clear_cache(args: &[String]) {
             }
         }
         i += 1;
+    }
+
+    if is_preflight {
+        let report = agy_cleaner::preflight_check(keep_count);
+        if is_json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).unwrap_or_default()
+            );
+        } else {
+            println!("\n=== AGM Conversation Prune Preflight Preview ===");
+            println!("  Keep Count:             {}", report.keep_count);
+            println!("  Total Conversations:    {}", report.total_conversations);
+            println!("  Preserved Count:        {}", report.preserved_count);
+            println!("  Pruned Count:           {}", report.pruned_count);
+            println!(
+                "  Projected Conversation Space Freed: {:.2} MB",
+                report.projected_reclaimed_bytes as f64 / 1024.0 / 1024.0
+            );
+            println!(
+                "  Projected Cache Space Freed:        {:.2} MB ({} targets)",
+                report.cache_bytes as f64 / 1024.0 / 1024.0,
+                report.cache_paths_count
+            );
+            let total_projected = report.projected_reclaimed_bytes + report.cache_bytes;
+            println!(
+                "  Total Projected Reclamation:        {:.2} MB",
+                total_projected as f64 / 1024.0 / 1024.0
+            );
+            println!(
+                "  Safe Temp Staging Dir:              {}",
+                report.staging_dir
+            );
+            if !report.conversations_to_prune.is_empty() {
+                println!("\n  Conversations to be staged & pruned:");
+                for c in report.conversations_to_prune.iter().take(10) {
+                    let short_id: String = c.conversation_id.chars().take(8).collect();
+                    println!(
+                        "    - [{}] {} ({:.2} KB)",
+                        short_id,
+                        c.title,
+                        c.file_size as f64 / 1024.0
+                    );
+                }
+                if report.conversations_to_prune.len() > 10 {
+                    println!(
+                        "    ... and {} more",
+                        report.conversations_to_prune.len() - 10
+                    );
+                }
+            }
+            println!(
+                "\n  (Run 'agm clean' or 'agm prune' without --dry-run/--preflight to execute)"
+            );
+        }
+        return;
     }
 
     if !is_json {

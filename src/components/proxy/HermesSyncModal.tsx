@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, X, CheckCircle2, AlertTriangle, Globe2, ListChecks } from 'lucide-react';
-import { HermesAgent } from '@lobehub/icons';
+import { RefreshCw, X, CheckCircle2, AlertTriangle, Globe2, ListChecks, Sparkles } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { request as invoke } from '../../utils/request';
 import { showToast } from '../common/ToastContainer';
@@ -165,8 +164,8 @@ export function HermesSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyncD
                 <div className="px-5 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-base-200">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                                <HermesAgent.Avatar size={22} />
+                            <div className="p-1.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg flex items-center justify-center">
+                                <Sparkles size={20} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-base-content">

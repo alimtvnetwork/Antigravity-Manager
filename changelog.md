@@ -3,6 +3,16 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.103.0 (2026-09-30)**:
+        -   **[Release v4.103.0: 多实例切换防弹回粘性保障、UI 弹窗互斥与高对比度高亮、对话清理运行中会话与活跃项目安全门禁、电报与邮件项目名去重及 200 词提示词预览] 彻底修复多实例切换中因后台轮询覆盖导致回弹至 worker-alpha 的核心缺陷，实现实例选择器与对话清理弹窗独立关闭按钮、Esc 键与遮罩关闭及全局互斥机制；重构对话会话清理器以严格保护所有运行中/排队中提示词及每个活跃项目最近 5 轮会话，CLI 提供 `agm prune` 预览与撤销回滚；彻底去重切号邮件与 Telegram 遥测中的重复项目名称，修复电报 HTML 标签 400 报错并支持 `/update` 远程更新，切号邮件与命令行全面支持 200 词提示词摘要预览 (Thanks to @aukgit)**:
+            -   **多实例切换防弹回与粘性持久化 (`src-tauri/src/modules/instance.rs`)**: 修复 `get_active_instance_id()` 在周期性 4 秒轮询时因检查后台实例运行状态而错误回退至 `worker-alpha` 的根本缺陷，优先严格遵循注册表用户所选 `registry.active_instance_id`；切换时即时更新 `last_used` 时间戳，并在 Windows 启动参数中注入 `CREATE_NEW_PROCESS_GROUP` 隔离会话；
+            -   **UI 弹窗全局互斥、独立关闭与高对比度高亮 (`src/components/navbar/InstanceSelector.tsx`, `src/components/modals/agy-clean-modal.tsx`, `src/components/accounts/AccountRow.tsx`)**: 为实例选择下拉菜单与对话清理弹窗增加醒目的 `X` 关闭按钮，支持 `Escape` 键盘关闭与遮罩点击关闭；派发 `agm:dropdown-open` 全局事件保证多弹窗相互排斥；实例选择器打开时自动调用 `scrollIntoView` 居中已选项目，并将暗黑模式选中项升级为白底黑字高对比度设计 (`text-slate-950 font-bold border-l-blue-600 ring-2 ring-blue-500/60`)；
+            -   **对话清理器安全门禁与 CLI Prune 套件 (`src-tauri/src/modules/agy_cleaner.rs`, `src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/telegram_inbound.rs`)**: 改造 `scan_conversations` 清理算法，严格排除 `repo_db` 中所有运行中、排队中、已派发与任务断点绑定的提示词会话文件，并为每个活跃工作区强制保留最近 5 轮会话；CLI 新增 `agm prune`、`agm pr <N>` 别名，支持 `--preflight`/`--dry-run` 空间预测、`--undo [TX]` 事务安全回滚与 `--json` 输出；Telegram 机器人上线 `/prune` 与 `/clean` 远程执行命令；
+            -   **通知中心项目名去重与 200 词提示词预览 (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/bin/agm.rs`)**: 实现 `deduplicate_names()`，杜绝邮件与 Telegram 切号通知中出现重复的项目名称；新增 `extract_words_preview()` 在切号邮件与 Telegram 消息中展示多达 200 词的运行中提示词预览；CLI `agm prompts ls` 新增 `--words <N>` 统一预览参数；
+            -   **Telegram 机器人 HTML 错误自愈与远程更新 (`src-tauri/src/modules/telegram_inbound.rs`)**: 增加 `strip_telegram_html_tags()`，在 Telegram API 遭遇 400 Bad Request（非法 HTML 实体或标签）时自动剥离标签并转义重试，根除消息发送失败与 raw 标签乱码；新增 `/update` 与 `/upgrade` 远程更新指令，在 `/status` 中即时呈现版本更新状态；
+            -   **前端组件构建韧性保障 (`src/components/proxy/CliSyncCard.tsx`, `src/components/proxy/HermesSyncModal.tsx`)**: 修复 `@lobehub/icons` 缺失图标导入导致的编译报错，平滑回退至 Lucide 矢量图标并保障前端构建 100% 成功。
+
+
     *   **v4.102.0 (2026-09-29)**:
         -   **[Release v4.102.0: 发布流水线预发通道门禁加固、多语言贡献者清洗管道、macOS 通用产物打包与 Keyring 旁路会话隔离] 彻底修复 GitHub Actions 发布工作流中的预发通道判定与 CLI 降级兜底预发参数，增强发布说明多语言致谢正则严格归一至 @aukgit 并脱敏外部用户 handle，自动完成 macOS 通用应用包打包归档，深化多实例 Keyring 旁路标记与凭据独立会话隔离，修复 Clippy 文档注释警告与 Windows 清单路径规范化 (Thanks to @aukgit)**:
             -   **发布流水线通道门禁加固与预发判定自愈 (`.github/workflows/release.yml`)**: 修复 `release.yml` 中对不存在的任务输出引用的缺陷，重构为直接依据 `github.ref_name` 动态判定预发通道，动态配置 `ncipollo/release-action@v1` 的 `prerelease` 与 `makeLatest` 标识，并在 CLI 降级上传中支持 `--prerelease` 参数；

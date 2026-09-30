@@ -646,9 +646,14 @@ pub fn format_observe_report() -> String {
                     String::new()
                 };
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
-                let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
+                let (preview_txt, wc) =
+                    repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
                 if !preview_txt.is_empty() {
-                    block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
+                    block.push_str(&format!(
+                        "   {} <i>({} words)</i>\n",
+                        clean_for_telegram_html(&preview_txt, 1500),
+                        wc
+                    ));
                 }
                 let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
                 block.push_str(&format!(
@@ -671,7 +676,11 @@ pub fn format_observe_report() -> String {
                 let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
                 let (preview_txt, wc) = repo_db::extract_prompt_words_preview(txt, 150);
                 if !preview_txt.is_empty() {
-                    block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
+                    block.push_str(&format!(
+                        "   {} <i>({} words)</i>\n",
+                        clean_for_telegram_html(&preview_txt, 1500),
+                        wc
+                    ));
                 }
                 running_items.push(block);
             } else if !running_workspace_names.contains(&short_name) {
@@ -704,7 +713,11 @@ pub fn format_observe_report() -> String {
         let mut block = format!("• <b>{}</b> 🟢{}\n", short_name, duration_display);
         let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 150);
         if !preview_txt.is_empty() {
-            block.push_str(&format!("   {} <i>({} words)</i>\n", clean_for_telegram_html(&preview_txt, 1500), wc));
+            block.push_str(&format!(
+                "   {} <i>({} words)</i>\n",
+                clean_for_telegram_html(&preview_txt, 1500),
+                wc
+            ));
         }
         let prompt_id_short = if ap.id.len() > 8 { &ap.id[..8] } else { &ap.id };
         block.push_str(&format!(
@@ -879,7 +892,11 @@ pub fn format_prompts_query_report(term: &str) -> String {
         let (preview, wc) = repo_db::extract_prompt_words_preview(&p.prompt_content, 200);
         let friendly_ws = repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
         let short_ws = shorten_project_name(&friendly_ws);
-        let badge = if p.status == "running" || p.status == "dispatched" { "🟢" } else { "⚪" };
+        let badge = if p.status == "running" || p.status == "dispatched" {
+            "🟢"
+        } else {
+            "⚪"
+        };
         let prompt_id_short = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
 
         out.push_str(&format!(
@@ -2519,7 +2536,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             } else if sub == "queue" || sub == "queues" {
                 Some(format_prompt_queues_report().await)
             } else if sub.starts_with("query") || sub.starts_with("search") {
-                let term = sub.strip_prefix("query").or_else(|| sub.strip_prefix("search")).unwrap_or("").trim();
+                let term = sub
+                    .strip_prefix("query")
+                    .or_else(|| sub.strip_prefix("search"))
+                    .unwrap_or("")
+                    .trim();
                 Some(format_prompts_query_report(term))
             } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())

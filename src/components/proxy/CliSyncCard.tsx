@@ -26,7 +26,7 @@ import { HermesSyncModal } from './HermesSyncModal';
 import { OpenClawSyncModal } from './OpenClawSyncModal';
 import { useProxyModels } from '../../hooks/useProxyModels';
 import GroupedSelect from '../common/GroupedSelect';
-import { Claude, OpenAI, Gemini, Grok, OpenCode, Github as LobeGithub, HermesAgent, OpenClaw } from '@lobehub/icons';
+import { Claude, OpenAI, Gemini, Grok, Github as LobeGithub, OpenClaw } from '@lobehub/icons';
 import { JeikCodeIcon } from '../common/JeikCodeIcon';
 
 interface CliSyncCardProps {
@@ -569,7 +569,7 @@ export const CliSyncCard = ({ proxyUrl, apiKey, className }: CliSyncCardProps) =
                 ), 'Codex AI')}
                 {renderCliItem('OpenCode', (
                     <div className="w-full h-full bg-[#000000] dark:bg-[#121214] flex items-center justify-center text-white">
-                        <OpenCode size={20} className="text-white" />
+                        <CodeXml size={22} className="text-cyan-400" />
                     </div>
                 ), 'OpenCode')}
                 {renderCliItem('GrokBuild', (
@@ -577,7 +577,11 @@ export const CliSyncCard = ({ proxyUrl, apiKey, className }: CliSyncCardProps) =
                         <Grok size={22} className="text-white" />
                     </div>
                 ), 'Grok Build')}
-                {renderCliItem('Hermes', <HermesAgent.Avatar size={40} shape="square" style={{ width: '100%', height: '100%', borderRadius: 0 }} />, 'Hermes Agent')}
+                {renderCliItem('Hermes', (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-700 via-indigo-700 to-violet-800 flex items-center justify-center text-white">
+                        <Sparkles size={22} className="text-purple-200" />
+                    </div>
+                ), 'Hermes Agent')}
                 {renderCliItem('OpenClaw', (
                     <div className="w-full h-full bg-[#18181b] dark:bg-[#121214] flex items-center justify-center text-white">
                         <OpenClaw.Color size={26} />

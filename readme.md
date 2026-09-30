@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.102.0)**
+**Bar 2: Version-Based Installation (v4.103.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -514,7 +514,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.102.0**：彻底修复 GitHub Actions 发布工作流中的预发通道判定与 CLI 降级兜底预发参数，增强发布说明多语言致谢正则严格归一至 @aukgit 并脱敏外部用户 handle，自动完成 macOS 通用应用包打包归档，深化多实例 Keyring 旁路标记与凭据独立会话隔离，修复 Clippy 文档注释警告与 Windows 清单路径规范化。
+> 最新版本 **v4.103.0**：彻底修复多实例切换中因后台轮询覆盖导致回弹至 worker-alpha 的核心缺陷，实现实例选择器与对话清理弹窗独立关闭按钮、Esc 键与遮罩关闭及全局互斥机制；重构对话会话清理器以严格保护所有运行中/排队中提示词及每个活跃项目最近 5 轮会话，CLI 提供 `agm prune` 预览与撤销回滚；彻底去重切号邮件与 Telegram 遥测中的重复项目名称，修复电报 HTML 标签 400 报错并支持 `/update` 远程更新，切号邮件与命令行全面支持 200 词提示词摘要预览。
 
 👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 
