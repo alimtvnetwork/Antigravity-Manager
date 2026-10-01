@@ -105,12 +105,12 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             className={cn(
             "group transition-all duration-200 border-b border-gray-100 dark:border-slate-800 border-l-4",
             isFocused
-                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2"
+                ? "bg-amber-100/80 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100 font-bold border-l-amber-500 border-amber-400 shadow-xl ring-2 ring-amber-400/80 dark:ring-amber-400/50"
                 : isCurrent
-                ? "bg-white dark:bg-white border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-950 dark:text-slate-950 hover:bg-amber-50 dark:hover:bg-amber-50"
+                ? "bg-amber-50/70 dark:bg-[#131b2e] border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-amber-500/20 hover:bg-amber-100/60 dark:hover:bg-[#18233c]"
                 : selected
-                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 font-bold shadow-lg"
-                : "border-l-transparent hover:bg-white dark:hover:bg-white hover:text-slate-950 dark:hover:text-slate-950 hover:border-l-stone-400 dark:hover:border-l-stone-500 text-gray-900 dark:text-gray-200",
+                ? "bg-blue-50/90 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 border-l-blue-600 dark:border-l-blue-500 font-semibold shadow-md ring-1 ring-blue-500/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-blue-500",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
@@ -130,10 +130,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     <span className={cn(
                         "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors",
                         isFocused || selected
-                            ? "text-slate-950 font-bold"
+                            ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-950 dark:text-white font-bold"
-                            : "text-gray-900 dark:text-gray-100"
+                            ? "text-amber-900 dark:text-amber-100 font-bold"
+                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                     )} title={account.email}>
                         {account.email}
                     </span>

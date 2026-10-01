@@ -183,12 +183,12 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             className={cn(
             "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-200",
             isFocused
-                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2 scale-[1.01]"
+                ? "bg-amber-100/80 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400/80 dark:ring-amber-400/50 ring-offset-1 scale-[1.01]"
                 : selected
-                ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 border-blue-400 dark:border-blue-400 font-bold shadow-xl ring-2 ring-blue-500"
+                ? "bg-blue-50/90 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 border-l-blue-600 dark:border-l-blue-500 border-blue-400 dark:border-blue-500/50 font-bold shadow-xl ring-2 ring-blue-500"
                 : isCurrent
-                ? "bg-amber-50/90 dark:bg-slate-800/95 border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/50 font-medium shadow-sm hover:bg-amber-100/80 dark:hover:bg-slate-750 hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/50"
-                : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 border-l-transparent hover:bg-stone-50 dark:hover:bg-slate-800/60 hover:border-gray-300 dark:hover:border-slate-700 hover:border-l-stone-400 dark:hover:border-l-stone-500 hover:shadow-xs",
+                ? "bg-amber-50/90 dark:bg-[#131b2e] border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/40 font-medium shadow-sm hover:bg-amber-100/80 dark:hover:bg-[#18233c] hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/50"
+                : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-gray-300 dark:hover:border-slate-700 hover:border-l-blue-400 dark:hover:border-l-blue-500 hover:shadow-xs",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 
@@ -205,9 +205,9 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     <h3 className={cn(
                         "font-semibold text-sm truncate w-full",
                         isFocused || selected
-                            ? "text-slate-950 font-bold"
+                            ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-950 dark:text-white font-bold"
+                            ? "text-amber-900 dark:text-amber-100 font-bold"
                             : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
