@@ -663,7 +663,7 @@ export function InstanceSelector() {
                                                     )}>
                                                         #{seqNum}
                                                     </span>
-                                                    <span className={cn("truncate font-bold", isSelected ? "text-slate-950 dark:text-slate-950" : "text-gray-900 dark:text-gray-100")}>
+                                                    <span className={cn("truncate font-bold", isSelected ? "text-blue-950 dark:text-white" : "text-gray-900 dark:text-gray-100")}>
                                                         {inst.config.name}
                                                     </span>
                                                     {isDefault && (
@@ -678,11 +678,11 @@ export function InstanceSelector() {
                                                     )}
                                                 </div>
                                                 {displayEmail ? (
-                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-slate-800 font-semibold" : "text-gray-500 dark:text-gray-400")}>
+                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-blue-200 font-semibold" : "text-gray-500 dark:text-gray-400")}>
                                                         {displayEmail}
                                                     </span>
                                                 ) : (
-                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-600 dark:text-slate-600" : "text-gray-400/60 dark:text-gray-500/60")}>
+                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-500 dark:text-slate-400" : "text-gray-400/60 dark:text-gray-500/60")}>
                                                         {t('instances.unlinked', 'No account linked')}
                                                     </span>
                                                 )}
@@ -881,7 +881,7 @@ export function InstanceSelector() {
                                 onClick={() => setCreateMode('clone-default')}
                                 className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
                                     createMode === 'clone-default'
-                                        ? 'bg-white text-slate-950 border-blue-600'
+                                        ? 'bg-white dark:bg-blue-600/20 text-blue-900 dark:text-blue-200 border-blue-600 dark:border-blue-500 shadow-xs'
                                         : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
                                 }`}
                             >
@@ -892,7 +892,7 @@ export function InstanceSelector() {
                                 onClick={() => setCreateMode('new')}
                                 className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
                                     createMode === 'new'
-                                        ? 'bg-white text-slate-950 border-blue-600'
+                                        ? 'bg-white dark:bg-blue-600/20 text-blue-900 dark:text-blue-200 border-blue-600 dark:border-blue-500 shadow-xs'
                                         : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
                                 }`}
                             >

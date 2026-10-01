@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.114.0 (2026-10-02)**:
+        -   **[Documentation] Complete Chinese Removal from Changelog & Docker Deployment Guide**:
+            -   **Description**: Completely purged all legacy Chinese language text from `changelog.md` and `docker/readme.md`, standardizing all documentation, historical version entries, and deployment guides in pure English across all distribution channels; normalized unicode fullwidth punctuation to standard ASCII format. (Thanks to @aukgit)
+        -   **[Theme] Awan Brand Palette Alignment for AccountRow & InstanceSelector**:
+            -   **Description**: Aligned `AccountRow.tsx` focus, current, and selected state colors with Awan brand tokens (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#43d6a2` Plasma Mint, `#0c2438` Deep Orbit Card); refined active instance name and email typography contrast in `InstanceSelector.tsx` for optimal dark mode legibility. (Thanks to @aukgit)
+
     *   **v4.113.0 (2026-10-02)**:
         -   **[Theme] Modern Awan Brand Color Scale & DaisyUI Palette Overhaul**:
             -   **Description**: Overhauled color theme tokens in `tailwind.config.js` introducing the official modern Awan brand color scale (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field). Realigned DaisyUI light and dark theme palettes for superior contrast, sleek dark surfaces, and fluid ambient state transitions. (Thanks to @aukgit)

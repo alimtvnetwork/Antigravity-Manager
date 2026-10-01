@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.113.1-3B82F6?style=flat-square" alt="Version v4.113.1">
+    <img src="https://img.shields.io/badge/Version-v4.114.0-3B82F6?style=flat-square" alt="Version v4.114.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.113.1)**
+**Bar 2: Version-Based Installation (v4.114.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -526,7 +526,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.113.1**: Overhauled color theme tokens with the official modern Awan brand palette (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field) across light and dark modes with DaisyUI theme realignment for crisp contrast and fluid transitions; completely purged Chinese language remnants from `README.md` and aligned release notes to English across documentation and changelogs.
+> Latest version **v4.114.0**: Completely purged all legacy Chinese language text from `changelog.md` and `docker/readme.md`, standardizing all documentation, historical version entries, and deployment guides in pure English across all distribution channels; normalized unicode fullwidth punctuation to standard ASCII format.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

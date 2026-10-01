@@ -275,14 +275,14 @@ function SortableAccountRow({
             className={cn(
                 "group transition-all duration-200 border-b border-gray-100 dark:border-base-200 border-l-4",
                 isFocused
-                    ? "bg-amber-100/80 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100 font-bold border-l-amber-500 border-amber-400 shadow-xl ring-2 ring-amber-400/80 dark:ring-amber-400/50"
-                    : selected
-                    ? "bg-blue-50/90 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 border-l-blue-600 dark:border-l-blue-500 font-semibold shadow-md ring-1 ring-blue-500/30"
+                    ? "bg-emerald-50/90 dark:bg-[#0c2438] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
                     : isCurrent
-                    ? "bg-amber-50/70 dark:bg-[#131b2e] border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-amber-500/20"
+                    ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-emerald-100/60 dark:hover:bg-[#15334d]/60"
+                    : selected
+                    ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-blue-500"
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]"
             )}
         >
             {/* 拖拽手柄 */}

@@ -27,6 +27,36 @@ h1, h2, h3, h4, .font-heading {
    Modern Awan Cloud Spec - CSS3 Smooth Color Switching & Aesthetics
    ========================================================================== */
 
+:root,
+.dark {
+  --awan-blue: #2878f0;
+  --awan-green: #16a97a;
+  --awan-cyan: #19b7c9;
+  --awan-mint: #43d6a2;
+  --awan-dark: #071a27;
+  --awan-card: #0c2438;
+  --awan-border: #15334d;
+  --awan-slate: #5d6b76;
+  --awan-light: #f5faf9;
+}
+
+@keyframes awan-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px -3px rgba(25, 183, 201, 0.4), 0 0 6px -2px rgba(67, 214, 162, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px -1px rgba(25, 183, 201, 0.65), 0 0 10px -1px rgba(67, 214, 162, 0.5);
+  }
+}
+
+.awan-glow {
+  box-shadow: 0 0 15px -3px rgba(25, 183, 201, 0.4), 0 0 6px -2px rgba(67, 214, 162, 0.3);
+}
+
+.awan-glow-pulse {
+  animation: awan-glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Universal smooth color switching animation across the entire UI */
 *,
 *::before,
@@ -66,11 +96,11 @@ body {
 }
 
 html {
-  background-color: #FAFBFC;
+  background-color: #f5faf9;
 }
 
 html.dark {
-  background-color: #1d232a;
+  background-color: #071a27;
 }
 
 /* 全局样式 */
@@ -81,7 +111,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #FAFBFC;
+  background-color: #f5faf9;
 }
 
 /* LobeHub UI flex center fallback for @lobehub/icons avatar components */
@@ -97,7 +127,7 @@ body {
 
 /* Dark mode override for body strictly */
 .dark body {
-  background-color: #1d232a;
+  background-color: #071a27;
   /* matches base-300 commonly used */
 }
 

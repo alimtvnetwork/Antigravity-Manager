@@ -104,7 +104,7 @@ export default function TitleBar() {
                 if ((e.target as HTMLElement).closest('button')) return;
                 await handleToggleMaximize();
             }}
-            className="w-full h-8 flex items-center justify-between select-none bg-[#FAFBFC] dark:bg-base-300 border-b border-gray-200/50 dark:border-base-200/60 relative z-50 shrink-0 transition-colors duration-150"
+            className="w-full h-8 flex items-center justify-between select-none bg-[#f5faf9] dark:bg-base-300 border-b border-gray-200/50 dark:border-base-200/60 relative z-50 shrink-0 transition-colors duration-150"
         >
             {isMac ? (
                 /* macOS Traffic Lights Style */

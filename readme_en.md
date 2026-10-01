@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.113.0)
+> Professional AI Account Management & Protocol Proxy System (v4.114.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.113.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.114.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.113.0**: Overhauled color theme tokens with the official modern Awan brand palette (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field) across light and dark modes with DaisyUI theme realignment for crisp contrast and fluid transitions; completely purged Chinese language remnants from `README.md` and aligned release notes to English across documentation and changelogs.
+> Latest version **v4.114.0**: Completely purged all legacy Chinese language text from `changelog.md` and `docker/readme.md`, standardizing all documentation, historical version entries, and deployment guides in pure English across all distribution channels; normalized unicode fullwidth punctuation to standard ASCII format.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
