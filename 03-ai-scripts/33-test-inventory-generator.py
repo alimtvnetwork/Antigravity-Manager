@@ -458,19 +458,6 @@ def build_test_inventory(
     return inventory
 
 
-def normalize_inventory_tests(raw_tests: Any) -> dict[str, dict[str, Any]]:
-    """Returns inventory tests keyed by id; synced manifests may store `tests` as a list instead of a dict."""
-    if isinstance(raw_tests, dict):
-        return {str(k): v for k, v in raw_tests.items() if isinstance(v, dict)}
-    if isinstance(raw_tests, list):
-        return {
-            str(t.get("id") or t.get("test_file") or idx): t
-            for idx, t in enumerate(raw_tests)
-            if isinstance(t, dict)
-        }
-    return {}
-
-
 def record_recent_changes(changed_files: list[str]) -> dict[str, Any]:
     """Safely appends distinct modified relative paths to recent-file-changes.json under lock."""
     with file_lock(LOCK_FILE_PATH):
@@ -491,7 +478,7 @@ def record_recent_changes(changed_files: list[str]) -> dict[str, Any]:
         if TEST_INVENTORY_PATH.is_file():
             try:
                 inv = json.loads(TEST_INVENTORY_PATH.read_text(encoding="utf-8"))
-                inventory_tests = normalize_inventory_tests(inv.get("tests"))
+                inventory_tests = inv.get("tests", {})
             except Exception:
                 pass
 
@@ -536,10 +523,7 @@ def check_inventory_age(max_age_days: float = 5.0) -> tuple[bool, dict[str, Any]
     try:
         inv = json.loads(TEST_INVENTORY_PATH.read_text(encoding="utf-8"))
         raw_updated = inv.get("updated_at", "")
-        if isinstance(raw_updated, (int, float)) and raw_updated > 0:
-            updated_dt = datetime.datetime.fromtimestamp(raw_updated, datetime.timezone.utc)
-            raw_updated = updated_dt.isoformat()
-        elif isinstance(raw_updated, str) and raw_updated:
+        if raw_updated:
             updated_dt = datetime.datetime.fromisoformat(raw_updated.replace("Z", "+00:00"))
         else:
             mtime = os.path.getmtime(TEST_INVENTORY_PATH)
@@ -548,7 +532,7 @@ def check_inventory_age(max_age_days: float = 5.0) -> tuple[bool, dict[str, Any]
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         age_days = round((now_dt - updated_dt).total_seconds() / 86400.0, 2)
         summary = inv.get("summary", {})
-        tests = normalize_inventory_tests(inv.get("tests"))
+        tests = inv.get("tests", {})
 
         has_profiled = any(t.get("duration_sec", 0.0) > 0.0 for t in tests.values())
         is_fresh = bool(age_days <= max_age_days and has_profiled)

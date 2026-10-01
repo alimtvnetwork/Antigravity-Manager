@@ -176,6 +176,29 @@ def update_template_version(next_version, dry_run=False):
     print(f"[*] Updated prompt-version.template.json -> {next_version}")
 
 
+def update_gitmap_latest_json(next_version, dry_run=False):
+    """Updates .gitmap/release/latest.json if present."""
+    gitmap_latest = REPO_ROOT / ".gitmap" / "release" / "latest.json"
+    if not gitmap_latest.parent.is_dir():
+        return
+
+    data = {
+        "version": next_version,
+        "tag": f"v{next_version}",
+        "branch": f"release/v{next_version}",
+    }
+
+    if dry_run:
+        print(f"[DRY RUN] Would update .gitmap/release/latest.json to {next_version}")
+        return
+
+    with open(gitmap_latest, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+    print(f"[*] Updated .gitmap/release/latest.json -> {next_version}")
+
+
 def update_readme_pins(current_ver, next_version, dry_run=False):
     """Pins new version in readme.md badges and text references."""
     if not README_MD.is_file():
@@ -267,6 +290,41 @@ def run_repo_sync_if_available(dry_run=False):
         print(f"[!] Warning running npm run sync: {e}")
 
 
+def update_constants_go(next_version, dry_run=False):
+    """Updates cli/constants/constants.go with the bumped version."""
+    constants_file = REPO_ROOT / "cli" / "constants" / "constants.go"
+    if not constants_file.is_file():
+        return
+    if dry_run:
+        print(f"[DRY RUN] Would update constants.go -> {next_version}")
+        return
+    try:
+        content = constants_file.read_text(encoding="utf-8")
+        updated = re.sub(r'var Version = "[^"]+"', f'var Version = "{next_version}"', content)
+        constants_file.write_text(updated, encoding="utf-8", newline="\n")
+        print(f"[*] Updated cli/constants/constants.go -> v{next_version}")
+    except Exception as e:
+        print(f"[!] Warning updating constants.go: {e}")
+
+
+def update_what_to_read_pins(current_ver, next_version, dry_run=False):
+    """Updates root what-to-read.md version pins."""
+    wtr_file = REPO_ROOT / "what-to-read.md"
+    if not wtr_file.is_file():
+        return
+    if dry_run:
+        print(f"[DRY RUN] Would update what-to-read.md -> {next_version}")
+        return
+    try:
+        content = wtr_file.read_text(encoding="utf-8")
+        updated = content.replace(f"v{current_ver}", f"v{next_version}")
+        updated = re.sub(r"\*\*Pinned version: v[0-9\.]+\*\*", f"**Pinned version: v{next_version}**", updated)
+        wtr_file.write_text(updated, encoding="utf-8", newline="\n")
+        print(f"[*] Updated what-to-read.md -> v{next_version}")
+    except Exception as e:
+        print(f"[!] Warning updating what-to-read.md: {e}")
+
+
 def execute_bump(tier="minor", explicit_version=None, scope=None, dry_run=False):
     """Main bump execution logic."""
     current_ver = read_canonical_version()
@@ -284,7 +342,10 @@ def execute_bump(tier="minor", explicit_version=None, scope=None, dry_run=False)
     update_version_json(next_ver, today_str, dry_run=dry_run)
     update_package_json(next_ver, dry_run=dry_run)
     update_template_version(next_ver, dry_run=dry_run)
+    update_gitmap_latest_json(next_ver, dry_run=dry_run)
+    update_constants_go(next_ver, dry_run=dry_run)
     update_readme_pins(current_ver, next_ver, dry_run=dry_run)
+    update_what_to_read_pins(current_ver, next_ver, dry_run=dry_run)
     update_changelogs(next_ver, bump_scope, today_str, dry_run=dry_run)
     run_repo_sync_if_available(dry_run=dry_run)
 
