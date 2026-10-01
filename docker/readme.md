@@ -1,52 +1,52 @@
-# 🐋 Antigravity Manager 原生 Docker 部署手冊
+# 🐋 Antigravity Manager Native Docker Deployment Guide
 
-本目錄包含 Antigravity Manager 的原生 Headless Docker 部署方案。該方案支持完整的 Web 管理界面、API 反代以及數據持久化，無需複雜的 VNC 或桌面環境。
+This directory contains the native Headless Docker deployment solution for Antigravity Manager. It provides a complete Web management UI, high-performance API proxy gateway, and full data persistence without requiring complex VNC or desktop GUI environments.
 
-## 🆕 本版本部署方案（本地前端構建復用）
-適用於「前端近期不改、後端經常調整」的場景。思路是先在本地生成 `dist/`，Docker 只編譯後端並直接拷貝 `dist/`，大幅縮短構建時間並降低前端構建風險。
+## 🆕 Deployment Strategy (Local Frontend Build Reuse)
+Ideal for scenarios where the backend changes frequently while the frontend remains stable. By generating `dist/` locally first, Docker only compiles the Rust backend and copies `dist/`, dramatically reducing build times and eliminating frontend build risks.
 
-**步驟**
-1. 本地生成前端靜態資源：
+**Steps**
+1. Generate frontend static assets locally:
 ```bash
 npm ci --legacy-peer-deps
 npm run build
 ```
-2. 使用本方案構建與啟動（後端-only + 復用 `dist/`）：
+2. Build and launch using local dist reuse (backend-only compilation):
 ```bash
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.localdist.yml build
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.localdist.yml up -d
 ```
-或合併為單條命令：
+Or combine into a single command:
 ```bash
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.localdist.yml up -d --build
 ```
 
-啟動後動態查看日誌：
+View dynamic logs after launch:
 ```bash
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.localdist.yml logs -f --tail=200
 ```
 
-**更新方式**
-- 後端有改動：重跑上面的 `build` + `up -d`
-- 前端有改動：先在本地重新 `npm run build`，再重跑 `build` + `up -d`
+**Updating**
+- Backend changes: Re-run `build` + `up -d` above.
+- Frontend changes: Run `npm run build` locally first, then re-run `build` + `up -d`.
 
-**Git 部署提醒**
-- 若服務器不在本地構建前端，請確保 `dist/` 已提交到倉庫（本版本已從 `.gitignore` 移除）。
+**Git Deployment Note**
+- If deploying to a remote server that does not build the frontend, ensure `dist/` is committed to the repository (removed from `.gitignore` for this release).
 
-## 🚀 快速開始
+## 🚀 Quick Start
 
-### 1. 直接拉取鏡像 (推薦)
-您可以直接從 Docker Hub 拉取已構建好的鏡像並啟动，無需獲取源碼：
+### 1. Direct Image Pull (Recommended)
+You can pull pre-built images directly from Docker Hub without cloning the source code:
 
 > [!IMPORTANT]
-> **安全警告**：從 v4.0.3 開始，Docker 版支持 **管理密碼與 API Key 分離**：
-> *   **API Key**：通過 `-e API_KEY=xxx` 設置，用於所有 AI 協議的 API 調用鑒權。
-> *   **Web 管理密碼**：通過 `-e WEB_PASSWORD=xxx` 設置，僅用於 Web UI 登錄。
-> *   **默認行為**：若未設置 `WEB_PASSWORD`，系統會自動回退使用 `API_KEY` 作為登錄密碼。若兩者皆未設置，則生成隨機 Key。
-> *   **查看方式**：執行 `docker logs antigravity-manager` 尋找 `Current API Key` 或 `Web UI Password`，或執行 `grep -E '"api_key"|"admin_password"' ~/.antigravity_tools/gui_config.json` 查看。
+> **Security Notice**: Starting from v4.0.3, Docker mode supports **separation of Admin Password and API Key**:
+> * **API Key**: Set via `-e API_KEY=xxx`, used for AI protocol client requests.
+> * **Web Password**: Set via `-e WEB_PASSWORD=xxx`, used exclusively for Web UI login.
+> * **Default Behavior**: If `WEB_PASSWORD` is not set, the system falls back to `API_KEY` as the login password. If neither is set, a random key is generated.
+> * **Inspection**: Run `docker logs antigravity-manager` to locate `Current API Key` or `Web UI Password`, or check `grep -E '"api_key"|"admin_password"' ~/.antigravity_tools/gui_config.json`.
 
 ```bash
-# 啟動容器 (請替换 your-secret-key 為強密鑰)
+# Start container (replace placeholder keys with strong secrets)
 docker run -d \
   --name antigravity-manager \
   -p 8045:8045 \
@@ -58,13 +58,13 @@ docker run -d \
 ```
 
 > [!TIP]
-> **🧪 體驗 Beta / 預覽版鏡像**：
-> 若需使用最新的 Beta 預發布特性，請拉取對應的 Beta 版本 Tag（預發布版本獨立構建發布，不會覆蓋 `latest` 穩定版標籤）：
+> **🧪 Preview / Beta Releases**:
+> To test the latest pre-release features, pull the corresponding Beta tag (pre-releases are built independently without overwriting the `latest` stable production tag):
 > ```bash
-> # 拉取指定 Beta 預發布版本
+> # Pull specific pre-release
 > docker pull lbjlaq/antigravity-manager:v4.8.2-beta.0
 > 
-> # 運行 Beta 容器
+> # Run Beta container
 > docker run -d --name antigravity-manager-beta \
 >   -p 8045:8045 \
 >   -e API_KEY=your-api-key \
@@ -73,29 +73,29 @@ docker run -d \
 >   -v ~/.antigravity_tools:/root/.antigravity_tools \
 >   lbjlaq/antigravity-manager:v4.8.2-beta.0
 > ```
-> 完整版本標籤請查看 [Docker Hub Tags](https://hub.docker.com/r/lbjlaq/antigravity-manager/tags)。若需直接運行未發版 Tag 的當前最新 `beta` 分支源碼，可在本地構建：`docker build -t lbjlaq/antigravity-manager:beta -f docker/Dockerfile .`。
+> For complete tag listings, visit [Docker Hub Tags](https://hub.docker.com/r/lbjlaq/antigravity-manager/tags). To build directly from the latest unreleased `beta` branch, run `docker build -t lbjlaq/antigravity-manager:beta -f docker/Dockerfile .`.
 
-#### 🔐 鑒權邏輯 (Security Scenarios)
-*   **場景 A：僅設置了 `API_KEY`**
-    - **Web 登錄**：使用 `API_KEY` 即可進入後台。
-    - **API 調用**：使用 `API_KEY` 進行 AI 請求鑒權。
-*   **場景 B：同時設置了 `API_KEY` 和 `WEB_PASSWORD` (推薦)**
-    - **Web 登錄**：**必須**使用 `WEB_PASSWORD`。此時輸入 API Key 將被拒絕，確保管理權限與調用權限隔離。
-    - **API 調用**：繼續使用 `API_KEY`。您可以放心地將 API Key 分發給團隊成員，而保留密碼僅供管理員使用。
+#### 🔐 Authentication Logic (Security Scenarios)
+* **Scenario A: Only `API_KEY` is set**
+  - **Web Login**: Access the Web UI using `API_KEY`.
+  - **API Calls**: Authenticate AI protocol calls using `API_KEY`.
+* **Scenario B: Both `API_KEY` and `WEB_PASSWORD` are set (Recommended)**
+  - **Web Login**: **Must** use `WEB_PASSWORD`. Entering the API Key will be rejected, ensuring admin privileges are isolated from API consumers.
+  - **API Calls**: Continue using `API_KEY`. You can safely distribute API keys to team members while keeping the admin password private.
 
-#### 🆙 舊版本升級指引
-如果您是從舊版本升級，默認沒有設置 `WEB_PASSWORD`。您可以通過以下方式添加：
-1.  **Web UI (推薦)**：使用原有的 `API_KEY` 登錄，在 **API 反代** 設置頁面中設置新的管理密碼。
-2.  **環境變量**：停止舊容器，啟動新容器時增加 `-e WEB_PASSWORD=您的新密碼`。
+#### 🆙 Upgrading from Older Versions
+If upgrading from an older version without `WEB_PASSWORD` configured:
+1. **Web UI (Recommended)**: Log in with the existing `API_KEY`, and set a new admin password in the **API Proxy** settings.
+2. **Environment Variable**: Stop the old container, and add `-e WEB_PASSWORD=your-new-password` when starting the new container.
 
 > [!TIP]
-> **優先級邏輯 (Priority)**:
-> - **環境變量** (`ABV_WEB_PASSWORD` / `WEB_PASSWORD`) 具有最高優先級。如果設置了環境變量，程序將始終使用它，忽略配置文件中的值。
-> - **配置文件** (`gui_config.json`) 用於持久化存儲。當您通過 Web UI 修改密碼並保存時，新密碼會寫入此文件（JSON 字段名為 `admin_password`）。
-> - **回退機制**: 如果上述兩者皆未設置，則回退使用 `API_KEY`；若連 `API_KEY` 也未設置，則隨機生成。
+> **Priority Hierarchy**:
+> - **Environment Variables** (`ABV_WEB_PASSWORD` / `WEB_PASSWORD`) take highest precedence. If set, the application will always use them, overriding configuration files.
+> - **Configuration File** (`gui_config.json`) is used for persistence. When modified via the Web UI, the password is saved here under `admin_password`.
+> - **Fallback**: If neither is set, fallback to `API_KEY`; if even `API_KEY` is not set, a random key is generated.
 
-### 2. 使用 Docker Compose
-在 `docker` 目錄下執行：
+### 2. Using Docker Compose
+In the `docker` directory, run:
 ```bash
 docker compose up -d
 ```
@@ -124,42 +124,40 @@ docker build -t antigravity-manager:local -f docker/Dockerfile .
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.fork.yml up -d --build
 ```
 
-#### 💡 構建參數
-本鏡像支持自動鏡像源切換，以提升国内構建速度：
-*   `USE_MIRROR`:
-    *   `auto` (默認): 自動檢測網絡環境，若無法訪問 Google 則切換至国内镜像（阿里云/NPM Mirror）。
-    *   `true`: 強制使用国内镜像源。
-    *   `false`: 強制使用官方默認源。
+#### 💡 Build Arguments
+This image supports automatic mirror switching to speed up builds:
+* `USE_MIRROR`:
+  - `auto` (Default): Automatically checks network connectivity; switches to mirror if Google is unreachable.
+  - `true`: Force mirror sources.
+  - `false`: Force official upstream sources.
 
-示例：
+Example:
 ```bash
-# 強制使用国内镜像加速構建
 docker build --build-arg USE_MIRROR=true -t antigravity-manager:latest -f docker/Dockerfile .
 ```
 
-## ⚙️ 環境變量配置
+## ⚙️ Environment Variables Configuration
 
-| 變量名 | 默認值 | 說明 |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PORT` | `8045` | 容器內服務監聽端口 |
-| `ABV_API_KEY` | - | **[重要]** 代理 API 密鑰。客戶端（如 Claude Code）訪問時需提供的 Key |
-| `ABV_WEB_PASSWORD` | - | **[安全]** Web 管理後台登錄密碼。若不設置則回退使用 API Key |
-| `ABV_MAX_BODY_SIZE` | `104857600` | **[性能]** 最大請求體限制 (Byte)。默認 100MB，用於解決大圖傳輸 413 錯誤 |
-| `LOG_LEVEL` | `info` | 日志等級 (debug, info, warn, error) |
-| `ABV_DIST_PATH` | `/app/dist` | 前端靜態資源託管路徑 (Dockerfile 已內置) |
-| `ABV_PUBLIC_URL` | - | 用於遠程 OAuth 回調的公網 URL (可選) |
+| `PORT` | `8045` | Port the container listens on |
+| `ABV_API_KEY` | - | **[Important]** Proxy API key required by AI clients (e.g., Claude Code) |
+| `ABV_WEB_PASSWORD` | - | **[Security]** Web UI admin password. Falls back to API Key if not set |
+| `ABV_MAX_BODY_SIZE` | `104857600` | **[Performance]** Maximum request body size in bytes (default 100MB, resolves 413 Payload Too Large on large images) |
+| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `ABV_DIST_PATH` | `/app/dist` | Path to frontend static assets (pre-baked in Dockerfile) |
+| `ABV_PUBLIC_URL` | - | Optional public URL for remote OAuth callback redirects |
 
-## 📂 數據持久化
-請務必將宿主機目錄掛載至容器內的 `/root/.antigravity_tools`，否則賬號和配置在容器重啟後會丟失。
+## 📂 Data Persistence
+Make sure to mount a host directory to `/root/.antigravity_tools` in the container; otherwise, accounts and configurations will be lost upon container restart.
 
-## 🌐 訪問位址
-*   **管理界面**: [http://localhost:8045](http://localhost:8045)
-*   **API Base**: [http://localhost:8045/v1](http://localhost:8045/v1)
+## 🌐 Endpoints
+* **Management UI**: [http://localhost:8045](http://localhost:8045)
+* **API Base**: [http://localhost:8045/v1](http://localhost:8045/v1)
 
-## 📦 Docker Hub 分發 (推薦)
-若要推送至你的倉庫：
+## 📦 Docker Hub Distribution (Recommended)
+To push to your registry:
 ```bash
-# 打上版本標籤並推送
 docker tag antigravity-manager:latest alimtvnetwork/antigravity-manager:latest
 docker tag antigravity-manager:latest alimtvnetwork/antigravity-manager:4.83.0
 docker push alimtvnetwork/antigravity-manager:latest
