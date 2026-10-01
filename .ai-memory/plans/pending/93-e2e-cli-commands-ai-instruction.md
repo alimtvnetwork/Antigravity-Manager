@@ -1,7 +1,7 @@
 # AI Instruction: Antigravity Multi-Instance CLI Operations, Account Switching, Prompt Continuity & Hygiene Manual
 
 > **Prompt Metadata:**
-> - Version: 1.0.0
+> - Version: 2.0.0
 > - Target Environment: Windows PowerShell / Bash / Headless CLI
 > - Target Binary: `agm` / `antigravity-manager` / `adm` / `.\run.ps1`
 > - Execution Directive: **Use existing CLI commands and scripts. Do NOT write new code to implement test runners.**
@@ -44,7 +44,7 @@ Command suite: `instances`, `instance`, `profile`, `ls`
 - **Command:** `agm instances list` (Aliases: `agm instances ls`, `agm ls`, `agm profile list`)
 - **JSON Flag:** `agm instances list --json`
 - **Output Fields:** `#` (sequence), `ID`, `NAME`, `STATUS` (`Running (PID: N)` or `Idle`), `BOUND EMAIL`, `DATA DIR`
-- **Example:**
+- **Examples:**
   ```powershell
   # List all profiles in human-readable table
   agm instances list
@@ -59,7 +59,7 @@ Command suite: `instances`, `instance`, `profile`, `ls`
 - **Parameters & Options:**
   - `<name>`: Friendly name or identifier for the instance (e.g. `"Worker-Alpha"`).
   - `--account, -a <email|id>`: Bind specific account (email or account ID). If omitted, binds to the next available unbound account.
-  - `--from, -f <source_id>`: Clone configuration, settings, and extensions from an existing instance profile.
+  - `--from, -f <source_id>`: Clone configuration, settings, and extensions from an existing instance profile (e.g. `default` or `#1`).
   - `--launch, -l`: Immediately launch the Antigravity IDE window after creation.
   - `--data-only, --do`: Create isolated data directory only without cloning the IDE executable binary.
   - `--json, -j`: Return created instance configuration in structured JSON.
@@ -68,8 +68,8 @@ Command suite: `instances`, `instance`, `profile`, `ls`
   # Create an instance bound to a specific email and launch immediately
   agm instance create "Worker-Alpha" -a "alex.dev@gmail.com" --launch
 
-  # Create an instance cloning settings from an existing profile
-  agm instance create "Worker-Beta" --from "Worker-Alpha" -a "erfan.office@gmail.com"
+  # Create an instance cloning settings from default
+  agm instance create "Worker-Beta" --from "default" -a "erfan.office@gmail.com"
 
   # Create a lightweight data-only instance
   agm instance create "Sandbox-01" --data-only --json
@@ -110,20 +110,46 @@ Command suite: `instances`, `instance`, `profile`, `ls`
   agm instances rm #2
   ```
 
-#### F. Copy / Clone Instance Profile
+#### F. Remove All Sandbox Test Instances
+- **Command:** `agm instances rm-all [--force]`
+- **Description:** Safely terminates and cleans up all non-default test sandbox instances while preserving the default instance.
+- **Example:**
+  ```powershell
+  agm instances rm-all --force
+  ```
+
+#### G. Copy / Clone Instance Profile
 - **Command:** `agm instance copy <source_id> <new_name>`
 - **Aliases:** `agm instance clone`, `agm copy-profile`
 - **Examples:**
   ```powershell
-  agm instance copy "Worker-Alpha" "Worker-Backup"
+  agm instance copy "default" "Worker-Backup"
   ```
 
-#### G. Observe Real Live PIDs & Directory Mapping
+#### H. Assign Project Workspace to Instance
+- **Command:** `agm instances assign <instance_id> <repo_paths...>`
+- **Aliases:** `agm instances bind`
+- **Examples:**
+  ```powershell
+  agm instances assign "Worker-Alpha" "D:/work/gitmap"
+  ```
+
+#### I. Observe Real Live PIDs & Directory Mapping
 - **Command:** `agm instances observe <instance_id> [--json]`
 - **Description:** Queries OS process table and returns verified active process IDs (`pids: [...]`), folder paths, and command lines.
 - **Examples:**
   ```powershell
   agm instances observe "Worker-Alpha" --json
+  ```
+
+#### J. Built-in End-to-End Instance Verification Engine
+- **Command:** `agm test-instance-flow [--json]`
+- **Aliases:** `agm tif`, `agm test-instance`, `agm instance-flow`
+- **Description:** Fully automated autonomous test workflow that clones an isolated instance from default, sets up running/queued prompts, launches IDE, verifies PID, backs up prompts, switches account, re-launches with new PID, restores prompts, verifies state, and cleans up.
+- **Examples:**
+  ```powershell
+  agm test-instance-flow
+  agm test-instance-flow --json
   ```
 
 ---
@@ -167,7 +193,7 @@ Command suite: `switch`, `switch-account`, `fast-forward`, `ff`
 #### B. Fast-Forward Smart Account Rotation
 - **Command:** `agm ff [instance_id] [--json]`
 - **Aliases:** `agm fast-forward`, `agm instance ff`, `agm instance rotate`
-- **Description:** Automatically evaluates rolling 4-hour quota windows across registered accounts, selects the healthiest account (highest remaining quota, zero 429 rate limits), and rotates the target instance.
+- **Description:** Automatically evaluates rolling 4-hour quota windows across registered accounts, selects the freshest account (highest remaining quota, longest refill runway), and rotates the target instance.
 - **Examples:**
   ```powershell
   # Fast-forward rotate specific instance to healthiest account
@@ -180,19 +206,72 @@ Command suite: `switch`, `switch-account`, `fast-forward`, `ff`
   agm ff
   ```
 
+#### C. Rotate All Running Instances
+- **Command:** `agm instances all ff`
+- **Description:** Fast-forwards quota-optimal accounts for every currently active running instance concurrently.
+- **Example:**
+  ```powershell
+  agm instances all ff
+  ```
+
+#### D. Conditional Switching on Low Credits
+- **Command:** `agm switch-if-low-credit [options]` (Aliases: `agm swlc`, `agm sfc`)
+- **Query Low Credit State:** `agm is-low-credit-for-switch` (Alias: `agm ilc`)
+- **Example:**
+  ```powershell
+  agm switch-if-low-credit --instance "Worker-Alpha"
+  ```
+
 ---
 
 ### 3. Running Prompt Backup, Continuous Heartbeat & Restoration
 
+Command suite: `backup-running-prompts`, `restore-running-prompts`, `resend-running-commands`, `which-prompts-running`, `query`
+
 #### A. Prompt Backup CLI
-- **Command:** `agm backup-running-prompts --instance <instance_id>`
-- **Description:** Takes an immediate snapshot of active and queued prompts in the instance workspace, writing metadata to `.antigravity_resume_task.json`.
-- **Example:**
+- **Command:** `agm backup-running-prompts [--instance <instance_id>]`
+- **Aliases:** `agm brp`, `agm backup-prompts`, `agm backup`
+- **Description:** Takes an immediate snapshot of active and queued prompts in the instance workspace, writing metadata to SQLite and `.antigravity_resume_task.json`.
+- **Examples:**
   ```powershell
   agm backup-running-prompts --instance "Worker-Alpha"
+  agm backup-running-prompts
   ```
 
-#### B. Prompt Heartbeat Telemetry Utility
+#### B. Prompt Restore CLI
+- **Command:** `agm restore-running-prompts [--instance <instance_id>]`
+- **Aliases:** `agm rrp`, `agm restore-prompts`, `agm restore`
+- **Description:** Restores backed up prompts back into the active prompt queue.
+- **Example:**
+  ```powershell
+  agm restore-running-prompts --instance "Worker-Alpha"
+  ```
+
+#### C. Resend Running Commands CLI
+- **Command:** `agm resend-running-commands [--instance <instance_id>]`
+- **Aliases:** `agm rrc`, `agm resend-running`, `agm resend`
+- **Description:** Resends interrupted in-flight prompts to the target instance project workspace so tasks resume uninterrupted.
+- **Example:**
+  ```powershell
+  agm resend-running-commands --instance "Worker-Alpha"
+  ```
+
+#### D. Query Prompts & Inspect Live State
+- **Commands:**
+  - `agm which-prompts-running` (Alias: `agm wpr`) — Shows exactly which prompts are active across instances.
+  - `agm running-prompts` — Detailed list of active in-flight prompts.
+  - `agm running-projects` — Lists all projects with active workers.
+  - `agm query <search_term>` (Aliases: `agm search`, `agm find`) — Search cached SQLite prompts displaying >= 200 word previews.
+  - `agm tree` — Hierarchy tree displaying instances, bound accounts, and queued prompts.
+- **Examples:**
+  ```powershell
+  agm which-prompts-running
+  agm running-prompts
+  agm query "test inventory"
+  agm tree
+  ```
+
+#### E. Continuous Prompt Heartbeat Telemetry Utility
 - **Script Path:** `scripts/prompt_heartbeat_runner.py`
 - **Actions:**
   - **Start:** `python scripts/prompt_heartbeat_runner.py start "<prompt_id>" "<instance_id>" "<log_path>" <interval_seconds>`
@@ -203,14 +282,14 @@ Command suite: `switch`, `switch-account`, `fast-forward`, `ff`
   # Start a 5-second interval heartbeat runner
   python scripts/prompt_heartbeat_runner.py start "prompt-101" "Worker-Alpha" "D:/work/project/.antigravity_goal_prompt.log" 5
 
-  # Check telemetry
+  # Check telemetry (returns: RUNNING=True, Iteration: N)
   python scripts/prompt_heartbeat_runner.py check "D:/work/project/.antigravity_goal_prompt.log"
 
   # Stop runner
   python scripts/prompt_heartbeat_runner.py stop "D:/work/project/.antigravity_goal_prompt.log"
   ```
 
-#### C. SQLite Active Prompt Seeding & Inspection
+#### F. SQLite Active Prompt Seeding & Inspection
 - **Script Path:** `scripts/test_prompt_helper.py`
 - **Actions:**
   - **Seed Prompt:** `python scripts/test_prompt_helper.py seed "<prompt_id>" "<instance_id>" "<workspace_dir>" "<prompt_text>"`
@@ -232,7 +311,7 @@ Command suite: `agy`, `cache-clear`, `clear`, `adm clear`
 
 #### A. Prune Stale Conversations with Custom Retention
 - **Command:** `agm agy cache-clear [options]`
-- **Aliases:** `adm clear k <N>`, `agm cache-clear -k <N> -y`, `agm agy clear`
+- **Aliases:** `adm clear k <N>`, `agm cache-clear -k <N> -y`, `agm agy clear`, `agm prune`
 - **Parameters & Options:**
   - `--keep <N>, -k <N>`: Number of latest conversations to retain intact (default: 10).
   - `-y, --yes`: Non-interactive bypass for headless execution.
@@ -270,7 +349,7 @@ Command suite: `agy`, `cache-clear`, `clear`, `adm clear`
 
 ### 5. Developer Hygiene & Build Clearing Suite
 
-Script path: `scripts/dev-tool-clear.ps1`
+Script paths: `scripts/dev-tool-clear.ps1` & `03-ai-scripts/19-artifact-remover.py`
 
 #### A. Full Cross-Platform Clean
 - **Command:** `powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 [options]`
@@ -298,7 +377,19 @@ Script path: `scripts/dev-tool-clear.ps1`
   powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 -CleanInstances
   ```
 
-#### B. Python Direct Artifact Remover
+#### B. Direct Cargo & Cache Cleanup via AGM Native CLI
+- **Commands:**
+  - `agm clean` / `agm purge` — Clean temporary caches and logs.
+  - `agm clear-cache` / `agm pr` — Clean cache.
+  - `agm clear-terminal` — Reset terminal artifacts.
+- **Examples:**
+  ```powershell
+  agm clean
+  agm clear cache
+  agm clear terminal
+  ```
+
+#### C. Python Direct Artifact Remover
 - **Command:** `python 03-ai-scripts/19-artifact-remover.py --clean-cargo --clean-temp --clean-pycache --force`
 - **Examples:**
   ```powershell
@@ -314,7 +405,7 @@ Command suite: `auto-switch`, `auto`, `switcher`
 
 #### A. Query Daemon Status
 - **Command:** `agm auto-switch status [--json]`
-- **Example:**
+- **Examples:**
   ```powershell
   agm auto-switch status
   agm auto-switch status --json
@@ -354,7 +445,33 @@ Command suite: `auto-switch`, `auto`, `switcher`
 
 ---
 
-### 7. Supabase Integration CLI Suite
+### 7. SSH Multi-Node & Cluster Remote Execution Suite
+
+Command suite: `ssh`, `nodes`, `se`, `sj`
+
+#### A. List Remote Cluster Nodes
+- **Command:** `agm nodes` (Alias: `agm ssh nodes`)
+- **Description:** Lists registered SSH worker nodes, machine IPs, status, and assigned tasks.
+- **Example:**
+  ```powershell
+  agm nodes
+  ```
+
+#### B. Execute Remote Command via Git SSH
+- **Command:** `agm se <node_name_or_ip> "<command>"`
+- **Aliases:** `agm ssh exec <node> "<command>"`
+- **Description:** Dispatches a remote command over SSH to the specified cluster node.
+- **Examples:**
+  ```powershell
+  agm se worker-node-01 "git status"
+  agm ssh exec 192.168.1.50 "gitmap sync"
+  ```
+
+---
+
+### 8. Supabase Integration CLI Suite
+
+Command suite: `supabase`, `supa`
 
 #### A. PowerShell Setup & Sync One-Liners
 - **Setup Script:** `powershell -ExecutionPolicy Bypass -File scripts/setup-supabase.ps1`
@@ -363,24 +480,33 @@ Command suite: `auto-switch`, `auto`, `switcher`
   ```powershell
   powershell -ExecutionPolicy Bypass -Command "& { . ./scripts/setup-supabase.ps1; Test-SupabaseConnection }"
   ```
+- **CLI Sync Status:**
+  ```powershell
+  agm supabase
+  agm supa status
+  ```
 
 ---
 
-### 8. Telegram Bot Daemon & Commands
+### 9. Telegram Bot Daemon & Commands
+
+Command suite: `telegram`
 
 #### A. Bot Daemon Scripts
 - **Start Telegram Daemon:** `powershell -ExecutionPolicy Bypass -File scripts/telegram-agent-daemon.ps1`
 - **Setup Bot Credentials:** `powershell -ExecutionPolicy Bypass -File scripts/setup-telegram-bot.ps1`
+- **CLI Verification:** `agm telegram status`
 
 #### B. Telegram Remote Bot Commands
 - `/status` — View running instances, bound accounts, and live quota telemetry.
 - `/switch <instance> <email>` — Trigger account switch for an instance remotely.
 - `/prune [k]` — Trigger conversation pruning keeping `k` items.
 - `/update` — Run AGM update and refresh status.
+- `/nodes` — View remote SSH nodes.
 
 ---
 
-### 9. Verification, Process & Database Inspection Commands
+### 10. Verification, Process & Database Inspection Commands
 
 #### A. Query Account Email Directly from SQLite `state.vscdb`
 - **Command:** `python scripts/query_vscdb_email.py "<path_to_state.vscdb>"`
@@ -415,7 +541,7 @@ Command suite: `auto-switch`, `auto`, `switcher`
 
 ---
 
-### 10. Pre-Flight, Version Bump & Release Gates
+### 11. Pre-Flight, Version Bump & Release Gates
 
 #### A. Rust Pre-Flight Checks
 ```powershell
@@ -487,17 +613,13 @@ foreach ($inst in ($list | Where-Object { $_.config.id -like "test-*" })) {
 }
 ```
 
-### Step 2: Create Two Isolated Instances
+### Step 2: Create Isolated Instance Cloned from Default
 ```powershell
 # Instance Alpha with Account A
-$instA = (agm instance create "test-worker-alpha" -a "account_a@gmail.com" --json | ConvertFrom-Json)
+$instA = (agm instance create "test-worker-alpha" --from "default" -a "account_a@gmail.com" --json | ConvertFrom-Json)
 
-# Instance Beta with Account B
-$instB = (agm instance create "test-worker-beta" -a "account_b@gmail.com" --json | ConvertFrom-Json)
-
-# Verify database isolation across both instances
+# Verify database isolation in new instance
 python scripts/query_vscdb_email.py "$($instA.data_dir)/User/globalStorage/state.vscdb"
-python scripts/query_vscdb_email.py "$($instB.data_dir)/User/globalStorage/state.vscdb"
 ```
 
 ### Step 3: Launch Instance A & Verify PID
@@ -550,6 +672,7 @@ $newPid = $obsNew.pids[0]
 Write-Host "New Post-Switch PID: $newPid"
 
 # Check prompt status in SQLite and resume telemetry
+agm which-prompts-running
 python scripts/test_prompt_helper.py check $promptId
 python scripts/prompt_heartbeat_runner.py start $promptId $instA.id "$wsDir/.antigravity_goal_prompt.log" 5
 ```
@@ -576,9 +699,7 @@ powershell -ExecutionPolicy Bypass -File scripts/dev-tool-clear.ps1 -CargoOnly
 ```powershell
 # If cleaning up:
 agm instance stop $instA.id
-agm instance stop $instB.id
 agm instance delete $instA.id --force
-agm instance delete $instB.id --force
 
 # If preserving for operator inspection:
 Write-Host "Instance $($instA.id) preserved alive at PID $newPid in $($instA.data_dir)."
@@ -595,12 +716,19 @@ Write-Host "Instance $($instA.id) preserved alive at PID $newPid in $($instA.dat
 | **Launch Profile** | `agm instance launch <id>` | `<id>`, `#seq`, `<name>` | Spawns Antigravity IDE with isolated `--user-data-dir` |
 | **Stop Profile** | `agm instance stop <id>` | `<id>`, `#seq`, `<name>` | Safely terminates specific instance PID only |
 | **Delete Profile** | `agm instance delete <id>` | `--force, -f` | Deletes directory and removes profile registry entry |
+| **Remove All Sandboxes** | `agm instances rm-all` | `--force, -f` | Removes all non-default sandbox instances |
 | **Switch Account** | `agm switch <id> <email>` | `--instance <id>`, `--json` | Injects credentials to `state.vscdb`, backs up prompts |
-| **Fast-Forward** | `agm ff [id]` | `[id]`, `--json` | Rotates profile to healthiest rolling quota account |
+| **Fast-Forward** | `agm ff [id]` | `[id]`, `--json` | Rotates profile to freshest rolling quota account |
+| **Rotate All Profiles** | `agm instances all ff` | N/A | Fast-forwards accounts for all running instances |
 | **Backup Prompts** | `agm backup-running-prompts` | `--instance <id>` | Snapshots running & queued prompts to resume file |
+| **Restore Prompts** | `agm restore-running-prompts`| `--instance <id>` | Restores backed up prompts back to active queue |
+| **Resend Commands** | `agm resend-running-commands`| `--instance <id>` | Re-pushes in-flight commands to project workspaces |
+| **Query Prompts** | `agm which-prompts-running` | N/A | Displays active prompts and project telemetry |
 | **Prune History** | `agm agy cache-clear` | `--keep <N>, -k <N>`, `-y`, `--preflight` | Prunes old conversations (keeps 10), protects active |
 | **Undo Prune** | `agm agy undo` | `[tx_id]` | Reverts pruning from temporary staging storage |
 | **Clean Dev Tools** | `scripts/dev-tool-clear.ps1` | `-CargoOnly`, `-CleanInstances`, `k <N>` | Purges Cargo caches, temp files, demo build folders |
 | **Auto-Switch** | `agm auto-switch <action>` | `status`, `enable`, `disable`, `threshold`, `interval`, `run` | Background quota monitor & automatic profile switcher |
+| **SSH Cluster** | `agm nodes` / `agm se <node>`| `<node> "<command>"` | List nodes and execute commands via Git SSH |
 | **Supabase Setup** | `scripts/setup-supabase.ps1` | One-liner PowerShell | Verifies & provisions Supabase backend connection |
 | **Telegram Daemon**| `scripts/telegram-agent-daemon.ps1` | Background daemon | Remote control via Telegram (`/status`, `/switch`, `/prune`) |
+| **E2E Flow Engine** | `agm test-instance-flow` | `--json` | Autonomous end-to-end verification engine |
