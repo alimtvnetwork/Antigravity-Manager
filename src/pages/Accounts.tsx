@@ -203,7 +203,7 @@ function Accounts() {
   useEffect(() => {
     if (!focusedAccountId) return;
     let attempts = 0;
-    const maxAttempts = 20; // Check over 2 seconds (100ms intervals)
+    const maxAttempts = 40;
     const interval = setInterval(() => {
       attempts++;
       const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
@@ -212,34 +212,10 @@ function Accounts() {
       if (targetEl) {
         clearInterval(interval);
         targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        targetEl.classList.add(
-          "ring-4",
-          "ring-blue-500",
-          "dark:ring-amber-400",
-          "ring-offset-2",
-          "dark:ring-offset-slate-900",
-          "shadow-2xl",
-          "scale-[1.01]",
-          "transition-all",
-          "duration-300"
-        );
-        const timer = setTimeout(() => {
-          targetEl.classList.remove(
-            "ring-4",
-            "ring-blue-500",
-            "dark:ring-amber-400",
-            "ring-offset-2",
-            "dark:ring-offset-slate-900",
-            "shadow-2xl",
-            "scale-[1.01]"
-          );
-          setFocusedAccountId(null);
-        }, 3000);
-        return () => clearTimeout(timer);
+        return;
       }
       if (attempts >= maxAttempts) {
         clearInterval(interval);
-        setFocusedAccountId(null);
       }
     }, 100);
     return () => clearInterval(interval);

@@ -8,10 +8,12 @@
 - [x] Record protected PIDs. Do not close Cursor or `agm-alim.exe` 10584.
 - [x] Restore keeps queued prompts queued and re-sends the prompt that was running.
 - [x] `close_instance` refuses Cursor and AGM processes.
+- [x] Instance list: a refresh that started before a click cannot overwrite the instance the user just chose.
+- [x] Accounts Focus keeps the white background and dark text, and scrolls for up to 4 seconds.
+- [x] Email dark-mode links and code chips use light text instead of cyan on navy.
 
 ## Remaining
 - [ ] Build is required before the scenario can be run. The installed app is still 4.109.
 - [ ] Scenario, on a new instance only: create copy, seed running + queued prompts, backup, fast-forward, switch, reopen, CLI-verify statuses, Settings check, switch back, delete the copy.
-- [ ] UI: selector stuck on worker-alpha, Focus contrast and scroll, Instances/Parts close buttons.
-- [ ] Prune/clear must keep running and queued prompts (confirm in code, then fix gaps).
-- [ ] Email and Telegram: one project name each, prompt text, HTML, `/update`.
+- [ ] Telegram message colors (email templates are updated; Telegram is HTML text, not these CSS rules).
+- [ ] `agm clean` / `agm purge` delete build artifacts, not conversations. Conversation prune is `agm prune` and already skips running and queued prompts.

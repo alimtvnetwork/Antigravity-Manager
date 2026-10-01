@@ -51,6 +51,8 @@ interface InstanceState {
     resumeRecentProjectPrompts: (instanceId?: string) => Promise<instanceService.AutoResumeResult>;
 }
 
+let instanceSelectionEpoch = 0;
+
 export const useInstanceStore = create<InstanceState>((set, get) => ({
     instances: [],
     activeInstanceId: 'default',
@@ -59,6 +61,7 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     error: null,
 
     fetchInstances: async (silent: boolean = false) => {
+        const epochAtStart = instanceSelectionEpoch;
         if (!silent) {
             set({ isLoading: true, error: null });
         }
@@ -67,6 +70,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 instanceService.listInstances(),
                 instanceService.getActiveInstance(),
             ]);
+            if (epochAtStart !== instanceSelectionEpoch) {
+                set({ instances, isLoading: false });
+                return;
+            }
             set({ instances, activeInstanceId: activeId, isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to fetch instances' });
@@ -277,10 +284,14 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     },
 
     setActiveInstance: async (instanceId: string) => {
-        set({ isLoading: true, error: null });
+        instanceSelectionEpoch += 1;
+        const epoch = instanceSelectionEpoch;
+        set({ isLoading: true, error: null, activeInstanceId: instanceId });
         try {
             await instanceService.setActiveInstance(instanceId);
-            set({ activeInstanceId: instanceId, isLoading: false });
+            if (epoch === instanceSelectionEpoch) {
+                set({ activeInstanceId: instanceId, isLoading: false });
+            }
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to set active instance' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.setActiveInstance' });

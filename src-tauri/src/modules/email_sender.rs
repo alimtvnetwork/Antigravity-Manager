@@ -783,8 +783,8 @@ pub fn wrap_html_email_card(
   @media (prefers-color-scheme: dark) {{
     body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
     td {{ color: #e2e8f0 !important; }}
-    a {{ color: #38bdf8 !important; }}
-    a:visited {{ color: #7dd3fc !important; }}
+    a {{ color: #f8fafc !important; }}
+    a:visited {{ color: #e2e8f0 !important; }}
   }}
 </style>
 </head>
@@ -792,7 +792,7 @@ pub fn wrap_html_email_card(
   <div style="max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 5px solid #38bdf8; padding: 28px 32px; color: #ffffff;">
       <div style="margin-bottom: 14px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 8px 16px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} ({}) | {} | {}]</span>
+        <span style="background: rgba(56, 189, 248, 0.15); color: #f8fafc; padding: 8px 16px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} ({}) | {} | {}]</span>
         <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 6px 14px; border-radius: 9999px; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-left: 10px; letter-spacing: 0.06em;">AGM TELEMETRY</span>
       </div>
       <h2 style="margin: 10px 0 0 0; font-size: 32px; color: #ffffff; font-weight: 800; line-height: 1.35;">{}</h2>
@@ -933,8 +933,8 @@ pub fn render_node_credits_status_table_html(
   @media (prefers-color-scheme: dark) {{
     body {{ background-color: #0f172a !important; color: #f1f5f9 !important; }}
     td {{ color: #e2e8f0 !important; }}
-    a {{ color: #38bdf8 !important; }}
-    a:visited {{ color: #7dd3fc !important; }}
+    a {{ color: #f8fafc !important; }}
+    a:visited {{ color: #e2e8f0 !important; }}
   }}
 </style>
 </head>
@@ -942,7 +942,7 @@ pub fn render_node_credits_status_table_html(
   <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.1); border: 1px solid #cbd5e1;">
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e293b 100%); border-top: 4px solid #38bdf8; padding: 24px 28px; color: #ffffff;">
       <div style="margin-bottom: 12px;">
-        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} | {}]</span>
+        <span style="background: rgba(56, 189, 248, 0.15); color: #f8fafc; padding: 5px 12px; border-radius: 8px; font-family: 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 700; border: 1px solid rgba(56, 189, 248, 0.35);">[{} | {} | {}]</span>
         <span style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; padding: 5px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 8px; letter-spacing: 0.06em;">AGM STATUS</span>
       </div>
       <h2 style="margin: 6px 0 0 0; font-size: 24px; color: #ffffff; font-weight: 700; line-height: 1.3;">Node &amp; Credits Status</h2>
@@ -1327,7 +1327,7 @@ pub fn render_idle_projects_email(
         proj_rows.push_str(&format!(
             r#"<tr>
   <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">{}</td>
-  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700;">sub: {} | proj-{}</code></td>
+  <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-family: 'Ubuntu Mono', monospace; font-size: 16px; font-weight: 700;">sub: {} | proj-{}</code></td>
   <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-family: 'Ubuntu Mono', monospace; font-size: 15px; color: #475569;">{}</td>
   <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><span style="background: {}; color: {}; border: 1px solid {}; padding: 6px 14px; border-radius: 6px; font-size: 15px; font-weight: 800;">{}</span></td>
 </tr>"#,
@@ -1433,32 +1433,32 @@ pub fn render_idle_projects_email(
   <tbody>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Send Prompt to Project</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;project_name&gt;</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Body: your prompt instruction)</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;project_name&gt;</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Body: your prompt instruction)</span></td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm prompt -p "&lt;name&gt;" "&lt;text&gt;"</code></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Broadcast to All</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | all</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Dispatches prompt to every workspace)</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">sub: {} | all</code><br><span style="color: #64748b; font-size: 15px; display: inline-block; margin-top: 4px;">(Dispatches prompt to every workspace)</span></td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm broadcast-email send-to-all</code></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Check Quota &amp; Credits</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm status</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm status</code></td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm status</code></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">Trigger Auto-Switch</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm switch-if-low-credit</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm switch-if-low-credit</code></td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm swlc</code></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 16px;">List Running Prompts</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm running-prompts ls</code></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">cmd: {} | agm running-prompts ls</code></td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm running-prompts ls</code></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; font-weight: 700; color: #0f172a; font-size: 16px;">Inbound Commands Manual</td>
-      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">Subject: help</code></td>
+      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #f8fafc; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">Subject: help</code></td>
       <td style="padding: 14px 20px;"><code style="background: #f1f5f9; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">agm help</code></td>
     </tr>
   </tbody>
@@ -1479,32 +1479,32 @@ pub fn render_idle_projects_email(
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">execute-pending-tasks</td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Autonomously executes queued tasks in .ai-memory/plans/pending/ with batched subagents and auto-looping.</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-pending-tasks</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-pending-tasks</span></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">execute-parent-task</td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Decomposes a large parent task into structured subtasks and runs continuous N-step self-loops until completion.</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-parent-task &lt;goal&gt;</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: execute-parent-task &lt;goal&gt;</span></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">ci-cd-fix</td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Grounded 4-part RCA diagnosis, fixes broken pipeline scripts or linters, and verifies green builds.</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: ci-cd-fix</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: ci-cd-fix</span></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">minor-bump</td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Synchronizes version across package manifests, updates CHANGELOG.md, and tags release commit.</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: minor-bump</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: minor-bump</span></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">coding-guidelines</td>
       <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.5;">Enforces PascalCase database entities, AppError wrapper patterns, positive booleans, and enum standards.</td>
-      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: coding-guidelines</span></td>
+      <td style="padding: 14px 20px; border-bottom: 1px solid #e2e8f0;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: coding-guidelines</span></td>
     </tr>
     <tr>
       <td style="padding: 14px 20px; font-weight: 700; color: #0284c7; font-size: 16px; font-family: 'Ubuntu Mono', monospace;">smart-test-runner</td>
       <td style="padding: 14px 20px; font-size: 16px; color: #334155; line-height: 1.5;">Executes affected targeted test suites incrementally, isolating slow suites and preventing regressions.</td>
-      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: smart-test-runner</span></td>
+      <td style="padding: 14px 20px;"><code style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-family: 'Ubuntu Mono', monospace;">sub: {} | proj-&lt;proj&gt;</code><br><span style="color: #64748b; font-size: 14px;">Body: smart-test-runner</span></td>
     </tr>
   </tbody>
 </table>

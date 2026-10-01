@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-01T14:40:00Z
+> Last updated: 2026-10-01T14:50:00Z
 
 ## Changelog
 
+- 2026-10-01T14:50:00Z, Plan 92 UI pass: instance clicks are not overwritten by an in-flight 4s refresh (`useInstanceStore.ts`). Accounts Focus stays on a white row with dark text and scrolls for up to 4s. Email dark-mode links and code chips use `#f8fafc` instead of cyan on navy. Conversation prune was already safe in `agy_cleaner`; `agm clean`/`purge` only remove build artifacts.
 - 2026-10-01T14:40:00Z, Plan 92 started: CLI instance switch must use a new copy and must not close Cursor or `agm-alim.exe`. Restore now keeps `queued` prompts queued and marks the previously running prompt `backed_up` so dispatch sends it again (`backup_prompts_db.rs`, `repo_db.rs`). `close_instance` refuses Cursor and AGM PIDs. Spec `02-spec/21-app/92-cli-instance-switch-e2e.md`. CI was green on `78f4a589` before this change.
 - 2026-10-01T09:00:00Z, Memory write: session lessons (CI gates, `gh` fork default, `workflow` scope, E2E buffering) in `memory/learned/22-cicd-gates-auto-commit-workflow-and-e2e-lessons.md`; maintainer preference "always commit and push, never ask" in `user-preferences/01-auto-commit-and-push.md`; suggestions 04 (CI/CD and release hardening) and 05 (codebase assessment) in `suggestions/`; pending plan 91 (Ubuntu pin before 2026-10-19, Node 24 actions, release gated on full CI success). README version badges and changelog summary synced to `v4.109.4`.
 - 2026-10-01T08:25:00Z, Installer asset verification & partial release resilience (RCA 42): resolved 404 download errors in `install.ps1` and `install.sh` caused by guessed asset URLs on partial releases (`v4.109.2`–`v4.109.4` lacking Windows/Linux assets). Implemented `Test-UrlReachable` / `test_url_reachable` pre-flight checks, verified asset parsing from API metadata (`Get-WindowsReleaseAsset` / `parse_github_releases_py`), filtered candidate lists across all discovery tiers to exclude releases missing target platform binaries, added `--dry-run` to `install.sh`, and documented in RCA 42 (`.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md`) and plan 90.

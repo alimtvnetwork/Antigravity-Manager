@@ -278,11 +278,11 @@ function SortableAccountRow({
                     : selected
                     ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 font-bold shadow-lg"
                     : isCurrent
-                    ? "bg-amber-50/90 dark:bg-slate-800/95 border-l-amber-500 dark:border-l-amber-400 font-semibold text-gray-900 dark:text-white"
+                    ? "bg-white dark:bg-white border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-950 dark:text-slate-950"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent hover:bg-stone-50 dark:hover:bg-base-200/60 hover:border-l-stone-400 dark:hover:border-l-stone-500",
-                !isDragging && !isFocused && !selected ? "hover:bg-amber-100/60 dark:hover:bg-slate-750 hover:border-l-amber-400/80" : ""
+                    : "border-l-transparent hover:bg-white dark:hover:bg-white hover:text-slate-950 dark:hover:text-slate-950 hover:border-l-stone-400 dark:hover:border-l-stone-500",
+                !isDragging && !isFocused && !selected ? "hover:bg-white dark:hover:bg-white hover:text-slate-950 dark:hover:text-slate-950 hover:border-l-amber-400/80" : ""
             )}
         >
             {/* 拖拽手柄 */}
