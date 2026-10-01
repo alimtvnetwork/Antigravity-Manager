@@ -1,3 +1,9 @@
+## v4.117.0 — 2026-10-02 (Minor release: Awan brand elevation hierarchy, dark mode contrast resolution, and CSS3 color transitions)
+
+**Scope:** Minor version bump. Harmonized elevation hierarchy and surface luminance according to Awan Software design system, resolved dark-on-dark contrast bottlenecks across InstanceSelector modals and inputs, high-contrast typography across QuotaItem and Account components, universal CSS3 color transitions, and 100% pure English documentation.
+
+---
+
 ## v4.116.0 — 2026-10-02 (Minor release: Awan brand design system, UI/UX contrast overhaul, CSS3 color switching animations, and pure English documentation)
 
 **Scope:** Minor version bump. Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility, full Awan Software brand specification alignment with Deep Orbit canvas and Zero-G Cyan accents, universal CSS3 color switching transitions across the entire interface, and 100% pure English documentation and changelogs.

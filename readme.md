@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.116.0-3B82F6?style=flat-square" alt="Version v4.116.0">
+    <img src="https://img.shields.io/badge/Version-v4.117.0-3B82F6?style=flat-square" alt="Version v4.117.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.116.0)**
+**Bar 2: Version-Based Installation (v4.117.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -526,7 +526,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.116.0**: Minor release featuring comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility; complete Awan brand palette alignment across InstanceSelector, AccountTable, AccountRow, and AccountCard; universal CSS3 color switching transitions with ambient glow pulse animations; and 100% pure English documentation.
+> Latest version **v4.117.0**: Minor release harmonizing elevation hierarchy and surface luminance according to Awan Software design system; resolving dark-on-dark contrast bottlenecks across InstanceSelector, QuotaItem, AccountTable, AccountRow, and AccountCard; universal CSS3 color switching transitions with ambient glow pulse animations; and 100% pure English documentation.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

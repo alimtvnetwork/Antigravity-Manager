@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.117.0 (2026-10-02)**:
+        -   **[UI/UX] Awan Brand Elevation Hierarchy & Dark Mode Contrast Overhaul**:
+            -   **Description**: Harmonized surface luminance and elevation hierarchy across the application according to Awan Software design system (`#071a27` Deep Orbit canvas < `#0c2438` Deep Orbit Card < `#15334d` Elevated Row / Modal). Resolved all dark-on-dark text contrast bottlenecks in `InstanceSelector.tsx` where active items now feature elevated `#15334d` surfaces, Zero-G Cyan accents (`#19b7c9`), and high-contrast cyan email typography (`dark:text-cyan-200`). Removed redundant close icon button in InstanceSelector header. (Thanks to @aukgit)
+        -   **[Theme] High-Contrast Typography & Account Component Modernization**:
+            -   **Description**: Refactored `AccountRow.tsx`, `AccountTable.tsx`, `AccountCard.tsx`, and `QuotaItem.tsx` to strictly adhere to semantic contrast standards (> 7:1 WCAG AAA). Completely eliminated white-on-white and dark-on-dark row anomalies in dark mode. Set focused rows to `#15334d` with `#43d6a2` Plasma Mint borders, current active rows to `#0c2438` with `#16a97a` Vector Green indicators, and synchronized sticky action table columns. Implemented universal CSS3 color switching transitions and ambient glow pulse animations. (Thanks to @aukgit)
+        -   **[Documentation] Pure English Internationalization & Zero Chinese Text Policy**:
+            -   **Description**: Enforced 100% pure English across `README.md`, `README_EN.md`, `changelog.md`, and `changelog_en.md`, eliminating all residual Chinese characters and standardizing release documentation for global distribution. (Thanks to @aukgit)
+
     *   **v4.116.0 (2026-10-02)**:
         -   **[UI/UX] Comprehensive Dark Mode Contrast Overhaul & Dark-on-Dark Text Elimination**:
             -   **Description**: Resolved critical dark-on-dark text contrast failures in `InstanceSelector.tsx` where active profile names, emails, and unlinked placeholders rendered in dark slate (`#020617` / `#1e293b`) on dark blue backgrounds; updated active profile text to crisp white (`dark:text-white`) and email typography to high-contrast cyan (`dark:text-cyan-200`). Modernized the active instance close button with accessible high-contrast rose styling (`dark:bg-rose-950/40 text-rose-300`). (Thanks to @aukgit)
