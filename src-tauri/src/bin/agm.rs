@@ -12748,6 +12748,7 @@ fn cmd_test_instance_flow(args: &[String]) {
 
     // Step 1: Clean up any existing test instances & stale test prompts
     println!("[STEP 1/7] Cleaning up existing non-default sandbox instances and stale prompts...");
+    let mut removed_ids: Vec<String> = Vec::new();
     if let Ok(instances) = instance::list_instances() {
         for inst in instances {
             if inst.config.is_default || inst.config.id == "default" {
@@ -12768,6 +12769,7 @@ fn cmd_test_instance_flow(args: &[String]) {
                     inst.config.id, e
                 );
             } else {
+                removed_ids.push(inst.config.id.clone());
                 println!(
                     "  [✓] Removed stale instance '{}' ({})",
                     inst.config.name, inst.config.id
@@ -12776,14 +12778,10 @@ fn cmd_test_instance_flow(args: &[String]) {
         }
     }
     if let Ok(conn) = repo_db::connect_db() {
-        let _ = conn.execute(
-            "DELETE FROM active_prompts WHERE instance_id != 'default' AND instance_id != '__default__'",
-            [],
-        );
-        let _ = conn.execute(
-            "DELETE FROM running_projects WHERE instance_id != 'default' AND instance_id != '__default__'",
-            [],
-        );
+        for id in &removed_ids {
+            let _ = conn.execute("DELETE FROM active_prompts WHERE instance_id = ?1", [id]);
+            let _ = conn.execute("DELETE FROM running_projects WHERE instance_id = ?1", [id]);
+        }
     }
     println!("  [SUCCESS] All stale sandbox instances and test prompts purged.");
     println!("--------------------------------------------------------------------------------");
@@ -12904,8 +12902,6 @@ fn cmd_test_instance_flow(args: &[String]) {
         }
     }
     let _ = integration::write_to_file_credentials_at(&target_data_path, &acc1_loaded);
-    let _ = integration::write_to_system_keyring(&acc1_loaded);
-    let _ = integration::write_to_file_credentials(&acc1_loaded);
 
     println!(
         "  [SUCCESS] Cloned IDE profile into instance '{}':",
