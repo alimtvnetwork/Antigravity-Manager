@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.110.1-3B82F6?style=flat-square" alt="Version v4.110.1">
+    <img src="https://img.shields.io/badge/Version-v4.113.0-3B82F6?style=flat-square" alt="Version v4.113.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.112.0)**
+**Bar 2: Version-Based Installation (v4.113.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -524,11 +524,11 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > [!TIP]
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
-## 📝 更新日志
+## 📝 Changelog
 
-> 最新版本 **v4.112.0**：彻底排查并根治 AGM 进程 CPU 占用偏高（30%+）与界面偶发 "Not responding" 假死卡顿问题，将全系统进程扫描重构为轻量级定向快照并引入 4 秒 TTL 安全缓存；全面排查后台 `agy.exe` 进程失控累积至 30+ 实例消耗 2GB 内存的问题，引入原子活跃工作区进程追踪表严密阻断重复派发；全面落地开机启动 60 秒绝对静默保护期（Startup Quiet Period），将后台遥测保底间隔提升至 300 秒（5 分钟）并改用事件广播推送模式；在原生窗口标题与 Windows 任务管理器中显式绑定并展示当前安装版本号（如 `Antigravity Manager Tools v4.112.0`），极大提升可维护性与稳定性。
+> Latest version **v4.113.0**: Overhauled color theme tokens with the official modern Awan brand palette (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field) across light and dark modes with DaisyUI theme realignment for crisp contrast and fluid transitions; completely purged Chinese language remnants from `README.md` and aligned release notes to English across documentation and changelogs.
 
-👉 **[查看完整更新日志 → changelog.md](changelog.md)**
+👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
 ---
 

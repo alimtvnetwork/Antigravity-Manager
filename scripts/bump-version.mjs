@@ -281,6 +281,8 @@ const TARGET_FILES = [
         stableOnly: true,
         replace: (content) => content
             .replace(/\(v[0-9][^)]*\)/, `(v${newVersion})`)
+            .replace(/badge\/Version-(?:v)?[0-9][^"-]*-([0-9A-Fa-f]{6}|blue)/, `badge/Version-v${newVersion}-$1`)
+            .replace(/alt="Version (?:v)?[0-9][^"]*"/, `alt="Version v${newVersion}"`)
             .replace(/Version-[0-9][^"]*-blue/, `Version-${newVersion}-blue`),
     },
     {
@@ -289,6 +291,8 @@ const TARGET_FILES = [
         stableOnly: true,
         replace: (content) => content
             .replace(/\(v[0-9][^)]*\)/, `(v${newVersion})`)
+            .replace(/badge\/Version-(?:v)?[0-9][^"-]*-([0-9A-Fa-f]{6}|blue)/, `badge/Version-${newVersion}-$1`)
+            .replace(/alt="Version (?:v)?[0-9][^"]*"/, `alt="Version ${newVersion}"`)
             .replace(/Version-[0-9][^"]*-blue/, `Version-${newVersion}-blue`),
     },
     {
