@@ -54,21 +54,32 @@ Write-Host "==========================================================" -Foregro
 
 # 1. Clean Cargo/Rust compiler caches, incremental files, and build demo artifacts
 Write-Host "[1/3] Cleaning Cargo and build demo caches..." -ForegroundColor Yellow
-python "$RootDir/03-ai-scripts/19-artifact-remover.py" --clean-cargo --force
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Artifact remover reported warning or exit code $LASTEXITCODE"
+
+$cargoIncrementalDirs = @(
+    (Join-Path $RootDir "src-tauri\target\debug\incremental"),
+    (Join-Path $RootDir "src-tauri\target\release\incremental")
+)
+foreach ($dir in $cargoIncrementalDirs) {
+    if (Test-Path $dir) {
+        Write-Host "  Removing Cargo incremental cache: $dir" -ForegroundColor DarkGray
+        Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+    }
 }
 
-# Clean any demo build artifacts if present
+# Clean any demo build artifacts if present, strictly protecting tracked files
 $demoDirs = @(
     (Join-Path $RootDir "build-demo"),
     (Join-Path $RootDir "target-demo"),
     (Join-Path $RootDir "src-tauri\build-demo"),
-    (Join-Path $RootDir "src-tauri\target-demo"),
-    (Join-Path $RootDir "src-tauri\target")
+    (Join-Path $RootDir "src-tauri\target-demo")
 )
 foreach ($dir in $demoDirs) {
     if (Test-Path $dir) {
+        $null = git ls-files --error-unmatch $dir 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Warning "Refusing to remove git-tracked directory: $dir"
+            continue
+        }
         Write-Host "  Removing demo directory: $dir" -ForegroundColor DarkGray
         Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
     }

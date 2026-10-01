@@ -217,13 +217,15 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
     Ok(())
 }
 
-/// Upsert one instance profile to the root Supabase endpoint and read the stored email back.
-pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, AppError> {
+fn resolve_sync_target(
+    instance_id: &str,
+) -> Result<(SupabaseEndpoint, instance::InstanceConfig, SupabaseConfig), AppError> {
     let config = load_config()?;
     let endpoint = config
         .endpoints
         .iter()
         .find(|ep| ep.is_enabled && ep.role == "root")
+        .cloned()
         .ok_or_else(|| AppError::Config("No enabled root Supabase endpoint".to_string()))?;
     let registry = instance::load_registry().map_err(|e| AppError::Config(e.to_string()))?;
     let inst = registry
@@ -231,21 +233,16 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
         .into_iter()
         .find(|item| item.id == instance_id)
         .ok_or_else(|| AppError::Config(format!("Instance '{}' is not registered", instance_id)))?;
-    let client = SupabaseClient::new(endpoint)?;
-    let profile_id = format!("{}_{}", get_local_node_id(), inst.id);
-    let email = inst.bound_email.clone().unwrap_or_default();
+    Ok((endpoint, inst, config))
+}
+
+fn build_sync_payloads(
+    config: &SupabaseConfig,
+    inst: &instance::InstanceConfig,
+    profile_id: &str,
+    email: &str,
+) -> (serde_json::Value, serde_json::Value) {
     let now = Utc::now().timestamp();
-    let payload = json!({
-        "id": profile_id,
-        "node_id": get_local_node_id(),
-        "profile_name": inst.name,
-        "active_account_id": inst.bound_account_id.clone().unwrap_or_default(),
-        "active_account_email": email,
-        "is_active": inst.is_default,
-        "quota_percent": 100,
-        "status": if inst.is_default { "running" } else { "idle" },
-        "updated_at": now
-    });
     let node_id = get_local_node_id();
     let node_payload = json!({
         "id": node_id,
@@ -256,6 +253,28 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
         "last_heartbeat_at": now,
         "status": "online"
     });
+    let profile_payload = json!({
+        "id": profile_id,
+        "node_id": node_id,
+        "profile_name": inst.name,
+        "active_account_id": inst.bound_account_id.clone().unwrap_or_default(),
+        "active_account_email": email,
+        "is_active": inst.is_default,
+        "quota_percent": 100,
+        "status": if inst.is_default { "running" } else { "idle" },
+        "updated_at": now
+    });
+    (node_payload, profile_payload)
+}
+
+async fn sync_node_and_profile(
+    client: &SupabaseClient,
+    config: &SupabaseConfig,
+    inst: &instance::InstanceConfig,
+    profile_id: &str,
+    email: &str,
+) -> Result<(), AppError> {
+    let (node_payload, profile_payload) = build_sync_payloads(config, inst, profile_id, email);
     let node_written = client.upsert("nodes", node_payload, "id").await?;
     if let Some(message) = postgrest_error_message(&node_written) {
         return Err(AppError::Network(
@@ -264,7 +283,7 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
         ));
     }
     let written = client
-        .upsert("instance_profiles", payload, "id")
+        .upsert("instance_profiles", profile_payload, "id")
         .await
         .map_err(|e| AppError::Network(format!("Supabase upsert failed: {}", e), None))?;
     if let Some(message) = postgrest_error_message(&written) {
@@ -273,6 +292,13 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
             None,
         ));
     }
+    Ok(())
+}
+
+async fn read_back_profile_email(
+    client: &SupabaseClient,
+    profile_id: &str,
+) -> Result<String, AppError> {
     let rows = client
         .select(
             "instance_profiles",
@@ -285,9 +311,27 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
             None,
         ));
     }
-    let stored = email_from_postgrest(&written)
-        .or_else(|| email_from_postgrest(&rows))
-        .unwrap_or_default();
+    email_from_postgrest(&rows).ok_or_else(|| {
+        AppError::Network(
+            format!(
+                "Supabase profile read-back returned no record for '{}'",
+                profile_id
+            ),
+            None,
+        )
+    })
+}
+
+/// Upsert one instance profile to the root Supabase endpoint and read the stored email back.
+pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, AppError> {
+    let (endpoint, inst, config) = resolve_sync_target(instance_id)?;
+    let client = SupabaseClient::new(&endpoint)?;
+    let profile_id = format!("{}_{}", get_local_node_id(), inst.id);
+    let email = inst.bound_email.clone().unwrap_or_default();
+
+    sync_node_and_profile(&client, &config, &inst, &profile_id, &email).await?;
+    let stored = read_back_profile_email(&client, &profile_id).await?;
+
     if !stored.eq_ignore_ascii_case(&email) {
         return Err(AppError::Config(format!(
             "Supabase stored '{}' for profile '{}' but the local instance is bound to '{}'",
@@ -298,15 +342,22 @@ pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, A
 }
 
 fn postgrest_error_message(value: &serde_json::Value) -> Option<String> {
-    let message = value.get("message").and_then(|item| item.as_str())?;
     let code = value
         .get("code")
+        .or_else(|| value.get("error_code"))
         .and_then(|item| item.as_str())
         .unwrap_or("");
-    if code.is_empty() {
-        Some(message.to_string())
-    } else {
-        Some(format!("{} ({})", message, code))
+    let message_opt = value
+        .get("message")
+        .or_else(|| value.get("error"))
+        .or_else(|| value.get("msg"))
+        .and_then(|item| item.as_str());
+
+    match (message_opt, code.is_empty()) {
+        (Some(msg), false) => Some(format!("{} ({})", msg, code)),
+        (Some(msg), true) => Some(msg.to_string()),
+        (None, false) => Some(format!("PostgREST error ({})", code)),
+        (None, true) => None,
     }
 }
 
@@ -557,5 +608,45 @@ mod tests {
         let serialized = serde_json::to_string(&config).expect("serialization works");
         assert!(serialized.contains("\"https://sample.supabase.co\""));
         assert!(!serialized.contains("/rest/v1/\""));
+    }
+
+    #[test]
+    fn test_postgrest_error_message_pgrst205() {
+        let err_json = json!({
+            "code": "PGRST205",
+            "details": null,
+            "hint": null,
+            "message": "relation \"nodes\" does not exist"
+        });
+        let msg = postgrest_error_message(&err_json).expect("should extract error");
+        assert_eq!(msg, "relation \"nodes\" does not exist (PGRST205)");
+
+        let err_only_code = json!({ "code": "PGRST205" });
+        let msg_code = postgrest_error_message(&err_only_code).expect("should extract error");
+        assert_eq!(msg_code, "PostgREST error (PGRST205)");
+
+        let ok_payload = json!({ "id": "node1", "status": "online" });
+        assert!(postgrest_error_message(&ok_payload).is_none());
+    }
+
+    #[test]
+    fn test_email_from_postgrest_readback() {
+        let row_array = json!([{ "active_account_email": "test@example.com" }]);
+        assert_eq!(
+            email_from_postgrest(&row_array),
+            Some("test@example.com".to_string())
+        );
+
+        let single_row = json!({ "active_account_email": "hello@example.com" });
+        assert_eq!(
+            email_from_postgrest(&single_row),
+            Some("hello@example.com".to_string())
+        );
+
+        let empty_array = json!([]);
+        assert_eq!(email_from_postgrest(&empty_array), None);
+
+        let empty_email = json!([{ "active_account_email": "   " }]);
+        assert_eq!(email_from_postgrest(&empty_email), None);
     }
 }
