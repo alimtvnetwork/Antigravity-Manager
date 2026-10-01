@@ -181,14 +181,14 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             id={`account-card-${account.id}`}
             ref={cardRef}
             className={cn(
-            "flex flex-col p-3 rounded-xl border border-l-4 transition-all duration-200",
+            "flex flex-col p-3 rounded-xl border border-gray-200 dark:border-slate-800 border-l-4 transition-all duration-200 bg-white dark:bg-[#071a27]",
             isFocused
-                ? "bg-amber-100/80 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400/80 dark:ring-amber-400/50 ring-offset-1 scale-[1.01]"
-                : selected
-                ? "bg-blue-50/90 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 border-l-blue-600 dark:border-l-blue-500 border-blue-400 dark:border-blue-500/50 font-bold shadow-xl ring-2 ring-blue-500"
+                ? "bg-emerald-50/90 dark:bg-[#0c2438] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
                 : isCurrent
-                ? "bg-amber-50/90 dark:bg-[#131b2e] border-l-amber-500 dark:border-l-amber-400 border-amber-300 dark:border-amber-500/40 font-medium shadow-sm hover:bg-amber-100/80 dark:hover:bg-[#18233c] hover:border-amber-500 dark:hover:border-amber-400 hover:shadow-md hover:ring-2 hover:ring-amber-400/50"
-                : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-gray-300 dark:hover:border-slate-700 hover:border-l-blue-400 dark:hover:border-l-blue-500 hover:shadow-xs",
+                ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-emerald-100/60 dark:hover:bg-[#15334d]/60"
+                : selected
+                ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 
@@ -207,7 +207,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-900 dark:text-amber-100 font-bold"
+                            ? "text-slate-950 dark:text-white font-bold"
                             : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
@@ -215,7 +215,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     <div className="flex items-center justify-between w-full gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {isCurrent && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[9px] font-bold shadow-sm border border-amber-300/60 dark:border-amber-400/40">
+                                <span className="px-1.5 py-0.5 rounded-md bg-[#16a97a]/15 dark:bg-[#16a97a]/25 text-[#16a97a] dark:text-[#43d6a2] text-[9px] font-bold shadow-sm border border-[#16a97a]/30 dark:border-[#16a97a]/40">
                                     {t('accounts.current').toUpperCase()}
                                 </span>
                             )}
@@ -266,7 +266,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                     );
                                 } else {
                                     return (
-                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 text-[9px] font-bold shadow-sm border border-gray-200 dark:border-white/10">
+                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-[#15334d] text-gray-500 dark:text-gray-400 text-[9px] font-bold shadow-sm border border-gray-200 dark:border-[#15334d]">
                                             <Circle className="w-2.5 h-2.5" />
                                             FREE
                                         </span>
@@ -274,7 +274,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                 }
                             })()}
                             {/* Priority */}
-                            <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 text-[9px] font-bold" title={t('accounts.priority_hint')}>
+                            <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-[#15334d] text-gray-500 dark:text-gray-400 text-[9px] font-bold" title={t('accounts.priority_hint')}>
                                 {t('accounts.priority')}: {account.priority ?? 50}
                             </span>
                             {/* Custom label */}

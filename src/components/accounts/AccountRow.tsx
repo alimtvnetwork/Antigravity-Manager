@@ -132,7 +132,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-900 dark:text-amber-100 font-bold"
+                            ? "text-slate-950 dark:text-white font-bold"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                     )} title={account.email}>
                         {account.email}
@@ -140,7 +140,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
                     <div className="flex items-center gap-1.5 shrink-0">
                         {isCurrent && (
-                            <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[10px] font-bold shadow-sm border border-amber-300/60 dark:border-amber-400/40">
+                            <span className="px-2 py-0.5 rounded-md bg-[#16a97a]/15 dark:bg-[#16a97a]/25 text-[#16a97a] dark:text-[#43d6a2] text-[10px] font-bold shadow-sm border border-[#16a97a]/30 dark:border-[#16a97a]/40">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         )}

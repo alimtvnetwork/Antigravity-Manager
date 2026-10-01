@@ -1,3 +1,9 @@
+## v4.115.0 — 2026-10-02 (Comprehensive dark mode contrast overhaul, Awan brand palette alignment, and CSS3 color transitions)
+
+**Scope:** Version bump. Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility, Awan brand palette alignment across InstanceSelector, AccountTable, AccountRow, and AccountCard, and universal CSS3 color switching transitions with ambient glow pulse animations.
+
+---
+
 ## v4.113.1 — 2026-10-01 (Synchronize prompts, skills, AI scripts, and coding guidelines)
 
 **Scope:** Version bump. Synchronize prompts, skills, AI scripts, and coding guidelines.

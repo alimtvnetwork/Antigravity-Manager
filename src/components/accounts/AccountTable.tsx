@@ -546,7 +546,7 @@ function AccountRowContent({
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-900 dark:text-amber-100 font-bold"
+                            ? "text-slate-950 dark:text-white font-bold"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                     )} title={account.email}>
                         {account.email}
@@ -554,7 +554,7 @@ function AccountRowContent({
 
                     <div className="flex items-center gap-1 shrink-0">
                         {isCurrent ? (
-                            <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 text-[9px] font-bold shadow-xs border border-amber-300/60 dark:border-amber-400/40">
+                            <span className="px-1.5 py-0.2 rounded bg-[#16a97a]/15 dark:bg-[#16a97a]/25 text-[#16a97a] dark:text-[#43d6a2] text-[9px] font-bold shadow-xs border border-[#16a97a]/30 dark:border-[#16a97a]/40">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         ) : null}

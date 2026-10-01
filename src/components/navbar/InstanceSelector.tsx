@@ -502,11 +502,11 @@ export function InstanceSelector() {
             {/* Dropdown Menu Popup (Strictly Above Page Content) */}
             {isOpen && (
                 <div
-                    className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95"
+                    className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] py-2 z-[9999] animate-in fade-in zoom-in-95"
                     style={{ isolation: 'isolate' }}
                 >
                     {/* Dropdown Header Bar with Duplicate and Combined Import / Export Dropdown */}
-                    <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 pb-1.5">
+                    <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-[#15334d] pb-1.5">
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                             {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
@@ -609,7 +609,7 @@ export function InstanceSelector() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder={t('instances.search_placeholder', 'Search profiles...')}
-                                className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-slate-100"
+                                className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-slate-100"
                             />
                         </div>
                     </div>
@@ -636,8 +636,8 @@ export function InstanceSelector() {
                                         className={cn(
                                             "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? "bg-blue-50 dark:bg-blue-950/50 text-blue-950 dark:text-blue-200 font-bold shadow-sm border-l-blue-600 dark:border-l-blue-500 ring-1 ring-blue-500/50 my-1 rounded-r-md"
-                                                : "border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100/70 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-blue-500"
+                                                ? "bg-blue-50/80 dark:bg-[#071a27] text-blue-950 dark:text-white font-bold shadow-sm border-l-[#2878f0] dark:border-l-[#19b7c9] ring-1 ring-[#19b7c9]/40 my-1 rounded-r-md"
+                                                : "border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100/70 hover:text-slate-900 dark:hover:bg-[#15334d]/60 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-[#19b7c9]"
                                         )}
                                     >
                                         <button
@@ -667,7 +667,7 @@ export function InstanceSelector() {
                                                         {inst.config.name}
                                                     </span>
                                                     {isDefault && (
-                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
+                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-[#16a97a]/20 text-[#16a97a] dark:text-[#43d6a2] border border-[#16a97a]/40 shrink-0">
                                                             DEFAULT
                                                         </span>
                                                     )}
@@ -678,7 +678,7 @@ export function InstanceSelector() {
                                                     )}
                                                 </div>
                                                 {displayEmail ? (
-                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-blue-200 font-semibold" : "text-gray-500 dark:text-gray-400")}>
+                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-cyan-200 font-semibold" : "text-gray-500 dark:text-slate-400")}>
                                                         {displayEmail}
                                                     </span>
                                                 ) : (
@@ -816,7 +816,7 @@ export function InstanceSelector() {
                     </div>
 
                     {/* Footer Bar: Smart Play / Run Selected Profile */}
-                    <div className="p-2 border-t border-gray-100 dark:border-slate-800">
+                    <div className="p-2 border-t border-gray-100 dark:border-[#15334d]">
                         <button
                             type="button"
                             disabled={launchingId === activeInstance?.config.id}
@@ -829,8 +829,8 @@ export function InstanceSelector() {
                             }}
                             className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                                 isActiveRunning
-                                    ? 'bg-red-50 dark:bg-red-950/30 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/40'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 hover:brightness-105 text-white shadow-xs'
+                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/50 shadow-xs'
+                                    : 'bg-[#16a97a] hover:bg-[#13946a] active:bg-[#0f7a56] hover:brightness-105 text-white shadow-xs'
                             }`}
                         >
                             {isActiveRunning ? (
@@ -856,7 +856,7 @@ export function InstanceSelector() {
                     onClick={() => setIsCreateOpen(false)}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#15334d]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-3">
@@ -869,7 +869,7 @@ export function InstanceSelector() {
                             <button
                                 type="button"
                                 onClick={() => setIsCreateOpen(false)}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
@@ -882,7 +882,7 @@ export function InstanceSelector() {
                                 className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
                                     createMode === 'clone-default'
                                         ? 'bg-white dark:bg-blue-600/20 text-blue-900 dark:text-blue-200 border-blue-600 dark:border-blue-500 shadow-xs'
-                                        : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
+                                        : 'bg-gray-50 dark:bg-[#071a27] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-[#15334d]'
                                 }`}
                             >
                                 {t('instances.clone_default', 'Clone from default')}
@@ -893,7 +893,7 @@ export function InstanceSelector() {
                                 className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
                                     createMode === 'new'
                                         ? 'bg-white dark:bg-blue-600/20 text-blue-900 dark:text-blue-200 border-blue-600 dark:border-blue-500 shadow-xs'
-                                        : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
+                                        : 'bg-gray-50 dark:bg-[#071a27] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-[#15334d]'
                                 }`}
                             >
                                 {t('instances.create_empty', 'New empty')}
@@ -905,7 +905,7 @@ export function InstanceSelector() {
                             value={newInstanceName}
                             onChange={(e) => setNewInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
                             autoFocus
                         />
                         <div className="flex justify-end gap-2">
