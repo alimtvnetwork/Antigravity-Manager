@@ -61,6 +61,7 @@ export function InstanceSelector() {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
     const [newInstanceName, setNewInstanceName] = useState('');
+    const [createMode, setCreateMode] = useState<'clone-default' | 'new'>('clone-default');
     const [copyInstanceName, setCopyInstanceName] = useState('');
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
@@ -138,11 +139,16 @@ export function InstanceSelector() {
         const trimmed = newInstanceName.trim();
         if (!trimmed) return;
         try {
-            const created = await createInstance(trimmed);
+            const created = createMode === 'clone-default'
+                ? await createInstance(trimmed, undefined, 'default')
+                : await createInstance(trimmed);
             await setActiveInstance(created.id);
             setNewInstanceName('');
             setIsCreateOpen(false);
-            showToast(t('instances.created_toast', 'New instance profile created'), 'success');
+            const toast = createMode === 'clone-default'
+                ? t('instances.cloned_default_toast', 'Cloned the default IDE')
+                : t('instances.created_toast', 'New instance profile created');
+            showToast(toast, 'success');
         } catch (e: any) {
             console.error('Failed to create instance:', e);
             const captured = useErrorStore.getState().captureError(e, {
@@ -867,6 +873,30 @@ export function InstanceSelector() {
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex gap-2 mb-3">
+                            <button
+                                type="button"
+                                onClick={() => setCreateMode('clone-default')}
+                                className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
+                                    createMode === 'clone-default'
+                                        ? 'bg-white text-slate-950 border-blue-600'
+                                        : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
+                                }`}
+                            >
+                                {t('instances.clone_default', 'Clone from default')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCreateMode('new')}
+                                className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border ${
+                                    createMode === 'new'
+                                        ? 'bg-white text-slate-950 border-blue-600'
+                                        : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700'
+                                }`}
+                            >
+                                {t('instances.create_empty', 'New empty')}
                             </button>
                         </div>
                         <input
