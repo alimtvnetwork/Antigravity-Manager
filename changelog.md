@@ -47,9 +47,22 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.111.0 (2026-10-01)**:
+        -   **[Bug Fix] CDN Manifest v4.85.0 陈旧锁死彻底根治与发布流水线动态生成**:
+            -   **Description**: 彻底排查并根治 `install.ps1` 与 `install.sh` 始终提示 `Cached CDN manifest version (v4.85.0)` 并回退到受 GitHub 限流接口的问题。恢复并升级 `03-ai-scripts/39-generate-releases-manifest.py` 清单生成引擎，将其原子纳入 `scripts/bump-version.mjs` 随版本发布同步推进；在 `.github/workflows/release.yml` 发布流水线中注入发布时动态生成步骤，并在安装脚本中增加本地预检优先通道，确保 CDN 零限流极速安装通道始终与最新正式版无缝同步。（Thanks to @aukgit）
+        -   **[UI/UX] 遵循 Awan 规范重构现代配色方案与全局 CSS3 平滑色阶切换动画**:
+            -   **Description**: 全面遵循现代 Awan 云平台设计规范，彻底消灭暗色模式下账号列表行、卡片与实例选择下拉框因硬编码 `bg-white dark:bg-white` 导致的白条刺眼失真与文字洗白问题；重构为现代低饱和微发光暗蓝灰玻璃质感卡片（`#131b2e` / `bg-slate-800/90`）与高对比度文字；在全局引入现代 CSS3 统一过渡动画，实现主题切换与选中状态色阶顺滑过渡。（Thanks to @aukgit）
+        -   **[Bug Fix] Windows 任务栏固定快捷方式保护与防丢失**:
+            -   **Description**: 彻底修复 `install.ps1` 在重新安装或更新时导致任务栏已固定应用消失的问题。安装前主动预检并安全备份现有任务栏固定快捷方式；修复清理旧版本时因注册表 `InstallLocation` 含双引号导致误调 `uninstall.exe` 卸载程序从而触发 Windows 自动墓碑化（Tombstone）取消固定；彻底移除对用户任务栏目录文件的强制删除，在安装完成后自动还原并更新固定快捷方式的指向与工作目录，确保已固定图标始终保留且正常启动新版本。（Thanks to @aukgit）
+
+
     *   **v4.110.0 (2026-10-01)**:
         -   **[Bug Fix] Windows 任务栏固定快捷方式保护与防丢失**:
             -   **Description**: 彻底修复 `install.ps1` 在重新安装或更新时导致任务栏已固定应用消失的问题。安装前主动预检并安全备份现有任务栏固定快捷方式；修复清理旧版本时因注册表 `InstallLocation` 含双引号导致误调 `uninstall.exe` 卸载程序从而触发 Windows 自动墓碑化（Tombstone）取消固定；彻底移除对用户任务栏目录文件的强制删除，在安装完成后自动还原并更新固定快捷方式的指向与工作目录，确保已固定图标始终保留且正常启动新版本。（Thanks to @aukgit）
+        -   **[Bug Fix] CDN Manifest v4.85.0 陈旧锁死彻底修复与发布流水线动态生成**:
+            -   **Description**: 彻底排查并根治 `install.ps1` 与 `install.sh` 始终提示 `Cached CDN manifest version (v4.85.0)` 并回退到受 GitHub 限流接口的问题。恢复并升级 `03-ai-scripts/39-generate-releases-manifest.py` 清单生成引擎，将其原子纳入 `scripts/bump-version.mjs` 随版本发布同步推进；在 `.github/workflows/release.yml` 发布流水线中注入发布时动态生成步骤，并在安装脚本中增加本地预检优先通道，确保 CDN 零限流极速安装通道始终与最新正式版无缝同步。（Thanks to @aukgit）
+        -   **[UI/UX] 遵循 Awan 规范重构现代配色方案与全局 CSS3 平滑色阶切换动画**:
+            -   **Description**: 全面遵循现代 Awan 云平台设计规范，彻底消灭暗色模式下账号列表行、卡片与实例选择下拉框因硬编码 `bg-white dark:bg-white` 导致的白条刺眼失真与文字洗白问题；重构为现代低饱和微发光暗蓝灰玻璃质感卡片（`#131b2e` / `bg-slate-800/90`）与高对比度文字；在全局引入现代 CSS3 统一过渡动画，实现主题切换与选中状态色阶顺滑过渡。（Thanks to @aukgit）
         -   **[Feature] 盲测多实例测试流与沙箱 8 大定律完整验证与加固**:
             -   **Description**: 严格审计并落地沙箱 8 大定律（L1 宿主 PID 安全、L2 数据目录所属 PID 映射、L3 克隆与新建配置隔离互斥、L4 UI 与 CLI 核心函数完全对齐且零子进程外挂、L5 排队中提示词完整保真与恢复、L6 退出前同步交付邮件与电报通知及错误堆栈捕获、L7 Supabase 端点回读验证与 PGRST205 缺失表硬失败拦截、L8 自动化测试仅清理 `test-cli-flow*` / `test-diag*` 沙箱）；模块化 `supabase_sync.rs` 并完善单元测试；加固 `scripts/dev-tool-clear.ps1` 增量目录清理逻辑。（Thanks to @aukgit）
 

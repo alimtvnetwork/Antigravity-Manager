@@ -1274,14 +1274,23 @@ $manifestTagUrlMap = @{}
 $manifestRawTagUrlMap = @{}
 $manifestLoaded = $false
 
-$manifestEndpoints = @(
+$manifestEndpoints = @()
+if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "releases-manifest.json"))) {
+    $manifestEndpoints += (Join-Path $PSScriptRoot "releases-manifest.json")
+}
+$manifestEndpoints += @(
     "https://raw.githubusercontent.com/$Repo/main/releases-manifest.json",
     "https://github.com/$Repo/releases/latest/download/releases-manifest.json"
 )
 
 foreach ($mUrl in $manifestEndpoints) {
     try {
-        $mResp = Invoke-RestMethod -Uri $mUrl -TimeoutSec 4
+        $mResp = $null
+        if (Test-Path -Path $mUrl -PathType Leaf -ErrorAction SilentlyContinue) {
+            $mResp = Get-Content -Path $mUrl -Raw -Encoding UTF8 | ConvertFrom-Json
+        } else {
+            $mResp = Invoke-RestMethod -Uri $mUrl -TimeoutSec 4
+        }
         if ($mResp -and $mResp.releases) {
             foreach ($rel in $mResp.releases) {
                 $tagVer = $rel.version

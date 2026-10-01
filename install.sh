@@ -431,13 +431,23 @@ parse_releases_manifest() {
 probe_cdn_manifest() {
     local key
     key=$(get_manifest_asset_key)
-    local urls=(
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local urls=()
+    if [[ -f "${script_dir}/releases-manifest.json" ]]; then
+        urls+=("file://${script_dir}/releases-manifest.json")
+    fi
+    urls+=(
         "https://raw.githubusercontent.com/${REPO}/main/releases-manifest.json"
         "https://github.com/${REPO}/releases/latest/download/releases-manifest.json"
     )
     for u in "${urls[@]}"; do
-        local resp
-        resp=$(curl -fsSL --max-time 4 "$u" 2>/dev/null || true)
+        local resp=""
+        if [[ "$u" == file://* ]]; then
+            resp=$(cat "${u#file://}" 2>/dev/null || true)
+        else
+            resp=$(curl -fsSL --max-time 4 "$u" 2>/dev/null || true)
+        fi
         if [[ -n "$resp" ]]; then
             echo "$resp" | parse_releases_manifest "$key"
             return 0
