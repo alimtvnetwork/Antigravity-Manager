@@ -274,15 +274,14 @@ function SortableAccountRow({
             className={cn(
                 "group transition-all duration-200 border-b border-gray-100 dark:border-base-200 border-l-4",
                 isFocused
-                    ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 font-bold border-l-amber-500 border-amber-400 shadow-2xl ring-4 ring-amber-400 dark:ring-amber-400 ring-offset-2"
+                    ? "bg-amber-100/80 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100 font-bold border-l-amber-500 border-amber-400 shadow-xl ring-2 ring-amber-400/80 dark:ring-amber-400/50"
                     : selected
-                    ? "bg-white dark:bg-white text-slate-900 dark:text-slate-950 border-l-blue-600 dark:border-l-blue-500 font-bold shadow-lg"
+                    ? "bg-blue-50/90 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 border-l-blue-600 dark:border-l-blue-500 font-semibold shadow-md ring-1 ring-blue-500/30"
                     : isCurrent
-                    ? "bg-white dark:bg-white border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-950 dark:text-slate-950"
+                    ? "bg-amber-50/70 dark:bg-[#131b2e] border-l-amber-500 dark:border-l-amber-400 font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-amber-500/20"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent hover:bg-white dark:hover:bg-white hover:text-slate-950 dark:hover:text-slate-950 hover:border-l-stone-400 dark:hover:border-l-stone-500",
-                !isDragging && !isFocused && !selected ? "hover:bg-white dark:hover:bg-white hover:text-slate-950 dark:hover:text-slate-950 hover:border-l-amber-400/80" : ""
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-blue-500"
             )}
         >
             {/* 拖拽手柄 */}
@@ -541,11 +540,11 @@ function AccountRowContent({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className={cn(
                         "font-medium text-xs break-all transition-colors",
-                        isFocused
-                            ? "text-slate-950 font-bold"
+                        isFocused || selected
+                            ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-950 dark:text-white font-bold"
-                            : "text-gray-900 dark:text-gray-100"
+                            ? "text-amber-900 dark:text-amber-100 font-bold"
+                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                     )} title={account.email}>
                         {account.email}
                     </span>
@@ -785,12 +784,16 @@ function AccountRowContent({
 
             {/* 操作列 */}
             <td className={cn(
-                "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle",
+                "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors",
                 // 动态高对比高亮处理
-                isCurrent
-                    ? "bg-[#fffbeb] dark:bg-[#131b2e]"
+                isFocused
+                    ? "bg-amber-100/80 dark:bg-amber-950/40"
+                    : selected
+                    ? "bg-blue-50/90 dark:bg-blue-950/40"
+                    : isCurrent
+                    ? "bg-amber-50/70 dark:bg-[#131b2e]"
                     : "bg-white dark:bg-base-100",
-                !isCurrent ? "group-hover:bg-amber-500/10 dark:group-hover:bg-[#162238]" : ""
+                !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60" : ""
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. 刷新按钮 (首选首位) */}
