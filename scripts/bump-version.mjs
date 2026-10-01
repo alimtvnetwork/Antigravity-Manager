@@ -249,10 +249,15 @@ const TARGET_FILES = [
     {
         name: 'src-tauri/tauri.conf.json',
         relPath: 'src-tauri/tauri.conf.json',
-        replace: (content) => content.replace(
-            /("version"\s*:\s*)"[^"]+"/,
-            `$1"${newVersion}"`
-        ),
+        replace: (content) => content
+            .replace(
+                /("version"\s*:\s*)"[^"]+"/,
+                `$1"${newVersion}"`
+            )
+            .replace(
+                /("title"\s*:\s*)"Antigravity Manager Tools(?: v[^"]+)?"/,
+                `$1"Antigravity Manager Tools v${newVersion}"`
+            ),
     },
     {
         name: 'src-tauri/Cargo.lock',

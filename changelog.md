@@ -47,6 +47,17 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.112.0 (2026-10-01)**:
+        -   **[Performance] CPU 与进程资源浪费彻底根除与 Windows 界面假死（Not Responding）修复**:
+            -   **Description**: 彻底排查并根治 AGM 进程占用 30%+ CPU 与界面偶发 "Not responding" 假死卡顿问题。重构 `src-tauri/src/modules/instance.rs` 中的进程枚举与健康检查机制，将原本调用 `sysinfo::ProcessRefreshKind::everything()` 全量枚举全系统进程的重型逻辑重构为轻量级指令行/可执行文件定向快照，并引入具备 4 秒 TTL 的线程安全快照缓存 `PROCESS_SCAN_CACHE`；在单个实例健康检查与退出关闭逻辑中全面采用精准定向刷新（`ProcessesToUpdate::Some(&[pid])`），彻底消除多实例轮询时 Win32 进程句柄遍历风暴对主线程与渲染器的资源争抢。（Thanks to @aukgit）
+        -   **[Stability] 后台 agy.exe 僵尸进程与失控累积阻断治理**:
+            -   **Description**: 彻底解决多个工作区并发或断点恢复时 `agy.exe` 进程在后台无限堆积至 30+ 实例并吞噬近 2GB 内存的问题。在 `src-tauri/src/modules/repo_db.rs` 中引入全局原子工作区活跃执行进程追踪表 `ACTIVE_AGY_WORKERS`，在派发执行前主动探测现有进程活性，严密阻断同工作区重复派发；优化实例停止清理逻辑，确保实例退出时彻底回收相关 worker 进程并清理状态缓存。（Thanks to @aukgit）
+        -   **[Telemetry] 启动 60 秒静默保护期与 5 分钟遥测广播规范对齐**:
+            -   **Description**: 遵循全新低开销架构规范，在所有后台守护协程（自动切号 `auto_switcher`、邮件监听 `email_watcher`、Telegram 轮询 `telegram_inbound`、任务调度器 `scheduler`、Supabase 同步 `supabase_sync`）及前端任务启动器 `BackgroundTaskRunner.tsx` 中全面落地启动 60 秒绝对静默保护期（Startup Quiet Period），彻底消除开机加载时密集网络请求与磁盘 I/O 峰值；将全局遥测与检查保底间隔提升至 300 秒（5 分钟），全面改用事件广播推送模式。（Thanks to @aukgit）
+        -   **[UI/UX] Windows 任务管理器显式版本号标识支持**:
+            -   **Description**: 在原生 Tauri 窗口初始化与主窗体生命周期中主动通过 Win32 `SetWindowTextW` 动态绑定应用名称与包版本号（如 `Antigravity Manager Tools v4.112.0`），并将其与 `tauri.conf.json` 及自动化发版脚本 `scripts/bump-version.mjs` 原子联动，确保 Windows 任务管理器中的主进程组名称一目了然显示当前安装版本，极大便利运维与版本确认。（Thanks to @aukgit）
+
+
     *   **v4.111.0 (2026-10-01)**:
         -   **[Bug Fix] CDN Manifest v4.85.0 陈旧锁死彻底根治与发布流水线动态生成**:
             -   **Description**: 彻底排查并根治 `install.ps1` 与 `install.sh` 始终提示 `Cached CDN manifest version (v4.85.0)` 并回退到受 GitHub 限流接口的问题。恢复并升级 `03-ai-scripts/39-generate-releases-manifest.py` 清单生成引擎，将其原子纳入 `scripts/bump-version.mjs` 随版本发布同步推进；在 `.github/workflows/release.yml` 发布流水线中注入发布时动态生成步骤，并在安装脚本中增加本地预检优先通道，确保 CDN 零限流极速安装通道始终与最新正式版无缝同步。（Thanks to @aukgit）

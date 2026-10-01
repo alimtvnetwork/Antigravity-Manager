@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.111.0)
+> Professional AI Account Management & Protocol Proxy System (v4.112.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.111.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.112.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.111.0**: Completely eliminated the frozen CDN Manifest (v4.85.0) lockout issue with dynamic release generation and automated bump tracking; overhauled UI styling following modern Awan specifications with glowing slate surfaces and universal CSS3 color switching transitions, eliminating stark white row anomalies in dark mode; resolved an issue where running `install.ps1` to reinstall or update removed previously pinned Windows Taskbar shortcuts (implemented pre-flight backup and post-install restoration); fully audited and enforced the 8 Instance Sandboxing Laws; modularized Supabase sync error handling and hardened development cache cleanup.
+> Latest version **v4.112.0**: Thoroughly diagnosed and eliminated excessive CPU usage (>30%) and UI "Not responding" freezes by replacing full-system process enumeration with lightweight targeted snapshots and a 4-second TTL thread-safe cache; eradicated runaway background `agy.exe` process accumulation (preventing dozens of zombie workers from consuming ~2GB RAM) via atomic per-workspace worker tracking; enforced a mandatory 60-second Startup Quiet Period across all background daemons and frontend runners to eliminate startup I/O and telemetry storms; aligned telemetry intervals to a 5-minute broadcast pattern; and dynamically surfaced the installed version number directly within the Windows Task Manager process group title.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

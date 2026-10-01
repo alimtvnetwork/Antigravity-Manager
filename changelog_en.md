@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.112.0 (2026-10-01)**:
+        -   **[Performance] CPU & Process Resource Waste Elimination & Windows "Not Responding" Freeze Fix**:
+            -   **Description**: Fully diagnosed and eliminated the root cause of AGM process spikes exceeding 30% CPU and UI "Not responding" freezes. Refactored process discovery and health inspection in `src-tauri/src/modules/instance.rs`, replacing heavy full-system `sysinfo::ProcessRefreshKind::everything()` enumeration with lightweight targeted command-line and executable snapshots backed by a thread-safe 4-second TTL cache (`PROCESS_SCAN_CACHE`). Switched instance health verification and teardown logic to targeted single-PID inspection (`ProcessesToUpdate::Some(&[pid])`), eliminating Win32 process handle enumeration contention across multi-instance evaluations. (Thanks to @aukgit)
+        -   **[Stability] Prevention of Runaway agy.exe Worker Process Accumulation**:
+            -   **Description**: Resolved an issue where concurrent workspace prompts or auto-resume loops accumulated 30+ background `agy.exe` processes consuming ~2GB RAM. Implemented the atomic active worker tracker `ACTIVE_AGY_WORKERS` in `src-tauri/src/modules/repo_db.rs`, actively verifying worker PID liveness before dispatch to strictly intercept duplicate process spawns within the same workspace. Enhanced instance stop cleanup to reliably prune terminated workers and purge stale cache references. (Thanks to @aukgit)
+        -   **[Telemetry] Mandatory 60-Second Startup Quiet Period & 5-Minute Telemetry Floors**:
+            -   **Description**: Enforced a strict 60-second Startup Quiet Period across all background daemons (`auto_switcher`, `email_watcher`, `telegram_inbound`, `scheduler`, `supabase_sync`) and the frontend `BackgroundTaskRunner.tsx`, eliminating startup disk I/O and network telemetry storms. Clamped background check and quota synchronization intervals to a minimum of 300 seconds (5 minutes) aligned with desktop event broadcast architecture. (Thanks to @aukgit)
+        -   **[UI/UX] Prominent Version Number Display in Windows Task Manager**:
+            -   **Description**: Dynamically bound the application version to native window titles via Win32 `SetWindowTextW` upon startup (e.g. `Antigravity Manager Tools v4.112.0`). Synchronized window titles across `tauri.conf.json` and `scripts/bump-version.mjs` to ensure the Windows Task Manager process group header prominently and reliably displays the installed version number. (Thanks to @aukgit)
+
     *   **v4.111.0 (2026-10-01)**:
         -   **[Bug Fix] CDN Manifest v4.85.0 Lockout Resolution & Dynamic Generation**:
             -   **Description**: Fully resolved the persistent warning in `install.ps1` and `install.sh` reporting `Cached CDN manifest version (v4.85.0) is not newer than current installed version`. Restored and enhanced `03-ai-scripts/39-generate-releases-manifest.py`, integrated manifest synchronization directly into `scripts/bump-version.mjs`, and added dynamic manifest generation in `.github/workflows/release.yml` to guarantee rate-limit-free Tier 1 CDN version resolution is always up-to-date across all installer channels. (Thanks to @aukgit)

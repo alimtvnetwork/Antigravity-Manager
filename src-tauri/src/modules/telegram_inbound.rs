@@ -3095,6 +3095,8 @@ pub fn start_telegram_daemon() {
     }
 
     tauri::async_runtime::spawn(async move {
+        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
+        tokio::time::sleep(Duration::from_secs(60)).await;
         let mut last_update_id = 0i64;
 
         loop {
@@ -3108,7 +3110,7 @@ pub fn start_telegram_daemon() {
                     let mut st = LAST_TELEGRAM_STATUS.write().await;
                     st.is_running = false;
                 }
-                tokio::time::sleep(Duration::from_secs(10)).await;
+                tokio::time::sleep(Duration::from_secs(60)).await;
                 continue;
             }
 

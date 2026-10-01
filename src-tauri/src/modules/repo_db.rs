@@ -23,9 +23,14 @@ use std::os::windows::process::CommandExt;
 
 static MEMORY_ACTIVE_PROMPTS: OnceLock<Mutex<HashMap<String, ActivePrompt>>> = OnceLock::new();
 static DISPATCHED_PROMPTS_CACHE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static ACTIVE_AGY_WORKERS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
 
 fn get_memory_prompts_map() -> &'static Mutex<HashMap<String, ActivePrompt>> {
     MEMORY_ACTIVE_PROMPTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn get_active_agy_workers() -> &'static Mutex<HashMap<String, u32>> {
+    ACTIVE_AGY_WORKERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub fn get_dispatched_prompts_cache() -> &'static Mutex<HashSet<String>> {
@@ -1913,6 +1918,28 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         return false;
     }
 
+    let ws_key = format!("{}:{}", prompt.instance_id, prompt.repo_path);
+    {
+        let mut workers = get_active_agy_workers().lock().unwrap();
+        if let Some(&existing_pid) = workers.get(&ws_key) {
+            let mut sys = sysinfo::System::new();
+            let target_pid = sysinfo::Pid::from_u32(existing_pid);
+            sys.refresh_processes_specifics(
+                sysinfo::ProcessesToUpdate::Some(&[target_pid]),
+                sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+            );
+            if sys.process(target_pid).is_some() {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Skipping duplicate spawn for prompt '{}'.",
+                    existing_pid, ws_key, prompt.id
+                ));
+                return false;
+            } else {
+                workers.remove(&ws_key);
+            }
+        }
+    }
+
     if let Some(agy_bin) = crate::modules::process::get_antigravity_cli_executable_path() {
         let mut cmd = std::process::Command::new(&agy_bin);
         cmd.current_dir(&ws_dir);
@@ -1968,9 +1995,14 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
 
         match cmd.spawn() {
             Ok(child) => {
+                let child_pid = child.id();
+                {
+                    let mut workers = get_active_agy_workers().lock().unwrap();
+                    workers.insert(ws_key, child_pid);
+                }
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
-                    prompt.id, child.id(), prompt.instance_id, prompt.repo_path, clean_prompt
+                    prompt.id, child_pid, prompt.instance_id, prompt.repo_path, clean_prompt
                 ));
                 true
             }
@@ -3623,7 +3655,18 @@ fn update_workspace_status_file(
 pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) -> usize {
     let mut stopped = 0;
     let mut sys = sysinfo::System::new();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::All,
+        sysinfo::ProcessRefreshKind::new()
+            .with_cmd(sysinfo::UpdateKind::OnlyIfNotSet)
+            .with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+    );
+
+    {
+        let mut workers = get_active_agy_workers().lock().unwrap();
+        let inst_prefix = format!("{}:", instance_id);
+        workers.retain(|k, _| !k.starts_with(&inst_prefix));
+    }
 
     let norm_data = data_dir.to_lowercase().replace('\\', "/");
     let clean_data = norm_data.trim_end_matches('/');

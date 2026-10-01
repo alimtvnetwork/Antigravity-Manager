@@ -114,11 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-<<<<<<< HEAD
-**Bar 2: Version-Based Installation (v4.110.1)**
-=======
-**Bar 2: Version-Based Installation (v4.111.0)**
->>>>>>> 3fb08b2be16ed065100c584408b7d2af5403d379
+**Bar 2: Version-Based Installation (v4.112.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -530,11 +526,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-<<<<<<< HEAD
-> 最新版本 **v4.110.1**：彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题，安装前主动预检并安全备份固定快捷方式，修正注册表带引号路径比较错误以杜绝误调 `uninstall.exe` 触发 Windows 墓碑化取消固定，彻底移除对任务栏目录文件的强制删除，安装后自动还原并更新固定快捷方式；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
-=======
-> 最新版本 **v4.111.0**：彻底根治 CDN Manifest (v4.85.0) 锁死陈旧版本问题，重构发布流水线动态生成并纳入版本发布自动化；遵循 Awan 规范重构现代低饱和微发光配色并引入全局 CSS3 平滑色阶切换动画，彻底解决暗色模式白条刺眼问题；彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题（安全备份并在安装后精准还原）；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
->>>>>>> 3fb08b2be16ed065100c584408b7d2af5403d379
+> 最新版本 **v4.112.0**：彻底排查并根治 AGM 进程 CPU 占用偏高（30%+）与界面偶发 "Not responding" 假死卡顿问题，将全系统进程扫描重构为轻量级定向快照并引入 4 秒 TTL 安全缓存；全面排查后台 `agy.exe` 进程失控累积至 30+ 实例消耗 2GB 内存的问题，引入原子活跃工作区进程追踪表严密阻断重复派发；全面落地开机启动 60 秒绝对静默保护期（Startup Quiet Period），将后台遥测保底间隔提升至 300 秒（5 分钟）并改用事件广播推送模式；在原生窗口标题与 Windows 任务管理器中显式绑定并展示当前安装版本号（如 `Antigravity Manager Tools v4.112.0`），极大提升可维护性与稳定性。
 
 👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 
