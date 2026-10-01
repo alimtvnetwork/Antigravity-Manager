@@ -22,7 +22,12 @@
 - Switch-back to `rokixshohag1@gmail.com`. Settings DB confirmed that address. The copy is still running as PID 8588.
 - The installed CLI marked the two queued prompts `dispatched` as well as the running one. The source fix for that is not in this binary yet.
 
+## Restore re-check with `src-tauri/target/debug/agm.exe` (build exit 0, 1m 40s)
+- Unrestored the same three backup rows and ran `restore-running-prompts --instance cli-switch-proof-6857`.
+- CLI printed `running` for "running the Gitmap tests" and `queued` for the other two.
+- Database after restore: `proof-running-1` is `dispatched` (sent again), `proof-queued-1` and `proof-queued-2` are still `queued`.
+- `agm-alim.exe` PID 10584 was still running afterward.
+
 ## Still open
-- [ ] Rebuild `agm` and re-run restore on this copy so queued prompts stay `queued`. The installed 4.109.0 CLI does not contain that fix.
 - [ ] Telegram message colors (email templates are updated; Telegram is HTML text, not these CSS rules).
 - [x] Conversation prune is `agm prune` and already skips running and queued prompts. `agm clean` / `agm purge` only delete build artifacts.
