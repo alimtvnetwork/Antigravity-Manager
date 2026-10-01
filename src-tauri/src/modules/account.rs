@@ -1638,7 +1638,7 @@ pub async fn switch_account(
     });
     let predicted_next_email = predicted_candidate.map(|c| c.email);
 
-    crate::modules::notification_hub::notify_account_switched_details(
+    let _notify = crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email,
             previous_quota_4h: prev_4h,
@@ -1658,7 +1658,8 @@ pub async fn switch_account(
             backed_up_prompts_count: None,
             restored_prompts_count: None,
         },
-    );
+    )
+    .await;
 
     Ok(())
 }

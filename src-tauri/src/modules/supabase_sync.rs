@@ -217,6 +217,117 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
     Ok(())
 }
 
+/// Upsert one instance profile to the root Supabase endpoint and read the stored email back.
+pub async fn push_and_read_instance_email(instance_id: &str) -> Result<String, AppError> {
+    let config = load_config()?;
+    let endpoint = config
+        .endpoints
+        .iter()
+        .find(|ep| ep.is_enabled && ep.role == "root")
+        .ok_or_else(|| AppError::Config("No enabled root Supabase endpoint".to_string()))?;
+    let registry = instance::load_registry().map_err(|e| AppError::Config(e.to_string()))?;
+    let inst = registry
+        .instances
+        .into_iter()
+        .find(|item| item.id == instance_id)
+        .ok_or_else(|| AppError::Config(format!("Instance '{}' is not registered", instance_id)))?;
+    let client = SupabaseClient::new(endpoint)?;
+    let profile_id = format!("{}_{}", get_local_node_id(), inst.id);
+    let email = inst.bound_email.clone().unwrap_or_default();
+    let now = Utc::now().timestamp();
+    let payload = json!({
+        "id": profile_id,
+        "node_id": get_local_node_id(),
+        "profile_name": inst.name,
+        "active_account_id": inst.bound_account_id.clone().unwrap_or_default(),
+        "active_account_email": email,
+        "is_active": inst.is_default,
+        "quota_percent": 100,
+        "status": if inst.is_default { "running" } else { "idle" },
+        "updated_at": now
+    });
+    let node_id = get_local_node_id();
+    let node_payload = json!({
+        "id": node_id,
+        "alias": config.node_alias,
+        "ip_address": get_local_ip(),
+        "uptime_seconds": get_uptime_seconds(),
+        "project_count": 1,
+        "last_heartbeat_at": now,
+        "status": "online"
+    });
+    let node_written = client.upsert("nodes", node_payload, "id").await?;
+    if let Some(message) = postgrest_error_message(&node_written) {
+        return Err(AppError::Network(
+            format!("Supabase node upsert failed: {}", message),
+            None,
+        ));
+    }
+    let written = client
+        .upsert("instance_profiles", payload, "id")
+        .await
+        .map_err(|e| AppError::Network(format!("Supabase upsert failed: {}", e), None))?;
+    if let Some(message) = postgrest_error_message(&written) {
+        return Err(AppError::Network(
+            format!("Supabase profile upsert failed: {}", message),
+            None,
+        ));
+    }
+    let rows = client
+        .select(
+            "instance_profiles",
+            &format!("id=eq.{}&select=active_account_email", profile_id),
+        )
+        .await?;
+    if let Some(message) = postgrest_error_message(&rows) {
+        return Err(AppError::Network(
+            format!("Supabase profile read failed: {}", message),
+            None,
+        ));
+    }
+    let stored = email_from_postgrest(&written)
+        .or_else(|| email_from_postgrest(&rows))
+        .unwrap_or_default();
+    if !stored.eq_ignore_ascii_case(&email) {
+        return Err(AppError::Config(format!(
+            "Supabase stored '{}' for profile '{}' but the local instance is bound to '{}'",
+            stored, profile_id, email
+        )));
+    }
+    Ok(format!("profile {} email {} confirmed", profile_id, stored))
+}
+
+fn postgrest_error_message(value: &serde_json::Value) -> Option<String> {
+    let message = value.get("message").and_then(|item| item.as_str())?;
+    let code = value
+        .get("code")
+        .and_then(|item| item.as_str())
+        .unwrap_or("");
+    if code.is_empty() {
+        Some(message.to_string())
+    } else {
+        Some(format!("{} ({})", message, code))
+    }
+}
+
+fn email_from_postgrest(value: &serde_json::Value) -> Option<String> {
+    let row = value
+        .as_array()
+        .and_then(|items| items.first())
+        .unwrap_or(value);
+    let email = row
+        .get("active_account_email")
+        .and_then(|item| item.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if email.is_empty() {
+        None
+    } else {
+        Some(email)
+    }
+}
+
 /// Force an immediate heartbeat and instance registry sync to all root endpoints
 pub async fn sync_local_node_now() -> Result<(), AppError> {
     let config = load_config()?;

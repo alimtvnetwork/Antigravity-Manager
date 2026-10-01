@@ -1259,7 +1259,7 @@ pub async fn execute_profile_rotation_with_context(
         .collect();
     let backup_count_opt = backup_res.as_ref().ok().copied();
 
-    crate::modules::notification_hub::notify_account_switched_details(
+    let _notify = crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email,
             previous_quota_4h: prev_q_4h,
@@ -1279,7 +1279,8 @@ pub async fn execute_profile_rotation_with_context(
             backed_up_prompts_count: backup_count_opt,
             restored_prompts_count: None,
         },
-    );
+    )
+    .await;
 
     // Delegate directly to the exact account switch pipeline (the exact ⇄ button handler)
     let app_handle_opt = crate::modules::log_bridge::get_app_handle();

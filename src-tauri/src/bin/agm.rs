@@ -26,6 +26,7 @@ use uuid::Uuid;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    antigravity_tools_lib::modules::logger::init_logger();
     let args: Vec<String> = env::args().collect();
     if args.len() <= 1 {
         print_banner();
@@ -5756,6 +5757,7 @@ fn cmd_supabase(args: &[String]) {
         },
         "schema" => cmd_supabase_schema(sub_args),
         "sync" => cmd_supabase_sync(&rt),
+        "confirm" => cmd_supabase_confirm(&rt, sub_args),
         "enable" => {
             let mut cfg = supabase_sync::load_config().unwrap_or_default();
             cfg.is_sync_enabled = true;
@@ -6486,6 +6488,25 @@ fn cmd_supabase_sync(rt: &tokio::runtime::Runtime) {
     match rt.block_on(supabase_sync::sync_local_node_now()) {
         Ok(_) => println!("✅ Sync completed successfully."),
         Err(e) => eprintln!("[ERROR] Sync failed: {}", e),
+    }
+}
+
+fn cmd_supabase_confirm(rt: &tokio::runtime::Runtime, args: &[String]) {
+    let instance_id = args
+        .iter()
+        .find(|arg| !arg.starts_with('-'))
+        .cloned()
+        .unwrap_or_else(|| "default".to_string());
+    println!(
+        "Checking Supabase profile for instance '{}'...",
+        instance_id
+    );
+    match rt.block_on(supabase_sync::push_and_read_instance_email(&instance_id)) {
+        Ok(message) => println!("[OK] [Notify] supabase: OK {}", message),
+        Err(err) => {
+            let trace = std::backtrace::Backtrace::force_capture();
+            eprintln!("[Notify] supabase: FAIL {}\n{}", err, trace);
+        }
     }
 }
 

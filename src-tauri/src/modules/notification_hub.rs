@@ -170,13 +170,19 @@ pub struct SwitchNotificationDetails {
 }
 
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch
-pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
+pub async fn notify_account_switched_details(mut details: SwitchNotificationDetails) -> String {
     let now_ts = chrono::Utc::now().timestamp();
     let selected_clean = details.selected_email.trim().to_string();
 
     if let Ok(mut guard) = LAST_SWITCH_DISPATCH.lock() {
         if guard.0.eq_ignore_ascii_case(&selected_clean) && (now_ts - guard.1).abs() <= 5 {
-            return;
+            let line = format!(
+                "[Notify] skipped duplicate switch to {} within 5s",
+                selected_clean
+            );
+            logger::log_info(&line);
+            println!("  [OK] {}", line);
+            return line;
         }
         *guard = (selected_clean.clone(), now_ts);
     }
@@ -291,11 +297,62 @@ pub fn notify_account_switched_details(mut details: SwitchNotificationDetails) {
         }
     }
 
-    tauri::async_runtime::spawn(async move {
-        dispatch_email_switch_alert(&details);
-        dispatch_self_json_in_use_broadcast(&details);
-        dispatch_telegram_switch_alert(&details).await;
-    });
+    deliver_switch_channels(&details).await
+}
+
+fn redact_secrets(text: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i..].starts_with(&['/', 'b', 'o', 't']) {
+            out.push_str("/bot<redacted>");
+            i += 4;
+            while i < chars.len() && chars[i] != '/' && chars[i] != ' ' {
+                i += 1;
+            }
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn record_channel(name: &str, result: Result<String, String>) -> String {
+    match result {
+        Ok(msg) => {
+            let line = format!("[Notify] {}: OK {}", name, msg);
+            logger::log_info(&line);
+            println!("  [OK] {}", line);
+            line
+        }
+        Err(err) => {
+            let trace = std::backtrace::Backtrace::force_capture();
+            let line = format!(
+                "[Notify] {}: FAIL {}\n{}",
+                name,
+                redact_secrets(&err),
+                trace
+            );
+            logger::log_error(&line);
+            eprintln!("{}", line);
+            format!("[Notify] {}: FAIL {}", name, redact_secrets(&err))
+        }
+    }
+}
+
+async fn deliver_switch_channels(details: &SwitchNotificationDetails) -> String {
+    let email = record_channel("email", dispatch_email_switch_alert(details));
+    dispatch_self_json_in_use_broadcast(details);
+    let telegram = record_channel("telegram", dispatch_telegram_switch_alert(details).await);
+    let supabase = record_channel(
+        "supabase",
+        crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
+            .await
+            .map_err(|err| redact_secrets(&err.to_string())),
+    );
+    format!("{}\n{}\n{}", email, telegram, supabase)
 }
 
 /// Dispatch notifications across Email and Telegram upon account/instance switch (backward-compatible)
@@ -305,7 +362,7 @@ pub fn notify_account_switched(
     reason: &str,
     is_auto: bool,
 ) {
-    notify_account_switched_details(SwitchNotificationDetails {
+    let details = SwitchNotificationDetails {
         previous_email: None,
         previous_quota_4h: None,
         previous_quota_weekly: None,
@@ -323,26 +380,41 @@ pub fn notify_account_switched(
         backed_up_projects: Vec::new(),
         backed_up_prompts_count: None,
         restored_prompts_count: None,
-    });
+    };
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            handle.spawn(async move {
+                let _ = notify_account_switched_details(details).await;
+            });
+        }
+        Err(_) => {
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                rt.block_on(notify_account_switched_details(details));
+            }
+        }
+    }
 }
 
 /// Helper to render and dispatch email switch notification
-fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
+fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) -> Result<String, String> {
     let settings = match email_vault_db::get_notification_settings() {
         Ok(s) => s,
-        Err(_) => return,
+        Err(e) => return Err(format!("email settings unreadable: {}", e)),
     };
 
     if !settings.is_enabled {
-        return;
+        return Err("email notifications are disabled".to_string());
     }
     if !settings.notify_on_workspace_switch {
-        return;
+        return Err("workspace-switch email is disabled".to_string());
     }
 
     let recipients = match email_vault_db::list_notify_recipients() {
         Ok(r) => r,
-        Err(_) => return,
+        Err(e) => return Err(format!("email recipients unreadable: {}", e)),
     };
 
     let active_recipients: Vec<String> = recipients
@@ -352,7 +424,7 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         .collect();
 
     if active_recipients.is_empty() {
-        return;
+        return Err("no active email recipients".to_string());
     }
 
     let selected_display = details.selected_email.trim();
@@ -709,7 +781,13 @@ fn dispatch_email_switch_alert(details: &SwitchNotificationDetails) {
         &html
     };
 
-    let _ = email_sender::dispatch_email_with_failover(&subject, email_body, &active_recipients);
+    match email_sender::dispatch_email_with_failover(&subject, email_body, &active_recipients) {
+        Ok(result) => Ok(format!(
+            "sent '{}' via {}",
+            subject, result.used_account_email
+        )),
+        Err(err) => Err(err),
+    }
 }
 
 /// Dispatch machine-readable pure JSON self-broadcast email to the default account (zero HTML)
@@ -774,21 +852,23 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
 }
 
 /// Helper to render and dispatch Telegram switch notification
-async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
+async fn dispatch_telegram_switch_alert(
+    details: &SwitchNotificationDetails,
+) -> Result<String, String> {
     let config = match telegram_inbound::load_config() {
         Ok(c) => c,
-        Err(_) => return,
+        Err(e) => return Err(format!("telegram config unreadable: {}", e)),
     };
 
     if !config.is_enabled {
-        return;
+        return Err("telegram bot is disabled".to_string());
     }
     if config.bot_token.trim().is_empty() {
-        return;
+        return Err("telegram bot token is empty".to_string());
     }
 
     let Some(chat_id) = config.allowed_chat_id else {
-        return;
+        return Err("telegram chat id is not set".to_string());
     };
 
     let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
@@ -925,12 +1005,9 @@ async fn dispatch_telegram_switch_alert(details: &SwitchNotificationDetails) {
         prompt_section
     );
 
-    if let Err(e) = telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await
-    {
-        logger::log_warn(&format!(
-            "[NotificationHub] Telegram switch alert failed: {}",
-            e
-        ));
+    match telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await {
+        Ok(()) => Ok(format!("sent to chat {}", chat_id)),
+        Err(e) => Err(redact_secrets(&e.to_string())),
     }
 }
 

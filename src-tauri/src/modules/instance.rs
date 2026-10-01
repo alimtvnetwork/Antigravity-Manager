@@ -2822,7 +2822,7 @@ pub async fn switch_account_to_instance(
         running_projs.into_iter().map(|p| p.repo_name),
     );
 
-    crate::modules::notification_hub::notify_account_switched_details(
+    let _notify = crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
             previous_email: prev_email.clone(),
             previous_quota_4h: prev_4h,
@@ -2842,7 +2842,20 @@ pub async fn switch_account_to_instance(
             backed_up_prompts_count: Some(backed_up_count),
             restored_prompts_count: Some(resent.len() + dispatched),
         },
-    );
+    )
+    .await;
+    if let Ok(prompts) = crate::modules::repo_db::list_all_prompts() {
+        for prompt in prompts
+            .into_iter()
+            .filter(|prompt| prompt.instance_id == instance.id)
+        {
+            println!("  [Prompt] {} status={}", prompt.id, prompt.status);
+            crate::modules::logger::log_info(&format!(
+                "[Prompt] instance {} prompt {} status {}",
+                instance.id, prompt.id, prompt.status
+            ));
+        }
+    }
 
     Ok(())
 }
