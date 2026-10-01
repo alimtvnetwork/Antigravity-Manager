@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.109.4 (2026-09-30)** (includes v4.109.1–v4.109.3):
+        -   **[Bug Fix] Update Settings Backward Compatibility**:
+            -   **Description**: Older `update_settings.json` files without `auto_check` / `last_check_time` no longer fail to load (E9001 when closing the update dialog). (Thanks to @aukgit)
+        -   **[Bug Fix] Stack Trace Parsing and UI Fixes**:
+            -   **Description**: Fixed parsing of URL-only stack frames with new tests; fixed the Accounts focus effect ordering and the cleanup dialog's Escape key. (Thanks to @aukgit)
+        -   **[Test] Test Runner and E2E Script**:
+            -   **Description**: Added the `npm run test` frontend runner and fixed stale tests; `scripts/test-instance-e2e.ps1` creates `build-demo/` itself and backs up running prompts per instance. (Thanks to @aukgit)
+        -   **[Known Issue] Missing Platform Assets**:
+            -   **Description**: v4.109.2–v4.109.4 were published while CI was red and lack Windows/Linux installers; the installers on `main` now skip partial releases. (Thanks to @aukgit)
+
     *   **v4.109.0 (2026-09-30)**:
         -   **[Bug Fix] Instance Profile Switching and Prompt Persistence Improvements**:
             -   **Description**: Fixed issue where fast-forward instance switching discarded the active prompt and reused default credentials. Running prompts are now correctly persisted, and isolated IDE accounts strictly enforce their bound credentials. (Thanks to @aukgit)

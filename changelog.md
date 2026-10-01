@@ -40,6 +40,16 @@
 > 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
 
 *   **版本历史记录 (Version History)**:
+    *   **v4.109.4 (2026-09-30)**（含 v4.109.1–v4.109.3）:
+        -   **[Bug Fix] 更新设置向后兼容**:
+            -   **Description**: 旧版 `update_settings.json` 缺少 `auto_check` / `last_check_time` 字段时不再加载失败（关闭更新弹窗报 E9001）。（Thanks to @aukgit）
+        -   **[Bug Fix] 堆栈解析与界面修复**:
+            -   **Description**: 修复仅含 URL 的堆栈帧解析并新增测试；修复账号页定位按钮的副作用顺序与清理弹窗 Esc 关闭。（Thanks to @aukgit）
+        -   **[Test] 测试入口与端到端脚本**:
+            -   **Description**: 新增 `npm run test` 前端测试入口并修复过期测试；`scripts/test-instance-e2e.ps1` 自动创建 `build-demo/` 并按实例备份运行中的提示词。（Thanks to @aukgit）
+        -   **[Known Issue] 部分安装包缺失**:
+            -   **Description**: v4.109.2–v4.109.4 发布时 CI 未通过，缺少 Windows/Linux 安装包；`main` 上的安装脚本已改为跳过不完整的版本。（Thanks to @aukgit）
+
     *   **v4.109.0 (2026-09-30)**:
         -   **[Bug Fix] 实例配置切换和提示词恢复改进**:
             -   **Description**: 修复了多实例切换（如快进）时会丢失当前正在运行的提示词并错误继承默认账号的 Bug。目前已确保运行中的提示词自动备份与恢复，并严格强制执行独立环境隔离的账号身份。（Thanks to @aukgit）
