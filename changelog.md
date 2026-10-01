@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.118.0] - 2026-10-02
+
+### Added
+- Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components
+- Enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas
+- Universal CSS3 color switching transitions and ambient glow pulse keyframe animations across the complete interface
+- Full English documentation standardization with zero Chinese character policy across all distribution channels
+
+---
+
 ## [v4.117.0] - 2026-10-02
 
 ### Added
@@ -97,6 +107,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.118.0 (2026-10-02)**:
+        -   **[UI/UX] Awan Design System Surface Contrast & Elevation Stability**:
+            -   **Description**: Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components; optimized active instance and account styling for seamless dark mode readability. (Thanks to @aukgit)
+        -   **[Theme] Accessible WCAG AAA Color Semantics & CSS3 Animations**:
+            -   **Description**: Enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas; harmonized universal CSS3 color switching transitions and ambient glow pulse keyframe animations across the complete interface. (Thanks to @aukgit)
+        -   **[Documentation] Universal English Documentation Standardization**:
+            -   **Description**: Enforced 100% pure English standardization across all repository documentation, install scripts, and distribution channels with a strict zero Chinese character policy. (Thanks to @aukgit)
+
+
     *   **v4.117.0 (2026-10-02)**:
         -   **[UI/UX] Awan Brand Elevation Hierarchy & Dark Mode Contrast Overhaul**:
             -   **Description**: Harmonized surface luminance and elevation hierarchy across the application according to Awan Software design system (`#071a27` Deep Orbit canvas < `#0c2438` Deep Orbit Card < `#15334d` Elevated Row / Modal). Resolved all dark-on-dark text contrast bottlenecks in `InstanceSelector.tsx` where active items now feature elevated `#15334d` surfaces, Zero-G Cyan accents (`#19b7c9`), and high-contrast cyan email typography (`dark:text-cyan-200`). Removed redundant close icon button in InstanceSelector header. (Thanks to @aukgit)

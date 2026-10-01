@@ -1,3 +1,9 @@
+## v4.118.0 — 2026-10-02 (Minor release: Awan design system surface contrast, WCAG AAA color semantics, and English documentation standardization)
+
+**Scope:** Minor version bump. Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components, enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas, universal CSS3 color switching transitions, and universal English documentation standardization.
+
+---
+
 ## v4.117.0 — 2026-10-02 (Minor release: Awan brand elevation hierarchy, dark mode contrast resolution, and CSS3 color transitions)
 
 **Scope:** Minor version bump. Harmonized elevation hierarchy and surface luminance according to Awan Software design system, resolved dark-on-dark contrast bottlenecks across InstanceSelector modals and inputs, high-contrast typography across QuotaItem and Account components, universal CSS3 color transitions, and 100% pure English documentation.
