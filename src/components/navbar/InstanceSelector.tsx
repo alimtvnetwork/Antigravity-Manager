@@ -510,9 +510,6 @@ export function InstanceSelector() {
                         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                             {t('instances.header_title', 'INSTANCES / PROFILES')}
                         </span>
-                        <button type="button" onClick={() => setIsOpen(false)} className="p-1 ml-auto mr-2 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" title="Close Panel">
-                            <X className="w-3.5 h-3.5" />
-                        </button>
                         <div className="flex items-center gap-1 relative">
                             {/* Create New Profile Button */}
                             <button
@@ -636,7 +633,7 @@ export function InstanceSelector() {
                                         className={cn(
                                             "w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150 border-l-4",
                                             isSelected
-                                                ? "bg-blue-50/80 dark:bg-[#071a27] text-blue-950 dark:text-white font-bold shadow-sm border-l-[#2878f0] dark:border-l-[#19b7c9] ring-1 ring-[#19b7c9]/40 my-1 rounded-r-md"
+                                                ? "bg-blue-50/80 dark:bg-[#15334d] text-blue-950 dark:text-white font-bold shadow-sm border-l-[#2878f0] dark:border-l-[#19b7c9] ring-1 ring-[#19b7c9]/40 my-1 rounded-r-md"
                                                 : "border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100/70 hover:text-slate-900 dark:hover:bg-[#15334d]/60 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-[#19b7c9]"
                                         )}
                                     >
@@ -678,11 +675,11 @@ export function InstanceSelector() {
                                                     )}
                                                 </div>
                                                 {displayEmail ? (
-                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-cyan-200 font-semibold" : "text-gray-500 dark:text-slate-400")}>
+                                                    <span className={cn("text-[10px] truncate font-mono", isSelected ? "text-slate-700 dark:text-cyan-200 font-semibold" : "text-gray-500 dark:text-slate-300 font-medium")}>
                                                         {displayEmail}
                                                     </span>
                                                 ) : (
-                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-500 dark:text-slate-400" : "text-gray-400/60 dark:text-gray-500/60")}>
+                                                    <span className={cn("text-[10px] italic truncate", isSelected ? "text-slate-500 dark:text-cyan-300/70" : "text-gray-400 dark:text-slate-400")}>
                                                         {t('instances.unlinked', 'No account linked')}
                                                     </span>
                                                 )}
@@ -936,7 +933,7 @@ export function InstanceSelector() {
                     onClick={() => setIsCopyOpen(false)}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-slate-800"
+                        className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-md shadow-2xl border border-gray-100 dark:border-[#15334d]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-3">
@@ -949,7 +946,7 @@ export function InstanceSelector() {
                             <button
                                 type="button"
                                 onClick={() => setIsCopyOpen(false)}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
@@ -965,7 +962,7 @@ export function InstanceSelector() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-3 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-lg mb-3 text-xs"
                             autoFocus
                         />
 
@@ -1043,7 +1040,7 @@ export function InstanceSelector() {
                     onClick={() => setIsEditOpen(false)}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#15334d]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-3">
@@ -1056,7 +1053,7 @@ export function InstanceSelector() {
                             <button
                                 type="button"
                                 onClick={() => setIsEditOpen(false)}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
@@ -1068,7 +1065,7 @@ export function InstanceSelector() {
                             value={editInstanceName}
                             onChange={(e) => setEditInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
+                            className="input input-sm w-full bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
                             autoFocus
                         />
                         <div className="flex justify-end gap-2">
@@ -1102,7 +1099,7 @@ export function InstanceSelector() {
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800"
+                        className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#15334d]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-3 text-red-600">
@@ -1118,7 +1115,7 @@ export function InstanceSelector() {
                                     setDeleteTarget(null);
                                     setIsDeleteOpen(false);
                                 }}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />

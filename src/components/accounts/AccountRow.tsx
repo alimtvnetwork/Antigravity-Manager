@@ -105,9 +105,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             className={cn(
             "group transition-all duration-200 border-b border-gray-100 dark:border-slate-800 border-l-4",
             isFocused
-                ? "bg-emerald-50/90 dark:bg-[#0c2438] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
+                ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
                 : isCurrent
-                ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-slate-100 shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-emerald-100/60 dark:hover:bg-[#15334d]/60"
+                ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-white shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-emerald-100/60 dark:hover:bg-[#15334d]/60"
                 : selected
                 ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
                 : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]",

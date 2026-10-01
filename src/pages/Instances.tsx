@@ -711,7 +711,7 @@ export default function Instances() {
                                                     );
                                                 }
                                                 return (
-                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-white/10 shrink-0">
+                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-slate-300 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-[#15334d] shrink-0">
                                                         <Circle className="w-2.5 h-2.5" />
                                                         FREE
                                                     </span>
@@ -1117,7 +1117,7 @@ export default function Instances() {
                                                         "text-[9px] font-bold px-1.5 py-0.5 rounded",
                                                         tier.includes('ULTRA') ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" :
                                                         tier.includes('PRO') ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
-                                                        "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400"
+                                                        "bg-gray-100 text-gray-600 dark:bg-[#15334d] dark:text-slate-300"
                                                     )}>
                                                         {tier}
                                                     </span>
