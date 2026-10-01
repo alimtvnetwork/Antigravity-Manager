@@ -2090,6 +2090,29 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         &config.data_dir,
     );
 
+    pids.retain(|&pid| {
+        let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) else {
+            return false;
+        };
+        let name = proc.name().to_string_lossy().to_lowercase();
+        let exe = proc
+            .exe()
+            .map(|p| p.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let is_editor_or_manager = name.contains("cursor")
+            || exe.contains("cursor")
+            || name.contains("agm")
+            || exe.contains("agm-alim");
+        if is_editor_or_manager {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Refusing to close protected process PID {} ({})",
+                pid, name
+            ));
+            return false;
+        }
+        true
+    });
+
     if pids.is_empty() {
         let _ = mark_instance_stopped(instance_id);
         return Ok(());

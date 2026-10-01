@@ -3979,12 +3979,17 @@ fn cmd_restore_running_prompts(args: &[String]) {
                 let short_id: String = r.prompt_id.chars().take(8).collect();
                 let (snippet, _) = truncate_words(&r.prompt_text, 15);
                 let img_label = if r.has_images { "Yes" } else { "None" };
+                let status_label = if r.status == "queued" {
+                    "queued"
+                } else {
+                    "running"
+                };
                 println!(
                     "#{:<4} {:<10} {:<24} {:<10} {:<16} {}",
                     idx + 1,
                     short_id,
                     r.project_name,
-                    "queued",
+                    status_label,
                     img_label,
                     snippet
                 );

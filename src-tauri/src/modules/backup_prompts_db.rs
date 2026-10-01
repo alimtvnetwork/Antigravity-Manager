@@ -570,9 +570,16 @@ pub fn restore_running_prompts_for_instance(
     // Reset dispatched prompts cache to allow restored prompts to execute post-switch
     repo_db::reset_dispatched_prompts_cache();
 
-    // Re-inject into repo_db active_prompts table if records exist in backup DB
+    // Re-inject into repo_db active_prompts table if records exist in backup DB.
+    // Queued prompts stay queued. Anything that was running is marked backed_up so
+    // dispatch sends that prompt again and leaves the queue untouched.
     for rec in &records {
         let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
+        let restored_status = prompt_status_after_restore(&rec.status);
+        crate::modules::logger::log_info(&format!(
+            "[BackupDB] Restore prompt {} on {}: saved '{}' -> '{}'",
+            rec.prompt_id, eff_inst, rec.status, restored_status
+        ));
         let active_p = ActivePrompt {
             id: rec.prompt_id.clone(),
             project_id: rec.project_id.clone(),
@@ -581,7 +588,7 @@ pub fn restore_running_prompts_for_instance(
             prompt_content: rec.prompt_text.clone(),
             model: Some("gemini-3.8-flash-high".to_string()),
             session_id: Some(rec.conversation_id.clone()),
-            status: "backed_up".to_string(),
+            status: restored_status.to_string(),
             created_at: now,
             updated_at: now,
             image_payload: rec.images_payload.clone(),
@@ -608,6 +615,16 @@ pub fn restore_running_prompts_for_instance(
     let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
 
     Ok(records)
+}
+
+/// Queued stays queued. A running, dispatched, or already backed-up prompt is
+/// marked backed_up so the dispatcher sends it again.
+fn prompt_status_after_restore(saved: &str) -> &'static str {
+    if saved == "queued" {
+        "queued"
+    } else {
+        "backed_up"
+    }
 }
 
 /// Query storage information of the split database

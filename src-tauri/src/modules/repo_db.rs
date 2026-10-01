@@ -2065,6 +2065,9 @@ pub fn resend_running_commands_for_instance(
     let mut dispatched_repos = HashSet::new();
 
     for mut prompt in prompts {
+        if prompt.status == "queued" {
+            continue;
+        }
         let clean_path = prompt.repo_path.trim().to_lowercase().replace('\\', "/");
         if dispatched_repos.contains(&clean_path) {
             crate::modules::logger::log_info(&format!(
