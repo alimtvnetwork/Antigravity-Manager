@@ -120,6 +120,7 @@ interface SortableRowProps {
 
 interface AccountRowContentProps {
     account: Account;
+    selected?: boolean;
     isCurrent: boolean;
     isFocused?: boolean;
     isRefreshing: boolean;
@@ -312,6 +313,7 @@ function SortableAccountRow({
             </td>
             <AccountRowContent
                 account={account}
+                selected={selected}
                 isCurrent={isCurrent}
                 isFocused={isFocused}
                 isRefreshing={isRefreshing}
@@ -340,6 +342,7 @@ function SortableAccountRow({
  */
 function AccountRowContent({
     account,
+    selected = false,
     isCurrent,
     isFocused = false,
     isRefreshing,
@@ -1257,6 +1260,7 @@ function AccountTable({
                                     </td>
                                     <AccountRowContent
                                         account={activeAccount}
+                                        selected={selectedIds.has(activeAccount.id)}
                                         isCurrent={isAccountCurrent(activeAccount)}
                                         isRefreshing={refreshingIds.has(activeAccount.id)}
                                         isSwitching={activeAccount.id === switchingAccountId}
