@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.109.4-3B82F6?style=flat-square" alt="Version 4.109.4">
+    <img src="https://img.shields.io/badge/Version-4.110.0-3B82F6?style=flat-square" alt="Version 4.110.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -455,16 +455,18 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.110.0** (2026-10-01):
+  - **Taskbar Pin Preservation**: Resolved taskbar pin loss during `install.ps1` reinstallation/updates by backing up pins, banning taskbar shortcut deletions, fixing unquoted registry path comparison, and auto-updating pin targets.
+  - **8 Sandboxing Laws Compliance**: Full multi-instance blind testing flow with strict PID and folder isolation, Supabase sync hardening, and dev tool cache cleaner.
+  - **CI Formatting Gates**: A tracked pre-commit hook (installed by `npm install`) blocks unformatted Rust, and the release workflow refuses tags whose Rust code fails `cargo fmt --check`.
+  - **Installer Asset Validation**: `install.ps1` and `install.sh` verify platform assets exist before downloading and skip incomplete releases.
+  - **Multi-Instance E2E**: Comprehensive test suite covering switch, fast-forward, per-instance prompt backup, and heartbeat end to end.
 - **v4.109.4** (2026-09-30):
   - **Prompt-Safe Instance Switching**: Switching or fast-forwarding an instance backs up and restores its running prompt, and each isolated instance keeps its own bound account.
   - **`agm clear` Retention**: Keep the newest N prompts and clean Rust/Cargo build caches.
   - **Update Settings Compatibility**: Older `update_settings.json` files without `auto_check` no longer fail to load (E9001 when closing the update dialog).
   - **UI & Error Reports**: Stack traces with URL-only frames parse correctly; the Accounts focus action and the cleanup dialog's Escape key work again.
   - **Test Runner**: `npm run test` runs the frontend tests; stale tests fixed.
-- **Since v4.109.4 on `main` (not yet released)**:
-  - **CI Formatting Gates**: A tracked pre-commit hook (installed by `npm install`) blocks unformatted Rust, and the release workflow refuses tags whose Rust code fails `cargo fmt --check`.
-  - **Installer Resilience**: `install.ps1` and `install.sh` verify that a platform asset exists before downloading and skip partial releases.
-  - **Multi-Instance E2E**: `scripts/test-instance-e2e.ps1` covers switch, fast-forward, per-instance prompt backup, and heartbeat end to end.
 - **v4.94.0** (2026-09-28):
   - **5-Step Non-Destructive Account Switching**: Seamless prompt snapshot, IDE graceful restart, and automatic prompt restoration across instances.
   - **Dual Supabase Endpoints Integration**: Full root (Lovable) and secondary Supabase integration with real-time multi-node synchronization.
