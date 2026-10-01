@@ -303,6 +303,59 @@ const TARGET_FILES = [
         ),
     },
     {
+        name: 'releases-manifest.json (CDN manifest for installers)',
+        relPath: 'releases-manifest.json',
+        replace: (content) => {
+            try {
+                const manifest = JSON.parse(content);
+                manifest.latest_version = newVersion;
+                manifest.latest_tag = `v${newVersion}`;
+                manifest.latest_tag_url = `https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v${newVersion}`;
+                manifest.latest_raw_tag_url = `https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v${newVersion}`;
+                manifest.generated_at = new Date().toISOString();
+
+                if (Array.isArray(manifest.releases)) {
+                    const existingIdx = manifest.releases.findIndex(r => r.version === newVersion);
+                    const baseDl = `https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v${newVersion}`;
+                    const releaseObj = {
+                        version: newVersion,
+                        tag: `v${newVersion}`,
+                        tag_url: `https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v${newVersion}`,
+                        raw_tag_url: `https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v${newVersion}`,
+                        release_url: `https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v${newVersion}`,
+                        published_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+                        prerelease: isPrerelease,
+                        assets: {
+                            windows_x64_setup: `${baseDl}/agm-alim-setup.exe`,
+                            windows_x64_zip: `${baseDl}/agm-alim_${newVersion}_windows_x64.zip`,
+                            windows_x64_msi: '',
+                            macos_x64_dmg: `${baseDl}/Antigravity.Manager.Tools_${newVersion}_x64.dmg`,
+                            macos_aarch64_dmg: `${baseDl}/Antigravity.Manager.Tools_${newVersion}_aarch64.dmg`,
+                            linux_amd64_appimage: '',
+                            linux_aarch64_appimage: '',
+                            linux_amd64_deb: `${baseDl}/Antigravity.Manager.Tools_${newVersion}_amd64.deb`,
+                            linux_aarch64_deb: `${baseDl}/Antigravity.Manager.Tools_${newVersion}_arm64.deb`,
+                            linux_x64_rpm: '',
+                            linux_aarch64_rpm: '',
+                        }
+                    };
+
+                    if (existingIdx >= 0) {
+                        manifest.releases[existingIdx] = releaseObj;
+                    } else {
+                        manifest.releases.unshift(releaseObj);
+                    }
+                    if (manifest.releases.length > 15) {
+                        manifest.releases = manifest.releases.slice(0, 15);
+                    }
+                }
+                return JSON.stringify(manifest, null, 2);
+            } catch {
+                return content;
+            }
+        },
+    },
+    {
         name: 'CHANGELOG.md (auto-insert release skeleton)',
         relPath: 'CHANGELOG.md',
         replace: (content) => {
