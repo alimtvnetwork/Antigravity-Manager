@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.72.0)**
+**Bar 2: Version-Based Installation (v4.110.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -524,9 +524,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.109.4**：修复了多实例切换时会丢失当前正在运行的提示词并错误继承默认账号的 Bug，确保运行中的提示词自动备份与恢复，严格强制独立环境隔离；新增 `agm clear` 命令保留最近 N 条提示词，并扩展了自动清理 Rust (Cargo target) 编译缓存的功能；修复旧版 `update_settings.json` 缺少 `auto_check` 字段时加载失败（关闭更新弹窗报 E9001）的问题；修复堆栈解析、账号页定位按钮与清理弹窗 Esc 关闭；新增 `npm run test` 测试入口。
->
-> `main` 分支最新改进（尚未发版）：受版本控制的 pre-commit 钩子（`npm install` 自动安装）阻止未格式化的 Rust 代码提交，发布流程在 `cargo fmt --check` 失败时拒绝打包；`install.ps1` / `install.sh` 下载前校验目标平台安装包是否存在并跳过不完整的版本；新增多实例端到端测试脚本 `scripts/test-instance-e2e.ps1`。
+> 最新版本 **v4.110.0**：彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题，安装前主动预检并安全备份固定快捷方式，修正注册表带引号路径比较错误以杜绝误调 `uninstall.exe` 触发 Windows 墓碑化取消固定，彻底移除对任务栏目录文件的强制删除，安装后自动还原并更新固定快捷方式；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
 
 👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 

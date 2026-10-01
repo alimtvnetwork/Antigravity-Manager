@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.110.0 (2026-10-01)**:
+        -   **[Bug Fix] Windows Taskbar Pin Preservation on Reinstallation/Updates**:
+            -   **Description**: Resolved an issue where running `install.ps1` to reinstall or update the application removed previously pinned Taskbar shortcuts. Added pre-flight detection and safe backup of existing user-pinned taskbar shortcuts; fixed a path-comparison bug in `Remove-PreviousInstallations` where registry `InstallLocation` containing quotation marks caused `Resolve-Path` to fail and erroneously execute `uninstall.exe`, triggering Windows taskbar tombstoning; strictly eliminated all deletions targeting `%APPDATA%\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\*.lnk`; and implemented post-installation restoration and target path refresh (`TargetPath` / `WorkingDirectory`) to guarantee pinned icons remain intact and functional across upgrades. (Thanks to @aukgit)
+        -   **[Feature] Blind AI Instance Test Flow & 8 Sandboxing Laws Compliance**:
+            -   **Description**: Audited and enforced the 8 Sandboxing Laws (L1 host PID safety, L2 folder-owns-PID mapping, L3 clone vs new profile segregation, L4 UI-CLI functional parity with zero shell spawns, L5 queued prompt preservation and recovery, L6 notification delivery and backtraces prior to process exit, L7 Supabase read-back email verification with PGRST205 missing table hard failure interception, L8 test cleanup restricted to `test-cli-flow*` / `test-diag*` sandboxes); modularized `supabase_sync.rs` under 15-line function caps with dedicated unit tests; hardened Cargo incremental cache cleanup in `scripts/dev-tool-clear.ps1`. (Thanks to @aukgit)
+
     *   **v4.109.4 (2026-09-30)** (includes v4.109.1–v4.109.3):
         -   **[Bug Fix] Update Settings Backward Compatibility**:
             -   **Description**: Older `update_settings.json` files without `auto_check` / `last_check_time` no longer fail to load (E9001 when closing the update dialog). (Thanks to @aukgit)

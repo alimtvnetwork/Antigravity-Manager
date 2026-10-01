@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.109.4)
+> Professional AI Account Management & Protocol Proxy System (v4.110.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.109.4-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.110.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,9 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.109.4**: Fixed multi-instance switching discard bug to ensure running prompts are safely persisted and strictly resumed under the new isolated IDE account's bound credentials; added `agm clear` alias with customizable N-limit retention for cache cleaning, including automated Rust and Cargo target directory purges; older `update_settings.json` files without `auto_check` no longer fail to load (E9001 when closing the update dialog); fixed stack-trace parsing, the Accounts focus action, and the cleanup dialog's Escape key; added the `npm run test` runner.
->
-> On `main`, not yet released: a tracked pre-commit hook (installed by `npm install`) blocks unformatted Rust, and the release workflow refuses tags that fail `cargo fmt --check`; `install.ps1` and `install.sh` verify the platform asset exists before downloading and skip partial releases; new multi-instance E2E script `scripts/test-instance-e2e.ps1`.
+> Latest version **v4.110.0**: Resolved an issue where running `install.ps1` to reinstall or update removed previously pinned Windows Taskbar shortcuts; added pre-flight detection and safe backup of pinned taskbar shortcuts; fixed a path-comparison bug in `Remove-PreviousInstallations` where unquoted registry paths caused `Resolve-Path` to fail and erroneously execute `uninstall.exe` triggering Windows taskbar tombstoning; eliminated all deletions targeting taskbar directory shortcuts; and implemented post-installation restoration and target path refresh (`TargetPath` / `WorkingDirectory`) to ensure pinned icons remain intact across upgrades; fully audited and verified the 8 Instance Sandboxing Laws for robust multi-instance lifecycle operations; modularized Supabase sync error handling and hardened development cache cleanup.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

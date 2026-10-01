@@ -462,19 +462,46 @@ function Remove-PreviousInstallations {
 
         if ($entries) {
             foreach ($entry in $entries) {
-                # Skip if already our brand in the exact target install dir
-                if ($entry.InstallLocation -and (Resolve-Path $entry.InstallLocation -ErrorAction SilentlyContinue).Path -eq (Resolve-Path $InstallDir -ErrorAction SilentlyContinue).Path) {
+                # Skip if already our brand in the exact target install dir (trim quotes and normalize paths)
+                $rawLoc = if ($entry.InstallLocation) { $entry.InstallLocation.Trim().Trim('"').Trim() } else { "" }
+                $uninstRaw = if ($entry.UninstallString) { $entry.UninstallString.Trim() } else { "" }
+                $uninstClean = ""
+                if ($uninstRaw) {
+                    if ($uninstRaw -match '^"([^"]+)"') {
+                        $uninstClean = $matches[1]
+                    } elseif ($uninstRaw -match '^([^\s]+\.exe)') {
+                        $uninstClean = $matches[1]
+                    } else {
+                        $uninstClean = $uninstRaw.Trim('"')
+                    }
+                }
+                if (-not $rawLoc -and $uninstClean) {
+                    $rawLoc = Split-Path $uninstClean -Parent
+                }
+
+                $isSameDir = $false
+                if ($rawLoc) {
+                    try {
+                        $resolvedEntry = (Resolve-Path $rawLoc -ErrorAction SilentlyContinue).Path
+                        $resolvedInstall = (Resolve-Path $InstallDir -ErrorAction SilentlyContinue).Path
+                        if ($resolvedEntry -and $resolvedInstall -and ($resolvedEntry.TrimEnd('\') -eq $resolvedInstall.TrimEnd('\'))) {
+                            $isSameDir = $true
+                        } elseif ($rawLoc.TrimEnd('\').Equals($InstallDir.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+                            $isSameDir = $true
+                        }
+                    } catch {}
+                }
+
+                if ($isSameDir) {
+                    Write-Step "Previous installation is in the current target directory ($InstallDir); preserving installation files and pinned shortcuts for in-place upgrade."
                     continue
                 }
 
                 Write-Step "Uninstalling previous version ($($entry.DisplayName))..."
-                if ($entry.UninstallString) {
+                if ($uninstClean -and (Test-Path $uninstClean)) {
                     try {
-                        $uninstClean = $entry.UninstallString.Trim('"')
-                        if (Test-Path $uninstClean) {
-                            $uninstExit = Invoke-IndentedCommand -FilePath $uninstClean -ArgumentList @("/S", "/currentuser")
-                            Write-Success "Previous uninstaller completed (exit code: $uninstExit)"
-                        }
+                        $uninstExit = Invoke-IndentedCommand -FilePath $uninstClean -ArgumentList @("/S", "/currentuser")
+                        Write-Success "Previous uninstaller completed (exit code: $uninstExit)"
                     } catch {
                         Write-Warn "Could not execute uninstaller: $_"
                     }
@@ -500,7 +527,9 @@ function Remove-PreviousInstallations {
 
     foreach ($pdir in $prevDirs) {
         if (Test-Path $pdir) {
-            if ($pdir -ne $InstallDir) {
+            $normPdir = try { (Resolve-Path $pdir -ErrorAction SilentlyContinue).Path.TrimEnd('\') } catch { $pdir.TrimEnd('\') }
+            $normInstall = try { (Resolve-Path $InstallDir -ErrorAction SilentlyContinue).Path.TrimEnd('\') } catch { $InstallDir.TrimEnd('\') }
+            if (-not $normPdir.Equals($normInstall, [System.StringComparison]::OrdinalIgnoreCase)) {
                 $uninstExe = Join-Path $pdir "uninstall.exe"
                 if (Test-Path $uninstExe) {
                     Write-Step "Running uninstaller in $pdir..."
@@ -514,7 +543,7 @@ function Remove-PreviousInstallations {
         }
     }
 
-    # 4. Clean legacy shortcuts from Start Menu, Desktop, and Taskbar (preserving active AGM by Alim.lnk)
+    # 4. Clean legacy shortcuts from Start Menu and Desktop (strictly preserving TaskbarDir so pinned apps are never removed)
     $prevShortcuts = @(
         (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
         (Join-Path $StartMenuDir "antigravity-tools.lnk"),
@@ -523,11 +552,7 @@ function Remove-PreviousInstallations {
         (Join-Path $DesktopDir "Antigravity Tools.lnk"),
         (Join-Path $DesktopDir "antigravity-tools.lnk"),
         (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
-        (Join-Path $DesktopDir "Anti-Gravity Tools.lnk"),
-        (Join-Path $TaskbarDir "Antigravity Tools.lnk"),
-        (Join-Path $TaskbarDir "antigravity-tools.lnk"),
-        (Join-Path $TaskbarDir "Anti-Gravity Tools by Alim.lnk"),
-        (Join-Path $TaskbarDir "Anti-Gravity Tools.lnk")
+        (Join-Path $DesktopDir "Anti-Gravity Tools.lnk")
     )
     foreach ($sc in $prevShortcuts) {
         if (Test-Path $sc) {
@@ -536,6 +561,131 @@ function Remove-PreviousInstallations {
     }
 
     Write-Success "Previous installation cleanup complete."
+}
+
+function Get-PinnedTaskbarShortcuts {
+    $pinned = [System.Collections.Generic.List[PSCustomObject]]::new()
+    if (-not (Test-Path $TaskbarDir)) {
+        return $pinned
+    }
+    try {
+        $WshShell = New-Object -ComObject WScript.Shell
+        # Check active Taskbar shortcuts first
+        $allLnks = @(Get-ChildItem -Path $TaskbarDir -Filter "*.lnk" -ErrorAction SilentlyContinue)
+
+        # Also inspect Tombstones (where Windows automatically moves pins when an app is uninstalled or binary missing)
+        $tombstoneDir = Join-Path $TaskbarDir "Tombstones"
+        if (Test-Path $tombstoneDir) {
+            $allLnks += @(Get-ChildItem -Path $tombstoneDir -Filter "*.lnk" -ErrorAction SilentlyContinue)
+        }
+
+        foreach ($lnk in $allLnks) {
+            try {
+                $sc = $WshShell.CreateShortcut($lnk.FullName)
+                $target = $sc.TargetPath
+                $name = $lnk.Name
+                $isOurApp = $false
+                if ($name -match '(?i)(agm-alim|Antigravity Manager Tools|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|antigravity-tools|Agm - Alim)') {
+                    $isOurApp = $true
+                } elseif ($target -and ($target -match '(?i)(agm-alim\.exe|agm\.exe)' -or $target -match '(?i)Programs\\agm-alim' -or ($InstallDir -and $target -like "*$InstallDir*"))) {
+                    $isOurApp = $true
+                }
+                if ($isOurApp) {
+                    $isTombstone = ($lnk.DirectoryName -like "*Tombstones*")
+                    $cleanName = if ($isTombstone) { $name -replace '\s*\(\d+\)\.lnk$', '.lnk' } else { $name }
+                    $pinned.Add([PSCustomObject]@{
+                        Path             = $lnk.FullName
+                        Name             = $cleanName
+                        OriginalName     = $name
+                        IsTombstone      = $isTombstone
+                        TargetPath       = $target
+                        WorkingDirectory = $sc.WorkingDirectory
+                        Arguments        = $sc.Arguments
+                        Description      = $sc.Description
+                        IconLocation     = $sc.IconLocation
+                    })
+                    Write-Step "Detected existing pinned Taskbar shortcut: $($lnk.Name) (Target: $target)"
+                }
+            } catch {}
+        }
+    } catch {}
+    return @($pinned)
+}
+
+function Backup-PinnedTaskbarShortcuts {
+    param([object[]]$Shortcuts)
+    $backupDir = Join-Path $env:TEMP "agm_taskbar_pin_backup"
+    if (-not (Test-Path $backupDir)) {
+        try { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null } catch {}
+    }
+    foreach ($sc in $Shortcuts) {
+        try {
+            $dest = Join-Path $backupDir $sc.Name
+            Copy-Item -Path $sc.Path -Destination $dest -Force -ErrorAction SilentlyContinue
+            Write-Step "Backed up pinned Taskbar shortcut: $($sc.Name)"
+        } catch {}
+    }
+    return $backupDir
+}
+
+function Restore-And-Update-PinnedTaskbarShortcuts {
+    param(
+        [object[]]$PreviouslyPinned,
+        [string]$BackupDir,
+        [string]$TargetExe,
+        [string]$TargetWorkDir
+    )
+
+    if (-not $PreviouslyPinned -or $PreviouslyPinned.Count -eq 0) {
+        # Fallback probe if caller did not supply list
+        $PreviouslyPinned = Get-PinnedTaskbarShortcuts
+    }
+
+    if (-not $PreviouslyPinned -or $PreviouslyPinned.Count -eq 0) {
+        Write-Step "No existing Taskbar pin detected; respecting user preference (not forcing new pin)."
+        return
+    }
+
+    Write-Step "Preserving and updating existing Taskbar pinned shortcut(s)..."
+    if (-not (Test-Path $TaskbarDir)) {
+        try { New-Item -ItemType Directory -Path $TaskbarDir -Force | Out-Null } catch {}
+    }
+
+    try {
+        $WshShell = New-Object -ComObject WScript.Shell
+        foreach ($pin in $PreviouslyPinned) {
+            $currentLnk = Join-Path $TaskbarDir $pin.Name
+            $backupLnk = if ($BackupDir) { Join-Path $BackupDir $pin.Name } else { $null }
+
+            # If Windows uninstaller removed the shortcut file from TaskbarDir, or it was in Tombstones, restore it from backup
+            if (-not (Test-Path $currentLnk) -and $backupLnk -and (Test-Path $backupLnk)) {
+                Copy-Item -Path $backupLnk -Destination $currentLnk -Force -ErrorAction SilentlyContinue
+                Write-Step "Restored preserved Taskbar pin file: $($pin.Name)"
+            }
+
+            # If it was recovered from Tombstones, clean up the tombstone file
+            if ($pin.IsTombstone -and (Test-Path $pin.Path)) {
+                Remove-Item -Path $pin.Path -Force -ErrorAction SilentlyContinue
+            }
+
+            # If the shortcut exists (either preserved or restored), update its target and working directory to the new exe
+            if (Test-Path $currentLnk) {
+                try {
+                    $sc = $WshShell.CreateShortcut($currentLnk)
+                    $sc.TargetPath = $TargetExe
+                    $sc.WorkingDirectory = $TargetWorkDir
+                    $sc.Description = $Tooltip
+                    $sc.IconLocation = "$TargetExe,0"
+                    $sc.Save()
+                    Write-Success "Taskbar pin updated and intact: $($pin.Name) -> $TargetExe"
+                } catch {
+                    Write-Warn "Could not update shortcut properties for ${currentLnk}: $_"
+                }
+            }
+        }
+    } catch {
+        Write-Warn "Taskbar pin preservation note: $_"
+    }
 }
 
 function Pin-TaskbarShortcut {
@@ -1324,6 +1474,14 @@ if ($CurrentVersion) {
     Write-Step "Installation mode        : Fresh installation (v$TargetVersion)"
 }
 
+# Pre-flight: Detect and backup existing taskbar pin configuration to ensure user pins remain intact
+$detectedTaskbarPins = Get-PinnedTaskbarShortcuts
+$taskbarBackupLocation = if ($detectedTaskbarPins.Count -gt 0) {
+    Backup-PinnedTaskbarShortcuts -Shortcuts $detectedTaskbarPins
+} else {
+    $null
+}
+
 # Step 2: Intelligent Multi-Version Try-Catch Installation Ladder (Up to 10 attempts)
 $maxAttempts = 10
 $attempt = 0
@@ -1591,15 +1749,13 @@ if (-not $NoShortcut) {
             try {
                 $WshShell = New-Object -ComObject WScript.Shell
 
-                # Clean any remaining legacy shortcut on Desktop or Start Menu
+                # Clean any remaining legacy shortcut on Desktop or Start Menu (strictly preserving TaskbarDir so pinned items remain intact)
                 $oldLnks = @("Agm - Alim.lnk", "agm-alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
                 foreach ($old in $oldLnks) {
                     $f1 = Join-Path $DesktopDir $old
                     if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
                     $f2 = Join-Path $StartMenuDir $old
                     if (Test-Path $f2) { Remove-Item -Path $f2 -Force -ErrorAction SilentlyContinue }
-                    $f3 = Join-Path $TaskbarDir $old
-                    if (Test-Path $f3) { Remove-Item -Path $f3 -Force -ErrorAction SilentlyContinue }
                 }
 
                 # Start Menu
@@ -1632,11 +1788,13 @@ if (-not $NoShortcut) {
             } catch {
                 Write-Warn "Could not create shortcuts: $_"
             }
-
-            # Step 6: Taskbar Pinning disabled per user specification.
-            # Preserves user's existing pinned taskbar items without duplicate or broken pinned shortcuts.
         }
     }
+}
+
+# Step 6: Restore & Update Pinned Taskbar Shortcuts (preserves existing pins, never removes on reinstall)
+if ($ExePath -and (Test-Path $ExePath)) {
+    Restore-And-Update-PinnedTaskbarShortcuts -PreviouslyPinned $detectedTaskbarPins -BackupDir $taskbarBackupLocation -TargetExe $ExePath -TargetWorkDir $InstallDir
 }
 
 Write-Host ""
