@@ -309,6 +309,83 @@ get_linux_rpm_or_appimage_asset_key() {
     echo "linux_amd64_appimage"
 }
 
+test_url_reachable() {
+    local url="$1"
+    local timeout="${2:-5}"
+    if [[ -z "$url" ]]; then
+        return 1
+    fi
+    local http_code
+    http_code=$(curl -fsSL -I -o /dev/null -w "%{http_code}" --connect-timeout "$timeout" --max-time $((timeout + 2)) "$url" 2>/dev/null || echo "000")
+    if [[ "$http_code" == "200" || "$http_code" == "302" || "$http_code" == "301" ]]; then
+        return 0
+    fi
+    if [[ "$http_code" == "404" ]]; then
+        return 1
+    fi
+    return 0
+}
+
+parse_github_releases_py() {
+    local py_bin="$1"
+    local platform="$2"
+    local pkg_ext="$3"
+    local arch="$4"
+    "$py_bin" -c '
+import json, sys, fnmatch
+
+platform = sys.argv[1]
+pkg_ext = sys.argv[2]
+arch = sys.argv[3]
+
+patterns = []
+if platform == "macos":
+    if arch in ("aarch64", "arm64"):
+        patterns = ["*aarch64*.dmg", "*arm64*.dmg", "*universal*.dmg", "*.dmg", "*universal*.app.tar.gz"]
+    else:
+        patterns = ["*x64*.dmg", "*x86_64*.dmg", "*universal*.dmg", "*.dmg", "*universal*.app.tar.gz"]
+elif platform == "linux":
+    if pkg_ext == "deb":
+        if arch in ("arm64", "aarch64"):
+            patterns = ["*arm64*.deb", "*aarch64*.deb", "*.deb"]
+        else:
+            patterns = ["*amd64*.deb", "*x86_64*.deb", "*.deb"]
+    elif pkg_ext == "rpm":
+        if arch == "aarch64":
+            patterns = ["*aarch64*.rpm", "*.rpm"]
+        else:
+            patterns = ["*x86_64*.rpm", "*x64*.rpm", "*.rpm"]
+    else:
+        if arch == "aarch64":
+            patterns = ["*aarch64*.AppImage", "*arm64*.AppImage", "*.AppImage"]
+        else:
+            patterns = ["*amd64*.AppImage", "*x86_64*.AppImage", "*.AppImage"]
+
+try:
+    data = json.load(sys.stdin)
+    items = data if isinstance(data, list) else [data]
+    for rel in items:
+        tag = rel.get("tag_name", "").lstrip("v")
+        if not tag:
+            continue
+        html_url = rel.get("html_url", "")
+        assets = rel.get("assets", [])
+        matched_url = ""
+        for pat in patterns:
+            for a in assets:
+                name = a.get("name", "")
+                if fnmatch.fnmatch(name, pat):
+                    matched_url = a.get("browser_download_url", "")
+                    break
+            if matched_url:
+                break
+        if matched_url:
+            print(f"{tag}\t{html_url}\t{matched_url}")
+except Exception:
+    pass
+' "$platform" "$pkg_ext" "$arch" 2>/dev/null
+}
+
 parse_releases_manifest_py() {
     local py_bin="$1"
     local key="$2"
@@ -405,6 +482,9 @@ append_manifest_candidate() {
     local ver="$1"
     local tag="$2"
     local asset="$3"
+    if [[ -z "$asset" ]]; then
+        return 0
+    fi
     if [[ $IS_PINNED -eq 0 ]]; then
         if is_version_in_candidates "$ver"; then
             return 0
@@ -428,7 +508,7 @@ append_pinned_manifest_candidate() {
     fi
     local lowest
     lowest=$(printf "%s\n%s\n" "$ver" "$CLEAN_PINNED" | sort -V | head -n1)
-    if [[ "$lowest" == "$ver" ]]; then
+    if [[ "$lowest" == "$ver" && -n "$asset" ]]; then
         if is_version_in_candidates "$ver"; then
             return 0
         fi
@@ -453,7 +533,7 @@ discover_manifest_candidates() {
         return 0
     fi
     while IFS=$'\t' read -r m_ver m_tag m_asset; do
-        if _is_valid_version "$m_ver"; then
+        if _is_valid_version "$m_ver" && [[ -n "$m_asset" ]]; then
             append_manifest_candidate "$m_ver" "$m_tag" "$m_asset"
         fi
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
@@ -465,12 +545,14 @@ discover_manifest_candidates() {
 
 append_api_candidate() {
     local tag="$1"
+    local tag_url="${2:-}"
+    local asset_url="${3:-}"
     if is_version_in_candidates "$tag"; then
         return 0
     fi
     CANDIDATE_VERSIONS+=("$tag")
-    CANDIDATE_TAG_URLS+=("https://github.com/${REPO}/releases/tag/v${tag}")
-    CANDIDATE_ASSET_URLS+=("")
+    CANDIDATE_TAG_URLS+=("${tag_url:-https://github.com/${REPO}/releases/tag/v${tag}}")
+    CANDIDATE_ASSET_URLS+=("${asset_url:-}")
 }
 
 fetch_api_release_tags() {
@@ -480,11 +562,39 @@ fetch_api_release_tags() {
     if [[ -z "$resp" ]]; then
         return 0
     fi
+
+    local parsed_releases=""
+    local arch_target="${ARCH_LABEL:-x86_64}"
+    if [[ "$PLATFORM" == "linux" && "$PKG_EXT" == "deb" ]]; then
+        arch_target="${DEB_ARCH:-amd64}"
+    elif [[ "$PLATFORM" == "linux" && "$PKG_EXT" == "rpm" ]]; then
+        arch_target="${RPM_ARCH:-x86_64}"
+    fi
+
+    if python3 -c "import sys; sys.exit(0)" 2>/dev/null; then
+        parsed_releases=$(echo "$resp" | parse_github_releases_py "python3" "$PLATFORM" "${PKG_EXT:-appimage}" "$arch_target")
+    elif python -c "import sys; sys.exit(0)" 2>/dev/null; then
+        parsed_releases=$(echo "$resp" | parse_github_releases_py "python" "$PLATFORM" "${PKG_EXT:-appimage}" "$arch_target")
+    fi
+
+    if [[ -n "$parsed_releases" ]]; then
+        while IFS=$'\t' read -r r_ver r_tag r_asset; do
+            if [[ -n "$r_ver" && -n "$r_asset" ]]; then
+                append_api_candidate "$r_ver" "$r_tag" "$r_asset"
+            fi
+            if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
+                break
+            fi
+        done <<< "$parsed_releases"
+        return 0
+    fi
+
+    # Fallback if Python is not present: extract tags and record candidate
     local tags
     tags=$(echo "$resp" | grep '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/' | tr -d '[:space:]' || true)
     while IFS= read -r tag; do
         if _is_valid_version "$tag"; then
-            append_api_candidate "$tag"
+            append_api_candidate "$tag" "" ""
         fi
         if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
             break
@@ -511,6 +621,17 @@ discover_api_candidates() {
             return 0
         fi
     fi
+
+    local old_versions=("${CANDIDATE_VERSIONS[@]}")
+    local old_tag_urls=("${CANDIDATE_TAG_URLS[@]}")
+    local old_asset_urls=("${CANDIDATE_ASSET_URLS[@]}")
+
+    if [[ $is_manifest_stale -eq 1 ]]; then
+        CANDIDATE_VERSIONS=()
+        CANDIDATE_TAG_URLS=()
+        CANDIDATE_ASSET_URLS=()
+    fi
+
     local api_urls=()
     api_urls+=("${GITHUB_API}?per_page=30")
     for api_url in "${api_urls[@]}"; do
@@ -519,6 +640,20 @@ discover_api_candidates() {
             break
         fi
     done
+
+    if [[ $is_manifest_stale -eq 1 ]]; then
+        for idx in "${!old_versions[@]}"; do
+            if [[ ${#CANDIDATE_VERSIONS[@]} -ge 10 ]]; then
+                break
+            fi
+            local ov="${old_versions[$idx]}"
+            if ! is_version_in_candidates "$ov"; then
+                CANDIDATE_VERSIONS+=("$ov")
+                CANDIDATE_TAG_URLS+=("${old_tag_urls[$idx]}")
+                CANDIDATE_ASSET_URLS+=("${old_asset_urls[$idx]}")
+            fi
+        done
+    fi
 }
 
 populate_fallback_candidates() {
@@ -574,46 +709,113 @@ display_migration() {
     echo ""
 }
 
-# Build download URL based on platform and package manager
-build_download_url() {
-    local base_url="https://github.com/${REPO}/releases/download/v${RELEASE_VERSION}"
+build_candidate_download_urls() {
+    local ver="$1"
+    local base_url="https://github.com/${REPO}/releases/download/v${ver}"
+    local urls=()
 
     case "$PLATFORM" in
         linux)
             case "$PKG_EXT" in
                 deb)
-                    DOWNLOAD_URL="${base_url}/Antigravity.Tools_${RELEASE_VERSION}_${DEB_ARCH}.deb"
-                    FILENAME="Antigravity.Tools_${RELEASE_VERSION}_${DEB_ARCH}.deb"
+                    urls+=(
+                        "${base_url}/Antigravity.Manager.Tools_${ver}_${DEB_ARCH}.deb"
+                        "${base_url}/Antigravity.Tools_${ver}_${DEB_ARCH}.deb"
+                        "${base_url}/agm-alim_${ver}_${DEB_ARCH}.deb"
+                        "${base_url}/agm-alim_${DEB_ARCH}.deb"
+                    )
                     ;;
                 rpm)
-                    DOWNLOAD_URL="${base_url}/Antigravity.Tools-${RELEASE_VERSION}-1.${RPM_ARCH}.rpm"
-                    FILENAME="Antigravity.Tools-${RELEASE_VERSION}-1.${RPM_ARCH}.rpm"
+                    urls+=(
+                        "${base_url}/Antigravity.Manager.Tools-${ver}-1.${RPM_ARCH}.rpm"
+                        "${base_url}/Antigravity.Tools-${ver}-1.${RPM_ARCH}.rpm"
+                        "${base_url}/agm-alim-${ver}-1.${RPM_ARCH}.rpm"
+                        "${base_url}/agm-alim-1.${RPM_ARCH}.rpm"
+                    )
                     ;;
-                AppImage)
-                    local appimage_arch
-                    if [[ "$ARCH_LABEL" == "x86_64" ]]; then
-                        appimage_arch="amd64"
-                    else
-                        appimage_arch="aarch64"
-                    fi
-                    DOWNLOAD_URL="${base_url}/Antigravity.Tools_${RELEASE_VERSION}_${appimage_arch}.AppImage"
-                    FILENAME="Antigravity.Tools_${RELEASE_VERSION}_${appimage_arch}.AppImage"
+                *)
+                    local appimage_arch="amd64"
+                    [[ "$ARCH_LABEL" == "aarch64" ]] && appimage_arch="aarch64"
+                    urls+=(
+                        "${base_url}/Antigravity.Manager.Tools_${ver}_${appimage_arch}.AppImage"
+                        "${base_url}/Antigravity.Tools_${ver}_${appimage_arch}.AppImage"
+                        "${base_url}/agm-alim_${ver}_${appimage_arch}.AppImage"
+                        "${base_url}/agm-alim_${appimage_arch}.AppImage"
+                    )
                     ;;
             esac
             ;;
         macos)
-            local mac_arch
-            if [[ "$ARCH_LABEL" == "x86_64" ]]; then
-                mac_arch="x64"
-            else
-                mac_arch="aarch64"
-            fi
-            DOWNLOAD_URL="${base_url}/Antigravity.Tools_${RELEASE_VERSION}_${mac_arch}.dmg"
-            FILENAME="Antigravity.Tools_${RELEASE_VERSION}_${mac_arch}.dmg"
+            local mac_arch="x64"
+            [[ "$ARCH_LABEL" == "aarch64" ]] && mac_arch="aarch64"
+            urls+=(
+                "${base_url}/Antigravity.Manager.Tools_${ver}_${mac_arch}.dmg"
+                "${base_url}/Antigravity.Tools_${ver}_${mac_arch}.dmg"
+                "${base_url}/agm-alim_${ver}_${mac_arch}.dmg"
+                "${base_url}/Antigravity.Manager.Tools_universal.app.tar.gz"
+            )
             ;;
     esac
 
-    info "Primary URL       : $DOWNLOAD_URL"
+    echo "${urls[@]}"
+}
+
+# Build download URL based on platform and package manager
+build_download_url() {
+    local candidate_list=()
+    if [[ -n "${cand_asset_url:-}" ]]; then
+        candidate_list+=("$cand_asset_url")
+    fi
+
+    # Probe release API for tag to get exact asset URL if available
+    local tag_url="https://api.github.com/repos/${REPO}/releases/tags/v${RELEASE_VERSION}"
+    local api_res
+    api_res=$(curl -fsSL --max-time 6 -H "User-Agent: Antigravity-Installer" "$tag_url" 2>/dev/null || true)
+    if [[ -n "$api_res" ]]; then
+        local arch_target="${ARCH_LABEL:-x86_64}"
+        if [[ "$PLATFORM" == "linux" && "$PKG_EXT" == "deb" ]]; then
+            arch_target="${DEB_ARCH:-amd64}"
+        elif [[ "$PLATFORM" == "linux" && "$PKG_EXT" == "rpm" ]]; then
+            arch_target="${RPM_ARCH:-x86_64}"
+        fi
+        local parsed=""
+        if python3 -c "import sys; sys.exit(0)" 2>/dev/null; then
+            parsed=$(echo "$api_res" | parse_github_releases_py "python3" "$PLATFORM" "${PKG_EXT:-appimage}" "$arch_target")
+        elif python -c "import sys; sys.exit(0)" 2>/dev/null; then
+            parsed=$(echo "$api_res" | parse_github_releases_py "python" "$PLATFORM" "${PKG_EXT:-appimage}" "$arch_target")
+        fi
+        if [[ -n "$parsed" ]]; then
+            local p_ver p_tag p_asset
+            IFS=$'\t' read -r p_ver p_tag p_asset <<< "$parsed"
+            if [[ -n "$p_asset" ]]; then
+                candidate_list+=("$p_asset")
+            fi
+        fi
+    fi
+
+    local fallback_urls
+    fallback_urls=$(build_candidate_download_urls "$RELEASE_VERSION")
+    for fu in $fallback_urls; do
+        candidate_list+=("$fu")
+    done
+
+    DOWNLOAD_URL=""
+    for cu in "${candidate_list[@]}"; do
+        if test_url_reachable "$cu" 4; then
+            DOWNLOAD_URL="$cu"
+            FILENAME="$(basename "$DOWNLOAD_URL")"
+            break
+        fi
+    done
+
+    if [[ -z "$DOWNLOAD_URL" && ${#candidate_list[@]} -gt 0 ]]; then
+        DOWNLOAD_URL="${candidate_list[0]}"
+        FILENAME="$(basename "$DOWNLOAD_URL")"
+    fi
+
+    if [[ -n "$DOWNLOAD_URL" ]]; then
+        info "Package download URL: $DOWNLOAD_URL"
+    fi
 }
 
 # Detect or install aria2c accelerator
@@ -721,8 +923,17 @@ download_file() {
     return 1
 }
 
-# Download installer with fallback candidates
 download_installer() {
+    if [[ -z "$DOWNLOAD_URL" ]]; then
+        warn "Release v${RELEASE_VERSION} does not contain an installer package for ${PLATFORM} (${PKG_EXT:-dmg})."
+        return 1
+    fi
+
+    if ! test_url_reachable "$DOWNLOAD_URL" 4; then
+        warn "Release package for v${RELEASE_VERSION} is not found on GitHub ($DOWNLOAD_URL returned 404)."
+        return 1
+    fi
+
     TEMP_DIR=$(mktemp -d)
     DOWNLOAD_PATH="${TEMP_DIR}/${FILENAME}"
 
@@ -1149,6 +1360,10 @@ main() {
             --check-update|--check)
                 check_for_updates_cli
                 ;;
+            --dry-run)
+                DRY_RUN=1
+                shift
+                ;;
             --update)
                 is_update_only=1
                 shift
@@ -1219,6 +1434,18 @@ main() {
             build_download_url
         fi
 
+        if [[ -z "$DOWNLOAD_URL" ]] || ! test_url_reachable "$DOWNLOAD_URL" 4; then
+            warn "Release v$cand_ver does not contain an accessible installer package for ${PLATFORM} (${PKG_EXT:-dmg}). Skipping to next candidate..."
+            continue
+        fi
+
+        if [[ "${DRY_RUN:-0}" == "1" ]]; then
+            warn "[DRY-RUN] Would download $DOWNLOAD_URL"
+            warn "[DRY-RUN] Would execute/install for ${PLATFORM} (${PKG_EXT:-dmg})"
+            success "[DRY-RUN] Dry run completed successfully."
+            exit 0
+        fi
+
         if download_installer; then
             remove_previous_installation
             local inst_res=0
@@ -1265,4 +1492,6 @@ main() {
     echo ""
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

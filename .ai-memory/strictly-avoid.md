@@ -444,3 +444,23 @@ Allowed work:
 - ✅ Keep workflow edits in their own commit so the rest of a fix can ship with a `repo`-only token.
 
 **Why:** Documentation-only gates failed 11 times (RCAs 02–34, 40), and four releases (`v4.109.1`–`v4.109.4`) published from commits with red CI (see `.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md`).
+
+---
+
+## Guessed Asset URLs & Enqueuing Asset-Less Releases in Installers — TOTAL BAN
+
+🔴 **NEVER construct guessed / synthetic release asset download URLs via string interpolation in `install.ps1`, `install.sh`, or updater scripts without verifying asset existence in release metadata and confirming reachability.**
+
+Forbidden:
+- ❌ Synthesizing platform asset URLs (e.g. `https://github.com/.../releases/download/v$ver/agm-alim_${ver}_x64-setup.exe` or `.../Antigravity.Tools_${ver}_amd64.deb`) without checking `release.assets`.
+- ❌ Enqueuing releases into installer candidate lists (Tier 1 CDN manifest, Tier 2 GitHub API, Tier 3 `updater.json`) when that release has no binaries for the target operating system / architecture.
+- ❌ Handing unverified candidate URLs directly to download accelerators (`aria2c`, `curl`, `Invoke-WebRequest`) without a fast pre-flight HTTP HEAD reachability check (`Test-UrlReachable` / `test_url_reachable`).
+- ❌ Assuming static package naming across version boundaries (`Antigravity.Manager.Tools_` vs `agm-alim_` vs `Antigravity.Tools_`).
+
+Allowed work:
+- ✅ Query the release's `assets` array directly via the GitHub Releases API to retrieve the exact `browser_download_url`.
+- ✅ Filter candidate lists during version discovery so only releases providing assets matching the current platform (Windows `.exe`/`.zip`, Linux `.deb`/`.rpm`/`.AppImage`, macOS `.dmg`) are queued.
+- ✅ Perform a lightweight pre-flight HEAD check (with a 4-second timeout) before invoking multi-connection accelerators like `aria2c`. If a URL returns 404, warn gracefully and proceed to the next fallback candidate.
+
+**Why:** Releases `v4.109.2`, `v4.109.3`, and `v4.109.4` were published with macOS-only assets. Installers that guessed Windows `.exe` URLs or enqueued asset-less releases triggered immediate 404 download errors and `aria2c` crash dumps on Attempt 1 (see `.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md`).
+

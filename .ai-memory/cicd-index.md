@@ -35,8 +35,9 @@ Tracks every CI/CD validator finding (CODE-RED-*, STYLE-*) encountered during se
 | 39 | [Release published with missing platform artifacts](cicd-issues/39-release-published-with-missing-artifacts-rca.md) | 🟡 Planned (plan 86) | release, artifacts | 2026-09-30 |
 | 40 | [Recurring rustfmt drift & releases shipping on red CI](cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md) | ✅ Resolved; pre-commit hook + `release.yml` fmt gate (`6b18ddc4`) | rustfmt, pre-commit-hook, release-gate, multi-os | 2026-10-01 |
 | 41 | [Test inventory generator crashes on synced manifest schema](cicd-issues/41-test-inventory-generator-schema-mismatch-rca.md) | ✅ Solved | tooling, schema, record-step | 2026-10-01 |
+| 42 | [Installer package 404 from guessed asset URLs on partial releases](cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md) | ✅ Solved | installer, release-assets, pre-flight, multi-os | 2026-10-01 |
 
-Rows 01–07 above are the older `resolved-issues/` linter series and do not share numbering with `cicd-issues/01-07`. The complete `cicd-issues/` list (01–41) is in [cicd-issues/readme.md](cicd-issues/readme.md).
+Rows 01–07 above are the older `resolved-issues/` linter series and do not share numbering with `cicd-issues/01-07`. The complete `cicd-issues/` list (01–42) is in [cicd-issues/readme.md](cicd-issues/readme.md).
 
 ---
 
@@ -47,6 +48,7 @@ Rows 01–07 above are the older `resolved-issues/` linter series and do not sha
 | Rustfmt drift | 02, 12, 16, 18, 20, 22, 27, 28, 29, 34, 40 | `.githooks/pre-commit` (via `npm install` / `npm run hooks:install`) | Never `--no-verify`; never put code edits in `npm run bump` commits |
 | Test isolation / env concurrency | 01, 04, 06, 14, 15, 17, 38 | none (review only) | Isolated temp data dirs; serialize env mutation; no shared account pools |
 | Release shipping on red CI / missing artifacts | 39, 40 | `release.yml` → `verify-release-target` fmt gate | Tag only after CI for that exact SHA is `success`; `cancelled` is not green |
+| Missing release assets / guessed URLs | 33, 35, 39, 42 | `Test-UrlReachable` pre-flight & API metadata asset parser | Never synthesize asset URLs; filter candidate queues by target platform assets |
 | Hidden failures behind first red step | 40 | none | After a fix, confirm the whole run is green, not only the fixed step |
 
 `gh` defaults to `upstream` (`lbjlaq/Antigravity-Manager`) in this clone. Always pass `-R alimtvnetwork/Antigravity-Manager` when reading CI.

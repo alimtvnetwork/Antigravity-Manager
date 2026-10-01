@@ -782,6 +782,69 @@ function Convert-ToSemVer {
     return [version]::new($major, $minor, $patch)
 }
 
+function Test-UrlReachable {
+    param(
+        [string]$Url,
+        [int]$TimeoutSec = 4
+    )
+    if (-not $Url) { return $false }
+    try {
+        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+        if ($curl) {
+            $code = & $curl.Source -fsSL -I -o NUL -w "%{http_code}" --connect-timeout $TimeoutSec --max-time ($TimeoutSec + 2) $Url 2>$null
+            if ($code -match '^(200|302|301)$') {
+                return $true
+            }
+            if ($code -eq '404') {
+                return $false
+            }
+        }
+        $req = [System.Net.HttpWebRequest]::Create($Url)
+        $req.Method = "HEAD"
+        $req.Timeout = $TimeoutSec * 1000
+        $req.AllowAutoRedirect = $true
+        $resp = $req.GetResponse()
+        $status = [int]$resp.StatusCode
+        $resp.Close()
+        return ($status -ge 200 -and $status -lt 400)
+    } catch {
+        if ($_.Exception.Response) {
+            $code = [int]$_.Exception.Response.StatusCode
+            if ($code -eq 404) { return $false }
+        }
+        return $true
+    }
+}
+
+function Get-WindowsReleaseAsset {
+    param(
+        [PSCustomObject]$ReleaseData,
+        [string]$Architecture = "x64"
+    )
+    if (-not $ReleaseData -or -not $ReleaseData.assets) { return $null }
+
+    # 1. Look for installer setup exe matching architecture
+    $matched = $ReleaseData.assets | Where-Object { 
+        $_.name -like "*${Architecture}*setup.exe" -or $_.name -like "*setup.exe" 
+    } | Select-Object -First 1
+
+    # 2. Look for standalone or installer exe
+    if (-not $matched) {
+        $matched = $ReleaseData.assets | Where-Object { 
+            $_.name -like "*.exe" -and $_.name -notlike "*build*" -and $_.name -notlike "*test*" 
+        } | Select-Object -First 1
+    }
+
+    # 3. Look for portable Windows zip
+    if (-not $matched) {
+        $matched = $ReleaseData.assets | Where-Object { 
+            $_.name -like "*windows*.zip" -or $_.name -like "*win*.zip" 
+        } | Select-Object -First 1
+    }
+
+    return $matched
+}
+
 # --- CHECK-UPDATE FLOW ---
 if ($CheckUpdate) {
     $curr = Get-InstalledVersion
@@ -799,19 +862,24 @@ if ($CheckUpdate) {
             try {
                 $mResp = Invoke-RestMethod -Uri $mUrl -TimeoutSec 4
                 if ($mResp -and $mResp.releases -and $mResp.releases.Count -gt 0) {
-                    $mTop = $mResp.releases[0].version -replace "^v", ""
-                    if ($curr) {
-                        try {
-                            $tVer = Convert-ToSemVer $mTop
-                            $cVer = Convert-ToSemVer $curr
-                            if ($tVer -gt $cVer) {
-                                $TargetVersion = $mTop
-                                break
-                            }
-                        } catch {}
-                    } else {
-                        $TargetVersion = $mTop
-                        break
+                    $winRel = $mResp.releases | Where-Object {
+                        $_.assets -and ($_.assets.windows_x64_setup -or $_.assets.windows_x64_zip)
+                    } | Select-Object -First 1
+                    if ($winRel) {
+                        $mTop = $winRel.version -replace "^v", ""
+                        if ($curr) {
+                            try {
+                                $tVer = Convert-ToSemVer $mTop
+                                $cVer = Convert-ToSemVer $curr
+                                if ($tVer -gt $cVer) {
+                                    $TargetVersion = $mTop
+                                    break
+                                }
+                            } catch {}
+                        } else {
+                            $TargetVersion = $mTop
+                            break
+                        }
                     }
                 }
             } catch {}
@@ -826,21 +894,20 @@ if ($CheckUpdate) {
             foreach ($endpoint in $apiEndpoints) {
                 try {
                     $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                    if ($resp -is [System.Array] -and $resp.Count -gt 0) {
-                        $candidate = $resp | Where-Object { 
-                            $_.assets -and ($_.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" }) 
-                        } | Select-Object -First 1
-                        if (-not $candidate) { 
-                            $candidate = $resp | Where-Object { $_.assets -and $_.assets.Count -gt 0 } | Select-Object -First 1 
-                        }
-                        if ($candidate -and $candidate.tag_name) {
-                            $TargetVersion = $candidate.tag_name -replace "^v", ""
+                    $releasesList = @()
+                    if ($resp -is [System.Array]) {
+                        $releasesList = $resp
+                    } elseif ($resp) {
+                        $releasesList = @($resp)
+                    }
+                    foreach ($rel in $releasesList) {
+                        $winAsset = Get-WindowsReleaseAsset -ReleaseData $rel -Architecture $Arch
+                        if ($winAsset -and $rel.tag_name) {
+                            $TargetVersion = $rel.tag_name -replace "^v", ""
                             break
                         }
-                    } elseif ($resp -and $resp.tag_name) {
-                        $TargetVersion = $resp.tag_name -replace "^v", ""
-                        break
                     }
+                    if ($TargetVersion) { break }
                 } catch {}
             }
         }
@@ -849,7 +916,13 @@ if ($CheckUpdate) {
             try {
                 $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
                 if ($updater -and $updater.version) {
-                    $TargetVersion = $updater.version -replace "^v", ""
+                    $uWinUrl = $null
+                    if ($updater.platforms -and $updater.platforms."windows-x86_64" -and $updater.platforms."windows-x86_64".url) {
+                        $uWinUrl = $updater.platforms."windows-x86_64".url
+                    }
+                    if ($uWinUrl -and (Test-UrlReachable -Url $uWinUrl -TimeoutSec 4)) {
+                        $TargetVersion = $updater.version -replace "^v", ""
+                    }
                 }
             } catch {}
         }
@@ -1075,11 +1148,10 @@ foreach ($mUrl in $manifestEndpoints) {
                 }
                 if ($winAsset) {
                     $manifestAssetUrlMap[$tagVer] = $winAsset
-                }
-
-                if (-not $isPinned) {
-                    if (-not $candidateVersions.Contains($tagVer)) {
-                        $candidateVersions.Add($tagVer)
+                    if (-not $isPinned) {
+                        if (-not $candidateVersions.Contains($tagVer)) {
+                            $candidateVersions.Add($tagVer)
+                        }
                     }
                 }
             }
@@ -1114,31 +1186,25 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
     foreach ($endpoint in $apiEndpoints) {
         try {
             $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+            $releasesList = @()
             if ($resp -is [System.Array]) {
-                foreach ($rel in $resp) {
-                    if ($rel.tag_name) {
-                        $hasWin = $rel.assets -and ($rel.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" })
-                        if (-not $hasWin) { continue }
-                        $tagVer = $rel.tag_name -replace "^v", ""
-                        if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                            $releaseMetadataMap[$tagVer] = $rel
-                        }
-                        if (-not $candidateVersions.Contains($tagVer)) {
-                            $candidateVersions.Add($tagVer)
-                        }
-                    }
-                }
+                $releasesList = $resp
             } elseif ($resp) {
-                if ($resp.tag_name) {
-                    $hasWin = $resp.assets -and ($resp.assets | Where-Object { $_.name -like "*.exe" -or $_.name -like "*windows*.zip" })
-                    if ($hasWin) {
-                        $tagVer = $resp.tag_name -replace "^v", ""
-                        if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
-                            $releaseMetadataMap[$tagVer] = $resp
-                        }
-                        if (-not $candidateVersions.Contains($tagVer)) {
-                            $candidateVersions.Add($tagVer)
-                        }
+                $releasesList = @($resp)
+            }
+            foreach ($rel in $releasesList) {
+                if ($rel.tag_name) {
+                    $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $rel -Architecture $Arch
+                    if (-not $matchedAsset) { continue }
+                    $tagVer = $rel.tag_name -replace "^v", ""
+                    if (-not $releaseMetadataMap.ContainsKey($tagVer)) {
+                        $releaseMetadataMap[$tagVer] = $rel
+                    }
+                    if ($matchedAsset.browser_download_url) {
+                        $manifestAssetUrlMap[$tagVer] = $matchedAsset.browser_download_url
+                    }
+                    if (-not $candidateVersions.Contains($tagVer)) {
+                        $candidateVersions.Add($tagVer)
                     }
                 }
             }
@@ -1146,21 +1212,27 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
         if (-not $isManifestStale -and $candidateVersions.Count -ge 10) { break }
     }
 
-    # Tier 3: Rate-limit-free GitHub Releases CDN updater.json probe
-    try {
-        $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
-        if ($updater -and $updater.version) {
-            $uVer = ($updater.version -replace "^v", "").Trim()
-            if ($uVer) {
-                if (-not $candidateVersions.Contains($uVer)) {
-                    $candidateVersions.Insert(0, $uVer)
+    # Tier 3: Rate-limit-free GitHub Releases CDN updater.json probe (fallback only if candidates list is still empty)
+    if ($candidateVersions.Count -eq 0) {
+        try {
+            $updater = Invoke-RestMethod -Uri "https://github.com/$Repo/releases/latest/download/updater.json" -TimeoutSec 6
+            if ($updater -and $updater.version) {
+                $uVer = ($updater.version -replace "^v", "").Trim()
+                $uWinUrl = $null
+                if ($updater.platforms -and $updater.platforms."windows-x86_64" -and $updater.platforms."windows-x86_64".url) {
+                    $uWinUrl = $updater.platforms."windows-x86_64".url
                 }
-                if (-not $manifestAssetUrlMap.ContainsKey($uVer) -and -not $releaseMetadataMap.ContainsKey($uVer)) {
-                    $manifestAssetUrlMap[$uVer] = "https://github.com/$Repo/releases/download/v$uVer/agm-alim_${uVer}_x64-setup.exe"
+                if ($uVer -and $uWinUrl) {
+                    if (Test-UrlReachable -Url $uWinUrl -TimeoutSec 4) {
+                        if (-not $candidateVersions.Contains($uVer)) {
+                            $candidateVersions.Add($uVer)
+                        }
+                        $manifestAssetUrlMap[$uVer] = $uWinUrl
+                    }
                 }
             }
-        }
-    } catch {}
+        } catch {}
+    }
 } elseif ($isPinned) {
     # If pinned, only query the specific release tag endpoint to fetch metadata if not in manifest
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
@@ -1173,6 +1245,10 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
                 if ($resp -and $resp.tag_name) {
                     $tagVer = $resp.tag_name -replace "^v", ""
                     $releaseMetadataMap[$tagVer] = $resp
+                    $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $resp -Architecture $Arch
+                    if ($matchedAsset -and $matchedAsset.browser_download_url) {
+                        $manifestAssetUrlMap[$tagVer] = $matchedAsset.browser_download_url
+                    }
                     break
                 }
             } catch {}
@@ -1184,8 +1260,10 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
 if ($isPinned) {
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
         $directSetupUrl = "https://github.com/$Repo/releases/download/v$cleanPinned/agm-alim_${cleanPinned}_x64-setup.exe"
-        $manifestAssetUrlMap[$cleanPinned] = $directSetupUrl
-        Write-Step "Configured deterministic direct asset target for pinned release: v$cleanPinned"
+        if (Test-UrlReachable -Url $directSetupUrl -TimeoutSec 4) {
+            $manifestAssetUrlMap[$cleanPinned] = $directSetupUrl
+            Write-Step "Configured deterministic direct asset target for pinned release: v$cleanPinned"
+        }
     }
 }
 
@@ -1276,22 +1354,20 @@ foreach ($candVersion in $versionQueue) {
                 } catch {}
             }
 
-            $matchedAsset = $null
-            if ($relData) {
-                if ($relData.assets) {
-                    $matchedAsset = $relData.assets | Where-Object { $_.name -like "*${Arch}*setup.exe" -or $_.name -like "*setup.exe" } | Select-Object -First 1
-                    if (-not $matchedAsset) {
-                        $matchedAsset = $relData.assets | Where-Object { $_.name -like "*.exe" -and $_.name -notlike "*build*" } | Select-Object -First 1
-                    }
-                }
-            }
-
+            $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $relData -Architecture $Arch
             if ($matchedAsset) {
                 $DownloadUrl = $matchedAsset.browser_download_url
-            } else {
-                Write-Warn "Release v$candVersion does not contain a Windows setup executable (.exe). Skipping to next candidate..."
-                continue
             }
+        }
+
+        if (-not $DownloadUrl) {
+            Write-Warn "Release v$candVersion does not contain a Windows setup package. Skipping to next candidate..."
+            continue
+        }
+
+        if (-not (Test-UrlReachable -Url $DownloadUrl -TimeoutSec 4)) {
+            Write-Warn "Release package for v$candVersion is not found on GitHub ($DownloadUrl returned 404). Skipping to next candidate..."
+            continue
         }
 
         Write-Step "Package download URL: $DownloadUrl"

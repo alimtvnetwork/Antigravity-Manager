@@ -23,4 +23,4 @@ This directory contains active issue tracking and bug reports.
 - [46-email-html-replies-node-identity-smart-rotator-rca.md](./46-email-html-replies-node-identity-smart-rotator-rca.md)
 
 ## CI/CD Pipeline Issues & RCAs
-For all CI/CD pipeline issues and RCAs (01 through 41), see [.ai-memory/cicd-issues/](../cicd-issues/readme.md) and the comprehensive index in [.ai-memory/cicd-index.md](../cicd-index.md).
+For all CI/CD pipeline issues and RCAs (01 through 42), see [.ai-memory/cicd-issues/](../cicd-issues/readme.md) and the comprehensive index in [.ai-memory/cicd-index.md](../cicd-index.md).

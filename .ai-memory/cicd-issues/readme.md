@@ -42,9 +42,11 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [39-release-published-with-missing-artifacts-rca.md](.ai-memory/cicd-issues/39-release-published-with-missing-artifacts-rca.md)
 - [40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md](.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md)
 - [41-test-inventory-generator-schema-mismatch-rca.md](.ai-memory/cicd-issues/41-test-inventory-generator-schema-mismatch-rca.md)
+- [42-installer-unverified-asset-urls-and-partial-release-rca.md](.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md)
 
 ## Recurring Failure Classes (read before committing)
 
 - **Rustfmt drift** (RCAs 02, 12, 16, 18, 20, 22, 27, 28, 29, 34, 40): now enforced by `.githooks/pre-commit` (installed via `npm install` / `npm run hooks:install`). `release.yml` → `verify-release-target` also runs `cargo fmt -- --check` before any build job (`6b18ddc4`). Never commit with `--no-verify`; never mix code edits into `npm run bump` commits.
 - **Test isolation / env concurrency** (RCAs 01, 04, 06, 14, 15, 17, 38): tests that touch data dirs, env vars, or shared account pools must use isolated temp dirs and serialize env mutation.
 - **Release shipping on red CI** (RCAs 39, 40): only tag after the CI run for that exact SHA is green; `cancelled` is not green. `gh` defaults to `upstream` here, so always pass `-R alimtvnetwork/Antigravity-Manager`.
+- **Missing release assets / guessed URLs** (RCAs 33, 35, 39, 42): verify assets against API release metadata and check reachability via HTTP HEAD before download; filter candidates to exclude releases without binary packages for the target platform.

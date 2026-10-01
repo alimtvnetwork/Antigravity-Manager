@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-09-28T18:39:00Z
+> Last updated: 2026-10-01T08:25:00Z
 
 ## Changelog
 
+- 2026-10-01T08:25:00Z, Installer asset verification & partial release resilience (RCA 42): resolved 404 download errors in `install.ps1` and `install.sh` caused by guessed asset URLs on partial releases (`v4.109.2`–`v4.109.4` lacking Windows/Linux assets). Implemented `Test-UrlReachable` / `test_url_reachable` pre-flight checks, verified asset parsing from API metadata (`Get-WindowsReleaseAsset` / `parse_github_releases_py`), filtered candidate lists across all discovery tiers to exclude releases missing target platform binaries, added `--dry-run` to `install.sh`, and documented in RCA 42 (`.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md`) and plan 90.
 - 2026-10-01T07:55:00Z, Issue 56 resolved: maintainer granted the `workflow` token scope; `release.yml` rustfmt gate is live on `origin/main` (`6b18ddc4`). Workflow edits (Node 24 action majors, Ubuntu 26 pin before 2026-10-19) are no longer credential-blocked.
 - 2026-10-01T07:40:00Z, CI/CD memory accuracy audit (plan 89 re-run): CI green on `bd60e569`; added missing RCAs 35–39 and a recurring-failure-class table to `.ai-memory/cicd-index.md`; appended "Bypassing CI Gates or Tagging on Unverified CI" ban to `strictly-avoid.md`; opened issue 56 (release rustfmt gate unpushed: token lacks `workflow` scope); fixed `33-test-inventory-generator.py --record` crash on the synced manifest schema (RCA 41). Read `.ai-memory/cicd-index.md` "Recurring Failure Classes" before committing or tagging.
 - 2026-10-01T01:15:00Z, CI/CD Rustfmt Drift Recovery & Git Hook Gate: resolved recurring cargo fmt check failure in `src-tauri/src/bin/agm.rs:8612` (`cmd_instances`), documented RCA 40 (`.ai-memory/cicd-issues/40-recurring-rustfmt-drift-and-releases-shipping-on-red-ci-rca.md`), wired tracked `.githooks/pre-commit` to `npm install` (`scripts/install-git-hooks.mjs`), committed a `release.yml` rustfmt gate locally (not pushed; see issue 56), and added total ban on single-line long iterator chains to `strictly-avoid.md`.
