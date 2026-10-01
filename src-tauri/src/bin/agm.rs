@@ -461,9 +461,13 @@ fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("    instances [ls] [--json]");
     println!("        List all sandbox profiles, bound accounts, and running PIDs");
-    println!("    instances create <name> [--account <email|id>] [--from <inst>] [--data-only] [--launch]");
+    println!("    instances create <name> [--account <email|id>] [--from default|<inst>] [--data-only] [--launch]");
     println!(
-        "        Create an isolated sandbox instance profile directory with dedicated credentials"
+        "        Create a new empty sandbox, or clone one with --from default (or another instance)"
+    );
+    println!("    test-instance-flow [--from default|<inst>] [--new] [--json]");
+    println!(
+        "        Switch test. Default clones the default IDE. --new starts an empty instance instead"
     );
     println!("    instances switch <seq|id|alias> <account>");
     println!("        Switch an instance profile's bound account credentials directly");
@@ -8676,7 +8680,7 @@ fn cmd_instances(args: &[String]) {
         println!("  machine fingerprints, extensions, and configuration without cross-contaminating Default or sibling instances.");
         println!("\nOptions:");
         println!("  --account, -a <email|id>          Bind a specific account by email or ID (defaults to next available unbound)");
-        println!("  --from, -f <source_instance>      Clone settings and extensions from an existing instance");
+        println!("  --from, -f <source_instance>      Clone from default or another instance. Omit for a new empty instance");
         println!("  --data-only, --do                 Create isolated data directory structure without cloning executable");
         println!("  --launch, -l                      Immediately launch the instance window after creation");
         println!("  --json, -j                        Output result in structured JSON format");
@@ -8794,7 +8798,7 @@ fn cmd_instances(args: &[String]) {
         println!("  import <path>                     Import sandbox instances from standard JSON envelope file");
         println!("\nCreate Options:");
         println!("  --account, -a <email|id>          Bind a specific account by email or ID (defaults to next available unbound)");
-        println!("  --from, -f <source_instance>      Clone settings and extensions from an existing instance");
+        println!("  --from, -f <source_instance>      Clone from default or another instance. Omit for a new empty instance");
         println!("  --data-only, --do                 Create isolated data directory structure without cloning executable");
         println!("  --launch, -l                      Immediately launch the instance window after creation");
         println!("\nGeneral Options:");
@@ -12731,7 +12735,46 @@ fn cmd_test_training(args: &[String]) {
 }
 
 fn cmd_test_instance_flow(args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Instance Switch Test:");
+        println!("  agm test-instance-flow [--from default|<inst>] [--new] [--json]");
+        println!("  agm tif --from default");
+        println!("  agm tif --new");
+        println!("\nModes:");
+        println!("  (default)              Clone the whole default IDE data directory");
+        println!("  --from, -f <inst>      Clone from default, #N, an id, or a name");
+        println!("  --new                  Create an empty instance. Do not copy IDE data");
+        println!("\nExamples:");
+        println!("  agm test-instance-flow --from default");
+        println!("  agm instances create \"Clone From Default\" --from default");
+        println!("  agm instances create \"New Empty Instance\"");
+        return;
+    }
+
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let is_new = args.iter().any(|a| a == "--new");
+    let mut from_source: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "--from" || args[i] == "-f") && i + 1 < args.len() {
+            from_source = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+    if is_new && from_source.is_some() {
+        eprintln!("[ERROR] Use either --new or --from, not both.");
+        std::process::exit(1);
+    }
+    let clone_source = if is_new {
+        None
+    } else {
+        Some(from_source.unwrap_or_else(|| "default".to_string()))
+    };
 
     println!("================================================================================");
     println!("  AGM Autonomous CLI Instance Switching & Prompt Preservation Workflow Engine");
@@ -12807,13 +12850,19 @@ fn cmd_test_instance_flow(args: &[String]) {
     println!("  [SUCCESS] All stale sandbox instances and test prompts purged.");
     println!("--------------------------------------------------------------------------------");
 
-    // Step 2: Create a new instance as a full copy of the whole IDE
+    // Step 2: Clone the default IDE, or create an empty instance when --new is set
     let test_inst_id = "test-cli-flow";
     let test_inst_name = "Test-CLI-Flow".to_string();
-    println!(
-        "[STEP 2/7] Creating new isolated instance '{}' (full copy of whole IDE)...",
-        test_inst_id
-    );
+    match &clone_source {
+        Some(source) => println!(
+            "[STEP 2/7] Cloning instance from '{}' into '{}'...",
+            source, test_inst_id
+        ),
+        None => println!(
+            "[STEP 2/7] Creating a new empty instance '{}' (no IDE data copied)...",
+            test_inst_id
+        ),
+    }
 
     let accounts = account::list_accounts().unwrap_or_default();
     let acc1 = accounts
@@ -12829,12 +12878,27 @@ fn cmd_test_instance_flow(args: &[String]) {
         .expect("No alternative account found in vault")
         .clone();
 
-    let new_inst = match instance::copy_instance("default", test_inst_name.clone(), Some("full")) {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            eprintln!("[ERROR] Failed to clone instance from default: {}", e);
-            std::process::exit(1);
+    let new_inst = match &clone_source {
+        Some(source) => {
+            let resolved = instance::resolve_instance_id(source).unwrap_or_else(|_| source.clone());
+            match instance::copy_instance(&resolved, test_inst_name.clone(), Some("full")) {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    eprintln!(
+                        "[ERROR] Failed to clone instance from '{}': {}",
+                        resolved, e
+                    );
+                    std::process::exit(1);
+                }
+            }
         }
+        None => match instance::create_instance(test_inst_name.clone()) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("[ERROR] Failed to create a new empty instance: {}", e);
+                std::process::exit(1);
+            }
+        },
     };
     let _ = instance::bind_account_to_instance(&new_inst.id, &acc1.id, &acc1.email);
     let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
@@ -13532,6 +13596,8 @@ fn cmd_test_instance_flow(args: &[String]) {
         let json_result = serde_json::json!({
             "success": true,
             "instance_cloned": new_inst.id,
+            "create_mode": if clone_source.is_some() { "clone" } else { "new" },
+            "cloned_from": clone_source,
             "folder_location": new_inst.data_dir,
             "account_1": acc1.email,
             "account_2": acc2.email,
