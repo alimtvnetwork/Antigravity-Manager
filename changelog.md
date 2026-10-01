@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.110.1] - 2026-10-01
+
+### Added
+- Synchronize V6 prompts, SQLite task manager, skills, and coding guidelines
+
+---
+
 ## [v4.108.0] - 2026-09-30
 
 ### Added
@@ -46,7 +53,6 @@
         -   **[Feature] 盲测多实例测试流与沙箱 8 大定律完整验证与加固**:
             -   **Description**: 严格审计并落地沙箱 8 大定律（L1 宿主 PID 安全、L2 数据目录所属 PID 映射、L3 克隆与新建配置隔离互斥、L4 UI 与 CLI 核心函数完全对齐且零子进程外挂、L5 排队中提示词完整保真与恢复、L6 退出前同步交付邮件与电报通知及错误堆栈捕获、L7 Supabase 端点回读验证与 PGRST205 缺失表硬失败拦截、L8 自动化测试仅清理 `test-cli-flow*` / `test-diag*` 沙箱）；模块化 `supabase_sync.rs` 并完善单元测试；加固 `scripts/dev-tool-clear.ps1` 增量目录清理逻辑。（Thanks to @aukgit）
 
-
     *   **v4.109.4 (2026-09-30)**（含 v4.109.1–v4.109.3）:
         -   **[Bug Fix] 更新设置向后兼容**:
             -   **Description**: 旧版 `update_settings.json` 缺少 `auto_check` / `last_check_time` 字段时不再加载失败（关闭更新弹窗报 E9001）。（Thanks to @aukgit）
@@ -62,7 +68,6 @@
             -   **Description**: 修复了多实例切换（如快进）时会丢失当前正在运行的提示词并错误继承默认账号的 Bug。目前已确保运行中的提示词自动备份与恢复，并严格强制执行独立环境隔离的账号身份。（Thanks to @aukgit）
         -   **[Feature] AGM CLI 缓存清理扩展**:
             -   **Description**: 新增 `agm clear` 命令别名支持 N-limit 自动保留条数设置，并扩展自动清理 Rust (Cargo target) 编译缓存。（Thanks to @aukgit）
-
 
     *   **v4.103.0 (2026-09-30)**:
         -   **[Release v4.103.0: 多实例切换防弹回粘性保障、UI 弹窗互斥与高对比度高亮、对话清理运行中会话与活跃项目安全门禁、电报与邮件项目名去重及 200 词提示词预览] 彻底修复多实例切换中因后台轮询覆盖导致回弹至 worker-alpha 的核心缺陷，实现实例选择器与对话清理弹窗独立关闭按钮、Esc 键与遮罩关闭及全局互斥机制；重构对话会话清理器以严格保护所有运行中/排队中提示词及每个活跃项目最近 5 轮会话，CLI 提供 `agm prune` 预览与撤销回滚；彻底去重切号邮件与 Telegram 遥测中的重复项目名称，修复电报 HTML 标签 400 报错并支持 `/update` 远程更新，切号邮件与命令行全面支持 200 词提示词摘要预览 (Thanks to @aukgit)**:

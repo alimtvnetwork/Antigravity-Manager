@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-4.110.0-3B82F6?style=flat-square" alt="Version 4.110.0">
+    <img src="https://img.shields.io/badge/Version-v4.110.1-3B82F6?style=flat-square" alt="Version v4.110.1">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.110.0)**
+**Bar 2: Version-Based Installation (v4.110.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -455,7 +455,7 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
-- **v4.110.0** (2026-10-01):
+- **v4.110.1** (2026-10-01):
   - **Taskbar Pin Preservation**: Resolved taskbar pin loss during `install.ps1` reinstallation/updates by backing up pins, banning taskbar shortcut deletions, fixing unquoted registry path comparison, and auto-updating pin targets.
   - **8 Sandboxing Laws Compliance**: Full multi-instance blind testing flow with strict PID and folder isolation, Supabase sync hardening, and dev tool cache cleaner.
   - **CI Formatting Gates**: A tracked pre-commit hook (installed by `npm install`) blocks unformatted Rust, and the release workflow refuses tags whose Rust code fails `cargo fmt --check`.
@@ -526,7 +526,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 更新日志
 
-> 最新版本 **v4.110.0**：彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题，安装前主动预检并安全备份固定快捷方式，修正注册表带引号路径比较错误以杜绝误调 `uninstall.exe` 触发 Windows 墓碑化取消固定，彻底移除对任务栏目录文件的强制删除，安装后自动还原并更新固定快捷方式；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
+> 最新版本 **v4.110.1**：彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题，安装前主动预检并安全备份固定快捷方式，修正注册表带引号路径比较错误以杜绝误调 `uninstall.exe` 触发 Windows 墓碑化取消固定，彻底移除对任务栏目录文件的强制删除，安装后自动还原并更新固定快捷方式；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
 
 👉 **[查看完整更新日志 → changelog.md](changelog.md)**
 
