@@ -609,7 +609,7 @@ function AccountRowContent({
                                 );
                             }
                             return (
-                                <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-white/10 hover:bg-gray-200 transition-colors cursor-default">
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-gray-400 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-[#15334d] hover:bg-gray-200 transition-colors cursor-default">
                                     <Circle className="w-2.5 h-2.5" />
                                     {t('accounts.free')}
                                 </span>
@@ -764,7 +764,7 @@ function AccountRowContent({
                                         </div>
                                     ) : (
                                         <div
-                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-gray-200/40 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 text-gray-400 text-[10px] font-mono leading-none gap-1.5"
+                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-gray-200/40 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] text-gray-400 text-[10px] font-mono leading-none gap-1.5"
                                             title="No profile bound"
                                         >
                                             <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
@@ -790,13 +790,13 @@ function AccountRowContent({
                 "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors",
                 // 动态高对比高亮处理
                 isFocused
-                    ? "bg-amber-100/80 dark:bg-amber-950/40"
+                    ? "bg-emerald-50/90 dark:bg-[#0c2438]"
                     : selected
-                    ? "bg-blue-50/90 dark:bg-blue-950/40"
+                    ? "bg-blue-50/90 dark:bg-[#0c2438]"
                     : isCurrent
-                    ? "bg-amber-50/70 dark:bg-[#131b2e]"
-                    : "bg-white dark:bg-base-100",
-                !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60" : ""
+                    ? "bg-emerald-50/60 dark:bg-[#0c2438]"
+                    : "bg-white dark:bg-[#071a27]",
+                !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-[#0c2438]/80" : ""
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. 刷新按钮 (首选首位) */}
