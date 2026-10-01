@@ -59,6 +59,14 @@ function getAccountRemainingQuota(account: any, targetModel: string): number {
     return minPercent;
 }
 
+const APP_START_TIME = Date.now();
+const STARTUP_QUIET_PERIOD_MS = 60_000;
+
+function getStartupDelayMs(): number {
+    const elapsed = Date.now() - APP_START_TIME;
+    return Math.max(0, STARTUP_QUIET_PERIOD_MS - elapsed);
+}
+
 function BackgroundTaskRunner() {
     const { config } = useConfigStore();
     const { refreshAllQuotas } = useAccountStore();
@@ -74,24 +82,37 @@ function BackgroundTaskRunner() {
         if (!config) return;
 
         let intervalId: ReturnType<typeof setTimeout> | null = null;
+        let initialTimerId: ReturnType<typeof setTimeout> | null = null;
         const { auto_refresh, refresh_interval } = config;
+        const quietDelay = getStartupDelayMs();
 
         // Check if we just turned it on
         if (auto_refresh && !prevAutoRefreshRef.current) {
-            console.log('[BackgroundTask] Auto-refresh enabled, executing immediately...');
-            refreshAllQuotas();
+            if (quietDelay > 0) {
+                console.log(`[BackgroundTask] Deferring initial quota refresh for ${Math.round(quietDelay / 1000)}s quiet period...`);
+                initialTimerId = setTimeout(() => {
+                    refreshAllQuotas();
+                }, quietDelay);
+            } else {
+                console.log('[BackgroundTask] Auto-refresh enabled, executing immediately...');
+                refreshAllQuotas();
+            }
         }
         prevAutoRefreshRef.current = auto_refresh;
 
-        if (auto_refresh && refresh_interval > 0) {
-            console.log(`[BackgroundTask] Starting auto-refresh quota timer: ${refresh_interval} mins`);
+        const effectiveIntervalMinutes = Math.max(5, refresh_interval || 5);
+        if (auto_refresh) {
+            console.log(`[BackgroundTask] Starting auto-refresh quota timer: ${effectiveIntervalMinutes} mins`);
             intervalId = setInterval(() => {
                 console.log('[BackgroundTask] Auto-refreshing all quotas...');
                 refreshAllQuotas();
-            }, Math.min(refresh_interval * 60 * 1000, 2147483647));
+            }, effectiveIntervalMinutes * 60 * 1000);
         }
 
         return () => {
+            if (initialTimerId) {
+                clearTimeout(initialTimerId);
+            }
             if (intervalId) {
                 console.log('[BackgroundTask] Clearing auto-refresh timer');
                 clearInterval(intervalId);
@@ -104,27 +125,38 @@ function BackgroundTaskRunner() {
         if (!config) return;
 
         let intervalId: ReturnType<typeof setTimeout> | null = null;
+        let initialTimerId: ReturnType<typeof setTimeout> | null = null;
         const { auto_sync, sync_interval } = config;
         const { syncAccountFromDb } = useAccountStore.getState();
+        const quietDelay = getStartupDelayMs();
 
         // Check if we just turned it on
-        if (auto_sync) {
-            if (!prevAutoSyncRef.current) {
+        if (auto_sync && !prevAutoSyncRef.current) {
+            if (quietDelay > 0) {
+                console.log(`[BackgroundTask] Deferring initial account sync for ${Math.round(quietDelay / 1000)}s quiet period...`);
+                initialTimerId = setTimeout(() => {
+                    syncAccountFromDb();
+                }, quietDelay);
+            } else {
                 console.log('[BackgroundTask] Auto-sync enabled, executing immediately...');
                 syncAccountFromDb();
             }
         }
         prevAutoSyncRef.current = auto_sync;
 
-        if (auto_sync && sync_interval > 0) {
-            console.log(`[BackgroundTask] Starting auto-sync account timer: ${sync_interval} mins`);
+        const effectiveSyncMinutes = Math.max(5, sync_interval || 5);
+        if (auto_sync) {
+            console.log(`[BackgroundTask] Starting auto-sync account timer: ${effectiveSyncMinutes} mins`);
             intervalId = setInterval(() => {
                 console.log('[BackgroundTask] Auto-syncing current account from DB...');
                 syncAccountFromDb();
-            }, Math.min(sync_interval * 60 * 1000, 2147483647));
+            }, effectiveSyncMinutes * 60 * 1000);
         }
 
         return () => {
+            if (initialTimerId) {
+                clearTimeout(initialTimerId);
+            }
             if (intervalId) {
                 console.log('[BackgroundTask] Clearing auto-sync timer');
                 clearInterval(intervalId);
@@ -139,7 +171,7 @@ function BackgroundTaskRunner() {
 
         const threshold = switcher.low_quota_threshold_percent ?? 15.0;
         const targetModel = switcher.target_model || 'gemini-2.5-flash';
-        const intervalSecs = Math.max(5, switcher.check_interval_seconds || 15);
+        const intervalSecs = Math.max(60, switcher.check_interval_seconds || 300);
 
         const checkAndSmartFastForward = async () => {
             if (isRotatingRef.current) return;
@@ -189,10 +221,11 @@ function BackgroundTaskRunner() {
             }
         };
 
-        // Immediate check when threshold or is_enabled changes (e.g., user moves slider to 98%)
+        const quietDelay = getStartupDelayMs();
+        const initialDelay = quietDelay > 0 ? quietDelay : 500;
         const timerId = setTimeout(() => {
             checkAndSmartFastForward();
-        }, 500);
+        }, initialDelay);
 
         const intervalId = setInterval(checkAndSmartFastForward, intervalSecs * 1000);
 

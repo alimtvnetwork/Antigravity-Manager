@@ -16,6 +16,19 @@ export default {
                 ubuntu: ['Ubuntu', 'sans-serif'],
                 'ubuntu-mono': ['Ubuntu Mono', 'monospace'],
             },
+            colors: {
+                awan: {
+                    blue: '#2878f0',     // Lift Blue (Main Brand Anchor)
+                    green: '#16a97a',    // Vector Green (Automation Success)
+                    cyan: '#19b7c9',     // Zero-G Cyan (Bridge / Glow)
+                    mint: '#43d6a2',     // Plasma Mint (Luminosity Highlight)
+                    dark: '#071a27',     // Deep Orbit (Dark Background)
+                    card: '#0c2438',     // Deep Orbit Card Surface
+                    border: '#15334d',   // Deep Orbit Border
+                    slate: '#5d6b76',    // Slate Vector (Supporting Neutral)
+                    light: '#f5faf9',    // Cloud Field (Light Background)
+                },
+            },
         },
     },
     plugins: [daisyui, containerQueries],
@@ -23,28 +36,30 @@ export default {
         themes: [
             {
                 light: {
-                    "primary": "#3b82f6",
-                    "secondary": "#64748b",
-                    "accent": "#10b981",
-                    "neutral": "#1f2937",
+                    "primary": "#2878f0",
+                    "secondary": "#5d6b76",
+                    "accent": "#16a97a",
+                    "neutral": "#071a27",
                     "base-100": "#ffffff",
-                    "info": "#0ea5e9",
-                    "success": "#10b981",
+                    "base-200": "#f5faf9",
+                    "base-300": "#e2e8f0",
+                    "info": "#19b7c9",
+                    "success": "#16a97a",
                     "warning": "#f59e0b",
                     "error": "#ef4444",
                 },
             },
             {
                 dark: {
-                    "primary": "#3b82f6",
-                    "secondary": "#94a3b8",
-                    "accent": "#10b981",
-                    "neutral": "#1f2937",
-                    "base-100": "#0f172a", // Slate-900
-                    "base-200": "#1e293b", // Slate-800
-                    "base-300": "#334155", // Slate-700
-                    "info": "#0ea5e9",
-                    "success": "#10b981",
+                    "primary": "#2878f0",
+                    "secondary": "#19b7c9",
+                    "accent": "#16a97a",
+                    "neutral": "#071a27",
+                    "base-100": "#071a27", // Deep Orbit Dark
+                    "base-200": "#0c2438", // Deep Orbit Card
+                    "base-300": "#15334d", // Deep Orbit Border / Component
+                    "info": "#19b7c9",     // Zero-G Cyan
+                    "success": "#16a97a",  // Vector Green
                     "warning": "#f59e0b",
                     "error": "#ef4444",
                 },

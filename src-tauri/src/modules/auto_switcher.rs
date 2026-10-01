@@ -1775,7 +1775,7 @@ pub fn calculate_next_interval_seconds(
     cfg: &AutoProfileSwitcherConfig,
 ) -> u32 {
     let Some(quota) = quota_percent else {
-        return cfg.check_interval_seconds.max(15);
+        return cfg.check_interval_seconds.max(300);
     };
 
     let caution_threshold = if cfg.low_quota_threshold_percent > cfg.critical_threshold_percent {
@@ -1785,11 +1785,11 @@ pub fn calculate_next_interval_seconds(
     };
 
     if quota <= cfg.critical_threshold_percent {
-        cfg.critical_interval_seconds.max(10)
+        cfg.critical_interval_seconds.max(60)
     } else if quota < caution_threshold {
-        cfg.caution_interval_seconds.max(15)
+        cfg.caution_interval_seconds.max(120)
     } else {
-        cfg.check_interval_seconds.max(15)
+        cfg.check_interval_seconds.max(300)
     }
 }
 
@@ -2051,8 +2051,10 @@ pub fn start_auto_switcher() {
         let mut last_enabled = initial_cfg.is_enabled;
         let mut last_threshold = initial_cfg.low_quota_threshold_percent;
 
+        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
         if last_enabled {
-            tokio::time::sleep(Duration::from_secs(3)).await;
             if let Err(e) = evaluate_and_execute_startup_rotation().await {
                 logger::log_warn(&format!(
                     "[AutoSwitcher] Error during startup rotation check: {}",
@@ -2076,7 +2078,7 @@ pub fn start_auto_switcher() {
             let interval_secs =
                 calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg) as u64;
 
-            let tick = 5u64;
+            let tick = 30u64;
             let mut elapsed = 0u64;
             while elapsed < interval_secs {
                 let sleep_dur = tick.min(interval_secs.saturating_sub(elapsed));
@@ -2114,12 +2116,13 @@ pub fn start_auto_switcher() {
     // Spawn dedicated 2-minute IDE Crash Recovery & Focus Watchdog
     tauri::async_runtime::spawn(async move {
         logger::log_info("[CrashWatchdog] 2-Minute IDE crash recovery & focus watchdog started.");
+        tokio::time::sleep(Duration::from_secs(60)).await;
         loop {
             let app_config = config::load_app_config().unwrap_or_default();
             let interval = app_config
                 .auto_profile_switcher
                 .watchdog_interval_seconds
-                .max(30);
+                .max(60);
             tokio::time::sleep(Duration::from_secs(interval as u64)).await;
 
             if let Err(e) = check_and_recover_crashed_instance().await {

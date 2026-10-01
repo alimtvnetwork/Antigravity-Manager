@@ -167,7 +167,7 @@ async fn execute_heartbeat_tick(
         update_status_inbox(now).await;
     }
 
-    let telemetry_interval = (settings.polling_interval_minutes.max(1) * 60) as i64;
+    let telemetry_interval = (settings.polling_interval_minutes.max(5) * 60) as i64;
     let is_telemetry_due = now - *last_telemetry >= telemetry_interval;
     if is_telemetry_due {
         *last_telemetry = now;
@@ -177,13 +177,17 @@ async fn execute_heartbeat_tick(
 }
 
 async fn run_watcher_heartbeat_loop() {
-    let mut last_inbox: i64 = 0;
-    let mut last_telemetry: i64 = 0;
-    let mut last_quota: i64 = 0;
-    let mut last_idle: i64 = 0;
+    // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
+    tokio::time::sleep(Duration::from_secs(60)).await;
+
+    let init_now = Utc::now().timestamp();
+    let mut last_inbox: i64 = init_now;
+    let mut last_telemetry: i64 = init_now;
+    let mut last_quota: i64 = init_now;
+    let mut last_idle: i64 = init_now;
 
     while WATCHER_RUNNING.load(Ordering::SeqCst) {
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
         let settings = match email_vault_db::get_notification_settings() {
             Ok(s) => s,
             Err(_) => continue,

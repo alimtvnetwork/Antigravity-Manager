@@ -639,8 +639,27 @@ pub fn run() {
                 info!("Tray disabled for this session");
             }
 
-            // Explicitly set window icon for main window on Windows/Linux and heal restored offscreen coordinates
+            // Explicitly set window icon and version title for main window on Windows/Linux and heal restored offscreen coordinates
             if let Some(window) = app.get_webview_window("main") {
+                let window_title = format!("Antigravity Manager Tools v{}", env!("CARGO_PKG_VERSION"));
+                let _ = window.set_title(&window_title);
+                #[cfg(target_os = "windows")]
+                {
+                    if let Ok(hwnd) = window.hwnd() {
+                        use std::os::windows::ffi::OsStrExt;
+                        let wide: Vec<u16> = std::ffi::OsStr::new(&window_title)
+                            .encode_wide()
+                            .chain(std::iter::once(0))
+                            .collect();
+                        unsafe {
+                            extern "system" {
+                                fn SetWindowTextW(hwnd: *mut std::ffi::c_void, lpString: *const u16) -> i32;
+                            }
+                            SetWindowTextW(hwnd.0, wide.as_ptr());
+                        }
+                    }
+                }
+
                 let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
                 if let Ok(img) = image::load_from_memory(icon_bytes) {
                     let rgba = img.to_rgba8();

@@ -1,5 +1,13 @@
 # Changelog
 
+## [v4.113.0] - 2026-10-02
+
+### Added
+- Modern Awan brand color scale and DaisyUI palette overhaul in `tailwind.config.js`
+- Complete removal of Chinese text from `README.md` and alignment of English changelogs
+
+---
+
 ## [v4.110.1] - 2026-10-01
 
 ### Added
@@ -42,11 +50,29 @@
 
 ---
 
-# 📝 更新日志 (Changelog)
+# 📝 Changelog
 
-> 完整版本历史记录。返回项目主页请查看 [README.md](README.md) | [English Changelog](CHANGELOG_EN.md)。
+> Complete version history for Antigravity Tools. Return to project home at [README.md](README.md) | [English Changelog](CHANGELOG_EN.md).
 
-*   **版本历史记录 (Version History)**:
+*   **Version History**:
+    *   **v4.113.0 (2026-10-02)**:
+        -   **[Theme] Modern Awan Brand Color Scale & DaisyUI Palette Overhaul**:
+            -   **Description**: Overhauled color theme tokens in `tailwind.config.js` introducing the official modern Awan brand color scale (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field). Realigned DaisyUI light and dark theme palettes for superior contrast, sleek dark surfaces, and fluid ambient state transitions. (Thanks to @aukgit)
+        -   **[Documentation] Complete Chinese Removal and English Documentation Alignment**:
+            -   **Description**: Completely removed Chinese language remnants from `README.md` and documentation changelog headers; standardized changelog entries in pure English across `CHANGELOG.md` and `CHANGELOG_EN.md` for consistent internationalization. (Thanks to @aukgit)
+
+
+    *   **v4.112.0 (2026-10-01)**:
+        -   **[Performance] CPU & Process Resource Waste Elimination & Windows "Not Responding" Freeze Fix**:
+            -   **Description**: Fully diagnosed and eliminated the root cause of AGM process spikes exceeding 30% CPU and UI "Not responding" freezes. Refactored process discovery and health inspection in `src-tauri/src/modules/instance.rs`, replacing heavy full-system `sysinfo::ProcessRefreshKind::everything()` enumeration with lightweight targeted command-line and executable snapshots backed by a thread-safe 4-second TTL cache (`PROCESS_SCAN_CACHE`). Switched instance health verification and teardown logic to targeted single-PID inspection (`ProcessesToUpdate::Some(&[pid])`), eliminating Win32 process handle enumeration contention across multi-instance evaluations. (Thanks to @aukgit)
+        -   **[Stability] Prevention of Runaway agy.exe Worker Process Accumulation**:
+            -   **Description**: Resolved an issue where concurrent workspace prompts or auto-resume loops accumulated 30+ background `agy.exe` processes consuming ~2GB RAM. Implemented the atomic active worker tracker `ACTIVE_AGY_WORKERS` in `src-tauri/src/modules/repo_db.rs`, actively verifying worker PID liveness before dispatch to strictly intercept duplicate process spawns within the same workspace. Enhanced instance stop cleanup to reliably prune terminated workers and purge stale cache references. (Thanks to @aukgit)
+        -   **[Telemetry] Mandatory 60-Second Startup Quiet Period & 5-Minute Telemetry Floors**:
+            -   **Description**: Enforced a strict 60-second Startup Quiet Period across all background daemons (`auto_switcher`, `email_watcher`, `telegram_inbound`, `scheduler`, `supabase_sync`) and the frontend `BackgroundTaskRunner.tsx`, eliminating startup disk I/O and network telemetry storms. Clamped background check and quota synchronization intervals to a minimum of 300 seconds (5 minutes) aligned with desktop event broadcast architecture. (Thanks to @aukgit)
+        -   **[UI/UX] Prominent Version Number Display in Windows Task Manager**:
+            -   **Description**: Dynamically bound the application version to native window titles via Win32 `SetWindowTextW` upon startup (e.g. `Antigravity Manager Tools v4.112.0`). Synchronized window titles across `tauri.conf.json` and `scripts/bump-version.mjs` to ensure the Windows Task Manager process group header prominently and reliably displays the installed version number. (Thanks to @aukgit)
+
+
     *   **v4.111.0 (2026-10-01)**:
         -   **[Bug Fix] CDN Manifest v4.85.0 陈旧锁死彻底根治与发布流水线动态生成**:
             -   **Description**: 彻底排查并根治 `install.ps1` 与 `install.sh` 始终提示 `Cached CDN manifest version (v4.85.0)` 并回退到受 GitHub 限流接口的问题。恢复并升级 `03-ai-scripts/39-generate-releases-manifest.py` 清单生成引擎，将其原子纳入 `scripts/bump-version.mjs` 随版本发布同步推进；在 `.github/workflows/release.yml` 发布流水线中注入发布时动态生成步骤，并在安装脚本中增加本地预检优先通道，确保 CDN 零限流极速安装通道始终与最新正式版无缝同步。（Thanks to @aukgit）

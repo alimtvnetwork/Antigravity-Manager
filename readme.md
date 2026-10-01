@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.110.1-3B82F6?style=flat-square" alt="Version v4.110.1">
+    <img src="https://img.shields.io/badge/Version-v4.113.0-3B82F6?style=flat-square" alt="Version v4.113.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,11 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-<<<<<<< HEAD
-**Bar 2: Version-Based Installation (v4.110.1)**
-=======
-**Bar 2: Version-Based Installation (v4.111.0)**
->>>>>>> 3fb08b2be16ed065100c584408b7d2af5403d379
+**Bar 2: Version-Based Installation (v4.113.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -528,15 +524,11 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > [!TIP]
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
-## 📝 更新日志
+## 📝 Changelog
 
-<<<<<<< HEAD
-> 最新版本 **v4.110.1**：彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题，安装前主动预检并安全备份固定快捷方式，修正注册表带引号路径比较错误以杜绝误调 `uninstall.exe` 触发 Windows 墓碑化取消固定，彻底移除对任务栏目录文件的强制删除，安装后自动还原并更新固定快捷方式；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
-=======
-> 最新版本 **v4.111.0**：彻底根治 CDN Manifest (v4.85.0) 锁死陈旧版本问题，重构发布流水线动态生成并纳入版本发布自动化；遵循 Awan 规范重构现代低饱和微发光配色并引入全局 CSS3 平滑色阶切换动画，彻底解决暗色模式白条刺眼问题；彻底修复 `install.ps1` 重新安装或更新时误删 Windows 任务栏已固定应用的问题（安全备份并在安装后精准还原）；全面落地沙箱 8 大定律验证与加固，提升多实例切换与盲测流的稳定性；模块化 Supabase 同步错误处理并加固开发环境构建缓存清理。
->>>>>>> 3fb08b2be16ed065100c584408b7d2af5403d379
+> Latest version **v4.113.0**: Overhauled color theme tokens with the official modern Awan brand palette (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint, `#071a27` Deep Orbit Dark, `#0c2438` Deep Orbit Card, `#15334d` Deep Orbit Border, `#5d6b76` Slate Vector, `#f5faf9` Cloud Field) across light and dark modes with DaisyUI theme realignment for crisp contrast and fluid transitions; completely purged Chinese language remnants from `README.md` and aligned release notes to English across documentation and changelogs.
 
-👉 **[查看完整更新日志 → changelog.md](changelog.md)**
+👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
 ---
 

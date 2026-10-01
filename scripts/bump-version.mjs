@@ -249,10 +249,15 @@ const TARGET_FILES = [
     {
         name: 'src-tauri/tauri.conf.json',
         relPath: 'src-tauri/tauri.conf.json',
-        replace: (content) => content.replace(
-            /("version"\s*:\s*)"[^"]+"/,
-            `$1"${newVersion}"`
-        ),
+        replace: (content) => content
+            .replace(
+                /("version"\s*:\s*)"[^"]+"/,
+                `$1"${newVersion}"`
+            )
+            .replace(
+                /("title"\s*:\s*)"Antigravity Manager Tools(?: v[^"]+)?"/,
+                `$1"Antigravity Manager Tools v${newVersion}"`
+            ),
     },
     {
         name: 'src-tauri/Cargo.lock',
@@ -276,6 +281,8 @@ const TARGET_FILES = [
         stableOnly: true,
         replace: (content) => content
             .replace(/\(v[0-9][^)]*\)/, `(v${newVersion})`)
+            .replace(/badge\/Version-(?:v)?[0-9][^"-]*-([0-9A-Fa-f]{6}|blue)/, `badge/Version-v${newVersion}-$1`)
+            .replace(/alt="Version (?:v)?[0-9][^"]*"/, `alt="Version v${newVersion}"`)
             .replace(/Version-[0-9][^"]*-blue/, `Version-${newVersion}-blue`),
     },
     {
@@ -284,6 +291,8 @@ const TARGET_FILES = [
         stableOnly: true,
         replace: (content) => content
             .replace(/\(v[0-9][^)]*\)/, `(v${newVersion})`)
+            .replace(/badge\/Version-(?:v)?[0-9][^"-]*-([0-9A-Fa-f]{6}|blue)/, `badge/Version-${newVersion}-$1`)
+            .replace(/alt="Version (?:v)?[0-9][^"]*"/, `alt="Version ${newVersion}"`)
             .replace(/Version-[0-9][^"]*-blue/, `Version-${newVersion}-blue`),
     },
     {

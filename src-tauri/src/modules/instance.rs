@@ -1,4 +1,5 @@
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
+use once_cell::sync::Lazy;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -500,38 +501,45 @@ pub fn export_instances_envelope() -> Result<String, String> {
         .map_err(|e| format!("Failed to serialize instances envelope: {}", e))
 }
 
-/// Inspect running Antigravity processes matching an instance data_dir
-pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
-    let mut system = System::new_with_specifics(
-        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::everything()),
-    );
-    system.refresh_processes_specifics(
-        sysinfo::ProcessesToUpdate::All,
-        sysinfo::ProcessRefreshKind::everything(),
-    );
+#[derive(Clone)]
+struct CachedProcessInfo {
+    pid: u32,
+    parent: Option<u32>,
+    name: String,
+    exe: String,
+    args_str: String,
+}
 
-    let normalized_target = data_dir.to_lowercase().replace('\\', "/");
-    let clean_target = normalized_target.trim_end_matches('/');
-    let mut matched_pids = Vec::new();
+static PROCESS_SCAN_CACHE: Lazy<std::sync::Mutex<(std::time::Instant, Vec<CachedProcessInfo>)>> =
+    Lazy::new(|| {
+        std::sync::Mutex::new((
+            std::time::Instant::now() - std::time::Duration::from_secs(10),
+            Vec::new(),
+        ))
+    });
 
-    // Map child PID -> parent PID to trace process lineage
-    let mut parent_map: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
-    let mut instance_root_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
-    let mut default_candidate_pids: Vec<u32> = Vec::new();
+fn get_cached_antigravity_processes() -> Vec<CachedProcessInfo> {
+    let mut cache = PROCESS_SCAN_CACHE.lock().unwrap();
+    if cache.0.elapsed() < std::time::Duration::from_millis(4000) && !cache.1.is_empty() {
+        return cache.1.clone();
+    }
 
+    let refresh_kind = sysinfo::ProcessRefreshKind::new()
+        .with_cmd(sysinfo::UpdateKind::OnlyIfNotSet)
+        .with_exe(sysinfo::UpdateKind::OnlyIfNotSet);
+
+    let mut system =
+        System::new_with_specifics(sysinfo::RefreshKind::new().with_processes(refresh_kind));
+    system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, refresh_kind);
+
+    let mut procs = Vec::new();
     for (pid, process) in system.processes() {
-        let pid_u32 = pid.as_u32();
-        if let Some(parent) = process.parent() {
-            parent_map.insert(pid_u32, parent.as_u32());
-        }
-
         let name = process.name().to_string_lossy().to_lowercase();
         let exe = process
             .exe()
             .and_then(|p| p.to_str())
             .unwrap_or("")
             .to_lowercase();
-
         let args = process.cmd();
         let args_str = args
             .iter()
@@ -549,9 +557,44 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             && !exe.contains("webview")
             && !args_str.contains("embedded-browser-webview");
 
-        if !is_antigravity {
-            continue;
+        if is_antigravity {
+            procs.push(CachedProcessInfo {
+                pid: pid.as_u32(),
+                parent: process.parent().map(|p| p.as_u32()),
+                name,
+                exe,
+                args_str,
+            });
         }
+    }
+
+    cache.0 = std::time::Instant::now();
+    cache.1 = procs.clone();
+    procs
+}
+
+/// Inspect running Antigravity processes matching an instance data_dir
+pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
+    let processes = get_cached_antigravity_processes();
+
+    let normalized_target = data_dir.to_lowercase().replace('\\', "/");
+    let clean_target = normalized_target.trim_end_matches('/');
+    let mut matched_pids = Vec::new();
+
+    // Map child PID -> parent PID to trace process lineage
+    let mut parent_map: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+    let mut instance_root_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut default_candidate_pids: Vec<u32> = Vec::new();
+
+    for proc in &processes {
+        let pid_u32 = proc.pid;
+        if let Some(parent) = proc.parent {
+            parent_map.insert(pid_u32, parent);
+        }
+
+        let name = &proc.name;
+        let exe = &proc.exe;
+        let args_str = &proc.args_str;
 
         let is_helper = args_str.contains("--type=")
             || name.contains("helper")
@@ -618,8 +661,8 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
     } else {
         // For instances, also include any child processes that descend from matched root PIDs
         let matched_set: std::collections::HashSet<u32> = matched_pids.iter().cloned().collect();
-        for (pid, _) in system.processes() {
-            let pid_u32 = pid.as_u32();
+        for proc_info in &processes {
+            let pid_u32 = proc_info.pid;
             if matched_set.contains(&pid_u32) {
                 continue;
             }
@@ -1151,8 +1194,12 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
     }
     if let Some(saved_pid) = config_pid.or_else(|| get_instance_saved_pid(instance_id)) {
         let mut sys = System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(saved_pid)) {
+        let target_pid = sysinfo::Pid::from_u32(saved_pid);
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::Some(&[target_pid]),
+            sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+        );
+        if let Some(proc) = sys.process(target_pid) {
             let proc_name = proc.name().to_string_lossy().to_lowercase();
             let proc_exe = proc
                 .exe()
@@ -2146,11 +2193,14 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let start_wait = std::time::Instant::now();
     let max_graceful = std::time::Duration::from_millis(3000);
 
+    let target_pids: Vec<sysinfo::Pid> = pids.iter().map(|&p| sysinfo::Pid::from_u32(p)).collect();
+
     loop {
-        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
-        let has_alive = pids
-            .iter()
-            .any(|&pid| system.process(sysinfo::Pid::from_u32(pid)).is_some());
+        system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::Some(&target_pids),
+            sysinfo::ProcessRefreshKind::new(),
+        );
+        let has_alive = target_pids.iter().any(|&pid| system.process(pid).is_some());
 
         if !has_alive {
             crate::modules::logger::log_info(&format!(

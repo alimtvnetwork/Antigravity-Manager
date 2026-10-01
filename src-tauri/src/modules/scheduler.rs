@@ -99,8 +99,12 @@ pub fn start_scheduler(
             "[Scheduler] Weekly Reset Warmup Scheduler started. Monitoring 7-day quota windows...",
         );
 
+        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
         // Scan every 5 minutes (300s) to check for accounts reaching weekly reset time
         let mut interval = time::interval(Duration::from_secs(300));
+        interval.tick().await; // consume initial 0ms tick
 
         loop {
             interval.tick().await;

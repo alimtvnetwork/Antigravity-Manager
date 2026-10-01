@@ -398,8 +398,11 @@ pub fn start_sync_worker() {
     }
 
     tauri::async_runtime::spawn(async move {
+        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
 
             let config = match load_config() {
                 Ok(c) => c,
