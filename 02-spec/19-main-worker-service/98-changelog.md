@@ -1,3 +1,9 @@
+## v4.116.0 — 2026-10-02 (Minor release: Awan brand design system, UI/UX contrast overhaul, CSS3 color switching animations, and pure English documentation)
+
+**Scope:** Minor version bump. Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility, full Awan Software brand specification alignment with Deep Orbit canvas and Zero-G Cyan accents, universal CSS3 color switching transitions across the entire interface, and 100% pure English documentation and changelogs.
+
+---
+
 ## v4.115.0 — 2026-10-02 (Comprehensive dark mode contrast overhaul, Awan brand palette alignment, and CSS3 color transitions)
 
 **Scope:** Version bump. Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility, Awan brand palette alignment across InstanceSelector, AccountTable, AccountRow, and AccountCard, and universal CSS3 color switching transitions with ambient glow pulse animations.

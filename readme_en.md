@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.115.0)
+> Professional AI Account Management & Protocol Proxy System (v4.116.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.115.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.116.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.115.0**: Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility; complete Awan brand palette alignment across InstanceSelector, AccountTable, AccountRow, and AccountCard; universal CSS3 color switching transitions with ambient glow pulse animations.
+> Latest version **v4.116.0**: Minor release featuring comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility; complete Awan brand palette alignment across InstanceSelector, AccountTable, AccountRow, and AccountCard; universal CSS3 color switching transitions with ambient glow pulse animations; and 100% pure English documentation.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

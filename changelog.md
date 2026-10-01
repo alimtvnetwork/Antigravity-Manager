@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.116.0] - 2026-10-02
+
+### Added
+- Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility across InstanceSelector and account tables
+- Full Awan Software brand specification alignment with Deep Orbit canvas and Zero-G Cyan accents
+- High-contrast typography and semantic color hierarchy across InstanceSelector, AccountTable, AccountRow, and AccountCard
+- Universal CSS3 color switching transitions and smooth glow pulse animations
+- 100% pure English documentation and changelogs across all distribution channels
+
+---
+
 ## [v4.115.0] - 2026-10-02
 
 ### Added
@@ -75,6 +86,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.116.0 (2026-10-02)**:
+        -   **[UI/UX] Comprehensive Dark Mode Contrast Overhaul & Dark-on-Dark Text Elimination**:
+            -   **Description**: Resolved critical dark-on-dark text contrast failures in `InstanceSelector.tsx` where active profile names, emails, and unlinked placeholders rendered in dark slate (`#020617` / `#1e293b`) on dark blue backgrounds; updated active profile text to crisp white (`dark:text-white`) and email typography to high-contrast cyan (`dark:text-cyan-200`). Modernized the active instance close button with accessible high-contrast rose styling (`dark:bg-rose-950/40 text-rose-300`). (Thanks to @aukgit)
+        -   **[Theme] Complete Awan Brand Specification & CSS3 Animation Modernization**:
+            -   **Description**: Aligned `AccountTable.tsx`, `AccountRow.tsx`, and `AccountCard.tsx` with the official Awan Software brand palette (`#0c2438` Deep Orbit Card, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint). Eliminated all blinding pure white rows in dark mode, set active rows to Deep Orbit Card with Zero-G Cyan accents, updated CURRENT badges to Vector Green, and aligned sticky action columns to eliminate color seams. Implemented universal CSS3 color switching transitions across the entire DOM with ambient glow pulse keyframes. (Thanks to @aukgit)
+        -   **[Documentation] Pure English Internationalization & Zero Chinese Text Policy**:
+            -   **Description**: Enforced 100% pure English across `README.md`, `README_EN.md`, `changelog.md`, and `changelog_en.md`, removing all residual Chinese text and standardizing release notes for global distribution. (Thanks to @aukgit)
+
+
     *   **v4.115.0 (2026-10-02)**:
         -   **[UI/UX] Comprehensive Dark Mode Contrast Overhaul & Dark-on-Dark Text Elimination**:
             -   **Description**: Resolved critical dark-on-dark text contrast failures in `InstanceSelector.tsx` where active profile names, emails, and unlinked placeholders rendered in dark slate (`#020617` / `#1e293b`) on dark blue backgrounds; updated active profile text to crisp white (`dark:text-white`) and email typography to high-contrast cyan (`dark:text-cyan-200`). Modernized the active instance close button with accessible high-contrast rose styling (`dark:bg-rose-950/40 text-rose-300`). (Thanks to @aukgit)
