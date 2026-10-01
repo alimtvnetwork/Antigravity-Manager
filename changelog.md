@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.113.1] - 2026-10-01
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.113.0] - 2026-10-02
 
 ### Added
@@ -61,7 +68,6 @@
         -   **[Documentation] Complete Chinese Removal and English Documentation Alignment**:
             -   **Description**: Completely removed Chinese language remnants from `README.md` and documentation changelog headers; standardized changelog entries in pure English across `CHANGELOG.md` and `CHANGELOG_EN.md` for consistent internationalization. (Thanks to @aukgit)
 
-
     *   **v4.112.0 (2026-10-01)**:
         -   **[Performance] CPU & Process Resource Waste Elimination & Windows "Not Responding" Freeze Fix**:
             -   **Description**: Fully diagnosed and eliminated the root cause of AGM process spikes exceeding 30% CPU and UI "Not responding" freezes. Refactored process discovery and health inspection in `src-tauri/src/modules/instance.rs`, replacing heavy full-system `sysinfo::ProcessRefreshKind::everything()` enumeration with lightweight targeted command-line and executable snapshots backed by a thread-safe 4-second TTL cache (`PROCESS_SCAN_CACHE`). Switched instance health verification and teardown logic to targeted single-PID inspection (`ProcessesToUpdate::Some(&[pid])`), eliminating Win32 process handle enumeration contention across multi-instance evaluations. (Thanks to @aukgit)
@@ -72,7 +78,6 @@
         -   **[UI/UX] Prominent Version Number Display in Windows Task Manager**:
             -   **Description**: Dynamically bound the application version to native window titles via Win32 `SetWindowTextW` upon startup (e.g. `Antigravity Manager Tools v4.112.0`). Synchronized window titles across `tauri.conf.json` and `scripts/bump-version.mjs` to ensure the Windows Task Manager process group header prominently and reliably displays the installed version number. (Thanks to @aukgit)
 
-
     *   **v4.111.0 (2026-10-01)**:
         -   **[Bug Fix] CDN Manifest v4.85.0 陈旧锁死彻底根治与发布流水线动态生成**:
             -   **Description**: 彻底排查并根治 `install.ps1` 与 `install.sh` 始终提示 `Cached CDN manifest version (v4.85.0)` 并回退到受 GitHub 限流接口的问题。恢复并升级 `03-ai-scripts/39-generate-releases-manifest.py` 清单生成引擎，将其原子纳入 `scripts/bump-version.mjs` 随版本发布同步推进；在 `.github/workflows/release.yml` 发布流水线中注入发布时动态生成步骤，并在安装脚本中增加本地预检优先通道，确保 CDN 零限流极速安装通道始终与最新正式版无缝同步。（Thanks to @aukgit）
@@ -80,7 +85,6 @@
             -   **Description**: 全面遵循现代 Awan 云平台设计规范，彻底消灭暗色模式下账号列表行、卡片与实例选择下拉框因硬编码 `bg-white dark:bg-white` 导致的白条刺眼失真与文字洗白问题；重构为现代低饱和微发光暗蓝灰玻璃质感卡片（`#131b2e` / `bg-slate-800/90`）与高对比度文字；在全局引入现代 CSS3 统一过渡动画，实现主题切换与选中状态色阶顺滑过渡。（Thanks to @aukgit）
         -   **[Bug Fix] Windows 任务栏固定快捷方式保护与防丢失**:
             -   **Description**: 彻底修复 `install.ps1` 在重新安装或更新时导致任务栏已固定应用消失的问题。安装前主动预检并安全备份现有任务栏固定快捷方式；修复清理旧版本时因注册表 `InstallLocation` 含双引号导致误调 `uninstall.exe` 卸载程序从而触发 Windows 自动墓碑化（Tombstone）取消固定；彻底移除对用户任务栏目录文件的强制删除，在安装完成后自动还原并更新固定快捷方式的指向与工作目录，确保已固定图标始终保留且正常启动新版本。（Thanks to @aukgit）
-
 
     *   **v4.110.0 (2026-10-01)**:
         -   **[Bug Fix] Windows 任务栏固定快捷方式保护与防丢失**:
