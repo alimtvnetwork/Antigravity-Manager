@@ -14,6 +14,8 @@ interface TaskRecord {
     detail: string;
     instance_id: string;
     split_path: string;
+    from_email?: string;
+    to_email?: string;
     created_at: number;
     finished_at?: number | null;
 }
@@ -40,8 +42,11 @@ interface TaskHistoryPage {
 interface SwitchPayload {
     from_email?: string;
     to_email?: string;
+    reason?: string;
+    how?: string;
     prompt_id?: string;
     prompt_text?: string;
+    prompt_reinjected?: boolean;
     moved_at?: number;
     switch_ok?: boolean;
 }
@@ -52,8 +57,50 @@ function formatTime(unix: number) {
 }
 
 function subjectText(subject: string, revealed: boolean) {
-    if (!subject.includes('@')) return subject;
+    if (!subject || !subject.includes('@')) return subject || '—';
     return revealed ? subject : maskEmail(subject);
+}
+
+function moveText(item: TaskRecord, revealed: boolean) {
+    const from = (item.from_email || '').trim();
+    const to = (item.to_email || '').trim();
+    if (!from && !to) return subjectText(item.subject, revealed);
+    const fromLabel = from ? subjectText(from, revealed) : '—';
+    const toLabel = to ? subjectText(to, revealed) : subjectText(item.subject, revealed);
+    return `${fromLabel} → ${toLabel}`;
+}
+
+function recorded(value: string | undefined, fallback: string) {
+    const text = (value || '').trim();
+    return text || fallback;
+}
+
+function detailRows(detail: TaskDetail, payload: SwitchPayload | null, revealed: boolean) {
+    const when = formatTime(payload?.moved_at || detail.created_at);
+    const from = payload?.from_email || detail.from_email || '';
+    const to = payload?.to_email || detail.to_email || detail.subject;
+    const isSwitch = (detail.action || '').toLowerCase().includes('switch')
+        || Boolean(payload?.from_email || payload?.to_email || payload?.reason);
+    if (!isSwitch) {
+        return [
+            { label: 'When', value: when },
+            { label: 'Action', value: detail.action_label || detail.action },
+            { label: 'Account', value: subjectText(detail.subject, revealed) },
+            { label: 'What happened', value: detail.detail || '—' },
+        ];
+    }
+    const reinject = payload && typeof payload.prompt_reinjected === 'boolean'
+        ? (payload.prompt_reinjected ? 'Yes' : 'No')
+        : 'Not recorded on this row';
+    return [
+        { label: 'From', value: subjectText(from, revealed) },
+        { label: 'To', value: subjectText(to, revealed) },
+        { label: 'When', value: when },
+        { label: 'Reason', value: recorded(payload?.reason, 'Not recorded on this row') },
+        { label: 'How', value: recorded(payload?.how, 'Not recorded on this row') },
+        { label: 'Prompt running', value: recorded(payload?.prompt_text, 'No running prompt was stored') },
+        { label: 'Prompt injected again', value: reinject },
+    ];
 }
 
 export default function Audit() {
@@ -107,8 +154,8 @@ export default function Audit() {
         <div className="h-full overflow-auto bg-white px-4 sm:px-6 pt-3 pb-6 max-w-[1400px] mx-auto w-full text-slate-950">
             <div className="mb-3">
                 <h1 className="text-lg font-semibold">Audit</h1>
-                <p className="text-xs text-slate-600">
-                    The list is a summary. Detail opens the split file for that row.
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Addresses hide the domain, such as gmail.com, and keep the start of the name. Detail loads that row only when you open it.
                 </p>
             </div>
             {error && (
@@ -123,7 +170,7 @@ export default function Audit() {
                             <th className="px-3 py-2 font-semibold">When</th>
                             <th className="px-3 py-2 font-semibold">Status</th>
                             <th className="px-3 py-2 font-semibold">Action</th>
-                            <th className="px-3 py-2 font-semibold">Subject</th>
+                            <th className="px-3 py-2 font-semibold">From → To</th>
                             <th className="px-3 py-2 font-semibold"></th>
                         </tr>
                     </thead>
@@ -133,7 +180,7 @@ export default function Audit() {
                                 <td className="px-3 py-2 whitespace-nowrap">{formatTime(item.created_at)}</td>
                                 <td className="px-3 py-2">{item.status}</td>
                                 <td className="px-3 py-2" title={item.action}>{item.action_label || item.action}</td>
-                                <td className="px-3 py-2">{subjectText(item.subject, Boolean(revealed[item.id]))}</td>
+                                <td className="px-3 py-2">{moveText(item, Boolean(revealed[item.id]))}</td>
                                 <td className="px-3 py-2 text-right">
                                     <button
                                         type="button"
@@ -173,22 +220,16 @@ export default function Audit() {
                     {detailError && <p className="text-rose-700">{detailError}</p>}
                     {!detail && !detailError && <p className="text-slate-500">Loading this row from its split file...</p>}
                     {detail && (
-                        <div className="space-y-2">
-                            <p><span className="font-semibold">Action:</span> {detail.action_label} ({detail.action})</p>
-                            <p><span className="font-semibold">Status:</span> {detail.status}</p>
-                            <p><span className="font-semibold">Subject:</span> {subjectText(detail.subject, detailRevealed)}</p>
-                            <p><span className="font-semibold">When:</span> {formatTime(detail.created_at)}</p>
-                            {payload && (
-                                <>
-                                    <p><span className="font-semibold">From:</span> {subjectText(payload.from_email || '', detailRevealed)}</p>
-                                    <p><span className="font-semibold">To:</span> {subjectText(payload.to_email || '', detailRevealed)}</p>
-                                    <p><span className="font-semibold">Moved:</span> {payload.moved_at ? formatTime(payload.moved_at) : ''}</p>
-                                    <p><span className="font-semibold">Switch happened:</span> {payload.switch_ok ? 'Yes' : 'No'}</p>
-                                    <p className="whitespace-pre-wrap"><span className="font-semibold">Prompt:</span> {payload.prompt_text || 'No running prompt was stored.'}</p>
-                                </>
-                            )}
-                            {!payload && detail.detail && <p>{detail.detail}</p>}
-                        </div>
+                        <table className="w-full text-left text-xs border border-slate-200 dark:border-white/10">
+                            <tbody>
+                                {detailRows(detail, payload, detailRevealed).map((row) => (
+                                    <tr key={row.label} className="border-t border-slate-100 dark:border-white/10 first:border-t-0">
+                                        <th className="w-40 px-3 py-2 font-semibold align-top bg-slate-50 dark:bg-white/5">{row.label}</th>
+                                        <td className="px-3 py-2 whitespace-pre-wrap">{row.value}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
                 </div>
             )}

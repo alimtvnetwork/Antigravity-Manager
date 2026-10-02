@@ -29,6 +29,8 @@ pub struct TaskRecord {
     pub detail: String,
     pub instance_id: String,
     pub split_path: String,
+    pub from_email: String,
+    pub to_email: String,
     pub created_at: i64,
     pub finished_at: Option<i64>,
 }
@@ -159,7 +161,8 @@ pub fn list_page(offset: u32, limit: u32) -> Result<TaskHistoryPage, String> {
         let conn = open_split(Path::new(&split.file_path))?;
         let mut stmt = conn
             .prepare(
-                "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at
+                "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at,
+                        COALESCE(from_email, ''), COALESCE(to_email, '')
                  FROM tasks ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
             )
             .map_err(|err| err.to_string())?;
@@ -180,6 +183,8 @@ pub fn list_page(offset: u32, limit: u32) -> Result<TaskHistoryPage, String> {
                     split_path: split.file_path.clone(),
                     created_at: row.get(7)?,
                     finished_at: row.get(8)?,
+                    from_email: row.get(9)?,
+                    to_email: row.get(10)?,
                 })
             })
             .map_err(|err| err.to_string())?;
@@ -289,22 +294,48 @@ pub fn get_detail(id: &str) -> Result<TaskDetail, String> {
     Err(format!("history task '{}' was not found", id))
 }
 
-pub fn switch_payload(
-    from_email: Option<&str>,
-    to_email: &str,
-    prompt_id: &str,
-    prompt_text: &str,
-    switch_ok: bool,
-) -> String {
+#[derive(Debug, Clone)]
+pub struct SwitchFacts {
+    pub from_email: String,
+    pub to_email: String,
+    pub reason: String,
+    pub how: String,
+    pub prompt_id: String,
+    pub prompt_text: String,
+    pub prompt_reinjected: bool,
+    pub switch_ok: bool,
+}
+
+pub fn switch_payload(facts: &SwitchFacts) -> String {
     serde_json::json!({
-        "from_email": from_email.unwrap_or(""),
-        "to_email": to_email,
-        "prompt_id": prompt_id,
-        "prompt_text": prompt_text,
+        "from_email": facts.from_email,
+        "to_email": facts.to_email,
+        "reason": facts.reason,
+        "how": facts.how,
+        "prompt_id": facts.prompt_id,
+        "prompt_text": facts.prompt_text,
+        "prompt_reinjected": facts.prompt_reinjected,
         "moved_at": Utc::now().timestamp(),
-        "switch_ok": switch_ok,
+        "switch_ok": facts.switch_ok,
     })
     .to_string()
+}
+
+fn payload_emails(payload_json: Option<&str>) -> (String, String) {
+    let Some(raw) = payload_json else {
+        return (String::new(), String::new());
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return (String::new(), String::new());
+    };
+    let text = |key: &str| {
+        value
+            .get(key)
+            .and_then(|item| item.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
+    (text("from_email"), text("to_email"))
 }
 
 fn complete(
@@ -322,10 +353,11 @@ fn complete(
     let now = Utc::now().timestamp();
     for split in splits {
         let conn = open_split(Path::new(&split.file_path))?;
+        let (from_email, to_email) = payload_emails(payload_json);
         let changed = if let Some(payload) = payload_json {
             conn.execute(
-                "UPDATE tasks SET status = ?1, detail = ?2, finished_at = ?3, payload_json = ?4 WHERE id = ?5",
-                params![status, detail, now, payload, id],
+                "UPDATE tasks SET status = ?1, detail = ?2, finished_at = ?3, payload_json = ?4, from_email = ?5, to_email = ?6 WHERE id = ?7",
+                params![status, detail, now, payload, from_email, to_email, id],
             )
             .map_err(|err| err.to_string())?
         } else {
@@ -393,6 +425,21 @@ fn open_split(path: &Path) -> Result<Connection, String> {
         "ALTER TABLE tasks ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''",
         [],
     );
+    let _ = conn.execute(
+        "ALTER TABLE tasks ADD COLUMN from_email TEXT NOT NULL DEFAULT ''",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE tasks ADD COLUMN to_email TEXT NOT NULL DEFAULT ''",
+        [],
+    );
+    let _ = conn.execute(
+        "UPDATE tasks
+         SET from_email = COALESCE(json_extract(payload_json, '$.from_email'), from_email),
+             to_email = COALESCE(json_extract(payload_json, '$.to_email'), to_email)
+         WHERE payload_json <> '' AND (from_email = '' OR to_email = '')",
+        [],
+    );
     Ok(conn)
 }
 
@@ -442,4 +489,32 @@ fn load_splits(index: &Connection, _dir: &Path) -> Result<Vec<SplitInfo>, String
         .map_err(|err| err.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|err| err.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn switch_payload_keeps_from_to_reason_and_reinject() {
+        let raw = switch_payload(&SwitchFacts {
+            from_email: "alpha@gmail.com".to_string(),
+            to_email: "beta@gmail.com".to_string(),
+            reason: "Manual account switch".to_string(),
+            how: "Closed the IDE, wrote the account, opened the IDE.".to_string(),
+            prompt_id: "p1".to_string(),
+            prompt_text: "keep going".to_string(),
+            prompt_reinjected: true,
+            switch_ok: true,
+        });
+        let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(value["from_email"], "alpha@gmail.com");
+        assert_eq!(value["to_email"], "beta@gmail.com");
+        assert_eq!(value["reason"], "Manual account switch");
+        assert_eq!(value["prompt_text"], "keep going");
+        assert_eq!(value["prompt_reinjected"], true);
+        let (from_email, to_email) = payload_emails(Some(&raw));
+        assert_eq!(from_email, "alpha@gmail.com");
+        assert_eq!(to_email, "beta@gmail.com");
+    }
 }

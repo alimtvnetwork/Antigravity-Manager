@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-02T20:20:00Z
+> Last updated: 2026-10-02T20:30:00Z
 
 ## Changelog
 
+- 2026-10-02T20:30:00Z, Audit list shows masked from → to. The domain stays hidden. Detail is a table (reason, how, prompt, reinjected) loaded only by `get_task_history_detail` on the Detail click. The list query does not return `payload_json`.
 - 2026-10-02T20:20:00Z, Account switch felt slow because the command awaited a Google quota fetch, an IMAP mailbox poll (`select_candidate_profiles`), and email/Telegram. Read `.ai-memory/issues/59-switch-blocks-on-quota-and-mailbox-rca.md` and spec 98. Do not put those calls back before `switch_account` returns. The 1.5s prompt wait runs only when a prompt was backed up.
 - 2026-10-02T20:05:00Z, A duplicate instance must copy settings and repo databases. Read `02-spec/21-app/97-instance-clone-themes-and-footer.md`. `copy_instance` copies `User/settings.json`, workspace storage, `.gemini` trees, and `repo_prompts.db` rows. Themes live on the Settings Themes tab. Accounts page size defaults to 150.
 - 2026-10-02T19:40:00Z, Before a bump or a tag, read `.ai-memory/learned/25-ci-failures-and-single-version.md`. One version in every manifest. Do not tag a red or cancelled run. Spec 96 removes the 5H and Weekly toolbar buttons.

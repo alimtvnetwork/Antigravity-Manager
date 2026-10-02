@@ -3100,11 +3100,16 @@ pub async fn switch_account_to_instance(
 
     let (prompt_id, prompt_text) = crate::modules::repo_db::switch_prompt_snapshot(&instance.id);
     let payload = crate::modules::task_history_db::switch_payload(
-        prev_email.as_deref(),
-        &account.email,
-        &prompt_id,
-        &prompt_text,
-        true,
+        &crate::modules::task_history_db::SwitchFacts {
+            from_email: prev_email.clone().unwrap_or_default(),
+            to_email: account.email.clone(),
+            reason: "Instance account switch".to_string(),
+            how: "The instance IDE was closed, the new account was written into that instance, then the instance was opened again.".to_string(),
+            prompt_id,
+            prompt_text,
+            prompt_reinjected: needs_reinject && dispatched > 0,
+            switch_ok: true,
+        },
     );
     audit.succeed_with_payload("switch finished", &payload);
     Ok(())

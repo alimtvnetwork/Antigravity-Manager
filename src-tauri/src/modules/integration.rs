@@ -21,6 +21,25 @@ pub trait SystemIntegration: Send + Sync {
     fn show_notification(&self, title: &str, body: &str);
 }
 
+static PROMPT_REINJECTED: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
+
+pub fn note_prompt_reinjected(value: bool) {
+    if let Ok(mut slot) = PROMPT_REINJECTED.lock() {
+        *slot = value;
+    }
+}
+
+pub fn take_prompt_reinjected() -> bool {
+    PROMPT_REINJECTED
+        .lock()
+        .map(|mut slot| {
+            let value = *slot;
+            *slot = false;
+            value
+        })
+        .unwrap_or(false)
+}
+
 /// 根据目标参数、进程运行态及可执行文件存在性决策最终切换环境
 pub fn resolve_effective_target(
     target_ide: Option<&str>,
@@ -246,6 +265,7 @@ impl SystemIntegration for DesktopIntegration {
         account: &crate::models::Account,
         target_ide: Option<&str>,
     ) -> Result<(), String> {
+        note_prompt_reinjected(false);
         crate::modules::logger::log_info(&format!(
             "[Desktop] Executing unified 5-step account switch for: {} (target_ide: {:?})",
             account.email, target_ide
@@ -381,7 +401,7 @@ impl SystemIntegration for DesktopIntegration {
         // =========================================================================
         // STEP 5: Re-Inject the Backed-Up Running Prompts
         // =========================================================================
-        if needs_reinject {
+        let reinjected = if needs_reinject {
             crate::modules::instance::wait_for_instance_prompt_channel("default");
             crate::modules::logger::log_info(
                 "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
@@ -391,12 +411,14 @@ impl SystemIntegration for DesktopIntegration {
                 false,
                 None,
             );
-            let _ = crate::modules::repo_db::dispatch_running_prompts("default");
+            crate::modules::repo_db::dispatch_running_prompts("default").unwrap_or(0) > 0
         } else {
             crate::modules::logger::log_info(
                 "[Desktop] [Step 5/5] No backed-up prompt; skipping the prompt-channel wait",
             );
-        }
+            false
+        };
+        note_prompt_reinjected(reinjected);
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
         if let Some(ref h) = self.app_handle {
