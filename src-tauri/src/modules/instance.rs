@@ -3015,81 +3015,88 @@ pub async fn switch_account_to_instance(
         launch_instance_without_prompt_reinject(&instance.id).map_err(|e| e.to_string())?;
     }
 
-    wait_for_instance_prompt_channel(&instance.id);
+    let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
+        crate::modules::repo_db::count_backed_up_prompts(&instance.id),
+    );
+    let (resent_len, dispatched) = if needs_reinject {
+        wait_for_instance_prompt_channel(&instance.id);
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
+            Some(&instance.id),
+            false,
+            None,
+        );
+        let resent =
+            crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
+                .unwrap_or_default();
+        let dispatched =
+            crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
+        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(&instance.id);
+        (resent.len(), dispatched)
+    } else {
+        crate::modules::logger::log_info(&format!(
+            "[Instance] No backed-up prompt for '{}'; skipping the prompt-channel wait",
+            instance.id
+        ));
+        (0usize, 0usize)
+    };
 
-    // 5.5. [Step 5/5] Restore from backup DB and re-inject running prompts strictly for THIS instance
-    let _ =
-        crate::modules::backup_prompts_db::restore_running_prompts(Some(&instance.id), false, None);
-    let resent =
-        crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
-            .unwrap_or_default();
-    let dispatched = crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
-    let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(&instance.id);
-
-    // 6. Dispatch unified Email and Telegram switch notifications
+    // Mailbox poll, email, and Telegram run after the command returns.
     let (target_4h, target_weekly) =
         crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
-
-    let mut pred_exclusions = vec![account.id.clone(), account.email.clone()];
-    if let Some(ref p_em) = prev_email {
-        pred_exclusions.push(p_em.clone());
-    }
-    let predicted_candidate = crate::modules::auto_switcher::select_candidate_profiles(
-        &instance.id,
-        "gemini-2.5-pro",
-        15.0,
-        &pred_exclusions,
-    )
-    .ok()
-    .and_then(|v| v.into_iter().next())
-    .filter(|c| {
-        !c.email.trim().eq_ignore_ascii_case(account.email.trim())
-            && prev_email
-                .as_deref()
-                .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
-                .unwrap_or(true)
-    });
-    let predicted_next_email = predicted_candidate.map(|c| c.email);
-
-    let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
-    let unique_projs = crate::modules::notification_hub::deduplicate_names(
-        running_projs.into_iter().map(|p| p.repo_name),
-    );
-
-    let _notify = crate::modules::notification_hub::notify_account_switched_details(
-        crate::modules::notification_hub::SwitchNotificationDetails {
-            previous_email: prev_email.clone(),
-            previous_quota_4h: prev_4h,
-            previous_quota_weekly: prev_weekly,
-            predicted_next_email,
-            selected_email: account.email.clone(),
-            target_quota_4h: target_4h,
-            target_quota_weekly: target_weekly,
-            credit_before_switch: prev_4h,
-            threshold_activated: None,
-            instance_id: instance.id.clone(),
-            instance_name: instance.name.clone(),
-            instance_mode: String::new(),
-            reason: "Smart Rotator / Instance Account Switch".to_string(),
-            is_auto: false,
-            backed_up_projects: unique_projs,
-            backed_up_prompts_count: Some(backed_up_count),
-            restored_prompts_count: Some(resent.len() + dispatched),
-        },
-    )
-    .await;
-    if let Ok(prompts) = crate::modules::repo_db::list_all_prompts() {
-        for prompt in prompts
-            .into_iter()
-            .filter(|prompt| prompt.instance_id == instance.id)
-        {
-            println!("  [Prompt] {} status={}", prompt.id, prompt.status);
-            crate::modules::logger::log_info(&format!(
-                "[Prompt] instance {} prompt {} status {}",
-                instance.id, prompt.id, prompt.status
-            ));
+    let followup_id = account.id.clone();
+    let followup_email = account.email.clone();
+    let followup_prev = prev_email.clone();
+    let followup_instance_id = instance.id.clone();
+    let followup_instance_name = instance.name.clone();
+    let restored_count = resent_len + dispatched;
+    tauri::async_runtime::spawn(async move {
+        let mut pred_exclusions = vec![followup_id.clone(), followup_email.clone()];
+        if let Some(ref p_em) = followup_prev {
+            pred_exclusions.push(p_em.clone());
         }
-    }
+        let predicted_next_email = crate::modules::auto_switcher::select_candidate_profiles(
+            &followup_instance_id,
+            "gemini-2.5-pro",
+            15.0,
+            &pred_exclusions,
+        )
+        .ok()
+        .and_then(|v| v.into_iter().next())
+        .filter(|c| {
+            !c.email.trim().eq_ignore_ascii_case(followup_email.trim())
+                && followup_prev
+                    .as_deref()
+                    .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                    .unwrap_or(true)
+        })
+        .map(|c| c.email);
+        let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+        let unique_projs = crate::modules::notification_hub::deduplicate_names(
+            running_projs.into_iter().map(|p| p.repo_name),
+        );
+        let _ = crate::modules::notification_hub::notify_account_switched_details(
+            crate::modules::notification_hub::SwitchNotificationDetails {
+                previous_email: followup_prev,
+                previous_quota_4h: prev_4h,
+                previous_quota_weekly: prev_weekly,
+                predicted_next_email,
+                selected_email: followup_email,
+                target_quota_4h: target_4h,
+                target_quota_weekly: target_weekly,
+                credit_before_switch: prev_4h,
+                threshold_activated: None,
+                instance_id: followup_instance_id.clone(),
+                instance_name: followup_instance_name,
+                instance_mode: String::new(),
+                reason: "Smart Rotator / Instance Account Switch".to_string(),
+                is_auto: false,
+                backed_up_projects: unique_projs,
+                backed_up_prompts_count: Some(backed_up_count),
+                restored_prompts_count: Some(restored_count),
+            },
+        )
+        .await;
+    });
 
     let (prompt_id, prompt_text) = crate::modules::repo_db::switch_prompt_snapshot(&instance.id);
     let payload = crate::modules::task_history_db::switch_payload(

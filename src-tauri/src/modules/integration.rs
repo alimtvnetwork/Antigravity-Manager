@@ -323,6 +323,9 @@ impl SystemIntegration for DesktopIntegration {
             Some("default"),
             None,
         );
+        let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
+            crate::modules::repo_db::count_backed_up_prompts("default"),
+        );
 
         // =========================================================================
         // STEP 2: Close the Antigravity IDE
@@ -378,16 +381,22 @@ impl SystemIntegration for DesktopIntegration {
         // =========================================================================
         // STEP 5: Re-Inject the Backed-Up Running Prompts
         // =========================================================================
-        crate::modules::instance::wait_for_instance_prompt_channel("default");
-        crate::modules::logger::log_info(
-            "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
-        );
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-            Some("default"),
-            false,
-            None,
-        );
-        let _ = crate::modules::repo_db::dispatch_running_prompts("default");
+        if needs_reinject {
+            crate::modules::instance::wait_for_instance_prompt_channel("default");
+            crate::modules::logger::log_info(
+                "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
+            );
+            let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+                Some("default"),
+                false,
+                None,
+            );
+            let _ = crate::modules::repo_db::dispatch_running_prompts("default");
+        } else {
+            crate::modules::logger::log_info(
+                "[Desktop] [Step 5/5] No backed-up prompt; skipping the prompt-channel wait",
+            );
+        }
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
         if let Some(ref h) = self.app_handle {

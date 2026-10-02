@@ -12,6 +12,9 @@ This directory contains active issue tracking and bug reports.
 - [53-vault-and-supabase-scripts-silent-failures-rca.md](./53-vault-and-supabase-scripts-silent-failures-rca.md)
 - [54-focus-button-dual-scroll-mechanism-rca.md](./54-focus-button-dual-scroll-mechanism-rca.md)
 
+## Fixed in v4.122.0
+- [59-switch-blocks-on-quota-and-mailbox-rca.md](./59-switch-blocks-on-quota-and-mailbox-rca.md) (quota fetch, mailbox poll, and email no longer block the switch command)
+
 ## Fixed in v4.119.0
 - [57-switch-marks-prompt-restored-before-ide-ready-rca.md](./57-switch-marks-prompt-restored-before-ide-ready-rca.md) (code fix `87135787`; live inject not watched)
 - [58-pro-badge-raw-tier-id-rca.md](./58-pro-badge-raw-tier-id-rca.md) (fetch-time normalization only; `standard-tier` stays raw; issue 47 still open)

@@ -749,6 +749,26 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
     prompts
 }
 
+/// Prompts that still need a re-push after this instance's IDE is back up.
+pub fn count_backed_up_prompts(instance_id: &str) -> usize {
+    let Ok(conn) = connect_db() else {
+        return 0;
+    };
+    conn.query_row(
+        "SELECT COUNT(*) FROM active_prompts
+         WHERE status = 'backed_up'
+           AND (instance_id = ?1 OR (?1 = 'default' AND instance_id IN ('default', '__default__', '')))",
+        [instance_id],
+        |row| row.get::<_, i64>(0),
+    )
+    .unwrap_or(0) as usize
+}
+
+/// A switch waits for the IDE prompt channel only when a prompt was actually backed up.
+pub fn needs_prompt_channel_wait(backed_up_count: usize) -> bool {
+    backed_up_count > 0
+}
+
 /// Backup all currently running prompts across active projects before switching
 pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let conn = connect_db()?;
@@ -3975,6 +3995,12 @@ mod tests {
             [],
         );
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn prompt_channel_wait_only_when_a_prompt_was_backed_up() {
+        assert!(!needs_prompt_channel_wait(0));
+        assert!(needs_prompt_channel_wait(1));
     }
 
     #[test]

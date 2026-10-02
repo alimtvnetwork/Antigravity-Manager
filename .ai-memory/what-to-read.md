@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-02T20:05:00Z
+> Last updated: 2026-10-02T20:20:00Z
 
 ## Changelog
 
+- 2026-10-02T20:20:00Z, Account switch felt slow because the command awaited a Google quota fetch, an IMAP mailbox poll (`select_candidate_profiles`), and email/Telegram. Read `.ai-memory/issues/59-switch-blocks-on-quota-and-mailbox-rca.md` and spec 98. Do not put those calls back before `switch_account` returns. The 1.5s prompt wait runs only when a prompt was backed up.
 - 2026-10-02T20:05:00Z, A duplicate instance must copy settings and repo databases. Read `02-spec/21-app/97-instance-clone-themes-and-footer.md`. `copy_instance` copies `User/settings.json`, workspace storage, `.gemini` trees, and `repo_prompts.db` rows. Themes live on the Settings Themes tab. Accounts page size defaults to 150.
 - 2026-10-02T19:40:00Z, Before a bump or a tag, read `.ai-memory/learned/25-ci-failures-and-single-version.md`. One version in every manifest. Do not tag a red or cancelled run. Spec 96 removes the 5H and Weekly toolbar buttons.
 - 2026-10-02T12:40:00Z, Root cause write-ups for the accounts bugs: `.ai-memory/issues/57-switch-marks-prompt-restored-before-ide-ready-rca.md` (launch marked the backup restored before the IDE could accept the prompt; code fix in v4.119.0, live inject not watched) and `.ai-memory/issues/58-pro-badge-raw-tier-id-rca.md` (raw tier id is not the label PRO). Issue 50 is the older hypothesis. Issue 47's cached `project_id` skip is still open.

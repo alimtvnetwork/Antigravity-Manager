@@ -1576,11 +1576,8 @@ pub async fn switch_account(
 
     ensure_enterprise_project_ready(&mut account).await?;
 
-    // Live Quota Refresh from Google API during account switch to keep local DB in sync
-    if let Ok(fresh_quota) = fetch_quota_with_retry(&mut account).await {
-        account.quota = Some(fresh_quota);
-        let _ = save_account(&account);
-    }
+    // Quota refresh hits loadCodeAssist. It must not sit in front of the IDE relaunch.
+    // The stored quota is what the switch notification uses. A refresh runs after return.
 
     // [FIX] Ensure account has a device profile for isolation
     if account.device_profile.is_none() {
@@ -1644,49 +1641,61 @@ pub async fn switch_account(
     let (target_4h, target_weekly) =
         crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
 
-    let mut pred_exclusions = vec![account.id.clone(), account.email.clone()];
-    if let Some(ref p_em) = prev_email {
-        pred_exclusions.push(p_em.clone());
-    }
-    let predicted_candidate = crate::modules::auto_switcher::select_candidate_profiles(
-        target_ide.unwrap_or("default"),
-        "gemini-2.5-pro",
-        15.0,
-        &pred_exclusions,
-    )
-    .ok()
-    .and_then(|v| v.into_iter().next())
-    .filter(|c| {
-        !c.email.trim().eq_ignore_ascii_case(account.email.trim())
-            && prev_email
-                .as_deref()
-                .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
-                .unwrap_or(true)
+    let followup_id = account.id.clone();
+    let followup_email = account.email.clone();
+    let followup_prev = prev_email.clone();
+    let followup_target = target_ide.unwrap_or("default").to_string();
+    tauri::async_runtime::spawn(async move {
+        // Predicted-next reads the mailbox. That poll used to block the switch command.
+        let mut pred_exclusions = vec![followup_id.clone(), followup_email.clone()];
+        if let Some(ref p_em) = followup_prev {
+            pred_exclusions.push(p_em.clone());
+        }
+        let predicted_next_email = crate::modules::auto_switcher::select_candidate_profiles(
+            &followup_target,
+            "gemini-2.5-pro",
+            15.0,
+            &pred_exclusions,
+        )
+        .ok()
+        .and_then(|v| v.into_iter().next())
+        .filter(|c| {
+            !c.email.trim().eq_ignore_ascii_case(followup_email.trim())
+                && followup_prev
+                    .as_deref()
+                    .map(|p| !c.email.trim().eq_ignore_ascii_case(p.trim()))
+                    .unwrap_or(true)
+        })
+        .map(|c| c.email);
+        let _ = crate::modules::notification_hub::notify_account_switched_details(
+            crate::modules::notification_hub::SwitchNotificationDetails {
+                previous_email: followup_prev,
+                previous_quota_4h: prev_4h,
+                previous_quota_weekly: prev_weekly,
+                predicted_next_email,
+                selected_email: followup_email,
+                target_quota_4h: target_4h,
+                target_quota_weekly: target_weekly,
+                credit_before_switch: prev_4h,
+                threshold_activated: None,
+                instance_id: followup_target.clone(),
+                instance_name: followup_target,
+                instance_mode: String::new(),
+                reason: "Manual account switch".to_string(),
+                is_auto: false,
+                backed_up_projects: Vec::new(),
+                backed_up_prompts_count: None,
+                restored_prompts_count: None,
+            },
+        )
+        .await;
+        if let Ok(mut refreshed) = load_account(&followup_id) {
+            if let Ok(fresh_quota) = fetch_quota_with_retry(&mut refreshed).await {
+                refreshed.quota = Some(fresh_quota);
+                let _ = save_account(&refreshed);
+            }
+        }
     });
-    let predicted_next_email = predicted_candidate.map(|c| c.email);
-
-    let _notify = crate::modules::notification_hub::notify_account_switched_details(
-        crate::modules::notification_hub::SwitchNotificationDetails {
-            previous_email: prev_email.clone(),
-            previous_quota_4h: prev_4h,
-            previous_quota_weekly: prev_weekly,
-            predicted_next_email,
-            selected_email: account.email.clone(),
-            target_quota_4h: target_4h,
-            target_quota_weekly: target_weekly,
-            credit_before_switch: prev_4h,
-            threshold_activated: None,
-            instance_id: target_ide.unwrap_or("default").to_string(),
-            instance_name: target_ide.unwrap_or("default").to_string(),
-            instance_mode: String::new(),
-            reason: "Manual account switch".to_string(),
-            is_auto: false,
-            backed_up_projects: Vec::new(),
-            backed_up_prompts_count: None,
-            restored_prompts_count: None,
-        },
-    )
-    .await;
 
     let (prompt_id, prompt_text) =
         crate::modules::repo_db::switch_prompt_snapshot(target_ide.unwrap_or("default"));
