@@ -1242,7 +1242,15 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             let _ = fs::write(&task_file, json_str);
         }
 
-        // Mark prompt as dispatched directly in the state database
+        let sent = spawn_prompt_via_agy(&prompt);
+        if !sent {
+            crate::modules::logger::log_error(&format!(
+                "[RepoDB] Prompt '{}' was not re-pushed for instance '{}'; left backed_up",
+                prompt.id, instance_id
+            ));
+            continue;
+        }
+
         let updated = conn.execute(
             "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
             params![now, &prompt.id],
@@ -1257,9 +1265,6 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 }
             }
         }
-
-        // Actively spawn agy CLI execution
-        spawn_prompt_via_agy(&prompt);
     }
 
     crate::modules::logger::log_info(&format!(
@@ -1930,10 +1935,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
             );
             if sys.process(target_pid).is_some() {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Skipping duplicate spawn for prompt '{}'.",
+                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Prompt '{}' is already running.",
                     existing_pid, ws_key, prompt.id
                 ));
-                return false;
+                return true;
             } else {
                 workers.remove(&ws_key);
             }
@@ -2166,7 +2171,15 @@ pub fn resend_running_commands_for_instance(
             let _ = fs::write(&task_file, json_str);
         }
 
-        // Update database status to dispatched and update timestamps
+        let sent = spawn_prompt_via_agy(&prompt);
+        if !sent {
+            crate::modules::logger::log_error(&format!(
+                "[RepoDB] Prompt '{}' was not re-pushed; left {}",
+                prompt.id, prompt.status
+            ));
+            continue;
+        }
+
         let _ = conn.execute(
             "UPDATE active_prompts SET status = 'dispatched', updated_at = ?, image_payload = ? WHERE id = ?",
             rusqlite::params![now, &prompt.image_payload, &prompt.id],
@@ -2175,9 +2188,6 @@ pub fn resend_running_commands_for_instance(
             "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?",
             rusqlite::params![now, now, &prompt.project_id],
         );
-
-        // Actively spawn agy CLI execution
-        spawn_prompt_via_agy(&prompt);
 
         prompt.status = "dispatched".to_string();
         prompt.updated_at = now;

@@ -1488,8 +1488,70 @@ pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Resul
     ))
 }
 
+/// Wait until the instance process exists, then give the prompt channel a moment to accept a send.
+pub fn wait_for_instance_prompt_channel(instance_id: &str) {
+    let registry = match load_registry() {
+        Ok(reg) => reg,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Prompt channel wait skipped for '{}': {}",
+                instance_id, err
+            ));
+            return;
+        }
+    };
+    let Some(inst) = registry
+        .instances
+        .iter()
+        .find(|item| item.id == instance_id)
+    else {
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Prompt channel wait skipped; instance '{}' is not registered",
+            instance_id
+        ));
+        return;
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
+    loop {
+        let pids = find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+        let running = !pids.is_empty()
+            || (inst.is_default && crate::modules::process::is_antigravity_running(None));
+        if running {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Prompt channel ready for '{}' ({} pids); injecting once",
+                instance_id,
+                pids.len()
+            ));
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            return;
+        }
+        if std::time::Instant::now() >= deadline {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Prompt channel wait timed out for '{}'; injecting anyway",
+                instance_id
+            ));
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+}
+
 /// Launch a specific instance with multi-window isolation, bound workspace folder restoration, and custom/cloned executable support
 pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> {
+    launch_instance_inner(instance_id, true)
+}
+
+/// Launch during an account switch. Prompt restore stays in the switch step that runs after the process is up.
+pub fn launch_instance_without_prompt_reinject(
+    instance_id: &str,
+) -> Result<(), crate::error::AppError> {
+    launch_instance_inner(instance_id, false)
+}
+
+fn launch_instance_inner(
+    instance_id: &str,
+    reinject_prompts: bool,
+) -> Result<(), crate::error::AppError> {
     let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
     let pos = registry
         .instances
@@ -1757,15 +1819,19 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             ))
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
-            Some(instance_id),
-            false,
-            None,
-        );
-        let _ =
-            crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
-        let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
-        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
+        if reinject_prompts {
+            let _ = crate::modules::backup_prompts_db::restore_running_prompts(
+                Some(instance_id),
+                false,
+                None,
+            );
+            let _ = crate::modules::repo_db::resend_running_commands_for_instance(
+                Some(instance_id),
+                20,
+            );
+            let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+            let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
+        }
         return Ok(());
     }
 
@@ -1840,15 +1906,19 @@ pub fn launch_instance(instance_id: &str) -> Result<(), crate::error::AppError> 
             crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
-            Some(instance_id),
-            false,
-            None,
-        );
-        let _ =
-            crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20);
-        let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
-        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
+        if reinject_prompts {
+            let _ = crate::modules::backup_prompts_db::restore_running_prompts(
+                Some(instance_id),
+                false,
+                None,
+            );
+            let _ = crate::modules::repo_db::resend_running_commands_for_instance(
+                Some(instance_id),
+                20,
+            );
+            let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+            let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
+        }
         Ok(())
     }
 }
@@ -2827,11 +2897,13 @@ pub async fn switch_account_to_instance(
                 "[Instance] start_antigravity_with_fallback_path returned ({}), falling back to launch_instance",
                 e
             ));
-            launch_instance(&instance.id).map_err(|err| err.to_string())?;
+            launch_instance_without_prompt_reinject(&instance.id).map_err(|err| err.to_string())?;
         }
     } else {
-        launch_instance(&instance.id).map_err(|e| e.to_string())?;
+        launch_instance_without_prompt_reinject(&instance.id).map_err(|e| e.to_string())?;
     }
+
+    wait_for_instance_prompt_channel(&instance.id);
 
     // 5.5. [Step 5/5] Restore from backup DB and re-inject running prompts strictly for THIS instance
     let _ =

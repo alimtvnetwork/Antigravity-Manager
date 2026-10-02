@@ -1333,7 +1333,7 @@ pub async fn execute_profile_rotation_with_context(
         .await;
     });
 
-    // Step 3: Automatically re-inject and resend backed-up running prompts across workspaces
+    // Step 3: Retry only prompts the switch left backed_up. Do not restore the backup again.
     let resent_count = match crate::modules::repo_db::resend_running_commands_for_instance(
         if inst_id == "default" {
             None

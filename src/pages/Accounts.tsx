@@ -1122,6 +1122,7 @@ function Accounts() {
                 onReorder={reorderAccounts}
                 onWarmup={handleWarmup}
                 onUpdateLabel={handleUpdateLabel}
+                onUpdatePriority={updateAccountPriority}
                 onViewError={(id: string) => setErrorAccountId(id)}
                 quotaWindow={quotaWindow}
                 focusedAccountId={focusedAccountId}

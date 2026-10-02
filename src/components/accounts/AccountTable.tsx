@@ -3,6 +3,7 @@
  * 支持拖拽排序功能，用户可以通过拖拽行来调整账号顺序
  */
 import { useMemo, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 
 import {
@@ -44,9 +45,9 @@ import {
     X,
     Check,
     Clock,
-    Bot,
     Repeat2,
     Terminal,
+    MoreHorizontal,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
@@ -58,7 +59,6 @@ import { Gemini, Claude } from '@lobehub/icons';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import { QuotaItem } from './QuotaItem';
-import { MODEL_CONFIG, sortModels } from '../../config/modelConfig';
 import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
@@ -87,6 +87,7 @@ interface AccountTableProps {
     onToggleProxy: (accountId: string) => void;
     onWarmup?: (accountId: string) => void;
     onUpdateLabel?: (accountId: string, label: string) => void;
+    onUpdatePriority?: (accountId: string, priority: number) => Promise<void> | void;
     /** 拖拽排序回调，当用户完成拖拽时触发 */
     onReorder?: (accountIds: string[]) => void;
     onViewError: (accountId: string) => void;
@@ -112,10 +113,12 @@ interface SortableRowProps {
     onToggleProxy: () => void;
     onWarmup?: () => void;
     onUpdateLabel?: (label: string) => void;
+    onUpdatePriority?: (priority: number) => Promise<void> | void;
+    showPriority?: boolean;
     onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
     isDragDisabled?: boolean;
-    modelFilter?: 'both' | 'gemini' | 'claude';
+    modelFilter?: 'gemini' | 'claude';
 }
 
 interface AccountRowContentProps {
@@ -135,9 +138,11 @@ interface AccountRowContentProps {
     onToggleProxy: () => void;
     onWarmup?: () => void;
     onUpdateLabel?: (label: string) => void;
+    onUpdatePriority?: (priority: number) => Promise<void> | void;
+    showPriority?: boolean;
     onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
-    modelFilter?: 'both' | 'gemini' | 'claude';
+    modelFilter?: 'gemini' | 'claude';
 }
 
 // ============================================================================
@@ -232,10 +237,12 @@ function SortableAccountRow({
     onToggleProxy,
     onWarmup,
     onUpdateLabel,
+    onUpdatePriority,
+    showPriority = false,
     onViewError,
     quotaWindow,
     isDragDisabled = false,
-    modelFilter = 'both',
+    modelFilter = 'gemini',
 }: SortableRowProps) {
     const { t } = useTranslation();
     const rowRef = useRef<HTMLTableRowElement | null>(null);
@@ -328,6 +335,8 @@ function SortableAccountRow({
                 onToggleProxy={onToggleProxy}
                 onWarmup={onWarmup}
                 onUpdateLabel={onUpdateLabel}
+                onUpdatePriority={onUpdatePriority}
+                showPriority={showPriority}
                 onViewError={onViewError}
                 quotaWindow={quotaWindow}
                 modelFilter={modelFilter}
@@ -357,20 +366,27 @@ function AccountRowContent({
     onToggleProxy,
     onWarmup,
     onUpdateLabel,
+    onUpdatePriority,
+    showPriority = false,
     onViewError,
-    quotaWindow,
-    modelFilter = 'both',
+    modelFilter = 'gemini',
 }: AccountRowContentProps) {
     const { t } = useTranslation();
-    const { config, showAllQuotas } = useConfigStore();
+    const { config } = useConfigStore();
     const validationBlockedLabel = getValidationBlockedStatusLabel(account.validation_blocked_reason, t);
 
     // 自定义标签编辑状态
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [labelInput, setLabelInput] = useState(account.custom_label || '');
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
+    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [moreMenuPos, setMoreMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const [editingPriority, setEditingPriority] = useState(false);
+    const [priorityInput, setPriorityInput] = useState(String(account.priority ?? 50));
     const { instances, activeInstanceId } = useInstanceStore();
     const menuRef = useRef<HTMLDivElement>(null);
+    const moreBtnRef = useRef<HTMLButtonElement>(null);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
 
     const boundInstance = useMemo(() => {
         return instances.find((inst) => inst.config.bound_email === account.email || inst.config.bound_account_id === account.id);
@@ -391,8 +407,13 @@ function AccountRowContent({
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (menuRef.current && !menuRef.current.contains(target)) {
                 setShowInstanceMenu(false);
+            }
+            const inMore = moreMenuRef.current?.contains(target) || moreBtnRef.current?.contains(target);
+            if (!inMore) {
+                setShowMoreMenu(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -420,61 +441,31 @@ function AccountRowContent({
         }
     };
 
-    // 解析周配额项 (当处于 weekly 视图时)
-    const weeklyItems = useMemo(() => {
-        if (quotaWindow !== 'weekly') return [];
-        return (account.quota?.quota_groups || []).flatMap(group => {
-            return (group.buckets || [])
-                .filter(b => b.window.toLowerCase().includes('week') || b.bucket_id.toLowerCase().includes('week'))
-                .map(b => {
-                    const shortGroupName = (group.display_name || '')
-                        .replace(/ models?$/i, '')
-                        .replace(/Claude and GPT/i, 'Claude/GPT');
-                    return {
-                        id: `${group.display_name}-${b.bucket_id}`,
-                        label: b.display_name ? `${shortGroupName} (${b.display_name})` : `${shortGroupName} (周)`,
-                        percentage: Math.round((b.remaining_fraction || 0) * 100),
-                        resetTime: b.reset_time,
-                        cycleTokens: b.cycle_tokens,
-                        Icon: shortGroupName.toLowerCase().includes('claude') ? Sparkles : Bot,
-                    };
-                });
-        });
-    }, [quotaWindow, account.quota?.quota_groups]);
-
-    // Determine models list to display
-    const displayModels = useMemo(() => {
-        if (showAllQuotas) {
-            const uniqueLabels = new Set<string>();
-            return sortModels(
-                (account.quota?.models || []).map(m => {
-                    const modelCfg = MODEL_CONFIG[m.name.toLowerCase()];
-                    const label = m.display_name || (modelCfg?.i18nKey ? t(modelCfg.i18nKey) : (modelCfg?.shortLabel || modelCfg?.label || m.name));
-                    const protectedKey = modelCfg?.protectedKey || m.name.toLowerCase();
-                    return {
-                        id: m.name.toLowerCase(),
-                        label,
-                        percentage: m.percentage || 0,
-                        resetTime: m.reset_time,
-                        isProtected: Boolean(config?.quota_protection?.enabled && isModelProtected(account.protected_models, protectedKey)),
-                        liveLimit: getLiveLimitForModel(account, m.name.toLowerCase(), protectedKey),
-                        Icon: modelCfg?.Icon || Bot,
-                    };
-                }).filter(m => {
-                    const isHiddenThinking = m.id.includes('thinking');
-                    if (isHiddenThinking) return false;
-
-                    const labelKey = `${m.label}-${m.id}`;
-                    if (uniqueLabels.has(labelKey)) {
-                        return false;
-                    }
-                    uniqueLabels.add(labelKey);
-                    return true;
-                })
-            );
+    const savePriority = () => {
+        const value = Number.parseInt(priorityInput, 10);
+        if (!onUpdatePriority || !Number.isInteger(value) || value < 1 || value > 100) {
+            setPriorityInput(String(account.priority ?? 50));
+            setEditingPriority(false);
+            return;
         }
+        void onUpdatePriority(value);
+        setEditingPriority(false);
+    };
 
-        // Consolidated view (Default): exactly TWO unified items (Gemini and Claude)
+    const openPriorityEditor = () => {
+        if (!onUpdatePriority) return;
+        setPriorityInput(String(account.priority ?? 50));
+        setEditingPriority(true);
+    };
+
+    const openMoreMenu = () => {
+        const rect = moreBtnRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setMoreMenuPos({ top: rect.bottom + 4, left: rect.right });
+        setShowMoreMenu(true);
+    };
+
+    const displayModels = useMemo(() => {
         // 1. Gemini (shared quota pool)
         const geminiQuotaModel = findQuotaModel(account.quota?.models, 'gemini-pro')
             || findQuotaModel(account.quota?.models, 'gemini-flash')
@@ -526,14 +517,27 @@ function AccountRowContent({
             },
         ];
 
-        if (modelFilter === 'gemini') {
-            return baseModels.filter((m) => m.id === 'gemini');
-        }
-        if (modelFilter === 'claude') {
-            return baseModels.filter((m) => m.id === 'claude');
-        }
-        return baseModels;
-    }, [showAllQuotas, account.quota?.models, account.protected_models, config?.quota_protection?.enabled, t, modelFilter]);
+        return baseModels.filter((m) => m.id === modelFilter);
+    }, [account.quota?.models, account.protected_models, config?.quota_protection?.enabled, modelFilter]);
+
+    const fourHourModel = displayModels[0];
+    const weeklyCell = useMemo(() => {
+        const groups = account.quota?.quota_groups || [];
+        const group = groups.find((item) => {
+            const name = (item.display_name || '').toLowerCase();
+            if (modelFilter === 'claude') return name.includes('claude');
+            return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+        });
+        const bucket = (group?.buckets || []).find((item) =>
+            (item.window || '').toLowerCase().includes('week')
+            || (item.bucket_id || '').toLowerCase().includes('week')
+        );
+        return {
+            percentage: bucket ? Math.round((bucket.remaining_fraction || 0) * 100) : 0,
+            resetTime: bucket?.reset_time,
+            weeklyTokens: bucket?.cycle_tokens ?? null,
+        };
+    }, [account.quota?.quota_groups, modelFilter]);
 
 
     return (
@@ -541,14 +545,21 @@ function AccountRowContent({
             {/* 邮箱列 */}
             <td className="px-2 py-0.5 align-middle">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className={cn(
+                    <span
+                        className={cn(
                         "font-medium text-xs break-all transition-colors",
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-slate-950 dark:text-white font-bold"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
-                    )} title={account.email}>
+                        )}
+                        title={account.email}
+                        onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            openPriorityEditor();
+                        }}
+                    >
                         {account.email}
                     </span>
 
@@ -628,10 +639,38 @@ function AccountRowContent({
                                 <span>{boundInstance.config.name}</span>
                             </span>
                         )}
-                        {/* 优先级 */}
-                        <span className="px-1.5 py-0.2 rounded bg-gray-100 dark:bg-base-300 text-gray-500 dark:text-gray-400 text-[9px] font-bold" title={t('accounts.priority_hint')}>
-                            {t('accounts.priority')}: {account.priority ?? 50}
-                        </span>
+                        {editingPriority ? (
+                            <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                autoFocus
+                                value={priorityInput}
+                                onChange={(event) => setPriorityInput(event.target.value)}
+                                onClick={(event) => event.stopPropagation()}
+                                onDoubleClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') savePriority();
+                                    if (event.key === 'Escape') {
+                                        setPriorityInput(String(account.priority ?? 50));
+                                        setEditingPriority(false);
+                                    }
+                                }}
+                                onBlur={savePriority}
+                                className="w-12 px-1 py-0.5 rounded border border-blue-400 bg-white text-slate-950 text-[10px] font-bold"
+                            />
+                        ) : showPriority ? (
+                            <span
+                                className="px-1.5 py-0.2 rounded bg-gray-100 dark:bg-base-300 text-gray-500 dark:text-gray-400 text-[9px] font-bold cursor-text"
+                                title={t('accounts.priority_hint')}
+                                onDoubleClick={(event) => {
+                                    event.stopPropagation();
+                                    openPriorityEditor();
+                                }}
+                            >
+                                {t('accounts.priority')}: {account.priority ?? 50}
+                            </span>
+                        ) : null}
                         {/* 远程节点租赁徽章 */}
                         {leaseInfo && (
                             <span
@@ -715,65 +754,22 @@ function AccountRowContent({
                         </button>
                     </div>
                 ) : (
-                    <div className={cn(
-                        "grid gap-1.5 py-0",
-                        (quotaWindow === 'weekly' && weeklyItems.length > 0)
-                            ? (weeklyItems.length === 1 ? "grid-cols-1" : "grid-cols-2")
-                            : "grid-cols-2"
-                    )}>
-                        {quotaWindow === 'weekly' && weeklyItems.length > 0 ? (
-                            weeklyItems.map((item) => (
-                                <QuotaItem
-                                    key={item.id}
-                                    label={item.label}
-                                    percentage={item.percentage}
-                                    resetTime={item.resetTime}
-                                    weeklyTokens={item.cycleTokens ?? null}
-                                    Icon={item.Icon}
-                                />
-                            ))
-                        ) : (
-                            <>
-                                {displayModels.map((model) => (
-                                    <QuotaItem
-                                        key={model.id}
-                                        label={model.label}
-                                        percentage={model.percentage}
-                                        resetTime={model.resetTime}
-                                        isProtected={model.isProtected}
-                                        liveLimit={model.liveLimit}
-                                        Icon={model.Icon}
-                                    />
-                                ))}
-                                {modelFilter !== 'both' && (
-                                    boundInstance ? (
-                                        <div
-                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-indigo-200/60 dark:border-indigo-800/50 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 group/instance text-[10px] font-mono leading-none gap-1.5"
-                                            title={`Bound profile: ${boundInstance.config.name} (${boundInstance.is_running ? 'Running' : 'Idle'})`}
-                                        >
-                                            <span className={cn(
-                                                "w-2 h-2 rounded-full shrink-0",
-                                                boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
-                                            )} />
-                                            <span className="font-bold truncate flex-1">
-                                                {boundInstance.config.name}
-                                            </span>
-                                            <span className="text-[8px] opacity-70 shrink-0 font-sans uppercase">
-                                                {boundInstance.is_running ? "RUN" : "IDLE"}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="relative h-[22px] flex items-center px-2 rounded-md overflow-hidden border border-gray-200/40 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] text-gray-400 text-[10px] font-mono leading-none gap-1.5"
-                                            title="No profile bound"
-                                        >
-                                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                                            <span className="italic truncate flex-1 text-[9px]">Unbound</span>
-                                        </div>
-                                    )
-                                )}
-                            </>
-                        )}
+                    <div className="grid grid-cols-2 gap-1.5 py-0">
+                        <QuotaItem
+                            label="4h"
+                            percentage={fourHourModel?.percentage ?? 0}
+                            resetTime={fourHourModel?.resetTime}
+                            isProtected={fourHourModel?.isProtected}
+                            liveLimit={fourHourModel?.liveLimit}
+                            Icon={fourHourModel?.Icon || (modelFilter === 'claude' ? Claude.Color : Gemini.Color)}
+                        />
+                        <QuotaItem
+                            label={t('accounts.table.weekly_quota', 'Weekly')}
+                            percentage={weeklyCell.percentage}
+                            resetTime={weeklyCell.resetTime}
+                            weeklyTokens={weeklyCell.weeklyTokens}
+                            Icon={modelFilter === 'claude' ? Claude.Color : Gemini.Color}
+                        />
                     </div>
                 )}
             </td>
@@ -799,18 +795,7 @@ function AccountRowContent({
                 !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-[#0c2438]/80" : ""
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                    {/* 1. 刷新按钮 (首选首位) */}
-                    <button
-                        className={`p-1.5 rounded-md transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
-                        disabled={isRefreshing || isDisabled}
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
-
-
-                    {/* 2. 切换/实例选择操作组 (排在第二位) */}
+                    {/* 切换/实例选择操作组 */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
                             className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
@@ -871,21 +856,65 @@ function AccountRowContent({
                         <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
 
-                    {/* 3. 详情与其它操作 */}
                     <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-                        title={t('common.details')}
+                        ref={moreBtnRef}
+                        type="button"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-slate-950 hover:bg-white rounded transition-all"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            if (showMoreMenu) {
+                                setShowMoreMenu(false);
+                                return;
+                            }
+                            openMoreMenu();
+                        }}
+                        title={t('common.more', 'More')}
                     >
-                        <Info className="w-3.5 h-3.5" />
+                        <MoreHorizontal className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                        className="hidden md:inline-flex p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                        title={t('accounts.device_fingerprint')}
-                    >
-                        <Fingerprint className="w-3.5 h-3.5" />
-                    </button>
+                    {showMoreMenu && moreMenuPos && createPortal(
+                        <div
+                            ref={moreMenuRef}
+                            className="fixed z-[10000] min-w-[168px] rounded-lg border border-gray-200 bg-white py-1 text-slate-950 shadow-xl"
+                            style={{ top: moreMenuPos.top, left: moreMenuPos.left, transform: 'translateX(-100%)' }}
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                disabled={isRefreshing || isDisabled}
+                                onClick={() => { setShowMoreMenu(false); onRefresh(); }}
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {t('common.refresh')}
+                            </button>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                onClick={() => { setShowMoreMenu(false); onViewDetails(); }}
+                            >
+                                <Info className="w-3.5 h-3.5" />
+                                {t('common.details')}
+                            </button>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                onClick={() => { setShowMoreMenu(false); onViewDevice(); }}
+                            >
+                                <Fingerprint className="w-3.5 h-3.5" />
+                                {t('accounts.device_fingerprint')}
+                            </button>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                onClick={() => { setShowMoreMenu(false); onExport(); }}
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                {t('common.export')}
+                            </button>
+                        </div>,
+                        document.body,
+                    )}
                     {onUpdateLabel && (
                         <button
                             className={cn(
@@ -911,13 +940,6 @@ function AccountRowContent({
                             <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
                         </button>
                     )}
-                    <button
-                        className="hidden sm:inline-flex p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-all"
-                        onClick={(e) => { e.stopPropagation(); onExport(); }}
-                        title={t('common.export')}
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                    </button>
                     <button
                         className={cn(
                             "p-1 rounded transition-all",
@@ -975,6 +997,7 @@ function AccountTable({
     onReorder,
     onWarmup,
     onUpdateLabel,
+    onUpdatePriority,
     onViewError,
     quotaWindow,
 }: AccountTableProps) {
@@ -994,7 +1017,11 @@ function AccountTable({
         return false;
     };
 
-    const [modelFilter, setModelFilter] = useState<'both' | 'gemini' | 'claude'>('both');
+    const [modelFilter, setModelFilter] = useState<'gemini' | 'claude'>('gemini');
+    const showPriority = useMemo(() => {
+        const values = new Set(accounts.map((account) => account.priority ?? 50));
+        return values.size > 1;
+    }, [accounts]);
     const [activeId, setActiveId] = useState<string | null>(null);
     // 排序状态配置: 支持按配额重置时间 (reset_time) 或最后使用时间 (last_used) 排序
     const [sortConfig, setSortConfig] = useState<{
@@ -1124,15 +1151,7 @@ function AccountTable({
                                         )}
                                         title={t('accounts.table.sort_by_reset_time', '点击按配额重置时间排序')}
                                     >
-                                        <span>
-                                            {quotaWindow === 'weekly'
-                                                ? t('accounts.table.weekly_quota', '周配额')
-                                                : modelFilter === 'gemini'
-                                                    ? 'Gemini + Instance'
-                                                    : modelFilter === 'claude'
-                                                        ? 'Claude + Instance'
-                                                        : t('accounts.table.quota')}
-                                        </span>
+                                        <span>4h / {t('accounts.table.weekly_quota', 'Weekly')}</span>
                                         {sortConfig.key === 'reset_time' ? (
                                             sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                                         ) : (
@@ -1142,19 +1161,6 @@ function AccountTable({
 
                                     {/* Gemini / Claude 视图切换药丸按钮 */}
                                     <div className="inline-flex items-center p-0.5 rounded-lg bg-gray-200/90 dark:bg-slate-900 border border-gray-300/80 dark:border-slate-800 text-[10px] font-semibold">
-                                        <button
-                                            type="button"
-                                            onClick={() => setModelFilter('both')}
-                                            className={cn(
-                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
-                                                modelFilter === 'both'
-                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
-                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                                            )}
-                                            title="Show both Gemini and Claude"
-                                        >
-                                            All
-                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => setModelFilter('gemini')}
@@ -1227,6 +1233,8 @@ function AccountTable({
                                     onToggleProxy={() => onToggleProxy(account.id)}
                                     onWarmup={onWarmup ? () => onWarmup(account.id) : undefined}
                                     onUpdateLabel={onUpdateLabel ? (label: string) => onUpdateLabel(account.id, label) : undefined}
+                                    onUpdatePriority={onUpdatePriority ? (priority: number) => onUpdatePriority(account.id, priority) : undefined}
+                                    showPriority={showPriority}
                                     onViewError={() => onViewError(account.id)}
                                     quotaWindow={quotaWindow}
                                     isDragDisabled={isSortingActive}

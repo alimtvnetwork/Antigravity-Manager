@@ -378,10 +378,10 @@ impl SystemIntegration for DesktopIntegration {
         // =========================================================================
         // STEP 5: Re-Inject the Backed-Up Running Prompts
         // =========================================================================
+        crate::modules::instance::wait_for_instance_prompt_channel("default");
         crate::modules::logger::log_info(
             "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
         );
-        let _ = crate::modules::repo_db::resend_all_running_commands(20);
         let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
             Some("default"),
             false,

@@ -123,15 +123,43 @@ struct IneligibleTier {
 
 #[derive(Debug, Deserialize)]
 struct Tier {
-    #[allow(dead_code)]
+    #[serde(rename = "isDefault", alias = "is_default")]
     is_default: Option<bool>,
     id: Option<String>,
-    #[allow(dead_code)]
-    #[serde(rename = "quotaTier")]
+    #[serde(rename = "quotaTier", alias = "quota_tier")]
     quota_tier: Option<String>,
     name: Option<String>,
-    #[allow(dead_code)]
     slug: Option<String>,
+}
+
+fn tier_text(tier: &Tier) -> Option<String> {
+    [
+        tier.name.clone(),
+        tier.id.clone(),
+        tier.slug.clone(),
+        tier.quota_tier.clone(),
+    ]
+    .into_iter()
+    .find(|value| value.as_ref().is_some_and(|text| !text.trim().is_empty()))
+    .flatten()
+}
+
+fn finalize_subscription_tier(raw: Option<String>, email: &str) -> Option<String> {
+    let raw = raw?;
+    let normalized = crate::models::quota::normalize_subscription_tier(&raw);
+    if crate::models::quota::is_known_tier(&normalized) {
+        crate::modules::logger::log_info(&format!(
+            "📊 [{}] Subscription identified successfully: {} (raw: {})",
+            email, normalized, raw
+        ));
+        Some(normalized)
+    } else {
+        crate::modules::logger::log_warn(&format!(
+            "📊 [{}] Unrecognized subscription tier id '{}'; not mapped to PRO",
+            email, raw
+        ));
+        Some(raw)
+    }
 }
 
 /// Get shared HTTP Client (15s timeout) for pure info fetching (No JA3)
@@ -196,48 +224,30 @@ async fn fetch_project_id(
                         // 1. Paid Tier (Google One AI Premium etc.)
                         // 2. Current Tier (If not ineligible)
                         // 3. Allowed Tiers (Restricted/Default proxy access)
-                        let mut subscription_tier = data
-                            .paid_tier
-                            .as_ref()
-                            .and_then(|t| t.name.clone())
-                            .or_else(|| data.paid_tier.as_ref().and_then(|t| t.id.clone()));
+                        let mut subscription_tier = data.paid_tier.as_ref().and_then(tier_text);
 
                         let is_ineligible = data.ineligible_tiers.is_some()
                             && !data.ineligible_tiers.as_ref().unwrap().is_empty();
 
+                        if subscription_tier.is_none() && !is_ineligible {
+                            subscription_tier = data.current_tier.as_ref().and_then(tier_text);
+                        }
                         if subscription_tier.is_none() {
-                            if !is_ineligible {
-                                subscription_tier = data
-                                    .current_tier
-                                    .as_ref()
-                                    .and_then(|t| t.name.clone())
-                                    .or_else(|| {
-                                        data.current_tier.as_ref().and_then(|t| t.id.clone())
+                            if let Some(allowed) = data.allowed_tiers.as_ref() {
+                                let chosen = allowed
+                                    .iter()
+                                    .find(|tier| tier.is_default == Some(true))
+                                    .or_else(|| allowed.first());
+                                if let Some(label) = chosen.and_then(tier_text) {
+                                    subscription_tier = Some(if is_ineligible {
+                                        format!("{} (Restricted)", label)
+                                    } else {
+                                        label
                                     });
-                            } else {
-                                // If account is marked as INELIGIBLE, drop to allowedTiers and extract default
-                                if let Some(mut allowed) = data.allowed_tiers {
-                                    if let Some(default_tier) =
-                                        allowed.iter_mut().find(|t| t.is_default == Some(true))
-                                    {
-                                        if let Some(name) = &default_tier.name {
-                                            subscription_tier =
-                                                Some(format!("{} (Restricted)", name));
-                                        } else if let Some(id) = &default_tier.id {
-                                            subscription_tier =
-                                                Some(format!("{} (Restricted)", id));
-                                        }
-                                    }
                                 }
                             }
                         }
-
-                        if let Some(ref tier) = subscription_tier {
-                            crate::modules::logger::log_info(&format!(
-                                "📊 [{}] Subscription identified successfully: {}",
-                                email, tier
-                            ));
-                        }
+                        subscription_tier = finalize_subscription_tier(subscription_tier, email);
 
                         if ep_idx > 0 {
                             crate::modules::logger::log_info(&format!(
