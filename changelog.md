@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.119.0] - 2026-10-02
+
+### Added
+- Accounts table shows one model at a time: 4-hour quota on the left and weekly quota on the right, for Gemini or Claude
+- Refresh, details, fingerprint, and export sit in one menu that stays above the sticky actions column
+- Priority stays hidden when every visible account shares it, and a double-click edits it in place
+- Audit page and `agm history` list account adds and switches from split SQLite files indexed by `task_index.db` (Thanks to @aukgit)
+
+### Fixed
+- A switch re-pushes the prompt that was running after the instance process is up, instead of marking the backup restored during launch (Thanks to @aukgit)
+- Paid tier ids that contain pro, premium, or advanced are stored as PRO so the badge can show (Thanks to @aukgit)
+
+---
+
 ## [v4.118.0] - 2026-10-02
 
 ### Added
@@ -107,6 +121,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.119.0 (2026-10-02)**:
+        -   **[Accounts] 4-hour and weekly quota columns**:
+            -   **Description**: Gemini or Claude is selected in the header. The left cell is that model's 4-hour quota and the right cell is its weekly quota. Refresh, details, fingerprint, and export are in one menu. A shared priority is hidden and can be edited by double-click. (Thanks to @aukgit)
+        -   **[Switch] Running prompt is re-pushed once**:
+            -   **Description**: Account switch waits until the instance process is up, then restores the running prompt once. A failed send stays backed up. (Thanks to @aukgit)
+        -   **[Audit] Split task history**:
+            -   **Description**: Account adds and switches are written to split SQLite files under `task-history`, indexed by `task_index.db`. `agm history` and the Audit page list the last 100 events per page. (Thanks to @aukgit)
+
+
     *   **v4.118.0 (2026-10-02)**:
         -   **[UI/UX] Awan Design System Surface Contrast & Elevation Stability**:
             -   **Description**: Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components; optimized active instance and account styling for seamless dark mode readability. (Thanks to @aukgit)
