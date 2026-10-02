@@ -1697,7 +1697,9 @@ pub async fn switch_account(
         }
     });
 
-    let snap = crate::modules::repo_db::switch_prompt_snapshot(target_ide.unwrap_or("default"));
+    // This path always switches the default instance. `target_ide` names the IDE flavor ("ide"),
+    // and prompts are stored under the instance id, so the snapshot must read "default".
+    let snap = crate::modules::repo_db::switch_prompt_snapshot("default");
     let reinjected = crate::modules::integration::take_prompt_reinjected();
     let payload = crate::modules::task_history_db::switch_payload(
         &crate::modules::task_history_db::SwitchFacts {

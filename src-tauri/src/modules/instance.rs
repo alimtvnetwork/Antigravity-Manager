@@ -1392,12 +1392,21 @@ pub fn resolve_instance_pid_for_switch(
     Some(pid)
 }
 
-/// Running check uses the PID saved at launch. It does not walk the process table.
-pub fn is_instance_running(instance_id: &str, _data_dir: &str, config_pid: Option<u32>) -> bool {
-    let Some(saved_pid) = config_pid.or_else(|| get_instance_saved_pid(instance_id)) else {
+/// Running check trusts the PID saved at launch. Only when that PID no longer matches
+/// (for example the macOS `open` wrapper exited) does it search once and save the real PID,
+/// so the next check is a single-process lookup again.
+pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option<u32>) -> bool {
+    let saved = config_pid.or_else(|| get_instance_saved_pid(instance_id));
+    if saved.map(saved_pid_matches).unwrap_or(false) {
+        return true;
+    }
+    let is_default = instance_id == "default";
+    let pids = find_pids_for_data_dir(data_dir, is_default);
+    let Some(pid) = pids.first().copied() else {
         return false;
     };
-    saved_pid_matches(saved_pid)
+    let _ = record_instance_pid(instance_id, pid, data_dir);
+    true
 }
 
 /// Delete an instance profile
