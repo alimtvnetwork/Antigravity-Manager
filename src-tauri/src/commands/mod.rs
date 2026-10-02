@@ -71,6 +71,14 @@ pub async fn list_accounts(
     Ok(accounts)
 }
 
+#[tauri::command]
+pub fn list_task_history(
+    offset: u32,
+    limit: u32,
+) -> Result<modules::task_history_db::TaskHistoryPage, String> {
+    modules::task_history_db::list_page(offset, limit.max(1).min(100))
+}
+
 /// 添加账号
 #[tauri::command]
 pub async fn add_account(

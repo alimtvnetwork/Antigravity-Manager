@@ -77,6 +77,7 @@ fn main() {
         }
         "doctor" | "check" => cmd_doctor(&cmd_args),
         "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
+        "history" | "audit" => cmd_history(&cmd_args),
         "switch" | "switch-account" | "switch_account" | "account-switch" | "swtich"
         | "swtich-account" | "swtich_account" | "account-swtich" => {
             cmd_switch(&cmd_args);
@@ -297,6 +298,7 @@ fn print_help_json() {
                     { "name": "switch-if-low-credit", "aliases": ["swlc", "sfc"], "flags": ["-t <pct>", "--json", "-f [file]", "--force"], "description": "Check live quota & rotate if quota <= threshold" },
                     { "name": "is-low-credit-for-switch", "aliases": ["ilc"], "flags": ["-t <pct>", "--json", "-f [file]"], "description": "Check if active quota <= threshold" },
                     { "name": "accounts", "aliases": ["acc"], "flags": ["--active", "--json"], "description": "List registered accounts, tiers, and quotas" },
+                    { "name": "history", "aliases": ["audit"], "flags": ["--page <n>", "--json"], "description": "List the task history audit from the split SQLite files" },
                     { "name": "switch", "aliases": [], "flags": ["<email|prefix|id>"], "description": "Switch active profile directly without GUI" }
                 ]
             },
@@ -394,6 +396,10 @@ fn print_help() {
     println!("        Check if active quota <= threshold (outputs true/false or JSON)");
     println!("    accounts, acc [--active] [--json]");
     println!("        List registered accounts, tiers, and remaining quotas");
+    println!("    history, audit [--page <n>] [--json]");
+    println!(
+        "        Show the last 100 task-history rows and where each split database file lives"
+    );
     println!("    account switch <email|id|#seq> [--instance <id>]");
     println!("        Switch account profile via accounts subcommand");
     println!();
@@ -1032,6 +1038,70 @@ fn cmd_accounts_import(args: &[String]) {
             }
         }
         Err(e) => eprintln!("[ERROR] Failed to parse accounts envelope: {}", e),
+    }
+}
+
+fn cmd_history(args: &[String]) {
+    if args
+        .iter()
+        .any(|arg| arg == "--help" || arg == "-h" || arg == "help")
+    {
+        println!("agm history [--page <n>] [--json]");
+        println!("  Page size is 100. The root index is task_index.db beside the split files.");
+        return;
+    }
+    let mut page: u32 = 1;
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--page" || args[index] == "-p" {
+            if let Some(next) = args.get(index + 1) {
+                page = next.parse::<u32>().unwrap_or(1).max(1);
+                index += 2;
+                continue;
+            }
+        }
+        index += 1;
+    }
+    let offset = (page - 1) * 100;
+    match antigravity_tools_lib::modules::task_history_db::list_page(offset, 100) {
+        Ok(result) => {
+            if args.iter().any(|arg| arg == "--json") {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).unwrap_or_default()
+                );
+                return;
+            }
+            println!("Task history root: data/task-history or the app data task-history folder");
+            for split in &result.splits {
+                let state = if split.is_current {
+                    "current"
+                } else {
+                    "closed"
+                };
+                println!(
+                    "  split {} {} rows {} {}",
+                    state, split.row_count, split.file_path, split.id
+                );
+            }
+            println!(
+                "Page {} of rows {}-{} ({} total)",
+                page,
+                offset + 1,
+                offset + result.items.len() as u32,
+                result.total
+            );
+            for item in &result.items {
+                println!(
+                    "  {} {} {} {} {}",
+                    item.created_at, item.status, item.action, item.subject, item.detail
+                );
+            }
+        }
+        Err(err) => {
+            eprintln!("[FAIL] history: {}", err);
+            std::process::exit(1);
+        }
     }
 }
 

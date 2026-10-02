@@ -43,6 +43,7 @@ pub mod supabase_command_queue;
 pub mod supabase_pruner;
 pub mod supabase_schema;
 pub mod supabase_sync;
+pub mod task_history_db;
 pub mod telegram_inbound;
 pub mod token_stats;
 pub mod training_api;

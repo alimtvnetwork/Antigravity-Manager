@@ -801,6 +801,7 @@ pub fn run() {
             greet,
             // Account management commands
             commands::list_accounts,
+            commands::list_task_history,
             commands::add_account,
             commands::delete_account,
             commands::delete_accounts,

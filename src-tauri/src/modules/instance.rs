@@ -2566,6 +2566,11 @@ pub async fn switch_account_to_instance(
     target_instance_id: Option<&str>,
 ) -> Result<(), String> {
     let mut account = crate::modules::account::load_account(account_id)?;
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        "switch_account",
+        &account.email,
+        target_instance_id,
+    );
     let fresh_token = crate::modules::oauth::ensure_fresh_token(&account.token, Some(&account.id))
         .await
         .map_err(|e| format!("Failed to refresh token: {}", e))?;
@@ -2979,6 +2984,7 @@ pub async fn switch_account_to_instance(
         }
     }
 
+    audit.succeed("switch finished");
     Ok(())
 }
 

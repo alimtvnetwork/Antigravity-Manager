@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Instances from './pages/Instances';
 import Settings from './pages/Settings';
+import Audit from './pages/Audit';
 import ApiProxy from './pages/ApiProxy';
 
 import Monitor from './pages/Monitor';
@@ -78,6 +79,10 @@ const router = createBrowserRouter([
       {
         path: 'email',
         element: <Email />,
+      },
+      {
+        path: 'audit',
+        element: <Audit />,
       },
       {
         path: 'settings',

@@ -1304,6 +1304,14 @@ pub fn add_account(
 
     save_account_index(&index)?;
 
+    crate::modules::task_history_db::record(
+        "add_account",
+        &account.email,
+        "ok",
+        "account saved",
+        None,
+    );
+
     Ok(account)
 }
 
@@ -1352,6 +1360,13 @@ pub fn upsert_account(
                     save_account_index(&index)?;
                 }
 
+                crate::modules::task_history_db::record(
+                    "add_account",
+                    &account.email,
+                    "ok",
+                    "account credentials updated",
+                    None,
+                );
                 return Ok(account);
             }
             Err(e) => {
@@ -1370,6 +1385,13 @@ pub fn upsert_account(
                     save_account_index(&index)?;
                 }
 
+                crate::modules::task_history_db::record(
+                    "add_account",
+                    &account.email,
+                    "ok",
+                    "account file recreated",
+                    None,
+                );
                 return Ok(account);
             }
         }
@@ -1518,6 +1540,11 @@ pub async fn switch_account(
     }
 
     let mut account = load_account(account_id)?;
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        "switch_account",
+        &account.email,
+        target_ide,
+    );
     if account.disabled || account.proxy_disabled || account.validation_blocked {
         return Err(format!(
             "Cannot switch to account '{}': Account is disabled or blocked (disabled: {}, proxy_disabled: {}, validation_blocked: {})",
@@ -1661,6 +1688,7 @@ pub async fn switch_account(
     )
     .await;
 
+    audit.succeed("switch finished");
     Ok(())
 }
 

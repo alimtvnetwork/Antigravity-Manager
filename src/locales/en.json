@@ -76,6 +76,7 @@
     "security": "IP Management",
     "security_logs": "IP Logs",
     "email": "Email & Alerts",
+    "audit": "Audit",
     "settings": "Settings",
     "theme_to_dark": "Switch to Dark Mode",
     "theme_to_light": "Switch to Light Mode",

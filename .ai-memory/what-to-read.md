@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-01T20:46:00Z
+> Last updated: 2026-10-02T12:20:00Z
 
 ## Changelog
 
+- 2026-10-02T12:20:00Z, Read `.ai-memory/learned/23-accounts-quota-reinject-and-how-to-find-it.md` before touching switch restore. A successful email with a zero restore count means `launch_instance` already marked the backup restored. Read `.ai-memory/design/01-surface-laws.md` before editing Accounts or any new screen. Read `.ai-memory/learned/24-task-history-split-db.md` before adding an account action: adds and switches enqueue into `task-history/task_index.db` plus split `history-*.db`. CLI `agm history`. UI route `/audit`.
 - 2026-10-01T20:46:00Z, Spec 94 is the blind-AI instance test. Clone-from-default and new-empty share `instance::copy_instance` / `create_instance_with_account` from CLI and the Create dialog. Release only after that flow, via `npm run bump`.
 - 2026-10-01T14:50:00Z, Plan 92 UI pass: instance clicks are not overwritten by an in-flight 4s refresh (`useInstanceStore.ts`). Accounts Focus stays on a white row with dark text and scrolls for up to 4s. Email dark-mode links and code chips use `#f8fafc` instead of cyan on navy. Conversation prune was already safe in `agy_cleaner`; `agm clean`/`purge` only remove build artifacts.
 - 2026-10-01T14:40:00Z, Plan 92 started: CLI instance switch must use a new copy and must not close Cursor or `agm-alim.exe`. Restore now keeps `queued` prompts queued and marks the previously running prompt `backed_up` so dispatch sends it again (`backup_prompts_db.rs`, `repo_db.rs`). `close_instance` refuses Cursor and AGM PIDs. Spec `02-spec/21-app/92-cli-instance-switch-e2e.md`. CI was green on `78f4a589` before this change.
