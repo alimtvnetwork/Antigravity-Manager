@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.122.0 (2026-10-02)**:
+        -   **[Switch] Return after the IDE relaunch**:
+            -   **Description**: Quota refresh, the mailbox poll, and email or Telegram run after the switch command returns. The 1.5s prompt wait is skipped when nothing was backed up. (Thanks to @aukgit)
+        -   **[Settings] Compact pinned models**:
+            -   **Description**: Pinned quota models are a filter and small chips. Pinned models sort first. (Thanks to @aukgit)
+
     *   **v4.121.0 (2026-10-02)**:
         -   **[Instances] Clone copies settings and repo databases**:
             -   **Description**: A duplicate instance copies `User/settings.json`, workspace databases, `.gemini` trees, and the source repo rows. (Thanks to @aukgit)
