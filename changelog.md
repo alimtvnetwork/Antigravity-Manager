@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.119.1] - 2026-10-02
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.119.0] - 2026-10-02
 
 ### Added
@@ -115,7 +122,6 @@
 
 ---
 
-
 # 📝 Changelog
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
@@ -129,7 +135,6 @@
         -   **[Audit] Split task history**:
             -   **Description**: Account adds and switches are written to split SQLite files under `task-history`, indexed by `task_index.db`. `agm history` and the Audit page list the last 100 events per page. (Thanks to @aukgit)
 
-
     *   **v4.118.0 (2026-10-02)**:
         -   **[UI/UX] Awan Design System Surface Contrast & Elevation Stability**:
             -   **Description**: Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components; optimized active instance and account styling for seamless dark mode readability. (Thanks to @aukgit)
@@ -137,7 +142,6 @@
             -   **Description**: Enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas; harmonized universal CSS3 color switching transitions and ambient glow pulse keyframe animations across the complete interface. (Thanks to @aukgit)
         -   **[Documentation] Universal English Documentation Standardization**:
             -   **Description**: Enforced 100% pure English standardization across all repository documentation, install scripts, and distribution channels with a strict zero Chinese character policy. (Thanks to @aukgit)
-
 
     *   **v4.117.0 (2026-10-02)**:
         -   **[UI/UX] Awan Brand Elevation Hierarchy & Dark Mode Contrast Overhaul**:
@@ -147,7 +151,6 @@
         -   **[Documentation] Pure English Internationalization & Zero Chinese Text Policy**:
             -   **Description**: Enforced 100% pure English across `README.md`, `README_EN.md`, `changelog.md`, and `changelog_en.md`, eliminating all residual Chinese characters and standardizing release documentation for global distribution. (Thanks to @aukgit)
 
-
     *   **v4.116.0 (2026-10-02)**:
         -   **[UI/UX] Comprehensive Dark Mode Contrast Overhaul & Dark-on-Dark Text Elimination**:
             -   **Description**: Resolved critical dark-on-dark text contrast failures in `InstanceSelector.tsx` where active profile names, emails, and unlinked placeholders rendered in dark slate (`#020617` / `#1e293b`) on dark blue backgrounds; updated active profile text to crisp white (`dark:text-white`) and email typography to high-contrast cyan (`dark:text-cyan-200`). Modernized the active instance close button with accessible high-contrast rose styling (`dark:bg-rose-950/40 text-rose-300`). (Thanks to @aukgit)
@@ -156,20 +159,17 @@
         -   **[Documentation] Pure English Internationalization & Zero Chinese Text Policy**:
             -   **Description**: Enforced 100% pure English across `README.md`, `README_EN.md`, `changelog.md`, and `changelog_en.md`, removing all residual Chinese text and standardizing release notes for global distribution. (Thanks to @aukgit)
 
-
     *   **v4.115.0 (2026-10-02)**:
         -   **[UI/UX] Comprehensive Dark Mode Contrast Overhaul & Dark-on-Dark Text Elimination**:
             -   **Description**: Resolved critical dark-on-dark text contrast failures in `InstanceSelector.tsx` where active profile names, emails, and unlinked placeholders rendered in dark slate (`#020617` / `#1e293b`) on dark blue backgrounds; updated active profile text to crisp white (`dark:text-white`) and email typography to high-contrast cyan (`dark:text-cyan-200`). Modernized the active instance close button with accessible high-contrast rose styling (`dark:bg-rose-950/40 text-rose-300`). (Thanks to @aukgit)
         -   **[Theme] Complete Awan Brand Specification & CSS3 Animation Modernization**:
             -   **Description**: Aligned `AccountTable.tsx`, `AccountRow.tsx`, and `AccountCard.tsx` with the official Awan Software brand palette (`#0c2438` Deep Orbit Card, `#16a97a` Vector Green, `#19b7c9` Zero-G Cyan, `#43d6a2` Plasma Mint). Eliminated all blinding pure white rows in dark mode, set active rows to Deep Orbit Card with Zero-G Cyan accents, updated CURRENT badges to Vector Green, and aligned sticky action columns to eliminate color seams. Implemented universal CSS3 color switching transitions across the entire DOM with ambient glow pulse keyframes. (Thanks to @aukgit)
 
-
     *   **v4.114.0 (2026-10-02)**:
         -   **[Documentation] Complete Chinese Removal from Changelog & Docker Deployment Guide**:
             -   **Description**: Completely purged all legacy Chinese language text from `changelog.md` and `docker/readme.md`, standardizing all documentation, historical version entries, and deployment guides in pure English across all distribution channels; normalized unicode fullwidth punctuation to standard ASCII format. (Thanks to @aukgit)
         -   **[Theme] Awan Brand Palette Alignment for AccountRow & InstanceSelector**:
             -   **Description**: Aligned `AccountRow.tsx` focus, current, and selected state colors with Awan brand tokens (`#2878f0` Lift Blue, `#16a97a` Vector Green, `#43d6a2` Plasma Mint, `#0c2438` Deep Orbit Card); refined active instance name and email typography contrast in `InstanceSelector.tsx` for optimal dark mode legibility. (Thanks to @aukgit)
-
 
     *   **v4.113.0 (2026-10-02)**:
         -   **[Theme] Modern Awan Brand Color Scale & DaisyUI Palette Overhaul**:
@@ -468,14 +468,12 @@
             -   **Frontend Diagnostic Modal Suppression (`src/services/accountService.ts`)**: Added `{ _suppressGlobalModal: true }` to `syncAccountFromDb()` Tauri IPC invocation, preventing speculative background account synchronization tasks from ever triggering intrusive full-screen red error modals in the UI.
             -   **Migration Logging & Observability (`src-tauri/src/modules/migration.rs`)**: Enhanced logging in `import_all_local_accounts` to provide clear warnings when candidate Keyring or SQLite DB OAuth tokens fail refresh due to expiration or revocation.
 
-
     *   **v4.91.0 (2026-09-28)**:
         -   **[Release v4.91.0: Pure JSON Email Telemetry, Strict 100% Quota Gating & Live Google API Probes, Telegram Project Deduplication, and Resilient Installer] Zero-HTML JSON email bodies with normalized schema, strict 100% 4-hour window quota enforcement with live Google API pre-switch probes and depleted bounce prevention, Telegram `/projects` deduplicated by workspace path with worker routing `<node-alias>:<cmd>` and `/prompts` catalog, and fixed `install.ps1` exit code leakage for seamless GitMap updates (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Pure JSON Email Telemetry & Schema Normalization (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/email_sender.rs`)**: Enforced 100% pure JSON payload bodies when email subjects contain `[JSON]`, stripping all HTML, CSS `<style>` blocks, and markdown fences. Normalized telemetry fields to `previous_email`, `predicted_email`, `selected_email`, `quota_percent`, `threshold_activated`, `machine_name`, `node_alias`, `local_ip`, `running_prompts_count`, and `timestamp`, eliminating duplicated fields (`old_email`, `new_email`, `target_email`).
             -   **Strict 100% Quota Gating & Live Google API Probing (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/modules/account.rs`, `src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`)**: Overhauled quota evaluation to compute the strict minimum across all short buckets and non-banned models (preventing Pro 20% from being masked by Flash 100%). Candidates under 100% quota are treated as 0.0% exhausted and excluded. Mandatory live Google API quota probes (`fetch_quota_with_retry`) verify fresh capacity prior to committing switches, strictly rejecting depleted or disabled profiles without unwanted fallback loops.
             -   **Telegram Project Deduplication & Fleet Routing (`src-tauri/src/modules/telegram_inbound.rs`)**: Deduplicated Telegram `/projects` output by canonical repository path, grouping multiple conversations under single project entries with active/total conversation counts. Added `<node-alias>:<command>` and `<ip>:<command>` selector syntax to dispatch commands to specific fleet nodes, introduced `/prompts` command with slugs and ~200-word preview snippets, and enabled prompt prefix/suffix/voice concatenation.
             -   **Installer Resilience & Exit Code Fix (`install.ps1`)**: Resolved Go `cmd.Run()` failure (`exit status 1`) in GitMap updater by adding explicit `$global:LASTEXITCODE = 0; exit 0` at script termination. Added graceful fallback to retain existing verified installations if remote binary downloads fail, ensuring reliable updates across all nodes.
-
 
     *   **v4.90.0 (2026-09-28)**:
         -   **[Release v4.90.0: Account Switch 98% Simulation E2E, Parallel Prompt Backup & Restoration, Multi-VM Collision Shielding & Sandbox Lifecycle Verification] Validated end-to-end 98% simulated failover, pre-switch live API quota refresh stability probe, multi-workspace parallel prompt snapshot to split SQLite with human names & image payloads, fast-forward button delegation, automatic prompt resumption & emergency alerts, Supabase lease & IMAP collision avoidance, sandbox instance lifecycle verification, comprehensive CLI help polish, and 15.0% production standard alignment (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -577,7 +575,6 @@
             -   **GitMap-Style Compile & Runtime Telemetry Parity (`src-tauri/src/modules/git_info.rs`, `build.rs`, `agm.rs`, `email_sender.rs`)**: Achieved 1:1 telemetry parity with GitMap. Injected `AGM_GIT_HASH`, `AGM_GIT_BRANCH`, and `AGM_LAST_RELEASE` during compilation in `build.rs` with runtime fallback in `git_info.rs`. Standardized terminal banners, `agm version`, `agm status`, and all outgoing email headers to embed exact Git metadata.
             -   **Enlarged Typography, Ubuntu Font Stack & High-Contrast White Links (`src-tauri/src/modules/email_sender.rs`)**: Overhauled HTML email styling with 28px titles, 16px body, 14-15px tables/code, and an explicit Ubuntu / Segoe UI / system-ui font stack. Styled all interactive action and target links with pure `#ffffff` text on pill badges, ensuring effortless readability across email clients.
             -   **Commands Cheat Sheet, Live Workspaces Table & Prompt Queue in CLI & Email (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`, `repo_db.rs`)**: Integrated three comprehensive tables across both the `agm` CLI default output and idle alert emails: (1) categorized command reference with syntax examples; (2) discovered workspaces with live status, paths, and copy-pasteable email reply targets (`sub: <NODE> | proj-<id>`); (3) recent prompt tasks and in-flight queue inventory.
-
 
     *   **v4.78.0 (2026-09-27)**:
         -   **[Release v4.78.0: Multi-Channel System Update Notifications (Default Enabled), Email Remote Syntax Manual Upgrade, Zero-Loss Prompt Resumption Across Profile Switches, and Active-Only Low Credit Alerts] Automated Update Receipts via Email & Telegram, Ubuntu High-Contrast Typography, Resumption Without Reinjection Loops, and Targeted Quota Alerts**:

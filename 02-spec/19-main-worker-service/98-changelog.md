@@ -1,3 +1,9 @@
+## v4.119.1 — 2026-10-02 (Synchronize prompts, skills, AI scripts, and coding guidelines)
+
+**Scope:** Version bump. Synchronize prompts, skills, AI scripts, and coding guidelines.
+
+---
+
 ## v4.118.0 — 2026-10-02 (Minor release: Awan design system surface contrast, WCAG AAA color semantics, and English documentation standardization)
 
 **Scope:** Minor version bump. Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components, enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas, universal CSS3 color switching transitions, and universal English documentation standardization.
