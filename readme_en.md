@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.119.0)
+> Professional AI Account Management & Protocol Proxy System (v4.120.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.119.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.120.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.119.0**: Accounts shows a model's 4-hour quota beside its weekly quota, a switch re-pushes the running prompt after the instance is up, and Audit plus `agm history` record account adds and switches in split SQLite files.
+> Latest version **v4.120.0**: Accounts uses one tier dropdown, Refresh then Switch, and masked emails. A quota refresh can set the Pro badge. Audit Detail reads the switch prompt from the split database.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

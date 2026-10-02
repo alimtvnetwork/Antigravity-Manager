@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.120.0 (2026-10-02)**:
+        -   **[Accounts] One tier dropdown and a shorter row**:
+            -   **Description**: The 5-hour and Weekly toolbar buttons are removed because those quotas already have their own cells. All, Pro, Ultra, and Free are one dropdown. Refresh is the first button, then Switch. Emails stay masked until Show email. (Thanks to @aukgit)
+        -   **[Audit] Lazy detail from the split database**:
+            -   **Description**: Account actions are numeric enums. The list shows title case. Detail opens that row's split file and shows the prompt that was running when a switch happened. (Thanks to @aukgit)
+        -   **[Release] One version and a refreshable Pro badge**:
+            -   **Description**: Quota refresh fetches the subscription tier even when a project id is cached. The bump script exits if package.json, version.json, Cargo.toml, tauri.conf.json, and hooks.nsh disagree. (Thanks to @aukgit)
+
     *   **v4.119.0 (2026-10-02)**:
         -   **[Accounts] 4-hour and weekly quota columns**:
             -   **Description**: Gemini or Claude is selected in the header. The left cell is that model's 4-hour quota and the right cell is its weekly quota. Refresh, details, fingerprint, and export are in one menu. A shared priority is hidden and can be edited by double-click. (Thanks to @aukgit)
