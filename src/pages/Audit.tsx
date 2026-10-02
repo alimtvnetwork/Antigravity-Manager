@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Copy, Info } from 'lucide-react';
 import { request } from '../utils/request';
 import { maskEmail } from '../utils/maskEmail';
 
@@ -46,6 +47,7 @@ interface SwitchPayload {
     how?: string;
     prompt_id?: string;
     prompt_text?: string;
+    conversation_id?: string;
     prompt_reinjected?: boolean;
     moved_at?: number;
     switch_ok?: boolean;
@@ -98,6 +100,7 @@ function detailRows(detail: TaskDetail, payload: SwitchPayload | null, revealed:
         { label: 'When', value: when },
         { label: 'Reason', value: recorded(payload?.reason, 'Not recorded on this row') },
         { label: 'How', value: recorded(payload?.how, 'Not recorded on this row') },
+        { label: 'Conversation', value: recorded(payload?.conversation_id, 'Not recorded on this row') },
         { label: 'Prompt running', value: recorded(payload?.prompt_text, 'No running prompt was stored') },
         { label: 'Prompt injected again', value: reinject },
     ];
@@ -111,6 +114,7 @@ export default function Audit() {
     const [openId, setOpenId] = useState('');
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     const [detailError, setDetailError] = useState('');
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         let alive = true;
@@ -133,6 +137,7 @@ export default function Audit() {
         setOpenId(id);
         setDetail(null);
         setDetailError('');
+        setCopied(false);
         request<TaskDetail>('get_task_history_detail', { id })
             .then((result) => setDetail(result))
             .catch((err: unknown) => setDetailError(err instanceof Error ? err.message : String(err)));
@@ -155,7 +160,7 @@ export default function Audit() {
             <div className="mb-3">
                 <h1 className="text-lg font-semibold">Audit</h1>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Addresses hide the domain, such as gmail.com, and keep the start of the name. Detail loads that row only when you open it.
+                    Addresses hide the domain, such as gmail.com, and keep the start of the name. The info button loads that row only when you open it.
                 </p>
             </div>
             {error && (
@@ -191,10 +196,12 @@ export default function Audit() {
                                     </button>
                                     <button
                                         type="button"
-                                        className="rounded-lg border border-slate-300 bg-white px-2 py-1"
+                                        aria-label="Show audit detail"
+                                        title="Detail"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-800"
                                         onClick={() => loadDetail(item.id)}
                                     >
-                                        Detail
+                                        <Info className="h-3.5 w-3.5" />
                                     </button>
                                 </td>
                             </tr>
@@ -210,27 +217,64 @@ export default function Audit() {
                 </table>
             </div>
             {openId && (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h2 className="font-semibold text-[#f5d76e] bg-[#070b10] inline-block rounded px-2 py-1">Detail</h2>
-                        <button type="button" className="text-xs underline" onClick={() => { setOpenId(''); setDetail(null); }}>
-                            Close
-                        </button>
+                <div
+                    className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => { setOpenId(''); setDetail(null); }}
+                >
+                    <div
+                        className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl"
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-label="Audit detail"
+                    >
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                            <h2 className="font-semibold">Audit detail</h2>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs disabled:opacity-40"
+                                    disabled={!detail}
+                                    onClick={() => {
+                                        if (!detail) return;
+                                        const rows = detailRows(detail, payload, detailRevealed);
+                                        const lines = rows.map((row) => `${row.label}: ${row.value}`);
+                                        const raw = detail.payload_json?.trim();
+                                        const body = raw ? `${lines.join('\n')}\n\n${raw}` : lines.join('\n');
+                                        void navigator.clipboard.writeText(body).then(() => {
+                                            setCopied(true);
+                                            window.setTimeout(() => setCopied(false), 1500);
+                                        });
+                                    }}
+                                >
+                                    <Copy className="h-3.5 w-3.5" />
+                                    {copied ? 'Copied' : 'Copy'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs"
+                                    onClick={() => { setOpenId(''); setDetail(null); }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-y-auto p-4 text-sm">
+                            {detailError && <p className="text-rose-700">{detailError}</p>}
+                            {!detail && !detailError && <p className="text-slate-500">Loading this row from its split file...</p>}
+                            {detail && (
+                                <table className="w-full text-left text-xs border border-slate-200">
+                                    <tbody>
+                                        {detailRows(detail, payload, detailRevealed).map((row) => (
+                                            <tr key={row.label} className="border-t border-slate-100 first:border-t-0">
+                                                <th className="w-40 px-3 py-2 font-semibold align-top bg-slate-50">{row.label}</th>
+                                                <td className="px-3 py-2 whitespace-pre-wrap">{row.value}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
-                    {detailError && <p className="text-rose-700">{detailError}</p>}
-                    {!detail && !detailError && <p className="text-slate-500">Loading this row from its split file...</p>}
-                    {detail && (
-                        <table className="w-full text-left text-xs border border-slate-200 dark:border-white/10">
-                            <tbody>
-                                {detailRows(detail, payload, detailRevealed).map((row) => (
-                                    <tr key={row.label} className="border-t border-slate-100 dark:border-white/10 first:border-t-0">
-                                        <th className="w-40 px-3 py-2 font-semibold align-top bg-slate-50 dark:bg-white/5">{row.label}</th>
-                                        <td className="px-3 py-2 whitespace-pre-wrap">{row.value}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
                 </div>
             )}
             <div className="mt-3 flex items-center justify-between text-xs text-slate-700">

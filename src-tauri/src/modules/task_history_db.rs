@@ -302,6 +302,7 @@ pub struct SwitchFacts {
     pub how: String,
     pub prompt_id: String,
     pub prompt_text: String,
+    pub conversation_id: String,
     pub prompt_reinjected: bool,
     pub switch_ok: bool,
 }
@@ -314,6 +315,7 @@ pub fn switch_payload(facts: &SwitchFacts) -> String {
         "how": facts.how,
         "prompt_id": facts.prompt_id,
         "prompt_text": facts.prompt_text,
+        "conversation_id": facts.conversation_id,
         "prompt_reinjected": facts.prompt_reinjected,
         "moved_at": Utc::now().timestamp(),
         "switch_ok": facts.switch_ok,
@@ -504,6 +506,7 @@ mod tests {
             how: "Closed the IDE, wrote the account, opened the IDE.".to_string(),
             prompt_id: "p1".to_string(),
             prompt_text: "keep going".to_string(),
+            conversation_id: "conv-same".to_string(),
             prompt_reinjected: true,
             switch_ok: true,
         });
@@ -512,6 +515,7 @@ mod tests {
         assert_eq!(value["to_email"], "beta@gmail.com");
         assert_eq!(value["reason"], "Manual account switch");
         assert_eq!(value["prompt_text"], "keep going");
+        assert_eq!(value["conversation_id"], "conv-same");
         assert_eq!(value["prompt_reinjected"], true);
         let (from_email, to_email) = payload_emails(Some(&raw));
         assert_eq!(from_email, "alpha@gmail.com");

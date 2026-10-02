@@ -286,6 +286,10 @@ fn default_stale_binding_timeout_hours() -> u32 {
     6
 }
 
+fn default_pid_refresh_seconds() -> u32 {
+    600
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -316,6 +320,9 @@ pub struct AutoProfileSwitcherConfig {
     pub fast_forward_shortcut: String,
     #[serde(default = "default_stale_binding_timeout_hours")]
     pub stale_binding_timeout_hours: u32,
+    /// How often the full process table is rebuilt. Default 10 minutes. Floor 3 minutes, ceiling 20.
+    #[serde(default = "default_pid_refresh_seconds")]
+    pub pid_refresh_seconds: u32,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -337,6 +344,7 @@ impl Default for AutoProfileSwitcherConfig {
             prompt_recency_threshold_seconds: 3600,
             fast_forward_shortcut: "Ctrl+Shift+F".to_string(),
             stale_binding_timeout_hours: 6,
+            pid_refresh_seconds: 600,
         }
     }
 }

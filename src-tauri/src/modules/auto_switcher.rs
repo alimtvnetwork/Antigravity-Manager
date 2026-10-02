@@ -1506,6 +1506,16 @@ pub async fn check_and_rotate_with_options(
             .or_else(|| calculate_account_quota(&bound_acc, &switcher_cfg.target_model))
             .unwrap_or(100.0);
 
+        let below_threshold = quota_percent <= effective_low_threshold
+            || quota_percent <= switcher_cfg.critical_threshold_percent;
+        if below_threshold || force {
+            let _ = instance::resolve_instance_pid_for_switch(
+                &inst.id,
+                &inst.data_dir,
+                inst.is_default || inst.id == "default",
+            );
+        }
+
         let is_depleted_before_finish = period_status
             .as_ref()
             .map(|s| s.is_depleted_before_finish)
@@ -1766,16 +1776,27 @@ pub async fn check_and_rotate_for_threshold(
     check_and_rotate_with_options(custom_threshold, force).await
 }
 
-/// Calculate dynamic polling interval based on credit quota ladder:
-/// - >= 18%: check_interval_seconds (default 300s / 5m)
-/// - < 18%: caution_interval_seconds (default 60s / 1m)
-/// - <= 15%: critical_interval_seconds (default 40s)
+/// Google quota checks are never faster than 2 minutes.
+/// The old 5-minute default (300) is now 2 minutes. A higher custom value is kept.
+pub const MIN_GOOGLE_QUOTA_CHECK_SECONDS: u32 = 120;
+
+pub fn google_quota_interval_seconds(configured: u32) -> u32 {
+    let secs = if configured == 300 {
+        MIN_GOOGLE_QUOTA_CHECK_SECONDS
+    } else {
+        configured
+    };
+    secs.max(MIN_GOOGLE_QUOTA_CHECK_SECONDS)
+}
+
+/// Calculate dynamic polling interval based on credit quota ladder.
+/// Every branch waits at least 2 minutes before the next Google quota check.
 pub fn calculate_next_interval_seconds(
     quota_percent: Option<f64>,
     cfg: &AutoProfileSwitcherConfig,
 ) -> u32 {
     let Some(quota) = quota_percent else {
-        return cfg.check_interval_seconds.max(300);
+        return google_quota_interval_seconds(cfg.check_interval_seconds);
     };
 
     let caution_threshold = if cfg.low_quota_threshold_percent > cfg.critical_threshold_percent {
@@ -1785,11 +1806,11 @@ pub fn calculate_next_interval_seconds(
     };
 
     if quota <= cfg.critical_threshold_percent {
-        cfg.critical_interval_seconds.max(60)
+        google_quota_interval_seconds(cfg.critical_interval_seconds)
     } else if quota < caution_threshold {
-        cfg.caution_interval_seconds.max(120)
+        google_quota_interval_seconds(cfg.caution_interval_seconds)
     } else {
-        cfg.check_interval_seconds.max(300)
+        google_quota_interval_seconds(cfg.check_interval_seconds)
     }
 }
 
@@ -2024,8 +2045,8 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
         None => return Ok(()),
     };
 
-    let pids = instance::find_pids_for_data_dir(&active_inst.data_dir, active_inst.is_default);
-    let is_running = !pids.is_empty();
+    let is_running =
+        instance::is_instance_running(&active_inst.id, &active_inst.data_dir, active_inst.pid);
 
     if !is_running {
         // Only clean stale lockfiles passively; NEVER call trigger_manual_rotation() or launch IDE windows
@@ -2107,6 +2128,8 @@ pub fn start_auto_switcher() {
                 }
             }
 
+            let _ = instance::refresh_pid_cache_if_due(switcher_cfg.pid_refresh_seconds);
+
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));
             }
@@ -2122,7 +2145,7 @@ pub fn start_auto_switcher() {
             let interval = app_config
                 .auto_profile_switcher
                 .watchdog_interval_seconds
-                .max(60);
+                .max(MIN_GOOGLE_QUOTA_CHECK_SECONDS);
             tokio::time::sleep(Duration::from_secs(interval as u64)).await;
 
             if let Err(e) = check_and_recover_crashed_instance().await {
@@ -2193,15 +2216,17 @@ mod tests {
         assert_eq!(cfg.low_quota_threshold_percent, 15.0);
         assert_eq!(cfg.critical_threshold_percent, 15.0);
 
-        assert_eq!(calculate_next_interval_seconds(None, &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(19.0), &cfg), 300);
-        assert_eq!(calculate_next_interval_seconds(Some(17.9), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(16.0), &cfg), 60);
-        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 40);
-        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);
-        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(None, &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(19.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(17.9), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(16.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 120);
+        assert_eq!(google_quota_interval_seconds(600), 600);
+        assert_eq!(google_quota_interval_seconds(40), 120);
     }
 
     #[test]

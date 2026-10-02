@@ -12,6 +12,9 @@
 | `89` | [89-cicd-rustfmt-cmd-instances-fix.md](./completed/89-cicd-rustfmt-cmd-instances-fix.md) | `COMPLETED` | CI/CD rustfmt compliance recovery, fixing line-length formatting drift in `src-tauri/src/bin/agm.rs:8612` (`cmd_instances`), documenting Root Cause Analysis 40 in `.ai-memory/cicd-issues/`, enforcing rustfmt via tracked `.githooks/pre-commit`, auditing CI memory indexes, and verifying green CI pipeline. Release-workflow fmt gate pushed in `6b18ddc4` (issue 56 resolved). |
 | `94` | [94-blind-ai-instance-test-and-release.md](./completed/94-blind-ai-instance-test-and-release.md) | `COMPLETED` | Blind AI instance test flow and release verification across the 8 Laws of Instance Sandboxing (L1 host PID safety, L2 folder owns PID, L3 clone vs new, L4 UI-CLI parity, L5 queued prompt preservation, L6 notify before return, L7 Supabase read-back & table integrity, L8 cleanup scope), dev hygiene hardening, and release ceremony alignment. |
 
+## Completed this run
+| `100` | [100-resume-same-conversation-and-pid-cache.md](../../02-spec/21-app/100-resume-same-conversation-and-pid-cache.md) | `DONE` | Same-conversation resume file, audit info modal, 2-minute quota floor, saved-PID check with a 10-minute process cache. |
+
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |

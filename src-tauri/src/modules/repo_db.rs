@@ -572,29 +572,134 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
     (raw_payload, found_paths)
 }
 
+/// Text to store for a live conversation. The transcript's latest USER_INPUT wins.
+/// When that line is missing, the conversation preview is the prompt that was running.
+pub fn live_prompt_text(preview: &str, transcript: &str) -> Option<String> {
+    for line in transcript.lines().rev() {
+        if !line.contains("USER_INPUT") {
+            continue;
+        }
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if val.get("type").and_then(|t| t.as_str()) != Some("USER_INPUT") {
+            continue;
+        }
+        if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
+            if !txt.trim().is_empty() {
+                return Some(txt.to_string());
+            }
+        }
+    }
+    let trimmed = preview.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Resume file the IDE reads after a switch. `session_id` is the same conversation.
+pub fn resume_task_document(
+    prompt: &ActivePrompt,
+    status: &str,
+    at: i64,
+    image_paths: &[String],
+) -> serde_json::Value {
+    let has_image = prompt.image_payload.is_some() || !image_paths.is_empty();
+    serde_json::json!({
+        "prompt_id": prompt.id,
+        "project_id": prompt.project_id,
+        "instance_id": prompt.instance_id,
+        "repo_path": prompt.repo_path,
+        "prompt_content": prompt.prompt_content,
+        "model": prompt.model,
+        "session_id": prompt.session_id,
+        "conversation_id": prompt.session_id,
+        "image_payload": prompt.image_payload,
+        "image_paths": image_paths,
+        "has_image": has_image,
+        "auto_boot": true,
+        "status": status,
+        "backed_up_at": at,
+    })
+}
+
+fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
+    let named = instance_id != "all"
+        && instance_id != "default"
+        && !instance_id.is_empty()
+        && instance_id != "__default__";
+    let home = if named {
+        crate::modules::instance::get_instance_home_dir(instance_id).ok()
+    } else {
+        dirs::home_dir()
+    };
+    let mut dirs = Vec::new();
+    if let Some(home) = home {
+        for sub in ["antigravity", "antigravity-cli", "antigravity-ide"] {
+            let path = home.join(".gemini").join(sub);
+            if path.exists() {
+                dirs.push(path);
+            }
+        }
+    }
+    dirs
+}
+
+struct ConversationSummaryRow {
+    cid: String,
+    preview: String,
+    status: String,
+    not_fully_idle: i32,
+    workspace_uris: Option<String>,
+}
+
+fn read_conversation_summary_rows(conn: &Connection) -> Vec<ConversationSummaryRow> {
+    let wide = "SELECT conversation_id, preview, status, not_fully_idle, workspace_uris
+         FROM conversation_summaries
+         ORDER BY last_modified_time DESC
+         LIMIT 25";
+    if let Ok(mut stmt) = conn.prepare(wide) {
+        if let Ok(rows) = stmt.query_map([], |row| {
+            Ok(ConversationSummaryRow {
+                cid: row.get(0)?,
+                preview: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                status: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                not_fully_idle: row.get::<_, Option<i32>>(3)?.unwrap_or(0),
+                workspace_uris: row.get(4)?,
+            })
+        }) {
+            return rows.flatten().collect();
+        }
+    }
+    let narrow = "SELECT conversation_id, preview, workspace_uris
+         FROM conversation_summaries
+         ORDER BY rowid DESC
+         LIMIT 25";
+    let Ok(mut stmt) = conn.prepare(narrow) else {
+        return Vec::new();
+    };
+    let Ok(rows) = stmt.query_map([], |row| {
+        Ok(ConversationSummaryRow {
+            cid: row.get(0)?,
+            preview: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+            status: String::new(),
+            not_fully_idle: 1,
+            workspace_uris: row.get(2)?,
+        })
+    }) else {
+        return Vec::new();
+    };
+    rows.flatten().collect()
+}
+
 /// Discover in-flight active conversations and running prompts directly from Antigravity core storage
 /// (~/.gemini/antigravity/conversation_summaries.db and brain/<cid>/.system_generated/logs/transcript.jsonl)
 pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<ActivePrompt> {
     let mut prompts = Vec::new();
     let mut seen_cids = std::collections::HashSet::new();
-    let mut candidate_dirs = Vec::new();
-    if instance_id != "all"
-        && instance_id != "default"
-        && !instance_id.is_empty()
-        && instance_id != "__default__"
-    {
-        if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(instance_id) {
-            for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
-                let p = inst_home.join(".gemini").join(sub);
-                if p.exists() && !candidate_dirs.contains(&p) {
-                    candidate_dirs.push(p);
-                }
-            }
-        }
-    }
-    if candidate_dirs.is_empty() {
-        candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
-    }
+    let candidate_dirs = gemini_dirs_for_instance(instance_id);
 
     for base_dir in candidate_dirs {
         let summaries_db = base_dir.join("conversation_summaries.db");
@@ -611,34 +716,17 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
         };
 
         let now = Utc::now().timestamp();
-        let mut stmt = match conn.prepare(
-            "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
-             FROM conversation_summaries 
-             ORDER BY last_modified_time DESC 
-             LIMIT 25",
-        ) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
-
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, i32>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        });
-
-        let Ok(rows) = rows else {
+        let rows = read_conversation_summary_rows(&conn);
+        if rows.is_empty() {
             continue;
-        };
+        }
 
-        for item in rows.flatten() {
-            let (cid, _title, _preview, status, not_fully_idle, ws_uris_opt, _last_time) = item;
+        for item in rows {
+            let cid = item.cid;
+            let preview = item.preview;
+            let status = item.status;
+            let not_fully_idle = item.not_fully_idle;
+            let ws_uris_opt = item.workspace_uris;
             if !seen_cids.insert(cid.clone()) {
                 continue;
             }
@@ -725,6 +813,10 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                         }
                     }
                 }
+            }
+
+            if user_prompt.is_none() {
+                user_prompt = live_prompt_text(&preview, "");
             }
 
             if let Some(prompt_text) = user_prompt {
@@ -829,21 +921,9 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         ));
     }
 
-    let instance_projects = detect_running_projects(instance_id).unwrap_or_default();
-    let instance_repo_paths: HashSet<String> = instance_projects
-        .iter()
-        .map(|proj| normalize_path_for_compare(&proj.repo_path))
-        .collect();
-
     // Layer 1: Core Antigravity Live Conversations Discovery (~/.gemini/antigravity)
     let ag_prompts = discover_running_prompts_from_antigravity(instance_id);
     for p in ag_prompts {
-        if !is_all_or_default
-            && !instance_repo_paths.is_empty()
-            && !instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
-        {
-            continue;
-        }
         let clean_repo_name = Path::new(&p.repo_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -882,25 +962,13 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             backed_up_count += 1;
             let (extracted_img, img_paths) = extract_image_payload_or_path(&p.prompt_content);
             let final_img = p.image_payload.clone().or(extracted_img);
-            let has_image = final_img.is_some() || !img_paths.is_empty();
-
-            // Write disk resume snapshot file inside project repo directory
+            // Write disk resume snapshot file inside project repo directory.
+            // session_id is the live conversation, so the IDE reopens that chat.
             let task_file = PathBuf::from(&p.repo_path).join(".antigravity_resume_task.json");
-            let payload = serde_json::json!({
-                "prompt_id": p.id,
-                "project_id": p.project_id,
-                "instance_id": p.instance_id,
-                "repo_path": p.repo_path,
-                "prompt_content": p.prompt_content,
-                "model": p.model,
-                "session_id": p.session_id,
-                "image_payload": final_img,
-                "image_paths": img_paths,
-                "has_image": has_image,
-                "auto_boot": true,
-                "status": "backed_up",
-                "backed_up_at": now,
-            });
+            let mut payload = resume_task_document(&p, "backed_up", now, &img_paths);
+            if final_img.is_some() {
+                payload["image_payload"] = serde_json::json!(final_img);
+            }
             if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
                 let _ = fs::write(&task_file, json_str);
             }
@@ -1246,24 +1314,22 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             prompt.id, prompt.repo_path
         ));
 
-        // Write disk resume snapshot file inside project repo directory
+        // Keep the conversation id on the file the IDE reads. A later rewrite must not drop it.
         let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
-        let payload = serde_json::json!({
-            "prompt_id": prompt.id,
-            "project_id": prompt.project_id,
-            "instance_id": instance_id,
-            "prompt_content": prompt.prompt_content,
-            "model": prompt.model,
-            "image_payload": prompt.image_payload,
-            "status": "dispatched",
-            "dispatched_at": now,
-        });
-        if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-            let _ = fs::write(&task_file, json_str);
-        }
+        let payload = resume_task_document(&prompt, "dispatched", now, &[]);
+        let file_written = if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            fs::write(&task_file, json_str).is_ok()
+        } else {
+            false
+        };
 
         let sent = spawn_prompt_via_agy(&prompt);
-        if !sent {
+        let same_conversation = prompt
+            .session_id
+            .as_deref()
+            .map(|id| !id.trim().is_empty())
+            .unwrap_or(false);
+        if !sent && !(file_written && same_conversation) {
             crate::modules::logger::log_error(&format!(
                 "[RepoDB] Prompt '{}' was not re-pushed for instance '{}'; left backed_up",
                 prompt.id, instance_id
@@ -1359,24 +1425,48 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
     Ok(rows)
 }
 
-/// List recent prompts across statuses
-pub fn switch_prompt_snapshot(instance_id: &str) -> (String, String) {
-    let prompts = list_all_prompts().unwrap_or_default();
-    let found = prompts.into_iter().find(|prompt| {
-        let same_instance = prompt.instance_id == instance_id
-            || (instance_id == "default"
-                && (prompt.instance_id.is_empty()
-                    || prompt.instance_id == "default"
-                    || prompt.instance_id == "__default__"));
-        same_instance
-            && (prompt.status == "running"
-                || prompt.status == "backed_up"
-                || prompt.status == "dispatched")
-    });
-    match found {
-        Some(prompt) => (prompt.id, prompt.prompt_content),
-        None => (String::new(), String::new()),
+pub struct SwitchPromptSnap {
+    pub prompt_id: String,
+    pub prompt_text: String,
+    pub conversation_id: String,
+}
+
+impl SwitchPromptSnap {
+    fn empty() -> Self {
+        Self {
+            prompt_id: String::new(),
+            prompt_text: String::new(),
+            conversation_id: String::new(),
+        }
     }
+}
+
+/// Newest running, backed-up, or dispatched prompt for this instance.
+/// Ordered by updated_at so a just-captured conversation is not hidden behind older rows.
+pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
+    let Ok(conn) = connect_db() else {
+        return SwitchPromptSnap::empty();
+    };
+    conn.query_row(
+        "SELECT id, prompt_content, IFNULL(session_id, '')
+         FROM active_prompts
+         WHERE status IN ('running', 'backed_up', 'dispatched')
+           AND (
+                instance_id = ?1
+                OR (?1 = 'default' AND instance_id IN ('default', '__default__', ''))
+           )
+         ORDER BY updated_at DESC
+         LIMIT 1",
+        [instance_id],
+        |row| {
+            Ok(SwitchPromptSnap {
+                prompt_id: row.get(0)?,
+                prompt_text: row.get(1)?,
+                conversation_id: row.get(2)?,
+            })
+        },
+    )
+    .unwrap_or_else(|_| SwitchPromptSnap::empty())
 }
 
 pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
@@ -1974,10 +2064,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
             );
             if sys.process(target_pid).is_some() {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Prompt '{}' is already running.",
+                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Prompt '{}' was not sent again.",
                     existing_pid, ws_key, prompt.id
                 ));
-                return true;
+                return false;
             } else {
                 workers.remove(&ws_key);
             }
@@ -4001,6 +4091,60 @@ mod tests {
     fn prompt_channel_wait_only_when_a_prompt_was_backed_up() {
         assert!(!needs_prompt_channel_wait(0));
         assert!(needs_prompt_channel_wait(1));
+    }
+
+    #[test]
+    fn live_prompt_uses_preview_when_the_transcript_has_no_user_input() {
+        let preview = live_prompt_text("keep the same chat", "{\"type\":\"MODEL\"}\n").unwrap();
+        assert_eq!(preview, "keep the same chat");
+        let user = live_prompt_text(
+            "preview",
+            "{\"type\":\"USER_INPUT\",\"content\":\"real prompt\"}",
+        )
+        .unwrap();
+        assert_eq!(user, "real prompt");
+        assert!(live_prompt_text("  ", "").is_none());
+    }
+
+    #[test]
+    fn resume_document_keeps_the_same_conversation_id() {
+        let prompt = ActivePrompt {
+            id: "prompt-conv-9".to_string(),
+            project_id: "proj".to_string(),
+            instance_id: "default".to_string(),
+            repo_path: "D:/work/app".to_string(),
+            prompt_content: "keep going".to_string(),
+            model: None,
+            session_id: Some("conv-9".to_string()),
+            status: "backed_up".to_string(),
+            created_at: 10,
+            updated_at: 10,
+            image_payload: None,
+        };
+        let doc = resume_task_document(&prompt, "backed_up", 10, &[]);
+        assert_eq!(doc["session_id"], "conv-9");
+        assert_eq!(doc["conversation_id"], "conv-9");
+        assert_eq!(doc["prompt_content"], "keep going");
+    }
+
+    #[test]
+    fn summary_rows_fall_back_when_status_columns_are_missing() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE conversation_summaries (conversation_id TEXT, preview TEXT, workspace_uris TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversation_summaries VALUES ('cid-1', 'running work', '[\"file:///d:/work/app\"]')",
+            [],
+        )
+        .unwrap();
+        let rows = read_conversation_summary_rows(&conn);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cid, "cid-1");
+        assert_eq!(rows[0].preview, "running work");
+        assert_eq!(rows[0].not_fully_idle, 1);
     }
 
     #[test]

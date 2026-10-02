@@ -12,6 +12,9 @@ This directory contains active issue tracking and bug reports.
 - [53-vault-and-supabase-scripts-silent-failures-rca.md](./53-vault-and-supabase-scripts-silent-failures-rca.md)
 - [54-focus-button-dual-scroll-mechanism-rca.md](./54-focus-button-dual-scroll-mechanism-rca.md)
 
+## Fixed in v4.124.0
+- [60-switch-drops-live-conversation-rca.md](./60-switch-drops-live-conversation-rca.md) (preview and conversation id kept; resume file no longer drops `session_id`; quota floor 2 minutes; saved PID trusted)
+
 ## Fixed in v4.122.0
 - [59-switch-blocks-on-quota-and-mailbox-rca.md](./59-switch-blocks-on-quota-and-mailbox-rca.md) (quota fetch, mailbox poll, and email no longer block the switch command)
 

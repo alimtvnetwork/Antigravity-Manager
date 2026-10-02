@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.124.0] - 2026-10-02
+
+### Fixed
+- Switch and fast-forward keep the running prompt and open the same conversation again. The audit row records that prompt and conversation. (Thanks to @aukgit)
+
+### Changed
+- Audit detail is an info button. It opens a scrollable table with Copy and Cancel, and loads that row only when opened. (Thanks to @aukgit)
+- Google quota checks wait at least 2 minutes. The saved process id is trusted. A full process scan runs on the 10-minute cache refresh, or when credit is under the threshold and that process no longer matches. (Thanks to @aukgit)
+
+---
+
 ## [v4.123.0] - 2026-10-02
 
 ### Changed
@@ -181,6 +192,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.124.0 (2026-10-02)**:
+        -   **[Switch] Same conversation after a switch**:
+            -   **Description**: Switch and fast-forward store the running prompt, including a conversation that only has a preview, and write that conversation id back onto the resume file and the audit row. (Thanks to @aukgit)
+        -   **[Audit] Info button and a scrollable detail**:
+            -   **Description**: The info button opens a table you can scroll, copy, and cancel. The list still does not load the payload until that click. (Thanks to @aukgit)
+        -   **[Quota] Two-minute checks and a saved process id**:
+            -   **Description**: Google quota checks wait at least 2 minutes. The process saved at launch is trusted. A full process scan runs every 10 minutes by default (never under 3, never over 20), or when credit is under the threshold and that process no longer matches. (Thanks to @aukgit)
+
+
     *   **v4.123.0 (2026-10-02)**:
         -   **[Audit] From, to, and a detail table**:
             -   **Description**: The list shows which account moved to which. The domain is hidden and the start of the name stays. Detail loads one row and shows the reason, how, the running prompt, and whether it was injected again. (Thanks to @aukgit)
