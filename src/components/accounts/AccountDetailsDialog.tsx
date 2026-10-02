@@ -49,13 +49,13 @@ export default function AccountDetailsDialog({ account, onClose, onUpdatePriorit
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-base-200 bg-gray-50/50 dark:bg-base-200/50 flex justify-between items-center min-w-0 gap-2">
                     <div className="flex items-center gap-3 min-w-0">
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-base-content shrink-0">{t('accounts.details.title')}</h3>
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-[#f5d76e] shrink-0">{t('accounts.details.title')}</h3>
                         <div className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-base-200 border border-gray-200 dark:border-base-300 text-xs font-mono text-gray-500 dark:text-gray-400 min-w-0 truncate max-w-[140px] sm:max-w-xs">
                             {account.email}
                         </div>
                         {account.quota?.subscription_tier && (
-                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${account.quota.subscription_tier === 'ultra' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                                account.quota.subscription_tier === 'pro' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-base-300 dark:text-gray-400'
+                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${account.quota.subscription_tier.toLowerCase().includes('ultra') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                account.quota.subscription_tier.toLowerCase().includes('pro') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-base-300 dark:text-gray-400'
                                 }`}>
                                 {account.quota.subscription_tier}
                             </div>
@@ -172,7 +172,7 @@ export default function AccountDetailsDialog({ account, onClose, onUpdatePriorit
                                                 </div>
                                                 {model.thinking_budget !== undefined && (
                                                     <span className="text-[10px] text-gray-500 font-mono bg-gray-100 dark:bg-base-200 px-1 rounded inline-block w-max mt-0.5">
-                                                        {t('proxy.config.thinking_budget', 'Thinking Budget')}: {model.thinking_budget}
+                                                        {t('proxy.config.thinking_budget.title', 'Thinking Budget')}: {model.thinking_budget}
                                                     </span>
                                                 )}
                                             </div>
@@ -189,11 +189,15 @@ export default function AccountDetailsDialog({ account, onClose, onUpdatePriorit
                                         {/* Progress Bar */}
                                         <div className="h-1.5 w-full bg-gray-100 dark:bg-base-200 rounded-full overflow-hidden mb-3">
                                             <div
-                                                className={`h-full rounded-full transition-all duration-500 ${model.percentage >= 50 ? 'bg-emerald-500' :
-                                                    model.percentage >= 20 ? 'bg-orange-400' :
-                                                        'bg-red-500'
-                                                    }`}
-                                                style={{ width: `${model.percentage}%` }}
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{
+                                                    width: `${model.percentage}%`,
+                                                    backgroundColor: model.name.toLowerCase().includes('claude')
+                                                        ? '#f5d76e'
+                                                        : model.name.toLowerCase().includes('gemini')
+                                                            ? '#3dd68c'
+                                                            : '#7eb6ff',
+                                                }}
                                             ></div>
                                         </div>
 
@@ -234,7 +238,17 @@ export default function AccountDetailsDialog({ account, onClose, onUpdatePriorit
                                                     </div>
                                                     {/* Progress bar */}
                                                     <div className="h-1.5 w-full bg-gray-100 dark:bg-base-300 rounded-full overflow-hidden mb-2">
-                                                        <div className={`h-full rounded-full transition-all duration-500 ${percentage >= 50 ? 'bg-emerald-500' : percentage >= 20 ? 'bg-amber-400' : 'bg-red-500'}`} style={{ width: `${percentage}%` }}></div>
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-500"
+                                                            style={{
+                                                                width: `${percentage}%`,
+                                                                backgroundColor: (group.display_name || '').toLowerCase().includes('claude')
+                                                                    ? '#f5d76e'
+                                                                    : (group.display_name || '').toLowerCase().includes('gemini')
+                                                                        ? '#3dd68c'
+                                                                        : '#7eb6ff',
+                                                            }}
+                                                        ></div>
                                                     </div>
                                                     <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                                                         <div className="flex items-center gap-1">

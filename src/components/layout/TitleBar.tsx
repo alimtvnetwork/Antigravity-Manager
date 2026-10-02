@@ -9,7 +9,7 @@ export default function TitleBar() {
     const { t } = useTranslation();
     const [isMaximized, setIsMaximized] = useState(false);
     const [appVersion, setAppVersion] = useState<string>(
-        versionData.version || versionData.Version || '4.99.0'
+        versionData.version || versionData.Version || '0.0.0'
     );
 
     useEffect(() => {

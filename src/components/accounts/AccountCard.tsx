@@ -30,7 +30,6 @@ interface AccountCardProps {
     onWarmup?: () => void;
     onUpdateLabel?: (label: string) => void;
     onViewError: () => void;
-    quotaWindow?: '5h' | 'weekly';
 }
 
 // Use unified model configuration
@@ -41,7 +40,7 @@ const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
     Icon: config.Icon
 }));
 
-function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountCardProps) {
+function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError }: AccountCardProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
     const { instances } = useInstanceStore();
@@ -142,7 +141,6 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
 
     // Parse weekly quota entries when in weekly view
     const weeklyItems = useMemo(() => {
-        if (quotaWindow !== 'weekly') return [];
         return (account.quota?.quota_groups || []).flatMap(group => {
             return (group.buckets || [])
                 .filter(b => b.window.toLowerCase().includes('week') || b.bucket_id.toLowerCase().includes('week'))
@@ -161,7 +159,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     };
                 });
         });
-    }, [quotaWindow, account.quota?.quota_groups]);
+    }, [account.quota?.quota_groups]);
 
     const isModelProtected = (key?: string) => {
         if (!config?.quota_protection?.enabled) return false;
@@ -332,19 +330,25 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-2 content-start">
-                        {quotaWindow === 'weekly' && weeklyItems.length > 0 ? (
-                            weeklyItems.map((item) => (
-                                <QuotaItem
-                                    key={item.id}
-                                    label={item.label}
-                                    percentage={item.percentage}
-                                    resetTime={item.resetTime}
-                                    weeklyTokens={item.cycleTokens ?? null}
-                                    Icon={item.Icon}
-                                />
-                            ))
+                        {displayModels[0] ? (
+                            <QuotaItem
+                                key={displayModels[0].id}
+                                label="4h"
+                                percentage={displayModels[0].data.percentage}
+                                resetTime={displayModels[0].data.reset_time}
+                                Icon={displayModels[0].Icon}
+                            />
+                        ) : null}
+                        {weeklyItems[0] ? (
+                            <QuotaItem
+                                key={weeklyItems[0].id}
+                                label="Weekly"
+                                percentage={weeklyItems[0].percentage}
+                                resetTime={weeklyItems[0].resetTime}
+                                Icon={weeklyItems[0].Icon}
+                            />
                         ) : (
-                            displayModels.map((model) => (
+                            displayModels.slice(1).map((model) => (
                                 <QuotaItem
                                     key={model.id}
                                     label={model.label}

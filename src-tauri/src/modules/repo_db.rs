@@ -1340,6 +1340,25 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
 }
 
 /// List recent prompts across statuses
+pub fn switch_prompt_snapshot(instance_id: &str) -> (String, String) {
+    let prompts = list_all_prompts().unwrap_or_default();
+    let found = prompts.into_iter().find(|prompt| {
+        let same_instance = prompt.instance_id == instance_id
+            || (instance_id == "default"
+                && (prompt.instance_id.is_empty()
+                    || prompt.instance_id == "default"
+                    || prompt.instance_id == "__default__"));
+        same_instance
+            && (prompt.status == "running"
+                || prompt.status == "backed_up"
+                || prompt.status == "dispatched")
+    });
+    match found {
+        Some(prompt) => (prompt.id, prompt.prompt_content),
+        None => (String::new(), String::new()),
+    }
+}
+
 pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     let conn = connect_db()?;
     let mut stmt = conn

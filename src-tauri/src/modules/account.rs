@@ -1305,7 +1305,7 @@ pub fn add_account(
     save_account_index(&index)?;
 
     crate::modules::task_history_db::record(
-        "add_account",
+        crate::modules::audit_action::AuditAction::AddAccount,
         &account.email,
         "ok",
         "account saved",
@@ -1361,7 +1361,7 @@ pub fn upsert_account(
                 }
 
                 crate::modules::task_history_db::record(
-                    "add_account",
+                    crate::modules::audit_action::AuditAction::UpdateAccount,
                     &account.email,
                     "ok",
                     "account credentials updated",
@@ -1386,7 +1386,7 @@ pub fn upsert_account(
                 }
 
                 crate::modules::task_history_db::record(
-                    "add_account",
+                    crate::modules::audit_action::AuditAction::UpdateAccount,
                     &account.email,
                     "ok",
                     "account file recreated",
@@ -1541,7 +1541,7 @@ pub async fn switch_account(
 
     let mut account = load_account(account_id)?;
     let mut audit = crate::modules::task_history_db::AuditTask::start(
-        "switch_account",
+        crate::modules::audit_action::AuditAction::SwitchAccount,
         &account.email,
         target_ide,
     );
@@ -1667,7 +1667,7 @@ pub async fn switch_account(
 
     let _notify = crate::modules::notification_hub::notify_account_switched_details(
         crate::modules::notification_hub::SwitchNotificationDetails {
-            previous_email: prev_email,
+            previous_email: prev_email.clone(),
             previous_quota_4h: prev_4h,
             previous_quota_weekly: prev_weekly,
             predicted_next_email,
@@ -1688,7 +1688,16 @@ pub async fn switch_account(
     )
     .await;
 
-    audit.succeed("switch finished");
+    let (prompt_id, prompt_text) =
+        crate::modules::repo_db::switch_prompt_snapshot(target_ide.unwrap_or("default"));
+    let payload = crate::modules::task_history_db::switch_payload(
+        prev_email.as_deref(),
+        &account.email,
+        &prompt_id,
+        &prompt_text,
+        true,
+    );
+    audit.succeed_with_payload("switch finished", &payload);
     Ok(())
 }
 

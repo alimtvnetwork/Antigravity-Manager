@@ -19,7 +19,7 @@ interface QuotaItemProps {
     Icon?: React.ComponentType<{ size?: number; className?: string }>;
 }
 
-export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit, isWeeklyConstrained, weeklyResetTime, weeklyTokens, className, Icon }: QuotaItemProps) {
+export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit, isWeeklyConstrained, weeklyResetTime, className, Icon }: QuotaItemProps) {
     const { t } = useTranslation();
     const liveState = getLiveLimitState(liveLimit);
     const showLiveIssue = liveState.shouldShow || isWeeklyConstrained;
@@ -144,13 +144,6 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
                 </span>
             </div>
         </div>
-        {weeklyTokens !== undefined && (
-            <div className="px-1.5 pt-0.5 text-[10px] text-gray-500 dark:text-gray-400 truncate"
-                title={t('accounts.weekly_tokens_tooltip', 'Tokens recorded by this instance in this quota cycle (input + output)')}>
-                {t('accounts.weekly_tokens', 'Cycle tokens')}: {weeklyTokens !== null && resetTime && Date.parse(resetTime) > Date.now()
-                    ? weeklyTokens.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 2 }) : 'N/A'}
-            </div>
-        )}
         </div>
     );
 }

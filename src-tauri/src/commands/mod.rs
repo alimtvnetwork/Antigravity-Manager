@@ -79,6 +79,11 @@ pub fn list_task_history(
     modules::task_history_db::list_page(offset, limit.max(1).min(100))
 }
 
+#[tauri::command]
+pub fn get_task_history_detail(id: String) -> Result<modules::task_history_db::TaskDetail, String> {
+    modules::task_history_db::get_detail(&id)
+}
+
 /// 添加账号
 #[tauri::command]
 pub async fn add_account(

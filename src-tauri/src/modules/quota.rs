@@ -299,12 +299,11 @@ pub async fn fetch_quota_with_cache(
 ) -> crate::error::AppResult<(QuotaData, Option<String>)> {
     use crate::error::AppError;
 
-    // Optimization: Skip loadCodeAssist call if project_id is cached to save API quota
-    let (project_id, subscription_tier) = if let Some(pid) = cached_project_id {
-        (Some(pid.to_string()), None)
-    } else {
-        fetch_project_id(access_token, email, account_id).await
-    };
+    let fetched = fetch_project_id(access_token, email, account_id).await;
+    let project_id = fetched
+        .0
+        .or_else(|| cached_project_id.map(|pid| pid.to_string()));
+    let subscription_tier = fetched.1;
 
     // We keep project_id to store in the DB, but we NO LONGER force inject it into payload if it's absent
 

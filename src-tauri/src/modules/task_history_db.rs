@@ -1,8 +1,10 @@
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use super::audit_action::{resolve_action, AuditAction};
 
 const SPLIT_ROW_CAP: i64 = 500;
 
@@ -19,7 +21,9 @@ pub struct SplitInfo {
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskRecord {
     pub id: String,
+    pub action_code: i32,
     pub action: String,
+    pub action_label: String,
     pub status: String,
     pub subject: String,
     pub detail: String,
@@ -27,6 +31,22 @@ pub struct TaskRecord {
     pub split_path: String,
     pub created_at: i64,
     pub finished_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskDetail {
+    pub id: String,
+    pub action_code: i32,
+    pub action: String,
+    pub action_label: String,
+    pub status: String,
+    pub subject: String,
+    pub detail: String,
+    pub instance_id: String,
+    pub split_path: String,
+    pub created_at: i64,
+    pub finished_at: Option<i64>,
+    pub payload_json: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,7 +64,7 @@ pub struct AuditTask {
 }
 
 impl AuditTask {
-    pub fn start(action: &str, subject: &str, instance_id: Option<&str>) -> Self {
+    pub fn start(action: AuditAction, subject: &str, instance_id: Option<&str>) -> Self {
         match enqueue(action, subject, "queued", instance_id) {
             Ok(id) => Self { id, open: true },
             Err(err) => {
@@ -58,18 +78,22 @@ impl AuditTask {
     }
 
     pub fn succeed(&mut self, detail: &str) {
-        self.finish("ok", detail);
+        self.finish("ok", detail, None);
+    }
+
+    pub fn succeed_with_payload(&mut self, detail: &str, payload_json: &str) {
+        self.finish("ok", detail, Some(payload_json));
     }
 
     pub fn fail(&mut self, detail: &str) {
-        self.finish("fail", detail);
+        self.finish("fail", detail, None);
     }
 
-    fn finish(&mut self, status: &str, detail: &str) {
+    fn finish(&mut self, status: &str, detail: &str, payload_json: Option<&str>) {
         if !self.open {
             return;
         }
-        if let Err(err) = complete(&self.id, status, detail) {
+        if let Err(err) = complete(&self.id, status, detail, payload_json) {
             crate::modules::logger::log_warn(&format!("[History] complete failed: {}", err));
         }
         self.open = false;
@@ -79,16 +103,22 @@ impl AuditTask {
 impl Drop for AuditTask {
     fn drop(&mut self) {
         if self.open {
-            let _ = complete(&self.id, "fail", "stopped before the task finished");
+            let _ = complete(&self.id, "fail", "stopped before the task finished", None);
         }
     }
 }
 
-pub fn record(action: &str, subject: &str, status: &str, detail: &str, instance_id: Option<&str>) {
+pub fn record(
+    action: AuditAction,
+    subject: &str,
+    status: &str,
+    detail: &str,
+    instance_id: Option<&str>,
+) {
     match enqueue(action, subject, status, instance_id) {
         Ok(id) => {
             if status != "queued" && status != "running" {
-                let _ = complete(&id, status, detail);
+                let _ = complete(&id, status, detail, None);
             }
         }
         Err(err) => {
@@ -129,22 +159,27 @@ pub fn list_page(offset: u32, limit: u32) -> Result<TaskHistoryPage, String> {
         let conn = open_split(Path::new(&split.file_path))?;
         let mut stmt = conn
             .prepare(
-                "SELECT id, action, status, subject, detail, instance_id, created_at, finished_at
+                "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at
                  FROM tasks ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
             )
             .map_err(|err| err.to_string())?;
         let rows = stmt
             .query_map(params![take, skip], |row| {
+                let legacy: String = row.get(1)?;
+                let code: Option<i32> = row.get(2)?;
+                let (action_code, action, action_label) = resolve_action(code, &legacy);
                 Ok(TaskRecord {
                     id: row.get(0)?,
-                    action: row.get(1)?,
-                    status: row.get(2)?,
-                    subject: row.get(3)?,
-                    detail: row.get(4)?,
-                    instance_id: row.get(5)?,
+                    action_code,
+                    action,
+                    action_label,
+                    status: row.get(3)?,
+                    subject: row.get(4)?,
+                    detail: row.get(5)?,
+                    instance_id: row.get(6)?,
                     split_path: split.file_path.clone(),
-                    created_at: row.get(6)?,
-                    finished_at: row.get(7)?,
+                    created_at: row.get(7)?,
+                    finished_at: row.get(8)?,
                 })
             })
             .map_err(|err| err.to_string())?;
@@ -164,7 +199,7 @@ pub fn list_page(offset: u32, limit: u32) -> Result<TaskHistoryPage, String> {
 }
 
 fn enqueue(
-    action: &str,
+    action: AuditAction,
     subject: &str,
     status: &str,
     instance_id: Option<&str>,
@@ -177,9 +212,17 @@ fn enqueue(
     let now = Utc::now().timestamp();
     split
         .execute(
-            "INSERT INTO tasks (id, action, status, subject, detail, instance_id, created_at, finished_at)
-             VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, NULL)",
-            params![id, action, status, subject, instance_id.unwrap_or(""), now],
+            "INSERT INTO tasks (id, action, action_code, status, subject, detail, instance_id, payload_json, created_at, finished_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, '', ?7, NULL)",
+            params![
+                id,
+                action.pascal(),
+                action.code(),
+                status,
+                subject,
+                instance_id.unwrap_or(""),
+                now
+            ],
         )
         .map_err(|err| err.to_string())?;
     index
@@ -206,7 +249,70 @@ fn enqueue(
     Ok(id)
 }
 
-fn complete(id: &str, status: &str, detail: &str) -> Result<(), String> {
+pub fn get_detail(id: &str) -> Result<TaskDetail, String> {
+    let dir = history_dir()?;
+    let index = open_index(&dir)?;
+    let splits = load_splits(&index, &dir)?;
+    for split in splits {
+        let conn = open_split(Path::new(&split.file_path))?;
+        let row = conn
+            .query_row(
+                "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at, payload_json
+                 FROM tasks WHERE id = ?1",
+                params![id],
+                |row| {
+                    let legacy: String = row.get(1)?;
+                    let code: Option<i32> = row.get(2)?;
+                    let (action_code, action, action_label) = resolve_action(code, &legacy);
+                    Ok(TaskDetail {
+                        id: row.get(0)?,
+                        action_code,
+                        action,
+                        action_label,
+                        status: row.get(3)?,
+                        subject: row.get(4)?,
+                        detail: row.get(5)?,
+                        instance_id: row.get(6)?,
+                        split_path: split.file_path.clone(),
+                        created_at: row.get(7)?,
+                        finished_at: row.get(8)?,
+                        payload_json: row.get(9)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|err| err.to_string())?;
+        if let Some(detail) = row {
+            return Ok(detail);
+        }
+    }
+    Err(format!("history task '{}' was not found", id))
+}
+
+pub fn switch_payload(
+    from_email: Option<&str>,
+    to_email: &str,
+    prompt_id: &str,
+    prompt_text: &str,
+    switch_ok: bool,
+) -> String {
+    serde_json::json!({
+        "from_email": from_email.unwrap_or(""),
+        "to_email": to_email,
+        "prompt_id": prompt_id,
+        "prompt_text": prompt_text,
+        "moved_at": Utc::now().timestamp(),
+        "switch_ok": switch_ok,
+    })
+    .to_string()
+}
+
+fn complete(
+    id: &str,
+    status: &str,
+    detail: &str,
+    payload_json: Option<&str>,
+) -> Result<(), String> {
     if id.is_empty() {
         return Ok(());
     }
@@ -216,12 +322,19 @@ fn complete(id: &str, status: &str, detail: &str) -> Result<(), String> {
     let now = Utc::now().timestamp();
     for split in splits {
         let conn = open_split(Path::new(&split.file_path))?;
-        let changed = conn
-            .execute(
+        let changed = if let Some(payload) = payload_json {
+            conn.execute(
+                "UPDATE tasks SET status = ?1, detail = ?2, finished_at = ?3, payload_json = ?4 WHERE id = ?5",
+                params![status, detail, now, payload, id],
+            )
+            .map_err(|err| err.to_string())?
+        } else {
+            conn.execute(
                 "UPDATE tasks SET status = ?1, detail = ?2, finished_at = ?3 WHERE id = ?4",
                 params![status, detail, now, id],
             )
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.to_string())?
+        };
         if changed > 0 {
             return Ok(());
         }
@@ -275,6 +388,11 @@ fn open_split(path: &Path) -> Result<Connection, String> {
         [],
     )
     .map_err(|err| err.to_string())?;
+    let _ = conn.execute("ALTER TABLE tasks ADD COLUMN action_code INTEGER", []);
+    let _ = conn.execute(
+        "ALTER TABLE tasks ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''",
+        [],
+    );
     Ok(conn)
 }
 

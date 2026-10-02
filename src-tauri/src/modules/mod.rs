@@ -1,6 +1,7 @@
 pub mod account;
 pub mod account_service;
 pub mod agy_cleaner;
+pub mod audit_action;
 pub mod auto_switcher;
 pub mod backup_prompts_db;
 pub mod cache;

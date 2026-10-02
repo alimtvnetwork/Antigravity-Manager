@@ -1094,7 +1094,7 @@ fn cmd_history(args: &[String]) {
             for item in &result.items {
                 println!(
                     "  {} {} {} {} {}",
-                    item.created_at, item.status, item.action, item.subject, item.detail
+                    item.created_at, item.status, item.action_label, item.subject, item.detail
                 );
             }
         }
@@ -11695,6 +11695,11 @@ fn cmd_update(args: &[String]) {
 
     // Binary update if needed
     if (!is_up_to_date || is_force) && !is_check {
+        let export_path = default_update_export_path();
+        match download_release_zip(&export_path) {
+            Ok(()) => println!("EXPORT_ZIP={}", export_path.display()),
+            Err(err) => eprintln!("[WARN] update zip was not saved: {}", err),
+        }
         if !is_json {
             println!(
                 "[*] A new version is available: v{} -> v{}",

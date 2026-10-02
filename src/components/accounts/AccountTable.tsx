@@ -5,6 +5,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { maskEmail } from '../../utils/maskEmail';
 
 import {
     DndContext,
@@ -91,7 +92,6 @@ interface AccountTableProps {
     /** 拖拽排序回调，当用户完成拖拽时触发 */
     onReorder?: (accountIds: string[]) => void;
     onViewError: (accountId: string) => void;
-    quotaWindow?: '5h' | 'weekly';
     focusedAccountId?: string | null;
 }
 
@@ -116,7 +116,6 @@ interface SortableRowProps {
     onUpdatePriority?: (priority: number) => Promise<void> | void;
     showPriority?: boolean;
     onViewError: () => void;
-    quotaWindow?: '5h' | 'weekly';
     isDragDisabled?: boolean;
     modelFilter?: 'gemini' | 'claude';
 }
@@ -141,7 +140,6 @@ interface AccountRowContentProps {
     onUpdatePriority?: (priority: number) => Promise<void> | void;
     showPriority?: boolean;
     onViewError: () => void;
-    quotaWindow?: '5h' | 'weekly';
     modelFilter?: 'gemini' | 'claude';
 }
 
@@ -179,35 +177,17 @@ function isModelProtected(protectedModels: string[] | undefined, modelName: stri
  * 提取账号的最快配额重置时间（毫秒时间戳）
  * 用于表格排序
  */
-function extractAccountResetTime(account: Account, quotaWindow?: '5h' | 'weekly'): number | null {
+function extractAccountResetTime(account: Account): number | null {
     let earliestTime: number | null = null;
-
-    if (quotaWindow === 'weekly') {
-        const groups = account.quota?.quota_groups || [];
-        for (const group of groups) {
-            for (const bucket of group.buckets || []) {
-                const isWeekly = bucket.window.toLowerCase().includes('week') || bucket.bucket_id.toLowerCase().includes('week');
-                if (isWeekly && bucket.reset_time) {
-                    const t = new Date(bucket.reset_time).getTime();
-                    if (!isNaN(t) && (earliestTime === null || t < earliestTime)) {
-                        earliestTime = t;
-                    }
-                }
-            }
-        }
-    } else {
-        // 5h 或常规视图下，从 models 中获取最近的 reset_time
-        const models = account.quota?.models || [];
-        for (const model of models) {
-            if (model.reset_time) {
-                const t = new Date(model.reset_time).getTime();
-                if (!isNaN(t) && (earliestTime === null || t < earliestTime)) {
-                    earliestTime = t;
-                }
+    const models = account.quota?.models || [];
+    for (const model of models) {
+        if (model.reset_time) {
+            const t = new Date(model.reset_time).getTime();
+            if (!isNaN(t) && (earliestTime === null || t < earliestTime)) {
+                earliestTime = t;
             }
         }
     }
-
     return earliestTime;
 }
 
@@ -240,7 +220,6 @@ function SortableAccountRow({
     onUpdatePriority,
     showPriority = false,
     onViewError,
-    quotaWindow,
     isDragDisabled = false,
     modelFilter = 'gemini',
 }: SortableRowProps) {
@@ -280,16 +259,16 @@ function SortableAccountRow({
             ref={setMergedRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group transition-all duration-200 border-b border-gray-100 dark:border-base-200 border-l-4",
+                "group border-b border-gray-100 dark:border-base-200 border-l-4 transition-[color,background-color] duration-[180ms] ease-in-out",
                 isFocused
                     ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
                     : isCurrent
-                    ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-white shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-emerald-100/60 dark:hover:bg-[#15334d]/60"
+                    ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-white shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
                     : selected
-                    ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
+                    ? "bg-[#070b10] text-[#f5d76e] border-l-[#f5d76e] font-semibold shadow-md"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]"
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-[#070b10] hover:text-[#f5d76e] hover:border-l-[#f5d76e]"
             )}
         >
             {/* 拖拽手柄 */}
@@ -338,7 +317,6 @@ function SortableAccountRow({
                 onUpdatePriority={onUpdatePriority}
                 showPriority={showPriority}
                 onViewError={onViewError}
-                quotaWindow={quotaWindow}
                 modelFilter={modelFilter}
             />
         </tr>
@@ -380,6 +358,7 @@ function AccountRowContent({
     const [labelInput, setLabelInput] = useState(account.custom_label || '');
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [showEmail, setShowEmail] = useState(false);
     const [moreMenuPos, setMoreMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [editingPriority, setEditingPriority] = useState(false);
     const [priorityInput, setPriorityInput] = useState(String(account.priority ?? 50));
@@ -552,15 +531,15 @@ function AccountRowContent({
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-slate-950 dark:text-white font-bold"
-                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
+                            : "text-gray-900 dark:text-gray-100 group-hover:text-[#f5d76e]"
                         )}
-                        title={account.email}
+                        title={showEmail ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
                             event.stopPropagation();
                             openPriorityEditor();
                         }}
                     >
-                        {account.email}
+                        {showEmail ? account.email : maskEmail(account.email)}
                     </span>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -767,7 +746,6 @@ function AccountRowContent({
                             label={t('accounts.table.weekly_quota', 'Weekly')}
                             percentage={weeklyCell.percentage}
                             resetTime={weeklyCell.resetTime}
-                            weeklyTokens={weeklyCell.weeklyTokens}
                             Icon={modelFilter === 'claude' ? Claude.Color : Gemini.Color}
                         />
                     </div>
@@ -792,10 +770,18 @@ function AccountRowContent({
                     : isCurrent
                     ? "bg-emerald-50/60 dark:bg-[#0c2438]"
                     : "bg-white dark:bg-[#071a27]",
-                !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-[#0c2438]/80" : ""
+                !isCurrent && !selected && !isFocused ? "group-hover:bg-[#070b10]" : ""
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                    {/* 切换/实例选择操作组 */}
+                    <button
+                        type="button"
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'cursor-not-allowed' : 'hover:text-[#f5d76e] hover:bg-[#070b10]'}`}
+                        onClick={(event) => { event.stopPropagation(); onRefresh(); }}
+                        title={t('common.refresh')}
+                        disabled={isRefreshing || isDisabled}
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
                             className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
@@ -840,23 +826,6 @@ function AccountRowContent({
                     </div>
 
                     <button
-                        className={`flex p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`flex p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-
-                    <button
                         ref={moreBtnRef}
                         type="button"
                         className="p-1 text-gray-500 dark:text-gray-400 hover:text-slate-950 hover:bg-white rounded transition-all"
@@ -882,11 +851,20 @@ function AccountRowContent({
                             <button
                                 type="button"
                                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
-                                disabled={isRefreshing || isDisabled}
-                                onClick={() => { setShowMoreMenu(false); onRefresh(); }}
+                                disabled={isSwitching || isDisabled}
+                                onClick={() => { setShowMoreMenu(false); onSwitch('ide'); }}
                             >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                {t('common.refresh')}
+                                <Repeat2 className="w-3.5 h-3.5" />
+                                {t('accounts.switch_to_ide', 'IDE switch')}
+                            </button>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                disabled={isSwitching || isDisabled}
+                                onClick={() => { setShowMoreMenu(false); onSwitch('agy'); }}
+                            >
+                                <Terminal className="w-3.5 h-3.5" />
+                                {t('accounts.switch_to_agy', 'CLI switch')}
                             </button>
                             <button
                                 type="button"
@@ -912,6 +890,16 @@ function AccountRowContent({
                                 <Download className="w-3.5 h-3.5" />
                                 {t('common.export')}
                             </button>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                                onClick={() => setShowEmail((current) => !current)}
+                            >
+                                {showEmail ? 'Hide email' : 'Show email'}
+                            </button>
+                            <div className="px-3 py-1.5 text-xs text-slate-600">
+                                Cycle tokens: {weeklyCell.weeklyTokens ?? 0}
+                            </div>
                         </div>,
                         document.body,
                     )}
@@ -999,7 +987,6 @@ function AccountTable({
     onUpdateLabel,
     onUpdatePriority,
     onViewError,
-    quotaWindow,
 }: AccountTableProps) {
     const { t } = useTranslation();
 
@@ -1052,8 +1039,8 @@ function AccountTable({
 
         return [...accounts].sort((a, b) => {
             if (sortConfig.key === 'reset_time') {
-                const timeA = extractAccountResetTime(a, quotaWindow);
-                const timeB = extractAccountResetTime(b, quotaWindow);
+                const timeA = extractAccountResetTime(a);
+                const timeB = extractAccountResetTime(b);
 
                 // 没有 reset_time 的排到后面
                 if (timeA === null && timeB === null) return 0;
@@ -1072,7 +1059,7 @@ function AccountTable({
 
             return 0;
         });
-    }, [accounts, sortConfig, quotaWindow, isSortingActive]);
+    }, [accounts, sortConfig, isSortingActive]);
 
     // 配置拖拽传感器
     const sensors = useSensors(
@@ -1236,8 +1223,7 @@ function AccountTable({
                                     onUpdatePriority={onUpdatePriority ? (priority: number) => onUpdatePriority(account.id, priority) : undefined}
                                     showPriority={showPriority}
                                     onViewError={() => onViewError(account.id)}
-                                    quotaWindow={quotaWindow}
-                                    isDragDisabled={isSortingActive}
+                                                        isDragDisabled={isSortingActive}
                                     modelFilter={modelFilter}
                                 />
                             ))}
@@ -1281,8 +1267,7 @@ function AccountTable({
                                         onToggleProxy={() => { }}
                                         isDisabled={Boolean(activeAccount.disabled)}
                                         onViewError={() => { }}
-                                        quotaWindow={quotaWindow}
-                                    />
+                                                            />
                                 </tr>
                             </tbody>
                         </table>

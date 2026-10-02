@@ -454,6 +454,30 @@ for (const target of TARGET_FILES) {
     }
 }
 
+if (!isDryRun) {
+    const mismatches = [];
+    const read = (relPath) => fs.readFileSync(path.join(ROOT_DIR, relPath), 'utf8');
+    const expect = (label, actual) => {
+        if (actual !== newVersion) mismatches.push(`${label}=${actual || 'missing'}`);
+    };
+    expect('package.json', JSON.parse(read('package.json')).version);
+    const versionDoc = JSON.parse(read('version.json'));
+    expect('version.json version', versionDoc.version);
+    expect('version.json Version', versionDoc.Version);
+    const cargo = read('src-tauri/Cargo.toml').match(/\[package\][\s\S]*?version\s*=\s*"([^"]+)"/);
+    expect('Cargo.toml', cargo && cargo[1]);
+    const tauri = JSON.parse(read('src-tauri/tauri.conf.json'));
+    expect('tauri.conf.json', tauri.version);
+    expect('tauri title', (tauri.app?.windows?.[0]?.title || '').replace('Antigravity Manager Tools v', ''));
+    const hook = read('src-tauri/hooks.nsh').match(/StrCpy \$0 "([^"]+)"/);
+    expect('hooks.nsh', hook && hook[1]);
+    if (mismatches.length > 0) {
+        error(`Version mismatch after bump: ${mismatches.join(', ')}`);
+        process.exit(1);
+    }
+    success('Every release manifest matches ' + newVersion);
+}
+
 // 7. Verify cargo dependency graph if cargo is present
 if (!isDryRun && fs.existsSync(path.join(ROOT_DIR, 'src-tauri/Cargo.toml'))) {
     try {

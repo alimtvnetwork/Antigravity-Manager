@@ -436,6 +436,25 @@ Here are my Supabase details:
 
     return (
         <div className="space-y-6 text-sm">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 text-slate-950">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-sm font-semibold">Saved Supabase configuration</h3>
+                        <p className="text-xs text-slate-600">
+                            {config.endpoints.length} endpoint{config.endpoints.length === 1 ? '' : 's'} loaded from the same file `agm supabase status` uses.
+                            {config.endpoints[0]?.url ? ` ${config.endpoints[0].url}` : ' No endpoint saved yet.'}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="rounded-lg bg-[#070b10] px-3 py-1.5 text-xs font-semibold text-[#f5d76e] disabled:opacity-40"
+                        disabled={!config.endpoints[0] || testingEndpointId === config.endpoints[0]?.id}
+                        onClick={() => config.endpoints[0] && handleTestEndpoint(config.endpoints[0])}
+                    >
+                        Test
+                    </button>
+                </div>
+            </section>
             {/* Header & Local Node Banner */}
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">

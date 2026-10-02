@@ -1,9 +1,7 @@
 
 
 import {
-  Calendar,
   ChevronDown,
-  Clock,
   Download,
   LayoutGrid,
   List,
@@ -40,7 +38,6 @@ import { useTranslation } from "react-i18next";
 
 type FilterType = "all" | "pro" | "ultra" | "free";
 type ViewMode = "list" | "grid";
-export type QuotaWindow = "5h" | "weekly";
 
 
 function Accounts() {
@@ -75,20 +72,10 @@ function Accounts() {
     return (saved === 'list' || saved === 'grid') ? saved : 'list';
   });
 
-  const [quotaWindow, setQuotaWindow] = useState<QuotaWindow>(() => {
-    const saved = localStorage.getItem('accounts_quota_window');
-    return (saved === '5h' || saved === 'weekly') ? saved : '5h';
-  });
-
   // Save view mode preference
   useEffect(() => {
     localStorage.setItem('accounts_view_mode', viewMode);
   }, [viewMode]);
-
-  // Save quota window preference
-  useEffect(() => {
-    localStorage.setItem('accounts_quota_window', quotaWindow);
-  }, [quotaWindow]);
 
   // Fetch accounts and active current account on mount
   useEffect(() => {
@@ -778,36 +765,6 @@ function Accounts() {
             )}
           </div>
 
-          {/* Quota window toggle (5H / Weekly) - Flat continuous grouping */}
-          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
-            <button
-              className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all",
-                quotaWindow === "5h"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-              )}
-              onClick={() => setQuotaWindow("5h")}
-              title={t("accounts.quota_window_5h", "5-hour rolling quota")}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>5H</span>
-            </button>
-            <button
-              className={cn(
-                "h-7 px-2.5 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all",
-                quotaWindow === "weekly"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
-              )}
-              onClick={() => setQuotaWindow("weekly")}
-              title={t("accounts.quota_window_weekly", "7-day weekly quota")}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{t("accounts.quota_window_weekly_short", "Weekly")}</span>
-            </button>
-          </div>
-
           {/* View mode switcher - Flat continuous grouping */}
           <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
             <button
@@ -836,96 +793,19 @@ function Accounts() {
             </button>
           </div>
 
-          {/* Quota tier filter pills - Flat continuous grouping */}
-          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
-            {/* All */}
-            <button
-              className={cn(
-                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
-                filter === 'all'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-              )}
-              onClick={() => setFilter('all')}
-              title={`${t('accounts.all')} (${filterCounts.all})`}
+          <label className="h-8 inline-flex items-center shrink-0">
+            <select
+              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-slate-950 dark:border-slate-700 dark:bg-[#070b10] dark:text-[#f5d76e]"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value as FilterType)}
+              aria-label="Account tier"
             >
-              <span>{t('accounts.all')}</span>
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
-                filter === 'all'
-                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-              )}>
-                {filterCounts.all}
-              </span>
-            </button>
-
-            {/* PRO */}
-            <button
-              className={cn(
-                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
-                filter === 'pro'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-              )}
-              onClick={() => setFilter('pro')}
-              title={`${t('accounts.pro')} (${filterCounts.pro})`}
-            >
-              <span>{t('accounts.pro')}</span>
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
-                filter === 'pro'
-                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-              )}>
-                {filterCounts.pro}
-              </span>
-            </button>
-
-            {/* ULTRA */}
-            <button
-              className={cn(
-                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
-                filter === 'ultra'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-              )}
-              onClick={() => setFilter('ultra')}
-              title={`${t('accounts.ultra')} (${filterCounts.ultra})`}
-            >
-              <span>{t('accounts.ultra')}</span>
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
-                filter === 'ultra'
-                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-              )}>
-                {filterCounts.ultra}
-              </span>
-            </button>
-
-            {/* FREE */}
-            <button
-              className={cn(
-                "h-7 px-2 inline-flex items-center gap-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0",
-                filter === 'free'
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs ring-1 ring-black/5"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content hover:bg-white/40"
-              )}
-              onClick={() => setFilter('free')}
-              title={`${t('accounts.free')} (${filterCounts.free})`}
-            >
-              <span>{t('accounts.free')}</span>
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-md text-[10px] font-bold transition-colors",
-                filter === 'free'
-                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-              )}>
-                {filterCounts.free}
-              </span>
-            </button>
-          </div>
+              <option value="all">{t('accounts.all')} ({filterCounts.all})</option>
+              <option value="pro">{t('accounts.pro')} ({filterCounts.pro})</option>
+              <option value="ultra">{t('accounts.ultra')} ({filterCounts.ultra})</option>
+              <option value="free">{t('accounts.free')} ({filterCounts.free})</option>
+            </select>
+          </label>
         </div>
 
         {/* Action buttons group */}
@@ -1124,7 +1004,6 @@ function Accounts() {
                 onUpdateLabel={handleUpdateLabel}
                 onUpdatePriority={updateAccountPriority}
                 onViewError={(id: string) => setErrorAccountId(id)}
-                quotaWindow={quotaWindow}
                 focusedAccountId={focusedAccountId}
               />
             </div>
@@ -1155,7 +1034,6 @@ function Accounts() {
               onWarmup={handleWarmup}
               onUpdateLabel={handleUpdateLabel}
               onViewError={(id: string) => setErrorAccountId(id)}
-              quotaWindow={quotaWindow}
             />
           </div>
         )}

@@ -20,12 +20,11 @@ interface AccountGridProps {
     onWarmup?: (accountId: string) => void;
     onUpdateLabel?: (accountId: string, label: string) => void;
     onViewError: (accountId: string) => void;
-    quotaWindow?: '5h' | 'weekly';
     focusedAccountId?: string | null;
 }
 
 
-function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, focusedAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError, quotaWindow }: AccountGridProps) {
+function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, focusedAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError }: AccountGridProps) {
     const { t } = useTranslation();
 
     const isAccountCurrent = (acc: Account) => {
@@ -73,7 +72,6 @@ function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, cur
                     onWarmup={onWarmup ? () => onWarmup(account.id) : undefined}
                     onUpdateLabel={onUpdateLabel ? (label: string) => onUpdateLabel(account.id, label) : undefined}
                     onViewError={() => onViewError(account.id)}
-                    quotaWindow={quotaWindow}
                 />
             ))}
         </div>

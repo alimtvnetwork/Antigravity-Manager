@@ -2567,7 +2567,7 @@ pub async fn switch_account_to_instance(
 ) -> Result<(), String> {
     let mut account = crate::modules::account::load_account(account_id)?;
     let mut audit = crate::modules::task_history_db::AuditTask::start(
-        "switch_account",
+        crate::modules::audit_action::AuditAction::SwitchAccount,
         &account.email,
         target_instance_id,
     );
@@ -2984,7 +2984,15 @@ pub async fn switch_account_to_instance(
         }
     }
 
-    audit.succeed("switch finished");
+    let (prompt_id, prompt_text) = crate::modules::repo_db::switch_prompt_snapshot(&instance.id);
+    let payload = crate::modules::task_history_db::switch_payload(
+        prev_email.as_deref(),
+        &account.email,
+        &prompt_id,
+        &prompt_text,
+        true,
+    );
+    audit.succeed_with_payload("switch finished", &payload);
     Ok(())
 }
 

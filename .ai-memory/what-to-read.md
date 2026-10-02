@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-02T12:40:00Z
+> Last updated: 2026-10-02T19:40:00Z
 
 ## Changelog
 
+- 2026-10-02T19:40:00Z, Before a bump or a tag, read `.ai-memory/learned/25-ci-failures-and-single-version.md`. One version in every manifest. Do not tag a red or cancelled run. Spec 96 removes the 5H and Weekly toolbar buttons.
 - 2026-10-02T12:40:00Z, Root cause write-ups for the accounts bugs: `.ai-memory/issues/57-switch-marks-prompt-restored-before-ide-ready-rca.md` (launch marked the backup restored before the IDE could accept the prompt; code fix in v4.119.0, live inject not watched) and `.ai-memory/issues/58-pro-badge-raw-tier-id-rca.md` (raw tier id is not the label PRO). Issue 50 is the older hypothesis. Issue 47's cached `project_id` skip is still open.
 - 2026-10-02T12:20:00Z, Read `.ai-memory/learned/23-accounts-quota-reinject-and-how-to-find-it.md` before touching switch restore. A successful email with a zero restore count means `launch_instance` already marked the backup restored. Read `.ai-memory/design/01-surface-laws.md` before editing Accounts or any new screen. Read `.ai-memory/learned/24-task-history-split-db.md` before adding an account action: adds and switches enqueue into `task-history/task_index.db` plus split `history-*.db`. CLI `agm history`. UI route `/audit`.
 - 2026-10-01T20:46:00Z, Spec 94 is the blind-AI instance test. Clone-from-default and new-empty share `instance::copy_instance` / `create_instance_with_account` from CLI and the Create dialog. Release only after that flow, via `npm run bump`.
