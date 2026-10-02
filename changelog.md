@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.123.0] - 2026-10-02
+
+### Changed
+- Audit shows a masked from-account to to-account. The domain stays hidden. Detail is a table, loaded only when that button is clicked, with the reason, how the switch ran, the prompt, and whether it was injected again. (Thanks to @aukgit)
+
+---
+
 ## [v4.122.0] - 2026-10-02
 
 ### Fixed
@@ -174,6 +181,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.123.0 (2026-10-02)**:
+        -   **[Audit] From, to, and a detail table**:
+            -   **Description**: The list shows which account moved to which. The domain is hidden and the start of the name stays. Detail loads one row and shows the reason, how, the running prompt, and whether it was injected again. (Thanks to @aukgit)
+
+
     *   **v4.122.0 (2026-10-02)**:
         -   **[Switch] Return after the IDE relaunch**:
             -   **Description**: Quota refresh, the mailbox poll, and email or Telegram run after the switch command returns. The 1.5s prompt wait is skipped when nothing was backed up. (Thanks to @aukgit)
