@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.121.0] - 2026-10-02
+
+### Added
+- A duplicate instance copies the source IDE settings, workspace databases, `.gemini` trees, and repo rows. (Thanks to @aukgit)
+- Settings has a Themes tab for the catalogue palettes, and About is a compact row with the update controls. (Thanks to @aukgit)
+
+### Changed
+- The accounts footer no longer prints the entry count. Per page sits on the left and defaults to 150. (Thanks to @aukgit)
+
+---
+
 ## [v4.120.0] - 2026-10-02
 
 ### Added
@@ -153,6 +164,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.121.0 (2026-10-02)**:
+        -   **[Instances] Clone copies settings and repo databases**:
+            -   **Description**: A duplicate instance copies `User/settings.json`, workspace databases, `.gemini` trees, and the source repo rows. (Thanks to @aukgit)
+        -   **[Settings] Catalogue themes and a compact About**:
+            -   **Description**: Themes sits next to Email. About is one row with the update controls. The accounts footer defaults to 150 per page and drops the entry-count sentence. (Thanks to @aukgit)
+
+
     *   **v4.120.0 (2026-10-02)**:
         -   **[Accounts] One tier dropdown and a shorter row**:
             -   **Description**: The 5-hour and Weekly toolbar buttons are removed because those quotas already have their own cells. All, Pro, Ultra, and Free are one dropdown. Refresh is the first button, then Switch. Emails stay masked until Show email. (Thanks to @aukgit)
