@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.125.0 (2026-10-02)**:
+        -   **[Instances] Other processes stay open**:
+            -   **Description**: A switch or fast-forward closes only that instance. Another instance's saved process id and profile path are left running. (Thanks to @aukgit)
+        -   **[Instances] Readable cards**:
+            -   **Description**: The page title no longer collides with the running count. Each card shows the full account, profile path, and action row. (Thanks to @aukgit)
+
     *   **v4.124.0 (2026-10-02)**:
         -   **[Switch] Same conversation after a switch**:
             -   **Description**: Switch and fast-forward store the running prompt, including a conversation that only has a preview, and write that conversation id back onto the resume file and the audit row. (Thanks to @aukgit)

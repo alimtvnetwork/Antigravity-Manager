@@ -353,18 +353,6 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 2/5] Closing running Antigravity IDE processes...",
         );
-        if process::is_antigravity_running(effective_target) {
-            process::close_antigravity(20, effective_target)?;
-        }
-        if effective_target != target_ide
-            && target_ide.is_some()
-            && process::is_antigravity_running(target_ide)
-        {
-            process::close_antigravity(20, target_ide)?;
-        }
-        if process::is_antigravity_running(None) {
-            let _ = process::close_antigravity(20, None);
-        }
         let _ = crate::modules::instance::close_instance("default");
 
         // =========================================================================

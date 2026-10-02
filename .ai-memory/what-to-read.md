@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-02T22:50:00Z
+> Last updated: 2026-10-02T23:20:00Z
 
 ## Changelog
 
+- 2026-10-02T23:20:00Z, Switching one instance must not close another instance's PID. `close_instance` and `get_antigravity_pids` spare `should_spare_pid` matches (saved PID or `/instances/{id}/`). Do not call `close_antigravity(None)` from a single-instance switch. Instance cards are one column until the window is wide.
 - 2026-10-02T22:50:00Z, Switch and fast-forward must keep the live conversation. Read `.ai-memory/issues/60-switch-drops-live-conversation-rca.md` and spec 100. Do not drop a conversation that only has a preview. Do not rewrite `.antigravity_resume_task.json` without `session_id`. Do not treat an already-alive `agy` worker as a successful re-push. `agy -p` is a new CLI prompt. Google quota checks wait at least 120 seconds. `is_instance_running` trusts the saved PID. The full process scan is the PID cache refresh (default 600 seconds, clamp 180..=1200) or a miss while quota is under the threshold. The audit info button loads `payload_json` only on click.
 - 2026-10-02T20:30:00Z, Audit list shows masked from → to. The domain stays hidden. Detail is a table (reason, how, prompt, reinjected) loaded only by `get_task_history_detail` on the info click. The list query does not return `payload_json`.
 - 2026-10-02T20:20:00Z, Account switch felt slow because the command awaited a Google quota fetch, an IMAP mailbox poll (`select_candidate_profiles`), and email/Telegram. Read `.ai-memory/issues/59-switch-blocks-on-quota-and-mailbox-rca.md` and spec 98. Do not put those calls back before `switch_account` returns. The 1.5s prompt wait runs only when a prompt was backed up.

@@ -142,7 +142,7 @@ export default function Instances() {
     useEffect(() => {
         if (activeInstanceId) {
             const timer = setTimeout(() => {
-                activeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                activeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
             }, 150);
             return () => clearTimeout(timer);
         }
@@ -281,26 +281,24 @@ export default function Instances() {
         <div className="h-full w-full overflow-y-auto">
             <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-4 space-y-3">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2.5">
-                            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                                <Laptop className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-base-content">
-                                    {t('instances.page_title', 'Instances & Profiles')}
-                                </h1>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {t('instances.page_desc', 'Run multiple Antigravity windows in parallel with isolated credentials and extensions')}
-                                </p>
-                            </div>
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shrink-0">
+                            <Laptop className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-base-content">
+                                {t('instances.page_title', 'Instances & Profiles')}
+                            </h1>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {t('instances.page_desc', 'Run multiple Antigravity windows in parallel with isolated credentials and extensions')}
+                            </p>
                         </div>
                     </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-base-200 text-xs text-gray-600 dark:text-gray-300 font-medium">
-                        {t('instances.running_summary', 'Running: {{running}} / {{total}}', {
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-base-200 text-xs text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                        {t('instances.running_summary', 'Running {{running}} of {{total}}', {
                             running: runningCount,
                             total: instances.length,
                         })}
@@ -423,8 +421,8 @@ export default function Instances() {
             {/* Auto-Switcher Status Banner */}
             {switcherStatus?.is_running ? (
                 <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2.5">
-                        <span className="relative flex h-2.5 w-2.5">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                        <span className="relative flex h-2.5 w-2.5 mt-1 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
                         </span>
@@ -432,7 +430,7 @@ export default function Instances() {
                             <span className="font-semibold text-gray-900 dark:text-gray-100">
                                 {t('instances.auto_switcher_active', 'Auto Profile Switcher Active')}
                             </span>
-                            <span className="text-gray-500 dark:text-gray-400 ml-2">
+                            <span className="text-gray-500 dark:text-gray-400 ml-2 break-words">
                                 {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
                                     ? `Current Active Quota: ${switcherStatus.current_quota_percent.toFixed(0)}%`
                                     : 'Monitoring active profile quota'}
@@ -538,7 +536,7 @@ export default function Instances() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {filteredInstances.map((inst, index) => {
                         const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
                         const seqNumber = originalIndex !== -1 ? originalIndex + 1 : index + 1;
@@ -581,11 +579,11 @@ export default function Instances() {
                                 {/* Top Accent Bar identifying profile color */}
                                 <div className={cn("h-1.5 w-full bg-gradient-to-r", theme.accentBar)} />
 
-                                <div className="p-6 flex flex-col flex-1 justify-between min-h-[280px]">
+                                <div className="p-4 sm:p-5 flex flex-col flex-1 justify-between min-h-[280px] min-w-0">
                                     {/* Card Top */}
-                                    <div>
-                                        <div className="flex items-start justify-between gap-2 mb-3">
-                                            <div className="flex items-center gap-2 min-w-0">
+                                    <div className="min-w-0">
+                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                                 <span
                                                     className={cn(
                                                         "w-2.5 h-2.5 rounded-full shrink-0",
@@ -678,7 +676,7 @@ export default function Instances() {
                                                 {displayEmail ? (
                                                     <span
                                                         className={cn(
-                                                            "px-2 py-0.5 rounded-md text-xs font-semibold font-mono border flex items-center gap-1.5 truncate max-w-[210px] shadow-2xs",
+                                                            "px-2 py-0.5 rounded-md text-xs font-semibold font-mono border flex items-center gap-1.5 min-w-0 shadow-2xs",
                                                             theme.emailPill
                                                         )}
                                                         title={displayEmail}
@@ -803,26 +801,26 @@ export default function Instances() {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-400">Profile ID:</span>
-                                                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[170px]">
+                                                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[60%]" title={inst.config.id}>
                                                     {inst.config.id}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate pt-0.5" title={inst.config.data_dir}>
-                                                <Folder className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate">{inst.config.data_dir}</span>
+                                            <div className="flex items-start gap-1.5 text-[11px] text-gray-400 pt-0.5 min-w-0" title={inst.config.data_dir}>
+                                                <Folder className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                <span className="break-all leading-snug">{inst.config.data_dir}</span>
                                             </div>
                                             {inst.config.executable_path ? (
-                                                <div className="flex items-center gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 truncate pt-0.5" title={inst.config.executable_path}>
-                                                    <Cpu className="w-3.5 h-3.5 shrink-0" />
-                                                    <span className="truncate font-mono">EXE: {inst.config.executable_path}</span>
+                                                <div className="flex items-start gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 pt-0.5 min-w-0" title={inst.config.executable_path}>
+                                                    <Cpu className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                    <span className="break-all font-mono leading-snug">{inst.config.executable_path}</span>
                                                 </div>
                                             ) : null}
                                         </div>
                                     </div>
 
                                     {/* Card Actions */}
-                                    <div className="pt-3 border-t border-gray-100 dark:border-base-100 flex items-center justify-between gap-1.5 mt-2">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                    <div className="pt-3 border-t border-gray-100 dark:border-base-100 mt-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             {inst.is_running ? (
                                                 <button
                                                     onClick={() => stopInstance(inst.config.id)}

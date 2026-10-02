@@ -344,6 +344,11 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
     let mut pids = Vec::new();
     let current_pid = std::process::id();
     let current_exe = get_current_exe_path();
+    let except_id = target_ide
+        .and_then(|target| target.strip_prefix("instance:"))
+        .unwrap_or("default");
+    let (protected_pids, protected_markers) =
+        crate::modules::instance::other_instance_protection(except_id);
 
     // Load both manual paths from config
     let config = crate::modules::config::load_app_config().ok();
@@ -401,6 +406,22 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             .map(|arg| arg.to_string_lossy().to_lowercase().replace('\\', "/"))
             .collect::<Vec<String>>()
             .join(" ");
+
+        let exe_early = process
+            .exe()
+            .and_then(|p| p.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if crate::modules::instance::should_spare_pid(
+            pid_u32,
+            &args_str,
+            &exe_early,
+            &name,
+            &protected_pids,
+            &protected_markers,
+        ) {
+            continue;
+        }
 
         let is_instance_sandbox = args_str.contains(".antigravity_tools")
             || args_str.contains("/instances/")

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.124.0)
+> Professional AI Account Management & Protocol Proxy System (v4.125.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.124.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.125.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.124.0**: Switch and fast-forward keep the running prompt on the same conversation. Audit detail is an info button that opens a scrollable table.
+> Latest version **v4.125.0**: Switching one instance leaves the other instances running. Instance cards show the account, path, and actions without clipping.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

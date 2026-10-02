@@ -2265,6 +2265,70 @@ pub fn set_instance_executable(
     Ok(())
 }
 
+/// True when this process is another instance and must not be closed.
+pub fn should_spare_pid(
+    pid: u32,
+    args: &str,
+    exe: &str,
+    name: &str,
+    protected_pids: &[u32],
+    markers: &[String],
+) -> bool {
+    if pid > 0 && protected_pids.contains(&pid) {
+        return true;
+    }
+    let args = args.to_lowercase().replace('\\', "/");
+    let exe = exe.to_lowercase().replace('\\', "/");
+    let name = name.to_lowercase();
+    markers.iter().any(|marker| {
+        let marker = marker.trim().to_lowercase().replace('\\', "/");
+        !marker.is_empty()
+            && (args.contains(&marker) || exe.contains(&marker) || name.contains(&marker))
+    })
+}
+
+/// Saved process ids and path markers for every instance except the one being switched.
+pub fn other_instance_protection(except_id: &str) -> (Vec<u32>, Vec<String>) {
+    let Ok(registry) = load_registry() else {
+        return (Vec::new(), Vec::new());
+    };
+    let mut pids = Vec::new();
+    let mut markers = Vec::new();
+    for inst in registry.instances {
+        let same = inst.id == except_id
+            || (except_id == "default" && (inst.is_default || inst.id == "default"));
+        if same {
+            continue;
+        }
+        if let Some(pid) = inst.pid.filter(|pid| *pid > 0) {
+            if !pids.contains(&pid) {
+                pids.push(pid);
+            }
+        }
+        if let Some(pid) = get_instance_saved_pid(&inst.id) {
+            if pid > 0 && !pids.contains(&pid) {
+                pids.push(pid);
+            }
+        }
+        let id = inst.id.to_lowercase();
+        if !id.is_empty() && id != "default" {
+            markers.push(format!("/instances/{}/", id));
+            markers.push(format!("antigravity-{}", id));
+        }
+        if !inst.is_default && inst.id != "default" {
+            let dir = inst
+                .data_dir
+                .replace('\\', "/")
+                .trim_end_matches('/')
+                .to_lowercase();
+            if !dir.is_empty() {
+                markers.push(dir);
+            }
+        }
+    }
+    (pids, markers)
+}
+
 /// Close only the process associated with this instance
 pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let registry = load_registry()?;
@@ -2394,6 +2458,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         &config.data_dir,
     );
 
+    let (protected_pids, markers) = other_instance_protection(instance_id);
     pids.retain(|&pid| {
         let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) else {
             return false;
@@ -2403,6 +2468,19 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             .exe()
             .map(|p| p.to_string_lossy().to_lowercase())
             .unwrap_or_default();
+        let args_str = proc
+            .cmd()
+            .iter()
+            .map(|arg| arg.to_string_lossy().to_lowercase().replace('\\', "/"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if should_spare_pid(pid, &args_str, &exe, &name, &protected_pids, &markers) {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Leaving PID {} running; it belongs to another instance",
+                pid
+            ));
+            return false;
+        }
         let is_editor_or_manager = name.contains("cursor")
             || exe.contains("cursor")
             || name.contains("agm")
@@ -3035,14 +3113,6 @@ pub async fn switch_account_to_instance(
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
     let _ = close_instance(&instance.id);
-    if is_default_inst {
-        if crate::modules::process::is_antigravity_running(None) {
-            let _ = crate::modules::process::close_antigravity(20, None);
-        }
-        if crate::modules::process::is_antigravity_running(Some("ide")) {
-            let _ = crate::modules::process::close_antigravity(20, Some("ide"));
-        }
-    }
     std::thread::sleep(std::time::Duration::from_millis(300));
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
@@ -3199,6 +3269,40 @@ pub async fn switch_account_to_instance(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn switch_spares_another_instances_pid() {
+        let protected = vec![11128u32];
+        let markers = vec![
+            "/instances/nextv2/".to_string(),
+            "antigravity-nextv2".to_string(),
+            "c:/users/administrator/.antigravity_tools/instances/nextv2".to_string(),
+        ];
+        assert!(should_spare_pid(
+            11128,
+            "",
+            "c:/program files/antigravity/antigravity.exe",
+            "antigravity.exe",
+            &protected,
+            &markers
+        ));
+        assert!(should_spare_pid(
+            4242,
+            "--user-data-dir=c:/users/administrator/.antigravity_tools/instances/nextv2",
+            "c:/program files/antigravity/antigravity.exe",
+            "antigravity.exe",
+            &protected,
+            &markers
+        ));
+        assert!(!should_spare_pid(
+            9001,
+            "--user-data-dir=c:/users/administrator/appdata/roaming/antigravity",
+            "c:/program files/antigravity/antigravity.exe",
+            "antigravity.exe",
+            &protected,
+            &markers
+        ));
+    }
 
     #[test]
     fn saved_pid_identity_and_refresh_floor() {
