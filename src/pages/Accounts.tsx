@@ -209,7 +209,8 @@ function Accounts() {
   }, [focusedAccountId, currentPage, filter, searchQuery]);
   const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
     const saved = localStorage.getItem("accounts_page_size");
-    return saved ? parseInt(saved) : null;
+    const parsed = saved ? parseInt(saved, 10) : 150;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 150;
   }); // Local pagination size preference
 
   // Save page size preference
@@ -1052,7 +1053,7 @@ function Accounts() {
               setLocalPageSize(newSize);
               setCurrentPage(1); // Reset to first page
             }}
-            pageSizeOptions={[10, 20, 50, 100]}
+            pageSizeOptions={[50, 100, 150, 200]}
             centerContent={
               updateInfo?.has_update ? (
                 <button

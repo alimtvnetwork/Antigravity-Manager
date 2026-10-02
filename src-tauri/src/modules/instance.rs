@@ -1001,7 +1001,19 @@ pub fn copy_instance(
             }
         } else {
             // Full directory copy (default): copies entire instance data tree while skipping volatile locks/caches
-            let _ = copy_dir_recursive(&src_path, &dst_path);
+            if let Err(err) = copy_dir_recursive(&src_path, &dst_path) {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Data-dir copy failed for {}: {}",
+                    source.id, err
+                ));
+            }
+        }
+
+        if let Err(err) = copy_required_ide_files(&src_path, &dst_path) {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Required settings copy failed: {}",
+                err
+            ));
         }
 
         purge_volatile_instance_sessions(&dst_path);
@@ -1126,6 +1138,21 @@ pub fn copy_instance(
         }
     }
 
+    if let Err(err) = copy_source_ide_trees(&source, &new_instance) {
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] IDE settings/repo tree copy failed: {}",
+            err
+        ));
+    }
+    if let Err(err) =
+        crate::modules::repo_db::clone_instance_repo_rows(&source.id, &new_instance.id)
+    {
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Repo database clone failed: {}",
+            err
+        ));
+    }
+
     Ok(new_instance)
 }
 
@@ -1151,7 +1178,87 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
     Ok(updated)
 }
 
-/// Helper function to copy directories recursively while sanitizing lock files and volatile caches
+/// Settings and workspace databases that must survive a clone even if a later
+/// file in the full tree is locked.
+const REQUIRED_IDE_REL_PATHS: &[&str] = &[
+    "User/settings.json",
+    "User/globalStorage",
+    "User/workspaceStorage",
+];
+
+/// Directories under `~/.gemini` that hold IDE settings and repo databases.
+const GEMINI_CLONE_DIRS: &[&str] = &["antigravity", "antigravity-ide", "antigravity-cli"];
+
+fn copy_required_ide_files(src: &Path, dst: &Path) -> Result<(), String> {
+    for rel in REQUIRED_IDE_REL_PATHS {
+        let from = src.join(rel);
+        if !from.exists() {
+            continue;
+        }
+        let to = dst.join(rel);
+        if from.is_dir() {
+            copy_dir_recursive(&from, &to).map_err(|e| format!("Failed to copy {}: {}", rel, e))?;
+        } else {
+            if let Some(parent) = to.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create parent for {}: {}", rel, e))?;
+            }
+            fs::copy(&from, &to).map_err(|e| format!("Failed to copy {}: {}", rel, e))?;
+        }
+    }
+    Ok(())
+}
+
+fn source_profile_home(source: &InstanceConfig) -> Option<PathBuf> {
+    if source.is_default || source.id == "default" {
+        std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .ok()
+            .map(PathBuf::from)
+    } else {
+        get_instance_home_dir(&source.id).ok()
+    }
+}
+
+/// Copy the source IDE's `.gemini` settings and repo trees into the new home.
+/// The default instance lives in the real user profile; named instances live
+/// under `instances/<id>/home`. Locks and caches stay behind via `copy_dir_recursive`.
+pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> Result<(), String> {
+    let Some(src_home) = source_profile_home(source) else {
+        return Ok(());
+    };
+    let dst_home = get_instance_home_dir(&dest.id)?;
+    copy_gemini_trees(&src_home, &dst_home)
+}
+
+fn copy_gemini_trees(src_home: &Path, dst_home: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst_home.join(".gemini"))
+        .map_err(|e| format!("Failed to create dest .gemini: {}", e))?;
+
+    for name in GEMINI_CLONE_DIRS {
+        let src = src_home.join(".gemini").join(name);
+        if !src.exists() {
+            continue;
+        }
+        let dst = dst_home.join(".gemini").join(name);
+        copy_dir_recursive(&src, &dst).map_err(|e| {
+            format!(
+                "Failed to copy {} from {} to {}: {}",
+                name,
+                src.display(),
+                dst.display(),
+                e
+            )
+        })?;
+        crate::modules::logger::log_info(&format!(
+            "[Instance] Cloned IDE tree {} into {}",
+            src.display(),
+            dst.display()
+        ));
+    }
+    Ok(())
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     let has_dst = dst.exists();
     if !has_dst {
@@ -3540,5 +3647,67 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&temp_base);
         println!("[TEMP E2E] Local-only E2E test completed successfully with 100% clean teardown.");
+    }
+}
+
+#[cfg(test)]
+mod clone_tree_tests {
+    use super::*;
+
+    #[test]
+    fn clone_copies_settings_workspace_db_and_gemini_repo() {
+        let root = std::env::temp_dir().join(format!("agm-clone-trees-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let src_data = root.join("src-data");
+        let dst_data = root.join("dst-data");
+        let src_home = root.join("src-home");
+        let dst_home = root.join("dst-home");
+        fs::create_dir_all(src_data.join("User").join("globalStorage")).unwrap();
+        fs::create_dir_all(src_data.join("User").join("workspaceStorage").join("proj")).unwrap();
+        fs::write(
+            src_data.join("User").join("settings.json"),
+            br#"{"workbench.colorTheme":"Tokyo Night"}"#,
+        )
+        .unwrap();
+        fs::write(
+            src_data
+                .join("User")
+                .join("workspaceStorage")
+                .join("proj")
+                .join("state.vscdb"),
+            b"workspace-repo-db",
+        )
+        .unwrap();
+        fs::create_dir_all(src_home.join(".gemini").join("antigravity")).unwrap();
+        fs::write(
+            src_home.join(".gemini").join("antigravity").join("repo.db"),
+            b"gemini-repo-db",
+        )
+        .unwrap();
+        fs::create_dir_all(&dst_data).unwrap();
+
+        copy_required_ide_files(&src_data, &dst_data).unwrap();
+        copy_gemini_trees(&src_home, &dst_home).unwrap();
+
+        assert_eq!(
+            fs::read(dst_data.join("User").join("settings.json")).unwrap(),
+            br#"{"workbench.colorTheme":"Tokyo Night"}"#
+        );
+        assert_eq!(
+            fs::read(
+                dst_data
+                    .join("User")
+                    .join("workspaceStorage")
+                    .join("proj")
+                    .join("state.vscdb")
+            )
+            .unwrap(),
+            b"workspace-repo-db"
+        );
+        assert_eq!(
+            fs::read(dst_home.join(".gemini").join("antigravity").join("repo.db")).unwrap(),
+            b"gemini-repo-db"
+        );
+        let _ = fs::remove_dir_all(&root);
     }
 }

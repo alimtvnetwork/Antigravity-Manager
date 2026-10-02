@@ -16,10 +16,10 @@ function Pagination({
     currentPage,
     totalPages,
     onPageChange,
-    totalItems,
+    totalItems: _totalItems,
     itemsPerPage,
     onPageSizeChange,
-    pageSizeOptions = [10, 20, 50, 100],
+    pageSizeOptions = [50, 100, 150, 200],
     centerContent
 }: PaginationProps) {
     const { t } = useTranslation();
@@ -39,11 +39,8 @@ function Pagination({
         pages.push(i);
     }
 
-    const startIndex = (currentPage - 1) * itemsPerPage + 1;
-    const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
-
     return (
-        <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex items-center justify-between px-4 py-2">
             {/* Mobile View */}
             <div className="flex flex-1 justify-between sm:hidden">
                 <button
@@ -69,18 +66,13 @@ function Pagination({
             </div>
 
             {/* Desktop View */}
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-400">
-                        {t('common.pagination_info', { start: startIndex, end: endIndex, total: totalItems })}
-                    </p>
-
-                    {/* 分页大小选择器 */}
+            <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center w-full gap-3">
+                <div className="flex items-center gap-2 justify-self-start">
                     {onPageSizeChange && (
-                        <div className="flex items-center gap-2">
+                        <>
                             <span className="text-sm text-gray-600 dark:text-gray-400">{t('common.per_page')}</span>
                             <select
-                                value={itemsPerPage}
+                                value={pageSizeOptions.includes(itemsPerPage) ? itemsPerPage : 150}
                                 onChange={(e) => onPageSizeChange(parseInt(e.target.value))}
                                 className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-base-100 text-gray-900 dark:text-base-content focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
@@ -88,17 +80,12 @@ function Pagination({
                                     <option key={size} value={size}>{size} {t('common.items')}</option>
                                 ))}
                             </select>
-                        </div>
+                        </>
                     )}
                 </div>
 
-                {centerContent && (
-                    <div className="flex items-center justify-center">
-                        {centerContent}
-                    </div>
-                )}
-
-                <div>
+                <div className="flex items-center justify-center gap-3">
+                    {centerContent}
                     <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                         <button
                             onClick={() => onPageChange(currentPage - 1)}
@@ -169,6 +156,7 @@ function Pagination({
                         </button>
                     </nav>
                 </div>
+                <div />
             </div>
         </div>
     );

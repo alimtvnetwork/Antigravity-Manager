@@ -4,6 +4,7 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { isLinux } from '../../utils/env';
+import { findPalette, THEME_PALETTES } from './themePalettes';
 
 export default function ThemeManager() {
     const { config, loadConfig } = useConfigStore();
@@ -42,21 +43,28 @@ export default function ThemeManager() {
 
         const applyTheme = async (theme: string) => {
             const root = document.documentElement;
-            const isDark = theme === 'dark';
+            const palette = findPalette(theme);
+            const isDark = palette.dark;
+
+            for (const item of THEME_PALETTES) {
+                root.classList.remove(`palette-${item.id}`);
+            }
+            root.classList.add(`palette-${palette.id}`);
+            root.style.setProperty('--bg', palette.bg);
+            root.style.setProperty('--surface', palette.surface);
+            root.style.setProperty('--primary', palette.primary);
+            root.style.setProperty('--fg', palette.fg);
 
             // Set Tauri window background color
             // Skip on Linux due to crash with transparent windows + softbuffer
             try {
                 if (!isLinux() && (window as any).__TAURI_INTERNALS__) {
-                    const bgColor = isDark ? '#071a27' : '#f5faf9';
-                    // Don't await this, let it happen in background to avoid blocking React render
-                    getCurrentWindow().setBackgroundColor(bgColor).catch(e =>
+                    getCurrentWindow().setBackgroundColor(palette.bg).catch(e =>
                         console.error('Failed to set window background color:', e)
                     );
 
-                    // Sync Windows title bar theme (for minimize/maximize/close button colors)
                     const { invoke } = await import('@tauri-apps/api/core');
-                    invoke('set_window_theme', { theme }).catch(() => {
+                    invoke('set_window_theme', { theme: isDark ? 'dark' : 'light' }).catch(() => {
                         // Ignore errors on non-Windows platforms
                     });
                 }
@@ -64,13 +72,10 @@ export default function ThemeManager() {
                 console.error('Window background sync failed:', e);
             }
 
-            // Set DaisyUI theme
-            root.setAttribute('data-theme', theme);
+            root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            root.style.backgroundColor = palette.bg;
+            root.style.color = palette.fg;
 
-            // Set inline style for immediate visual feedback
-            root.style.backgroundColor = isDark ? '#071a27' : '#f5faf9';
-
-            // Set Tailwind dark mode class
             if (isDark) {
                 root.classList.add('dark');
             } else {

@@ -339,3 +339,31 @@ a {
   background-color: #273549 !important;
   border-color: rgba(71, 85, 105, 0.9) !important;
 }
+
+html.palette-midnight,
+html.palette-vscode-dark,
+html.palette-tokyo-night,
+html.palette-one-dark,
+html.palette-github-dark,
+html.palette-monokai,
+html.palette-editorial {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+html.palette-midnight .dark\:bg-base-100,
+html.palette-vscode-dark .dark\:bg-base-100,
+html.palette-tokyo-night .dark\:bg-base-100,
+html.palette-one-dark .dark\:bg-base-100,
+html.palette-github-dark .dark\:bg-base-100,
+html.palette-monokai .dark\:bg-base-100,
+html.palette-editorial .dark\:bg-base-100,
+html.palette-midnight .dark\:bg-base-200,
+html.palette-vscode-dark .dark\:bg-base-200,
+html.palette-tokyo-night .dark\:bg-base-200,
+html.palette-one-dark .dark\:bg-base-200,
+html.palette-github-dark .dark\:bg-base-200,
+html.palette-monokai .dark\:bg-base-200,
+html.palette-editorial .dark\:bg-base-200 {
+  background-color: var(--surface) !important;
+}

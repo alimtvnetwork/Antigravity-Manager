@@ -21,6 +21,7 @@ import DebugConsole from '../components/debug/DebugConsole';
 import ProxyPoolSettings from '../components/settings/ProxyPoolSettings';
 import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
 import SupabaseSyncSettings from '../components/settings/SupabaseSyncSettings';
+import ThemePicker from '../components/settings/ThemePicker';
 import versionData from '../../version.json';
 
 function normalizeDataDirDisplay(path: string): string {
@@ -44,7 +45,7 @@ function Settings() {
     const { t, i18n } = useTranslation();
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
-    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
     const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.120.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
@@ -595,6 +596,15 @@ function Settings() {
                             onClick={() => setActiveTab('email')}
                         >
                             {t('settings.tabs.email', 'Email-Alerts')}
+                        </button>
+                        <button
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'themes'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                            onClick={() => setActiveTab('themes')}
+                        >
+                            {t('settings.tabs.themes', 'Themes')}
                         </button>
                         <button
                             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'supabase'
@@ -2039,114 +2049,52 @@ function Settings() {
                         <EmailNotificationSettings />
                     )}
 
+                    {activeTab === 'themes' && (
+                        <ThemePicker />
+                    )}
+
                     {activeTab === 'supabase' && (
                         <SupabaseSyncSettings />
                     )}
 
                     {activeTab === 'about' && (
                         <div className="flex flex-col h-full animate-in fade-in duration-500">
-                            <div className="flex-1 flex flex-col justify-center items-center space-y-8">
-                                {/* Branding Section */}
-                                <div className="text-center space-y-4">
-                                    <div className="relative inline-block group">
-                                        <div className="absolute inset-0 bg-blue-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-                                        <img
-                                            src="/icon.png"
-                                            alt="Antigravity Logo"
-                                            className="relative w-24 h-24 rounded-3xl shadow-2xl transform group-hover:scale-105 transition-all duration-500 rotate-3 group-hover:rotate-6 object-cover bg-white dark:bg-black"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-3xl font-black text-gray-900 dark:text-base-content tracking-tight mb-2">{t('common.app_name', 'Agm Tool By Alim')}</h3>
-                                        <div className="flex items-center justify-center gap-2 text-sm">
-                                            v{appVersion}
-                                            <span className="text-gray-400 dark:text-gray-600">•</span>
-                                            <span className="text-gray-500 dark:text-gray-400">{t('settings.branding.subtitle')}</span>
+                            <div className="flex flex-col gap-4 max-w-3xl">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src="/icon.png"
+                                        alt="Antigravity Logo"
+                                        className="w-10 h-10 rounded-lg object-cover bg-white dark:bg-black"
+                                    />
+                                    <div className="min-w-0">
+                                        <h3 className="text-base font-semibold text-gray-900 dark:text-base-content leading-tight">{t('common.app_name', 'Agm Tool By Alim')}</h3>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                            <span>v{appVersion}</span>
+                                            <span>·</span>
+                                            <span>{t('settings.branding.subtitle')}</span>
+                                            <span>·</span>
+                                            <span>Tauri v2 · React 19</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Cards Grid - 4 columns */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-5xl px-4">
-                                    {/* Author & Sponsor Card */}
-                                    <a
-                                        href="https://alimkarim.com"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
-                                    >
-                                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <User className="w-6 h-6 text-blue-500" />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.author', 'Maintainer & Sponsor')}</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content text-xs sm:text-sm">Md. Alim Ul Karim</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Riseup Asia LLC</div>
-                                        </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <a href="https://alimkarim.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-blue-400">
+                                        <User className="w-3.5 h-3.5" />
+                                        Md. Alim Ul Karim
                                     </a>
-
-                                    {/* Telegram Card */}
-                                    <a
-                                        href="https://t.me/AntigravityManager"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-sky-200 dark:hover:border-sky-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
-                                    >
-                                        <div className="p-3 bg-sky-50 dark:bg-sky-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <Send className="w-6 h-6 text-sky-500" />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.telegram')}</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content whitespace-nowrap overflow-hidden text-ellipsis w-full">Channel</div>
-                                        </div>
+                                    <a href="https://t.me/AntigravityManager" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-sky-400">
+                                        <Send className="w-3.5 h-3.5" />
+                                        {t('settings.about.telegram')}
                                     </a>
-
-                                    {/* GitHub Card */}
-                                    <a
-                                        href="https://github.com/alimtvnetwork/Antigravity-Manager"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
-                                    >
-                                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <Github className="w-6 h-6 text-gray-900 dark:text-white" />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.github')}</div>
-                                            <div className="flex items-center gap-1 font-bold text-gray-900 dark:text-base-content">
-                                                <span>{t('settings.about.view_code')}</span>
-                                                <ExternalLink className="w-3 h-3 text-gray-400" />
-                                            </div>
-                                        </div>
+                                    <a href="https://github.com/alimtvnetwork/Antigravity-Manager" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-gray-400">
+                                        <Github className="w-3.5 h-3.5" />
+                                        {t('settings.about.view_code')}
                                     </a>
-
-                                    {/* Support Card */}
-                                    <div
-                                        onClick={() => setIsSupportModalOpen(true)}
-                                        className="bg-white dark:bg-base-100 p-4 rounded-2xl border border-gray-100 dark:border-base-300 shadow-sm hover:shadow-md hover:border-pink-200 dark:hover:border-pink-800 transition-all group flex flex-col items-center text-center gap-3 cursor-pointer"
-                                    >
-                                        <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <Heart className="w-6 h-6 text-pink-500 fill-pink-500" />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">{t('settings.about.support_title')}</div>
-                                            <div className="font-bold text-gray-900 dark:text-base-content">{t('settings.about.support_btn')}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Tech Stack Badges */}
-                                <div className="flex gap-2 justify-center">
-                                    <div className="px-3 py-1 bg-gray-50 dark:bg-base-200 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-base-300">
-                                        Tauri v2
-                                    </div>
-                                    <div className="px-3 py-1 bg-gray-50 dark:bg-base-200 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-base-300">
-                                        React 19
-                                    </div>
-                                    <div className="px-3 py-1 bg-gray-50 dark:bg-base-200 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-base-300">
-                                        TypeScript
-                                    </div>
+                                    <button type="button" onClick={() => setIsSupportModalOpen(true)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-pink-400">
+                                        <Heart className="w-3.5 h-3.5" />
+                                        {t('settings.about.support_btn')}
+                                    </button>
                                 </div>
 
                                 {/* Update Channel Selector */}
