@@ -1,6 +1,6 @@
 # Issue 50: Instance switch or fast-forward loses the running prompt
 
-Status: open (planned, not fixed)
+Status: the failure observed on 2026-10-02 is [issue 57](./57-switch-marks-prompt-restored-before-ide-ready-rca.md). The diagnosis below was the 2026-09-30 hypothesis. Do not implement it as the current cause.
 Raised: 2026-09-30
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)
 Plan: [87](../plans/pending/87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md)

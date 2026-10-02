@@ -1,6 +1,6 @@
 # Issue 47: PRO accounts render no PRO badge
 
-Status: open (planned, not fixed)
+Status: open. The cache skip below is still in `fetch_quota_with_cache`. A second cause, raw tier ids that are not the label `PRO`, is [issue 58](./58-pro-badge-raw-tier-id-rca.md) and was normalized on the fetch path in v4.119.0.
 Raised: 2026-09-30
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)
 Plan: [85](../plans/pending/85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md)

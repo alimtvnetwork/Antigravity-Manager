@@ -2,6 +2,8 @@
 
 Read this before changing the Accounts table, account switch, or the GitMap update zip. The symptom and the first log line are not the same thing.
 
+Formal write-ups: [issue 57](../issues/57-switch-marks-prompt-restored-before-ide-ready-rca.md) is the prompt root cause. [issue 58](../issues/58-pro-badge-raw-tier-id-rca.md) is the raw tier id. [issue 47](../issues/47-pro-badge-missing-when-tier-not-fetched-rca.md) is still the cached-project skip. [issue 50](../issues/50-instance-switch-loses-running-prompt-rca.md) is an older hypothesis; do not treat it as the current cause.
+
 ## What looked done and was not
 
 Email and Telegram already left `[Notify] email: OK` and `[Notify] telegram: OK`. Specs 39, 72, and 92 said the running prompt was restored. The restore function did run. It marked `prompt_backups.is_restored = 1` and `active_prompts.status = 'dispatched'` inside `launch_instance`, immediately after `spawn`, before the IDE could accept a prompt. The later step in `switch_account_to_instance` then queried `is_restored = 0` and `status = 'backed_up'` and found nothing. A zero restore count next to a successful email is the signature of this bug.
