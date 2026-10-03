@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.128.1 (2026-10-03)**:
+        -   **[Build & Core] Rust Compilation Fixes & Type Alignment**:
+            -   **Description**: Fixed Rust compilation errors in `instance.rs` and `account.rs` by properly converting `get_antigravity_executable_path` `PathBuf` to `String`, resolved `cannot move out of type AuditTask` in `task_history_db.rs` by cloning `task.id`, and enhanced CLI E2E test parsing. (Thanks to @aukgit)
+        -   **[Supabase] Workspace Lease & Conflict Prevention Table**:
+            -   **Description**: Added real-time Workspace Lease and Cluster Lock table to the Supabase tab with live node status, profile name, expiration countdown, and click-to-unmask email toggle. (Thanks to @aukgit)
+        -   **[Accounts] Uniform Segmented Pill Capsule Toolbar**:
+            -   **Description**: Grouped Focus, +, Refresh, Warm, and Show All Quotas into contiguous segmented pill capsules (`rounded-full`, dark glass styling) matching Instances aesthetic. (Thanks to @aukgit)
+
     *   **v4.128.0 (2026-10-03)**:
         -   **[Audit] Pagination & Two-Tier SQLite Acceleration**:
             -   **Description**: Added 100/200 item page size selection backed by a two-tier SQLite cache (`hot_tasks_cache` in `task_index.db`) for instant render, and enriched account switch rows with `From → To` transition arrays, instance ID, IDE type, machine alias, IDE path, and switch reason. (Thanks to @aukgit)

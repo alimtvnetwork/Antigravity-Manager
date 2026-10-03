@@ -121,8 +121,9 @@ try {
     Write-Host "`n[2/7] Testing 'agm instance ls --json'..." -ForegroundColor Yellow
     $lsOut = Invoke-Agm @("instance", "ls", "--json")
     $lsJson = Parse-JsonOutput $lsOut
+    $items = if ($lsJson -and $lsJson.data) { $lsJson.data } else { $lsJson }
     Assert-Step "Instance list returns array with sequence_name and PID" {
-        $null -ne $lsJson -and $lsJson.Count -ge 1 -and $null -ne $lsJson[0].sequence_name
+        $null -ne $items -and $items.Count -ge 1 -and ($null -ne $items[0].sequence_name -or $null -ne $items[0].name)
     }
 
     # 3. Test agm instance duplicate

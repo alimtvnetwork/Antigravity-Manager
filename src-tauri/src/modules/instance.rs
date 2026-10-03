@@ -3641,6 +3641,7 @@ pub async fn switch_account_to_instance(
     let ide_path = instance.executable_path.clone().unwrap_or_else(|| {
         crate::modules::process::get_antigravity_executable_path(None)
             .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+            .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default()
     });
     let payload = crate::modules::task_history_db::switch_payload(

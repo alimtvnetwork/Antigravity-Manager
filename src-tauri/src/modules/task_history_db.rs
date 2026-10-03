@@ -390,7 +390,7 @@ pub fn record_scheduler_event(facts: &SchedulerFacts) -> Result<String, String> 
     );
     let payload = scheduler_payload(facts);
     task.succeed_with_payload(&facts.reason, &payload);
-    Ok(task.id)
+    Ok(task.id.clone())
 }
 
 pub fn record_requeue_event(
@@ -415,7 +415,7 @@ pub fn record_requeue_event(
     })
     .to_string();
     task.succeed_with_payload(reason, &payload);
-    Ok(task.id)
+    Ok(task.id.clone())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

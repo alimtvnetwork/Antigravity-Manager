@@ -1704,6 +1704,7 @@ pub async fn switch_account(
     let machine_alias = crate::modules::email_watcher::detect_machine_name();
     let ide_path = crate::modules::process::get_antigravity_executable_path(None)
         .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+        .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
     let payload = crate::modules::task_history_db::switch_payload(
         &crate::modules::task_history_db::SwitchFacts {

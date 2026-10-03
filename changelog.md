@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.128.1] - 2026-10-03
+
+### Fixed
+- Fixed Rust compilation errors in `instance.rs` and `account.rs` by properly converting `get_antigravity_executable_path` `PathBuf` to `String`. (Thanks to @aukgit)
+- Fixed `cannot move out of type AuditTask` compiler errors in `task_history_db.rs` by cloning `task.id`. (Thanks to @aukgit)
+- Enhanced `scripts/e2e-instance-commands-test.ps1` to unwrap `agm instance ls --json` response payloads seamlessly. (Thanks to @aukgit)
+
+### Added
+- Added Workspace Lease & Cluster Lock table to the Supabase top-level settings view with real-time multi-node status and click-to-unmask email toggle. (Thanks to @aukgit)
+- Modernized Accounts top toolbar into uniform segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop) grouping Focus, +, Refresh, Warm, and Show All Quotas. (Thanks to @aukgit)
+
+---
+
 ## [v4.128.0] - 2026-10-03
 
 ### Added
@@ -273,6 +286,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.128.1 (2026-10-03)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.128.0 (2026-10-03)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

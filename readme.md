@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.128.0-3B82F6?style=flat-square" alt="Version v4.128.0">
+    <img src="https://img.shields.io/badge/Version-v4.128.1-3B82F6?style=flat-square" alt="Version v4.128.1">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.128.0)**
+**Bar 2: Version-Based Installation (v4.128.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -456,6 +456,14 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.128.1** (2026-10-03):
+  - **Rust Compilation Fixes & Type Alignment**: Resolved mismatched types in `instance.rs` and `account.rs` by properly mapping `get_antigravity_executable_path` `PathBuf` to `String`, fixed `AuditTask` drop move errors in `task_history_db.rs`, and enhanced CLI E2E test parsing.
+  - **Supabase Workspace Lease & Lock Table**: Added real-time Workspace Lease and Cluster Lock table to the Supabase tab with live node status, profile name, countdown timer, and click-to-unmask email toggle.
+  - **Accounts Segmented Pill Capsule Toolbar**: Modernized Accounts top toolbar into uniform segmented pill capsules (`rounded-full`, dark glass backdrop) grouping Focus, +, Refresh, Warm, and Show All Quotas.
+- **v4.128.0** (2026-10-03):
+  - **Audit Pagination & Two-Tier SQLite Cache**: Added 100/200 pagination dropdown backed by `hot_tasks_cache` for sub-millisecond retrieval and enriched transition facts (`From → To`, instance ID, IDE path, reason).
+  - **First-Class Supabase Tab**: Top-level tab between Email and Audit with dual-endpoint cluster governance, node health, and cross-DB migration tools.
+  - **Instances Card & List Views**: Introduced `InstanceTable` list view, multi-field search, and `PromptTreeViewModal` with prompt backup/restore and asset inspector.
 - **v4.127.2** (2026-10-03):
   - **CLI Formatting & Output Polish**: Enhanced `agm instance settings` and related CLI command helpers with clean tabular output and robust non-zero error reporting.
   - **Architectural Invariants**: Codified UI segmented pill encapsulation and headless duplication parity into project engineering guidelines.
@@ -536,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.127.2**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, JSON import/export with undo/redo history, and CLI output format polish.
+> Latest version **v4.128.1**: Rust compilation and type alignment fixes, Supabase workspace lease & lock table, uniform accounts segmented pill capsule toolbar, audit pagination with two-tier SQLite cache, first-class Supabase tab, and instance card/list view modes.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
