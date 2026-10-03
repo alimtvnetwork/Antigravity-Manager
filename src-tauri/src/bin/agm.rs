@@ -8865,12 +8865,16 @@ fn cmd_instance_duplicate_or_clone(args: &[String]) {
     let resolved_src = match instance::resolve_instance_id(source_spec) {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("[ERROR] Could not resolve source instance '{}': {}", source_spec, e);
+            eprintln!(
+                "[ERROR] Could not resolve source instance '{}': {}",
+                source_spec, e
+            );
             std::process::exit(1);
         }
     };
 
-    match instance::copy_instance_with_options(&resolved_src, new_name, Some("full"), copy_projects) {
+    match instance::copy_instance_with_options(&resolved_src, new_name, Some("full"), copy_projects)
+    {
         Ok(mut cfg) => {
             if let Ok(exe_path) = instance::clone_instance_executable(&cfg.id) {
                 cfg.executable_path = Some(exe_path);
@@ -8908,7 +8912,10 @@ fn cmd_instance_count(args: &[String]) {
                 let total = val.get("total").and_then(|v| v.as_u64()).unwrap_or(0);
                 let active = val.get("active").and_then(|v| v.as_u64()).unwrap_or(0);
                 let running = val.get("running").and_then(|v| v.as_u64()).unwrap_or(0);
-                let active_id = val.get("active_instance_id").and_then(|v| v.as_str()).unwrap_or("default");
+                let active_id = val
+                    .get("active_instance_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default");
                 println!("\nAntigravity Instances Summary:");
                 println!("  Total registered:  {}", total);
                 println!("  Active profile:    {} (count: {})", active_id, active);
@@ -8935,12 +8942,15 @@ fn cmd_instance_copy_projects(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg_lower = args[i].to_lowercase();
-        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src") && i + 1 < args.len() {
+        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src")
+            && i + 1 < args.len()
+        {
             from_spec = Some(args[i + 1].clone());
             i += 2;
             continue;
         }
-        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len() {
+        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len()
+        {
             to_spec = Some(args[i + 1].clone());
             i += 2;
             continue;
@@ -8951,7 +8961,9 @@ fn cmd_instance_copy_projects(args: &[String]) {
     if from_spec.is_none() || to_spec.is_none() {
         let start_idx = if non_flag_args
             .first()
-            .map(|s| s.eq_ignore_ascii_case("copy-projects") || s.eq_ignore_ascii_case("copy_projects"))
+            .map(|s| {
+                s.eq_ignore_ascii_case("copy-projects") || s.eq_ignore_ascii_case("copy_projects")
+            })
             .unwrap_or(false)
         {
             1
@@ -8977,7 +8989,10 @@ fn cmd_instance_copy_projects(args: &[String]) {
 
     match instance::copy_instance_projects(&src, &dst) {
         Ok(count) => {
-            println!("[SUCCESS] Copied {} workspace project(s) from '{}' to '{}'.", count, src, dst);
+            println!(
+                "[SUCCESS] Copied {} workspace project(s) from '{}' to '{}'.",
+                count, src, dst
+            );
         }
         Err(e) => {
             eprintln!("[ERROR] Failed to copy projects: {}", e);
@@ -9000,12 +9015,15 @@ fn cmd_instance_copy_settings(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg_lower = args[i].to_lowercase();
-        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src") && i + 1 < args.len() {
+        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src")
+            && i + 1 < args.len()
+        {
             from_spec = Some(args[i + 1].clone());
             i += 2;
             continue;
         }
-        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len() {
+        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len()
+        {
             to_spec = Some(args[i + 1].clone());
             i += 2;
             continue;
@@ -9020,21 +9038,29 @@ fn cmd_instance_copy_settings(args: &[String]) {
 
     if let Some(ref ep) = exe_path {
         if let Some(detected_inst) = instance::find_instance_by_executable(ep) {
-            println!("[*] Resolved instance '{}' from executable path '{}'", detected_inst, ep);
+            println!(
+                "[*] Resolved instance '{}' from executable path '{}'",
+                detected_inst, ep
+            );
             if from_spec.is_none() {
                 from_spec = Some(detected_inst);
             } else if to_spec.is_none() {
                 to_spec = Some(detected_inst);
             }
         } else {
-            eprintln!("[WARN] Could not find any registered instance matching executable '{}'", ep);
+            eprintln!(
+                "[WARN] Could not find any registered instance matching executable '{}'",
+                ep
+            );
         }
     }
 
     if from_spec.is_none() || to_spec.is_none() {
         let start_idx = if non_flag_args
             .first()
-            .map(|s| s.eq_ignore_ascii_case("copy-settings") || s.eq_ignore_ascii_case("copy_settings"))
+            .map(|s| {
+                s.eq_ignore_ascii_case("copy-settings") || s.eq_ignore_ascii_case("copy_settings")
+            })
             .unwrap_or(false)
         {
             1
@@ -9060,7 +9086,10 @@ fn cmd_instance_copy_settings(args: &[String]) {
 
     match instance::copy_instance_settings(&src, &dst) {
         Ok(_) => {
-            println!("[SUCCESS] Copied theme and Antigravity settings from '{}' to '{}'.", src, dst);
+            println!(
+                "[SUCCESS] Copied theme and Antigravity settings from '{}' to '{}'.",
+                src, dst
+            );
         }
         Err(e) => {
             eprintln!("[ERROR] Failed to copy settings: {}", e);
@@ -9096,7 +9125,9 @@ fn cmd_instance_settings(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg_lower = args[i].to_lowercase();
-        if (arg_lower == "--instance" || arg_lower == "-i" || arg_lower == "--inst") && i + 1 < args.len() {
+        if (arg_lower == "--instance" || arg_lower == "-i" || arg_lower == "--inst")
+            && i + 1 < args.len()
+        {
             target_instance = Some(args[i + 1].clone());
             i += 2;
             continue;
@@ -9124,7 +9155,10 @@ fn cmd_instance_settings(args: &[String]) {
         Some("enforce-defaults") | Some("enforce") | Some("defaults") => {
             match instance::enforce_default_settings(target_ref) {
                 Ok(count) => {
-                    println!("[SUCCESS] Enforced default settings across {} instance(s).", count);
+                    println!(
+                        "[SUCCESS] Enforced default settings across {} instance(s).",
+                        count
+                    );
                 }
                 Err(e) => {
                     eprintln!("[ERROR] Failed to enforce default settings: {}", e);
@@ -9186,7 +9220,10 @@ fn cmd_instance_settings(args: &[String]) {
                             eprintln!("[ERROR] Failed to write to '{}': {}", path, e);
                             std::process::exit(1);
                         }
-                        println!("[SUCCESS] Exported instance '{}' settings to '{}'.", inst_spec, path);
+                        println!(
+                            "[SUCCESS] Exported instance '{}' settings to '{}'.",
+                            inst_spec, path
+                        );
                     } else {
                         println!("{}", json_str);
                     }
@@ -9208,7 +9245,10 @@ fn cmd_instance_settings(args: &[String]) {
             let content = match fs::read_to_string(&file_path) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[ERROR] Failed to read settings file '{}': {}", file_path, e);
+                    eprintln!(
+                        "[ERROR] Failed to read settings file '{}': {}",
+                        file_path, e
+                    );
                     std::process::exit(1);
                 }
             };
