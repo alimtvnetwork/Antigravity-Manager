@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.127.2] - 2026-10-03
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.127.0] - 2026-10-03
 
 ### Added
@@ -250,16 +257,13 @@
         -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
             -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)
 
-
     *   **v4.127.0 (2026-10-03)**:
         -   **[Instances] Unified Settings Sync, Duplication Parity & Combined Navbar Controls**:
             -   **Description**: Duplicating an instance from UI or CLI routes through identical underlying service logic (`copy_instance_with_options`), replicating `workspaceStorage`, `state.vscdb`, `storage.json`, and database project mappings. Consolidated Quick Clean, Theme/Language preferences, and Window Controls into seamless segmented pill capsules, and introduced JSON import/export with snapshot undo/redo in Instance Settings modal. (Thanks to @aukgit)
 
-
     *   **v4.126.1 (2026-10-03)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.126.0 (2026-10-03)**:
         -   **[Instances] Deep Clone of Settings, Themes & Projects**:
@@ -275,13 +279,11 @@
         -   **[Email] Telemetry & Connection Health**:
             -   **Description**: Enriched Email view with IMAP/SMTP connection badges, daemon watcher state, and security vault health indicators. (Thanks to @aukgit)
 
-
     *   **v4.125.0 (2026-10-02)**:
         -   **[Instances] Other processes stay open**:
             -   **Description**: A switch or fast-forward closes only that instance. Another instance's saved process id and profile path are left running. (Thanks to @aukgit)
         -   **[Instances] Readable cards**:
             -   **Description**: The page title no longer collides with the running count. Each card shows the full account, profile path, and action row. (Thanks to @aukgit)
-
 
     *   **v4.124.0 (2026-10-02)**:
         -   **[Switch] Same conversation after a switch**:
@@ -291,11 +293,9 @@
         -   **[Quota] Two-minute checks and a saved process id**:
             -   **Description**: Google quota checks wait at least 2 minutes. The process saved at launch is trusted. A full process scan runs every 10 minutes by default (never under 3, never over 20), or when credit is under the threshold and that process no longer matches. (Thanks to @aukgit)
 
-
     *   **v4.123.0 (2026-10-02)**:
         -   **[Audit] From, to, and a detail table**:
             -   **Description**: The list shows which account moved to which. The domain is hidden and the start of the name stays. Detail loads one row and shows the reason, how, the running prompt, and whether it was injected again. (Thanks to @aukgit)
-
 
     *   **v4.122.0 (2026-10-02)**:
         -   **[Switch] Return after the IDE relaunch**:
@@ -303,13 +303,11 @@
         -   **[Settings] Compact pinned models**:
             -   **Description**: Pinned quota models are a filter and small chips. Pinned models sort first. (Thanks to @aukgit)
 
-
     *   **v4.121.0 (2026-10-02)**:
         -   **[Instances] Clone copies settings and repo databases**:
             -   **Description**: A duplicate instance copies `User/settings.json`, workspace databases, `.gemini` trees, and the source repo rows. (Thanks to @aukgit)
         -   **[Settings] Catalogue themes and a compact About**:
             -   **Description**: Themes sits next to Email. About is one row with the update controls. The accounts footer defaults to 150 per page and drops the entry-count sentence. (Thanks to @aukgit)
-
 
     *   **v4.120.0 (2026-10-02)**:
         -   **[Accounts] One tier dropdown and a shorter row**:
@@ -318,7 +316,6 @@
             -   **Description**: Account actions are numeric enums. The list shows title case. Detail opens that row's split file and shows the prompt that was running when a switch happened. (Thanks to @aukgit)
         -   **[Release] One version and a refreshable Pro badge**:
             -   **Description**: Quota refresh fetches the subscription tier even when a project id is cached. The bump script exits if package.json, version.json, Cargo.toml, tauri.conf.json, and hooks.nsh disagree. (Thanks to @aukgit)
-
 
     *   **v4.119.0 (2026-10-02)**:
         -   **[Accounts] 4-hour and weekly quota columns**:

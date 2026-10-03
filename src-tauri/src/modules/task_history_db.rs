@@ -683,6 +683,11 @@ mod tests {
             conversation_id: "conv-same".to_string(),
             prompt_reinjected: true,
             switch_ok: true,
+            instance_id: "default".to_string(),
+            ide_type: "antigravity".to_string(),
+            idc_machine_alias: "node-1".to_string(),
+            ide_path: "/usr/bin/antigravity".to_string(),
+            switch_reason: "Manual account switch".to_string(),
         });
         let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
         assert_eq!(value["from_email"], "alpha@gmail.com");
@@ -691,6 +696,11 @@ mod tests {
         assert_eq!(value["prompt_text"], "keep going");
         assert_eq!(value["conversation_id"], "conv-same");
         assert_eq!(value["prompt_reinjected"], true);
+        assert_eq!(value["instance_id"], "default");
+        assert_eq!(value["ide_type"], "antigravity");
+        assert_eq!(value["idc_machine_alias"], "node-1");
+        assert_eq!(value["ide_path"], "/usr/bin/antigravity");
+        assert_eq!(value["switch_reason"], "Manual account switch");
         let (from_email, to_email) = payload_emails(Some(&raw));
         assert_eq!(from_email, "alpha@gmail.com");
         assert_eq!(to_email, "beta@gmail.com");
