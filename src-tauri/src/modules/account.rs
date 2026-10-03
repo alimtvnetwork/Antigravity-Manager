@@ -1722,6 +1722,7 @@ pub async fn switch_account(
             idc_machine_alias: machine_alias,
             ide_path,
             switch_reason: "Manual account switch".to_string(),
+            steps: None,
         },
     );
     audit.succeed_with_payload("switch finished", &payload);
