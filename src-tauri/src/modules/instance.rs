@@ -3557,6 +3557,7 @@ pub async fn switch_account_to_instance(
     );
     let (resent_len, dispatched) = if needs_reinject {
         wait_for_instance_prompt_channel(&instance.id);
+        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
         let _ = crate::modules::backup_prompts_db::restore_running_prompts(
             Some(&instance.id),
             false,
@@ -3636,6 +3637,12 @@ pub async fn switch_account_to_instance(
     });
 
     let snap = crate::modules::repo_db::switch_prompt_snapshot(&instance.id);
+    let machine_alias = crate::modules::email_watcher::detect_machine_name();
+    let ide_path = instance.executable_path.clone().unwrap_or_else(|| {
+        crate::modules::process::get_antigravity_executable_path(None)
+            .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+            .unwrap_or_default()
+    });
     let payload = crate::modules::task_history_db::switch_payload(
         &crate::modules::task_history_db::SwitchFacts {
             from_email: prev_email.clone().unwrap_or_default(),
@@ -3647,6 +3654,11 @@ pub async fn switch_account_to_instance(
             conversation_id: snap.conversation_id,
             prompt_reinjected: needs_reinject && dispatched > 0,
             switch_ok: true,
+            instance_id: instance.id.clone(),
+            ide_type: "antigravity".to_string(),
+            idc_machine_alias: machine_alias,
+            ide_path,
+            switch_reason: "Instance account switch".to_string(),
         },
     );
     audit.succeed_with_payload("switch finished", &payload);

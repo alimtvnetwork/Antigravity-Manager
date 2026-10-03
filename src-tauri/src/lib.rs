@@ -1045,6 +1045,7 @@ pub fn run() {
             commands::resume_recent_project_prompts,
             commands::assign_project_to_instance,
             commands::get_instance_workspace_folders,
+            commands::get_project_conversation_tree,
             // Email and Mailbox Management commands
             commands::get_email_settings,
             commands::save_email_settings,

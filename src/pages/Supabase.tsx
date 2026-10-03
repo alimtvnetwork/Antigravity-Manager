@@ -1,4 +1,4 @@
-import { Database, Server, RefreshCw, Radio, ShieldCheck, Cpu } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import SupabaseSyncSettings from '../components/settings/SupabaseSyncSettings';
 

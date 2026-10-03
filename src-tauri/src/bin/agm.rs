@@ -10231,8 +10231,15 @@ fn cmd_instances(args: &[String]) {
                                 None
                             }
                         });
+                        let seq_name = format!("#{} {}", seq, inst.config.name);
+                        let file_path = inst
+                            .config
+                            .executable_path
+                            .clone()
+                            .unwrap_or_else(|| inst.config.data_dir.clone());
                         serde_json::json!({
                             "seq": seq,
+                            "sequence_name": seq_name,
                             "id": inst.config.id,
                             "name": inst.config.name,
                             "is_default": inst.config.is_default,
@@ -10243,6 +10250,8 @@ fn cmd_instances(args: &[String]) {
                             "node": node_alias,
                             "local_ip": local_ip,
                             "data_dir": inst.config.data_dir,
+                            "executable_path": inst.config.executable_path,
+                            "file_path": file_path,
                         })
                     })
                     .collect();
@@ -10266,18 +10275,21 @@ fn cmd_instances(args: &[String]) {
                 local_ip
             );
             println!(
-                "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} DATA DIR",
-                "#", "ID", "NAME", "STATUS", "BOUND ACCOUNT", "NODE / IP"
+                "{:<6} {:<10} {:<24} {:<18} {:<24} FILE / EXE PATH",
+                "#", "PID", "SEQUENCE NAME", "STATUS", "BOUND ACCOUNT"
             );
             println!("{}", "-".repeat(115));
 
             for (idx, inst) in instances.iter().enumerate() {
-                let seq_str = match inst.config.seq_num {
-                    Some(s) => format!("#{}", s),
-                    None => format!("#{}", idx + 1),
-                };
+                let seq = inst.config.seq_num.unwrap_or((idx + 1) as u32);
+                let seq_str = format!("#{}", seq);
+                let seq_name = format!("#{} {}", seq, inst.config.name);
+                let pid_str = inst
+                    .pid
+                    .map(|p| p.to_string())
+                    .unwrap_or_else(|| "-".to_string());
                 let status_str = if inst.is_running {
-                    format!("Running (PID: {})", inst.pid.unwrap_or(0))
+                    format!("Running ({})", pid_str)
                 } else {
                     "Idle".to_string()
                 };
@@ -10296,16 +10308,19 @@ fn cmd_instances(args: &[String]) {
                         }
                     })
                     .unwrap_or_else(|| "-".to_string());
-                let node_info = format!("{}/{}", node_alias, local_ip);
+                let file_path = inst
+                    .config
+                    .executable_path
+                    .as_deref()
+                    .unwrap_or(&inst.config.data_dir);
                 println!(
-                    "{:<5} {:<16} {:<20} {:<18} {:<24} {:<20} {}",
+                    "{:<6} {:<10} {:<24} {:<18} {:<24} {}",
                     seq_str,
-                    inst.config.id,
-                    inst.config.name,
+                    pid_str,
+                    seq_name,
                     status_str,
                     email,
-                    node_info,
-                    inst.config.data_dir
+                    file_path
                 );
             }
             println!();

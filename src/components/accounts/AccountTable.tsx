@@ -93,6 +93,7 @@ interface AccountTableProps {
     onReorder?: (accountIds: string[]) => void;
     onViewError: (accountId: string) => void;
     focusedAccountId?: string | null;
+    showAllEmails?: boolean;
 }
 
 interface SortableRowProps {
@@ -118,6 +119,7 @@ interface SortableRowProps {
     onViewError: () => void;
     isDragDisabled?: boolean;
     modelFilter?: 'gemini' | 'claude';
+    showAllEmails?: boolean;
 }
 
 interface AccountRowContentProps {
@@ -141,6 +143,7 @@ interface AccountRowContentProps {
     showPriority?: boolean;
     onViewError: () => void;
     modelFilter?: 'gemini' | 'claude';
+    showAllEmails?: boolean;
 }
 
 // ============================================================================
@@ -222,6 +225,7 @@ function SortableAccountRow({
     onViewError,
     isDragDisabled = false,
     modelFilter = 'gemini',
+    showAllEmails = false,
 }: SortableRowProps) {
     const { t } = useTranslation();
     const rowRef = useRef<HTMLTableRowElement | null>(null);
@@ -318,6 +322,7 @@ function SortableAccountRow({
                 showPriority={showPriority}
                 onViewError={onViewError}
                 modelFilter={modelFilter}
+                showAllEmails={showAllEmails}
             />
         </tr>
     );
@@ -348,6 +353,7 @@ function AccountRowContent({
     showPriority = false,
     onViewError,
     modelFilter = 'gemini',
+    showAllEmails = false,
 }: AccountRowContentProps) {
     const { t } = useTranslation();
     const { config } = useConfigStore();
@@ -359,6 +365,7 @@ function AccountRowContent({
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showEmail, setShowEmail] = useState(false);
+    const [isHoverUnmasked, setIsHoverUnmasked] = useState(false);
     const [moreMenuPos, setMoreMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [editingPriority, setEditingPriority] = useState(false);
     const [priorityInput, setPriorityInput] = useState(String(account.priority ?? 50));
@@ -522,24 +529,28 @@ function AccountRowContent({
     return (
         <>
             {/* 邮箱列 */}
-            <td className="px-2 py-0.5 align-middle">
+            <td
+                className="px-2 py-0.5 align-middle"
+                onMouseLeave={() => setIsHoverUnmasked(false)}
+            >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span
                         className={cn(
-                        "font-medium text-xs break-all transition-colors",
+                        "font-medium text-xs break-all transition-colors cursor-pointer select-text",
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-amber-300 dark:text-amber-300 font-bold drop-shadow-xs"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-[#f5d76e]"
                         )}
-                        title={showEmail ? account.email : maskEmail(account.email)}
+                        title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
                             event.stopPropagation();
+                            setIsHoverUnmasked(true);
                             openPriorityEditor();
                         }}
                     >
-                        {showEmail ? account.email : maskEmail(account.email)}
+                        {showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                     </span>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -987,6 +998,7 @@ function AccountTable({
     onUpdateLabel,
     onUpdatePriority,
     onViewError,
+    showAllEmails = false,
 }: AccountTableProps) {
     const { t } = useTranslation();
 
@@ -1223,8 +1235,9 @@ function AccountTable({
                                     onUpdatePriority={onUpdatePriority ? (priority: number) => onUpdatePriority(account.id, priority) : undefined}
                                     showPriority={showPriority}
                                     onViewError={() => onViewError(account.id)}
-                                                        isDragDisabled={isSortingActive}
+                                    isDragDisabled={isSortingActive}
                                     modelFilter={modelFilter}
+                                    showAllEmails={showAllEmails}
                                 />
                             ))}
                         </tbody>

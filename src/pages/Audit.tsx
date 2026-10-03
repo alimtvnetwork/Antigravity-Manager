@@ -13,11 +13,23 @@ import type {
 
 export type { TaskRecord, TaskHistoryItem, TaskDetail, TaskHistoryPage, TaskPayload, AuditFilterType };
 
-const PAGE_SIZE = 100;
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+export function formatStrictTime(unix: number | undefined | null): string {
+    if (!unix) return '—';
+    const d = new Date(unix * 1000);
+    if (isNaN(d.getTime())) return '—';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = MONTH_NAMES[d.getMonth()] || 'JAN';
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const secs = String(d.getSeconds()).padStart(2, '0');
+    return `${day}-${month}-${year} ${hours}:${mins}:${secs}`;
+}
 
 export function formatTime(unix: number) {
-    if (!unix) return '';
-    return new Date(unix * 1000).toLocaleString();
+    return formatStrictTime(unix);
 }
 
 export function subjectText(subject: string, revealed: boolean) {
@@ -282,21 +294,94 @@ export function detailRows(detail: TaskDetail, payload: TaskPayload | null, reve
         ? (payload.prompt_reinjected ? 'Yes' : 'No')
         : 'Not recorded on this row';
 
-    return [
+    const rows: DetailRow[] = [
         { label: 'From', value: subjectText(from, revealed), copyValue: subjectText(from, revealed) },
         { label: 'To', value: subjectText(to, revealed), copyValue: subjectText(to, revealed) },
         { label: 'When', value: when, copyValue: when },
         { label: 'Action', value: renderActionBadge(detail), copyValue: actionLabel },
-        { label: 'Reason', value: recorded(payload?.reason, 'Not recorded on this row'), copyValue: recorded(payload?.reason, 'Not recorded on this row') },
-        { label: 'How', value: recorded(payload?.how, 'Not recorded on this row'), copyValue: recorded(payload?.how, 'Not recorded on this row') },
-        { label: 'Conversation', value: recorded(payload?.conversation_id, 'Not recorded on this row'), copyValue: recorded(payload?.conversation_id, 'Not recorded on this row') },
-        { label: 'Prompt running', value: recorded(payload?.prompt_text, 'No running prompt was stored'), copyValue: recorded(payload?.prompt_text, 'No running prompt was stored') },
-        { label: 'Prompt injected again', value: reinject, copyValue: reinject },
     ];
+
+    const instId = payload?.instance_id || detail.instance_id;
+    if (instId) {
+        rows.push({
+            label: 'Instance ID',
+            value: <span className="font-mono text-xs text-slate-800 dark:text-cyan-300 select-all">{instId}</span>,
+            copyValue: instId,
+        });
+    }
+
+    if (payload?.ide_type) {
+        rows.push({
+            label: 'IDE Type',
+            value: <span className="font-medium text-xs text-slate-800 dark:text-slate-200">{payload.ide_type}</span>,
+            copyValue: payload.ide_type,
+        });
+    }
+
+    if (payload?.idc_machine_alias) {
+        rows.push({
+            label: 'IDC Machine Alias',
+            value: <span className="font-medium text-xs text-slate-800 dark:text-slate-200">{payload.idc_machine_alias}</span>,
+            copyValue: payload.idc_machine_alias,
+        });
+    }
+
+    if (payload?.ide_path) {
+        rows.push({
+            label: 'IDE Path',
+            value: <span className="font-mono text-xs text-slate-600 dark:text-slate-400 break-all select-all">{payload.ide_path}</span>,
+            copyValue: payload.ide_path,
+        });
+    }
+
+    const switchReason = payload?.switch_reason || payload?.reason || detail.detail;
+    if (switchReason) {
+        rows.push({
+            label: 'Switch Reason',
+            value: <span className="text-slate-800 dark:text-slate-200">{switchReason}</span>,
+            copyValue: switchReason,
+        });
+    }
+
+    if (payload?.how) {
+        rows.push({
+            label: 'How',
+            value: recorded(payload.how, 'Not recorded on this row'),
+            copyValue: recorded(payload.how, 'Not recorded on this row'),
+        });
+    }
+
+    if (payload?.conversation_id) {
+        rows.push({
+            label: 'Conversation',
+            value: recorded(payload.conversation_id, 'Not recorded on this row'),
+            copyValue: recorded(payload.conversation_id, 'Not recorded on this row'),
+        });
+    }
+
+    if (payload?.prompt_text) {
+        rows.push({
+            label: 'Prompt running',
+            value: recorded(payload.prompt_text, 'No running prompt was stored'),
+            copyValue: recorded(payload.prompt_text, 'No running prompt was stored'),
+        });
+    }
+
+    rows.push({
+        label: 'Prompt injected again',
+        value: reinject,
+        copyValue: reinject,
+    });
+
+    return rows;
 }
 
 export default function Audit() {
     const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState<number>(() => {
+        const saved = localStorage.getItem('audit_page_size');
+        return saved === '200' ? 200 : 100;
+    });
     const [filter, setFilter] = useState<AuditFilterType>('all');
     const [data, setData] = useState<TaskHistoryPage | null>(null);
     const [error, setError] = useState('');
@@ -306,22 +391,48 @@ export default function Audit() {
     const [detailError, setDetailError] = useState('');
     const [copied, setCopied] = useState(false);
 
+    const handlePageSizeChange = (newSize: number) => {
+        setPageSize(newSize);
+        localStorage.setItem('audit_page_size', String(newSize));
+        setPage(0);
+    };
+
     useEffect(() => {
         let alive = true;
-        request<TaskHistoryPage>('list_task_history', { offset: page * PAGE_SIZE, limit: PAGE_SIZE })
-            .then((result) => {
-                if (alive) {
-                    setData(result);
-                    setError('');
+        const fetchHistory = async () => {
+            try {
+                if (pageSize === 200) {
+                    const [p1, p2] = await Promise.all([
+                        request<TaskHistoryPage>('list_task_history', { offset: page * 200, limit: 100 }),
+                        request<TaskHistoryPage>('list_task_history', { offset: page * 200 + 100, limit: 100 }).catch(() => null),
+                    ]);
+                    if (alive) {
+                        const items = p2 ? [...p1.items, ...p2.items] : p1.items;
+                        setData({
+                            total: p1.total,
+                            offset: page * 200,
+                            limit: 200,
+                            items,
+                            splits: p1.splits,
+                        });
+                        setError('');
+                    }
+                } else {
+                    const res = await request<TaskHistoryPage>('list_task_history', { offset: page * 100, limit: 100 });
+                    if (alive) {
+                        setData(res);
+                        setError('');
+                    }
                 }
-            })
-            .catch((err: unknown) => {
+            } catch (err: unknown) {
                 if (alive) setError(err instanceof Error ? err.message : String(err));
-            });
+            }
+        };
+        fetchHistory();
         return () => {
             alive = false;
         };
-    }, [page]);
+    }, [page, pageSize]);
 
     const loadDetail = (id: string) => {
         setOpenId(id);
@@ -358,7 +469,7 @@ export default function Audit() {
     }, [filter, switchItems, schedulerItems, allItems]);
 
     const total = data?.total ?? 0;
-    const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
     let payload: TaskPayload | null = null;
     if (detail?.payload_json) {
@@ -375,7 +486,7 @@ export default function Audit() {
             <div className="mb-3">
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-base-content">Audit Log & History</h1>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Audit trail for account rotations, prompt scheduler dispatches, and IDE reconnect events. Addresses hide the domain, and detailed facts are loaded on demand.
+                    Audit trail for account rotations, prompt scheduler dispatches, and IDE reconnect events. Addresses hide the domain, and detailed facts are loaded on demand. Double-click any row to view details.
                 </p>
             </div>
 
@@ -464,36 +575,32 @@ export default function Audit() {
                 <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300 border-b border-slate-200 dark:border-[#15334d]">
                         <tr>
-                            <th className="px-3 py-2.5 font-semibold">When</th>
-                            <th className="px-3 py-2.5 font-semibold">Status</th>
-                            <th className="px-3 py-2.5 font-semibold">Action</th>
                             <th className="px-3 py-2.5 font-semibold">From → To / Subject</th>
+                            <th className="px-3 py-2.5 font-semibold">Action</th>
+                            <th className="px-3 py-2.5 font-semibold">Status</th>
+                            <th className="px-3 py-2.5 font-semibold">Time</th>
                             <th className="px-3 py-2.5 font-semibold text-right">Details</th>
                         </tr>
                     </thead>
                     <tbody>
                         {displayItems.map((item) => {
+                            const isRevealed = Boolean(revealed[item.id]);
                             const hasEmail = Boolean(item.from_email || item.to_email || item.subject?.includes('@'));
                             const isSched = isSchedulerAction(item);
+
+                            const fromEmailRaw = item.from_email || '';
+                            const toEmailRaw = item.to_email || item.subject || '';
+                            const fromEmailText = fromEmailRaw ? (isRevealed ? fromEmailRaw : maskEmail(fromEmailRaw)) : '—';
+                            const toEmailText = toEmailRaw ? (isRevealed ? toEmailRaw : maskEmail(toEmailRaw)) : '—';
+
                             return (
-                                <tr key={item.id} className="border-t border-slate-100 dark:border-[#15334d]/60 hover:bg-slate-50/60 dark:hover:bg-[#15334d]/40 transition-colors">
-                                    <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-400 font-mono text-[11px]">
-                                        {formatTime(item.created_at)}
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
-                                            /dispatch|ok|success|complete/i.test(item.status)
-                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60'
-                                                : /fail|err/i.test(item.status)
-                                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/60'
-                                                : 'bg-slate-100 text-slate-700 dark:bg-[#071a27] dark:text-slate-300 border-slate-200 dark:border-[#15334d]'
-                                        }`}>
-                                            {item.status || 'unknown'}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        {renderActionBadge(item)}
-                                    </td>
+                                <tr
+                                    key={item.id}
+                                    onDoubleClick={() => loadDetail(item.id)}
+                                    className="border-t border-slate-100 dark:border-[#15334d]/60 hover:bg-slate-50/60 dark:hover:bg-[#15334d]/40 transition-colors cursor-pointer select-text"
+                                    title="Double click row to view detail"
+                                >
+                                    {/* 1. From -> To / Subject */}
                                     <td className="px-3 py-2">
                                         {isSched ? (
                                             <div className="flex flex-col">
@@ -506,18 +613,72 @@ export default function Audit() {
                                                     </span>
                                                 )}
                                             </div>
+                                        ) : hasEmail ? (
+                                            <div className="flex items-center gap-1.5 font-mono text-xs flex-wrap">
+                                                <span
+                                                    className="cursor-pointer hover:underline text-slate-800 dark:text-slate-200 select-text"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }));
+                                                    }}
+                                                    title={isRevealed ? (item.from_email || '—') : 'Click to unmask email'}
+                                                >
+                                                    {fromEmailText}
+                                                </span>
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                                    →
+                                                </span>
+                                                <span
+                                                    className="cursor-pointer hover:underline text-slate-800 dark:text-slate-200 select-text"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }));
+                                                    }}
+                                                    title={isRevealed ? (item.to_email || item.subject) : 'Click to unmask email'}
+                                                >
+                                                    {toEmailText}
+                                                </span>
+                                            </div>
                                         ) : (
                                             <span className="font-mono text-slate-800 dark:text-slate-200">
-                                                {moveText(item, Boolean(revealed[item.id]))}
+                                                {moveText(item, isRevealed)}
                                             </span>
                                         )}
                                     </td>
+
+                                    {/* 2. Action */}
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        {renderActionBadge(item)}
+                                    </td>
+
+                                    {/* 3. Status */}
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                                            /dispatch|ok|success|complete/i.test(item.status)
+                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60'
+                                                : /fail|err/i.test(item.status)
+                                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/60'
+                                                : 'bg-slate-100 text-slate-700 dark:bg-[#071a27] dark:text-slate-300 border-slate-200 dark:border-[#15334d]'
+                                        }`}>
+                                            {item.status || 'unknown'}
+                                        </span>
+                                    </td>
+
+                                    {/* 4. Time formatted strictly as DD-MMM-YYYY HH:MM:SS */}
+                                    <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                                        {formatStrictTime(item.created_at)}
+                                    </td>
+
+                                    {/* 5. Details */}
                                     <td className="px-3 py-2 text-right whitespace-nowrap">
                                         {hasEmail && (
                                             <button
                                                 type="button"
                                                 className="mr-2 text-slate-700 dark:text-cyan-400 underline hover:text-slate-900 dark:hover:text-cyan-300 cursor-pointer text-xs"
-                                                onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }));
+                                                }}
                                             >
                                                 {revealed[item.id] ? 'Hide email' : 'Show email'}
                                             </button>
@@ -527,7 +688,10 @@ export default function Audit() {
                                             aria-label="Show audit detail"
                                             title="Detail"
                                             className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                                            onClick={() => loadDetail(item.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                loadDetail(item.id);
+                                            }}
                                         >
                                             <Info className="h-3.5 w-3.5" />
                                         </button>
@@ -612,7 +776,7 @@ export default function Audit() {
                                     <tbody>
                                         {detailRows(detail, payload, detailRevealed).map((row) => (
                                             <tr key={row.label} className="border-t border-slate-100 dark:border-[#15334d]/60 first:border-t-0">
-                                                <th className="w-40 px-3.5 py-2.5 font-semibold align-top bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300">{row.label}</th>
+                                                <th className="w-44 px-3.5 py-2.5 font-semibold align-top bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300">{row.label}</th>
                                                 <td className="px-3.5 py-2.5 whitespace-pre-wrap text-slate-900 dark:text-gray-100 bg-white dark:bg-[#0c2438]">{row.value}</td>
                                             </tr>
                                         ))}
@@ -625,13 +789,26 @@ export default function Audit() {
             )}
 
             {/* Pagination Controls */}
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-700 dark:text-gray-300">
-                <span>
-                    {filter === 'all'
-                        ? `${total} events · page ${page + 1} of ${pageCount}`
-                        : `Showing ${displayItems.length} of ${allItems.length} on this page (${total} total events)`
-                    }
-                </span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700 dark:text-gray-300">
+                <div className="flex items-center gap-3">
+                    <span>
+                        {filter === 'all'
+                            ? `${total} events · page ${page + 1} of ${pageCount}`
+                            : `Showing ${displayItems.length} of ${allItems.length} on this page (${total} total events)`
+                        }
+                    </span>
+                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                        <span>Items per page:</span>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                            className="h-7 px-2 py-0.5 rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-slate-900 dark:text-gray-100 font-medium cursor-pointer"
+                        >
+                            <option value={100}>100</option>
+                            <option value={200}>200</option>
+                        </select>
+                    </label>
+                </div>
                 <div className="flex gap-2">
                     <button
                         type="button"

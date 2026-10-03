@@ -76,7 +76,7 @@ pub fn list_task_history(
     offset: u32,
     limit: u32,
 ) -> Result<modules::task_history_db::TaskHistoryPage, String> {
-    modules::task_history_db::list_page(offset, limit.max(1).min(100))
+    modules::task_history_db::list_page(offset, limit.clamp(1, 500))
 }
 
 #[tauri::command]

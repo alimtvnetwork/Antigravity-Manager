@@ -1006,6 +1006,7 @@ function Accounts() {
                 onUpdatePriority={updateAccountPriority}
                 onViewError={(id: string) => setErrorAccountId(id)}
                 focusedAccountId={focusedAccountId}
+                showAllEmails={showAllQuotas}
               />
             </div>
           </div>

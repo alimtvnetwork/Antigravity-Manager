@@ -40,6 +40,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
 
     // Export State
     const [exportScope, setExportScope] = useState<'accounts' | 'full'>('accounts');
+    const [includeAuditHistory, setIncludeAuditHistory] = useState(true);
     const [usePassword, setUsePassword] = useState(false);
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,6 +58,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
         accountsCount: number;
         hasConfig: boolean;
         instancesCount: number;
+        auditHistoryCount?: number;
         rawPayload: any;
     } | null>(null);
 
@@ -83,11 +85,20 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
         // Full backup payload
         let emailSettings = null;
         let emailAccounts = null;
+        let auditHistory = null;
         try {
             emailSettings = await invoke('get_email_settings');
             emailAccounts = await invoke('list_email_accounts');
         } catch {
             // Standby or not configured
+        }
+
+        if (includeAuditHistory) {
+            try {
+                auditHistory = await invoke('list_task_history', { offset: 0, limit: 500 });
+            } catch {
+                // Standby or not configured
+            }
         }
 
         return {
@@ -96,6 +107,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
             instances: instances.map((i) => i.config),
             email_settings: emailSettings,
             email_accounts: emailAccounts,
+            audit_history: auditHistory,
         };
     };
 
@@ -270,6 +282,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
         let accountsCount = 0;
         let hasConfig = false;
         let instancesCount = 0;
+        let auditHistoryCount = 0;
         let backupType: 'accounts' | 'full' = 'accounts';
 
         const data = parsed.data || parsed;
@@ -281,6 +294,9 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
             if (data.instances && Array.isArray(data.instances)) {
                 instancesCount = data.instances.length;
             }
+            if (data.audit_history && Array.isArray(data.audit_history)) {
+                auditHistoryCount = data.audit_history.length;
+            }
             if (hasConfig || instancesCount > 0) {
                 backupType = 'full';
             }
@@ -291,6 +307,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
             accountsCount,
             hasConfig,
             instancesCount,
+            auditHistoryCount,
             rawPayload: data,
         });
     };
@@ -480,6 +497,31 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                                 </div>
                             </div>
 
+                            {/* Full Scope Options: Audit Records */}
+                            {exportScope === 'full' && (
+                                <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-slate-800 space-y-2">
+                                    <label className="flex items-center justify-between cursor-pointer">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                            <div>
+                                                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                                    {t('backup.include_audit', 'Include Audit Records & Task History')}
+                                                </span>
+                                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                                    {t('backup.include_audit_desc', 'Export account switches, prompt scheduler runs, and task history (up to 500 records).')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={includeAuditHistory}
+                                            onChange={(e) => setIncludeAuditHistory(e.target.checked)}
+                                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                                        />
+                                    </label>
+                                </div>
+                            )}
+
                             {/* Password Protection Toggle */}
                             <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-slate-800 space-y-3">
                                 <label className="flex items-center justify-between cursor-pointer">
@@ -603,6 +645,11 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                                             <div>
                                                 • Instances: <strong>{parsedDataPreview.instancesCount}</strong>
                                             </div>
+                                            {parsedDataPreview.backupType === 'full' && (
+                                                <div>
+                                                    • Audit Records: <strong>{parsedDataPreview.auditHistoryCount ?? 0}</strong>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

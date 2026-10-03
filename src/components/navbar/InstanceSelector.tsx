@@ -973,7 +973,7 @@ export function InstanceSelector() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="input input-sm w-full bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:ring-2 focus:ring-indigo-500/30"
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all shadow-xs"
                             autoFocus
                         />
 

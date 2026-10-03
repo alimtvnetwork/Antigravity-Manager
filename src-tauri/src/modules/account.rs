@@ -1701,6 +1701,10 @@ pub async fn switch_account(
     // and prompts are stored under the instance id, so the snapshot must read "default".
     let snap = crate::modules::repo_db::switch_prompt_snapshot("default");
     let reinjected = crate::modules::integration::take_prompt_reinjected();
+    let machine_alias = crate::modules::email_watcher::detect_machine_name();
+    let ide_path = crate::modules::process::get_antigravity_executable_path(None)
+        .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+        .unwrap_or_default();
     let payload = crate::modules::task_history_db::switch_payload(
         &crate::modules::task_history_db::SwitchFacts {
             from_email: prev_email.clone().unwrap_or_default(),
@@ -1712,6 +1716,11 @@ pub async fn switch_account(
             conversation_id: snap.conversation_id,
             prompt_reinjected: reinjected,
             switch_ok: true,
+            instance_id: "default".to_string(),
+            ide_type: "antigravity".to_string(),
+            idc_machine_alias: machine_alias,
+            ide_path,
+            switch_reason: "Manual account switch".to_string(),
         },
     );
     audit.succeed_with_payload("switch finished", &payload);

@@ -26,6 +26,9 @@ import {
     ArrowRightLeft,
     X,
     SlidersHorizontal,
+    LayoutGrid,
+    List,
+    Layers,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +36,8 @@ import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
 import type { InstanceStatus } from '../services/instanceService';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
+import InstanceTable from '../components/instances/InstanceTable';
+import PromptTreeViewModal from '../components/instances/PromptTreeViewModal';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
@@ -201,13 +206,28 @@ export default function Instances() {
         };
     }, [fetchInstances, fetchSwitcherStatus, fetchAccounts]);
 
+    const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
+        return (localStorage.getItem('agm_instance_view_mode') as 'card' | 'list') || 'card';
+    });
+    const [promptTreeInstance, setPromptTreeInstance] = useState<{ id: string; name: string } | null>(null);
+
+    const handleSetViewMode = (mode: 'card' | 'list') => {
+        setViewMode(mode);
+        localStorage.setItem('agm_instance_view_mode', mode);
+    };
+
     const filteredInstances = instances.filter((inst) => {
+        if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
-        return (
-            inst.config.name.toLowerCase().includes(query) ||
-            inst.config.id.toLowerCase().includes(query) ||
-            (inst.config.bound_email && inst.config.bound_email.toLowerCase().includes(query))
-        );
+        const nameMatch = inst.config.name.toLowerCase().includes(query);
+        const idMatch = inst.config.id.toLowerCase().includes(query);
+        const boundAcc = accounts.find((a) => a.id === inst.config.bound_account_id || a.email.toLowerCase() === (inst.config.bound_email || '').toLowerCase());
+        const boundEmail = inst.config.bound_email || boundAcc?.email || '';
+        const emailMatch = boundEmail.toLowerCase().includes(query);
+        const pidMatch = inst.pid ? inst.pid.toString().includes(query) : false;
+        const statusMatch = (inst.is_running ? 'running active' : 'idle').includes(query);
+        const defaultMatch = (inst.config.is_default || inst.config.id === 'default') && 'default'.includes(query);
+        return nameMatch || idMatch || emailMatch || pidMatch || statusMatch || defaultMatch;
     });
 
     const runningCount = instances.filter((i) => i.is_running).length;
@@ -326,108 +346,158 @@ export default function Instances() {
                         </div>
                     </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-base-200 text-xs text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
-                        {t('instances.running_summary', 'Running {{running}} of {{total}}', {
-                            running: runningCount,
-                            total: instances.length,
-                        })}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Segmented Pill Group 1: Status & Maintenance */}
+                    <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <div className="px-3 py-1 text-xs text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap">
+                            {t('instances.running_summary', 'Running {{running}} of {{total}}', {
+                                running: runningCount,
+                                total: instances.length,
+                            })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                fetchInstances();
+                                fetchSwitcherStatus();
+                            }}
+                            disabled={isLoading}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            title={t('common.refresh', 'Refresh')}
+                        >
+                            <RotateCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
+                            <span>{t('common.refresh', 'Refresh')}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const msg = await cleanAndRestartWorkspace();
+                                    showToast(msg || 'Stuck Electron processes cleared & Antigravity restarted!', 'success');
+                                } catch (e: any) {
+                                    setActionError(e?.toString() || 'Failed to clean and restart workspace');
+                                }
+                            }}
+                            disabled={isLoading}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 rounded-r-full transition-colors cursor-pointer"
+                            title="Force-terminate lingering background Electron/Antigravity processes, purge lockfiles, and cleanly relaunch Antigravity"
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Clean & Restart</span>
+                        </button>
                     </div>
-                    <button
-                        onClick={() => {
-                            fetchInstances();
-                            fetchSwitcherStatus();
-                        }}
-                        disabled={isLoading}
-                        className="btn btn-ghost btn-sm gap-1.5 border border-gray-200 dark:border-base-100 text-xs"
-                        title={t('common.refresh', 'Refresh')}
-                    >
-                        <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
-                        <span className="hidden sm:inline">{t('common.refresh', 'Refresh')}</span>
-                    </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const msg = await cleanAndRestartWorkspace();
-                                showToast(msg || 'Stuck Electron processes cleared & Antigravity restarted!', 'success');
-                            } catch (e: any) {
-                                setActionError(e?.toString() || 'Failed to clean and restart workspace');
-                            }
-                        }}
-                        disabled={isLoading}
-                        className="btn btn-warning btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer"
-                        title="Force-terminate lingering background Electron/Antigravity processes, purge lockfiles, and cleanly relaunch Antigravity"
-                    >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span className="hidden md:inline">Clean & Restart</span>
-                    </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                await toggleAutoSwitcher();
-                                showToast(
-                                    switcherStatus?.is_running
-                                        ? 'Auto-Switcher disabled'
-                                        : 'Auto-Switcher enabled',
-                                    'success'
-                                );
-                            } catch (e: any) {
-                                setActionError(e?.toString() || 'Failed to toggle Auto Switcher');
-                            }
-                        }}
-                        disabled={isLoading}
-                        className={cn(
-                            "btn btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer border",
-                            switcherStatus?.is_running
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                : "btn-ghost border-gray-200 dark:border-base-100 text-gray-600 dark:text-gray-400"
-                        )}
-                        title="Toggle background auto-profile switcher daemon"
-                    >
-                        {switcherStatus?.is_running ? (
-                            <ToggleRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-400" />
-                        )}
-                        <span>Auto-Switch: {switcherStatus?.is_running ? 'ON' : 'OFF'}</span>
-                    </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const msg = await triggerManualRotation();
-                                showToast(msg || 'Evaluated quota across instances!', 'success');
-                            } catch (e: any) {
-                                setActionError(e?.toString() || 'Failed to trigger quota evaluation');
-                            }
-                        }}
-                        disabled={isLoading}
-                        className="btn btn-ghost border border-gray-200 dark:border-base-100 text-gray-600 dark:text-gray-400 btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer hover:text-blue-600"
-                        title="Evaluate rolling quota across all monitored instances and auto-rotate any low quota accounts"
-                    >
-                        <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
-                        <span className="hidden lg:inline">Eval Quota</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            setSettingsModalTarget(null);
-                            setIsSettingsModalOpen(true);
-                        }}
-                        className="btn btn-ghost border border-gray-200 dark:border-base-100 text-gray-700 dark:text-gray-300 btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer hover:text-blue-600 hover:border-blue-400"
-                        title="Instance Settings & Sync: Turbo mode, plan review, copy settings, folder sync, JSON tools"
-                    >
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Settings & Sync</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            setNewInstanceName('');
-                            setIsCreateOpen(true);
-                        }}
-                        className="btn btn-primary btn-sm gap-1.5 shadow-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>{t('instances.create_btn', 'New Instance')}</span>
-                    </button>
+
+                    {/* Segmented Pill Group 2: Automation & Settings */}
+                    <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await toggleAutoSwitcher();
+                                    showToast(
+                                        switcherStatus?.is_running
+                                            ? 'Auto-Switcher disabled'
+                                            : 'Auto-Switcher enabled',
+                                        'success'
+                                    );
+                                } catch (e: any) {
+                                    setActionError(e?.toString() || 'Failed to toggle Auto Switcher');
+                                }
+                            }}
+                            disabled={isLoading}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-full transition-colors cursor-pointer",
+                                switcherStatus?.is_running
+                                    ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                            )}
+                            title="Toggle background auto-profile switcher daemon"
+                        >
+                            {switcherStatus?.is_running ? (
+                                <ToggleRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                                <ToggleLeft className="w-4 h-4 text-slate-400" />
+                            )}
+                            <span>Auto-Switch: {switcherStatus?.is_running ? 'ON' : 'OFF'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const msg = await triggerManualRotation();
+                                    showToast(msg || 'Evaluated quota across instances!', 'success');
+                                } catch (e: any) {
+                                    setActionError(e?.toString() || 'Failed to trigger quota evaluation');
+                                }
+                            }}
+                            disabled={isLoading}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            title="Evaluate rolling quota across all monitored instances and auto-rotate any low quota accounts"
+                        >
+                            <RotateCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+                            <span>Eval Quota</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSettingsModalTarget(null);
+                                setIsSettingsModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-full transition-colors cursor-pointer"
+                            title="Instance Settings & Sync: Turbo mode, plan review, copy settings, folder sync, JSON tools"
+                        >
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Settings & Sync</span>
+                        </button>
+                    </div>
+
+                    {/* Segmented Pill Group 3: View Mode & Creation */}
+                    <div className="flex items-center gap-2">
+                        {/* View Switcher Capsule */}
+                        <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                            <button
+                                type="button"
+                                onClick={() => handleSetViewMode('card')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-full transition-colors cursor-pointer",
+                                    viewMode === 'card'
+                                        ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
+                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                )}
+                                title="Card View"
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Cards</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSetViewMode('list')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-full transition-colors cursor-pointer",
+                                    viewMode === 'list'
+                                        ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
+                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                )}
+                                title="List View"
+                            >
+                                <List className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">List</span>
+                            </button>
+                        </div>
+
+                        {/* New Instance Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setNewInstanceName('');
+                                setIsCreateOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{t('instances.create_btn', 'New Instance')}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -581,6 +651,43 @@ export default function Instances() {
                         {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
                     </p>
                 </div>
+            ) : viewMode === 'list' ? (
+                <InstanceTable
+                    instances={filteredInstances}
+                    activeInstanceId={activeInstanceId}
+                    searchQuery={searchQuery}
+                    onLaunch={handleLaunch}
+                    onStop={stopInstance}
+                    onSwitch={(id) => {
+                        const target = instances.find((i) => i.config.id === id);
+                        if (target) setSwitchTargetInstance(target);
+                    }}
+                    onFastForward={async (id) => {
+                        try {
+                            const msg = await fastForwardInstance(id);
+                            showToast(msg || 'Rotated to next best profile!', 'success');
+                        } catch (e: any) {
+                            setActionError(e?.toString() || 'Fast forward failed');
+                        }
+                    }}
+                    onSettings={(id) => {
+                        const target = instances.find((i) => i.config.id === id);
+                        setSettingsModalTarget(target || null);
+                        setIsSettingsModalOpen(true);
+                    }}
+                    onClone={(id, name) => {
+                        setCopyTargetId(id);
+                        setCopyInstanceName(`${name} Copy`);
+                        setCopyProjects(true);
+                    }}
+                    onDelete={handleDelete}
+                    onOpenPromptTree={(id) => {
+                        const target = instances.find((i) => i.config.id === id);
+                        setPromptTreeInstance({ id, name: target?.config.name || id });
+                    }}
+                    onSetActive={setActiveInstance}
+                    onSetDefault={setDefaultInstance}
+                />
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {filteredInstances.map((inst, index) => {
@@ -972,7 +1079,15 @@ export default function Instances() {
                                             </div>
 
                                             {/* Clean Secondary Utility Icon Buttons (Settings & Sync, Clone, Executable, Wipe, Delete) */}
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
+                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
+                                                    title="View project and conversation prompt tree"
+                                                >
+                                                    <Layers className="w-3 h-3 text-cyan-500" />
+                                                </button>
+
                                                 <button
                                                     onClick={() => {
                                                         setSettingsModalTarget(inst);
@@ -1352,7 +1467,7 @@ export default function Instances() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-xs font-medium focus:ring-2 focus:ring-indigo-500/30"
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all shadow-xs"
                             autoFocus
                         />
 
@@ -1541,6 +1656,14 @@ export default function Instances() {
                 targetInstance={settingsModalTarget}
                 instances={instances}
                 onInstancesUpdated={() => fetchInstances(true)}
+            />
+
+            {/* Project & Conversation Prompt Tree View Modal */}
+            <PromptTreeViewModal
+                isOpen={Boolean(promptTreeInstance)}
+                onClose={() => setPromptTreeInstance(null)}
+                instanceId={promptTreeInstance?.id || ''}
+                instanceName={promptTreeInstance?.name || ''}
             />
         </div>
         </div>

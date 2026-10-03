@@ -28,6 +28,9 @@ export interface ProxyConfig {
     image_thinking_mode?: 'enabled' | 'disabled'; // [NEW] 图像思维模式开关
     only_raw_quota_models?: boolean; // [NEW] 是否只暴露真实配额模型
     proxy_pool?: ProxyPoolConfig;
+    default_path_rewrite?: boolean;
+    enable_all_urls?: boolean;
+    excluded_urls?: string[];
 }
 
 export interface LogRetentionConfig {

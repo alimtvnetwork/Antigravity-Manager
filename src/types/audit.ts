@@ -46,6 +46,11 @@ export interface SwitchPayload {
     prompt_reinjected?: boolean;
     moved_at?: number;
     switch_ok?: boolean;
+    instance_id?: string;
+    ide_type?: string;
+    idc_machine_alias?: string;
+    ide_path?: string;
+    switch_reason?: string;
 }
 
 export interface SchedulerPayload {

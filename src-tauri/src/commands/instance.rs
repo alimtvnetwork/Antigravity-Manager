@@ -285,3 +285,14 @@ pub fn import_instance_settings(
 pub fn count_instances() -> Result<serde_json::Value, String> {
     instance::count_instances()
 }
+
+#[tauri::command]
+pub fn get_project_conversation_tree(
+    max_words: Option<usize>,
+    only_running: Option<bool>,
+) -> Result<Vec<crate::modules::repo_db::AgmProjectTreeNode>, String> {
+    Ok(crate::modules::repo_db::get_project_conversation_tree(
+        max_words.unwrap_or(200),
+        only_running.unwrap_or(false),
+    ))
+}

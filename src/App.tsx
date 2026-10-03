@@ -82,6 +82,10 @@ const router = createBrowserRouter([
         element: <Email />,
       },
       {
+        path: 'supabase',
+        element: <Supabase />,
+      },
+      {
         path: 'audit',
         element: <Audit />,
       },

@@ -37,13 +37,17 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
             liveLimit.message ? `Message: ${liveLimit.message}` : null,
         ].filter(Boolean).join(' ')
         : label;
-    const getBgColorClass = (p: number) => {
+    const getBgGradientClass = (p: number) => {
         const color = getQuotaColor(p);
         switch (color) {
-            case 'success': return 'bg-emerald-500';
-            case 'warning': return 'bg-amber-500';
-            case 'error': return 'bg-rose-500';
-            default: return 'bg-gray-500';
+            case 'success':
+                return 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400';
+            case 'warning':
+                return 'bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400';
+            case 'error':
+                return 'bg-gradient-to-r from-rose-500 via-red-400 to-pink-500';
+            default:
+                return 'bg-gradient-to-r from-slate-500 to-gray-500';
         }
     };
 
@@ -77,11 +81,13 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
         )}
             title={showLiveIssue ? liveLimitTitle : label}
         >
-            {/* Background Progress Bar */}
+            {/* Background Progress Bar with modern multi-stop vibrant glowing gradient */}
             <div
                 className={cn(
-                    "absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-15 dark:opacity-25",
-                    showLiveIssue ? (isUnavailable ? "bg-rose-500" : "bg-amber-500") : getBgColorClass(percentage)
+                    "absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 shadow-xs",
+                    showLiveIssue
+                        ? (isUnavailable ? "bg-gradient-to-r from-rose-600 to-pink-500" : "bg-gradient-to-r from-amber-500 to-yellow-400")
+                        : getBgGradientClass(percentage)
                 )}
                 style={{ width: `${percentage}%` }}
             />

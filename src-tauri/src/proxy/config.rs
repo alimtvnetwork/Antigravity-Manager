@@ -994,6 +994,13 @@ pub struct ProxyConfig {
     /// 代理池配置
     #[serde(default)]
     pub proxy_pool: ProxyPoolConfig,
+
+    #[serde(default = "default_true")]
+    pub default_path_rewrite: bool,
+    #[serde(default = "default_true")]
+    pub enable_all_urls: bool,
+    #[serde(default)]
+    pub excluded_urls: Vec<String>,
 }
 
 /// Request log retention policy.
@@ -1113,6 +1120,9 @@ impl Default for ProxyConfig {
             proxy_pool: ProxyPoolConfig::default(),
             image_thinking_mode: None,
             image_scheduler: ImageSchedulerConfig::default(),
+            default_path_rewrite: true,
+            enable_all_urls: true,
+            excluded_urls: Vec::new(),
         }
     }
 }
@@ -1259,5 +1269,24 @@ mod tests {
         // 测试边缘情况
         assert_eq!(normalize_proxy_url(""), "");
         assert_eq!(normalize_proxy_url("   "), "");
+    }
+
+    #[test]
+    fn test_proxy_config_url_routing_defaults() {
+        let default_cfg = ProxyConfig::default();
+        assert!(default_cfg.default_path_rewrite);
+        assert!(default_cfg.enable_all_urls);
+        assert!(default_cfg.excluded_urls.is_empty());
+
+        let json_str = r#"{
+            "enabled": true,
+            "port": 8045,
+            "api_key": "test-key",
+            "auto_start": false
+        }"#;
+        let parsed: ProxyConfig = serde_json::from_str(json_str).unwrap();
+        assert!(parsed.default_path_rewrite);
+        assert!(parsed.enable_all_urls);
+        assert!(parsed.excluded_urls.is_empty());
     }
 }
