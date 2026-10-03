@@ -1,5 +1,25 @@
 # Changelog
 
+## [v4.128.0] - 2026-10-03
+
+### Added
+- Audit pagination with 100/200 items per page and two-tier SQLite caching (`hot_tasks_cache` in `task_index.db` for instant load, split cold DBs for older pages). (Thanks to @aukgit)
+- Enriched account switch details: transition array (`From → To`), instance ID, IDE type, machine alias, IDE path, and switch reason. (Thanks to @aukgit)
+- First-class Supabase top-level navigation tab alongside Email & Alerts and Audit, providing multi-endpoint cluster governance, health telemetry, workspace leases, and cross-DB migration. (Thanks to @aukgit)
+- Card View and List View toggle for Instances, featuring the new `InstanceTable` component matching Accounts layout. (Thanks to @aukgit)
+- Project & Prompt Tree View modal (`PromptTreeViewModal`) displaying projects and conversations hierarchy, queued prompts, and full-screen prompt inspector with image gallery and attachments. (Thanks to @aukgit)
+- Modernized Accounts view: uniform pill button capsule toolbar (Focus, +, Refresh, Warm, Show All Quotas), hover/double-click email unmasking with automatic re-mask on mouse leave, and vibrant glowing multi-stop gradient progress bars. (Thanks to @aukgit)
+- Post-rotation prompt stabilization delay (7.0s) guaranteeing IDE extension host and DevTools channels are fully ready before re-injecting prompts. (Thanks to @aukgit)
+- Proxy routing & URL filtering settings: default path rewrite toggle, enable all URLs toggle, and excluded URLs list. (Thanks to @aukgit)
+- Full backup & restore enhancement: added option to include or exclude audit records and task history. (Thanks to @aukgit)
+- CLI parity enhancements: structured JSON output across `agm instance ls --json` and `agm instance count --json`, PID display, sequence names, and local-only E2E test script (`scripts/e2e-instance-commands-test.ps1`). (Thanks to @aukgit)
+
+### Fixed
+- Fixed cramped text box padding in Duplicate/Clone modals (`px-4 py-3`, rounded-xl). (Thanks to @aukgit)
+- Redesigned Instances top toolbar into cohesive segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop). (Thanks to @aukgit)
+
+---
+
 ## [v4.127.2] - 2026-10-03
 
 ### Added
@@ -253,6 +273,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.128.0 (2026-10-03)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.127.1 (2026-10-03)**:
         -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
             -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)

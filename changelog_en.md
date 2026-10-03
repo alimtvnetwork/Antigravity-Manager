@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.128.0 (2026-10-03)**:
+        -   **[Audit] Pagination & Two-Tier SQLite Acceleration**:
+            -   **Description**: Added 100/200 item page size selection backed by a two-tier SQLite cache (`hot_tasks_cache` in `task_index.db`) for instant render, and enriched account switch rows with `From → To` transition arrays, instance ID, IDE type, machine alias, IDE path, and switch reason. (Thanks to @aukgit)
+        -   **[Navigation] First-Class Supabase Top-Level Tab**:
+            -   **Description**: Promoted Supabase sync and cluster governance to a top-level tab alongside Email and Audit, offering dual endpoints, workspace leases, and cross-DB migration. (Thanks to @aukgit)
+        -   **[Instances] Card & List View Toggle with Prompt Tree Inspector**:
+            -   **Description**: Implemented Card vs. List view modes with `InstanceTable`, expanded search across name, email, PID, and status, and introduced `PromptTreeViewModal` for project/conversation inspection and prompt backup/restore. (Thanks to @aukgit)
+        -   **[Accounts & UI] Modernized Toolbar, Unmasking & Glowing Progress**:
+            -   **Description**: Added cohesive pill button capsule toolbar (Focus, +, Refresh, Warm, Show All Quotas), hover/double-click email unmasking with automatic re-mask on mouse leave, and vibrant glowing multi-stop progress gradients. (Thanks to @aukgit)
+        -   **[Proxy & Backup] URL Filtering & Audit Backup Selection**:
+            -   **Description**: Added Proxy default path rewrite toggle, enable all URLs toggle, comma-separated excluded URLs input, and full backup modal option to include or exclude audit records and task history. (Thanks to @aukgit)
+        -   **[Core & CLI] Prompt Stabilization Delay & CLI Parity**:
+            -   **Description**: Added 7.0s post-rotation prompt stabilization delay before resume task injection, structured JSON output across `agm instance ls --json` and `agm instance count --json`, and local-only E2E test suite. (Thanks to @aukgit)
+
     *   **v4.127.1 (2026-10-03)**:
         -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
             -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)
