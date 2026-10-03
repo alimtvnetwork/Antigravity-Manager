@@ -152,7 +152,7 @@ export function NavSettings({
     const currentLangItem = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
 
     return (
-        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* 1. Antigravity Quick Clean (Recycle) Icon Button */}
             <button
                 type="button"
@@ -161,11 +161,11 @@ export function NavSettings({
                     setIsCleanModalOpen(true);
                     window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
                 }}
-                className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
+                className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
                 title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
                 aria-label="Quick Clean"
             >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
             {/* 2. Combined Theme & Language Dropdown Button */}
@@ -179,16 +179,16 @@ export function NavSettings({
                             window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
                         }
                     }}
-                    className="h-9 px-2.5 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center gap-1.5 transition-all duration-150 ease-out shadow-xs cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-slate-700"
+                    className="h-7 px-2 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center gap-1 transition-all duration-150 ease-out shadow-xs cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-slate-700"
                     title="Theme & Language Preferences"
                 >
                     {theme === 'light' ? (
-                        <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <Sun className="w-3 h-3 text-amber-500 shrink-0" />
                     ) : (
-                        <Moon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Moon className="w-3 h-3 text-blue-400 shrink-0" />
                     )}
                     <span className="uppercase">{currentLangItem.short}</span>
-                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-2.5 h-2.5 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isPrefsOpen && (
@@ -255,18 +255,18 @@ export function NavSettings({
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}
             {isTauri() && (
-                <div className="flex items-center gap-1 md:gap-1.5 shrink-0 z-50">
+                <div className="flex items-center gap-1 shrink-0 z-50">
                     <button
                         type="button"
                         id="btn-window-minimize"
                         name="window-minimize"
                         data-xpath="//*[@id='btn-window-minimize']"
                         onClick={handleMinimize}
-                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
+                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                         title={t('common.minimize', 'Minimize')}
                         aria-label="Minimize"
                     >
-                        <Minus className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 pointer-events-none" />
+                        <Minus className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 pointer-events-none" />
                     </button>
 
                     <button
@@ -275,17 +275,17 @@ export function NavSettings({
                         name="window-maximize"
                         data-xpath="//*[@id='btn-window-maximize']"
                         onClick={handleToggleMaximize}
-                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
+                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                         title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                         aria-label={isMaximized ? "Restore" : "Maximize"}
                     >
                         {isMaximized ? (
-                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <svg className="w-3 h-3 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <rect x="4.5" y="1.5" width="10" height="10" rx="1" />
                                 <path d="M1.5 5.5v9h9" />
                             </svg>
                         ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <svg className="w-3 h-3 text-gray-700 dark:text-gray-300 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <rect x="2" y="2" width="12" height="12" rx="1.5" />
                             </svg>
                         )}
@@ -297,11 +297,11 @@ export function NavSettings({
                         name="window-close"
                         data-xpath="//*[@id='btn-window-close']"
                         onClick={handleClose}
-                        className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer group"
+                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer group"
                         title={t('common.close', 'Close')}
                         aria-label="Close"
                     >
-                        <X className="w-4 h-4 md:w-5 md:h-5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none" />
+                        <X className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none" />
                     </button>
                 </div>
             )}
@@ -310,10 +310,10 @@ export function NavSettings({
             {!isTauri() && (
                 <button
                     onClick={handleLogout}
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
                     title={t('nav.logout', 'Logout')}
                 >
-                    <LogOut className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400" />
+                    <LogOut className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                 </button>
             )}
 
