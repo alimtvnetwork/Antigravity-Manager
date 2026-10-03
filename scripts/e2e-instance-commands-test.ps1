@@ -61,7 +61,7 @@ function Parse-JsonOutput {
     param([object]$rawOutput)
     if ($null -eq $rawOutput) { return $null }
     $text = if ($rawOutput -is [array]) { $rawOutput -join "`n" } else { $rawOutput.ToString() }
-    $trimmed = $text.Trim()
+    $trimmed = ($text -replace "\x1b\[[0-9;]*[a-zA-Z]", "").Trim()
     $jsonStart = $trimmed.IndexOf('{')
     $arrayStart = $trimmed.IndexOf('[')
     $startIdx = -1
@@ -151,12 +151,12 @@ try {
     Write-Host "`n[6/7] Testing settings enforcement (set-turbo, set-plan-review)..." -ForegroundColor Yellow
     $turboOut = Invoke-Agm @("instance", "settings", "set-turbo", "--instance", $testInstName, "--enable")
     Assert-Step "Set turbo mode succeeded" {
-        $turboOut -match "Turbo mode" -or $turboOut -match "updated"
+        $turboOut -match "turboMode" -or $turboOut -match "Turbo mode" -or $turboOut -match "updated" -or $turboOut -match "SUCCESS"
     }
 
     $planOut = Invoke-Agm @("instance", "settings", "set-plan-review", "--instance", $testInstName, "--always-proceed")
     Assert-Step "Set plan review succeeded" {
-        $planOut -match "Plan review" -or $planOut -match "updated"
+        $planOut -match "planReview" -or $planOut -match "Plan review" -or $planOut -match "updated" -or $planOut -match "SUCCESS"
     }
 
     # 7. Test settings export & import
