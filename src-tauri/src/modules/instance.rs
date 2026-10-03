@@ -3220,6 +3220,8 @@ pub async fn switch_account_to_instance(
         .find(|i| i.id == target_id)
         .ok_or_else(|| format!("Target instance {} not found", target_id))?;
 
+    let lease_ttl_secs = crate::modules::workspace_lease_manager::get_default_lease_ttl_secs();
+
     let is_default_inst = instance.is_default || instance.id == "default";
 
     if is_default_inst {
@@ -3237,6 +3239,23 @@ pub async fn switch_account_to_instance(
         let service = crate::modules::account_service::AccountService::new(integration);
         service.switch_account(account_id, None).await?;
         bind_account_to_instance("default", &account.id, &account.email)?;
+
+        // Acquire distributed lease in Supabase Root DB for default instance profile
+        let lease_acc_id = account.id.clone();
+        let lease_acc_email = account.email.clone();
+        let lease_inst_name = instance.name.clone();
+        let ttl_secs = lease_ttl_secs;
+        tauri::async_runtime::spawn(async move {
+            let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
+                &lease_acc_id,
+                &lease_acc_email,
+                &lease_inst_name,
+                ttl_secs,
+            )
+            .await;
+            let _ = crate::modules::supabase_sync::sync_local_node_now().await;
+        });
+
         let registry_after = load_registry().unwrap_or_default();
         if registry_after.active_instance_id.is_empty()
             || registry_after.active_instance_id == "default"
@@ -3623,12 +3642,13 @@ pub async fn switch_account_to_instance(
     let lease_acc_id = account.id.clone();
     let lease_acc_email = account.email.clone();
     let lease_inst_name = instance.name.clone();
+    let ttl_secs = lease_ttl_secs;
     tauri::async_runtime::spawn(async move {
         let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
             &lease_acc_id,
             &lease_acc_email,
             &lease_inst_name,
-            90,
+            ttl_secs,
         )
         .await;
         let _ = crate::modules::supabase_sync::sync_local_node_now().await;

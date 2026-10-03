@@ -285,6 +285,7 @@ export interface AutoProfileSwitcherConfig {
     prompt_recency_threshold_seconds?: number;
     fast_forward_shortcut?: string;
     stale_binding_timeout_hours?: number;
+    account_lockout_window_minutes?: number;
 }
 
 export function isInstanceBindingStale(

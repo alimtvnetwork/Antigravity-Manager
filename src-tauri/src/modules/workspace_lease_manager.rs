@@ -59,13 +59,26 @@ fn get_root_client(config: &SupabaseConfig) -> Option<SupabaseClient> {
     None
 }
 
+/// Derive lease TTL from app config (derived from account_cooldown_minutes * 60, min 1800s, default 3600s)
+pub fn get_default_lease_ttl_secs() -> i64 {
+    let cooldown_mins = crate::modules::config::load_app_config()
+        .map(|c| c.auto_profile_switcher.account_cooldown_minutes)
+        .unwrap_or(60);
+    ((cooldown_mins as i64) * 60).max(1800)
+}
+
 /// Attempt to acquire an exclusive lease for an account
 pub async fn acquire_lease(
     account_id: &str,
     profile_name: &str,
     ttl_secs: i64,
 ) -> Result<LeaseResult, AppError> {
-    acquire_lease_with_details(account_id, "", profile_name, ttl_secs).await
+    let effective_ttl = if ttl_secs <= 90 {
+        get_default_lease_ttl_secs()
+    } else {
+        ttl_secs.max(1800)
+    };
+    acquire_lease_with_details(account_id, "", profile_name, effective_ttl).await
 }
 
 /// Attempt to acquire an exclusive lease for an account with rich metadata
@@ -75,6 +88,12 @@ pub async fn acquire_lease_with_details(
     profile_name: &str,
     ttl_secs: i64,
 ) -> Result<LeaseResult, AppError> {
+    let effective_ttl = if ttl_secs <= 90 {
+        get_default_lease_ttl_secs()
+    } else {
+        ttl_secs.max(1800)
+    };
+
     let config = supabase_sync::load_config()?;
     let client = match get_root_client(&config) {
         Some(c) => c,
@@ -85,7 +104,7 @@ pub async fn acquire_lease_with_details(
                 error_message: None,
                 owner_node_id: None,
                 owner_alias: None,
-                expires_at: Some(Utc::now().timestamp() + ttl_secs),
+                expires_at: Some(Utc::now().timestamp() + effective_ttl),
             });
         }
     };
@@ -101,7 +120,7 @@ pub async fn acquire_lease_with_details(
             .unwrap_or_default()
     };
     let now = Utc::now().timestamp();
-    let expires = now + ttl_secs;
+    let expires = now + effective_ttl;
 
     // First attempt using atomic RPC stored function
     let rpc_payload = json!({
@@ -109,7 +128,7 @@ pub async fn acquire_lease_with_details(
         "p_node_id": node_id,
         "p_node_alias": node_alias,
         "p_profile_name": profile_name,
-        "p_ttl_seconds": ttl_secs,
+        "p_ttl_seconds": effective_ttl,
         "p_account_email": email_to_use,
         "p_ip_address": local_ip
     });
@@ -225,7 +244,11 @@ pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
     };
 
     let now = Utc::now().timestamp();
-    let query = format!("expires_at=gt.{}&select=*", now);
+    let query = format!(
+        "or=(expires_at.gt.{},leased_at.gt.{})&select=*",
+        now,
+        now - 7200
+    );
     let resp = client.select("workspace_leases", &query).await?;
 
     let leases: Vec<WorkspaceLease> = serde_json::from_value(resp).unwrap_or_default();
@@ -249,30 +272,91 @@ pub fn is_account_leased_by_other(account_id: &str) -> bool {
 pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> bool {
     let local_node = supabase_sync::get_local_node_id();
     let now = Utc::now().timestamp();
-    let stale_hours = crate::modules::config::load_app_config()
+    let app_config = crate::modules::config::load_app_config();
+    let stale_hours = app_config
+        .as_ref()
         .map(|c| {
             c.auto_profile_switcher
                 .stale_binding_timeout_hours
                 .clamp(1, 24)
         })
         .unwrap_or(6);
+    let cooldown_minutes = app_config
+        .as_ref()
+        .map(|c| {
+            c.auto_profile_switcher
+                .account_cooldown_minutes
+                .max(c.auto_profile_switcher.account_lockout_window_minutes)
+        })
+        .unwrap_or(60);
     let stale_timeout_secs = (stale_hours as i64) * 3600;
+    let lockout_window_secs = (cooldown_minutes as i64) * 60;
     let email_clean = email.trim().to_lowercase();
+    let acc_id_clean = account_id.trim();
     if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
         for (k, lease) in cache.iter() {
-            let is_match = k == account_id
-                || lease.account_id == account_id
-                || (!email_clean.is_empty()
-                    && lease.profile_name.trim().to_lowercase() == email_clean);
+            let is_match_id = !acc_id_clean.is_empty()
+                && (k.eq_ignore_ascii_case(acc_id_clean)
+                    || lease.account_id.trim().eq_ignore_ascii_case(acc_id_clean)
+                    || lease
+                        .account_email
+                        .trim()
+                        .eq_ignore_ascii_case(acc_id_clean));
+            let is_match_email = !email_clean.is_empty()
+                && (lease.account_email.trim().to_lowercase() == email_clean
+                    || lease.profile_name.trim().to_lowercase() == email_clean
+                    || lease.account_id.trim().to_lowercase() == email_clean);
+            let is_match = is_match_id || is_match_email;
             let is_stale_without_ping =
                 lease.leased_at > 0 && (now - lease.leased_at) > stale_timeout_secs;
+            let is_locked_or_unexpired = (lease.leased_at > 0
+                && (now - lease.leased_at) < lockout_window_secs)
+                || lease.expires_at > now;
             if is_match
-                && lease.expires_at > now
+                && is_locked_or_unexpired
                 && !is_stale_without_ping
                 && lease.node_id != local_node
             {
                 return true;
             }
+        }
+    }
+    false
+}
+
+/// Find any cached workspace lease matching account ID or email (case-insensitive)
+pub fn find_cached_lease(account_id: &str, email: &str) -> Option<WorkspaceLease> {
+    let email_clean = email.trim().to_lowercase();
+    let acc_id_clean = account_id.trim();
+    if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
+        for (k, lease) in cache.iter() {
+            let is_match_id = !acc_id_clean.is_empty()
+                && (k.eq_ignore_ascii_case(acc_id_clean)
+                    || lease.account_id.trim().eq_ignore_ascii_case(acc_id_clean)
+                    || lease
+                        .account_email
+                        .trim()
+                        .eq_ignore_ascii_case(acc_id_clean));
+            let is_match_email = !email_clean.is_empty()
+                && (lease.account_email.trim().to_lowercase() == email_clean
+                    || lease.profile_name.trim().to_lowercase() == email_clean
+                    || lease.account_id.trim().to_lowercase() == email_clean);
+            if is_match_id || is_match_email {
+                return Some(lease.clone());
+            }
+        }
+    }
+    None
+}
+
+/// Check if an account or email has an active or recent lease in the remote cache within the given cooldown window.
+pub fn has_active_lease_in_cooldown(account_id: &str, email: &str, cooldown_secs: i64) -> bool {
+    let now = Utc::now().timestamp();
+    if let Some(lease) = find_cached_lease(account_id, email) {
+        if (lease.leased_at > 0 && (now - lease.leased_at) < cooldown_secs)
+            || lease.expires_at > now
+        {
+            return true;
         }
     }
     false
@@ -350,7 +434,7 @@ mod tests {
             },
         );
 
-        // 5. Active lease matched by email / profile name
+        // 5. Active lease matched by account_email (even when profile_name differs)
         cache.insert(
             "acc_by_email".to_string(),
             WorkspaceLease {
@@ -359,9 +443,24 @@ mod tests {
                 node_id: "node-remote-delta".to_string(),
                 node_alias: "Node-Delta".to_string(),
                 ip_address: "192.168.1.103".to_string(),
-                profile_name: "team-shared@example.com".to_string(),
+                profile_name: "Profile-Different-Name".to_string(),
                 leased_at: now - 100,
                 expires_at: now + 3600,
+            },
+        );
+
+        // 6. Recently leased by remote node within lockout window (even if expires_at has passed)
+        cache.insert(
+            "acc_remote_locked".to_string(),
+            WorkspaceLease {
+                account_id: "acc_remote_locked".to_string(),
+                account_email: "locked@example.com".to_string(),
+                node_id: "node-remote-epsilon".to_string(),
+                node_alias: "Node-Epsilon".to_string(),
+                ip_address: "192.168.1.104".to_string(),
+                profile_name: "Profile-Epsilon".to_string(),
+                leased_at: now - 300, // 5 min ago (< 60m lockout window)
+                expires_at: now - 10,
             },
         );
 
@@ -370,6 +469,7 @@ mod tests {
         // Assertions:
         assert!(!is_account_or_email_leased_by_other("acc_local", ""));
         assert!(is_account_or_email_leased_by_other("acc_remote_active", ""));
+        assert!(is_account_or_email_leased_by_other("ACC_REMOTE_ACTIVE", "")); // Case-insensitive ID
         assert!(!is_account_or_email_leased_by_other(
             "acc_remote_expired",
             ""
@@ -379,10 +479,22 @@ mod tests {
             "some_random_id",
             "team-shared@example.com"
         ));
+        assert!(is_account_or_email_leased_by_other(
+            "some_random_id",
+            "TEAM-SHARED@EXAMPLE.COM" // Case-insensitive email
+        ));
+        assert!(is_account_or_email_leased_by_other("acc_remote_locked", ""));
         assert!(!is_account_or_email_leased_by_other(
             "acc_non_existent",
             "other@example.com"
         ));
+        assert!(has_active_lease_in_cooldown("acc_remote_active", "", 3600));
+        assert!(has_active_lease_in_cooldown(
+            "",
+            "TEAM-SHARED@example.com",
+            3600
+        ));
+        assert!(!has_active_lease_in_cooldown("acc_non_existent", "", 3600));
 
         // Cleanup
         let mut cache = ACTIVE_REMOTE_LEASES.write().unwrap();

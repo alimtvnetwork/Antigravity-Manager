@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, Diamond, Gem, Circle, Clock, ToggleLeft, ToggleRight, Fingerprint } from 'lucide-react';
 import { Account } from '../../types/account';
-import { getQuotaColor, formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
+import { formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
 import { cn } from '../../utils/cn';
 import { useTranslation } from 'react-i18next';
 import { formatCompactDuration, getLiveLimitForModel, getLiveLimitState } from '../../utils/liveLimit';
@@ -70,21 +70,23 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
     const claudeModel = findQuotaModel(account.quota?.models, 'claude');
     const isDisabled = Boolean(account.disabled);
 
-    // 颜色映射，避免动态类名被 Tailwind purge
+    // 颜色与渐变映射
     const getColorClass = (percentage: number) => {
-        const color = getQuotaColor(percentage);
-        switch (color) {
-            case 'success': return 'bg-emerald-500';
-            case 'warning': return 'bg-amber-500';
-            case 'error': return 'bg-rose-500';
-            default: return 'bg-gray-500';
-        }
+        if (percentage >= 50) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500';
+        if (percentage >= 20) return 'bg-gradient-to-r from-amber-500 to-amber-400';
+        return 'bg-gradient-to-r from-rose-500 to-rose-400';
+    };
+
+    const getTextColorClass = (percentage: number) => {
+        if (percentage >= 50) return 'text-cyan-600 dark:text-cyan-400';
+        if (percentage >= 20) return 'text-amber-600 dark:text-amber-400';
+        return 'text-rose-600 dark:text-rose-400';
     };
 
     const getTimeColorClass = (resetTime: string | undefined) => {
         const color = getTimeRemainingColor(resetTime);
         switch (color) {
-            case 'success': return 'text-emerald-500 dark:text-emerald-400';
+            case 'success': return 'text-cyan-600 dark:text-cyan-400';
             case 'warning': return 'text-amber-500 dark:text-amber-400';
             default: return 'text-blue-600 dark:text-blue-400';
         }
@@ -103,14 +105,14 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             id={`account-row-${account.id}`}
             ref={rowRef}
             className={cn(
-            "group transition-all duration-200 border-b border-gray-100 dark:border-slate-800 border-l-4",
+            "group transition-all duration-200 border-b border-slate-200/80 dark:border-slate-800/80 border-l-2",
             isFocused
-                ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
+                ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
-                ? "bg-slate-900/90 dark:bg-[#050d14] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
+                ? "bg-slate-900/90 dark:bg-[#091b2c] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-slate-800/90 dark:hover:bg-[#0c2438]"
                 : selected
-                ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
-                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]",
+                ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
@@ -213,13 +215,13 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-0">
                         {/* Gemini Pro */}
                         <div className={cn(
-                            "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] group/quota",
+                            "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-slate-200 dark:bg-slate-800/80 group/quota",
                             isImageLiveLimited && "border-amber-400/70 dark:border-amber-500/70 bg-amber-50/80 dark:bg-amber-950/30 ring-1 ring-amber-400/30",
                             liveImageState.isActive && "border-rose-400/70 dark:border-rose-500/70 bg-rose-50/80 dark:bg-rose-950/30 ring-rose-400/30"
                         )}>
                             {geminiProModel && (
                                 <div
-                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-15 dark:opacity-20 ${getColorClass(geminiProModel.percentage)}`}
+                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 ${getColorClass(geminiProModel.percentage)}`}
                                     style={{ width: `${geminiProModel.percentage}%` }}
                                 />
                             )}
@@ -239,8 +241,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                     )}
                                 </div>
                                 <span className={cn("w-[36px] text-right font-bold transition-colors",
-                                    getQuotaColor(geminiProModel?.percentage || 0) === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                                        getQuotaColor(geminiProModel?.percentage || 0) === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                                    getTextColorClass(geminiProModel?.percentage || 0)
                                 )}>
                                     {geminiProModel ? `${geminiProModel.percentage}%` : '-'}
                                 </span>
@@ -248,10 +249,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         </div>
 
                         {/* Gemini Flash */}
-                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] group/quota">
+                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-slate-200 dark:bg-slate-800/80 group/quota">
                             {geminiFlashModel && (
                                 <div
-                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-15 dark:opacity-20 ${getColorClass(geminiFlashModel.percentage)}`}
+                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 ${getColorClass(geminiFlashModel.percentage)}`}
                                     style={{ width: `${geminiFlashModel.percentage}%` }}
                                 />
                             )}
@@ -271,8 +272,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                     )}
                                 </div>
                                 <span className={cn("w-[36px] text-right font-bold transition-colors",
-                                    getQuotaColor(geminiFlashModel?.percentage || 0) === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                                        getQuotaColor(geminiFlashModel?.percentage || 0) === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                                    getTextColorClass(geminiFlashModel?.percentage || 0)
                                 )}>
                                     {geminiFlashModel ? `${geminiFlashModel.percentage}%` : '-'}
                                 </span>
@@ -280,10 +280,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         </div>
 
                         {/* Gemini Image */}
-                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] group/quota">
+                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-slate-200 dark:bg-slate-800/80 group/quota">
                             {geminiImageModel && (
                                 <div
-                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-15 dark:opacity-20 ${getColorClass(geminiImageModel.percentage)}`}
+                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 ${getColorClass(geminiImageModel.percentage)}`}
                                     style={{ width: `${geminiImageModel.percentage}%` }}
                                 />
                             )}
@@ -305,8 +305,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                 </div>
                                 <span className={cn("w-[36px] text-right font-bold transition-colors",
                                     isImageLiveLimited ? (liveImageState.isActive ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400') :
-                                        getQuotaColor(geminiImageModel?.percentage || 0) === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                                        getQuotaColor(geminiImageModel?.percentage || 0) === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                                        getTextColorClass(geminiImageModel?.percentage || 0)
                                 )}>
                                     {isImageLiveLimited ? `${liveImageLimit?.status || 'ERR'}` : (geminiImageModel ? `${geminiImageModel.percentage}%` : '-')}
                                 </span>
@@ -314,10 +313,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         </div>
 
                         {/* Claude */}
-                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-[#15334d] bg-gray-50/30 dark:bg-[#0c2438] group/quota">
+                        <div className="relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-slate-200 dark:bg-slate-800/80 group/quota">
                             {claudeModel && (
                                 <div
-                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-15 dark:opacity-20 ${getColorClass(claudeModel.percentage)}`}
+                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 ${getColorClass(claudeModel.percentage)}`}
                                     style={{ width: `${claudeModel.percentage}%` }}
                                 />
                             )}
@@ -337,8 +336,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                     )}
                                 </div>
                                 <span className={cn("w-[36px] text-right font-bold transition-colors",
-                                    getQuotaColor(claudeModel?.percentage || 0) === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                                        getQuotaColor(claudeModel?.percentage || 0) === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                                    getTextColorClass(claudeModel?.percentage || 0)
                                 )}>
                                     {claudeModel ? `${claudeModel.percentage}%` : '-'}
                                 </span>
@@ -360,7 +358,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                     {/* 1. Refresh button (first) */}
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
+                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
                         disabled={isRefreshing || isDisabled}
@@ -371,7 +369,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     {/* 2. 切换/实例选择按钮 (排在第二位) */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
-                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onSwitch(); }}
                             onContextMenu={(e) => {
                                 e.preventDefault();
@@ -400,7 +398,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                         className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-base-100 text-gray-700 dark:text-gray-300"
                                     >
                                         <div className="flex items-center gap-1.5 truncate">
-                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-teal-500' : 'bg-gray-400'}`} />
                                             <span className="truncate">{inst.config.name}</span>
                                         </div>
                                         {inst.config.id === activeInstanceId && (
@@ -414,21 +412,21 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
                     {/* 3. 详情与其它操作 */}
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
                         title={t('common.details')}
                     >
                         <Info className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
                         title={t('accounts.device_fingerprint')}
                     >
                         <Fingerprint className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
                         title={t('common.export')}
                     >
@@ -436,9 +434,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     </button>
                     <button
                         className={cn(
-                            "p-1.5 rounded-lg transition-all",
+                            "p-1.5 rounded-[5px] transition-all",
                             account.proxy_disabled
-                                ? "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                                ? "text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
                                 : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                         )}
                         onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
@@ -451,7 +449,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         )}
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('common.delete')}
                     >

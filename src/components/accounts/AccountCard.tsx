@@ -179,14 +179,14 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             id={`account-card-${account.id}`}
             ref={cardRef}
             className={cn(
-            "flex flex-col p-3 rounded-xl border border-gray-200 dark:border-[#15334d] border-l-4 transition-all duration-200 bg-white dark:bg-[#0c2438]",
+            "flex flex-col p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-all duration-200 bg-white dark:bg-[#0c2438]",
             isFocused
-                ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
+                ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
-                ? "bg-slate-900/90 dark:bg-[#050d14] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
+                ? "bg-slate-900/90 dark:bg-[#091b2c] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-slate-800/90 dark:hover:bg-[#0c2438]"
                 : selected
-                ? "bg-blue-50/90 dark:bg-[#0c2438] text-blue-950 dark:text-blue-100 border-l-[#2878f0] dark:border-l-[#2878f0] font-semibold shadow-md ring-1 ring-[#2878f0]/40 dark:ring-[#2878f0]/30"
-                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#0c2438]/80 hover:text-slate-900 dark:hover:text-white hover:border-l-[#2878f0] dark:hover:border-l-[#2878f0]",
+                ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 
@@ -290,7 +290,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                 >
                                     <span className={cn(
                                         "w-1.5 h-1.5 rounded-full shrink-0",
-                                        boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
+                                        boundInstance.is_running ? "bg-teal-500 animate-pulse" : "bg-indigo-400"
                                     )} />
                                     <span>{boundInstance.config.name}</span>
                                 </span>
@@ -364,7 +364,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             </div>
 
             {/* Footer: Actions Only */}
-            <div className="flex-none flex items-center justify-center pt-2 pb-1 border-t border-gray-100 dark:border-base-200">
+            <div className="flex-none flex items-center justify-center pt-2 pb-1 border-t border-slate-200/80 dark:border-slate-800/80">
                 {/* Label edit popup */}
                 {isEditingLabel && (
                     <div className="absolute inset-0 bg-white/95 dark:bg-base-100/95 rounded-xl z-10 flex items-center justify-center p-4">
@@ -380,14 +380,14 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                                 maxLength={15}
                             />
                             <button
-                                className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-all"
+                                className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
                                 onClick={handleSaveLabel}
                                 title={t('common.save', 'Save')}
                             >
                                 <Check className="w-4 h-4" />
                             </button>
                             <button
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                                 onClick={handleCancelLabel}
                                 title={t('common.cancel', 'Cancel')}
                             >
@@ -399,9 +399,9 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                 <div className="flex flex-wrap items-center justify-center gap-1 w-full">
                     {/* 1. Refresh button (top priority) */}
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${isRefreshing
-                            ? 'text-green-600 bg-green-50'
-                            : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${isRefreshing
+                            ? 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20'
+                            : 'text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         disabled={isRefreshing || isDisabled}
                         title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
@@ -411,7 +411,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
 
                     {/* 2. Switch operations group */}
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
                         disabled={isSwitching || isDisabled}
@@ -419,7 +419,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
                         disabled={isSwitching || isDisabled}
@@ -427,7 +427,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
                         disabled={isSwitching || isDisabled}
@@ -437,14 +437,14 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
 
                     {/* 3. Details and auxiliary operations */}
                     <button
-                        className="p-1.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
                         title={t('common.details')}
                     >
                         <Info className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
                         title={t('accounts.device_fingerprint')}
                     >
@@ -454,7 +454,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     {onUpdateLabel && (
                         <button
                             className={cn(
-                                "p-1.5 rounded-lg transition-all",
+                                "p-1.5 rounded-[5px] transition-all",
                                 account.custom_label
                                     ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                                     : "text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
@@ -466,7 +466,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         </button>
                     )}
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('classic'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
                         disabled={isSwitching || isDisabled}
@@ -474,7 +474,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
                         disabled={isSwitching || isDisabled}
@@ -482,7 +482,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
                         disabled={isSwitching || isDisabled}
@@ -491,7 +491,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     </button>
                     {onWarmup && (
                         <button
-                            className={`p-1.5 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
+                            className={`p-1.5 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                             title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warm up this account'))}
                             disabled={isRefreshing || isDisabled}
@@ -500,7 +500,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         </button>
                     )}
                     <button
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
                         title={t('common.export')}
                     >
@@ -508,9 +508,9 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     </button>
                     <button
                         className={cn(
-                            "p-1.5 rounded-lg transition-all",
+                            "p-1.5 rounded-[5px] transition-all",
                             account.proxy_disabled
-                                ? "text-gray-400 hover:text-green-600 hover:bg-green-50"
+                                ? "text-gray-400 hover:text-cyan-600 hover:bg-cyan-50"
                                 : "text-gray-400 hover:text-orange-600 hover:bg-orange-50"
                         )}
                         onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
@@ -523,7 +523,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         )}
                     </button>
                     <button
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('common.delete')}
                     >

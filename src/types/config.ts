@@ -233,6 +233,7 @@ export interface AutoProfileSwitcherConfig {
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
     fast_forward_shortcut?: string;
+    account_cooldown_minutes?: number;
 }
 
 // ============================================================================

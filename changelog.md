@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.132.0] - 2026-10-04
+
+### Added
+- **Supabase 密钥自动探测与加载 (Repo-Secrets Auto-Discovery)**: 实现了多路径密钥自动探测机制（`candidate_repo_secrets_paths()`），支持自动读取并解析 `repo-secrets/03-supabase/` 凭据，自动进行 Base64 解码与服务端点规范化，实现免配置自动同步。 (Thanks to @aukgit)
+- **多实例/跨机器账号租约互斥与冷却保护 (Account Lease Lock & Cooldown)**: 借助 Supabase 分布式租约锁（`workspace_leases`，TTL 1800s-3600s）彻底杜绝多实例或多机并发争抢同一账号；新增可配置的账号复用冷却期（`account_cooldown_minutes: u32`，默认 60 分钟），并在所有账号均处于冷却时提供智能回退保底机制。 (Thanks to @aukgit)
+- **Supabase CLI 命令行能力对齐**: 新增 `agm supabase set-config` 命令行支持（支持 `--cooldown`、`--interval` 等参数配置），并在 `modules/cli.rs` 中完整打通 `supabase status/sync/list-leases/test` 命令。 (Thanks to @aukgit)
+
+### Improved
+- **账号列表分组与视觉边框升级**: 重构 Accounts 页面表格样式，增加柔和的行分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色悬浮蓝条高亮（`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` 与 `border-l-blue-500/70`），去除过深生硬的明黄与纯黑底色。 (Thanks to @aukgit)
+- **配额进度条 VS Code 渐变配色升级**: 彻底替换刺眼的纯绿荧光色，采用 VS Code 风格的蓝绿/青蓝渐变条（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`）搭配深色背景底轨，配额百分比徽章同步软化为青色。 (Thanks to @aukgit)
+- **实例表格紧凑化与横向滚动消除**: 合并“配置名称”与“绑定账号”为单一紧凑的“Profile & Account”列；将数据目录路径截断为尾部路径（`...\<parent>\<leaf>`），支持悬停完整提示与点击复制；将提示词（Prompts）按钮整合至操作下拉菜单/药丸胶囊内，彻底消除 1280px 分辨率下的横向滚动条。 (Thanks to @aukgit)
+- **卡片视图 4 列紧凑布局与按钮标准圆角**: 卡片网格升级为每行 4 列紧凑排列（`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`）；重构操作按钮为专业紧凑的双行工具栏；全局按钮圆角统一规范为 5–6px（`rounded-[5px]`）；修复“轮换至最佳候选”按钮内边距并增加当前目标实例悬停提示；软化 Audit 审计按钮为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
+
+---
+
 ## [v4.130.0] - 2026-10-04
 
 ### Fixed
@@ -312,6 +327,24 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.132.0 (2026-10-04)**:
+        -   **[UI & Theming] 账号列表边框分组、VS Code 渐变色与 5-6px 圆角规范**:
+            -   **Description**: 重构 Accounts 页面表格样式，增加行间分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色高亮行，将配额进度条升级为 VS Code 蓝绿青渐变（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`），全局按钮圆角统一规范为 5-6px。 (Thanks to @aukgit)
+        -   **[Backend & Secrets] Supabase 密钥目录自动探测与加载**:
+            -   **Description**: 支持自动扫描 `repo-secrets/03-supabase/` 凭据并自动完成 Base64 解码与服务端点注入，实现免配置即用。 (Thanks to @aukgit)
+        -   **[Account Isolation] 分布式租约锁与账号使用冷却期**:
+            -   **Description**: 基于 Supabase 分布式租约锁（1800s-3600s TTL）防止多实例或跨机器并发争抢同一账号，并在设置中提供可配置的账号复用冷却时间（默认 60 分钟），智能过滤近期使用账号并在全冷却时安全回退。 (Thanks to @aukgit)
+        -   **[Instances UI] 实例表格合并紧凑化与卡片 4 列布局**:
+            -   **Description**: 合并配置名称与邮箱列，截断长路径显示，提示词按钮归入操作栏，消除横向滚动；卡片模式重构为每行 4 列紧凑排列与双行工具栏，修复轮换最佳按钮提示与内边距，并将 Audit 按钮软化为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
+        -   **[CLI & Parity] Supabase 命令行完整对齐**:
+            -   **Description**: 提供 `agm supabase set-config` 以及 `antigravity-manager supabase [status|sync|list-leases|test]` 完整命令行管理支持。 (Thanks to @aukgit)
+
+
+    *   **v4.131.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.130.0 (2026-10-04)**:
         -   **[Stability] Startup Crash & White Screen Resolution (PR #499)**:
             -   **Description**: Resolved an immediate startup crash (`0xc0000409`) where synchronous `tokio::spawn` calls in Tauri's `.setup()` hook panicked on non-Tokio worker threads. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)

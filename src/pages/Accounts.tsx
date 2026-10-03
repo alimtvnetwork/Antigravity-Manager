@@ -813,9 +813,9 @@ function Accounts() {
         <div className="flex items-center gap-2 shrink-0 ml-auto">
           {/* Batch operations if items selected */}
           {selectedIds.size > 0 && (
-            <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+            <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
               <button
-                className="px-2.5 py-1 text-red-600 dark:text-red-400 text-xs font-semibold rounded-l-full hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-red-600 dark:text-red-400 text-xs font-semibold rounded-l-md hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={handleBatchDelete}
                 title={t("accounts.delete_selected", { count: selectedIds.size })}
               >
@@ -831,7 +831,7 @@ function Accounts() {
                 <span className="hidden xl:inline">{t("accounts.disable_proxy_selected", { count: selectedIds.size })}</span>
               </button>
               <button
-                className="px-2.5 py-1 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-r-full hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-r-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={() => handleBatchToggleProxy(true)}
                 title={t("accounts.enable_proxy_selected", { count: selectedIds.size })}
               >
@@ -842,11 +842,11 @@ function Accounts() {
           )}
 
           {/* Segmented Pill Capsule: Focus, +, Refresh, Warm, Show All Quotas */}
-          <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+          <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
             {/* Focus Active/Picked Account Button */}
             <button
               type="button"
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-full text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-md text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
               onClick={handleFocusActiveAccount}
               title={
                 currentAccount
@@ -919,7 +919,7 @@ function Accounts() {
 
             {/* Show All Quotas */}
             <label
-              className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-full text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
+              className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
               title={t("accounts.show_all_quotas")}
             >
               <span className="text-xs font-semibold hidden xl:inline">
@@ -983,7 +983,7 @@ function Accounts() {
       <div className="flex-1 min-h-0 relative" ref={containerRef}>
         {viewMode === "list" ? (
           <div className="h-full bg-white dark:bg-base-100 rounded-2xl shadow-sm border border-gray-100 dark:border-base-200 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto [&_th:nth-child(3)]:border-x [&_th:nth-child(3)]:border-slate-200/70 dark:[&_th:nth-child(3)]:border-[#15334d]/70 [&_td:nth-child(3)]:border-x [&_td:nth-child(3)]:border-slate-100 dark:[&_td:nth-child(3)]:border-[#15334d]/50">
               <AccountTable
                 accounts={paginatedAccounts}
                 selectedIds={selectedIds}

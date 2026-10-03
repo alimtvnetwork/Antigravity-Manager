@@ -290,6 +290,14 @@ fn default_pid_refresh_seconds() -> u32 {
     600
 }
 
+fn default_account_lockout_window_minutes() -> u32 {
+    60
+}
+
+fn default_account_cooldown_minutes() -> u32 {
+    60
+}
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -325,6 +333,10 @@ pub struct AutoProfileSwitcherConfig {
     /// How often the full process table is rebuilt. Default 10 minutes. Floor 3 minutes, ceiling 20.
     #[serde(default = "default_pid_refresh_seconds")]
     pub pid_refresh_seconds: u32,
+    #[serde(default = "default_account_lockout_window_minutes")]
+    pub account_lockout_window_minutes: u32,
+    #[serde(default = "default_account_cooldown_minutes")]
+    pub account_cooldown_minutes: u32,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -348,6 +360,8 @@ impl Default for AutoProfileSwitcherConfig {
             fast_forward_shortcut: "Ctrl+Shift+F".to_string(),
             stale_binding_timeout_hours: 6,
             pid_refresh_seconds: 600,
+            account_lockout_window_minutes: 60,
+            account_cooldown_minutes: 60,
         }
     }
 }

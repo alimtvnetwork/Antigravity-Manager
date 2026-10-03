@@ -263,16 +263,16 @@ function SortableAccountRow({
             ref={setMergedRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group border-b border-gray-100 dark:border-base-200 border-l-4 transition-[color,background-color] duration-[180ms] ease-in-out",
+                "group border-b border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-[color,background-color,border-color] duration-[180ms] ease-in-out",
                 isFocused
-                    ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
+                    ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                     : isCurrent
-                    ? "bg-slate-900/90 dark:bg-[#050d14] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
+                    ? "bg-slate-900/90 dark:bg-[#091b2c] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-slate-800/90 dark:hover:bg-[#0c2438]"
                     : selected
-                    ? "bg-[#070b10] text-[#f5d76e] border-l-[#f5d76e] font-semibold shadow-md"
+                    ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-[#070b10] hover:text-[#f5d76e] hover:border-l-[#f5d76e]"
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:border-l-blue-500/70"
             )}
         >
             {/* 拖拽手柄 */}
@@ -541,7 +541,7 @@ function AccountRowContent({
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-amber-300 dark:text-amber-300 font-bold drop-shadow-xs"
-                            : "text-gray-900 dark:text-gray-100 group-hover:text-[#f5d76e]"
+                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-cyan-300"
                         )}
                         title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
@@ -624,7 +624,7 @@ function AccountRowContent({
                             >
                                 <span className={cn(
                                     "w-1.5 h-1.5 rounded-full shrink-0",
-                                    boundInstance.is_running ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"
+                                    boundInstance.is_running ? "bg-teal-500 animate-pulse" : "bg-indigo-400"
                                 )} />
                                 <span>{boundInstance.config.name}</span>
                             </span>
@@ -695,13 +695,13 @@ function AccountRowContent({
                                     onClick={(e) => e.stopPropagation()}
                                 />
                                 <button
-                                    className="p-0.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-all"
+                                    className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleSaveLabel(); }}
                                 >
                                     <Check className="w-3 h-3" />
                                 </button>
                                 <button
-                                    className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
+                                    className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleCancelLabel(); }}
                                 >
                                     <X className="w-3 h-3" />
@@ -772,21 +772,21 @@ function AccountRowContent({
 
             {/* 操作列 */}
             <td className={cn(
-                "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors",
+                "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors border-b border-slate-200/80 dark:border-slate-800/80",
                 // 动态高对比高亮处理
                 isFocused
-                    ? "bg-emerald-50/90 dark:bg-[#15334d]"
+                    ? "bg-teal-50/90 dark:bg-[#0e2c44]"
                     : selected
-                    ? "bg-blue-50/90 dark:bg-[#0c2438]"
+                    ? "bg-blue-50/90 dark:bg-[#0f273d]"
                     : isCurrent
-                    ? "bg-emerald-50/60 dark:bg-[#0c2438]"
-                    : "bg-white dark:bg-[#071a27]",
-                !isCurrent && !selected && !isFocused ? "group-hover:bg-[#070b10]" : ""
+                    ? "bg-slate-900/90 dark:bg-[#091b2c]"
+                    : "bg-white dark:bg-[#081826]",
+                !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50/80 dark:group-hover:bg-[#0f273d]/60" : ""
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     <button
                         type="button"
-                        className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'cursor-not-allowed' : 'hover:text-[#f5d76e] hover:bg-[#070b10]'}`}
+                        className={`p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                         onClick={(event) => { event.stopPropagation(); onRefresh(); }}
                         title={t('common.refresh')}
                         disabled={isRefreshing || isDisabled}
@@ -795,7 +795,7 @@ function AccountRowContent({
                     </button>
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
-                            className={`p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            className={`p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onSwitch(); }}
                             onContextMenu={(e) => {
                                 e.preventDefault();
@@ -839,7 +839,7 @@ function AccountRowContent({
                     <button
                         ref={moreBtnRef}
                         type="button"
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-slate-950 hover:bg-white rounded transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-slate-950 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[5px] transition-all"
                         onClick={(event) => {
                             event.stopPropagation();
                             if (showMoreMenu) {
@@ -917,7 +917,7 @@ function AccountRowContent({
                     {onUpdateLabel && (
                         <button
                             className={cn(
-                                "hidden lg:inline-flex p-1 rounded transition-all",
+                                "hidden lg:inline-flex p-1 rounded-[5px] transition-all",
                                 account.custom_label
                                     ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                                     : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
@@ -931,7 +931,7 @@ function AccountRowContent({
 
                     {onWarmup && (
                         <button
-                            className={`hidden xl:inline-flex p-1 text-gray-500 dark:text-gray-400 rounded transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
+                            className={`hidden xl:inline-flex p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
                             onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                             title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warmup Account'))}
                             disabled={isRefreshing || isDisabled}
@@ -941,9 +941,9 @@ function AccountRowContent({
                     )}
                     <button
                         className={cn(
-                            "p-1 rounded transition-all",
+                            "p-1 rounded-[5px] transition-all",
                             account.proxy_disabled
-                                ? "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                                ? "text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
                                 : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                         )}
                         onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
@@ -956,7 +956,7 @@ function AccountRowContent({
                         )}
                     </button>
                     <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('common.delete')}
                     >
@@ -1123,10 +1123,10 @@ function AccountTable({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#071724] shadow-xs">
                 <table className="w-full">
                     <thead>
-                        <tr className="border-b border-gray-100 dark:border-base-200 bg-gray-50 dark:bg-base-200">
+                        <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/90 dark:bg-slate-900/90">
                             <th className="pl-2 py-1 text-left w-7">
                                 <span className="sr-only">{t('accounts.drag_to_reorder')}</span>
                             </th>
@@ -1159,14 +1159,14 @@ function AccountTable({
                                     </button>
 
                                     {/* Gemini / Claude 视图切换药丸按钮 */}
-                                    <div className="inline-flex items-center p-0.5 rounded-lg bg-gray-200/90 dark:bg-slate-900 border border-gray-300/80 dark:border-slate-800 text-[10px] font-semibold">
+                                    <div className="inline-flex items-center p-0.5 rounded-md bg-slate-200/80 dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 text-[10px] font-semibold">
                                         <button
                                             type="button"
                                             onClick={() => setModelFilter('gemini')}
                                             className={cn(
-                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
+                                                "px-2 py-0.5 rounded-[5px] transition-all cursor-pointer font-medium",
                                                 modelFilter === 'gemini'
-                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
+                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-xs"
                                                     : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Gemini"
@@ -1177,9 +1177,9 @@ function AccountTable({
                                             type="button"
                                             onClick={() => setModelFilter('claude')}
                                             className={cn(
-                                                "px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium",
+                                                "px-2 py-0.5 rounded-[5px] transition-all cursor-pointer font-medium",
                                                 modelFilter === 'claude'
-                                                    ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30 dark:border-amber-400/30 shadow-xs"
+                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-xs"
                                                     : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Claude"
@@ -1207,11 +1207,11 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-slate-50/90 dark:bg-slate-900/90 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
                         </tr>
                     </thead>
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
-                        <tbody className="divide-y divide-gray-100 dark:divide-base-200">
+                        <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
                             {sortedAccounts.map((account) => (
                                 <SortableAccountRow
                                     key={account.id}
@@ -1249,9 +1249,9 @@ function AccountTable({
             <DragOverlay>
                 {
                     activeAccount ? (
-                        <table className="w-full bg-white dark:bg-base-100 shadow-2xl rounded-lg border border-blue-200 dark:border-blue-800">
+                        <table className="w-full bg-white dark:bg-[#0c2438] shadow-2xl rounded-lg border border-blue-500/40 dark:border-blue-700/60">
                             <tbody>
-                                <tr className="bg-blue-50 dark:bg-blue-900/30">
+                                <tr className="bg-blue-50/90 dark:bg-[#0f273d] border-b border-slate-200/80 dark:border-slate-800/80">
                                     <td className="pl-2 py-0.5 w-7">
                                         <div className="flex items-center justify-center w-5 h-5 text-blue-500">
                                             <GripVertical className="w-3.5 h-3.5" />

@@ -818,9 +818,19 @@ pub fn select_candidate_profiles(
 ) -> Result<Vec<ProfileCandidate>, String> {
     let registry = instance::load_registry()?;
     let now_sec = chrono::Utc::now().timestamp();
-    let mut candidates = Vec::new();
+    let app_config = config::load_app_config();
+    let cooldown_minutes = app_config
+        .as_ref()
+        .map(|c| c.auto_profile_switcher.account_cooldown_minutes)
+        .unwrap_or(60);
+    let cooldown_secs: i64 = (cooldown_minutes as i64) * 60;
 
     let mut effective_exclusions = excluded_account_ids.to_vec();
+    for in_use_id in get_active_in_use_account_ids() {
+        if !effective_exclusions.contains(&in_use_id) {
+            effective_exclusions.push(in_use_id);
+        }
+    }
     for cross_vm_acc in crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
     {
         if !effective_exclusions.contains(&cross_vm_acc) {
@@ -828,9 +838,32 @@ pub fn select_candidate_profiles(
         }
     }
 
+    // Helper closure to evaluate if an account is in cooldown window
+    let is_in_cooldown = |acc: &account::Account| -> bool {
+        let is_recently_used = acc.last_used > 0 && (now_sec - acc.last_used) < cooldown_secs;
+        let has_remote_lease = if let Some(lease) =
+            crate::modules::workspace_lease_manager::find_cached_lease(&acc.id, &acc.email)
+        {
+            (lease.leased_at > 0 && (now_sec - lease.leased_at) < cooldown_secs)
+                || lease.expires_at > now_sec
+        } else {
+            false
+        };
+        is_recently_used || has_remote_lease
+    };
+
+    let mut available_pool: Vec<ProfileCandidate> = Vec::new();
+    let mut cooldown_pool: Vec<(ProfileCandidate, i64)> = Vec::new();
+    let mut seen_account_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
     // 1. Inspect instances not in active use
     for inst in &registry.instances {
         if inst.id == current_instance_id {
+            continue;
+        }
+
+        // If instance is running on this machine, never steal its account
+        if crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
             continue;
         }
 
@@ -853,6 +886,7 @@ pub fn select_candidate_profiles(
             if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
                 continue;
             }
+            // Strictly skip accounts leased by another active machine/node
             if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
                 &acc.id, &acc.email,
             ) {
@@ -873,16 +907,21 @@ pub fn select_candidate_profiles(
 
             // Strict 100% 4-Hour Quota Gate:
             // Candidate accounts must have 100% quota, OR their reset period has elapsed (eligible for live refresh).
-            // Under no circumstances can a known < 100% account without elapsed reset period be selected.
             if quota >= 100.0 || is_period_finished {
+                seen_account_ids.insert(acc.id.clone());
                 let score = score_candidate_account(&acc, target_model, now_sec);
-                candidates.push(ProfileCandidate {
+                let candidate = ProfileCandidate {
                     instance_id: inst.id.clone(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
                     score,
-                });
+                };
+                if is_in_cooldown(&acc) {
+                    cooldown_pool.push((candidate, acc.last_used));
+                } else {
+                    available_pool.push(candidate);
+                }
             }
         }
     }
@@ -890,19 +929,33 @@ pub fn select_candidate_profiles(
     // 2. Check unbound accounts in pool
     let all_accounts = account::list_accounts().unwrap_or_default();
     for acc in &all_accounts {
+        if seen_account_ids.contains(&acc.id) {
+            continue;
+        }
         if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
             continue;
         }
         if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
             continue;
         }
+        // Strictly skip accounts leased by another active machine/node
         if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
             &acc.id, &acc.email,
         ) {
             continue;
         }
-        if candidates.iter().any(|c| c.account_id == acc.id) {
-            continue;
+
+        // Check if bound to an instance running on this machine
+        let bound_inst = registry
+            .instances
+            .iter()
+            .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
+        if let Some(inst) = bound_inst {
+            if inst.id != current_instance_id
+                && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+            {
+                continue;
+            }
         }
 
         let period_status = evaluate_account_period_status(acc, target_model, threshold, now_sec);
@@ -918,68 +971,123 @@ pub fn select_candidate_profiles(
 
         // Strict 100% 4-Hour Quota Gate
         if quota >= 100.0 || is_period_finished {
+            seen_account_ids.insert(acc.id.clone());
             let score = score_candidate_account(acc, target_model, now_sec);
-            let candidate_inst_id = registry
-                .instances
-                .iter()
-                .find(|i| i.bound_account_id.as_deref() == Some(&acc.id))
+            let candidate_inst_id = bound_inst
                 .map(|i| i.id.clone())
                 .unwrap_or_else(|| current_instance_id.to_string());
-            candidates.push(ProfileCandidate {
+            let candidate = ProfileCandidate {
                 instance_id: candidate_inst_id,
                 account_id: acc.id.clone(),
                 email: acc.email.clone(),
                 quota_percent: quota,
                 score,
-            });
+            };
+            if is_in_cooldown(acc) {
+                cooldown_pool.push((candidate, acc.last_used));
+            } else {
+                available_pool.push(candidate);
+            }
         }
     }
 
-    // If no candidate met the 100% or period-finished criteria, fall back to best available accounts above threshold
-    if candidates.is_empty() {
+    // 3. Fallback: If no candidate met the 100% or period-finished criteria, fall back to best available accounts above threshold
+    if available_pool.is_empty() && cooldown_pool.is_empty() {
         for acc in &all_accounts {
+            if seen_account_ids.contains(&acc.id) {
+                continue;
+            }
             if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
             if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
                 continue;
             }
+            // Strictly skip accounts leased by another active machine/node
             if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
                 &acc.id, &acc.email,
             ) {
                 continue;
             }
+
+            let bound_inst = registry
+                .instances
+                .iter()
+                .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
+            if let Some(inst) = bound_inst {
+                if inst.id != current_instance_id
+                    && crate::modules::instance::is_instance_running(
+                        &inst.id,
+                        &inst.data_dir,
+                        inst.pid,
+                    )
+                {
+                    continue;
+                }
+            }
+
             let quota = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
             if quota > threshold {
+                seen_account_ids.insert(acc.id.clone());
                 let score = quota / 100.0;
-                let candidate_inst_id = registry
-                    .instances
-                    .iter()
-                    .find(|i| i.bound_account_id.as_deref() == Some(&acc.id))
+                let candidate_inst_id = bound_inst
                     .map(|i| i.id.clone())
                     .unwrap_or_else(|| current_instance_id.to_string());
-                candidates.push(ProfileCandidate {
+                let candidate = ProfileCandidate {
                     instance_id: candidate_inst_id,
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
                     score,
-                });
+                };
+                if is_in_cooldown(acc) {
+                    cooldown_pool.push((candidate, acc.last_used));
+                } else {
+                    available_pool.push(candidate);
+                }
             }
         }
     }
 
-    // Priority Sorting:
-    // Sort all verified candidates by subscription tier score descending (Ultra > Pro > Free).
-    // Tie-breaker: deterministic email ordering.
-    candidates.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
-        Some(std::cmp::Ordering::Equal) | None => {
-            a.email.to_lowercase().cmp(&b.email.to_lowercase())
-        }
-        Some(ord) => ord,
-    });
+    // 4. Graceful Fallback Logic:
+    // If available pool is not empty, use ONLY the available pool.
+    // If and ONLY IF available pool is completely empty (all healthy accounts are in cooldown),
+    // fall back to the cooldown pool sorted by oldest `last_used` so the system never gets stuck.
+    let selected_candidates = if !available_pool.is_empty() {
+        // Priority Sorting for available pool:
+        // Sort by subscription tier score descending (Ultra > Pro > Free).
+        // Tie-breaker: deterministic email ordering.
+        available_pool.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
+            Some(std::cmp::Ordering::Equal) | None => {
+                a.email.to_lowercase().cmp(&b.email.to_lowercase())
+            }
+            Some(ord) => ord,
+        });
+        available_pool
+    } else if !cooldown_pool.is_empty() {
+        crate::modules::logger::log_info(&format!(
+            "[AutoSwitcher] All {} healthy account(s) are currently in cooldown. Triggering graceful fallback to oldest last_used account.",
+            cooldown_pool.len()
+        ));
+        // Sort by oldest last_used (ascending last_used timestamp: smallest first)
+        cooldown_pool.sort_by(
+            |(a_cand, a_last), (b_cand, b_last)| match a_last.cmp(b_last) {
+                std::cmp::Ordering::Equal => match b_cand.score.partial_cmp(&a_cand.score) {
+                    Some(std::cmp::Ordering::Equal) | None => a_cand
+                        .email
+                        .to_lowercase()
+                        .cmp(&b_cand.email.to_lowercase()),
+                    Some(ord) => ord,
+                },
+                ord => ord,
+            },
+        );
+        cooldown_pool.into_iter().map(|(cand, _)| cand).collect()
+    } else {
+        Vec::new()
+    };
 
-    Ok(candidates)
+    Ok(selected_candidates)
 }
 
 /// Find next best candidate profile with healthy quota, prioritizing 100% quota accounts
@@ -1418,11 +1526,12 @@ pub async fn execute_profile_rotation_with_context(
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
     let target_acc_id = target.account_id.clone();
     let target_inst_id = target.instance_id.clone();
+    let lease_ttl = crate::modules::workspace_lease_manager::get_default_lease_ttl_secs();
     tauri::async_runtime::spawn(async move {
         let _ = crate::modules::workspace_lease_manager::acquire_lease(
             &target_acc_id,
             &target_inst_id,
-            90,
+            lease_ttl,
         )
         .await;
     });
@@ -2674,5 +2783,50 @@ mod tests {
             "acc-456",
             "fresh@example.com"
         ));
+    }
+
+    #[test]
+    fn test_cooldown_partition_and_fallback_logic() {
+        let now_sec = 1700000000;
+        let cooldown_secs = 3600; // 60 mins
+
+        // Acc 1: Not in cooldown (last_used 2 hours ago)
+        let acc_avail = make_test_account("acc-avail", "avail@example.com", "gemini-pro", 100, "");
+        let mut acc_avail = acc_avail;
+        acc_avail.last_used = now_sec - 7200;
+
+        // Acc 2: In cooldown (last_used 10 mins ago)
+        let acc_cd1 = make_test_account("acc-cd1", "cd1@example.com", "gemini-pro", 100, "");
+        let mut acc_cd1 = acc_cd1;
+        acc_cd1.last_used = now_sec - 600;
+
+        // Acc 3: In cooldown (last_used 40 mins ago - older)
+        let acc_cd2 = make_test_account("acc-cd2", "cd2@example.com", "gemini-pro", 100, "");
+        let mut acc_cd2 = acc_cd2;
+        acc_cd2.last_used = now_sec - 2400;
+
+        let is_cooldown = |acc: &account::Account| -> bool {
+            acc.last_used > 0 && (now_sec - acc.last_used) < cooldown_secs
+        };
+
+        assert!(!is_cooldown(&acc_avail));
+        assert!(is_cooldown(&acc_cd1));
+        assert!(is_cooldown(&acc_cd2));
+
+        // When available pool has members, it takes precedence
+        let mut available_pool = vec![acc_avail.clone()];
+        let mut cooldown_pool = vec![
+            (acc_cd1.clone(), acc_cd1.last_used),
+            (acc_cd2.clone(), acc_cd2.last_used),
+        ];
+
+        assert!(!available_pool.is_empty());
+
+        // When available pool is empty, fallback sorts by oldest last_used (cd2 < cd1)
+        available_pool.clear();
+        assert!(available_pool.is_empty());
+        cooldown_pool.sort_by(|(_, a_last), (_, b_last)| a_last.cmp(b_last));
+        assert_eq!(cooldown_pool[0].0.id, "acc-cd2"); // used 40m ago comes before used 10m ago
+        assert_eq!(cooldown_pool[1].0.id, "acc-cd1");
     }
 }

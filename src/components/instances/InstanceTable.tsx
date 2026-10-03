@@ -8,6 +8,7 @@ import {
     Zap,
     SlidersHorizontal,
     Copy,
+    Check,
     Trash2,
     Folder,
     Layers,
@@ -37,6 +38,15 @@ interface InstanceTableProps {
     onSetDefault?: (id: string) => void;
 }
 
+function formatShortPath(fullPath: string): string {
+    if (!fullPath) return '';
+    const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
+    const sep = isWindows ? '\\' : '/';
+    const parts = fullPath.split(/[\\/]/).filter(Boolean);
+    if (parts.length <= 2) return fullPath;
+    return `...${sep}${parts.slice(-2).join(sep)}`;
+}
+
 
 export default function InstanceTable({
     instances,
@@ -57,28 +67,33 @@ export default function InstanceTable({
 }: InstanceTableProps) {
     const { accounts, currentAccount } = useAccountStore();
     const [revealedEmails, setRevealedEmails] = useState<Record<string, boolean>>({});
+    const [copiedPathId, setCopiedPathId] = useState<string | null>(null);
 
     const toggleEmail = (id: string) => {
         setRevealedEmails((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
+    const handleCopyPath = (id: string, path: string) => {
+        navigator.clipboard.writeText(path);
+        setCopiedPathId(id);
+        setTimeout(() => setCopiedPathId(null), 1500);
+    };
+
     return (
-        <div className="w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-xs">
+        <div className="w-full overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0c2438] shadow-xs">
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                     <thead>
-                        <tr className="border-b border-slate-200/70 dark:border-[#15334d] bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-3.5 py-3 w-12 text-center">#</th>
-                            <th className="px-3.5 py-3 min-w-[160px]">Profile Name</th>
-                            <th className="px-3.5 py-3 min-w-[200px]">Bound Account</th>
-                            <th className="px-3.5 py-3 min-w-[160px]">Model Quota</th>
-                            <th className="px-3.5 py-3 min-w-[120px]">Status & PID</th>
-                            <th className="px-3.5 py-3 min-w-[180px]">File / Data Path</th>
-                            <th className="px-3.5 py-3 text-center min-w-[110px]">Prompts</th>
-                            <th className="px-3.5 py-3 text-right min-w-[180px]">Actions</th>
+                        <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            <th className="px-2.5 py-2.5 w-10 text-center">#</th>
+                            <th className="px-3 py-2.5 min-w-[170px]">Profile & Account</th>
+                            <th className="px-3 py-2.5 min-w-[130px]">Model Quota</th>
+                            <th className="px-2.5 py-2.5 min-w-[100px]">Status & PID</th>
+                            <th className="px-3 py-2.5 min-w-[150px]">File / Data Path</th>
+                            <th className="px-3 py-2.5 text-right min-w-[210px]">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-[#15334d]/60 font-medium">
+                    <tbody className="font-medium">
                         {instances.map((inst, idx) => {
                             const seq = inst.config.seq_num ?? idx + 1;
                             const isActive = activeInstanceId === inst.config.id;
@@ -106,91 +121,114 @@ export default function InstanceTable({
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
-                                        "transition-colors hover:bg-slate-50/70 dark:hover:bg-[#102b42]",
-                                        isActive && "bg-blue-50/30 dark:bg-blue-950/20"
+                                        "transition-colors duration-150 border-b border-slate-200/80 dark:border-slate-800/80 last:border-b-0",
+                                        isActive
+                                            ? "bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]"
+                                            : "hover:bg-slate-50/80 dark:hover:bg-[#0d253a]/70"
                                     )}
                                 >
                                     {/* 1. Sequence */}
-                                    <td className="px-3.5 py-2.5 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d]">
+                                    <td className="px-2.5 py-2 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-[5px] bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d]">
                                             #{seq}
                                         </span>
                                     </td>
 
-                                    {/* 2. Profile Name & Flags */}
-                                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                                    {/* 2. Merged Profile & Account */}
+                                    <td className="px-3 py-2 whitespace-nowrap min-w-[170px]">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs">
                                                 {inst.config.name}
                                             </span>
                                             {isDefault ? (
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-300/40">
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-300/40">
                                                     DEFAULT
                                                 </span>
                                             ) : onSetDefault ? (
                                                 <button
                                                     type="button"
                                                     onClick={() => onSetDefault(inst.config.id)}
-                                                    className="text-[10px] text-slate-400 hover:text-amber-500 underline cursor-pointer"
+                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer"
                                                     title="Set as default profile"
                                                 >
                                                     Set Default
                                                 </button>
                                             ) : null}
                                             {isActive ? (
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-600 text-white shadow-2xs">
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-sky-600 text-white shadow-2xs">
                                                     ACTIVE
                                                 </span>
                                             ) : (
                                                 <button
                                                     type="button"
                                                     onClick={() => onSetActive(inst.config.id)}
-                                                    className="text-[10px] text-slate-400 hover:text-blue-500 underline cursor-pointer"
+                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer"
                                                     title="Set as active target for account rotations"
                                                 >
                                                     Set Active
                                                 </button>
                                             )}
+                                            {tier.includes('ultra') && (
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300/40">
+                                                    ULTRA
+                                                </span>
+                                            )}
+                                            {tier.includes('pro') && (
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40">
+                                                    PRO
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
-                                            ID: {inst.config.id}
-                                        </div>
-                                    </td>
-
-                                    {/* 3. Bound Account */}
-                                    <td className="px-3.5 py-2.5 whitespace-nowrap">
-                                        <div className="flex items-center gap-1.5">
-                                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                            <span
+                                                className={cn(
+                                                    "w-1.5 h-1.5 rounded-full shrink-0",
+                                                    !boundEmail
+                                                        ? "bg-slate-300 dark:bg-slate-600"
+                                                        : boundAccount?.disabled
+                                                        ? "bg-rose-500"
+                                                        : boundAccount?.proxy_disabled
+                                                        ? "bg-amber-500"
+                                                        : "bg-teal-500 dark:bg-cyan-400"
+                                                )}
+                                                title={
+                                                    !boundEmail
+                                                        ? "Unassigned"
+                                                        : boundAccount?.disabled
+                                                        ? "Account disabled"
+                                                        : boundAccount?.proxy_disabled
+                                                        ? "Proxy disabled"
+                                                        : "Account active"
+                                                }
+                                            />
+                                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                                             {boundEmail ? (
                                                 <span
                                                     onClick={() => toggleEmail(inst.config.id)}
-                                                    className="font-mono text-xs text-slate-800 dark:text-slate-200 cursor-pointer hover:underline"
+                                                    className="cursor-pointer hover:underline text-slate-600 dark:text-slate-300 truncate max-w-[170px]"
                                                     title={isEmailRevealed ? boundEmail : 'Click to unmask email'}
                                                 >
                                                     {displayedEmail}
                                                 </span>
                                             ) : (
-                                                <span className="text-xs text-slate-400 italic">Unassigned</span>
-                                            )}
-                                            {tier.includes('ultra') && (
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300/40">
-                                                    ULTRA
+                                                <span className="text-slate-400 dark:text-slate-500 italic text-[11px]" title={`ID: ${inst.config.id}`}>
+                                                    Unassigned
                                                 </span>
                                             )}
-                                            {tier.includes('pro') && (
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-300/40">
-                                                    PRO
+                                            {boundAccount?.disabled ? (
+                                                <span className="px-1 py-0.2 rounded-[5px] text-[9px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/40">
+                                                    Disabled
                                                 </span>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </td>
 
-                                    {/* 4. Model Quota & Glow Progress */}
-                                    <td className="px-3.5 py-2.5 whitespace-nowrap min-w-[160px]">
+                                    {/* 3. Model Quota & Glow Progress */}
+                                    <td className="px-3 py-2 whitespace-nowrap min-w-[130px]">
                                         {percentage !== null ? (
                                             <div className="space-y-1">
                                                 <div className="flex items-center justify-between text-[10px] font-mono">
-                                                    <span className="truncate max-w-[100px] text-slate-600 dark:text-slate-300">
+                                                    <span className="truncate max-w-[90px] text-slate-600 dark:text-slate-300">
                                                         {mainModel?.name || 'Primary Model'}
                                                     </span>
                                                     <span className="font-bold text-slate-900 dark:text-slate-100">
@@ -201,11 +239,11 @@ export default function InstanceTable({
                                                     <div
                                                         className={cn(
                                                             "h-full rounded-full transition-all duration-500",
-                                                            percentage > 30
-                                                                ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_8px_rgba(20,184,166,0.35)]"
-                                                                : percentage > 10
-                                                                ? "bg-gradient-to-r from-amber-500 to-orange-400 shadow-[0_0_8px_rgba(245,158,11,0.35)]"
-                                                                : "bg-gradient-to-r from-rose-500 to-pink-500 shadow-[0_0_8px_rgba(244,63,94,0.35)]"
+                                                            percentage > 50
+                                                                ? "bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500 shadow-[0_0_6px_rgba(20,184,166,0.25)]"
+                                                                : percentage >= 20
+                                                                ? "bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_0_6px_rgba(245,158,11,0.25)]"
+                                                                : "bg-gradient-to-r from-rose-500 to-red-500 shadow-[0_0_6px_rgba(244,63,94,0.25)]"
                                                         )}
                                                         style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
                                                     />
@@ -216,51 +254,59 @@ export default function InstanceTable({
                                         )}
                                     </td>
 
-                                    {/* 5. Status & PID */}
-                                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                                    {/* 4. Status & PID */}
+                                    <td className="px-2.5 py-2 whitespace-nowrap min-w-[100px]">
                                         {inst.is_running ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-800">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[11px] font-semibold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
                                                 Running {inst.pid ? `(${inst.pid})` : ''}
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-[#071a27] dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-[#071a27] dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
                                                 Idle
                                             </span>
                                         )}
                                     </td>
 
-                                    {/* 6. Executable / Data Path */}
-                                    <td className="px-3.5 py-2.5 whitespace-nowrap max-w-[200px]">
-                                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate" title={inst.config.executable_path || inst.config.data_dir}>
-                                            <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            <span className="truncate">
-                                                {inst.config.executable_path || inst.config.data_dir}
-                                            </span>
-                                        </div>
+                                    {/* 5. Executable / Data Path (Truncated ending path with copy button) */}
+                                    <td
+                                        className="px-3 py-2 whitespace-nowrap min-w-[150px] max-w-[190px]"
+                                        title={(inst as any).data_dir || inst.config.data_dir || inst.config.executable_path}
+                                    >
+                                        {(() => {
+                                            const fullPath = (inst as any).data_dir || inst.config.data_dir || inst.config.executable_path || '';
+                                            const shortPath = formatShortPath(fullPath);
+                                            const isCopied = copiedPathId === inst.config.id;
+                                            return (
+                                                <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                                    <div
+                                                        className="flex items-center gap-1 min-w-0 truncate"
+                                                        title={(inst as any).data_dir || inst.config.data_dir || fullPath}
+                                                    >
+                                                        <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                        <span className="truncate">{shortPath}</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyPath(inst.config.id, (inst as any).data_dir || inst.config.data_dir || fullPath)}
+                                                        className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0"
+                                                        title={isCopied ? "Copied!" : "Copy full path"}
+                                                    >
+                                                        {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
                                     </td>
 
-                                    {/* 7. Prompt Queue & Conversations */}
-                                    <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenPromptTree(inst.config.id)}
-                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-[#071a27] text-slate-700 dark:text-cyan-300 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                                            title="View Project and Conversation Prompt Tree"
-                                        >
-                                            <Layers className="w-3.5 h-3.5" />
-                                            <span>Prompts</span>
-                                        </button>
-                                    </td>
-
-                                    {/* 8. Actions (Segmented capsule) */}
-                                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                                        <div className="inline-flex items-center rounded-full bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                                    {/* 6. Actions (Segmented capsule with 5-6px rounded buttons) */}
+                                    <td className="px-3 py-2 text-right whitespace-nowrap min-w-[210px]">
+                                        <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                                             {inst.is_running ? (
                                                 <button
                                                     type="button"
                                                     onClick={() => onStop(inst.config.id)}
-                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-full transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer"
                                                     title="Stop Instance"
                                                 >
                                                     <Square className="w-3 h-3 fill-current" />
@@ -269,7 +315,7 @@ export default function InstanceTable({
                                                 <button
                                                     type="button"
                                                     onClick={() => onLaunch(inst.config.id)}
-                                                    className="px-2 py-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-l-full transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer"
                                                     title="Launch Instance"
                                                 >
                                                     <Play className="w-3 h-3 fill-current" />
@@ -279,7 +325,7 @@ export default function InstanceTable({
                                             <button
                                                 type="button"
                                                 onClick={() => onSwitch(inst.config.id)}
-                                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                                 title="Switch Account"
                                             >
                                                 <RotateCcw className="w-3 h-3" />
@@ -288,17 +334,26 @@ export default function InstanceTable({
                                             <button
                                                 type="button"
                                                 onClick={() => onFastForward(inst.config.id)}
-                                                className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                                 title="Fast Forward to Best Candidate"
                                             >
                                                 <Zap className="w-3 h-3 fill-current" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenPromptTree(inst.config.id)}
+                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                title="Prompts & Conversations"
+                                            >
+                                                <Layers className="w-3 h-3" />
                                             </button>
 
                                             {onAudit && (
                                                 <button
                                                     type="button"
                                                     onClick={() => onAudit(inst.config.id, inst.config.name)}
-                                                    className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-slate-500 hover:text-amber-500 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                                     title="Audit Trail"
                                                 >
                                                     <History className="w-3 h-3" />
@@ -310,13 +365,12 @@ export default function InstanceTable({
                                                     type="button"
                                                     onClick={() => onSync(inst.config.id)}
                                                     disabled={Boolean(syncingInstanceIds?.[inst.config.id])}
-                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                     title="Sync PID and Quota"
                                                 >
                                                     <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds?.[inst.config.id] && "animate-spin")} />
                                                 </button>
                                             )}
-
 
                                             <button
                                                 type="button"
@@ -330,7 +384,7 @@ export default function InstanceTable({
                                             <button
                                                 type="button"
                                                 onClick={() => onClone(inst.config.id, inst.config.name)}
-                                                className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                                 title="Clone / Duplicate Profile"
                                             >
                                                 <Copy className="w-3 h-3" />
@@ -341,7 +395,7 @@ export default function InstanceTable({
                                                     type="button"
                                                     onClick={() => onDelete(inst.config.id)}
                                                     disabled={inst.is_running}
-                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-r-full transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Delete Profile"
                                                 >
                                                     <Trash2 className="w-3 h-3" />

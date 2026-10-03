@@ -46,6 +46,14 @@ import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 import { showToast } from '../components/common/ToastContainer';
 
+function truncatePath(fullPath?: string | null): string {
+    if (!fullPath) return '';
+    const isWindows = fullPath.includes('\\') || !fullPath.includes('/');
+    const parts = fullPath.split(/[\\/]/).filter(Boolean);
+    if (parts.length <= 2) return fullPath;
+    const sep = isWindows ? '\\' : '/';
+    return `...${sep}${parts.slice(-2).join(sep)}`;
+}
 
 const INSTANCE_THEMES = [
     {
@@ -357,8 +365,8 @@ export default function Instances() {
                     </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    {/* Segmented Pill Group 1: Status & Maintenance */}
-                    <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                    {/* Segmented Group 1: Status & Maintenance */}
+                    <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                         <div className="px-3 py-1 text-xs text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap">
                             {t('instances.running_summary', 'Running {{running}} of {{total}}', {
                                 running: runningCount,
@@ -408,7 +416,7 @@ export default function Instances() {
                                 }
                             }}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 rounded-r-full transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 rounded-r-[5px] transition-colors cursor-pointer"
                             title="Force-terminate lingering background Electron/Antigravity processes, purge lockfiles, and cleanly relaunch Antigravity"
                         >
                             <Sparkles className="w-3.5 h-3.5" />
@@ -417,8 +425,8 @@ export default function Instances() {
                     </div>
 
 
-                    {/* Segmented Pill Group 2: Automation & Settings */}
-                    <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                    {/* Segmented Group 2: Automation & Settings */}
+                    <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                         <button
                             type="button"
                             onClick={async () => {
@@ -436,7 +444,7 @@ export default function Instances() {
                             }}
                             disabled={isLoading}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-full transition-colors cursor-pointer",
+                                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-[5px] transition-colors cursor-pointer",
                                 switcherStatus?.is_running
                                     ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#15334d]"
@@ -473,7 +481,7 @@ export default function Instances() {
                                 setSettingsModalTarget(null);
                                 setIsSettingsModalOpen(true);
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-full transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer"
                             title="Instance Settings & Sync: Turbo mode, plan review, copy settings, folder sync, JSON tools"
                         >
                             <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
@@ -481,15 +489,15 @@ export default function Instances() {
                         </button>
                     </div>
 
-                    {/* Segmented Pill Group 3: View Mode & Creation */}
+                    {/* Segmented Group 3: View Mode & Creation */}
                     <div className="flex items-center gap-2">
                         {/* View Switcher Capsule */}
-                        <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                             <button
                                 type="button"
                                 onClick={() => handleSetViewMode('card')}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-full transition-colors cursor-pointer",
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-[5px] transition-colors cursor-pointer",
                                     viewMode === 'card'
                                         ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -503,7 +511,7 @@ export default function Instances() {
                                 type="button"
                                 onClick={() => handleSetViewMode('list')}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-full transition-colors cursor-pointer",
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-[5px] transition-colors cursor-pointer",
                                     viewMode === 'list'
                                         ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -522,7 +530,7 @@ export default function Instances() {
                                 setNewInstanceName('');
                                 setIsCreateOpen(true);
                             }}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer transition-all"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer transition-all"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             <span>{t('instances.create_btn', 'New Instance')}</span>
@@ -584,20 +592,27 @@ export default function Instances() {
                             ) : null}
                         </div>
                     </div>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const msg = await triggerManualRotation();
-                                showToast(msg || 'Rotated to next best profile!', 'success');
-                            } catch (e: any) {
-                                setActionError(e?.toString() || 'Rotation failed');
-                            }
-                        }}
-                        className="btn btn-xs sm:btn-sm gap-1.5 shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-md shadow-blue-500/20 border-none rounded-xl cursor-pointer transition-all active:scale-95"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
-                    </button>
+                    {(() => {
+                        const activeInstance = instances.find(i => i.config.id === (activeInstanceId || 'default')) || instances.find(i => i.config.is_default) || instances[0];
+                        const rotateTooltip = `Rotates active instance (${activeInstance?.config.name || 'current'}) to the highest health candidate`;
+                        return (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const msg = await triggerManualRotation();
+                                        showToast(msg || 'Rotated to next best profile!', 'success');
+                                    } catch (e: any) {
+                                        setActionError(e?.toString() || 'Rotation failed');
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
+                                title={rotateTooltip}
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
+                            </button>
+                        );
+                    })()}
                 </div>
             ) : null}
 
@@ -618,7 +633,7 @@ export default function Instances() {
                         setNewInstanceName('');
                         setIsCreateOpen(true);
                     }}
-                    className="btn btn-primary btn-sm gap-1.5 shadow-sm"
+                    className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[5px]"
                 >
                     <Plus className="w-4 h-4" />
                     <span>{t('instances.create_btn', 'New Instance')}</span>
@@ -654,7 +669,7 @@ export default function Instances() {
                                     setActionError(e?.toString() || 'Failed to initialize default profile');
                                 }
                             }}
-                            className="btn btn-primary btn-sm gap-1.5 shadow-sm"
+                            className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[5px]"
                         >
                             <Play className="w-3.5 h-3.5" />
                             <span>{t('instances.init_default', 'Initialize Default Profile')}</span>
@@ -664,7 +679,7 @@ export default function Instances() {
                                 setNewInstanceName('');
                                 setIsCreateOpen(true);
                             }}
-                            className="btn btn-outline btn-sm gap-1.5"
+                            className="btn btn-outline btn-sm gap-1.5 rounded-[5px]"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             <span>{t('instances.create_custom', 'Create Custom Profile')}</span>
@@ -739,7 +754,7 @@ export default function Instances() {
                 />
             ) : (
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {filteredInstances.map((inst, index) => {
                         const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
                         const seqNumber = originalIndex !== -1 ? originalIndex + 1 : index + 1;
@@ -773,7 +788,7 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "rounded-xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
                                         ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
                                         : "border-gray-200/80 dark:border-[#15334d] hover:border-gray-300 dark:hover:border-blue-500/40"
@@ -782,25 +797,25 @@ export default function Instances() {
                                 {/* Top Accent Bar identifying profile color */}
                                 <div className={cn("h-1.5 w-full bg-gradient-to-r", theme.accentBar)} />
 
-                                <div className="p-4 sm:p-5 flex flex-col flex-1 justify-between min-h-[280px] min-w-0">
+                                <div className="p-3.5 flex flex-col flex-1 justify-between min-w-0">
                                     {/* Card Top */}
                                     <div className="min-w-0">
-                                        <div className="flex items-start justify-between gap-3 mb-3">
-                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                        <div className="flex items-start justify-between gap-2 mb-2.5">
+                                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                                 <span
                                                     className={cn(
                                                         "w-2.5 h-2.5 rounded-full shrink-0",
                                                         inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
                                                     )}
                                                 />
-                                                <span className="px-2 py-0.5 rounded-md text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
                                                     #{seqNumber}
                                                 </span>
-                                                <h3 className={cn("font-bold text-sm truncate", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
+                                                <h3 className={cn("font-bold text-xs truncate max-w-[120px]", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
                                                 {inst.config.is_default ? (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
+                                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
                                                         DEFAULT
                                                     </span>
                                                 ) : (
@@ -813,7 +828,7 @@ export default function Instances() {
                                                                 setActionError(e?.toString() || 'Failed to set default profile');
                                                             }
                                                         }}
-                                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-base-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                                        className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-base-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
                                                         title="Set as default profile"
                                                     >
                                                         <Star className="w-2.5 h-2.5" />
@@ -823,28 +838,27 @@ export default function Instances() {
                                             </div>
                                             <div className="shrink-0 flex items-center gap-1">
                                                 {isActive ? (
-                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs tracking-wider">
-                                                        Active Target
+                                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-blue-600 text-white shadow-xs tracking-wider">
+                                                        Active
                                                     </span>
                                                 ) : (
                                                     <button
                                                         onClick={() => setActiveInstance(inst.config.id)}
-                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-1 cursor-pointer"
+                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer"
                                                         title="Set as active instance for account switches"
                                                     >
                                                         Set Active
                                                     </button>
                                                 )}
-                                                {/* Top Quick Actions: Edit, Duplicate, Delete */}
                                                 <button
                                                     onClick={() => {
                                                         setEditTargetId(inst.config.id);
                                                         setEditInstanceName(inst.config.name);
                                                     }}
-                                                    className="btn btn-ghost btn-xs p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                                                    className="p-1 rounded-[5px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
                                                     title={t('instances.edit_title', 'Rename profile')}
                                                 >
-                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    <Pencil className="w-3 h-3" />
                                                 </button>
                                                 <button
                                                     onClick={() => {
@@ -852,35 +866,35 @@ export default function Instances() {
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
                                                         setCopyProjects(true);
                                                     }}
-                                                    className="btn btn-ghost btn-xs p-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer"
+                                                    className="p-1 rounded-[5px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer"
                                                     title="Clone / Duplicate profile settings and extensions"
                                                 >
-                                                    <Copy className="w-3.5 h-3.5" />
+                                                    <Copy className="w-3 h-3" />
                                                 </button>
-                                                {inst.config.is_default ? null : (
+                                                {!inst.config.is_default && (
                                                     <button
                                                         onClick={() => handleDelete(inst.config.id)}
                                                         disabled={inst.is_running}
-                                                        className="btn btn-ghost btn-xs p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
+                                                        className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
                                                         title="Delete profile"
                                                     >
-                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        <Trash2 className="w-3 h-3" />
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {/* Bound Account / Email Section with dark glass capsule */}
-                                        <div className="py-2 px-3 rounded-xl bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-3 flex items-center justify-between gap-2">
+                                        {/* Bound Account / Email Section: Compact py-1 px-2.5 rounded-md */}
+                                        <div className="py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5">
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                                <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
+                                                <Mail className="w-3 h-3 text-gray-400 shrink-0" />
+                                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
                                                     Account:
                                                 </span>
                                                 {displayEmail ? (
                                                     <span
                                                         className={cn(
-                                                            "px-2 py-0.5 rounded-md text-xs font-semibold font-mono border flex items-center gap-1.5 min-w-0 shadow-2xs",
+                                                            "px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs",
                                                             theme.emailPill
                                                         )}
                                                         title={displayEmail}
@@ -889,7 +903,7 @@ export default function Instances() {
                                                         <span className="truncate">{displayEmail}</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="text-xs text-gray-400 italic">
+                                                    <span className="text-[11px] text-gray-400 italic">
                                                         Unassigned
                                                     </span>
                                                 )}
@@ -898,7 +912,7 @@ export default function Instances() {
                                                 const tier = boundAccount.quota.subscription_tier.toLowerCase();
                                                 if (tier.includes('ultra')) {
                                                     return (
-                                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-bold shadow-xs shrink-0">
+                                                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-bold shadow-xs shrink-0">
                                                             <Gem className="w-2.5 h-2.5 fill-current" />
                                                             ULTRA
                                                         </span>
@@ -906,14 +920,14 @@ export default function Instances() {
                                                 }
                                                 if (tier.includes('pro')) {
                                                     return (
-                                                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-bold shadow-xs shrink-0">
+                                                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-bold shadow-xs shrink-0">
                                                             <Diamond className="w-2.5 h-2.5 fill-current" />
                                                             PRO
                                                         </span>
                                                     );
                                                 }
                                                 return (
-                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-slate-300 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-[#15334d] shrink-0">
+                                                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-slate-300 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-[#15334d] shrink-0">
                                                         <Circle className="w-2.5 h-2.5" />
                                                         FREE
                                                     </span>
@@ -921,45 +935,45 @@ export default function Instances() {
                                             })() : null}
                                         </div>
 
-                                        {/* Colorful Gemini Quota Progress Bar Section with dark glass Quota box */}
-                                        <div className="mb-3">
+                                        {/* Colorful Gemini Quota Progress Bar: VS Code cyan-teal palette */}
+                                        <div className="mb-2.5">
                                             {geminiModel ? (() => {
                                                 const pct = Math.min(100, Math.max(0, geminiModel.percentage));
                                                 const getGradient = (percentage: number) => {
-                                                    if (percentage >= 50) return 'from-emerald-500 via-teal-400 to-emerald-400 shadow-emerald-500/20';
-                                                    if (percentage >= 20) return 'from-amber-500 via-yellow-400 to-orange-400 shadow-amber-500/20';
-                                                    return 'from-rose-500 via-red-500 to-pink-500 shadow-rose-500/20';
+                                                    if (percentage >= 50) return 'from-teal-500 via-cyan-500 to-sky-500 shadow-[0_0_6px_rgba(20,184,166,0.25)]';
+                                                    if (percentage >= 20) return 'from-amber-500 to-orange-500 shadow-[0_0_6px_rgba(245,158,11,0.25)]';
+                                                    return 'from-rose-500 to-red-500 shadow-[0_0_6px_rgba(244,63,94,0.25)]';
                                                 };
                                                 const getTextClass = (percentage: number) => {
-                                                    if (percentage >= 50) return 'text-emerald-600 dark:text-emerald-400';
+                                                    if (percentage >= 50) return 'text-teal-600 dark:text-cyan-400';
                                                     if (percentage >= 20) return 'text-amber-600 dark:text-amber-400';
                                                     return 'text-rose-600 dark:text-rose-400';
                                                 };
 
                                                 return (
-                                                    <div className="p-3 rounded-xl bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
+                                                    <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-1.5">
                                                         <div className="flex items-center justify-between text-xs">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Gemini.Color className="w-4 h-4 shrink-0" />
-                                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
+                                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
                                                                     {geminiModel.display_name || 'Gemini 3.1 Pro'}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1.5 shrink-0">
                                                                 {geminiModel.reset_time ? (
-                                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1 font-mono" title={`Resets in ${formatTimeRemaining(geminiModel.reset_time)}`}>
-                                                                        <Clock className="w-3 h-3 text-gray-400" />
+                                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 font-mono" title={`Resets in ${formatTimeRemaining(geminiModel.reset_time)}`}>
+                                                                        <Clock className="w-2.5 h-2.5 text-gray-400" />
                                                                         {formatTimeRemaining(geminiModel.reset_time)}
                                                                     </span>
                                                                 ) : null}
-                                                                <span className={cn("font-mono font-bold text-xs px-2 py-0.5 rounded-md bg-white dark:bg-[#081a2b] shadow-2xs border border-gray-200 dark:border-[#15334d]", getTextClass(pct))}>
+                                                                <span className={cn("font-mono font-bold text-[11px] px-1.5 py-0.5 rounded-md bg-white dark:bg-[#081a2b] shadow-2xs border border-gray-200 dark:border-[#15334d]", getTextClass(pct))}>
                                                                     {pct}%
                                                                 </span>
                                                             </div>
                                                         </div>
 
-                                                        {/* Progress bar with glowing animated gradient */}
-                                                        <div className="h-2.5 w-full bg-gray-200/90 dark:bg-[#081a2b] border border-transparent dark:border-[#15334d]/60 rounded-full overflow-hidden p-0.5 relative shadow-inner">
+                                                        {/* Progress bar height h-2 rounded-full */}
+                                                        <div className="h-2 w-full bg-slate-100 dark:bg-[#071a27] border border-slate-200/60 dark:border-[#15334d]/60 rounded-full overflow-hidden relative shadow-inner">
                                                             <div
                                                                 className={cn(
                                                                     "h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out shadow-xs",
@@ -971,41 +985,41 @@ export default function Instances() {
                                                     </div>
                                                 );
                                             })() : boundAccount ? (
-                                                <div className="p-2.5 rounded-xl bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
-                                                    <div className="flex items-center gap-2">
-                                                        <Gemini.Color className="w-4 h-4 shrink-0 opacity-70" />
-                                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Gemini quota not synced</span>
+                                                <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
                                                     </div>
                                                     <button
                                                         onClick={() => refreshQuota(boundAccount.id)}
-                                                        className="btn btn-ghost btn-xs text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer"
+                                                        className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
                                                     >
                                                         <RotateCw className="w-3 h-3" />
                                                         <span>Sync</span>
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="p-2.5 rounded-xl bg-gray-50/40 dark:bg-[#0c2438]/60 border border-dashed border-gray-200 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-400">
-                                                    <div className="flex items-center gap-2">
-                                                        <Gemini.Color className="w-4 h-4 shrink-0 opacity-40 grayscale" />
-                                                        <span className="text-[11px] italic">Gemini Quota (No profile bound)</span>
+                                                <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#0c2438]/60 border border-dashed border-gray-200 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-400">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
+                                                        <span className="text-[10px] italic">No profile bound</span>
                                                     </div>
                                                     <span className="text-[10px] text-gray-400/80">Launch to assign</span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Status and Profile details: Modern compact badge layout */}
-                                        <div className="space-y-2 py-2.5 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
-                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        {/* Status and Profile details: Compact badge layout */}
+                                        <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
+                                            <div className="flex items-center justify-between gap-1.5 flex-wrap">
                                                 {/* Status Badge */}
                                                 {inst.is_running ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs">
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        Running {inst.pid ? `(PID: ${inst.pid})` : ''}
+                                                        Running {inst.pid ? `(${inst.pid})` : ''}
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                                                         Idle
                                                     </span>
@@ -1013,7 +1027,7 @@ export default function Instances() {
 
                                                 {/* Profile ID Monospace Pill */}
                                                 <span
-                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#0c2438] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] truncate max-w-[150px]"
+                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#0c2438] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] truncate max-w-[120px]"
                                                     title={`Profile ID: ${inst.config.id}`}
                                                 >
                                                     <span className="text-gray-400 dark:text-slate-500">ID:</span>
@@ -1022,10 +1036,10 @@ export default function Instances() {
                                             </div>
 
                                             {/* Path with clean folder badge and copy action */}
-                                            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#0c2438]/70 border border-gray-200/70 dark:border-[#15334d] text-[11px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
-                                                <div className="flex items-center gap-1.5 min-w-0 flex-1 text-gray-500 dark:text-slate-400" title={inst.config.data_dir}>
-                                                    <Folder className="w-3.5 h-3.5 shrink-0 text-blue-500/80" />
-                                                    <span className="truncate font-mono text-[10px]">{inst.config.data_dir}</span>
+                                            <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/70 border border-gray-200/70 dark:border-[#15334d] text-[10px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
+                                                <div className="flex items-center gap-1 min-w-0 flex-1 text-gray-500 dark:text-slate-400" title={inst.config.data_dir}>
+                                                    <Folder className="w-3 h-3 shrink-0 text-blue-500/80" />
+                                                    <span className="truncate font-mono" title={inst.config.data_dir}>{truncatePath(inst.config.data_dir)}</span>
                                                 </div>
                                                 <button
                                                     type="button"
@@ -1038,7 +1052,7 @@ export default function Instances() {
                                                             showToast('Failed to copy path', 'error');
                                                         }
                                                     }}
-                                                    className="opacity-60 group-hover:opacity-100 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#15334d] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
+                                                    className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-gray-200 dark:hover:bg-[#15334d] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
                                                     title="Copy directory path"
                                                 >
                                                     <Copy className="w-3 h-3" />
@@ -1047,10 +1061,10 @@ export default function Instances() {
 
                                             {/* Custom executable path badge */}
                                             {inst.config.executable_path ? (
-                                                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/40 dark:border-purple-800/30 text-[11px] group transition-colors">
-                                                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-purple-700 dark:text-purple-300" title={inst.config.executable_path}>
-                                                        <Cpu className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-                                                        <span className="truncate font-mono text-[10px]">{inst.config.executable_path}</span>
+                                                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/40 dark:border-purple-800/30 text-[10px] group transition-colors">
+                                                    <div className="flex items-center gap-1 min-w-0 flex-1 text-purple-700 dark:text-purple-300" title={inst.config.executable_path}>
+                                                        <Cpu className="w-3 h-3 shrink-0 text-purple-500" />
+                                                        <span className="truncate font-mono" title={inst.config.executable_path}>{truncatePath(inst.config.executable_path)}</span>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -1065,7 +1079,7 @@ export default function Instances() {
                                                                 }
                                                             }
                                                         }}
-                                                        className="opacity-60 group-hover:opacity-100 p-1 rounded-md hover:bg-purple-200/60 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 transition-opacity cursor-pointer shrink-0"
+                                                        className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-purple-200/60 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 transition-opacity cursor-pointer shrink-0"
                                                         title="Copy executable path"
                                                     >
                                                         <Copy className="w-3 h-3" />
@@ -1075,155 +1089,155 @@ export default function Instances() {
                                         </div>
                                     </div>
 
-                                    {/* Card Actions with clear visual hierarchy */}
-                                    <div className="pt-3 border-t border-gray-100 dark:border-[#15334d]/80 mt-2">
-                                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                                            {/* Primary Action Buttons (Launch/Stop, Switch, FF) */}
-                                            <div className="flex items-center gap-1.5">
-                                                {inst.is_running ? (
-                                                    <button
-                                                        onClick={() => stopInstance(inst.config.id)}
-                                                        className="btn btn-xs bg-rose-500/15 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white border border-rose-500/30 rounded-lg gap-1 font-semibold cursor-pointer transition-colors shadow-2xs"
-                                                        title="Gracefully stop this instance window"
-                                                    >
-                                                        <Square className="w-3 h-3" />
-                                                        <span>Stop</span>
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleLaunch(inst.config.id)}
-                                                        className="btn btn-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer shadow-xs shadow-blue-500/25 transition-all active:scale-95"
-                                                        title="Launch instance window"
-                                                    >
-                                                        <Play className="w-3 h-3" />
-                                                        <span>Launch</span>
-                                                    </button>
-                                                )}
-
-                                                {/* Sleek Switch Account Button */}
+                                    {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
+                                    <div className="pt-2.5 border-t border-gray-100 dark:border-[#15334d]/80 mt-2 space-y-1.5">
+                                        {/* Row 1: Stop/Launch, Switch, Fast-Forward, Audit, Sync */}
+                                        <div className="flex items-center gap-1 w-full">
+                                            {inst.is_running ? (
                                                 <button
-                                                    onClick={() => setSwitchTargetInstance(inst)}
-                                                    className="btn btn-xs bg-sky-500/10 hover:bg-sky-500 text-sky-700 dark:text-sky-300 hover:text-white border border-sky-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
-                                                    title="Explicitly select and switch this instance to any registered account"
+                                                    type="button"
+                                                    onClick={() => stopInstance(inst.config.id)}
+                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                                                    title="Stop Instance"
                                                 >
-                                                    <ArrowRightLeft className="w-3 h-3" />
-                                                    <span>Switch</span>
+                                                    <Square className="w-3 h-3 fill-current" />
                                                 </button>
-
-                                                {/* Fast Forward Badge Button */}
+                                            ) : (
                                                 <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const msg = await fastForwardInstance(inst.config.id);
-                                                            showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
-                                                        } catch (e: any) {
-                                                            setActionError(e?.toString() || 'Fast forward failed');
-                                                        }
-                                                    }}
-                                                    className="btn btn-xs bg-purple-500/10 hover:bg-purple-500 text-purple-700 dark:text-purple-300 hover:text-white border border-purple-500/25 rounded-lg gap-1 font-bold cursor-pointer transition-colors"
-                                                    title="Fast Forward: Automatically rotate to the next healthiest profile in pool"
+                                                    type="button"
+                                                    onClick={() => handleLaunch(inst.config.id)}
+                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+                                                    title="Launch Instance"
                                                 >
-                                                    <FastForward className="w-3 h-3" />
-                                                    <span>FF</span>
+                                                    <Play className="w-3 h-3 fill-current" />
                                                 </button>
+                                            )}
 
-                                                {/* Audit Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSwitchTargetInstance(inst)}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Switch Account"
+                                            >
+                                                <ArrowRightLeft className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const msg = await fastForwardInstance(inst.config.id);
+                                                        showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
+                                                    } catch (e: any) {
+                                                        setActionError(e?.toString() || 'Fast forward failed');
+                                                    }
+                                                }}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Fast Forward to Next Best"
+                                            >
+                                                <FastForward className="w-3 h-3" />
+                                            </button>
+
+                                            {/* Softened Audit Button (VS Code slate theme) */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setAuditModalInstance({
+                                                    id: inst.config.id,
+                                                    name: inst.config.name,
+                                                    sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
+                                                })}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Audit Trail"
+                                            >
+                                                <History className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: true }));
+                                                    try {
+                                                        await syncInstance(inst.config.id);
+                                                    } catch (e: any) {
+                                                        setActionError(e?.toString() || 'Failed to sync instance');
+                                                    } finally {
+                                                        setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: false }));
+                                                    }
+                                                }}
+                                                disabled={Boolean(syncingInstanceIds[inst.config.id])}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                                                title="Sync PID and Quota"
+                                            >
+                                                <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds[inst.config.id] && "animate-spin")} />
+                                            </button>
+                                        </div>
+
+                                        {/* Row 2: Prompts, Settings, Clone, Executable, Wipe, Delete */}
+                                        <div className="flex items-center gap-1 w-full">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Prompt Tree"
+                                            >
+                                                <Layers className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSettingsModalTarget(inst);
+                                                    setIsSettingsModalOpen(true);
+                                                }}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Settings & Sync"
+                                            >
+                                                <SlidersHorizontal className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setCopyTargetId(inst.config.id);
+                                                    setCopyInstanceName(`${inst.config.name} Copy`);
+                                                    setCopyProjects(true);
+                                                }}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Clone Profile"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCloneExecutable(inst.config.id)}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Clone Binary"
+                                            >
+                                                <Cpu className="w-3 h-3" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleWipeSession(inst.config.id)}
+                                                disabled={inst.is_running}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="Wipe Credentials"
+                                            >
+                                                <RotateCcw className="w-3 h-3" />
+                                            </button>
+
+                                            {!inst.config.is_default && (
                                                 <button
-                                                    onClick={() => setAuditModalInstance({
-                                                        id: inst.config.id,
-                                                        name: inst.config.name,
-                                                        sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
-                                                    })}
-                                                    className="btn btn-xs bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-300 hover:text-white border border-amber-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
-                                                    title="Open Audit Trail for this instance"
-                                                >
-                                                    <History className="w-3 h-3 text-amber-500" />
-                                                    <span>Audit</span>
-                                                </button>
-
-                                                {/* Sync Button */}
-                                                <button
-                                                    onClick={async () => {
-                                                        setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: true }));
-                                                        try {
-                                                            await syncInstance(inst.config.id);
-                                                        } catch (e: any) {
-                                                            setActionError(e?.toString() || 'Failed to sync instance');
-                                                        } finally {
-                                                            setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: false }));
-                                                        }
-                                                    }}
-                                                    disabled={Boolean(syncingInstanceIds[inst.config.id])}
-                                                    className="btn btn-xs bg-teal-500/10 hover:bg-teal-500 text-teal-700 dark:text-teal-300 hover:text-white border border-teal-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
-                                                    title="Sync PID and quota for this instance"
-                                                >
-                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds[inst.config.id] && "animate-spin")} />
-                                                    <span>Sync</span>
-                                                </button>
-                                            </div>
-
-
-                                            {/* Clean Secondary Utility Icon Buttons (Settings & Sync, Clone, Executable, Wipe, Delete) */}
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
-                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
-                                                    title="View project and conversation prompt tree"
-                                                >
-                                                    <Layers className="w-3 h-3 text-cyan-500" />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        setSettingsModalTarget(inst);
-                                                        setIsSettingsModalOpen(true);
-                                                    }}
-                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
-                                                    title="Settings & Sync: Turbo mode, plan review, copy settings, folders, and JSON"
-                                                >
-                                                    <SlidersHorizontal className="w-3 h-3" />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        setCopyTargetId(inst.config.id);
-                                                        setCopyInstanceName(`${inst.config.name} Copy`);
-                                                        setCopyProjects(true);
-                                                    }}
-                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
-                                                    title="Clone profile settings and extensions"
-                                                >
-                                                    <Copy className="w-3 h-3" />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => handleCloneExecutable(inst.config.id)}
-                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
-                                                    title="Clone executable binary for this profile"
-                                                >
-                                                    <Cpu className="w-3 h-3" />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => handleWipeSession(inst.config.id)}
+                                                    type="button"
+                                                    onClick={() => handleDelete(inst.config.id)}
                                                     disabled={inst.is_running}
-                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                    title="Wipe auth credentials (keep settings)"
+                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    title="Delete Profile"
                                                 >
-                                                    <RotateCcw className="w-3 h-3" />
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
-
-                                                {inst.config.is_default ? null : (
-                                                    <button
-                                                        onClick={() => handleDelete(inst.config.id)}
-                                                        disabled={inst.is_running}
-                                                        className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        title="Delete profile"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

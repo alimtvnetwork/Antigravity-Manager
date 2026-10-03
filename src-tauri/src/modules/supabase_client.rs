@@ -26,6 +26,45 @@ pub struct SupabaseEndpoint {
     pub tags: Vec<String>,
 }
 
+impl SupabaseEndpoint {
+    /// Construct a new SupabaseEndpoint with normalized URL and standard role defaults
+    pub fn new_endpoint(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        url: impl Into<String>,
+        api_key: impl Into<String>,
+        role: impl Into<String>,
+    ) -> Self {
+        let role_str = role.into();
+        let is_root = role_str.eq_ignore_ascii_case("root");
+        let raw_url = url.into();
+        let clean_url = normalize_supabase_url(&raw_url);
+        Self {
+            id: id.into(),
+            name: name.into(),
+            url: clean_url,
+            api_key: api_key.into(),
+            role: role_str.clone(),
+            is_enabled: true,
+            prune_threshold_mb: if is_root { 400 } else { 200 },
+            priority: if is_root { 1 } else { 2 },
+            notes: None,
+            tags: vec![role_str],
+        }
+    }
+}
+
+/// Helper to construct a SupabaseEndpoint with standard defaults
+pub fn create_endpoint(
+    id: impl Into<String>,
+    name: impl Into<String>,
+    url: impl Into<String>,
+    api_key: impl Into<String>,
+    role: impl Into<String>,
+) -> SupabaseEndpoint {
+    SupabaseEndpoint::new_endpoint(id, name, url, api_key, role)
+}
+
 /// Table verification result for schema checking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableVerificationResult {
@@ -526,6 +565,35 @@ mod tests {
         assert_eq!(client2.base_url(), "https://abcdefg.supabase.co");
         assert_eq!(client2.table_url("nodes"), client1.table_url("nodes"));
         assert_eq!(client2.rpc_url("sync_nodes"), client1.rpc_url("sync_nodes"));
+    }
+
+    #[test]
+    fn test_create_endpoint_helpers() {
+        let ep = create_endpoint(
+            "ep1",
+            "Root DB",
+            "https://xyz.supabase.co/rest/v1/",
+            "key1",
+            "root",
+        );
+        assert_eq!(ep.id, "ep1");
+        assert_eq!(ep.url, "https://xyz.supabase.co");
+        assert_eq!(ep.role, "root");
+        assert_eq!(ep.priority, 1);
+        assert_eq!(ep.prune_threshold_mb, 400);
+
+        let ep_sec = SupabaseEndpoint::new_endpoint(
+            "ep2",
+            "Sec DB",
+            "https://abc.supabase.co/",
+            "key2",
+            "secondary",
+        );
+        assert_eq!(ep_sec.id, "ep2");
+        assert_eq!(ep_sec.url, "https://abc.supabase.co");
+        assert_eq!(ep_sec.role, "secondary");
+        assert_eq!(ep_sec.priority, 2);
+        assert_eq!(ep_sec.prune_threshold_mb, 200);
     }
 
     #[test]

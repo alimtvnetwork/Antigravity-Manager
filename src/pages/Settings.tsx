@@ -46,7 +46,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.130.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.132.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -112,6 +112,7 @@ function Settings() {
             target_model: 'gemini-pro',
             has_auto_resume: true,
             cooldown_seconds: 180,
+            ...({ account_lockout_window_minutes: 60 } as any),
         },
         conversation_cleanup: {
             is_enabled: false,
@@ -1260,7 +1261,7 @@ function Settings() {
                             </div>
 
                             {/* Auto Profile Switcher */}
-                            <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm">
+                            <div className="group bg-white dark:bg-base-100 rounded-xl p-5 border border-gray-100 dark:border-base-200 hover:border-blue-200 transition-all duration-300 shadow-sm space-y-4">
                                 <AutoSwitcherSettings
                                     config={formData.auto_profile_switcher}
                                     onChange={async (newConfig) => {
@@ -1276,6 +1277,46 @@ function Settings() {
                                         }
                                     }}
                                 />
+
+                                {/* Account Lockout Window Setting */}
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="space-y-0.5">
+                                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                            {t('settings.auto_switcher.account_lockout_window', 'Account Lockout Window')}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            {t('settings.auto_switcher.account_lockout_window_desc', 'Duration an account remains temporarily locked out after quota exhaustion or rate limits before re-evaluation.')}
+                                        </p>
+                                    </div>
+                                    <div className="relative shrink-0">
+                                        <select
+                                            value={(formData.auto_profile_switcher as any)?.account_lockout_window_minutes ?? 60}
+                                            onChange={async (e) => {
+                                                const minutes = Number(e.target.value);
+                                                const newConfig = {
+                                                    ...(formData.auto_profile_switcher || {}),
+                                                    account_lockout_window_minutes: minutes,
+                                                };
+                                                const newFormData = {
+                                                    ...formData,
+                                                    auto_profile_switcher: newConfig as any,
+                                                };
+                                                setFormData(newFormData);
+                                                try {
+                                                    await saveConfig(newFormData);
+                                                } catch (error) {
+                                                    showToast(`${t('common.error')}: ${error}`, 'error');
+                                                }
+                                            }}
+                                            className="appearance-none px-3 py-1.5 pr-8 bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] rounded-md text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
+                                        >
+                                            <option value={30}>{t('settings.auto_switcher.lockout_30m', '30 minutes')}</option>
+                                            <option value={60}>{t('settings.auto_switcher.lockout_60m', '60 minutes (Default)')}</option>
+                                            <option value={120}>{t('settings.auto_switcher.lockout_120m', '120 minutes')}</option>
+                                        </select>
+                                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2.5 top-2.5" />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Quota Protection */}

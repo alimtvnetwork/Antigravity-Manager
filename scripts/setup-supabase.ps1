@@ -35,10 +35,33 @@ Write-Host "Target Config File: $targetPath" -ForegroundColor Yellow
 
 # 2. Build or read config
 $config = $null
+$defaultVaultPath = "d:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json"
+if (-not $ConfigFile -and (Test-Path $defaultVaultPath)) {
+    $ConfigFile = $defaultVaultPath
+}
+
 if ($ConfigFile -and (Test-Path $ConfigFile)) {
     Write-Host "Loading configuration from JSON file: $ConfigFile" -ForegroundColor Green
     $jsonRaw = Get-Content -Path $ConfigFile -Raw
-    $config = $jsonRaw | ConvertFrom-Json
+    $parsed = $jsonRaw | ConvertFrom-Json
+    if ($parsed.data -and $parsed.data.endpoints) {
+        $config = $parsed.data
+        if ($parsed.variables) {
+            foreach ($prop in $parsed.variables.PSObject.Properties) {
+                $varPattern = "`${" + $prop.Name + "}"
+                $varVal = $prop.Value
+                if ($config.node_alias -eq $varPattern) { $config.node_alias = $varVal }
+                foreach ($ep in $config.endpoints) {
+                    if ($ep.url -eq $varPattern) { $ep.url = $varVal }
+                }
+            }
+        }
+    } else {
+        $config = $parsed
+    }
+    if ($NodeAlias -and $config) {
+        $config.node_alias = $NodeAlias
+    }
 } else {
     Write-Host "Generating configuration using provided endpoints..." -ForegroundColor Green
     

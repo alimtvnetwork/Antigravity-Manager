@@ -1,0 +1,14 @@
+{
+  "id": "105-02",
+  "name": "Frontend Table Zero-Scroll Optimization, 4-Col Grid, VS Code Progress Theming & 5-6px Button Radii",
+  "status": "COMPLETED",
+  "owner": "Worker 02",
+  "owned_files": [
+    "src/services/instanceService.ts",
+    "src/components/instances/InstanceTable.tsx",
+    "src/pages/Instances.tsx",
+    "src/pages/Accounts.tsx",
+    "src/components/accounts/QuotaItem.tsx",
+    "src/pages/Settings.tsx"
+  ]
+}

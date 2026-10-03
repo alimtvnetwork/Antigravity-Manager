@@ -44,6 +44,7 @@ const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     caution_interval_seconds: 60,
     critical_interval_seconds: 40,
     critical_threshold_percent: 12.0,
+    account_cooldown_minutes: 60,
 };
 
 export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ config, onChange }) => {
@@ -447,6 +448,52 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                     <span>5 min</span>
                                     <span>10 min</span>
                                 </div>
+                            </div>
+
+                            {/* Account Reuse Cooldown Window Setting */}
+                            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60">
+                                <div className="flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span>Account Reuse Cooldown (Minutes)</span>
+                                    </span>
+                                    <span className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">
+                                        {currentConfig.account_cooldown_minutes ?? 60} min
+                                    </span>
+                                </div>
+                                <div className="relative mt-1">
+                                    <select
+                                        value={currentConfig.account_cooldown_minutes ?? 60}
+                                        onChange={(e) => onChange({ ...currentConfig, account_cooldown_minutes: Number(e.target.value) })}
+                                        className="w-full appearance-none px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-[5px] text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
+                                    >
+                                        <option value={15}>15 Minutes</option>
+                                        <option value={30}>30 Minutes</option>
+                                        <option value={45}>45 Minutes</option>
+                                        <option value={60}>60 Minutes (Default)</option>
+                                        <option value={120}>120 Minutes (2 Hours)</option>
+                                    </select>
+                                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2.5 top-2.5" />
+                                </div>
+                                <div className="flex gap-1.5 pt-1.5 flex-wrap">
+                                    {[15, 30, 45, 60, 120].map((mins) => (
+                                        <button
+                                            key={mins}
+                                            type="button"
+                                            onClick={() => onChange({ ...currentConfig, account_cooldown_minutes: mins })}
+                                            className={`px-2 py-0.5 text-[10px] font-mono font-medium rounded-[5px] border transition-all cursor-pointer ${
+                                                (currentConfig.account_cooldown_minutes ?? 60) === mins
+                                                    ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-800 shadow-xs'
+                                                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            {mins}m
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                                    Enforces cross-machine lease lock and skips recently used accounts until cooldown expires, with automatic fallback if all accounts are cooling down.
+                                </p>
                             </div>
                         </div>
 
