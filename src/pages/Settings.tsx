@@ -46,7 +46,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.125.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.126.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -2058,49 +2058,89 @@ function Settings() {
                     )}
 
                     {activeTab === 'about' && (
-                        <div className="flex flex-col h-full animate-in fade-in duration-500">
-                            <div className="flex flex-col gap-4 max-w-3xl">
-                                <div className="flex items-center gap-3">
+                        <div className="flex flex-col h-full animate-in fade-in duration-500 max-w-4xl space-y-4">
+                            {/* Main Identity & Tech Card */}
+                            <div className="p-5 rounded-2xl bg-white dark:bg-base-200 border border-gray-200/80 dark:border-base-100 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3.5 min-w-0">
                                     <img
                                         src="/icon.png"
                                         alt="Antigravity Logo"
-                                        className="w-10 h-10 rounded-lg object-cover bg-white dark:bg-black"
+                                        className="w-12 h-12 rounded-xl object-cover bg-white dark:bg-black shadow-xs ring-1 ring-black/5 dark:ring-white/10 shrink-0"
                                     />
                                     <div className="min-w-0">
-                                        <h3 className="text-base font-semibold text-gray-900 dark:text-base-content leading-tight">{t('common.app_name', 'Agm Tool By Alim')}</h3>
-                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                            <span>v{appVersion}</span>
-                                            <span>·</span>
-                                            <span>{t('settings.branding.subtitle')}</span>
-                                            <span>·</span>
-                                            <span>Tauri v2 · React 19</span>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="text-base font-bold text-gray-900 dark:text-base-content leading-tight">
+                                                {t('common.app_name', 'Agm Tool By Alim')}
+                                            </h3>
+                                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs">
+                                                v{appVersion}
+                                            </span>
                                         </div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                            {t('settings.branding.subtitle')}
+                                        </p>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-wrap items-center gap-2 text-xs">
-                                    <a href="https://alimkarim.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-blue-400">
-                                        <User className="w-3.5 h-3.5" />
-                                        Md. Alim Ul Karim
-                                    </a>
-                                    <a href="https://t.me/AntigravityManager" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-sky-400">
-                                        <Send className="w-3.5 h-3.5" />
-                                        {t('settings.about.telegram')}
-                                    </a>
-                                    <a href="https://github.com/alimtvnetwork/Antigravity-Manager" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-gray-400">
-                                        <Github className="w-3.5 h-3.5" />
-                                        {t('settings.about.view_code')}
-                                    </a>
-                                    <button type="button" onClick={() => setIsSupportModalOpen(true)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-pink-400">
-                                        <Heart className="w-3.5 h-3.5" />
-                                        {t('settings.about.support_btn')}
-                                    </button>
+                                <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-center">
+                                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-gray-100 dark:bg-base-300 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-base-200">
+                                        Tauri v2
+                                    </span>
+                                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-gray-100 dark:bg-base-300 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-base-200">
+                                        React 19
+                                    </span>
+                                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-gray-100 dark:bg-base-300 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-base-200">
+                                        Rust Core
+                                    </span>
                                 </div>
+                            </div>
 
-                                {/* Update Channel Selector */}
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                                        <span>{t('settings.about.update_channel')}:</span>
+                            {/* Action Pills Row */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                <a
+                                    href="https://alimkarim.com"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-base-100 bg-white dark:bg-base-200 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-xs transition-all duration-200 group cursor-pointer"
+                                >
+                                    <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
+                                    <span>Md. Alim Ul Karim</span>
+                                </a>
+                                <a
+                                    href="https://t.me/AntigravityManager"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-base-100 bg-white dark:bg-base-200 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-400 hover:shadow-xs transition-all duration-200 group cursor-pointer"
+                                >
+                                    <Send className="w-4 h-4 text-sky-500 group-hover:scale-110 transition-transform" />
+                                    <span>{t('settings.about.telegram')}</span>
+                                </a>
+                                <a
+                                    href="https://github.com/alimtvnetwork/Antigravity-Manager"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-base-100 bg-white dark:bg-base-200 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-white hover:shadow-xs transition-all duration-200 group cursor-pointer"
+                                >
+                                    <Github className="w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:scale-110 transition-transform" />
+                                    <span>{t('settings.about.view_code')}</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSupportModalOpen(true)}
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-pink-200/80 dark:border-pink-900/40 bg-pink-50/50 dark:bg-pink-950/20 text-xs font-medium text-pink-700 dark:text-pink-300 hover:border-pink-400 hover:bg-pink-100/60 dark:hover:bg-pink-950/40 hover:shadow-xs transition-all duration-200 group cursor-pointer"
+                                >
+                                    <Heart className="w-4 h-4 text-pink-500 group-hover:scale-110 transition-transform fill-pink-500/20" />
+                                    <span>{t('settings.about.support_btn')}</span>
+                                </button>
+                            </div>
+
+                            {/* Update Management Card */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-base-200 border border-gray-200/80 dark:border-base-100 shadow-xs flex flex-col gap-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    {/* Update Channel Selector */}
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                            {t('settings.about.update_channel')}:
+                                        </span>
                                         <div className="inline-flex p-1 bg-gray-100 dark:bg-base-300 rounded-xl border border-gray-200/60 dark:border-base-200">
                                             <button
                                                 type="button"
@@ -2121,7 +2161,7 @@ function Settings() {
                                                         showToast(`${t('common.error')}: ${err}`, 'error');
                                                     }
                                                 }}
-                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                                                     (formData.update_channel || 'stable') === 'stable'
                                                         ? 'bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-sm'
                                                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -2148,7 +2188,7 @@ function Settings() {
                                                         showToast(`${t('common.error')}: ${err}`, 'error');
                                                     }
                                                 }}
-                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
                                                     formData.update_channel === 'beta'
                                                         ? 'bg-white dark:bg-base-100 text-amber-600 dark:text-amber-400 shadow-sm'
                                                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -2158,99 +2198,99 @@ function Settings() {
                                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                                             </button>
                                         </div>
+                                        {formData.update_channel === 'beta' && (
+                                            <span className="text-[11px] text-amber-600/90 dark:text-amber-400/90">
+                                                {t('settings.about.channel_beta_hint')}
+                                            </span>
+                                        )}
                                     </div>
-                                    {formData.update_channel === 'beta' && (
-                                        <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90">
-                                            {t('settings.about.channel_beta_hint')}
-                                        </p>
-                                    )}
+
+                                    {/* Check for Updates Action */}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleCheckUpdate}
+                                            disabled={isCheckingUpdate}
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-2 shadow-sm hover:shadow-md disabled:cursor-not-allowed cursor-pointer"
+                                        >
+                                            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                                            {isCheckingUpdate ? t('settings.about.checking_update') : t('settings.about.check_update')}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Check for Updates */}
-                                <div className="flex flex-col items-center gap-3">
-                                    <button
-                                        onClick={handleCheckUpdate}
-                                        disabled={isCheckingUpdate}
-                                        className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-sm hover:shadow-md disabled:cursor-not-allowed"
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-                                        {isCheckingUpdate ? t('settings.about.checking_update') : t('settings.about.check_update')}
-                                    </button>
-
-                                    {/* Update Status */}
-                                    {updateInfo && !isCheckingUpdate && (
-                                        <div className="text-center">
-                                            {updateInfo.hasUpdate ? (
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <div className="flex items-center gap-1.5 text-sm text-orange-600 dark:text-orange-400 font-medium">
-                                                        <span>{t('settings.about.new_version_available', { version: updateInfo.latestVersion })}</span>
-                                                        {updateInfo.channel === 'beta' && (
-                                                            <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                                                Beta
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        {isBrewInstalled && (
-                                                            <button
-                                                                onClick={() => setIsBrewConfirmOpen(true)}
-                                                                disabled={isBrewUpgrading}
-                                                                className="px-4 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:cursor-not-allowed"
-                                                            >
-                                                                {isBrewUpgrading ? (
-                                                                    <>
-                                                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                                                        {t('settings.about.brew_upgrading')}
-                                                                    </>
-                                                                ) : (
-                                                                    t('settings.about.brew_upgrade')
-                                                                )}
-                                                            </button>
-                                                        )}
+                                {/* Inline Status Messaging */}
+                                {updateInfo && !isCheckingUpdate && (
+                                    <div className="pt-3 border-t border-gray-100 dark:border-base-100">
+                                        {updateInfo.hasUpdate ? (
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+                                                <div className="flex items-center gap-2 text-xs text-orange-700 dark:text-orange-300 font-medium">
+                                                    <span>{t('settings.about.new_version_available', { version: updateInfo.latestVersion })}</span>
+                                                    {updateInfo.channel === 'beta' && (
+                                                        <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                                            Beta
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    {isBrewInstalled && (
                                                         <button
-                                                            onClick={handleRunInstallerUpdate}
-                                                            disabled={isInstallerUpdating}
-                                                            className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                                                            onClick={() => setIsBrewConfirmOpen(true)}
+                                                            disabled={isBrewUpgrading}
+                                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:cursor-not-allowed cursor-pointer"
                                                         >
-                                                            {isInstallerUpdating ? (
+                                                            {isBrewUpgrading ? (
                                                                 <>
-                                                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                                                    <span>{t('settings.about.installer_running', 'Running Installer...')}</span>
+                                                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                                                    {t('settings.about.brew_upgrading')}
                                                                 </>
                                                             ) : (
-                                                                <>
-                                                                    <Sparkles className="w-3.5 h-3.5" />
-                                                                    <span>{t('settings.about.run_installer', 'Install Update Now')}</span>
-                                                                </>
+                                                                t('settings.about.brew_upgrade')
                                                             )}
                                                         </button>
-                                                        <a
-                                                            href={updateInfo.downloadUrl}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
-                                                        >
-                                                            {t('settings.about.download_update')}
-                                                            <ExternalLink className="w-3.5 h-3.5" />
-                                                        </a>
-                                                    </div>
+                                                    )}
+                                                    <button
+                                                        onClick={handleRunInstallerUpdate}
+                                                        disabled={isInstallerUpdating}
+                                                        className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                                                    >
+                                                        {isInstallerUpdating ? (
+                                                            <>
+                                                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                                                <span>{t('settings.about.installer_running', 'Running Installer...')}</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="w-3 h-3" />
+                                                                <span>{t('settings.about.run_installer', 'Install Update Now')}</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <a
+                                                        href={updateInfo.downloadUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                                                    >
+                                                        {t('settings.about.download_update')}
+                                                        <ExternalLink className="w-3 h-3" />
+                                                    </a>
                                                 </div>
-                                            ) : (
-                                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                                                    ✓ {t('settings.about.latest_version')}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                                <CheckCircle2 className="w-4 h-4" />
+                                                <span>{t('settings.about.latest_version')}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="text-center text-[10px] text-gray-300 dark:text-gray-600 mt-auto pb-2">
+                            <div className="text-center text-[10px] text-gray-400 dark:text-gray-500 pt-2 mt-auto">
                                 {t('settings.about.copyright')}
                             </div>
                         </div>
-                    )
-                    }
+                    )}
                 </div >
 
                 {/* Data Directory Migration Modal */}

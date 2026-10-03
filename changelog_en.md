@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.126.0 (2026-10-03)**:
+        -   **[Instances] Deep Clone of Settings, Themes & Projects**:
+            -   **Description**: Duplicating an instance deep-copies source user settings, color theme (`workbench.colorTheme`), keybindings, snippets, and clones running projects and prompts in `repo_prompts.db`. Settings are synchronized across data dir and AppData for Windows IDE parity. (Thanks to @aukgit)
+        -   **[Audit] Full Dark Mode Styling**:
+            -   **Description**: Audit view cards, table headers, hover rows, and detail modal fully adopt dark palette tokens, fixing blinding white backgrounds. (Thanks to @aukgit)
+        -   **[Settings] Compact About Section**:
+            -   **Description**: Redesigned About tab into a sleek, compact card with a single-row identity header, tech badges, and integrated horizontal updater. (Thanks to @aukgit)
+        -   **[Accounts] High-Contrast Selected Row**:
+            -   **Description**: Current account row highlighted with dark slate background, amber border, yellow text, and gold badge instead of green-on-green. (Thanks to @aukgit)
+        -   **[Instances] Redesigned Duplicate Dialog**:
+            -   **Description**: Modernized instance duplication UI with scope breakdown cards, glass Cancel button, and CSS3 animated gradient Duplicate button. (Thanks to @aukgit)
+        -   **[Email] Telemetry & Connection Health**:
+            -   **Description**: Enriched Email view with IMAP/SMTP connection badges, daemon watcher state, and security vault health indicators. (Thanks to @aukgit)
+
     *   **v4.125.0 (2026-10-02)**:
         -   **[Instances] Other processes stay open**:
             -   **Description**: A switch or fast-forward closes only that instance. Another instance's saved process id and profile path are left running. (Thanks to @aukgit)

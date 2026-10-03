@@ -263,7 +263,7 @@ function SortableAccountRow({
                 isFocused
                     ? "bg-emerald-50/90 dark:bg-[#15334d] text-slate-900 dark:text-[#43d6a2] font-bold border-l-[#43d6a2] dark:border-l-[#43d6a2] border-emerald-400 dark:border-[#43d6a2]/50 shadow-xl ring-2 ring-[#43d6a2]/60 dark:ring-[#43d6a2]/40"
                     : isCurrent
-                    ? "bg-emerald-50/60 dark:bg-[#0c2438] border-l-[#16a97a] dark:border-l-[#16a97a] font-semibold text-slate-900 dark:text-white shadow-xs ring-1 ring-[#16a97a]/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
+                    ? "bg-slate-900/90 dark:bg-[#050d14] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-[#070b10] hover:text-[#f5d76e]"
                     : selected
                     ? "bg-[#070b10] text-[#f5d76e] border-l-[#f5d76e] font-semibold shadow-md"
                     : isDragging
@@ -530,7 +530,7 @@ function AccountRowContent({
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-slate-950 dark:text-white font-bold"
+                            ? "text-amber-300 dark:text-amber-300 font-bold drop-shadow-xs"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-[#f5d76e]"
                         )}
                         title={showEmail ? account.email : maskEmail(account.email)}
@@ -544,7 +544,7 @@ function AccountRowContent({
 
                     <div className="flex items-center gap-1 shrink-0">
                         {isCurrent ? (
-                            <span className="px-1.5 py-0.2 rounded bg-[#16a97a]/15 dark:bg-[#16a97a]/25 text-[#16a97a] dark:text-[#43d6a2] text-[9px] font-bold shadow-xs border border-[#16a97a]/30 dark:border-[#16a97a]/40">
+                            <span className="px-1.5 py-0.2 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30 text-[9px] font-bold shadow-xs">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         ) : null}

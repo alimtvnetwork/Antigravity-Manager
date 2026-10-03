@@ -3968,7 +3968,8 @@ pub(crate) fn clone_repo_rows_on(
     let mut project_stmt = conn
         .prepare(
             "SELECT id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at
-             FROM running_projects WHERE instance_id = ?1",
+             FROM running_projects
+             WHERE instance_id = ?1 OR (instance_id = '__default__' AND ?1 = 'default')",
         )
         .map_err(|e| format!("Failed to read source repos: {}", e))?;
     let projects: Vec<(String, String, String, Option<String>, i64, i64, i64)> = project_stmt
@@ -4002,7 +4003,8 @@ pub(crate) fn clone_repo_rows_on(
         let mut prompt_stmt = conn
             .prepare(
                 "SELECT id, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-                 FROM active_prompts WHERE project_id = ?1 AND instance_id = ?2",
+                 FROM active_prompts
+                 WHERE project_id = ?1 AND (instance_id = ?2 OR (instance_id = '__default__' AND ?2 = 'default'))",
             )
             .map_err(|e| format!("Failed to read source prompts: {}", e))?;
         let prompts: Vec<(
@@ -4193,6 +4195,74 @@ mod tests {
         assert_eq!(source_projects, 1);
         assert_eq!(target_projects, 1);
         assert_eq!(target_prompts, 1);
+    }
+
+    #[test]
+    fn test_clone_repo_rows_matches_default_and_under_default() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        // Project with 'default'
+        conn.execute(
+            "INSERT INTO running_projects
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-def', 'default', 'DefRepo', 'D:/work/def-repo', NULL, 1, 10, 10)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO active_prompts
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES ('prompt-def', 'proj-def', 'default', 'D:/work/def-repo', 'prompt def', NULL, NULL, 'running', 10, 10, NULL)",
+            [],
+        )
+        .unwrap();
+
+        // Project with '__default__'
+        conn.execute(
+            "INSERT INTO running_projects
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('proj-under', '__default__', 'UnderRepo', 'D:/work/under-repo', NULL, 1, 10, 10)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO active_prompts
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES ('prompt-under', 'proj-under', '__default__', 'D:/work/under-repo', 'prompt under', NULL, NULL, 'running', 10, 10, NULL)",
+            [],
+        )
+        .unwrap();
+
+        let copied = clone_repo_rows_on(&conn, "default", "target-inst").unwrap();
+        assert_eq!(copied, 2);
+
+        let target_projects: Vec<(String, String)> = conn
+            .prepare(
+                "SELECT id, instance_id FROM running_projects WHERE instance_id = 'target-inst'",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(target_projects.len(), 2);
+        for (_, inst_id) in &target_projects {
+            assert_eq!(inst_id, "target-inst");
+        }
+
+        let target_prompts: Vec<(String, String, String)> = conn
+            .prepare("SELECT id, project_id, instance_id FROM active_prompts WHERE instance_id = 'target-inst'")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(target_prompts.len(), 2);
+        for (_, proj_id, inst_id) in &target_prompts {
+            assert_eq!(inst_id, "target-inst");
+            assert!(proj_id.ends_with("__target-inst"));
+        }
     }
 
     #[test]

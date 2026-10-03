@@ -981,7 +981,17 @@ pub fn copy_instance(
         .ok_or_else(|| format!("Source instance {} not found", source_id))?
         .clone();
 
-    let new_instance = create_instance(target_name)?;
+    let mut new_instance = create_instance(target_name)?;
+
+    if source.extensions_dir.is_some() {
+        new_instance.extensions_dir = source.extensions_dir.clone();
+        if let Ok(mut reg) = load_registry() {
+            if let Some(inst) = reg.instances.iter_mut().find(|i| i.id == new_instance.id) {
+                inst.extensions_dir = source.extensions_dir.clone();
+                let _ = save_registry(&reg);
+            }
+        }
+    }
 
     let src_path = PathBuf::from(&source.data_dir);
     let dst_path = PathBuf::from(&new_instance.data_dir);
@@ -1144,6 +1154,7 @@ pub fn copy_instance(
             err
         ));
     }
+    let _ = crate::modules::repo_db::detect_running_projects(&source.id);
     if let Err(err) =
         crate::modules::repo_db::clone_instance_repo_rows(&source.id, &new_instance.id)
     {
@@ -1182,6 +1193,8 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
 /// file in the full tree is locked.
 const REQUIRED_IDE_REL_PATHS: &[&str] = &[
     "User/settings.json",
+    "User/keybindings.json",
+    "User/snippets",
     "User/globalStorage",
     "User/workspaceStorage",
 ];
@@ -1224,11 +1237,165 @@ fn source_profile_home(source: &InstanceConfig) -> Option<PathBuf> {
 /// The default instance lives in the real user profile; named instances live
 /// under `instances/<id>/home`. Locks and caches stay behind via `copy_dir_recursive`.
 pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> Result<(), String> {
-    let Some(src_home) = source_profile_home(source) else {
-        return Ok(());
+    if let Some(src_home) = source_profile_home(source) {
+        if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
+            let _ = copy_gemini_trees(&src_home, &dst_home);
+        }
+    }
+    copy_source_user_settings(source, dest)?;
+    Ok(())
+}
+
+/// Deep copies user settings, themes, keybindings, and snippets from source instance to target instance.
+/// On Windows, copies into both `instance_data_dir/User` AND `instance_home/AppData/Roaming/Antigravity/User`.
+pub fn copy_source_user_settings(
+    source: &InstanceConfig,
+    dest: &InstanceConfig,
+) -> Result<(), String> {
+    let dst_data_dir = PathBuf::from(&dest.data_dir);
+    let dst_user_dir = dst_data_dir.join("User");
+    let _ = fs::create_dir_all(&dst_user_dir);
+
+    let mut dst_dirs = vec![dst_user_dir];
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
+            let dst_appdata_user = dst_home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User");
+            let _ = fs::create_dir_all(&dst_appdata_user);
+            dst_dirs.push(dst_appdata_user);
+        }
+    }
+
+    let mut src_user_dirs: Vec<PathBuf> = Vec::new();
+
+    if source.is_default || source.id == "default" {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let p = PathBuf::from(appdata).join("Antigravity").join("User");
+                if p.exists() && !src_user_dirs.contains(&p) {
+                    src_user_dirs.push(p);
+                }
+            }
+        }
+        let default_user = get_default_antigravity_data_dir().join("User");
+        if default_user.exists() && !src_user_dirs.contains(&default_user) {
+            src_user_dirs.push(default_user);
+        }
+        let source_data_user = PathBuf::from(&source.data_dir).join("User");
+        if source_data_user.exists() && !src_user_dirs.contains(&source_data_user) {
+            src_user_dirs.push(source_data_user);
+        }
+    } else {
+        let source_data_user = PathBuf::from(&source.data_dir).join("User");
+        if source_data_user.exists() && !src_user_dirs.contains(&source_data_user) {
+            src_user_dirs.push(source_data_user);
+        }
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(source_home) = get_instance_home_dir(&source.id) {
+                let source_appdata_user = source_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User");
+                if source_appdata_user.exists() && !src_user_dirs.contains(&source_appdata_user) {
+                    src_user_dirs.push(source_appdata_user);
+                }
+            }
+        }
+    }
+
+    // Copy all files and snippet directories from src_user_dirs into all dst_dirs
+    for src_user in &src_user_dirs {
+        if let Ok(entries) = fs::read_dir(src_user) {
+            for entry in entries.flatten() {
+                let file_name = entry.file_name();
+                let name_str = file_name.to_string_lossy().to_lowercase();
+
+                if name_str.ends_with(".lock")
+                    || name_str.contains("cache")
+                    || name_str == "lockfile"
+                {
+                    continue;
+                }
+
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_file() {
+                        for dst in &dst_dirs {
+                            let _ = fs::copy(entry.path(), dst.join(&file_name));
+                        }
+                    } else if file_type.is_dir() && name_str == "snippets" {
+                        for dst in &dst_dirs {
+                            let _ = copy_dir_recursive(&entry.path(), &dst.join(&file_name));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Specifically ensure settings.json (which contains workbench.colorTheme, read folders,
+    // browser settings, etc.) is copied into BOTH places so that regardless of whether the IDE
+    // reads from data_dir or APPDATA, the color theme and settings are identical to the source!
+    let mut candidate_settings: Vec<PathBuf> = Vec::new();
+    for src_user in &src_user_dirs {
+        let s = src_user.join("settings.json");
+        if s.is_file() {
+            candidate_settings.push(s);
+        }
+    }
+
+    if let Some(best_settings) = pick_best_settings_path(&candidate_settings) {
+        for dst in &dst_dirs {
+            let target_settings = dst.join("settings.json");
+            if let Some(parent) = target_settings.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = fs::copy(best_settings, target_settings);
+        }
+        crate::modules::logger::log_info(&format!(
+            "[Instance] Cloned best source settings from {} into {} user targets",
+            best_settings.display(),
+            dst_dirs.len()
+        ));
+    }
+
+    Ok(())
+}
+
+fn pick_best_settings_path(candidates: &[PathBuf]) -> Option<&PathBuf> {
+    if candidates.is_empty() {
+        return None;
+    }
+    if candidates.len() == 1 {
+        return Some(&candidates[0]);
+    }
+
+    let score_file = |path: &PathBuf| -> (bool, u64, u64) {
+        let has_theme = fs::read_to_string(path)
+            .map(|content| content.contains("workbench.colorTheme"))
+            .unwrap_or(false);
+        let (mtime, len) = fs::metadata(path)
+            .map(|m| {
+                let mt = m
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                (mt, m.len())
+            })
+            .unwrap_or((0, 0));
+        (has_theme, mtime, len)
     };
-    let dst_home = get_instance_home_dir(&dest.id)?;
-    copy_gemini_trees(&src_home, &dst_home)
+
+    candidates.iter().max_by_key(|p| score_file(p))
 }
 
 fn copy_gemini_trees(src_home: &Path, dst_home: &Path) -> Result<(), String> {
@@ -3893,6 +4060,17 @@ mod clone_tree_tests {
         )
         .unwrap();
         fs::write(
+            src_data.join("User").join("keybindings.json"),
+            b"[{\"key\": \"ctrl+k\"}]",
+        )
+        .unwrap();
+        fs::create_dir_all(src_data.join("User").join("snippets")).unwrap();
+        fs::write(
+            src_data.join("User").join("snippets").join("rust.json"),
+            b"{\"snippet\": \"test\"}",
+        )
+        .unwrap();
+        fs::write(
             src_data
                 .join("User")
                 .join("workspaceStorage")
@@ -3917,6 +4095,14 @@ mod clone_tree_tests {
             br#"{"workbench.colorTheme":"Tokyo Night"}"#
         );
         assert_eq!(
+            fs::read(dst_data.join("User").join("keybindings.json")).unwrap(),
+            b"[{\"key\": \"ctrl+k\"}]"
+        );
+        assert_eq!(
+            fs::read(dst_data.join("User").join("snippets").join("rust.json")).unwrap(),
+            b"{\"snippet\": \"test\"}"
+        );
+        assert_eq!(
             fs::read(
                 dst_data
                     .join("User")
@@ -3931,6 +4117,82 @@ mod clone_tree_tests {
             fs::read(dst_home.join(".gemini").join("antigravity").join("repo.db")).unwrap(),
             b"gemini-repo-db"
         );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_copy_source_user_settings_copies_to_data_and_appdata() {
+        let root = std::env::temp_dir().join(format!("agm-user-settings-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+
+        let src_data = root.join("src-inst").join("data");
+        let dst_data = root.join("dst-inst").join("data");
+
+        let src_user = src_data.join("User");
+        fs::create_dir_all(&src_user).unwrap();
+        fs::write(
+            src_user.join("settings.json"),
+            br#"{"workbench.colorTheme":"Catppuccin Mocha"}"#,
+        )
+        .unwrap();
+        fs::write(
+            src_user.join("keybindings.json"),
+            br#"[{"key":"ctrl+shift+p"}]"#,
+        )
+        .unwrap();
+        let src_snippets = src_user.join("snippets");
+        fs::create_dir_all(&src_snippets).unwrap();
+        fs::write(
+            src_snippets.join("custom.json"),
+            b"{\"prefix\": \"custom\"}",
+        )
+        .unwrap();
+
+        let source = InstanceConfig {
+            id: "src-inst".to_string(),
+            name: "Source".to_string(),
+            data_dir: src_data.to_string_lossy().to_string(),
+            executable_path: None,
+            extensions_dir: Some("D:/extensions".to_string()),
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+
+        let dest = InstanceConfig {
+            id: "dst-inst".to_string(),
+            name: "Dest".to_string(),
+            data_dir: dst_data.to_string_lossy().to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(2),
+        };
+
+        let _ = copy_source_user_settings(&source, &dest);
+
+        assert_eq!(
+            fs::read(dst_data.join("User").join("settings.json")).unwrap(),
+            br#"{"workbench.colorTheme":"Catppuccin Mocha"}"#
+        );
+        assert_eq!(
+            fs::read(dst_data.join("User").join("keybindings.json")).unwrap(),
+            br#"[{"key":"ctrl+shift+p"}]"#
+        );
+        assert_eq!(
+            fs::read(dst_data.join("User").join("snippets").join("custom.json")).unwrap(),
+            b"{\"prefix\": \"custom\"}"
+        );
+
         let _ = fs::remove_dir_all(&root);
     }
 }

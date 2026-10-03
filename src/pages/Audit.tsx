@@ -156,21 +156,21 @@ export default function Audit() {
     const detailRevealed = detail ? Boolean(revealed[detail.id]) : false;
 
     return (
-        <div className="h-full overflow-auto bg-white px-4 sm:px-6 pt-3 pb-6 max-w-[1400px] mx-auto w-full text-slate-950">
+        <div className="h-full overflow-auto bg-white dark:bg-[#0c2438] px-4 sm:px-6 pt-3 pb-6 max-w-[1400px] mx-auto w-full text-slate-950 dark:text-base-content">
             <div className="mb-3">
-                <h1 className="text-lg font-semibold">Audit</h1>
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-base-content">Audit</h1>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
                     Addresses hide the domain, such as gmail.com, and keep the start of the name. The info button loads that row only when you open it.
                 </p>
             </div>
             {error && (
-                <div className="mb-3 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-rose-700">
+                <div className="mb-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-rose-950/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">
                     {error}
                 </div>
             )}
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438]">
                 <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-700">
+                    <thead className="bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300 border-b border-slate-200 dark:border-[#15334d]">
                         <tr>
                             <th className="px-3 py-2 font-semibold">When</th>
                             <th className="px-3 py-2 font-semibold">Status</th>
@@ -181,7 +181,7 @@ export default function Audit() {
                     </thead>
                     <tbody>
                         {(data?.items || []).map((item) => (
-                            <tr key={item.id} className="border-t border-slate-100">
+                            <tr key={item.id} className="border-t border-slate-100 dark:border-[#15334d]/60 hover:bg-slate-50/60 dark:hover:bg-[#15334d]/40 transition-colors">
                                 <td className="px-3 py-2 whitespace-nowrap">{formatTime(item.created_at)}</td>
                                 <td className="px-3 py-2">{item.status}</td>
                                 <td className="px-3 py-2" title={item.action}>{item.action_label || item.action}</td>
@@ -189,7 +189,7 @@ export default function Audit() {
                                 <td className="px-3 py-2 text-right">
                                     <button
                                         type="button"
-                                        className="mr-2 text-slate-700 underline"
+                                        className="mr-2 text-slate-700 dark:text-cyan-400 underline hover:text-slate-900 dark:hover:text-cyan-300 cursor-pointer"
                                         onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}
                                     >
                                         {revealed[item.id] ? 'Hide email' : 'Show email'}
@@ -198,7 +198,7 @@ export default function Audit() {
                                         type="button"
                                         aria-label="Show audit detail"
                                         title="Detail"
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-800"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                         onClick={() => loadDetail(item.id)}
                                     >
                                         <Info className="h-3.5 w-3.5" />
@@ -208,7 +208,7 @@ export default function Audit() {
                         ))}
                         {data && data.items.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-3 py-6 text-slate-500">
+                                <td colSpan={5} className="px-3 py-6 text-slate-500 dark:text-slate-400 text-center">
                                     No history yet. Add or switch an account and it will show up here.
                                 </td>
                             </tr>
@@ -222,17 +222,17 @@ export default function Audit() {
                     onClick={() => { setOpenId(''); setDetail(null); }}
                 >
                     <div
-                        className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-white text-slate-950 shadow-xl"
+                        className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-slate-950 dark:text-gray-100 shadow-xl"
                         onClick={(event) => event.stopPropagation()}
                         role="dialog"
                         aria-label="Audit detail"
                     >
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                            <h2 className="font-semibold">Audit detail</h2>
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-[#15334d] px-4 py-3">
+                            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Audit detail</h2>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] px-3 py-1 text-xs disabled:opacity-40 cursor-pointer"
                                     disabled={!detail}
                                     onClick={() => {
                                         if (!detail) return;
@@ -251,7 +251,7 @@ export default function Audit() {
                                 </button>
                                 <button
                                     type="button"
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs"
+                                    className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] px-3 py-1 text-xs cursor-pointer"
                                     onClick={() => { setOpenId(''); setDetail(null); }}
                                 >
                                     Cancel
@@ -259,15 +259,15 @@ export default function Audit() {
                             </div>
                         </div>
                         <div className="overflow-y-auto p-4 text-sm">
-                            {detailError && <p className="text-rose-700">{detailError}</p>}
-                            {!detail && !detailError && <p className="text-slate-500">Loading this row from its split file...</p>}
+                            {detailError && <p className="text-rose-700 dark:text-rose-400">{detailError}</p>}
+                            {!detail && !detailError && <p className="text-slate-500 dark:text-slate-400">Loading this row from its split file...</p>}
                             {detail && (
-                                <table className="w-full text-left text-xs border border-slate-200">
+                                <table className="w-full text-left text-xs border border-slate-200 dark:border-[#15334d]">
                                     <tbody>
                                         {detailRows(detail, payload, detailRevealed).map((row) => (
-                                            <tr key={row.label} className="border-t border-slate-100 first:border-t-0">
-                                                <th className="w-40 px-3 py-2 font-semibold align-top bg-slate-50">{row.label}</th>
-                                                <td className="px-3 py-2 whitespace-pre-wrap">{row.value}</td>
+                                            <tr key={row.label} className="border-t border-slate-100 dark:border-[#15334d]/60 first:border-t-0">
+                                                <th className="w-40 px-3 py-2 font-semibold align-top bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300">{row.label}</th>
+                                                <td className="px-3 py-2 whitespace-pre-wrap text-slate-900 dark:text-gray-100 bg-white dark:bg-[#0c2438]">{row.value}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -277,12 +277,12 @@ export default function Audit() {
                     </div>
                 </div>
             )}
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-700">
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-700 dark:text-gray-300">
                 <span>{total} events · page {page + 1} of {pageCount}</span>
                 <div className="flex gap-2">
                     <button
                         type="button"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-slate-950 disabled:opacity-40"
+                        className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] disabled:opacity-40 cursor-pointer"
                         disabled={page <= 0}
                         onClick={() => setPage((current) => Math.max(0, current - 1))}
                     >
@@ -290,7 +290,7 @@ export default function Audit() {
                     </button>
                     <button
                         type="button"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-slate-950 disabled:opacity-40"
+                        className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] disabled:opacity-40 cursor-pointer"
                         disabled={page + 1 >= pageCount}
                         onClick={() => setPage((current) => current + 1)}
                     >
