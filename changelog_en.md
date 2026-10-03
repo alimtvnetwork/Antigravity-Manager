@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.126.1 (2026-10-03)**:
+        -   **[Instances] Auto-Switch Instance Reopen & Rotation Lifecycle**:
+            -   **Description**: Fixed auto-profile switcher failing to reopen when the default instance reaches zero credits by preserving candidate instance IDs during evaluation and executing full cross-instance launch lifecycle. (Thanks to @aukgit)
+        -   **[Instances] Reliable Process Relaunch & Lockfile Purge**:
+            -   **Description**: Fixed default instance account switch short-circuit leaving the IDE in an Idle state after process termination. Stale lockfiles (`lockfile`, `code.lock`, `DevToolsActivePort`) are purged before restarting to prevent silent Electron launch aborts on Windows. (Thanks to @aukgit)
+        -   **[UI] Modernized Instances & Profiles Styling**:
+            -   **Description**: Redesigned Instances view with sleek dark glass styling, eliminating jarring light-gray capsules on dark theme. Upgraded Auto Profile Switcher banner to a glassmorphism card with glowing active pulse indicators, structured quota badges, and compact badge footer layout. (Thanks to @aukgit)
+
     *   **v4.126.0 (2026-10-03)**:
         -   **[Instances] Deep Clone of Settings, Themes & Projects**:
             -   **Description**: Duplicating an instance deep-copies source user settings, color theme (`workbench.colorTheme`), keybindings, snippets, and clones running projects and prompts in `repo_prompts.db`. Settings are synchronized across data dir and AppData for Windows IDE parity. (Thanks to @aukgit)

@@ -4,6 +4,8 @@ pub enum AuditAction {
     AddAccount = 1,
     UpdateAccount = 2,
     SwitchAccount = 3,
+    SchedulePrompt = 4,
+    RequeueConversation = 5,
 }
 
 impl AuditAction {
@@ -16,6 +18,8 @@ impl AuditAction {
             Self::AddAccount => "AddAccount",
             Self::UpdateAccount => "UpdateAccount",
             Self::SwitchAccount => "SwitchAccount",
+            Self::SchedulePrompt => "SchedulePrompt",
+            Self::RequeueConversation => "RequeueConversation",
         }
     }
 
@@ -24,6 +28,8 @@ impl AuditAction {
             Self::AddAccount => "Add Account",
             Self::UpdateAccount => "Update Account",
             Self::SwitchAccount => "Switch Account",
+            Self::SchedulePrompt => "Schedule Prompt",
+            Self::RequeueConversation => "Requeue Conversation",
         }
     }
 
@@ -32,6 +38,8 @@ impl AuditAction {
             1 => Some(Self::AddAccount),
             2 => Some(Self::UpdateAccount),
             3 => Some(Self::SwitchAccount),
+            4 => Some(Self::SchedulePrompt),
+            5 => Some(Self::RequeueConversation),
             _ => None,
         }
     }
@@ -42,6 +50,8 @@ impl AuditAction {
             "addaccount" | "1" => Some(Self::AddAccount),
             "updateaccount" | "2" => Some(Self::UpdateAccount),
             "switchaccount" | "3" => Some(Self::SwitchAccount),
+            "scheduleprompt" | "promptscheduler" | "4" => Some(Self::SchedulePrompt),
+            "requeueconversation" | "requeue" | "5" => Some(Self::RequeueConversation),
             _ => None,
         }
     }

@@ -877,7 +877,7 @@ pub fn select_candidate_profiles(
             if quota >= 100.0 || is_period_finished {
                 let score = score_candidate_account(&acc, target_model, now_sec);
                 candidates.push(ProfileCandidate {
-                    instance_id: current_instance_id.to_string(),
+                    instance_id: inst.id.clone(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
@@ -919,8 +919,14 @@ pub fn select_candidate_profiles(
         // Strict 100% 4-Hour Quota Gate
         if quota >= 100.0 || is_period_finished {
             let score = score_candidate_account(acc, target_model, now_sec);
+            let candidate_inst_id = registry
+                .instances
+                .iter()
+                .find(|i| i.bound_account_id.as_deref() == Some(&acc.id))
+                .map(|i| i.id.clone())
+                .unwrap_or_else(|| current_instance_id.to_string());
             candidates.push(ProfileCandidate {
-                instance_id: current_instance_id.to_string(),
+                instance_id: candidate_inst_id,
                 account_id: acc.id.clone(),
                 email: acc.email.clone(),
                 quota_percent: quota,
@@ -946,8 +952,14 @@ pub fn select_candidate_profiles(
             let quota = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
             if quota > threshold {
                 let score = quota / 100.0;
+                let candidate_inst_id = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.bound_account_id.as_deref() == Some(&acc.id))
+                    .map(|i| i.id.clone())
+                    .unwrap_or_else(|| current_instance_id.to_string());
                 candidates.push(ProfileCandidate {
-                    instance_id: current_instance_id.to_string(),
+                    instance_id: candidate_inst_id,
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
@@ -1135,6 +1147,7 @@ pub async fn select_and_verify_next_best_profile(
 
 #[derive(Debug, Clone, Default)]
 pub struct RotationContext {
+    pub current_instance_id: Option<String>,
     pub previous_email: Option<String>,
     pub previous_quota_4h: Option<f64>,
     pub previous_quota_weekly: Option<f64>,
@@ -1152,29 +1165,56 @@ pub async fn execute_profile_rotation_with_context(
     has_auto_resume: bool,
     ctx: Option<RotationContext>,
 ) -> Result<(), String> {
+    let current_instance_id = ctx
+        .as_ref()
+        .and_then(|c| c.current_instance_id.clone())
+        .unwrap_or_else(|| {
+            crate::modules::instance::get_active_instance_id()
+                .unwrap_or_else(|_| "default".to_string())
+        });
     let inst_id = &target.instance_id;
 
+    let was_running = crate::modules::instance::load_registry()
+        .ok()
+        .and_then(|r| {
+            r.instances
+                .into_iter()
+                .find(|i| i.id == current_instance_id)
+        })
+        .map(|i| crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid))
+        .unwrap_or_else(|| {
+            if current_instance_id == "default" {
+                crate::modules::process::is_antigravity_running(None)
+                    || crate::modules::process::is_antigravity_running(Some("ide"))
+            } else {
+                false
+            }
+        });
+
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
-    let backup_res = crate::modules::repo_db::backup_running_prompts(inst_id);
+    let backup_res = crate::modules::repo_db::backup_running_prompts(&current_instance_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(Some(inst_id), None);
+    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(
+        Some(&current_instance_id),
+        None,
+    );
     match &backup_res {
         Ok(c) => {
             logger::log_info(&format!(
                 "[AutoSwitcher] Pre-switch backup created for {} running prompts (instance '{}')",
-                c, inst_id
+                c, current_instance_id
             ));
         }
         Err(e) => {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Pre-switch prompt backup failed for instance '{}': {}",
-                inst_id, e
+                current_instance_id, e
             ));
         }
     }
 
     if has_auto_resume {
-        let _ = snapshot_task_state(inst_id, &target.account_id, &reason);
+        let _ = snapshot_task_state(&current_instance_id, &target.account_id, &reason);
     }
 
     logger::log_info(&format!(
@@ -1289,16 +1329,55 @@ pub async fn execute_profile_rotation_with_context(
         None => crate::modules::integration::SystemManager::Headless,
     };
 
-    if inst_id == "default" {
-        let service = crate::modules::account_service::AccountService::new(integration);
-        service.switch_account(&target.account_id, None).await?;
+    let app_config = config::load_app_config().unwrap_or_default();
+    if target.instance_id != current_instance_id {
+        logger::log_info(&format!(
+            "[AutoSwitcher] Cross-instance rotation: rotating from '{}' to '{}' (account '{}', email '{}')",
+            current_instance_id, target.instance_id, target.account_id, target.email
+        ));
+        // a) Save in-flight prompts
+        let _ = crate::modules::repo_db::requeue_running_conversations_for_instance(
+            &current_instance_id,
+        );
+        // b) Close the depleted instance
+        let _ = crate::modules::instance::close_instance(&current_instance_id);
+        // c) Update active instance pointer
+        let _ = crate::modules::instance::set_active_instance_id(&target.instance_id);
         let _ = crate::modules::instance::bind_account_to_instance(
-            "default",
+            &target.instance_id,
             &target.account_id,
             &target.email,
         );
+        if target.instance_id == "default" {
+            let _ = crate::modules::account::set_current_account_id(&target.account_id);
+        }
+        // d) If auto_reopen_on_switch is true (or by default): Relaunch the target instance
+        if app_config.auto_profile_switcher.auto_reopen_on_switch {
+            let _ = crate::modules::instance::launch_instance(&target.instance_id);
+        }
     } else {
-        instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
+        logger::log_info(&format!(
+            "[AutoSwitcher] Same-instance rotation on '{}' to account '{}' (email '{}')",
+            current_instance_id, target.account_id, target.email
+        ));
+        if inst_id == "default" {
+            let service = crate::modules::account_service::AccountService::new(integration);
+            service.switch_account(&target.account_id, None).await?;
+            let _ = crate::modules::instance::bind_account_to_instance(
+                "default",
+                &target.account_id,
+                &target.email,
+            );
+        } else {
+            instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
+        }
+
+        // e) If previously running, ensure launch_instance_without_prompt_reinject(current_instance_id) is invoked
+        if was_running {
+            let _ = crate::modules::instance::launch_instance_without_prompt_reinject(
+                &current_instance_id,
+            );
+        }
     }
 
     // Emit event to frontend so UI reflects the button activation and refreshes state
@@ -1319,6 +1398,7 @@ pub async fn execute_profile_rotation_with_context(
             },
         );
         let _ = handle.emit("accounts://refreshed", ());
+        let _ = handle.emit("instances://refreshed", ());
     }
 
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
@@ -1607,6 +1687,7 @@ pub async fn check_and_rotate_with_options(
                 let predicted_email = predicted_candidate.map(|c| c.email);
 
                 let rot_ctx = RotationContext {
+                    current_instance_id: Some(inst.id.clone()),
                     previous_email: previous_email_opt,
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
@@ -1718,6 +1799,7 @@ pub async fn check_and_rotate_with_options(
                 let predicted_email = predicted_candidate.map(|c| c.email);
 
                 let rot_ctx = RotationContext {
+                    current_instance_id: Some(inst.id.clone()),
                     previous_email: previous_email_opt,
                     previous_quota_4h: prev_4h,
                     previous_quota_weekly: prev_weekly,
@@ -1921,6 +2003,7 @@ pub async fn trigger_manual_rotation_for_instance(
     let predicted_email = predicted_candidate.map(|c| c.email);
 
     let rot_ctx = RotationContext {
+        current_instance_id: Some(inst_id.clone()),
         previous_email: prev_email,
         previous_quota_4h: prev_4h,
         previous_quota_weekly: prev_weekly,

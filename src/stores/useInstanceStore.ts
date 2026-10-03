@@ -571,13 +571,30 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 throw new Error('No accounts verified with 100% 4-hour quota in pool. All available accounts are below 100%.');
             }
 
-            const targetCandidate = verifiedCandidate;
+            const targetCandidate = verifiedCandidate as Account & { instanceId?: string };
+
+            // Detect if the target candidate belongs to another instance
+            const candidateBoundInstance = get().instances.find(
+                i => i.config.bound_account_id === targetCandidate.id
+            );
+            const candidateInstanceId =
+                targetCandidate.instanceId || candidateBoundInstance?.config.id;
+
+            if (targetCandidate.instanceId && targetCandidate.instanceId !== instId) {
+                await instanceService.setActiveInstance(targetCandidate.instanceId);
+                await get().launchInstance(targetCandidate.instanceId);
+            } else if (candidateInstanceId && candidateInstanceId !== instId) {
+                await instanceService.setActiveInstance(candidateInstanceId);
+                await get().launchInstance(candidateInstanceId);
+            }
+
+            const effectiveInstanceId = candidateInstanceId || instId;
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;
-            if (instId) {
-                if (instId !== 'default') {
-                    targetIdeParam = `instance:${instId}`;
+            if (effectiveInstanceId) {
+                if (effectiveInstanceId !== 'default') {
+                    targetIdeParam = `instance:${effectiveInstanceId}`;
                 }
             }
             await useAccountStore.getState().switchAccount(targetCandidate.id, targetIdeParam);
@@ -585,23 +602,26 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             // 8. Auto-resume recent active prompts (<1h) if enabled
             let resumeResult: instanceService.AutoResumeResult | null = null;
             try {
-                resumeResult = await instanceService.resumeRecentProjectPrompts(instId);
+                resumeResult = await instanceService.resumeRecentProjectPrompts(effectiveInstanceId);
             } catch (resumeErr) {
                 console.warn('[useInstanceStore] Auto-resume recent prompts notice:', resumeErr);
             }
 
-            // 9. Synchronize UI state
+            // 9. Synchronize UI state (Ensure fetchInstances() and fetchAccounts() are called upon rotation completion)
             await Promise.all([
                 get().fetchInstances(true),
-                useAccountStore.getState().fetchCurrentAccount(),
                 useAccountStore.getState().fetchAccounts(),
+                useAccountStore.getState().fetchCurrentAccount(),
             ]);
 
-            set({ activeInstanceId: instId, isLoading: false });
+            const finalInst = get().instances.find(i => i.config.id === effectiveInstanceId);
+            const resolvedInstanceName = finalInst?.config.name || instanceName;
+
+            set({ activeInstanceId: effectiveInstanceId, isLoading: false });
 
             return {
                 accountEmail: targetCandidate.email,
-                instanceName,
+                instanceName: resolvedInstanceName,
                 daysUntilRefill: 0,
                 resumedProjectsCount: resumeResult?.resumed_project_count ?? 0,
                 skippedProjectsCount: resumeResult?.skipped_project_count ?? 0,

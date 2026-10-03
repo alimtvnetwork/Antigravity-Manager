@@ -100,6 +100,9 @@ fn main() {
         "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
             cmd_backup_running_prompts(&cmd_args);
         }
+        "queue-scheduler" | "queue_scheduler" | "scheduler" | "qs" => {
+            cmd_queue_scheduler(&cmd_args);
+        }
         "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
             cmd_restore_running_prompts(&cmd_args);
         }
@@ -322,7 +325,8 @@ fn print_help_json() {
                     { "name": "prompt", "aliases": [], "flags": ["\"<text>\"", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt with git pull & 01-prompts templates" },
                     { "name": "query", "aliases": ["search", "find", "prompts query"], "flags": ["[term]", "--words <W>", "--limit <N>", "--status <S>", "--json"], "description": "Query cached SQLite prompts with ≥200-word preview" },
                     { "name": "prune", "aliases": ["pr", "clear-cache"], "flags": ["--keep <N>", "--preflight", "--undo", "--json"], "description": "Safely prune older conversations (guards active prompts & ≥5 sessions)" },
-                    { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" }
+                    { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" },
+                    { "name": "queue-scheduler", "aliases": ["scheduler", "qs"], "flags": ["--once", "[instance]"], "description": "10-minute automated queue bookkeeping: auto-push FIFO prompts when project is idle" }
                 ]
             },
             {
@@ -441,6 +445,8 @@ fn print_help() {
     );
     println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
     println!("        Restore and re-enqueue in-flight prompts into active workspaces");
+    println!("    queue-scheduler, scheduler, qs [--once] [instance]");
+    println!("        10-minute automated queue bookkeeping: auto-push FIFO prompts when project is idle");
     println!("    tree [all] [--words <W>] [--json]");
     println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
     println!("    which-prompts-running, wpr [--json]");
@@ -3767,6 +3773,91 @@ fn cmd_auto_switch(args: &[String]) {
                 }
             }
             println!();
+        }
+    }
+}
+
+fn cmd_queue_scheduler(args: &[String]) {
+    if let Some(first) = args.first() {
+        let first_lower = first.to_lowercase();
+        if first_lower == "help" || first_lower == "--help" || first_lower == "-h" {
+            println!("AGM Prompt Queue Scheduler (10-Minute Loop & Audit Trail):");
+            println!("  agm queue-scheduler [--once] [instance_id]   Check enqueued prompts, verify project idleness, and auto-dispatch FIFO");
+            println!("\nOptions:");
+            println!("  --once, -o, once         Run a single bookkeeping cycle and exit");
+            println!(
+                "  [instance_id]            Filter to a specific instance (default: all instances)"
+            );
+            println!("\nAliases: agm queue-scheduler, agm queue_scheduler, agm scheduler, agm qs");
+            println!("\nExamples:");
+            println!("  agm queue-scheduler --once           # Run single check and push enqueued prompts if projects are idle");
+            println!("  agm queue-scheduler                  # Run continuous background daemon with 10-minute intervals");
+            println!("  agm queue-scheduler default --once   # Run single check for default instance only");
+            return;
+        }
+    }
+
+    let once = args
+        .iter()
+        .any(|a| a == "--once" || a == "-o" || a == "once");
+    let target_instance = args
+        .iter()
+        .find(|a| !a.starts_with('-') && *a != "once")
+        .map(|s| s.as_str());
+
+    println!("============================================================");
+    println!("        ANTIGRAVITY PROMPT QUEUE SCHEDULER (10-MIN LOOP)   ");
+    println!("============================================================");
+    if let Some(target) = target_instance {
+        println!("Target Instance Filter: {}", target);
+    } else {
+        println!("Target Instance Filter: All Instances");
+    }
+    println!(
+        "Mode:                  {}",
+        if once {
+            "Single Run (--once)"
+        } else {
+            "Continuous Loop (Every 10 min)"
+        }
+    );
+    println!("Audit Logging:         Enabled (AuditAction::SchedulePrompt, code 4)");
+    println!("============================================================\n");
+
+    if once {
+        run_scheduler_single_cycle(target_instance);
+        return;
+    }
+
+    // Continuous loop: runs cycle, then sleeps 600s
+    let interval = std::time::Duration::from_secs(600);
+    loop {
+        run_scheduler_single_cycle(target_instance);
+        println!("\n[Scheduler] Sleeping 10 minutes until next bookkeeping cycle (press Ctrl+C to stop)...");
+        std::thread::sleep(interval);
+    }
+}
+
+fn run_scheduler_single_cycle(target_instance: Option<&str>) {
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    println!("[{}] Executing prompt queue bookkeeping cycle...", now);
+
+    match repo_db::check_and_dispatch_enqueued_prompts(target_instance) {
+        Ok(dispatched) => {
+            if dispatched > 0 {
+                println!(
+                    "[{}] SUCCESS: Dispatched {} enqueued prompt(s) to idle project(s) and recorded audit trail.",
+                    now, dispatched
+                );
+            } else {
+                println!(
+                    "[{}] Completed: Evaluated queue. All projects are either active/busy or have no enqueued prompts.",
+                    now
+                );
+            }
+        }
+        Err(err) => {
+            eprintln!("[{}] ERROR running queue scheduler: {}", now, err);
         }
     }
 }

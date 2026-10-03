@@ -312,6 +312,8 @@ pub struct AutoProfileSwitcherConfig {
     pub auto_resume_recent_prompts: bool,
     #[serde(default = "default_false")]
     pub auto_focus_window: bool,
+    #[serde(default = "default_true")]
+    pub auto_reopen_on_switch: bool,
     #[serde(default = "default_watchdog_interval")]
     pub watchdog_interval_seconds: u32,
     #[serde(default = "default_recency_threshold")]
@@ -340,6 +342,7 @@ impl Default for AutoProfileSwitcherConfig {
             auto_fast_forward_on_critical: true,
             auto_resume_recent_prompts: true,
             auto_focus_window: false,
+            auto_reopen_on_switch: true,
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
             fast_forward_shortcut: "Ctrl+Shift+F".to_string(),

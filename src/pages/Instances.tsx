@@ -170,7 +170,29 @@ export default function Instances() {
             fetchInstances(true);
             fetchSwitcherStatus();
         }, 3000);
-        return () => clearInterval(timer);
+
+        let unlistenList: (() => void)[] = [];
+        import('@tauri-apps/api/event').then(({ listen }) => {
+            const events = ['account://auto-switched', 'instance://switched', 'instance://rotated'];
+            Promise.all(
+                events.map((ev) =>
+                    listen(ev, async () => {
+                        await Promise.all([
+                            fetchInstances(true),
+                            fetchSwitcherStatus(),
+                            fetchAccounts(),
+                        ]);
+                    })
+                )
+            ).then((unsubscribers) => {
+                unlistenList = unsubscribers;
+            });
+        });
+
+        return () => {
+            clearInterval(timer);
+            unlistenList.forEach((fn) => fn());
+        };
     }, [fetchInstances, fetchSwitcherStatus, fetchAccounts]);
 
     const filteredInstances = instances.filter((inst) => {
@@ -420,22 +442,27 @@ export default function Instances() {
 
             {/* Auto-Switcher Status Banner */}
             {switcherStatus?.is_running ? (
-                <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                        <span className="relative flex h-2.5 w-2.5 mt-1 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/80 dark:from-blue-950/40 dark:via-[#0c2438]/60 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-500/30 rounded-2xl p-4 backdrop-blur-md shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <span className="relative flex h-3 w-3 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
                         </span>
-                        <div>
-                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                            <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400" />
                                 {t('instances.auto_switcher_active', 'Auto Profile Switcher Active')}
                             </span>
-                            <span className="text-gray-500 dark:text-gray-400 ml-2 break-words">
-                                {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
-                                    ? `Current Active Quota: ${switcherStatus.current_quota_percent.toFixed(0)}%`
-                                    : 'Monitoring active profile quota'}
-                                {switcherStatus.last_switch_reason ? ` • Last switch: ${switcherStatus.last_switch_reason}` : ''}
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-mono bg-blue-500/15 text-blue-700 dark:text-cyan-300 border border-blue-400/30 shadow-2xs">
+                                Current Active Quota: {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
+                                    ? `${switcherStatus.current_quota_percent.toFixed(0)}%`
+                                    : '100%'}
                             </span>
+                            {switcherStatus.last_switch_reason ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-500/10 text-gray-600 dark:text-gray-300 border border-gray-400/20 max-w-xs truncate" title={switcherStatus.last_switch_reason}>
+                                    Reason: {switcherStatus.last_switch_reason}
+                                </span>
+                            ) : null}
                         </div>
                     </div>
                     <button
@@ -447,9 +474,9 @@ export default function Instances() {
                                 setActionError(e?.toString() || 'Rotation failed');
                             }
                         }}
-                        className="btn btn-xs btn-outline btn-primary gap-1 shrink-0"
+                        className="btn btn-xs sm:btn-sm gap-1.5 shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-md shadow-blue-500/20 border-none rounded-xl cursor-pointer transition-all active:scale-95"
                     >
-                        <RotateCcw className="w-3 h-3" />
+                        <RotateCcw className="w-3.5 h-3.5" />
                         <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
                     </button>
                 </div>
@@ -570,10 +597,10 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-base-200 overflow-hidden shadow-xs",
+                                    "rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
-                                        ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-slate-800/40"
-                                        : "border-gray-200/80 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-content/20"
+                                        ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
+                                        : "border-gray-200/80 dark:border-[#15334d] hover:border-gray-300 dark:hover:border-blue-500/40"
                                 )}
                             >
                                 {/* Top Accent Bar identifying profile color */}
@@ -666,8 +693,8 @@ export default function Instances() {
                                             </div>
                                         </div>
 
-                                        {/* Bound Account / Email Section with distinct color pill */}
-                                        <div className="py-2 px-3 rounded-xl bg-gray-50/80 dark:bg-base-100/60 border border-gray-100 dark:border-base-100/80 mb-3 flex items-center justify-between gap-2">
+                                        {/* Bound Account / Email Section with dark glass capsule */}
+                                        <div className="py-2 px-3 rounded-xl bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-3 flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                 <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                                 <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
@@ -717,7 +744,7 @@ export default function Instances() {
                                             })() : null}
                                         </div>
 
-                                        {/* Colorful Gemini Quota Progress Bar Section */}
+                                        {/* Colorful Gemini Quota Progress Bar Section with dark glass Quota box */}
                                         <div className="mb-3">
                                             {geminiModel ? (() => {
                                                 const pct = Math.min(100, Math.max(0, geminiModel.percentage));
@@ -733,7 +760,7 @@ export default function Instances() {
                                                 };
 
                                                 return (
-                                                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50/90 to-blue-50/20 dark:from-base-100/60 dark:to-blue-950/10 border border-gray-200/70 dark:border-base-100 space-y-2">
+                                                    <div className="p-3 rounded-xl bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
                                                         <div className="flex items-center justify-between text-xs">
                                                             <div className="flex items-center gap-1.5">
                                                                 <Gemini.Color className="w-4 h-4 shrink-0" />
@@ -748,14 +775,14 @@ export default function Instances() {
                                                                         {formatTimeRemaining(geminiModel.reset_time)}
                                                                     </span>
                                                                 ) : null}
-                                                                <span className={cn("font-mono font-bold text-xs px-1.5 py-0.5 rounded-md bg-white dark:bg-base-200 shadow-2xs border border-gray-100 dark:border-base-100", getTextClass(pct))}>
+                                                                <span className={cn("font-mono font-bold text-xs px-2 py-0.5 rounded-md bg-white dark:bg-[#081a2b] shadow-2xs border border-gray-200 dark:border-[#15334d]", getTextClass(pct))}>
                                                                     {pct}%
                                                                 </span>
                                                             </div>
                                                         </div>
 
                                                         {/* Progress bar with glowing animated gradient */}
-                                                        <div className="h-2.5 w-full bg-gray-200/90 dark:bg-base-200 rounded-full overflow-hidden p-0.5 relative shadow-inner">
+                                                        <div className="h-2.5 w-full bg-gray-200/90 dark:bg-[#081a2b] border border-transparent dark:border-[#15334d]/60 rounded-full overflow-hidden p-0.5 relative shadow-inner">
                                                             <div
                                                                 className={cn(
                                                                     "h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out shadow-xs",
@@ -767,7 +794,7 @@ export default function Instances() {
                                                     </div>
                                                 );
                                             })() : boundAccount ? (
-                                                <div className="p-2.5 rounded-xl bg-gray-50/60 dark:bg-base-100/40 border border-gray-100 dark:border-base-100 flex items-center justify-between text-xs text-gray-500">
+                                                <div className="p-2.5 rounded-xl bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
                                                     <div className="flex items-center gap-2">
                                                         <Gemini.Color className="w-4 h-4 shrink-0 opacity-70" />
                                                         <span className="text-[11px] text-gray-500 dark:text-gray-400">Gemini quota not synced</span>
@@ -781,7 +808,7 @@ export default function Instances() {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="p-2.5 rounded-xl bg-gray-50/40 dark:bg-base-100/20 border border-dashed border-gray-200 dark:border-base-100 flex items-center justify-between text-xs text-gray-400">
+                                                <div className="p-2.5 rounded-xl bg-gray-50/40 dark:bg-[#0c2438]/60 border border-dashed border-gray-200 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-400">
                                                     <div className="flex items-center gap-2">
                                                         <Gemini.Color className="w-4 h-4 shrink-0 opacity-40 grayscale" />
                                                         <span className="text-[11px] italic">Gemini Quota (No profile bound)</span>
@@ -791,116 +818,180 @@ export default function Instances() {
                                             )}
                                         </div>
 
-                                        {/* Status and Profile details */}
-                                        <div className="space-y-1.5 text-xs py-2 border-t border-gray-100 dark:border-base-100 text-gray-600 dark:text-gray-400">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-400">Status:</span>
-                                                <span className={cn("font-medium", inst.is_running ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-gray-500")}>
-                                                    {inst.is_running ? `Running (PID: ${inst.pid})` : 'Idle'}
+                                        {/* Status and Profile details: Modern compact badge layout */}
+                                        <div className="space-y-2 py-2.5 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                {/* Status Badge */}
+                                                {inst.is_running ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                        Running {inst.pid ? `(PID: ${inst.pid})` : ''}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                        Idle
+                                                    </span>
+                                                )}
+
+                                                {/* Profile ID Monospace Pill */}
+                                                <span
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#0c2438] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] truncate max-w-[150px]"
+                                                    title={`Profile ID: ${inst.config.id}`}
+                                                >
+                                                    <span className="text-gray-400 dark:text-slate-500">ID:</span>
+                                                    <span className="truncate">{inst.config.id}</span>
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-400">Profile ID:</span>
-                                                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[60%]" title={inst.config.id}>
-                                                    {inst.config.id}
-                                                </span>
+
+                                            {/* Path with clean folder badge and copy action */}
+                                            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50/80 dark:bg-[#0c2438]/70 border border-gray-200/70 dark:border-[#15334d] text-[11px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
+                                                <div className="flex items-center gap-1.5 min-w-0 flex-1 text-gray-500 dark:text-slate-400" title={inst.config.data_dir}>
+                                                    <Folder className="w-3.5 h-3.5 shrink-0 text-blue-500/80" />
+                                                    <span className="truncate font-mono text-[10px]">{inst.config.data_dir}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        try {
+                                                            await navigator.clipboard.writeText(inst.config.data_dir);
+                                                            showToast('Data dir path copied to clipboard', 'info');
+                                                        } catch {
+                                                            showToast('Failed to copy path', 'error');
+                                                        }
+                                                    }}
+                                                    className="opacity-60 group-hover:opacity-100 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#15334d] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
+                                                    title="Copy directory path"
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                </button>
                                             </div>
-                                            <div className="flex items-start gap-1.5 text-[11px] text-gray-400 pt-0.5 min-w-0" title={inst.config.data_dir}>
-                                                <Folder className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                                <span className="break-all leading-snug">{inst.config.data_dir}</span>
-                                            </div>
+
+                                            {/* Custom executable path badge */}
                                             {inst.config.executable_path ? (
-                                                <div className="flex items-start gap-1.5 text-[11px] text-purple-600 dark:text-purple-400 pt-0.5 min-w-0" title={inst.config.executable_path}>
-                                                    <Cpu className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                                    <span className="break-all font-mono leading-snug">{inst.config.executable_path}</span>
+                                                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/40 dark:border-purple-800/30 text-[11px] group transition-colors">
+                                                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-purple-700 dark:text-purple-300" title={inst.config.executable_path}>
+                                                        <Cpu className="w-3.5 h-3.5 shrink-0 text-purple-500" />
+                                                        <span className="truncate font-mono text-[10px]">{inst.config.executable_path}</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (inst.config.executable_path) {
+                                                                try {
+                                                                    await navigator.clipboard.writeText(inst.config.executable_path);
+                                                                    showToast('Executable path copied to clipboard', 'info');
+                                                                } catch {
+                                                                    showToast('Failed to copy executable path', 'error');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="opacity-60 group-hover:opacity-100 p-1 rounded-md hover:bg-purple-200/60 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 transition-opacity cursor-pointer shrink-0"
+                                                        title="Copy executable path"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
                                                 </div>
                                             ) : null}
                                         </div>
                                     </div>
 
-                                    {/* Card Actions */}
-                                    <div className="pt-3 border-t border-gray-100 dark:border-base-100 mt-2">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {inst.is_running ? (
+                                    {/* Card Actions with clear visual hierarchy */}
+                                    <div className="pt-3 border-t border-gray-100 dark:border-[#15334d]/80 mt-2">
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                            {/* Primary Action Buttons (Launch/Stop, Switch, FF) */}
+                                            <div className="flex items-center gap-1.5">
+                                                {inst.is_running ? (
+                                                    <button
+                                                        onClick={() => stopInstance(inst.config.id)}
+                                                        className="btn btn-xs bg-rose-500/15 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white border border-rose-500/30 rounded-lg gap-1 font-semibold cursor-pointer transition-colors shadow-2xs"
+                                                        title="Gracefully stop this instance window"
+                                                    >
+                                                        <Square className="w-3 h-3" />
+                                                        <span>Stop</span>
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleLaunch(inst.config.id)}
+                                                        className="btn btn-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer shadow-xs shadow-blue-500/25 transition-all active:scale-95"
+                                                        title="Launch instance window"
+                                                    >
+                                                        <Play className="w-3 h-3" />
+                                                        <span>Launch</span>
+                                                    </button>
+                                                )}
+
+                                                {/* Sleek Switch Account Button */}
                                                 <button
-                                                    onClick={() => stopInstance(inst.config.id)}
-                                                    className="btn btn-xs btn-error btn-outline gap-1 cursor-pointer"
-                                                    title="Gracefully stop this instance window"
+                                                    onClick={() => setSwitchTargetInstance(inst)}
+                                                    className="btn btn-xs bg-sky-500/10 hover:bg-sky-500 text-sky-700 dark:text-sky-300 hover:text-white border border-sky-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
+                                                    title="Explicitly select and switch this instance to any registered account"
                                                 >
-                                                    <Square className="w-3 h-3" />
-                                                    <span>Stop</span>
+                                                    <ArrowRightLeft className="w-3 h-3" />
+                                                    <span>Switch</span>
                                                 </button>
-                                            ) : (
+
+                                                {/* Fast Forward Badge Button */}
                                                 <button
-                                                    onClick={() => handleLaunch(inst.config.id)}
-                                                    className="btn btn-xs btn-primary gap-1 shadow-xs cursor-pointer"
-                                                    title="Launch instance window"
+                                                    onClick={async () => {
+                                                        try {
+                                                            const msg = await fastForwardInstance(inst.config.id);
+                                                            showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
+                                                        } catch (e: any) {
+                                                            setActionError(e?.toString() || 'Fast forward failed');
+                                                        }
+                                                    }}
+                                                    className="btn btn-xs bg-purple-500/10 hover:bg-purple-500 text-purple-700 dark:text-purple-300 hover:text-white border border-purple-500/25 rounded-lg gap-1 font-bold cursor-pointer transition-colors"
+                                                    title="Fast Forward: Automatically rotate to the next healthiest profile in pool"
                                                 >
-                                                    <Play className="w-3 h-3" />
-                                                    <span>Launch</span>
+                                                    <FastForward className="w-3 h-3" />
+                                                    <span>FF</span>
                                                 </button>
-                                            )}
-                                            {/* Explicit Switch Account Button */}
-                                            <button
-                                                onClick={() => setSwitchTargetInstance(inst)}
-                                                className="btn btn-xs btn-outline btn-info gap-1 cursor-pointer"
-                                                title="Explicitly select and switch this instance to any registered account"
-                                            >
-                                                <ArrowRightLeft className="w-3 h-3" />
-                                                <span>Switch</span>
-                                            </button>
-                                            {/* Fast Forward Button */}
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const msg = await fastForwardInstance(inst.config.id);
-                                                        showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
-                                                    } catch (e: any) {
-                                                        setActionError(e?.toString() || 'Fast forward failed');
-                                                    }
-                                                }}
-                                                className="btn btn-xs btn-primary btn-outline gap-1 cursor-pointer"
-                                                title="Fast Forward: Automatically rotate to the next healthiest profile in pool"
-                                            >
-                                                <FastForward className="w-3 h-3" />
-                                                <span>FF</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setCopyTargetId(inst.config.id);
-                                                    setCopyInstanceName(`${inst.config.name} Copy`);
-                                                }}
-                                                className="btn btn-xs btn-outline btn-ghost gap-1 text-indigo-600 dark:text-indigo-400 cursor-pointer"
-                                                title="Clone profile settings and extensions"
-                                            >
-                                                <Copy className="w-3 h-3" />
-                                                <span>Clone</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleCloneExecutable(inst.config.id)}
-                                                className="btn btn-xs btn-ghost text-purple-600 dark:text-purple-400 cursor-pointer"
-                                                title="Clone executable binary for this profile"
-                                            >
-                                                <Cpu className="w-3.5 h-3.5" />
-                                            </button>
-                                            {inst.config.is_default ? null : (
+                                            </div>
+
+                                            {/* Clean Secondary Utility Icon Buttons (Clone, Executable, Wipe, Delete) */}
+                                            <div className="flex items-center gap-1">
                                                 <button
-                                                    onClick={() => handleDelete(inst.config.id)}
+                                                    onClick={() => {
+                                                        setCopyTargetId(inst.config.id);
+                                                        setCopyInstanceName(`${inst.config.name} Copy`);
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
+                                                    title="Clone profile settings and extensions"
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleCloneExecutable(inst.config.id)}
+                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
+                                                    title="Clone executable binary for this profile"
+                                                >
+                                                    <Cpu className="w-3 h-3" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleWipeSession(inst.config.id)}
                                                     disabled={inst.is_running}
-                                                    className="btn btn-ghost btn-xs p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
-                                                    title="Delete profile"
+                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    title="Wipe auth credentials (keep settings)"
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    <RotateCcw className="w-3 h-3" />
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleWipeSession(inst.config.id)}
-                                                disabled={inst.is_running}
-                                                className="btn btn-xs btn-ghost text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-30"
-                                                title="Wipe auth credentials (keep settings)"
-                                            >
-                                                <RotateCcw className="w-3.5 h-3.5" />
-                                            </button>
+
+                                                {inst.config.is_default ? null : (
+                                                    <button
+                                                        onClick={() => handleDelete(inst.config.id)}
+                                                        disabled={inst.is_running}
+                                                        className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title="Delete profile"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

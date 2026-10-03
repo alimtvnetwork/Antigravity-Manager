@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.126.0)
+> Professional AI Account Management & Protocol Proxy System (v4.126.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.126.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.126.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.126.0**: Deep clone of IDE settings, themes, and projects for instance duplication, full dark mode for Audit, compact About tab redesign, CSS3 animated buttons, and high-contrast account selection.
+> Latest version **v4.126.1**: Auto-switch cross-instance reopen & rotation lifecycle fix when default credits reach zero, process relaunch with stale lockfile purge, and modern dark glass Instances & Profiles UI redesign.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

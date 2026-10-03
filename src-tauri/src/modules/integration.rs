@@ -374,6 +374,34 @@ impl SystemIntegration for DesktopIntegration {
             &account.email,
         );
 
+        // Purge stale lockfiles in data_dir before process restart
+        let mut target_data_dirs =
+            vec![crate::modules::instance::get_default_antigravity_data_dir()];
+        if let Ok(reg) = crate::modules::instance::load_registry() {
+            if let Some(def) = reg
+                .instances
+                .iter()
+                .find(|i| i.is_default || i.id == "default")
+            {
+                let p = std::path::PathBuf::from(&def.data_dir);
+                if !target_data_dirs.contains(&p) {
+                    target_data_dirs.push(p);
+                }
+            }
+        }
+        for dir in &target_data_dirs {
+            for lock in &["lockfile", "code.lock", "DevToolsActivePort"] {
+                let lock_file = dir.join(lock);
+                if lock_file.exists() {
+                    let _ = fs::remove_file(&lock_file);
+                    crate::modules::logger::log_info(&format!(
+                        "[Desktop] Purged stale lockfile: {:?}",
+                        lock_file
+                    ));
+                }
+            }
+        }
+
         // =========================================================================
         // STEP 4: Re-Open / Re-Run the Antigravity IDE
         // =========================================================================

@@ -388,3 +388,54 @@ pub async fn trigger_warmup_for_account(account: &Account) {
         }
     }
 }
+
+/// Start prompt queue scheduler that runs every 10 minutes (600s).
+/// Bookkeeps enqueued prompts, checks whether projects are idle,
+/// and automatically pushes the first enqueued prompt (FIFO) if idle.
+pub fn start_prompt_queue_scheduler() {
+    tokio::spawn(async move {
+        logger::log_info(
+            "[PromptQueueScheduler] Background 10-minute prompt queue scheduler initialized.",
+        );
+        // Quiet delay after startup
+        tokio::time::sleep(Duration::from_secs(30)).await;
+
+        let mut interval = time::interval(Duration::from_secs(600));
+        interval.tick().await; // consume initial tick
+
+        loop {
+            interval.tick().await;
+            logger::log_info(
+                "[PromptQueueScheduler] Running 10-minute enqueued prompt bookkeeping cycle...",
+            );
+            match tokio::task::spawn_blocking(|| {
+                crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
+            })
+            .await
+            {
+                Ok(Ok(count)) => {
+                    if count > 0 {
+                        logger::log_info(&format!(
+                            "[PromptQueueScheduler] Bookkeeping cycle dispatched {} enqueued prompt(s)",
+                            count
+                        ));
+                    } else {
+                        logger::log_info("[PromptQueueScheduler] Bookkeeping cycle finished: no idle projects with enqueued prompts");
+                    }
+                }
+                Ok(Err(err)) => {
+                    logger::log_warn(&format!(
+                        "[PromptQueueScheduler] Bookkeeping cycle returned error: {}",
+                        err
+                    ));
+                }
+                Err(err) => {
+                    logger::log_warn(&format!(
+                        "[PromptQueueScheduler] Bookkeeping task panicked: {}",
+                        err
+                    ));
+                }
+            }
+        }
+    });
+}

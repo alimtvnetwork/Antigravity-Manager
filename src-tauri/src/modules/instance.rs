@@ -1881,11 +1881,11 @@ pub fn wait_for_instance_prompt_channel(instance_id: &str) {
             || (inst.is_default && crate::modules::process::is_antigravity_running(None));
         if running {
             crate::modules::logger::log_info(&format!(
-                "[Instance] Prompt channel ready for '{}' ({} pids); injecting once",
+                "[Instance] Prompt channel ready for '{}' ({} pids); allowing 6s stabilization window before inject",
                 instance_id,
                 pids.len()
             ));
-            std::thread::sleep(std::time::Duration::from_millis(1500));
+            std::thread::sleep(std::time::Duration::from_millis(6000));
             return;
         }
         if std::time::Instant::now() >= deadline {
@@ -2183,6 +2183,7 @@ fn launch_instance_inner(
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
         if reinject_prompts {
+            wait_for_instance_prompt_channel(instance_id);
             let _ = crate::modules::backup_prompts_db::restore_running_prompts(
                 Some(instance_id),
                 false,
@@ -2270,6 +2271,7 @@ fn launch_instance_inner(
         })?;
         let _ = record_instance_pid(instance_id, child.id(), &data_dir);
         if reinject_prompts {
+            wait_for_instance_prompt_channel(instance_id);
             let _ = crate::modules::backup_prompts_db::restore_running_prompts(
                 Some(instance_id),
                 false,
@@ -3035,6 +3037,10 @@ pub async fn switch_account_to_instance(
     let is_default_inst = instance.is_default || instance.id == "default";
 
     if is_default_inst {
+        let was_running = is_instance_running("default", &instance.data_dir, instance.pid)
+            || crate::modules::process::is_antigravity_running(None)
+            || crate::modules::process::is_antigravity_running(Some("ide"));
+
         let app_handle_opt = crate::modules::log_bridge::get_app_handle();
         let integration = match app_handle_opt.as_ref() {
             Some(h) => crate::modules::integration::SystemManager::Desktop(h.clone()),
@@ -3048,6 +3054,16 @@ pub async fn switch_account_to_instance(
             || registry_after.active_instance_id == "default"
         {
             let _ = set_active_instance_id("default");
+        }
+        if was_running {
+            let _ = launch_instance_without_prompt_reinject("default");
+            if let Some(pid) = get_instance_saved_pid("default").or_else(|| {
+                find_pids_for_data_dir(&instance.data_dir, true)
+                    .first()
+                    .copied()
+            }) {
+                let _ = record_instance_pid("default", pid, &instance.data_dir);
+            }
         }
         return Ok(());
     }
@@ -3279,9 +3295,10 @@ pub async fn switch_account_to_instance(
         None
     };
 
-    // 1.5. [Step 1/5] Snapshot and backup running prompts scoped to THIS target instance BEFORE closing IDE
+    // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
     let backed_up_count =
-        crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
+        crate::modules::repo_db::requeue_running_conversations_for_instance(&instance.id)
+            .unwrap_or(0);
     let _ =
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None);
 

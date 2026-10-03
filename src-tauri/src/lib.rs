@@ -558,6 +558,10 @@ pub fn run() {
                     // Start smart scheduler for 7-day weekly reset warmup
                     modules::scheduler::start_scheduler(None, proxy_state.clone());
                     info!("Smart scheduler (7-Day Weekly Reset Warmup) started in headless mode.");
+
+                    // Start prompt queue scheduler daemon (10-minute ticker)
+                    modules::scheduler::start_prompt_queue_scheduler();
+                    info!("Prompt queue scheduler daemon started in headless mode.");
                 }
                 Err(e) => {
                     error!("Failed to load config for headless mode: {}", e);
@@ -736,6 +740,10 @@ pub fn run() {
             let scheduler_state = app.handle().state::<commands::proxy::ProxyServiceState>();
             modules::scheduler::start_scheduler(Some(app.handle().clone()), scheduler_state.inner().clone());
             info!("Smart scheduler (7-Day Weekly Reset Warmup) initialized.");
+
+            // Start prompt queue scheduler daemon (10-minute ticker)
+            modules::scheduler::start_prompt_queue_scheduler();
+            info!("Prompt queue scheduler daemon initialized.");
 
             // Start auto profile switcher daemon
             modules::auto_switcher::start_auto_switcher();

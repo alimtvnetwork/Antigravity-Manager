@@ -7,7 +7,7 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -1359,6 +1359,386 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     ));
 
     Ok(dispatched_count)
+}
+
+/// Check if any prompt or task is currently actively executing for a project
+pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
+    let now = Utc::now().timestamp();
+
+    // 1. Check in-memory active prompts map
+    if let Ok(map) = get_memory_prompts_map().lock() {
+        for p in map.values() {
+            let matches_inst = instance_id.is_empty()
+                || instance_id == "all"
+                || p.instance_id == instance_id
+                || ((instance_id == "default" || instance_id == "__default__")
+                    && (p.instance_id == "default"
+                        || p.instance_id == "__default__"
+                        || p.instance_id.is_empty()));
+            if matches_inst && (p.project_id == project_id || p.repo_path == project_id) {
+                if p.status == "running" || (p.status == "dispatched" && p.updated_at >= now - 120)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 2. Check active workers map
+    if let Ok(workers) = get_active_agy_workers().lock() {
+        for key in workers.keys() {
+            if key.contains(project_id) {
+                return true;
+            }
+        }
+    }
+
+    // 3. Check SQLite active_prompts for 'running' or recently 'dispatched'
+    if let Ok(conn) = connect_db() {
+        let running_count: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts 
+                 WHERE (project_id = ?1 OR repo_path = ?1) 
+                   AND (status = 'running' OR (status = 'dispatched' AND updated_at >= ?2))",
+                params![project_id, now - 120],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if running_count > 0 {
+            return true;
+        }
+    }
+
+    // 4. Check Antigravity live conversation summaries directly for running sessions
+    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    if let Some(base_dir) = base_dir {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if summaries_db.exists() {
+            let conn_res = Connection::open_with_flags(
+                &summaries_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+            .or_else(|_| {
+                let uri = format!(
+                    "file:{}?immutable=1",
+                    summaries_db.to_string_lossy().replace('\\', "/")
+                );
+                Connection::open_with_flags(
+                    &uri,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                )
+            });
+
+            if let Ok(conn) = conn_res {
+                let _ = conn.pragma_update(None, "busy_timeout", 3000);
+                if let Ok(mut stmt) = conn.prepare(
+                    "SELECT status, not_fully_idle, workspace_uris, last_modified_time 
+                     FROM conversation_summaries 
+                     ORDER BY last_modified_time DESC 
+                     LIMIT 30",
+                ) {
+                    let clean_target = normalize_path_for_compare(project_id);
+                    let rows = stmt.query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, i32>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, String>(3)?,
+                        ))
+                    });
+                    if let Ok(rows) = rows {
+                        for item in rows.flatten() {
+                            let (status, not_fully_idle, ws_uris_opt, last_time_str) = item;
+                            let is_recency_active = if let Ok(parsed) =
+                                chrono::DateTime::parse_from_rfc3339(&last_time_str)
+                            {
+                                let age = (Utc::now() - parsed.with_timezone(&Utc)).num_seconds();
+                                age >= 0 && age < 600
+                            } else {
+                                false
+                            };
+                            let is_conv_running = not_fully_idle != 0
+                                || status.contains("RUNNING")
+                                || is_recency_active;
+                            if is_conv_running {
+                                if let Some(ws_uris_raw) = ws_uris_opt {
+                                    let ws_uris: Vec<String> =
+                                        serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                                    for u in ws_uris {
+                                        let clean_p =
+                                            normalize_path_for_compare(&decode_uri_to_path(&u));
+                                        if !clean_target.is_empty()
+                                            && (clean_p == clean_target
+                                                || clean_p.contains(&clean_target)
+                                                || clean_target.contains(&clean_p))
+                                        {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Bookkeep and check enqueued/backed_up prompts across projects.
+/// If a project has no prompt running (idle verified), automatically pushes
+/// the first enqueued prompt (FIFO) and logs the action to Audit Trail.
+pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Result<usize, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let run_id = format!("sched-{}", Utc::now().format("%Y%m%d-%H%M%S"));
+
+    // 1. Gather candidate projects that have enqueued prompts ('backed_up', 'queued', 'pending')
+    let mut stmt = conn
+        .prepare(
+            "SELECT DISTINCT project_id, instance_id, repo_path FROM active_prompts 
+             WHERE status IN ('backed_up', 'queued', 'pending')
+             ORDER BY updated_at ASC",
+        )
+        .map_err(|e| format!("Failed to query candidate enqueued projects: {}", e))?;
+
+    let candidate_projects = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .collect::<Vec<_>>();
+
+    if candidate_projects.is_empty() {
+        return Ok(0);
+    }
+
+    let mut dispatched_count = 0;
+
+    for (project_id, inst_id, repo_path) in candidate_projects {
+        if let Some(target) = target_instance {
+            let is_match = target == "all"
+                || inst_id == target
+                || ((target == "default" || target == "__default__")
+                    && (inst_id == "default" || inst_id == "__default__" || inst_id.is_empty()));
+            if !is_match {
+                continue;
+            }
+        }
+
+        // Check if project is currently running a prompt
+        let is_running = is_prompt_running_for_project(&project_id, &inst_id)
+            || is_prompt_running_for_project(&repo_path, &inst_id);
+
+        let clean_project_name = Path::new(&repo_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| project_id.clone());
+
+        if is_running {
+            crate::modules::logger::log_info(&format!(
+                "[PromptQueueScheduler] Project '{}' ({}) is currently active/busy; enqueued prompts remain queued",
+                clean_project_name, project_id
+            ));
+            continue;
+        }
+
+        // Project is IDLE! Pick the first enqueued prompt (FIFO: earliest created_at)
+        let prompt_opt: Option<ActivePrompt> = conn
+            .query_row(
+                "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
+                 FROM active_prompts
+                 WHERE (project_id = ?1 OR repo_path = ?2) AND status IN ('backed_up', 'queued', 'pending')
+                 ORDER BY created_at ASC
+                 LIMIT 1",
+                params![&project_id, &repo_path],
+                |row| {
+                    Ok(ActivePrompt {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        instance_id: row.get(2)?,
+                        repo_path: row.get(3)?,
+                        prompt_content: row.get(4)?,
+                        model: row.get(5)?,
+                        session_id: row.get(6)?,
+                        status: row.get(7)?,
+                        created_at: row.get(8)?,
+                        updated_at: row.get(9)?,
+                        image_payload: row.get(10).ok(),
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| format!("Failed to fetch enqueued prompt for {}: {}", project_id, e))?;
+
+        let Some(prompt) = prompt_opt else {
+            continue;
+        };
+
+        crate::modules::logger::log_info(&format!(
+            "[PromptQueueScheduler] Project '{}' verified idle. Dispatching enqueued prompt '{}' (conv: {:?})",
+            clean_project_name, prompt.id, prompt.session_id
+        ));
+
+        // Write .antigravity_resume_task.json to project directory
+        let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
+        let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt.prompt_content);
+        let final_img = prompt.image_payload.clone().or(extracted_img);
+        let mut payload = resume_task_document(&prompt, "dispatched", now, &img_paths);
+        if final_img.is_some() {
+            payload["image_payload"] = serde_json::json!(final_img);
+        }
+        let _ = if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            fs::write(&task_file, json_str).is_ok()
+        } else {
+            false
+        };
+
+        // Spawn prompt via agy
+        let sent = spawn_prompt_via_agy(&prompt);
+
+        // Update active_prompts status to 'dispatched'
+        let _ = conn.execute(
+            "UPDATE active_prompts SET status = 'dispatched', updated_at = ?1 WHERE id = ?2",
+            params![now, &prompt.id],
+        );
+
+        if let Ok(mut map) = get_memory_prompts_map().lock() {
+            if let Some(p) = map.get_mut(&prompt.id) {
+                p.status = "dispatched".to_string();
+                p.updated_at = now;
+            }
+        }
+
+        // Record SchedulerFacts in Audit Trail
+        let prompt_preview = if prompt.prompt_content.len() > 140 {
+            format!("{}...", &prompt.prompt_content[..140])
+        } else {
+            prompt.prompt_content.clone()
+        };
+
+        let action_taken = if sent {
+            "dispatched"
+        } else {
+            "resume_task_written"
+        };
+        let reason = format!(
+            "Project verified idle; enqueued prompt pushed automatically via {}",
+            action_taken
+        );
+
+        let facts = crate::modules::task_history_db::SchedulerFacts {
+            scheduler_run_id: run_id.clone(),
+            project_name: clean_project_name.clone(),
+            repo_path: prompt.repo_path.clone(),
+            prompt_id: prompt.id.clone(),
+            prompt_preview,
+            conversation_id: prompt.session_id.clone().unwrap_or_default(),
+            action_taken: action_taken.to_string(),
+            reason,
+            idle_check_passed: true,
+            instance_id: prompt.instance_id.clone(),
+            timestamp: now,
+        };
+
+        let _ = crate::modules::task_history_db::record_scheduler_event(&facts);
+        dispatched_count += 1;
+    }
+
+    Ok(dispatched_count)
+}
+
+/// Re-enqueue running conversations for an instance before switch/restart.
+/// Marks active prompts as 'backed_up', updates resume document, and logs to Audit.
+pub fn requeue_running_conversations_for_instance(instance_id: &str) -> Result<usize, String> {
+    let count = backup_running_prompts(instance_id)?;
+    if count == 0 {
+        return Ok(0);
+    }
+
+    if let Ok(conn) = connect_db() {
+        let is_all_or_default =
+            instance_id == "all" || instance_id == "__default__" || instance_id == "default";
+        let stmt_res = if instance_id == "all" {
+            conn.prepare(
+                "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
+                 FROM active_prompts WHERE status = 'backed_up' ORDER BY updated_at DESC LIMIT 50",
+            )
+        } else if is_all_or_default {
+            conn.prepare(
+                "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
+                 FROM active_prompts WHERE status = 'backed_up' AND instance_id IN ('default', '__default__', '') ORDER BY updated_at DESC LIMIT 50",
+            )
+        } else {
+            conn.prepare(
+                "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
+                 FROM active_prompts WHERE status = 'backed_up' AND instance_id = ?1 ORDER BY updated_at DESC LIMIT 50",
+            )
+        };
+
+        if let Ok(mut stmt) = stmt_res {
+            let rows: Vec<(String, String, String, String, String, Option<String>)> =
+                if instance_id == "all" || is_all_or_default {
+                    stmt.query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, Option<String>>(5)?,
+                        ))
+                    })
+                    .map(|mapped| mapped.flatten().collect())
+                    .unwrap_or_default()
+                } else {
+                    stmt.query_map(params![instance_id], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, Option<String>>(5)?,
+                        ))
+                    })
+                    .map(|mapped| mapped.flatten().collect())
+                    .unwrap_or_default()
+                };
+
+            for (_id, project_id, inst_id, repo_path, prompt_content, session_id) in rows {
+                let project_name = Path::new(&repo_path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or(project_id);
+                let cid = session_id.unwrap_or_default();
+                let preview = if prompt_content.len() > 100 {
+                    format!("{}...", &prompt_content[..100])
+                } else {
+                    prompt_content
+                };
+                let reason = "In-flight conversation re-enqueued for restart/switch continuity";
+                let _ = crate::modules::task_history_db::record_requeue_event(
+                    &project_name,
+                    &inst_id,
+                    &cid,
+                    reason,
+                    &preview,
+                );
+            }
+        }
+    }
+
+    Ok(count)
 }
 
 /// List all running projects across instances

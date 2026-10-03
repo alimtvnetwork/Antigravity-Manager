@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.126.0-3B82F6?style=flat-square" alt="Version v4.126.0">
+    <img src="https://img.shields.io/badge/Version-v4.126.1-3B82F6?style=flat-square" alt="Version v4.126.1">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.126.0)**
+**Bar 2: Version-Based Installation (v4.126.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -526,7 +526,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.126.0**: Deep clone of IDE settings, themes, and projects for instance duplication, full dark mode for Audit, compact About tab redesign, CSS3 animated buttons, and high-contrast account selection.
+> Latest version **v4.126.1**: Auto-switch cross-instance reopen & rotation lifecycle fix when default credits reach zero, process relaunch with stale lockfile purge, and modern dark glass Instances & Profiles UI redesign.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
