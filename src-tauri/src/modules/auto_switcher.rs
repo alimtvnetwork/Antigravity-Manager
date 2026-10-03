@@ -1351,9 +1351,21 @@ pub async fn execute_profile_rotation_with_context(
         if target.instance_id == "default" {
             let _ = crate::modules::account::set_current_account_id(&target.account_id);
         }
-        // d) If auto_reopen_on_switch is true (or by default): Relaunch the target instance
+        // d) Ensure target instance credentials are fully injected and instance is launched
+        let _ = crate::modules::instance::switch_account_to_instance(
+            &target.account_id,
+            Some(&target.instance_id),
+        )
+        .await;
         if app_config.auto_profile_switcher.auto_reopen_on_switch {
-            let _ = crate::modules::instance::launch_instance(&target.instance_id);
+            let is_target_running = crate::modules::instance::load_registry()
+                .ok()
+                .and_then(|r| r.instances.into_iter().find(|i| i.id == target.instance_id))
+                .map(|i| crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid))
+                .unwrap_or(false);
+            if !is_target_running {
+                let _ = crate::modules::instance::launch_instance(&target.instance_id);
+            }
         }
     } else {
         logger::log_info(&format!(
