@@ -188,7 +188,7 @@ concurrency:
   cancel-in-progress: false  # Never cancel release jobs
 ```
 
-Release branches must NOT use `cancel-in-progress: true` — a cancelled release leaves orphaned tags and partial assets.
+Release branches must NOT use `cancel-in-progress: true` — a canceled release leaves orphaned tags and partial assets.
 
 ---
 
@@ -222,7 +222,7 @@ permissions:
 - [Release Versioning](./16-release-versioning.md) — Version resolution and tagging
 - [Updater Binary](./20-updater-binary.md) — Multi-module build for the updater
 - [Network Requirements](./21-network-requirements.md) — Download infrastructure for update consumers
-- [CI/CD Pipeline Workflows](../12-cicd-pipeline-workflows/01-index.md) — Server-side pipeline patterns
+- [CI/CD Pipeline Workflows](../12-cicd-pipeline-workflows/readme.md) — Server-side pipeline patterns
 - [Complete Workflow Reference](../12-cicd-pipeline-workflows/02-go-binary-deploy/04-complete-workflow-reference.md) — Full annotated YAML
 
 ---

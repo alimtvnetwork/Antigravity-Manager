@@ -256,15 +256,15 @@ go test -bench=. ./internal/rag/...
 |--------|--------|---------|
 | Line Coverage | ≥90% | 100% |
 | Branch Coverage | ≥85% | 100% |
-| Mutation Score | ≥80% | **Closed at v2.0.0 (Patch D, audit-10).** Target retained as the binding gate; measurement gated on executable RAG code landing outside `spec/`. Until then, line+branch coverage at 100% remains the operative proxy. |
+| Mutation Score | ≥80% | **Closed at v2.0.0 (Patch D, audit-10).** Target retained as the binding gate; measurement gated on executable RAG code landing outside `02-spec/`. Until then, line+branch coverage at 100% remains the operative proxy. |
 
 ### Patch D Closure Note (v2.0.0)
 
-The audit-10 Patch D `TBD` is **resolved as of project v5.39.0** (RAG matrix v2.0.0). The ≥80% target is now the binding mutation-score gate for any future executable RAG validator implementation. No mutation tooling is added inside `spec/` itself, because:
+The audit-10 Patch D `TBD` is **resolved as of project v5.39.0** (RAG matrix v2.0.0). The ≥80% target is now the binding mutation-score gate for any future executable RAG validator implementation. No mutation tooling is added inside `02-spec/` itself, because:
 
 1. `02-spec/06-seedable-config-architecture/` is a markdown specification, not executable code — there is nothing in this folder to mutate.
 2. `02-spec/19-main-worker-service/` (the consumer of the RAG validator) is **spec-only by hard project rule** (`mem://constraints/spec19-no-implementation`); mutation tooling cannot be wired there.
-3. Implementation of the RAG validator will occur in a separate, non-`spec/` repository or module during Phase-14 ramp-up. **At that point**, the chosen mutation framework (e.g. `gremlins` for Go, `cargo-mutants` for Rust, or Stryker for TS) MUST enforce the ≥80% gate from this matrix as a CI-blocking check.
+3. Implementation of the RAG validator will occur in a separate, non-`02-spec/` repository or module during Phase-14 ramp-up. **At that point**, the chosen mutation framework (e.g. `gremlins` for Go, `cargo-mutants` for Rust, or Stryker for TS) MUST enforce the ≥80% gate from this matrix as a CI-blocking check.
 
 Operative effect: the target is no longer "TBD" — it is **≥80%, deferred-by-design until executable code exists**, with line+branch coverage at 100% as the active proxy gate. This is the exhaustive, blind-AI-actionable disposition.
 

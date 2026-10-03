@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 ```
 
-Release builds MUST NEVER be cancelled — every release tag must produce a GitHub Release regardless of subsequent commits.
+Release builds MUST NEVER be canceled — every release tag must produce a GitHub Release regardless of subsequent commits.
 
 ---
 
@@ -116,7 +116,7 @@ make_latest: ${{ !contains(steps.version.outputs.version, '-') }}
 
 ## Cross-references
 
-- [`./01-index.md`](./01-index.md) — Distribution overview
+- [`./readme.md`](./readme.md) — Distribution overview
 - [`./02-install-contract.md`](./02-install-contract.md) — Install contract (consumes these artifacts)
 - [`02-spec/12-cicd-pipeline-workflows/`](../12-cicd-pipeline-workflows/) — CICD conventions
 - [`02-spec/16-generic-release/`](../16-generic-release/) — Generic release standard

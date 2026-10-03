@@ -31,7 +31,7 @@ When invoked with no flags, both installers MUST pull the following four folders
 
 | Folder | Mandatory | Purpose |
 |--------|-----------|---------|
-| `spec/` | yes | Full coding-guidelines spec tree (568+ files) |
+| `02-spec/` | yes | Full coding-guidelines spec tree (568+ files) |
 | `linters/` | yes | Language-specific lint plugins, ESLint configs, tree-sitter queries |
 | `linter-scripts/` | yes | Legacy orchestrator (validator wrappers, helper scripts) |
 | `linters-cicd/` | yes | Python check suite, registry, `run-all.sh`, baseline |
@@ -117,7 +117,7 @@ No silent failures. No bare stack traces.
 
 ## Cross-references
 
-- [`./01-index.md`](./01-index.md) — Distribution overview
+- [`./readme.md`](./readme.md) — Distribution overview
 - [`./04-release-pipeline.md`](./04-release-pipeline.md) — Where the artifacts come from
 - [`./05-install-config.md`](./05-install-config.md) — Folder-list contract
 

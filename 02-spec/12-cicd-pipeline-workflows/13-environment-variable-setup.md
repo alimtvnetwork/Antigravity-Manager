@@ -158,20 +158,20 @@ The tool maintains an `env-registry.json` file to track all managed variables:
   "variables": [
     {
       "key": "<TOOL>_HOME",
-      "value": "/opt/<tool>",
+      "value": "E:\\<tool>",
       "createdAt": "2026-04-09T14:30:00Z",
       "platforms": ["registry", "powershell-profile", "git-bash"]
     },
     {
       "key": "<TOOL>_DATA",
-      "value": "/opt/<tool>/data",
+      "value": "E:\\<tool>\\data",
       "createdAt": "2026-04-09T14:30:00Z",
       "platforms": ["registry", "powershell-profile"]
     }
   ],
   "pathEntries": [
     {
-      "directory": "/opt/<tool>",
+      "directory": "E:\\<tool>",
       "createdAt": "2026-04-09T14:30:00Z"
     }
   ]

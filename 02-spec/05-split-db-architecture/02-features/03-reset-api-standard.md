@@ -3,7 +3,7 @@
 **Version:** 3.2.0
 **Status:** Active
 **Updated:** 2026-04-16
-**Parent:** [01-index.md](../01-index.md)
+**Parent:** [readme.md](../readme.md)
 
 ---
 
@@ -135,7 +135,7 @@ Request:
 
 Response:
 {
-  "Status": "cancelled"
+  "Status": "canceled"
 }
 ```
 
@@ -157,7 +157,7 @@ CREATE TABLE ResetRequest (
     ConfirmedAt DATETIME,
     CancelledAt DATETIME,
     CompletedAt DATETIME,
-    Status TEXT DEFAULT 'pending',                 -- pending, confirmed, expired, cancelled, completed
+    Status TEXT DEFAULT 'pending',                 -- pending, confirmed, expired, canceled, completed
     DeletedCount INTEGER,
     FreedBytes INTEGER,
     ErrorMessage TEXT
@@ -320,7 +320,7 @@ Common errors:
 - `x401`: Reset expired
 - `x402`: Invalid reset ID
 - `x403`: Reset already confirmed
-- `x404`: Reset cancelled
+- `x404`: Reset canceled
 
 ---
 
@@ -328,7 +328,7 @@ Common errors:
 
 | Reference | Location |
 |-----------|----------|
-| Split DB Overview | `../01-index.md` |
+| Split DB Overview | `../readme.md` |
 | CLI Examples | `./01-cli-examples.md` |
 | AI Bridge Reset | `02-spec/22-ai-bridge-cli/01-backend/14-reset-and-export-api.md` |
 | GSearch Database | `02-spec/20-gsearch-cli/01-backend/22-database-architecture.md` |

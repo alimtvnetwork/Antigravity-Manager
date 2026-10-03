@@ -46,11 +46,21 @@ type DelegatedRequestServer struct {
 In the handler or service layer that makes the delegated HTTP call:
 
 ```go
+// -----------------------------------------------------------------------------
+// Step 1: Declare Concrete Types in `types.go` (Mandatory Rule)
+// -----------------------------------------------------------------------------
+// In types.go:
+// type (
+//     EnvelopeResult = result.Result[*Envelope]
+//     DelegatedRequestResultWrap = result.Result[DelegatedRequestResult]
+// )
+// -----------------------------------------------------------------------------
+
 func (s *Service) fetchFromDelegatedServer(
 	context stdctx.Context,
 	site *models.Site,
 	path string,
-) result.Result[*Envelope] {
+) EnvelopeResult {
     delegatedUrl := fmt.Sprintf("%s/wp-json/%s", site.Url, path)
 
     res := s.executeDelegatedRequest(context, delegatedUrl)
@@ -69,7 +79,7 @@ func (s *Service) buildDelegatedEnvelope(
     delegatedUrl, path string,
     statusCode int,
     bodyBytes []byte,
-) result.Result[*Envelope] {
+) EnvelopeResult {
     envelope := NewEnvelope()
     envelope.Attributes.RequestDelegatedAt = delegatedUrl
 
@@ -82,7 +92,7 @@ func (s *Service) buildDelegatedEnvelope(
     return result.SuccessResult(envelope)
 }
 
-func (s *Service) executeDelegatedRequest(context stdctx.Context, url string) result.Result[DelegatedRequestResult] {
+func (s *Service) executeDelegatedRequest(context stdctx.Context, url string) DelegatedRequestResultWrap {
     req, err := http.NewRequestWithContext(context, http.MethodGet, url, nil)
 
     if err != nil {

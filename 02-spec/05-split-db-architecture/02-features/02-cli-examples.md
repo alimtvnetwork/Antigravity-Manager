@@ -3,7 +3,7 @@
 **Version:** 3.2.0
 **Updated:** 2026-04-16
 **Status:** Active
-**Parent:** [01-index.md](../01-index.md)
+**Parent:** [readme.md](../readme.md)
 
 ---
 
@@ -621,7 +621,7 @@ CREATE TABLE ResetRequests (
     ConfirmedAt DATETIME,
     CancelledAt DATETIME,
     CompletedAt DATETIME,
-    Status TEXT DEFAULT 'pending',                 -- pending, confirmed, expired, cancelled, completed
+    Status TEXT DEFAULT 'pending',                 -- pending, confirmed, expired, canceled, completed
     DeletedCount INTEGER,
     FreedBytes INTEGER,
     ErrorMessage TEXT
@@ -653,7 +653,7 @@ POST /api/v1/reset/confirm
 
 POST /api/v1/reset/cancel
   Request:  { "ResetId": "rst_abc123" }
-  Response: { "Status": "cancelled" }
+  Response: { "Status": "canceled" }
 ```
 
 ### Example: AI Bridge Reset Flow
@@ -706,7 +706,7 @@ POST /api/v1/reset/confirm
 
 | Reference | Location |
 |-----------|----------|
-| Split DB Overview | `../01-index.md` |
+| Split DB Overview | `../readme.md` |
 | Reset API Standard | `./02-reset-api-standard.md` |
 | Database Flow Diagrams | `./03-database-flow-diagrams.md` |
 | AI Bridge DB Architecture | `../22-ai-bridge-cli/01-backend/12-database-architecture.md` |

@@ -200,9 +200,9 @@ answers:
 
 ## Cross-References
 
-- [01-index.md](./01-index.md) — Pattern inventory
+- [readme.md](./readme.md) — Pattern inventory
 - [03-shared-conventions.md](../03-shared-conventions.md) — Pinning, triggers, permissions
-- [Coding Guidelines (Cross-Language)](../../02-coding-guidelines/01-cross-language/15-master-coding-guidelines/01-index.md)
+- [Coding Guidelines (Cross-Language)](../../02-coding-guidelines/01-cross-language/15-master-coding-guidelines/readme.md)
 - [Linters CI/CD Integration](../../02-coding-guidelines/06-cicd-integration/97-acceptance-criteria.md)
 
 ---

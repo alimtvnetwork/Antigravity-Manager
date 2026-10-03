@@ -203,6 +203,7 @@ This rule applies to **all** areas where file/path errors can occur:
 A linter or code review check **must** reject any file/path error log that fails this checklist:
 
 ### Mandatory Error Context Checklist (Zero Tolerance)
+
 - [ ] **Exact Path Embedded:** Error metadata contains `Path` or `FilePath` with the full resolved path (`appfault.WrapWithPath(...)` or `.WithPath(p)`).
 - [ ] **Variable Name Recorded:** Variable name (e.g. `opts.FilePath`, `sourceDir`, `batchSize`) is explicitly recorded in `Variables` or context (`.WithVar(name, val)`).
 - [ ] **Multiple Paths Differentiated:** Operations touching multiple files/directories log all involved paths (e.g. `sourcePath`, `destinationPath`, or `.WithPaths(src, dst)`).

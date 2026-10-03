@@ -1,8 +1,14 @@
 # AppError Package Reference — AppError struct and constructors
 
-> **Parent:** [AppError Package Reference](./01-index.md)
-> **Version:** 2.0.0
-> **Updated:** 2026-04-02
+> **Parent:** [AppError Package Reference](./readme.md)
+> **Version:** 2.1.0
+> **Updated:** 2026-09-22
+
+> [!IMPORTANT]
+> **Modernized Standard: `pkg/appfault` (`*appfault.AppError`):**
+> Per global AI guidelines and `06-appfault-package-migration.md`, all structured errors must be constructed using `coding-guidelines/common/pkg/appfault` (`*appfault.AppError` / `appfault.Fault`).
+> Convenience constructors (`appfault.New`, `appfault.Wrap`, `appfault.WrapFile`, `appfault.WrapUrl`) are defined in `pkg/appfault`.
+> Any service functions returning result envelopes must define concrete named types in `types.go` (e.g. `type ConfigResult = result.Wrap[*Config]`).
 
 ---
 

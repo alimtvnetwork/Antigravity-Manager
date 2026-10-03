@@ -36,7 +36,7 @@ code, docs, or pipelines is a **build-time violation**.
 | Schema spec (this)  | `02-spec/01-spec-authoring-guide/14-version-schema.md` |
 | Runtime artifact    | `version.json` at the **repository root**        |
 
-The runtime file MUST NOT live inside `spec/`, `src/`, or any subfolder.
+The runtime file MUST NOT live inside `02-spec/`, `src/`, or any subfolder.
 Tools locate it by walking up to the nearest directory that contains both
 `package.json` (or equivalent) and `version.json`.
 

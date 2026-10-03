@@ -86,7 +86,7 @@ any working directory).
 
 | Linter | Title | Fix Template |
 |--------|-------|--------------|
-| `misspell` | Replace `colour` with `color` (US English) | `- colour\n+ color` |
+| `misspell` | Replace `color` with `color` (US English) | `- color\n+ color` |
 | `gocritic/paramTypeCombine` | Combine consecutive params of same type | `- func f(a string, b string)\n+ func f(a, b string)` |
 | `gocritic/sprintfQuotedString` | Use `%q` instead of `"%s"` | `- fmt.Sprintf(\`KEY="%s"\`, val)\n+ fmt.Sprintf(\`KEY=%q\`, val)` |
 | `unused` | Remove the unused symbol | `- // entire declaration` + nolint hint for future-API case |
@@ -173,7 +173,7 @@ See `.github/scripts/lint-suggest.py` in reference CLI implementations.
 
 ## Cross-References
 
-- [01-index.md](./01-index.md)
+- [readme.md](./readme.md)
 - [04-baseline-diff-lint-gate.md](./05-baseline-diff-lint-gate.md) — Sibling script that decides which findings are NEW
 
 ---

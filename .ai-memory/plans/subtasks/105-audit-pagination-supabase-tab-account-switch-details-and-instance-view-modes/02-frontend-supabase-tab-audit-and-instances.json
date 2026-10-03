@@ -1,0 +1,24 @@
+{
+  "subtask_id": "105-02",
+  "name": "Frontend Supabase Tab, Audit Overhaul, Instances View Modes & Prompt Drawer",
+  "status": "IN_PROGRESS",
+  "owner": "Worker 02 (Frontend Specialist)",
+  "owned_files": [
+    "src/components/navbar/Navbar.tsx",
+    "src/components/navbar/NavMenu.tsx",
+    "src/App.tsx",
+    "src/pages/Supabase.tsx",
+    "src/pages/Audit.tsx",
+    "src/types/audit.ts",
+    "src/pages/Accounts.tsx",
+    "src/components/accounts/AccountTable.tsx",
+    "src/components/accounts/QuotaItem.tsx",
+    "src/pages/Instances.tsx",
+    "src/components/navbar/InstanceSelector.tsx",
+    "src/components/instances/InstanceTable.tsx",
+    "src/components/instances/PromptTreeViewModal.tsx",
+    "src/pages/Settings.tsx",
+    "src/types/config.ts",
+    "src/components/modals/UnifiedBackupModal.tsx"
+  ]
+}

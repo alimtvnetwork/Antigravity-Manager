@@ -93,67 +93,28 @@ func Print(command string) {
 }
 ```
 
-## Help Interception & DRY Argument Checking
+## Help Interception
 
-To keep command handlers DRY and eliminate repetitive boilerplate (`if len(args) == 0 || hasHelpFlag(args)`), a centralized helper in `cmd` intercepts `--help`, `-h`, `help`, and enforces minimum required positional arguments:
+A shared helper in `cmd` intercepts `--help` before flag parsing:
 
 ```go
 // cmd/helpcheck.go
-package cmd
-
-import (
-    "coding-guidelines/common/pkg/appfault"
-    "toolname/helptext"
-)
-
-// HasHelpFlag checks whether args contains -h, --help, or help.
-func HasHelpFlag(args []string) bool {
+func checkHelp(command string, args []string) {
     for _, a := range args {
-        if a == "--help" || a == "-h" || a == "help" {
-            return true
+        if a == "--help" || a == "-h" {
+            helptext.Print(command)
+            os.Exit(0)
         }
     }
-    return false
-}
-
-// CheckHelpOrEmpty checks if help was requested or if positional arguments are insufficient.
-// Returns (handled bool, appErr *appfault.AppError):
-// - When help flag is present: prints help text, returns (true, nil).
-// - When args < minArgs and no help flag: prints help text, returns (true, appfault.NewValidation(...)).
-// - When valid: returns (false, nil) so execution continues.
-func CheckHelpOrEmpty(command string, args []string, minArgs int) (bool, *appfault.AppError) {
-    if HasHelpFlag(args) {
-        helptext.Print(command)
-        return true, nil
-    }
-
-    if len(args) < minArgs {
-        helptext.Print(command)
-        return true, appfault.NewValidation(
-            "cli."+command,
-            "E1001",
-            "missing required arguments for command: "+command,
-        )
-    }
-
-    return false, nil
 }
 ```
 
-Every handler calls `CheckHelpOrEmpty` as its first line, returning early if handled:
+Every handler calls `checkHelp` as its first line:
 
 ```go
-// cmd/scan.go
-func runScan(args []string) *appfault.AppError {
-    handled, appErr := CheckHelpOrEmpty("scan", args, 1)
-    if handled {
-        return appErr
-    }
-
-    dir, cfg := parseScanFlags(args)
-    records := scanner.Scan(dir, cfg)
-    formatter.WriteTerminal(os.Stdout, records)
-    return nil
+func runScan(args []string) {
+    checkHelp("scan", args)
+    // ... existing logic
 }
 ```
 

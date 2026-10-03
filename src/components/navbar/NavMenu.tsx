@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, Menu, Check } from 'lucide-react';
+import { ChevronDown, Menu, Check, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useClickOutside } from './NavDropdowns';
 import { isActive, type NavItem } from './constants';
@@ -35,7 +35,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
     // Find currently active navigation item
     const currentItem = visibleNavItems.find(item => isActive(location.pathname, item.path)) || visibleNavItems[0];
-    const CurrentIcon = currentItem ? currentItem.icon : Menu;
+    const CurrentIcon = currentItem ? currentItem.icon : (location.pathname.startsWith('/supabase') ? Database : Menu);
 
     return (
         <div className="relative" ref={menuRef}>

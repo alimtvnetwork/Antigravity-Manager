@@ -1,11 +1,13 @@
 # Task Retention & Dynamic Query Filtering Specification
 
 ## 1. Overview
+
 This specification standardizes automated retention policies and dynamic query filtering across the SQLite task database subsystem (`04-code/golang/pkg/applogger/sqlitelogger`).
 
 ## 2. Retention Management
 
 ### 2.1 Time-Based Pruning
+
 `SplitDBManager.PruneTasks(maxAge time.Duration) (int, *appfault.AppError)`:
 - Discovers all task databases in `tasksDir`.
 - Compares each file's modification time against `cutoff := time.Now().Add(-maxAge)`.
@@ -15,6 +17,7 @@ This specification standardizes automated retention policies and dynamic query f
   3. Increments pruned count.
 
 ### 2.2 Capacity-Based Pruning
+
 `SplitDBManager.PruneTaskCount(maxDbs int) (int, *appfault.AppError)`:
 - If discovered database count exceeds `maxDbs`:
   1. Sorts task databases by modification time ascending (oldest first).
@@ -23,6 +26,7 @@ This specification standardizes automated retention policies and dynamic query f
 ## 3. Dynamic Query Filtering
 
 ### 3.1 Filter Specification
+
 The `FilterOptions` struct controls log retrieval:
 ```go
 type FilterOptions struct {
@@ -35,6 +39,7 @@ type FilterOptions struct {
 ```
 
 ### 3.2 Dynamic SQL Generation
+
 `queryLogs(db *sql.DB, filter FilterOptions)` generates an parameterized SQL query:
 - Base: `SELECT id, task_id, timestamp, level, message, caller, fields_json, stack_trace, duration_ms, status FROM logs WHERE 1=1`
 - If `Level` provided: `AND level = ?`

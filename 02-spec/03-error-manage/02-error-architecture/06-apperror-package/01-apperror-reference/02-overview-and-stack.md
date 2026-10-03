@@ -1,6 +1,6 @@
 # AppError Package Reference — Overview, invariants, StackTrace
 
-> **Parent:** [AppError Package Reference](./01-index.md)
+> **Parent:** [AppError Package Reference](./readme.md)
 > **Version:** 1.3.0
 > **Updated:** 2026-03-31
 

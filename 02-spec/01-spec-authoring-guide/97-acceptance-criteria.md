@@ -15,10 +15,10 @@
 
 | # | Criterion | Source |
 |---|-----------|--------|
-| AC-001 | Every spec module has `01-index.md` at root | `04-required-files.md` |
+| AC-001 | Every spec module has `readme.md` at root | `04-required-files.md` |
 | AC-002 | Every spec module has `99-consistency-report.md` at root | `04-required-files.md` |
 | AC-003 | CLI modules follow 3-folder pattern (`01-backend/`, `02-frontend/`, `03-deploy/`) | `06-cli-module-template.md` |
-| AC-004 | Subfolders with 3+ files include their own `01-index.md` | `04-required-files.md` |
+| AC-004 | Subfolders with 3+ files include their own `readme.md` | `04-required-files.md` |
 
 ---
 
@@ -37,13 +37,13 @@
 
 | # | Criterion | Source |
 |---|-----------|--------|
-| AC-009 | Every `01-index.md` includes Version and Updated metadata | `01-index.md` |
-| AC-010 | Every `01-index.md` includes AI Confidence score | `01-index.md` |
-| AC-011 | Every `01-index.md` includes Ambiguity score | `01-index.md` |
-| AC-012 | Every `01-index.md` includes Keywords section | `01-index.md` |
-| AC-013 | Every `01-index.md` includes Scoring table | `01-index.md` |
-| AC-014 | Every `01-index.md` includes numbered file inventory table | `01-index.md` |
-| AC-015 | Every `01-index.md` includes Cross-References table | `01-index.md` |
+| AC-009 | Every `readme.md` includes Version and Updated metadata | `readme.md` |
+| AC-010 | Every `readme.md` includes AI Confidence score | `readme.md` |
+| AC-011 | Every `readme.md` includes Ambiguity score | `readme.md` |
+| AC-012 | Every `readme.md` includes Keywords section | `readme.md` |
+| AC-013 | Every `readme.md` includes Scoring table | `readme.md` |
+| AC-014 | Every `readme.md` includes numbered file inventory table | `readme.md` |
+| AC-015 | Every `readme.md` includes Cross-References table | `readme.md` |
 
 ---
 
@@ -59,7 +59,7 @@
 
 ## Cross-References
 
-- [Overview](./01-index.md)
+- [Overview](./readme.md)
 - [Required Files](./04-required-files.md)
 - [Naming Conventions](./03-naming-conventions.md)
 - [Cross-References Guide](./10-cross-references.md)

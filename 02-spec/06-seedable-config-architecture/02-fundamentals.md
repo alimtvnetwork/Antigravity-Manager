@@ -2,7 +2,7 @@
 
 **Version:** 3.2.0
 **Updated:** 2026-04-16
-**Parent:** [01-index.md](./01-index.md)
+**Parent:** [readme.md](./readme.md)
 
 ---
 
@@ -731,7 +731,7 @@ See: `06-validation-data-seeding.md` for complete implementation guide.
 
 | Reference | Location |
 |-----------|----------|
-| Split DB Architecture | [05-split-db-architecture/01-index.md](../05-split-db-architecture/01-index.md) |
+| Split DB Architecture | [05-split-db-architecture/readme.md](../05-split-db-architecture/readme.md) |
 
 ---
 

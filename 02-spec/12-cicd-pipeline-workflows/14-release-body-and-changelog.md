@@ -98,33 +98,17 @@ The release body is assembled as a single markdown file written to `/tmp/release
 
 ## Install
 
-### Windows (PowerShell 5.1+)
+### Quick install (Windows PowerShell)
 
-#### Direct Latest Install (Auto-Updating)
 ```powershell
-irm https://raw.githubusercontent.com/<repo>/main/install.ps1 | iex
+irm https://github.com/<repo>/releases/download/<version>/install.ps1 | iex
 ```
 
-#### Pinned Version Install (<version>)
-```powershell
-irm https://raw.githubusercontent.com/<repo>/<version>/install.ps1 | iex
-```
+### Quick install (Linux / macOS)
 
----
-
-### Linux / macOS (Bash)
-
-#### Direct Latest Install (Auto-Updating)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<repo>/main/install.sh | bash
+curl -fsSL https://github.com/<repo>/releases/download/<version>/install.sh | bash
 ```
-
-#### Pinned Version Install (<version>)
-```bash
-curl -fsSL https://raw.githubusercontent.com/<repo>/<version>/install.sh | bash
-```
-
----
 
 ### Manual download
 
@@ -199,33 +183,27 @@ The complete script for assembling the release body in a GitHub Actions step:
 
     ## Install
 
-    ### Windows (PowerShell 5.1+)
+    ### Quick install (Windows PowerShell)
 
-    #### Direct Latest Install (Auto-Updating)
     \`\`\`powershell
-    irm https://raw.githubusercontent.com/$REPO/main/install.ps1 | iex
+    irm https://github.com/$REPO/releases/download/$VERSION/install.ps1 | iex
     \`\`\`
 
-    #### Pinned Version Install ($VERSION)
+    ### Quick install (Linux / macOS)
+
+    \`\`\`bash
+    curl -fsSL https://github.com/$REPO/releases/download/$VERSION/install.sh | bash
+    \`\`\`
+
+    ### Install specific version (generic installer)
+
     \`\`\`powershell
-    irm https://raw.githubusercontent.com/$REPO/$VERSION/install.ps1 | iex
+    & { \$Version = "$VERSION"; irm https://raw.githubusercontent.com/$REPO/main/scripts/install.ps1 | iex }
     \`\`\`
 
-    ---
-
-    ### Linux / macOS (Bash)
-
-    #### Direct Latest Install (Auto-Updating)
     \`\`\`bash
-    curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/$REPO/main/scripts/install.sh | bash -s -- --version $VERSION
     \`\`\`
-
-    #### Pinned Version Install ($VERSION)
-    \`\`\`bash
-    curl -fsSL https://raw.githubusercontent.com/$REPO/$VERSION/install.sh | bash
-    \`\`\`
-
-    ---
 
     ### Manual download
 

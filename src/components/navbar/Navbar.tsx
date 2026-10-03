@@ -1,5 +1,5 @@
 import { startTransition } from 'react';
-import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from '../../stores/useConfigStore';
@@ -35,6 +35,7 @@ function Navbar() {
         { path: '/user-token', label: t('nav.user_token', 'User Tokens'), icon: Users, priority: 'low' },
         { path: '/security', label: t('nav.security'), icon: Lock, priority: 'low' },
         { path: '/email', label: t('nav.email', 'Email & Alerts'), icon: Mail, priority: 'high' },
+        { path: '/supabase', label: t('nav.supabase', 'Supabase'), icon: Database, priority: 'high' },
         { path: '/audit', label: t('nav.audit', 'Audit'), icon: ScrollText, priority: 'high' },
         { path: '/settings', label: t('nav.settings'), icon: Settings, priority: 'high' },
     ];

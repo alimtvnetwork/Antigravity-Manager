@@ -123,7 +123,7 @@ spec/
 34-time-log-cli/                  # Headless CLI
 ├── 01-backend/                  # ✅ Present
 ├── 03-deploy/                   # ✅ Present (note: still uses 03, NOT 02)
-├── 01-index.md
+├── readme.md
 └── 99-consistency-report.md
                                  # 02-frontend/ intentionally omitted
 
@@ -152,7 +152,7 @@ spec/
 └── ...
 ```
 
-**Policy:** Additional subfolders are permitted when a CLI has significant feature areas beyond the core 3. They MUST follow the same naming convention and contain `01-index.md`.
+**Policy:** Additional subfolders are permitted when a CLI has significant feature areas beyond the core 3. They MUST follow the same naming convention and contain `readme.md`.
 
 ---
 
@@ -175,7 +175,7 @@ spec/
 └── 03-coding-guidelines/            # Level 1
     └── 03-golang/                    # Level 2
         └── 01-enum-specification/    # Level 3 (maximum)
-            ├── 01-index.md
+            ├── readme.md
             ├── 01-{file}.md
             └── ...
 ```

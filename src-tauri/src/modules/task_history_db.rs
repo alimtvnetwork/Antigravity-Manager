@@ -1,6 +1,6 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -146,6 +146,53 @@ pub fn list_page(offset: u32, limit: u32) -> Result<TaskHistoryPage, String> {
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let total: i64 = splits.iter().map(|split| split.row_count).sum();
+
+    // Fast path: if offset == 0 && limit <= 200, query hot_tasks_cache directly for sub-millisecond response
+    if offset == 0 && limit <= 200 {
+        let mut stmt = index
+            .prepare(
+                "SELECT id, action, action_code, status, subject, detail, instance_id, split_path, created_at, finished_at,
+                        COALESCE(from_email, ''), COALESCE(to_email, '')
+                 FROM hot_tasks_cache ORDER BY created_at DESC LIMIT ?1",
+            )
+            .map_err(|err| err.to_string())?;
+        let rows = stmt
+            .query_map(params![limit.max(1)], |row| {
+                let legacy: String = row.get(1)?;
+                let code: Option<i32> = row.get(2)?;
+                let (action_code, action, action_label) = resolve_action(code, &legacy);
+                Ok(TaskRecord {
+                    id: row.get(0)?,
+                    action_code,
+                    action,
+                    action_label,
+                    status: row.get(3)?,
+                    subject: row.get(4)?,
+                    detail: row.get(5)?,
+                    instance_id: row.get(6)?,
+                    split_path: row.get(7)?,
+                    created_at: row.get(8)?,
+                    finished_at: row.get(9)?,
+                    from_email: row.get(10)?,
+                    to_email: row.get(11)?,
+                })
+            })
+            .map_err(|err| err.to_string())?;
+        let mut items = Vec::new();
+        for row in rows {
+            items.push(row.map_err(|err| err.to_string())?);
+        }
+        if !items.is_empty() || total == 0 {
+            return Ok(TaskHistoryPage {
+                total,
+                offset,
+                limit,
+                items,
+                splits,
+            });
+        }
+    }
+
     let mut items = Vec::new();
     let mut skip = offset as i64;
     let mut need = limit.max(1) as i64;
@@ -251,6 +298,28 @@ fn enqueue(
             )
             .map_err(|err| err.to_string())?;
     }
+
+    // Synchronously update hot_tasks_cache and cap at 200 entries
+    let split_path_str = split_path.to_string_lossy().to_string();
+    let _ = index.execute(
+        "INSERT OR REPLACE INTO hot_tasks_cache (id, action, action_code, status, subject, detail, instance_id, split_path, created_at, finished_at, from_email, to_email)
+         VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7, ?8, NULL, '', '')",
+        params![
+            id,
+            action.pascal(),
+            action.code(),
+            status,
+            subject,
+            instance_id.unwrap_or(""),
+            split_path_str,
+            now
+        ],
+    );
+    let _ = index.execute(
+        "DELETE FROM hot_tasks_cache WHERE id NOT IN (SELECT id FROM hot_tasks_cache ORDER BY created_at DESC LIMIT 200)",
+        [],
+    );
+
     Ok(id)
 }
 
@@ -349,7 +418,7 @@ pub fn record_requeue_event(
     Ok(task.id)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SwitchFacts {
     pub from_email: String,
     pub to_email: String,
@@ -360,6 +429,16 @@ pub struct SwitchFacts {
     pub conversation_id: String,
     pub prompt_reinjected: bool,
     pub switch_ok: bool,
+    #[serde(default)]
+    pub instance_id: String,
+    #[serde(default)]
+    pub ide_type: String,
+    #[serde(default)]
+    pub idc_machine_alias: String,
+    #[serde(default)]
+    pub ide_path: String,
+    #[serde(default)]
+    pub switch_reason: String,
 }
 
 pub fn switch_payload(facts: &SwitchFacts) -> String {
@@ -374,6 +453,11 @@ pub fn switch_payload(facts: &SwitchFacts) -> String {
         "prompt_reinjected": facts.prompt_reinjected,
         "moved_at": Utc::now().timestamp(),
         "switch_ok": facts.switch_ok,
+        "instance_id": facts.instance_id,
+        "ide_type": facts.ide_type,
+        "idc_machine_alias": facts.idc_machine_alias,
+        "ide_path": facts.ide_path,
+        "switch_reason": facts.switch_reason,
     })
     .to_string()
 }
@@ -408,9 +492,10 @@ fn complete(
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let now = Utc::now().timestamp();
+    let (from_email, to_email) = payload_emails(payload_json);
+    let mut updated_in_split = false;
     for split in splits {
         let conn = open_split(Path::new(&split.file_path))?;
-        let (from_email, to_email) = payload_emails(payload_json);
         let changed = if let Some(payload) = payload_json {
             conn.execute(
                 "UPDATE tasks SET status = ?1, detail = ?2, finished_at = ?3, payload_json = ?4, from_email = ?5, to_email = ?6 WHERE id = ?7",
@@ -425,10 +510,26 @@ fn complete(
             .map_err(|err| err.to_string())?
         };
         if changed > 0 {
-            return Ok(());
+            updated_in_split = true;
+            break;
         }
     }
-    Err(format!("history task '{}' was not found", id))
+
+    // Synchronously update hot_tasks_cache and cap at 200 entries
+    let _ = index.execute(
+        "UPDATE hot_tasks_cache SET status = ?1, detail = ?2, finished_at = ?3, from_email = ?4, to_email = ?5 WHERE id = ?6",
+        params![status, detail, now, from_email, to_email, id],
+    );
+    let _ = index.execute(
+        "DELETE FROM hot_tasks_cache WHERE id NOT IN (SELECT id FROM hot_tasks_cache ORDER BY created_at DESC LIMIT 200)",
+        [],
+    );
+
+    if updated_in_split {
+        Ok(())
+    } else {
+        Err(format!("history task '{}' was not found", id))
+    }
 }
 
 fn history_index_path(dir: &Path) -> PathBuf {
@@ -449,6 +550,24 @@ fn open_index(dir: &Path) -> Result<Connection, String> {
             closed_at INTEGER,
             row_count INTEGER NOT NULL DEFAULT 0,
             is_current INTEGER NOT NULL
+        )",
+        [],
+    )
+    .map_err(|err| err.to_string())?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS hot_tasks_cache (
+            id TEXT PRIMARY KEY,
+            action TEXT NOT NULL,
+            action_code INTEGER,
+            status TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            detail TEXT NOT NULL DEFAULT '',
+            instance_id TEXT NOT NULL DEFAULT '',
+            split_path TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            finished_at INTEGER,
+            from_email TEXT NOT NULL DEFAULT '',
+            to_email TEXT NOT NULL DEFAULT ''
         )",
         [],
     )

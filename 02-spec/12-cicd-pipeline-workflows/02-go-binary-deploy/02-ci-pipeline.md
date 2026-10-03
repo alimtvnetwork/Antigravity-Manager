@@ -101,7 +101,7 @@ sha-check:
     key: ci-passed-${{ github.sha }}
 ```
 
-**Why inline the cache write?** A separate `mark-success` job could be cancelled by `cancel-in-progress` after all validation jobs pass but before the cache is saved. Inlining it into the final validation step prevents this race condition.
+**Why inline the cache write?** A separate `mark-success` job could be canceled by `cancel-in-progress` after all validation jobs pass but before the cache is saved. Inlining it into the final validation step prevents this race condition.
 
 ---
 
@@ -197,17 +197,16 @@ Key details:
 - `-count=1` disables test caching for reliable CI results
 - `-covermode=atomic` enables safe concurrent coverage collection
 
-### Artifact Upload
+### Zero-Storage Test Reporting
+
+Emit test results directly to `$GITHUB_STEP_SUMMARY` without consuming storage:
 
 ```yaml
-- uses: actions/upload-artifact@v4
-  if: always()  # upload even on failure
-  with:
-    name: test-results-${{ matrix.name }}
-    path: |
-      test-output.txt
-      coverage-${{ matrix.name }}.out
-    retention-days: 7
+- name: Publish test summary
+  if: always()
+  run: |
+    echo "### Test Results: ${{ matrix.name }}" >> "$GITHUB_STEP_SUMMARY"
+    tail -n 20 test-output.txt >> "$GITHUB_STEP_SUMMARY"
 ```
 
 ---

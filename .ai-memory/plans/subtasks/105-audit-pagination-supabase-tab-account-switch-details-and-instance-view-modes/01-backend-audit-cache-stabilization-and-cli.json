@@ -1,0 +1,17 @@
+{
+  "subtask_id": "105-01",
+  "name": "Backend Audit Cache, Stabilization Delay & CLI Enhancements",
+  "status": "IN_PROGRESS",
+  "owner": "Worker 01 (Backend Specialist)",
+  "owned_files": [
+    "src-tauri/src/modules/task_history_db.rs",
+    "src-tauri/src/commands/mod.rs",
+    "src-tauri/src/modules/auto_switcher.rs",
+    "src-tauri/src/modules/instance.rs",
+    "src-tauri/src/modules/integration.rs",
+    "src-tauri/src/models/config.rs",
+    "src-tauri/src/proxy/config.rs",
+    "src-tauri/src/bin/agm.rs",
+    "scripts/e2e-instance-commands-test.ps1"
+  ]
+}
