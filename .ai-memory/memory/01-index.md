@@ -43,6 +43,14 @@ Updated: 2026-04-27
 - [Split SQLite Logging & Task DB Migration](learned/07-split-sqlite-logging-and-task-db-migration.md) — Split SQLite logging architecture, configurable directories, task DB auto-repair/migrations, and log rotation.
 - [Task Retention, Line Streaming & Extensible ApiManager](learned/08-task-retention-streaming-atomic-apimanager.md) — Task retention pruning, query filtering, live line streaming, atomic file writes, lazyonce reset/context, and ApiManager spec.
 - [Conversation Log & Context Wrapper Protocol](learned/09-conversation-log-and-context-wrapper-protocol.md) — Conversation log persistence protocol, verbatim user capturing, prompt staging into prompts/, and zero-execution boundary.
+- [Auto-Switch Architecture & Strict Candidate Evaluation](../learned/21-auto-switch-two-trigger-cli-architecture-and-strict-candidate.md) — Multi-instance candidate evaluation, 100% quota threshold, and reactive + 1-minute ticker.
+- [CI/CD Gates, Auto-Commit Workflow & E2E Lessons](learned/22-cicd-gates-auto-commit-workflow-and-e2e-lessons.md) — Git hook enforcement, gh repo parameter rules, and auto-commit preferences.
+- [Accounts Quota Reinject Sequencing & Update Zip](../learned/23-accounts-quota-reinject-and-how-to-find-it.md) — Settle delay before prompt restoration, single restore per switch, and update zip export.
+- [Task History Split Database Architecture](../learned/24-task-history-split-db.md) — Split SQLite task catalog (`task_index.db`) and 500-row batch databases (`history-*.db`).
+- [CI Failures & Single-Version Rule](../learned/25-ci-failures-and-single-version.md) — Single-version synchronization across all manifests and rustfmt formatting gate enforcement.
+- [CLI Prompt Queue Scheduler & IDE Reconnect](../learned/26-cli-prompt-scheduler-and-ide-reconnect.md) — 10-minute prompt scheduler, idle project detection from `conversation_summaries.db`, and 5-8s IDE settle delay.
+- [Auto-Switch Instance Reopen Fix & UI Modernization](../learned/27-auto-switch-instance-reopen-fix.md) — Preservation of candidate instance IDs, cross-instance window launch, and stale lockfile cleanup.
+- [Navbar Pill Grouping & Instance Settings Parity](../learned/28-navbar-pill-grouping-and-instance-settings-parity.md) — Contiguous segmented pill grouping in UI and CLI/UI instance duplication parity via `copy_instance_with_options`.
 - [Fast File Indexing & Caching Strategy](standards/05-fast-file-indexing-and-caching.md) — Pre-computed file scanning and index caching in `tmp/` via `08-fast-file-scanner.py` for rapid multi-step lookups.
 - [Prompt Synchronization Architecture](standards/04-prompt-synchronization-architecture.md) — All prompts authored in `01-prompts/` and compiled to flat `01-prompts/*.md` via `scripts/update-prompts.ps1` without external Git clones.
 - [Version Source of Truth Standard](standards/version-source-of-truth.md) — Canonical `version.json` standard at repo root.

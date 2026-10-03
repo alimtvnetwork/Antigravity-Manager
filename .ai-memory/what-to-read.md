@@ -1,10 +1,14 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-02T23:20:00Z
+> Last updated: 2026-10-04T01:31:00Z
 
 ## Changelog
 
+- 2026-10-04T01:31:00Z, Release v4.130.0 resolved startup white screen crash by replacing `tokio::runtime::Runtime::new()` and raw `tokio::spawn` calls in Tauri async commands (instance creation, auto-switcher save) and background schedulers (warmup, prompt queue, PID quota sync) with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn`.
+- 2026-10-03T23:30:00Z, Fixed account `SwitchFacts` struct initializer in `src-tauri/src/modules/account.rs` by supplying missing `steps: None` field.
+- 2026-10-03T23:16:00Z, Release v4.129.0 added Instance Audit Trail Modal (`InstanceAuditTrailModal.tsx`), multi-step switch lifecycle tracking (`backup_prompts` -> `reset_process` -> `restore_prompts` -> `verify_restored`) with prominent display of the last 2-3 account switches, and 10-minute periodic + on-demand PID quota synchronization (`start_instance_pid_quota_scheduler`, `syncInstancePidAndQuota`).
+- 2026-10-03T20:37:00Z, Release v4.128.0 added audit pagination (100/200 items) with cache DB, top-level Supabase navigation tab, enriched account switch details (instance, IDE type, machine alias, path, reason), instance Card vs List view toggle with real-time search, and Prompt Tree View drawer with queued/running status and media previews.
 - 2026-10-02T23:20:00Z, Switching one instance must not close another instance's PID. `close_instance` and `get_antigravity_pids` spare `should_spare_pid` matches (saved PID or `/instances/{id}/`). Do not call `close_antigravity(None)` from a single-instance switch. Instance cards are one column until the window is wide.
 - 2026-10-02T22:50:00Z, Switch and fast-forward must keep the live conversation. Read `.ai-memory/issues/60-switch-drops-live-conversation-rca.md` and spec 100. Do not drop a conversation that only has a preview. Do not rewrite `.antigravity_resume_task.json` without `session_id`. Do not treat an already-alive `agy` worker as a successful re-push. `agy -p` is a new CLI prompt. Google quota checks wait at least 120 seconds. `is_instance_running` trusts the saved PID. The full process scan is the PID cache refresh (default 600 seconds, clamp 180..=1200) or a miss while quota is under the threshold. The audit info button loads `payload_json` only on click.
 - 2026-10-02T20:30:00Z, Audit list shows masked from → to. The domain stays hidden. Detail is a table (reason, how, prompt, reinjected) loaded only by `get_task_history_detail` on the info click. The list query does not return `payload_json`.
@@ -71,6 +75,16 @@
 - .ai-memory/memory/learned/18-ruby-homebrew-cask-architecture.md, why: Homebrew Cask package definition architecture and release distribution
 - .ai-memory/memory/learned/19-agm-dedicated-domain-skills-suite.md, why: dedicated AGM domain skills suite covering reverse proxy, thinking store, multi-instance sandboxing, split SQLite databases, React UI, and email remote control
 - .ai-memory/memory/learned/20-installer-multi-version-fallback-ladder-and-release-blocks.md, why: installer multi-version fallback ladder, quiet aria2c delegation, release asset decoupling, and bottom-bar update trigger
+- .ai-memory/learned/23-accounts-quota-reinject-and-how-to-find-it.md, why: accounts quota reinject sequencing, waiting for instance prompt channel before single restore, and zip update export
+- .ai-memory/learned/24-task-history-split-db.md, why: task history Split-SQLite database layout (task_index.db catalog and history-<id>.db 500-row chunks)
+- .ai-memory/learned/25-ci-failures-and-single-version.md, why: single-version rule across package.json, version.json, Cargo.toml, tauri.conf.json, and hooks.nsh before tagging
+- .ai-memory/learned/26-cli-prompt-scheduler-and-ide-reconnect.md, why: background 10-minute prompt queue scheduler, direct inspection of conversation_summaries.db to avoid false-busy locks, and 5-8s IDE settle delay
+- .ai-memory/learned/27-auto-switch-instance-reopen-fix.md, why: multi-instance candidate instance ID preservation in auto-switcher, cross-instance window launching, and stale lockfile cleanup
+- .ai-memory/learned/28-navbar-pill-grouping-and-instance-settings-parity.md, why: UI navbar contiguous segmented pill grouping (rounded-full, shared border, dark-glass) and CLI/UI instance duplication parity via copy_instance_with_options
+- .ai-memory/issues/61-running-prompt-resumption-and-conversation-continuity-rca.md, why: preview fallback in live prompt text, schema resilience for conversation summaries, session_id/conversation_id preservation in .antigravity_resume_task.json, and 120s PID quota check floor
+- .ai-memory/cicd-issues/43-rust-mismatched-types-and-move-errors-v4-128-0-rca.md, why: get_antigravity_executable_path PathBuf-to-String mapping and task.id clone for Drop trait types
+- `02-spec/21-app/104-instance-audit-trail-and-pid-quota-sync.md`, why: instance audit trail modal, 4-step lifecycle tracking, and 10-minute PID quota synchronization specification
+- `02-spec/21-app/105-audit-pagination-supabase-tab-account-switch-details-and-instance-view-modes.md`, why: audit pagination, Supabase top-level tab, account switch details, and instance card/list view modes specification
 - `02-spec/21-app/01-index.md`, why: master index of application specifications, architecture guides, token capture sequences, and multi-instance blueprints
 - `.ai-memory/memory/standards/version-source-of-truth.md`, why: mandatory standard for version.json single source of truth, 'inherit' keyword for sub-packages, and release sync workflow
 - `.ai-memory/memory/01-index.md`, why: architectural map of version propagation, sync pipeline, and release ceremony
@@ -118,3 +132,11 @@
 - .ai-memory/plans/completed/12-spec-remediation-completed.md
 - .ai-memory/plans/completed/16-repo-structure-installers-and-release.md
 - .ai-memory/plans/completed/25-email-management-split-security-db-and-remote-control.md
+- .ai-memory/plans/completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md
+- .ai-memory/plans/completed/74-ui-email-telegram-fixes-revisit.md
+- .ai-memory/plans/completed/83-local-e2e-instance-switching-and-prompt-restore.md
+- .ai-memory/plans/completed/89-cicd-rustfmt-cmd-instances-fix.md
+- .ai-memory/plans/completed/94-blind-ai-instance-test-and-release.md
+- .ai-memory/plans/completed/104-instance-settings-sync-duplication-and-navbar-combine.md
+- .ai-memory/plans/pending/101-instance-clone-audit-theme-and-ui-enhancements.md
+- .ai-memory/plans/pending/105-audit-pagination-supabase-tab-account-switch-details-and-instance-view-modes.md
