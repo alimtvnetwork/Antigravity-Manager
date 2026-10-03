@@ -10315,12 +10315,7 @@ fn cmd_instances(args: &[String]) {
                     .unwrap_or(&inst.config.data_dir);
                 println!(
                     "{:<6} {:<10} {:<24} {:<18} {:<24} {}",
-                    seq_str,
-                    pid_str,
-                    seq_name,
-                    status_str,
-                    email,
-                    file_path
+                    seq_str, pid_str, seq_name, status_str, email, file_path
                 );
             }
             println!();
