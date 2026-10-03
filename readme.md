@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.127.0-3B82F6?style=flat-square" alt="Version v4.127.0">
+    <img src="https://img.shields.io/badge/Version-v4.127.1-3B82F6?style=flat-square" alt="Version v4.127.1">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.127.0)**
+**Bar 2: Version-Based Installation (v4.127.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -455,6 +455,9 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.127.1** (2026-10-03):
+  - **CLI Formatting & Output Polish**: Enhanced `agm instance settings` and related CLI command helpers with clean tabular output and robust non-zero error reporting.
+  - **Architectural Invariants**: Codified UI segmented pill encapsulation and headless duplication parity into project engineering guidelines.
 - **v4.127.0** (2026-10-03):
   - **Navbar Header Button Consolidation**: Unified Quick Clean + Preferences and Window Controls (Minimize, Maximize, Close) into sleek segmented pill control capsules with dark-glass styling.
   - **Deep Settings Synchronization & Parity**: CLI `agm instance copy-settings` and UI modal to synchronize theme colors, turbo mode, browser policy, and file permissions across instances with executable path auto-discovery (`--exe`).
@@ -532,7 +535,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.127.0**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, and JSON import/export with undo/redo history.
+> Latest version **v4.127.1**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, JSON import/export with undo/redo history, and CLI output format polish.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

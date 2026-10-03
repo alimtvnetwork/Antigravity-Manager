@@ -246,9 +246,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.127.1 (2026-10-03)**:
+        -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
+            -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)
+
+
     *   **v4.127.0 (2026-10-03)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Instances] Unified Settings Sync, Duplication Parity & Combined Navbar Controls**:
+            -   **Description**: Duplicating an instance from UI or CLI routes through identical underlying service logic (`copy_instance_with_options`), replicating `workspaceStorage`, `state.vscdb`, `storage.json`, and database project mappings. Consolidated Quick Clean, Theme/Language preferences, and Window Controls into seamless segmented pill capsules, and introduced JSON import/export with snapshot undo/redo in Instance Settings modal. (Thanks to @aukgit)
 
 
     *   **v4.126.1 (2026-10-03)**:

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.127.0)
+> Professional AI Account Management & Protocol Proxy System (v4.127.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.127.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.127.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.127.0**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, and JSON import/export with undo/redo history.
+> Latest version **v4.127.1**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, JSON import/export with undo/redo history, and CLI output format polish.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

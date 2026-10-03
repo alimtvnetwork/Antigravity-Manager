@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.127.1 (2026-10-03)**:
+        -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
+            -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)
+
     *   **v4.127.0 (2026-10-03)**:
         -   **[Instances] Deep Settings Synchronization & Executable Auto-Discovery**:
             -   **Description**: Added comprehensive CLI commands (`agm instance copy-settings`) and UI modal (`InstanceSettingsModal`) to synchronize theme colors, turbo mode, browser execution policy, code review, readable file, and writable folder permissions across instances with executable path auto-discovery (`--exe`). (Thanks to @aukgit)
