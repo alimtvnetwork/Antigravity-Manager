@@ -48,8 +48,15 @@ pub fn copy_instance(
     source_id: String,
     target_name: String,
     clone_mode: Option<String>,
+    copy_projects: Option<bool>,
 ) -> Result<InstanceConfig, String> {
-    instance::copy_instance(&source_id, target_name, clone_mode.as_deref())
+    let should_copy_projs = copy_projects.unwrap_or(true);
+    instance::copy_instance_with_options(
+        &source_id,
+        target_name,
+        clone_mode.as_deref(),
+        should_copy_projs,
+    )
 }
 
 #[tauri::command]
@@ -228,4 +235,53 @@ pub fn get_instance_workspace_folders(instance_id: String) -> Result<Vec<String>
         &resolved_id,
         &data_dir,
     ))
+}
+
+#[tauri::command]
+pub fn copy_instance_projects(from_id: String, to_id: String) -> Result<usize, String> {
+    instance::copy_instance_projects(&from_id, &to_id)
+}
+
+#[tauri::command]
+pub fn copy_instance_settings(from_id: String, to_id: String) -> Result<(), String> {
+    instance::copy_instance_settings(&from_id, &to_id)
+}
+
+#[tauri::command]
+pub fn enforce_default_settings(target_instance: Option<String>) -> Result<usize, String> {
+    instance::enforce_default_settings(target_instance.as_deref())
+}
+
+#[tauri::command]
+pub fn set_instance_turbo_mode(
+    target_instance: Option<String>,
+    enabled: bool,
+) -> Result<usize, String> {
+    instance::set_instance_turbo_mode(target_instance.as_deref(), enabled)
+}
+
+#[tauri::command]
+pub fn set_instance_plan_review(
+    target_instance: Option<String>,
+    always_proceed: bool,
+) -> Result<usize, String> {
+    instance::set_instance_plan_review(target_instance.as_deref(), always_proceed)
+}
+
+#[tauri::command]
+pub fn export_instance_settings(instance_id: String) -> Result<String, String> {
+    instance::export_instance_settings(&instance_id)
+}
+
+#[tauri::command]
+pub fn import_instance_settings(
+    target_instance: Option<String>,
+    json_str: String,
+) -> Result<usize, String> {
+    instance::import_instance_settings(target_instance.as_deref(), &json_str)
+}
+
+#[tauri::command]
+pub fn count_instances() -> Result<serde_json::Value, String> {
+    instance::count_instances()
 }

@@ -547,10 +547,12 @@ fn get_cached_antigravity_processes() -> Vec<CachedProcessInfo> {
             .collect::<Vec<String>>()
             .join(" ");
 
-        let is_antigravity = (name.contains("antigravity")
-            || exe.contains("antigravity")
-            || exe.contains("/tmp/.mount_")
-            || name == "apprun")
+        let is_non_ide = crate::modules::process::is_non_ide_binary(&name, &exe, &args_str);
+        let is_antigravity = !is_non_ide
+            && (name.contains("antigravity")
+                || exe.contains("antigravity")
+                || exe.contains("/tmp/.mount_")
+                || name == "apprun")
             && !name.contains("agm")
             && !exe.contains("agm")
             && !name.contains("webview")
@@ -973,6 +975,31 @@ pub fn copy_instance(
     target_name: String,
     clone_mode: Option<&str>,
 ) -> Result<InstanceConfig, String> {
+    copy_instance_with_options(source_id, target_name, clone_mode, true)
+}
+
+/// Clone alias for copy_instance_with_options
+pub fn clone_instance(
+    source_id: &str,
+    target_name: &str,
+    clone_mode: Option<&str>,
+    copy_projects: bool,
+) -> Result<InstanceConfig, String> {
+    copy_instance_with_options(
+        source_id,
+        target_name.to_string(),
+        clone_mode,
+        copy_projects,
+    )
+}
+
+/// Copy/clone an existing profile with options (optionally copying open projects and recent paths)
+pub fn copy_instance_with_options(
+    source_id: &str,
+    target_name: String,
+    clone_mode: Option<&str>,
+    copy_projects: bool,
+) -> Result<InstanceConfig, String> {
     let registry = load_registry()?;
     let source = registry
         .instances
@@ -1154,14 +1181,48 @@ pub fn copy_instance(
             err
         ));
     }
-    let _ = crate::modules::repo_db::detect_running_projects(&source.id);
-    if let Err(err) =
-        crate::modules::repo_db::clone_instance_repo_rows(&source.id, &new_instance.id)
-    {
-        crate::modules::logger::log_warn(&format!(
-            "[Instance] Repo database clone failed: {}",
-            err
-        ));
+
+    if copy_projects {
+        let _ = crate::modules::repo_db::detect_running_projects(&source.id);
+        if let Err(err) =
+            crate::modules::repo_db::clone_instance_repo_rows(&source.id, &new_instance.id)
+        {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Repo database clone failed: {}",
+                err
+            ));
+        }
+        let _ = copy_instance_projects(&source.id, &new_instance.id);
+    } else {
+        let ws_main = dst_path.join("User").join("workspaceStorage");
+        let has_ws = ws_main.exists();
+        if has_ws {
+            let _ = fs::remove_dir_all(&ws_main);
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let ws_appdata = dst_path
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("workspaceStorage");
+            if ws_appdata.exists() {
+                let _ = fs::remove_dir_all(&ws_appdata);
+            }
+            if let Ok(dst_home) = get_instance_home_dir(&new_instance.id) {
+                let ws_home = dst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("workspaceStorage");
+                if ws_home.exists() {
+                    let _ = fs::remove_dir_all(&ws_home);
+                }
+            }
+        }
+        purge_recent_project_paths(&new_instance);
     }
 
     Ok(new_instance)
@@ -1462,13 +1523,32 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// A saved PID matches when that one process is still Antigravity. This does not scan the process table.
 pub fn process_identity_matches(name: &str, exe: &str) -> bool {
     let name = name.to_lowercase();
-    let exe = exe.to_lowercase();
-    let is_antigravity = name.contains("antigravity") || exe.contains("antigravity");
+    let exe = exe.to_lowercase().replace('\\', "/");
+
+    // Fast reject known non-IDE developer tools
+    if crate::modules::process::is_non_ide_binary(&name, &exe, "") {
+        return false;
+    }
+
     let blocked = name.contains("agm")
         || exe.contains("agm")
         || name.contains("webview")
         || exe.contains("webview");
-    is_antigravity && !blocked
+    if blocked {
+        return false;
+    }
+
+    // Positive identity check: executable name itself must reflect Antigravity
+    let is_antigravity_name =
+        name.contains("antigravity") || name == "apprun" || name.starts_with("code");
+
+    let is_antigravity_exe = exe.ends_with("/antigravity.exe")
+        || exe.ends_with("/antigravity")
+        || exe.contains("/antigravity-")
+        || exe.contains("antigravity ide.exe")
+        || exe.contains(".app/contents/macos");
+
+    is_antigravity_name || is_antigravity_exe
 }
 
 pub fn saved_pid_matches(pid: u32) -> bool {
@@ -1756,6 +1836,77 @@ pub fn get_instance_workspace_folders(instance_id: &str, data_dir: &str) -> Vec<
     folders
 }
 
+/// Snapshot all currently open or registered workspace project directories for an instance.
+pub fn snapshot_active_workspaces(instance_id: &str) -> Vec<String> {
+    let registry = match load_registry() {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) else {
+        return Vec::new();
+    };
+
+    let folders = get_instance_workspace_folders(instance_id, &inst.data_dir);
+    if !folders.is_empty() {
+        return folders;
+    }
+
+    // Fallback: query active projects in repo_db
+    if let Ok(projects) = crate::modules::repo_db::list_running_projects() {
+        let is_target_default = instance_id == "default" || instance_id == "__default__";
+        let mut fallback_folders = Vec::new();
+        for p in projects {
+            let matches = p.instance_id == instance_id
+                || (is_target_default
+                    && (p.instance_id == "default" || p.instance_id == "__default__"));
+            if matches && Path::new(&p.repo_path).exists() {
+                fallback_folders.push(p.repo_path);
+            }
+        }
+        if !fallback_folders.is_empty() {
+            fallback_folders.truncate(8);
+            return fallback_folders;
+        }
+    }
+
+    Vec::new()
+}
+
+/// Migrate active workspaces from a depleted/source instance to a target candidate instance.
+/// Seeds `User/workspaceStorage/<ws-id>/workspace.json` in target instance data directory
+/// and registers projects in `repo_db`.
+pub fn migrate_instance_workspaces(
+    from_instance_id: &str,
+    to_instance_id: &str,
+) -> Result<Vec<String>, String> {
+    if from_instance_id == to_instance_id {
+        return Ok(snapshot_active_workspaces(from_instance_id));
+    }
+
+    let workspaces = snapshot_active_workspaces(from_instance_id);
+    if workspaces.is_empty() {
+        crate::modules::logger::log_info(&format!(
+            "[WorkspaceMigration] No active workspaces found on source '{}' to migrate to '{}'",
+            from_instance_id, to_instance_id
+        ));
+        return Ok(Vec::new());
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[WorkspaceMigration] Migrating {} workspace(s) from '{}' to '{}': {:?}",
+        workspaces.len(),
+        from_instance_id,
+        to_instance_id,
+        workspaces
+    ));
+
+    for ws_path in &workspaces {
+        let _ = assign_project_to_instance(to_instance_id, ws_path);
+    }
+
+    Ok(workspaces)
+}
+
 /// Explicitly bind/assign one or more project workspace directories to a specific instance (`instance_id`, `#seq`, or name).
 /// Seeds `<instance.data_dir>/User/workspaceStorage/<id>/workspace.json` and registers the project in `repo_db`.
 pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Result<String, String> {
@@ -1911,9 +2062,26 @@ pub fn launch_instance_without_prompt_reinject(
     launch_instance_inner(instance_id, false)
 }
 
+/// Launch a specific instance with extra/migrated workspace folders and prompt reinjection control
+pub fn launch_instance_with_workspaces(
+    instance_id: &str,
+    extra_workspaces: Option<&[String]>,
+    reinject_prompts: bool,
+) -> Result<(), crate::error::AppError> {
+    launch_instance_inner_with_extra_workspaces(instance_id, reinject_prompts, extra_workspaces)
+}
+
 fn launch_instance_inner(
     instance_id: &str,
     reinject_prompts: bool,
+) -> Result<(), crate::error::AppError> {
+    launch_instance_inner_with_extra_workspaces(instance_id, reinject_prompts, None)
+}
+
+fn launch_instance_inner_with_extra_workspaces(
+    instance_id: &str,
+    reinject_prompts: bool,
+    extra_workspaces: Option<&[String]>,
 ) -> Result<(), crate::error::AppError> {
     let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
     let pos = registry
@@ -1937,7 +2105,14 @@ fn launch_instance_inner(
     let target_data_path = PathBuf::from(&data_dir);
 
     // Snapshot bound workspace folders BEFORE closing existing instance processes
-    let workspace_folders = get_instance_workspace_folders(instance_id, &data_dir);
+    let mut workspace_folders = get_instance_workspace_folders(instance_id, &data_dir);
+    if let Some(extras) = extra_workspaces {
+        for folder in extras {
+            if Path::new(folder).exists() && !workspace_folders.contains(folder) {
+                workspace_folders.push(folder.clone());
+            }
+        }
+    }
 
     // Determine executable FIRST while running processes are alive for discovery
     let exe_path = if !is_default {
@@ -2249,8 +2424,9 @@ fn launch_instance_inner(
             for folder in &workspace_folders {
                 cmd.arg(folder);
             }
+        } else {
+            cmd.arg("--new-window");
         }
-        cmd.arg("--new-window");
 
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -2258,7 +2434,10 @@ fn launch_instance_inner(
 
         #[cfg(target_os = "windows")]
         {
-            cmd.creation_flags(0x00000200 | 0x08000000); // CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
+            // 0x00000200: CREATE_NEW_PROCESS_GROUP
+            // 0x01000000: CREATE_BREAKAWAY_FROM_JOB
+            // Note: NEVER add 0x08000000 (CREATE_NO_WINDOW) to a GUI application!
+            cmd.creation_flags(0x00000200 | 0x01000000);
         }
 
         #[cfg(target_os = "linux")]
@@ -3056,7 +3235,6 @@ pub async fn switch_account_to_instance(
             let _ = set_active_instance_id("default");
         }
         if was_running {
-            let _ = launch_instance_without_prompt_reinject("default");
             if let Some(pid) = get_instance_saved_pid("default").or_else(|| {
                 find_pids_for_data_dir(&instance.data_dir, true)
                     .first()
@@ -3295,6 +3473,21 @@ pub async fn switch_account_to_instance(
         None
     };
 
+    // Snapshot active workspaces from current active instance if switching to a target instance with no workspaces
+    let inherited_workspaces = if !is_default_inst
+        && !registry.active_instance_id.is_empty()
+        && registry.active_instance_id != instance.id
+    {
+        let current_target_ws = get_instance_workspace_folders(&instance.id, &instance.data_dir);
+        if current_target_ws.is_empty() {
+            migrate_instance_workspaces(&registry.active_instance_id, &instance.id).ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
     let backed_up_count =
         crate::modules::repo_db::requeue_running_conversations_for_instance(&instance.id)
@@ -3355,7 +3548,8 @@ pub async fn switch_account_to_instance(
             launch_instance_without_prompt_reinject(&instance.id).map_err(|err| err.to_string())?;
         }
     } else {
-        launch_instance_without_prompt_reinject(&instance.id).map_err(|e| e.to_string())?;
+        launch_instance_with_workspaces(&instance.id, inherited_workspaces.as_deref(), false)
+            .map_err(|e| e.to_string())?;
     }
 
     let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
@@ -3459,6 +3653,1062 @@ pub async fn switch_account_to_instance(
     Ok(())
 }
 
+/// Locate the best existing settings.json path for an instance
+pub fn find_instance_settings_path(inst: &InstanceConfig) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    let data_user_settings = PathBuf::from(&inst.data_dir)
+        .join("User")
+        .join("settings.json");
+    if data_user_settings.is_file() {
+        candidates.push(data_user_settings);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let roaming_settings = PathBuf::from(&inst.data_dir)
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("settings.json");
+        if roaming_settings.is_file() && !candidates.contains(&roaming_settings) {
+            candidates.push(roaming_settings);
+        }
+        if let Ok(home) = get_instance_home_dir(&inst.id) {
+            let home_settings = home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("settings.json");
+            if home_settings.is_file() && !candidates.contains(&home_settings) {
+                candidates.push(home_settings);
+            }
+        }
+        if inst.is_default || inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let default_appdata_settings = PathBuf::from(appdata)
+                    .join("Antigravity")
+                    .join("User")
+                    .join("settings.json");
+                if default_appdata_settings.is_file()
+                    && !candidates.contains(&default_appdata_settings)
+                {
+                    candidates.push(default_appdata_settings);
+                }
+            }
+            let def_dir_settings = get_default_antigravity_data_dir()
+                .join("User")
+                .join("settings.json");
+            if def_dir_settings.is_file() && !candidates.contains(&def_dir_settings) {
+                candidates.push(def_dir_settings);
+            }
+        }
+    }
+    pick_best_settings_path(&candidates).cloned()
+}
+
+/// Collect all target settings.json files for an instance across portable and roaming paths
+pub fn get_instance_settings_targets(inst: &InstanceConfig) -> Vec<PathBuf> {
+    let mut targets = Vec::new();
+    let primary = PathBuf::from(&inst.data_dir)
+        .join("User")
+        .join("settings.json");
+    targets.push(primary);
+
+    #[cfg(target_os = "windows")]
+    {
+        let roaming_settings = PathBuf::from(&inst.data_dir)
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("settings.json");
+        if !targets.contains(&roaming_settings) {
+            targets.push(roaming_settings);
+        }
+        if let Ok(home) = get_instance_home_dir(&inst.id) {
+            let home_settings = home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("settings.json");
+            if !targets.contains(&home_settings) {
+                targets.push(home_settings);
+            }
+        }
+        if inst.is_default || inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let default_appdata_settings = PathBuf::from(appdata)
+                    .join("Antigravity")
+                    .join("User")
+                    .join("settings.json");
+                if !targets.contains(&default_appdata_settings) {
+                    targets.push(default_appdata_settings);
+                }
+            }
+            let def_dir_settings = get_default_antigravity_data_dir()
+                .join("User")
+                .join("settings.json");
+            if !targets.contains(&def_dir_settings) {
+                targets.push(def_dir_settings);
+            }
+        }
+    }
+
+    targets
+}
+
+/// Recursively merge source JSON into dest JSON object
+pub fn deep_merge_json(dest: &mut serde_json::Value, source: &serde_json::Value) {
+    match (dest, source) {
+        (serde_json::Value::Object(dest_map), serde_json::Value::Object(source_map)) => {
+            for (key, val) in source_map {
+                if let Some(dest_val) = dest_map.get_mut(key) {
+                    if dest_val.is_object() && val.is_object() {
+                        deep_merge_json(dest_val, val);
+                    } else {
+                        *dest_val = val.clone();
+                    }
+                } else {
+                    dest_map.insert(key.clone(), val.clone());
+                }
+            }
+        }
+        (dest_val, source_val) => {
+            *dest_val = source_val.clone();
+        }
+    }
+}
+
+/// Synchronize opened paths list and workspace history in storage.json
+pub fn merge_storage_json_recent_paths(from_inst: &InstanceConfig, to_inst: &InstanceConfig) {
+    let mut src_storage_candidates = vec![PathBuf::from(&from_inst.data_dir)
+        .join("User")
+        .join("globalStorage")
+        .join("storage.json")];
+    #[cfg(target_os = "windows")]
+    {
+        src_storage_candidates.push(
+            PathBuf::from(&from_inst.data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("storage.json"),
+        );
+        if let Ok(home) = get_instance_home_dir(&from_inst.id) {
+            src_storage_candidates.push(
+                home.join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("storage.json"),
+            );
+        }
+        if from_inst.is_default || from_inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                src_storage_candidates.push(
+                    PathBuf::from(appdata)
+                        .join("Antigravity")
+                        .join("User")
+                        .join("globalStorage")
+                        .join("storage.json"),
+                );
+            }
+        }
+    }
+
+    let src_storage_path = src_storage_candidates.into_iter().find(|p| p.is_file());
+    let src_storage_val: Option<serde_json::Value> = src_storage_path.and_then(|p| {
+        fs::read_to_string(&p)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+    });
+
+    if let Some(src_val) = src_storage_val {
+        let opened_paths = src_val.get("openedPathsList").cloned();
+        let backup_workspaces = src_val.get("backupWorkspaces").cloned();
+
+        let has_recent = opened_paths.is_some() || backup_workspaces.is_some();
+        if has_recent {
+            let mut dst_storage_targets = vec![PathBuf::from(&to_inst.data_dir)
+                .join("User")
+                .join("globalStorage")
+                .join("storage.json")];
+            #[cfg(target_os = "windows")]
+            {
+                dst_storage_targets.push(
+                    PathBuf::from(&to_inst.data_dir)
+                        .join("AppData")
+                        .join("Roaming")
+                        .join("Antigravity")
+                        .join("User")
+                        .join("globalStorage")
+                        .join("storage.json"),
+                );
+                if let Ok(home) = get_instance_home_dir(&to_inst.id) {
+                    dst_storage_targets.push(
+                        home.join("AppData")
+                            .join("Roaming")
+                            .join("Antigravity")
+                            .join("User")
+                            .join("globalStorage")
+                            .join("storage.json"),
+                    );
+                }
+            }
+
+            for dst_storage in dst_storage_targets {
+                if let Some(parent) = dst_storage.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                let mut dst_map: serde_json::Map<String, serde_json::Value> =
+                    if dst_storage.exists() {
+                        fs::read_to_string(&dst_storage)
+                            .ok()
+                            .and_then(|s| serde_json::from_str(&s).ok())
+                            .and_then(|v: serde_json::Value| {
+                                if let serde_json::Value::Object(m) = v {
+                                    Some(m)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_default()
+                    } else {
+                        serde_json::Map::new()
+                    };
+
+                if let Some(ref op) = opened_paths {
+                    dst_map.insert("openedPathsList".to_string(), op.clone());
+                }
+                if let Some(ref bw) = backup_workspaces {
+                    dst_map.insert("backupWorkspaces".to_string(), bw.clone());
+                }
+
+                if let Ok(pretty) =
+                    serde_json::to_string_pretty(&serde_json::Value::Object(dst_map))
+                {
+                    let _ = fs::write(dst_storage, pretty);
+                }
+            }
+        }
+    }
+}
+
+/// Synchronize recently opened paths and workspace history in state.vscdb SQLite tables
+pub fn merge_state_vscdb_recent_paths(from_inst: &InstanceConfig, to_inst: &InstanceConfig) {
+    let mut src_vscdb_candidates = vec![PathBuf::from(&from_inst.data_dir)
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb")];
+    #[cfg(target_os = "windows")]
+    {
+        src_vscdb_candidates.push(
+            PathBuf::from(&from_inst.data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb"),
+        );
+        if let Ok(home) = get_instance_home_dir(&from_inst.id) {
+            src_vscdb_candidates.push(
+                home.join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("state.vscdb"),
+            );
+        }
+        if from_inst.is_default || from_inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                src_vscdb_candidates.push(
+                    PathBuf::from(appdata)
+                        .join("Antigravity")
+                        .join("User")
+                        .join("globalStorage")
+                        .join("state.vscdb"),
+                );
+            }
+        }
+    }
+
+    let src_db_path = src_vscdb_candidates.into_iter().find(|p| p.is_file());
+    if let Some(src_db) = src_db_path {
+        if let Ok(conn_src) = rusqlite::Connection::open(&src_db) {
+            let mut stmt = match conn_src.prepare(
+                "SELECT key, value FROM ItemTable WHERE key LIKE '%recentlyOpened%' OR key LIKE '%history.%' OR key LIKE '%openedPaths%'",
+            ) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+
+            let rows: Vec<(String, Vec<u8>)> = stmt
+                .query_map([], |row| {
+                    let k: String = row.get(0)?;
+                    let v: Vec<u8> = row.get(1)?;
+                    Ok((k, v))
+                })
+                .ok()
+                .map(|mapped| mapped.flatten().collect())
+                .unwrap_or_default();
+
+            if rows.is_empty() {
+                return;
+            }
+
+            let mut dst_vscdb_targets = vec![PathBuf::from(&to_inst.data_dir)
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb")];
+            #[cfg(target_os = "windows")]
+            {
+                dst_vscdb_targets.push(
+                    PathBuf::from(&to_inst.data_dir)
+                        .join("AppData")
+                        .join("Roaming")
+                        .join("Antigravity")
+                        .join("User")
+                        .join("globalStorage")
+                        .join("state.vscdb"),
+                );
+                if let Ok(home) = get_instance_home_dir(&to_inst.id) {
+                    dst_vscdb_targets.push(
+                        home.join("AppData")
+                            .join("Roaming")
+                            .join("Antigravity")
+                            .join("User")
+                            .join("globalStorage")
+                            .join("state.vscdb"),
+                    );
+                }
+            }
+
+            for dst_db in dst_vscdb_targets {
+                if let Some(parent) = dst_db.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                if let Ok(conn_dst) = rusqlite::Connection::open(&dst_db) {
+                    let _ = conn_dst.execute(
+                        "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
+                        [],
+                    );
+                    for (k, v) in &rows {
+                        let _ = conn_dst.execute(
+                            "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?1, ?2)",
+                            rusqlite::params![k, v],
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Purge opened paths list and recent project history from an instance's state stores
+pub fn purge_recent_project_paths(inst: &InstanceConfig) {
+    let mut storage_targets = vec![PathBuf::from(&inst.data_dir)
+        .join("User")
+        .join("globalStorage")
+        .join("storage.json")];
+    let mut vscdb_targets = vec![PathBuf::from(&inst.data_dir)
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb")];
+    #[cfg(target_os = "windows")]
+    {
+        storage_targets.push(
+            PathBuf::from(&inst.data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("storage.json"),
+        );
+        vscdb_targets.push(
+            PathBuf::from(&inst.data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb"),
+        );
+        if let Ok(home) = get_instance_home_dir(&inst.id) {
+            storage_targets.push(
+                home.join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("storage.json"),
+            );
+            vscdb_targets.push(
+                home.join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("state.vscdb"),
+            );
+        }
+    }
+
+    for st in storage_targets {
+        if st.exists() {
+            if let Ok(content) = fs::read_to_string(&st) {
+                if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let serde_json::Value::Object(ref mut map) = val {
+                        map.remove("openedPathsList");
+                        map.remove("backupWorkspaces");
+                        if let Ok(pretty) = serde_json::to_string_pretty(&val) {
+                            let _ = fs::write(&st, pretty);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for vt in vscdb_targets {
+        if vt.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&vt) {
+                let _ = conn.execute(
+                    "DELETE FROM ItemTable WHERE key LIKE '%recentlyOpened%' OR key LIKE '%history.%' OR key LIKE '%openedPaths%'",
+                    [],
+                );
+            }
+        }
+    }
+}
+
+/// Copies workspace projects and recent paths from one instance to another.
+/// Copies workspaceStorage directories, merges storage.json openedPathsList,
+/// copies state.vscdb history rows, and clones repo_db project rows.
+pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, String> {
+    let from_resolved = resolve_instance_id(from_id)?;
+    let to_resolved = resolve_instance_id(to_id)?;
+    if from_resolved == to_resolved {
+        return Ok(0);
+    }
+    let registry = load_registry()?;
+    let from_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == from_resolved)
+        .ok_or_else(|| format!("Source instance '{}' not found", from_id))?
+        .clone();
+    let to_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == to_resolved)
+        .ok_or_else(|| format!("Destination instance '{}' not found", to_id))?
+        .clone();
+
+    // 1. Locate source workspaceStorage directories
+    let mut src_ws_dirs = Vec::new();
+    let src_data = PathBuf::from(&from_inst.data_dir);
+    let p1 = src_data.join("User").join("workspaceStorage");
+    if p1.exists() {
+        src_ws_dirs.push(p1);
+    }
+    let p2 = src_data.join("workspaceStorage");
+    if p2.exists() && !src_ws_dirs.contains(&p2) {
+        src_ws_dirs.push(p2);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let p3 = src_data
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("workspaceStorage");
+        if p3.exists() && !src_ws_dirs.contains(&p3) {
+            src_ws_dirs.push(p3);
+        }
+        if let Ok(src_home) = get_instance_home_dir(&from_inst.id) {
+            let p4 = src_home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("workspaceStorage");
+            if p4.exists() && !src_ws_dirs.contains(&p4) {
+                src_ws_dirs.push(p4);
+            }
+        }
+        if from_inst.is_default || from_inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let p5 = PathBuf::from(appdata)
+                    .join("Antigravity")
+                    .join("User")
+                    .join("workspaceStorage");
+                if p5.exists() && !src_ws_dirs.contains(&p5) {
+                    src_ws_dirs.push(p5);
+                }
+            }
+        }
+    }
+
+    // 2. Prepare destination workspaceStorage directories
+    let dst_data = PathBuf::from(&to_inst.data_dir);
+    let dst_ws_main = dst_data.join("User").join("workspaceStorage");
+    let mut dst_ws_dirs = vec![dst_ws_main];
+
+    #[cfg(target_os = "windows")]
+    {
+        let p_dst_appdata = dst_data
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("workspaceStorage");
+        dst_ws_dirs.push(p_dst_appdata);
+
+        if let Ok(dst_home) = get_instance_home_dir(&to_inst.id) {
+            let p_dst_home = dst_home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("workspaceStorage");
+            dst_ws_dirs.push(p_dst_home);
+        }
+    }
+
+    for d in &dst_ws_dirs {
+        let _ = fs::create_dir_all(d);
+    }
+
+    let mut copied_count = 0usize;
+    let mut copied_names = std::collections::HashSet::new();
+
+    for src_ws in &src_ws_dirs {
+        if let Ok(entries) = fs::read_dir(src_ws) {
+            for entry in entries.flatten() {
+                if let Ok(ft) = entry.file_type() {
+                    if ft.is_dir() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy().to_string();
+                        if copied_names.insert(name_str.clone()) {
+                            copied_count += 1;
+                        }
+                        for dst_ws in &dst_ws_dirs {
+                            let target = dst_ws.join(&name);
+                            let _ = copy_dir_recursive(&entry.path(), &target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Clone repo rows in repo_db
+    let _ = crate::modules::repo_db::detect_running_projects(&from_inst.id);
+    if let Ok(rows) = crate::modules::repo_db::clone_instance_repo_rows(&from_inst.id, &to_inst.id)
+    {
+        if copied_count == 0 && rows > 0 {
+            copied_count = rows;
+        }
+    }
+
+    // 4. Merge recent paths in storage.json
+    merge_storage_json_recent_paths(&from_inst, &to_inst);
+
+    // 5. Merge recent paths from state.vscdb
+    merge_state_vscdb_recent_paths(&from_inst, &to_inst);
+
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Copied {} workspace projects from '{}' to '{}'",
+        copied_count, from_id, to_id
+    ));
+
+    Ok(copied_count)
+}
+
+/// Scans registered instances and checks if an instance has executable_path matching exe_path,
+/// or if exe_path is inside an instance's directory.
+pub fn find_instance_by_executable(exe_path: &str) -> Option<String> {
+    let clean_exe = exe_path.trim().replace('\\', "/").to_lowercase();
+    if clean_exe.is_empty() {
+        return None;
+    }
+    let instances = list_instances().ok()?;
+
+    // 1. Direct match on executable_path
+    for inst in &instances {
+        if let Some(ref ep) = inst.config.executable_path {
+            let clean_ep = ep.trim().replace('\\', "/").to_lowercase();
+            if clean_ep == clean_exe {
+                return Some(inst.config.id.clone());
+            }
+        }
+    }
+
+    // 2. Check if exe_path contains instance id pattern (e.g. Antigravity-<id>.exe or antigravity-<id>)
+    for inst in &instances {
+        let id_lower = inst.config.id.to_lowercase();
+        let target_name1 = format!("antigravity-{}", id_lower);
+        let target_name2 = format!("launch-{}.cmd", id_lower);
+        if clean_exe.contains(&target_name1) || clean_exe.contains(&target_name2) {
+            return Some(inst.config.id.clone());
+        }
+    }
+
+    // 3. Check if exe_path is inside an instance's directory tree
+    for inst in &instances {
+        let data_dir_clean = inst
+            .config
+            .data_dir
+            .trim()
+            .replace('\\', "/")
+            .to_lowercase();
+        if !data_dir_clean.is_empty() && clean_exe.starts_with(&data_dir_clean) {
+            return Some(inst.config.id.clone());
+        }
+
+        if let Ok(home) = get_instance_home_dir(&inst.config.id) {
+            let home_clean = home.to_string_lossy().replace('\\', "/").to_lowercase();
+            if clean_exe.starts_with(&home_clean) {
+                return Some(inst.config.id.clone());
+            }
+        }
+
+        if let Ok(instances_root) = get_instances_dir() {
+            let inst_root = instances_root
+                .join(&inst.config.id)
+                .to_string_lossy()
+                .replace('\\', "/")
+                .to_lowercase();
+            if clean_exe.starts_with(&inst_root) {
+                return Some(inst.config.id.clone());
+            }
+        }
+    }
+
+    // 4. If base executable matches and default instance exists, return default
+    if let Ok(base_exe) = crate::modules::process::detect_antigravity_with_diagnostics(None) {
+        let base_clean = base_exe.to_string_lossy().replace('\\', "/").to_lowercase();
+        if base_clean == clean_exe {
+            return Some("default".to_string());
+        }
+    }
+
+    None
+}
+
+/// Copies theme and Antigravity settings from source instance to destination instance,
+/// performing deep-merge into destination settings.json.
+pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> {
+    let from_resolved = resolve_instance_id(from_id)?;
+    let to_resolved = resolve_instance_id(to_id)?;
+    if from_resolved == to_resolved {
+        return Ok(());
+    }
+    let registry = load_registry()?;
+    let from_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == from_resolved)
+        .ok_or_else(|| format!("Source instance '{}' not found", from_id))?
+        .clone();
+    let to_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == to_resolved)
+        .ok_or_else(|| format!("Destination instance '{}' not found", to_id))?
+        .clone();
+
+    // 1. Find source settings.json
+    let src_settings_path = find_instance_settings_path(&from_inst)
+        .ok_or_else(|| format!("No settings.json found for source instance '{}'", from_id))?;
+
+    let content = fs::read_to_string(&src_settings_path)
+        .map_err(|e| format!("Failed to read source settings: {}", e))?;
+    let src_json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid JSON in source settings: {}", e))?;
+
+    // 2. Extract theme, antigravity, and policy settings
+    let mut extracted = serde_json::Map::new();
+    if let serde_json::Value::Object(map) = src_json {
+        for (k, v) in map {
+            let k_lower = k.to_lowercase();
+            let is_theme = k.starts_with("workbench.")
+                && (k_lower.contains("theme") || k_lower.contains("color"));
+            let is_antigravity = k.starts_with("antigravity.");
+            let is_policy = k_lower.contains("policy");
+            if is_theme || is_antigravity || is_policy {
+                extracted.insert(k, v);
+            }
+        }
+    }
+
+    if extracted.is_empty() {
+        return Ok(());
+    }
+
+    // 3. Collect destination settings paths
+    let dst_settings_paths = get_instance_settings_targets(&to_inst);
+    for dst_path in dst_settings_paths {
+        if let Some(parent) = dst_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let mut target_json: serde_json::Value = if dst_path.exists() {
+            fs::read_to_string(&dst_path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_else(|| serde_json::json!({}))
+        } else {
+            serde_json::json!({})
+        };
+
+        if !target_json.is_object() {
+            target_json = serde_json::json!({});
+        }
+
+        deep_merge_json(
+            &mut target_json,
+            &serde_json::Value::Object(extracted.clone()),
+        );
+
+        if let Ok(pretty) = serde_json::to_string_pretty(&target_json) {
+            let _ = fs::write(&dst_path, pretty);
+        }
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Successfully merged settings from '{}' to '{}'",
+        from_id, to_id
+    ));
+    Ok(())
+}
+
+/// Enforces baseline default settings across target or all non-default instances.
+/// Uses 'default' instance as reference baseline and ensures antigravity.turboMode: true,
+/// antigravity.planReviewAlwaysProceed: true, and standard execution policies are applied.
+pub fn enforce_default_settings(target_instance: Option<&str>) -> Result<usize, String> {
+    let registry = load_registry()?;
+    let default_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.is_default || i.id == "default")
+        .cloned();
+
+    // 1. Establish baseline settings map
+    let mut baseline_map = serde_json::Map::new();
+    if let Some(ref def) = default_inst {
+        if let Some(def_settings_path) = find_instance_settings_path(def) {
+            if let Ok(content) = fs::read_to_string(&def_settings_path) {
+                if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(&content) {
+                    for (k, v) in map {
+                        let k_lower = k.to_lowercase();
+                        let is_theme = k.starts_with("workbench.")
+                            && (k_lower.contains("theme") || k_lower.contains("color"));
+                        let is_antigravity = k.starts_with("antigravity.");
+                        let is_policy = k_lower.contains("policy");
+                        if is_theme || is_antigravity || is_policy {
+                            baseline_map.insert(k, v);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Mandate performance & automation defaults
+    baseline_map.insert(
+        "antigravity.turboMode".to_string(),
+        serde_json::Value::Bool(true),
+    );
+    baseline_map.insert(
+        "antigravity.planReviewAlwaysProceed".to_string(),
+        serde_json::Value::Bool(true),
+    );
+    baseline_map
+        .entry("antigravity.browserExecutionPolicy".to_string())
+        .or_insert_with(|| serde_json::Value::String("auto".to_string()));
+    baseline_map
+        .entry("antigravity.codeReviewPolicy".to_string())
+        .or_insert_with(|| serde_json::Value::String("auto".to_string()));
+
+    let baseline_val = serde_json::Value::Object(baseline_map);
+
+    // 3. Determine target instances
+    let targets: Vec<InstanceConfig> = if let Some(spec) = target_instance {
+        let resolved = resolve_instance_id(spec)?;
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| i.id == resolved)
+            .collect()
+    } else {
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| !i.is_default && i.id != "default")
+            .collect()
+    };
+
+    let mut updated_count = 0usize;
+    for inst in &targets {
+        let paths = get_instance_settings_targets(inst);
+        for path in paths {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let mut current: serde_json::Value = if path.exists() {
+                fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_else(|| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+
+            if !current.is_object() {
+                current = serde_json::json!({});
+            }
+
+            deep_merge_json(&mut current, &baseline_val);
+
+            if let Ok(pretty) = serde_json::to_string_pretty(&current) {
+                let _ = fs::write(&path, pretty);
+            }
+        }
+        updated_count += 1;
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Enforced default settings across {} instance(s)",
+        updated_count
+    ));
+    Ok(updated_count)
+}
+
+/// Sets antigravity.turboMode in User/settings.json for target or all instances.
+pub fn set_instance_turbo_mode(
+    target_instance: Option<&str>,
+    enabled: bool,
+) -> Result<usize, String> {
+    let registry = load_registry()?;
+    let targets: Vec<InstanceConfig> = if let Some(spec) = target_instance {
+        let resolved = resolve_instance_id(spec)?;
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| i.id == resolved)
+            .collect()
+    } else {
+        registry.instances
+    };
+
+    let mut updated = 0usize;
+    for inst in &targets {
+        let paths = get_instance_settings_targets(inst);
+        for path in paths {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let mut json_val: serde_json::Value = if path.exists() {
+                fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_else(|| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+            if !json_val.is_object() {
+                json_val = serde_json::json!({});
+            }
+            if let serde_json::Value::Object(ref mut map) = json_val {
+                map.insert(
+                    "antigravity.turboMode".to_string(),
+                    serde_json::Value::Bool(enabled),
+                );
+                if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
+                    let _ = fs::write(&path, pretty);
+                }
+            }
+        }
+        updated += 1;
+    }
+    Ok(updated)
+}
+
+/// Sets antigravity.planReviewAlwaysProceed in User/settings.json for target or all instances.
+pub fn set_instance_plan_review(
+    target_instance: Option<&str>,
+    always_proceed: bool,
+) -> Result<usize, String> {
+    let registry = load_registry()?;
+    let targets: Vec<InstanceConfig> = if let Some(spec) = target_instance {
+        let resolved = resolve_instance_id(spec)?;
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| i.id == resolved)
+            .collect()
+    } else {
+        registry.instances
+    };
+
+    let mut updated = 0usize;
+    for inst in &targets {
+        let paths = get_instance_settings_targets(inst);
+        for path in paths {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let mut json_val: serde_json::Value = if path.exists() {
+                fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_else(|| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+            if !json_val.is_object() {
+                json_val = serde_json::json!({});
+            }
+            if let serde_json::Value::Object(ref mut map) = json_val {
+                map.insert(
+                    "antigravity.planReviewAlwaysProceed".to_string(),
+                    serde_json::Value::Bool(always_proceed),
+                );
+                if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
+                    let _ = fs::write(&path, pretty);
+                }
+            }
+        }
+        updated += 1;
+    }
+    Ok(updated)
+}
+
+/// Reads User/settings.json and returns formatted JSON string with metadata envelope.
+pub fn export_instance_settings(instance_id: &str) -> Result<String, String> {
+    let resolved_id = resolve_instance_id(instance_id)?;
+    let registry = load_registry()?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id)
+        .ok_or_else(|| format!("Instance '{}' not found", instance_id))?;
+
+    let settings_val = if let Some(settings_path) = find_instance_settings_path(inst) {
+        fs::read_to_string(&settings_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let envelope = serde_json::json!({
+        "instance_id": inst.id,
+        "instance_name": inst.name,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "settings": settings_val
+    });
+
+    serde_json::to_string_pretty(&envelope).map_err(|e| e.to_string())
+}
+
+/// Ingests settings JSON and writes to target instance (or all if target is None).
+pub fn import_instance_settings(
+    target_instance: Option<&str>,
+    json_str: &str,
+) -> Result<usize, String> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(json_str).map_err(|e| format!("Invalid JSON format: {}", e))?;
+
+    let settings_to_apply =
+        if let Some(settings_obj) = parsed.get("settings").filter(|v| v.is_object()) {
+            settings_obj.clone()
+        } else if let Some(payload_obj) = parsed.get("payload").filter(|v| v.is_object()) {
+            if let Some(s) = payload_obj.get("settings").filter(|v| v.is_object()) {
+                s.clone()
+            } else {
+                payload_obj.clone()
+            }
+        } else if parsed.is_object() {
+            parsed
+        } else {
+            return Err("Input must be a JSON object containing settings".to_string());
+        };
+
+    let registry = load_registry()?;
+    let targets: Vec<InstanceConfig> = if let Some(spec) = target_instance {
+        let resolved = resolve_instance_id(spec)?;
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| i.id == resolved)
+            .collect()
+    } else {
+        registry.instances
+    };
+
+    let mut updated_count = 0usize;
+    for inst in &targets {
+        let paths = get_instance_settings_targets(inst);
+        for path in paths {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let mut current: serde_json::Value = if path.exists() {
+                fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_else(|| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+
+            if !current.is_object() {
+                current = serde_json::json!({});
+            }
+
+            deep_merge_json(&mut current, &settings_to_apply);
+
+            if let Ok(pretty) = serde_json::to_string_pretty(&current) {
+                let _ = fs::write(&path, pretty);
+            }
+        }
+        updated_count += 1;
+    }
+
+    Ok(updated_count)
+}
+
+/// Returns total instance count, active count, and running count.
+pub fn count_instances() -> Result<serde_json::Value, String> {
+    let instances = list_instances()?;
+    let total = instances.len();
+    let running = instances.iter().filter(|i| i.is_running).count();
+    let active_id = get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    let active_count = if instances.iter().any(|i| i.config.id == active_id) {
+        1
+    } else {
+        0
+    };
+
+    Ok(serde_json::json!({
+        "total": total,
+        "active": active_count,
+        "running": running,
+        "active_instance_id": active_id
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3512,6 +4762,30 @@ mod tests {
         assert_eq!(pid_refresh_interval_seconds(180), 180);
         assert_eq!(pid_refresh_interval_seconds(600), 600);
         assert_eq!(pid_refresh_interval_seconds(2000), 1200);
+    }
+
+    #[test]
+    fn test_process_identity_matches_rejects_developer_tools() {
+        assert!(!process_identity_matches(
+            "esbuild.exe",
+            "D:/work/Antigravity-Manager/node_modules/@esbuild/win32-x64/esbuild.exe"
+        ));
+        assert!(!process_identity_matches(
+            "cargo.exe",
+            "D:/work/Antigravity-Manager/target/debug/build/cargo.exe"
+        ));
+        assert!(process_identity_matches(
+            "Antigravity.exe",
+            "C:/Users/Admin/AppData/Local/Programs/Antigravity/Antigravity.exe"
+        ));
+    }
+
+    #[test]
+    fn test_workspace_snapshot_and_migration_helpers() {
+        let ws = snapshot_active_workspaces("non-existent-instance-id-xyz");
+        assert!(ws.is_empty());
+        let res = migrate_instance_workspaces("non-existent-1", "non-existent-1");
+        assert!(res.is_ok());
     }
 
     #[test]

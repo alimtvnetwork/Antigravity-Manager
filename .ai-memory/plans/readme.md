@@ -14,6 +14,7 @@
 
 ## Completed this run
 | `100` | [100-resume-same-conversation-and-pid-cache.md](../../02-spec/21-app/100-resume-same-conversation-and-pid-cache.md) | `DONE` | Same-conversation resume file, audit info modal, 2-minute quota floor, saved-PID check with a 10-minute process cache. |
+| `104` | [104-instance-settings-sync-duplication-and-navbar-combine.md](./completed/104-instance-settings-sync-duplication-and-navbar-combine.md) | `DONE` | Combined navbar buttons, unified duplicate parity, project/folder copy, deep settings sync, defaults enforcement, and JSON import/export with undo/redo. |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |

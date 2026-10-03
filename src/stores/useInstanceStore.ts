@@ -22,7 +22,7 @@ interface InstanceState {
     updateSwitcherConfig: (config: AutoProfileSwitcherConfig) => Promise<void>;
     triggerManualRotation: () => Promise<string>;
     createInstance: (name: string, boundAccountId?: string, fromInstanceId?: string) => Promise<InstanceConfig>;
-    copyInstance: (sourceId: string, targetName: string, cloneMode?: string) => Promise<InstanceConfig>;
+    copyInstance: (sourceId: string, targetName: string, cloneMode?: string, copyProjects?: boolean) => Promise<InstanceConfig>;
     renameInstance: (instanceId: string, newName: string) => Promise<InstanceConfig>;
     deleteInstance: (instanceId: string) => Promise<void>;
     wipeSession: (instanceId: string) => Promise<void>;
@@ -136,10 +136,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         }
     },
 
-    copyInstance: async (sourceId: string, targetName: string, cloneMode?: string) => {
+    copyInstance: async (sourceId: string, targetName: string, cloneMode?: string, copyProjects?: boolean) => {
         set({ isLoading: true, error: null });
         try {
-            const config = await instanceService.copyInstance(sourceId, targetName, cloneMode);
+            const config = await instanceService.copyInstance(sourceId, targetName, cloneMode, copyProjects);
             await get().fetchInstances(true);
             set({ isLoading: false });
             return config;
@@ -580,12 +580,10 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             const candidateInstanceId =
                 targetCandidate.instanceId || candidateBoundInstance?.config.id;
 
-            if (targetCandidate.instanceId && targetCandidate.instanceId !== instId) {
-                await instanceService.setActiveInstance(targetCandidate.instanceId);
-                await get().launchInstance(targetCandidate.instanceId);
-            } else if (candidateInstanceId && candidateInstanceId !== instId) {
+            if (candidateInstanceId && candidateInstanceId !== instId) {
+                // Gracefully close the depleted instance first
+                await get().closeInstance(instId);
                 await instanceService.setActiveInstance(candidateInstanceId);
-                await get().launchInstance(candidateInstanceId);
             }
 
             const effectiveInstanceId = candidateInstanceId || instId;
@@ -598,6 +596,11 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
                 }
             }
             await useAccountStore.getState().switchAccount(targetCandidate.id, targetIdeParam);
+
+            const isTargetRunning = get().instances.find(i => i.config.id === effectiveInstanceId)?.is_running;
+            if (!isTargetRunning) {
+                await get().launchInstance(effectiveInstanceId);
+            }
 
             // 8. Auto-resume recent active prompts (<1h) if enabled
             let resumeResult: instanceService.AutoResumeResult | null = null;

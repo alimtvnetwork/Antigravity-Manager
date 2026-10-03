@@ -38,6 +38,7 @@ const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     cooldown_seconds: 180,
     auto_resume_recent_prompts: true,
     auto_focus_window: false,
+    auto_reopen_on_switch: true,
     watchdog_interval_seconds: 120,
     prompt_recency_threshold_seconds: 3600,
     caution_interval_seconds: 60,
@@ -562,6 +563,25 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Toggle: Auto-Reopen Workspace on Profile Switch */}
+                                    <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            id="auto_reopen_workspace_cb"
+                                            checked={currentConfig.auto_reopen_on_switch ?? true}
+                                            onChange={(e) => onChange({ ...currentConfig, auto_reopen_on_switch: e.target.checked })}
+                                            className="checkbox checkbox-xs checkbox-primary rounded mt-0.5"
+                                        />
+                                        <div className="text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                Auto-Reopen Workspace on Profile Switch
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                                Automatically reopens the active IDE workspace window in the target instance upon quota rotation.
+                                            </p>
+                                        </div>
+                                    </label>
 
                                     {/* Toggle 4: 2-Minute IDE Crash & Focus Watchdog */}
                                     <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">

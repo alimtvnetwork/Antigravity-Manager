@@ -25,12 +25,14 @@ import {
     ToggleRight,
     ArrowRightLeft,
     X,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
 import type { InstanceStatus } from '../services/instanceService';
+import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
@@ -134,6 +136,9 @@ export default function Instances() {
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [copyInstanceName, setCopyInstanceName] = useState('');
     const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
+    const [copyProjects, setCopyProjects] = useState<boolean>(true);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+    const [settingsModalTarget, setSettingsModalTarget] = useState<InstanceStatus | null>(null);
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
@@ -155,6 +160,7 @@ export default function Instances() {
                 setCopyTargetId(null);
                 setEditTargetId(null);
                 setSwitchTargetInstance(null);
+                setIsSettingsModalOpen(false);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -237,10 +243,12 @@ export default function Instances() {
         if (!copyTargetId || !copyInstanceName.trim()) return;
         setActionError(null);
         try {
-            const copied = await copyInstance(copyTargetId, copyInstanceName.trim(), cloneMode);
+            const copied = await copyInstance(copyTargetId, copyInstanceName.trim(), cloneMode, copyProjects);
             await setActiveInstance(copied.id);
+            await fetchInstances(true);
             setCopyInstanceName('');
             setCopyTargetId(null);
+            showToast(t('instances.copied_toast', 'Instance profile duplicated'), 'success');
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to copy instance');
         }
@@ -398,6 +406,17 @@ export default function Instances() {
                     >
                         <RotateCw className={cn("w-3.5 h-3.5", isLoading ? "animate-spin" : "")} />
                         <span className="hidden lg:inline">Eval Quota</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            setSettingsModalTarget(null);
+                            setIsSettingsModalOpen(true);
+                        }}
+                        className="btn btn-ghost border border-gray-200 dark:border-base-100 text-gray-700 dark:text-gray-300 btn-sm gap-1.5 shadow-sm text-xs font-semibold cursor-pointer hover:text-blue-600 hover:border-blue-400"
+                        title="Instance Settings & Sync: Turbo mode, plan review, copy settings, folder sync, JSON tools"
+                    >
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Settings & Sync</span>
                     </button>
                     <button
                         onClick={() => {
@@ -674,6 +693,7 @@ export default function Instances() {
                                                     onClick={() => {
                                                         setCopyTargetId(inst.config.id);
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
+                                                        setCopyProjects(true);
                                                     }}
                                                     className="btn btn-ghost btn-xs p-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer"
                                                     title="Clone / Duplicate profile settings and extensions"
@@ -951,12 +971,24 @@ export default function Instances() {
                                                 </button>
                                             </div>
 
-                                            {/* Clean Secondary Utility Icon Buttons (Clone, Executable, Wipe, Delete) */}
+                                            {/* Clean Secondary Utility Icon Buttons (Settings & Sync, Clone, Executable, Wipe, Delete) */}
                                             <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setSettingsModalTarget(inst);
+                                                        setIsSettingsModalOpen(true);
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
+                                                    title="Settings & Sync: Turbo mode, plan review, copy settings, folders, and JSON"
+                                                >
+                                                    <SlidersHorizontal className="w-3 h-3" />
+                                                </button>
+
                                                 <button
                                                     onClick={() => {
                                                         setCopyTargetId(inst.config.id);
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
+                                                        setCopyProjects(true);
                                                     }}
                                                     className="p-1.5 rounded-lg text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200/70 dark:border-[#15334d] transition-colors cursor-pointer"
                                                     title="Clone profile settings and extensions"
@@ -1392,6 +1424,25 @@ export default function Instances() {
                             </div>
                         </div>
 
+                        {/* Copy Workspace Projects & Folders Option */}
+                        <div className="mb-5 p-3 rounded-xl border border-gray-200 dark:border-base-100 bg-gray-50/50 dark:bg-base-100/50 flex items-center justify-between gap-3">
+                            <div className="min-w-0 pr-2">
+                                <label htmlFor="instances-page-copy-projects" className="font-bold text-xs text-gray-900 dark:text-gray-100 cursor-pointer block">
+                                    {t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}
+                                </label>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                                    {t('instances.copy_projects_desc', 'Duplicate opened workspaces, project states, and recent folder paths into the new profile.')}
+                                </p>
+                            </div>
+                            <input
+                                id="instances-page-copy-projects"
+                                type="checkbox"
+                                checked={copyProjects}
+                                onChange={(e) => setCopyProjects(e.target.checked)}
+                                className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer shrink-0"
+                            />
+                        </div>
+
                         <div className="flex justify-end items-center gap-2.5 pt-2">
                             <button
                                 type="button"
@@ -1479,6 +1530,18 @@ export default function Instances() {
                     </div>
                 </div>
             )}
+
+            {/* Instance Settings & Deep Sync Modal */}
+            <InstanceSettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => {
+                    setIsSettingsModalOpen(false);
+                    setSettingsModalTarget(null);
+                }}
+                targetInstance={settingsModalTarget}
+                instances={instances}
+                onInstancesUpdated={() => fetchInstances(true)}
+            />
         </div>
         </div>
     );

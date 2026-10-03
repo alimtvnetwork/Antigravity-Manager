@@ -3,6 +3,18 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.127.0 (2026-10-03)**:
+        -   **[Instances] Deep Settings Synchronization & Executable Auto-Discovery**:
+            -   **Description**: Added comprehensive CLI commands (`agm instance copy-settings`) and UI modal (`InstanceSettingsModal`) to synchronize theme colors, turbo mode, browser execution policy, code review, readable file, and writable folder permissions across instances with executable path auto-discovery (`--exe`). (Thanks to @aukgit)
+        -   **[Instances] Open Projects & Folder Copy Parity**:
+            -   **Description**: Added full support for copying included open workspace projects and recent folders (`workspaceStorage`, `state.vscdb`, `storage.json`) during instance duplication both via CLI (`agm instance duplicate --copy-projects`, `agm instance copy-projects`) and the UI clone modal. (Thanks to @aukgit)
+        -   **[Instances] Baseline Defaults Enforcement & Fast Toggles**:
+            -   **Description**: Added commands and fast toggles to enforce reference baseline settings (turbo mode ON, plan review always proceed) across single or all instances (`agm instance settings enforce-defaults`, `set-turbo`, `set-plan-review`). (Thanks to @aukgit)
+        -   **[UI] Header Action Button Consolidation**:
+            -   **Description**: Combined disjoint action buttons into cohesive, unified segmented pill control capsules: joined Quick Clean (`↺`) & Preferences dropdown (`🌙 EN ⌵`), and joined Window Controls (Minimize `—`, Maximize `🗗`, Close `✕`) with dark-glass styling and smooth hover highlights. (Thanks to @aukgit)
+        -   **[CLI] Instance Count & JSON Import/Export with Undo/Redo**:
+            -   **Description**: Added `agm instance count` and settings JSON export/import with UI clipboard Copy/Paste and in-memory snapshot Undo/Redo history. (Thanks to @aukgit)
+
     *   **v4.126.1 (2026-10-03)**:
         -   **[Instances] Auto-Switch Instance Reopen & Rotation Lifecycle**:
             -   **Description**: Fixed auto-profile switcher failing to reopen when the default instance reaches zero credits by preserving candidate instance IDs during evaluation and executing full cross-instance launch lifecycle. (Thanks to @aukgit)

@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.126.1-3B82F6?style=flat-square" alt="Version v4.126.1">
+    <img src="https://img.shields.io/badge/Version-v4.127.0-3B82F6?style=flat-square" alt="Version v4.127.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.126.1)**
+**Bar 2: Version-Based Installation (v4.127.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -455,6 +455,12 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.127.0** (2026-10-03):
+  - **Navbar Header Button Consolidation**: Unified Quick Clean + Preferences and Window Controls (Minimize, Maximize, Close) into sleek segmented pill control capsules with dark-glass styling.
+  - **Deep Settings Synchronization & Parity**: CLI `agm instance copy-settings` and UI modal to synchronize theme colors, turbo mode, browser policy, and file permissions across instances with executable path auto-discovery (`--exe`).
+  - **Open Projects & Folder Copy Parity**: Added full support for copying open workspace projects (`workspaceStorage`, `state.vscdb`) during duplication in CLI (`agm instance duplicate --copy-projects`, `agm instance copy-projects`) and UI clone modal.
+  - **Baseline Defaults Enforcement & Fast Toggles**: Added commands to enforce baseline settings (turbo mode ON, plan review always proceed) across single or all instances (`agm instance settings enforce-defaults`, `set-turbo`, `set-plan-review`).
+  - **JSON Import/Export & Clipboard Settings**: Added settings JSON export/import and UI clipboard Copy/Paste with undo/redo snapshot history and instance count reporting.
 - **v4.110.1** (2026-10-01):
   - **Taskbar Pin Preservation**: Resolved taskbar pin loss during `install.ps1` reinstallation/updates by backing up pins, banning taskbar shortcut deletions, fixing unquoted registry path comparison, and auto-updating pin targets.
   - **8 Sandboxing Laws Compliance**: Full multi-instance blind testing flow with strict PID and folder isolation, Supabase sync hardening, and dev tool cache cleaner.
@@ -526,7 +532,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.126.1**: Auto-switch cross-instance reopen & rotation lifecycle fix when default credits reach zero, process relaunch with stale lockfile purge, and modern dark glass Instances & Profiles UI redesign.
+> Latest version **v4.127.0**: Unified instance settings synchronization & deep copy CLI/UI, workspace projects and folder copy parity, baseline defaults enforcement & fast toggles, navbar header button consolidation into segmented pill capsules, and JSON import/export with undo/redo history.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

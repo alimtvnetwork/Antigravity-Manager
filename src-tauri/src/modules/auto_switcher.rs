@@ -1174,23 +1174,6 @@ pub async fn execute_profile_rotation_with_context(
         });
     let inst_id = &target.instance_id;
 
-    let was_running = crate::modules::instance::load_registry()
-        .ok()
-        .and_then(|r| {
-            r.instances
-                .into_iter()
-                .find(|i| i.id == current_instance_id)
-        })
-        .map(|i| crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid))
-        .unwrap_or_else(|| {
-            if current_instance_id == "default" {
-                crate::modules::process::is_antigravity_running(None)
-                    || crate::modules::process::is_antigravity_running(Some("ide"))
-            } else {
-                false
-            }
-        });
-
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
     let backup_res = crate::modules::repo_db::backup_running_prompts(&current_instance_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
@@ -1330,6 +1313,26 @@ pub async fn execute_profile_rotation_with_context(
     };
 
     let app_config = config::load_app_config().unwrap_or_default();
+
+    // Snapshot active workspace folders from current_instance_id before closing it
+    let source_data_dir = crate::modules::instance::load_registry()
+        .ok()
+        .and_then(|r| {
+            r.instances
+                .into_iter()
+                .find(|i| i.id == current_instance_id)
+        })
+        .map(|i| i.data_dir)
+        .unwrap_or_else(|| {
+            crate::modules::instance::get_default_antigravity_data_dir()
+                .to_string_lossy()
+                .to_string()
+        });
+    let active_workspaces = crate::modules::instance::get_instance_workspace_folders(
+        &current_instance_id,
+        &source_data_dir,
+    );
+
     if target.instance_id != current_instance_id {
         logger::log_info(&format!(
             "[AutoSwitcher] Cross-instance rotation: rotating from '{}' to '{}' (account '{}', email '{}')",
@@ -1339,9 +1342,17 @@ pub async fn execute_profile_rotation_with_context(
         let _ = crate::modules::repo_db::requeue_running_conversations_for_instance(
             &current_instance_id,
         );
-        // b) Close the depleted instance
+        // b) Inherit/copy workspace projects from depleted instance to target instance
+        let _ = crate::modules::instance::copy_instance_projects(
+            &current_instance_id,
+            &target.instance_id,
+        );
+        for ws in &active_workspaces {
+            let _ = crate::modules::instance::assign_project_to_instance(&target.instance_id, ws);
+        }
+        // c) Close the depleted instance
         let _ = crate::modules::instance::close_instance(&current_instance_id);
-        // c) Update active instance pointer
+        // d) Update active instance pointer
         let _ = crate::modules::instance::set_active_instance_id(&target.instance_id);
         let _ = crate::modules::instance::bind_account_to_instance(
             &target.instance_id,
@@ -1351,21 +1362,15 @@ pub async fn execute_profile_rotation_with_context(
         if target.instance_id == "default" {
             let _ = crate::modules::account::set_current_account_id(&target.account_id);
         }
-        // d) Ensure target instance credentials are fully injected and instance is launched
+        // e) Ensure target instance credentials are fully injected and instance is launched
         let _ = crate::modules::instance::switch_account_to_instance(
             &target.account_id,
             Some(&target.instance_id),
         )
-        .await;
-        if app_config.auto_profile_switcher.auto_reopen_on_switch {
-            let is_target_running = crate::modules::instance::load_registry()
-                .ok()
-                .and_then(|r| r.instances.into_iter().find(|i| i.id == target.instance_id))
-                .map(|i| crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid))
-                .unwrap_or(false);
-            if !is_target_running {
-                let _ = crate::modules::instance::launch_instance(&target.instance_id);
-            }
+        .await?;
+
+        if !app_config.auto_profile_switcher.auto_reopen_on_switch {
+            let _ = crate::modules::instance::close_instance(&target.instance_id);
         }
     } else {
         logger::log_info(&format!(
@@ -1384,11 +1389,8 @@ pub async fn execute_profile_rotation_with_context(
             instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
         }
 
-        // e) If previously running, ensure launch_instance_without_prompt_reinject(current_instance_id) is invoked
-        if was_running {
-            let _ = crate::modules::instance::launch_instance_without_prompt_reinject(
-                &current_instance_id,
-            );
+        if !app_config.auto_profile_switcher.auto_reopen_on_switch {
+            let _ = crate::modules::instance::close_instance(&current_instance_id);
         }
     }
 

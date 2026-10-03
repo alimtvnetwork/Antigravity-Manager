@@ -5,8 +5,8 @@
 staged_rs=$(git diff --cached --name-only --diff-filter=ACMR -- 'src-tauri/*.rs')
 [ -z "$staged_rs" ] && exit 0
 
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "[pre-commit] WARNING: cargo not found on PATH; skipping rustfmt check." >&2
+if ! cargo --version >/dev/null 2>&1; then
+    echo "[pre-commit] WARNING: cargo not available or toolchain not configured; skipping rustfmt check." >&2
     echo "[pre-commit] CI will still run 'cargo fmt -- --check' and fail on unformatted Rust." >&2
     exit 0
 fi

@@ -65,6 +65,7 @@ export function InstanceSelector() {
     const [copyInstanceName, setCopyInstanceName] = useState('');
     const [copyTargetId, setCopyTargetId] = useState<string | null>(null);
     const [cloneMode, setCloneMode] = useState<'full' | 'profile'>('full');
+    const [copyProjects, setCopyProjects] = useState<boolean>(true);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<InstanceStatus | null>(null);
@@ -168,8 +169,9 @@ export function InstanceSelector() {
         const target = (copyTargetId ? instances.find(i => i.config.id === copyTargetId) : null) || activeInstance || instances[0];
         if (!target) return;
         try {
-            const copied = await copyInstance(target.config.id, trimmed, cloneMode);
+            const copied = await copyInstance(target.config.id, trimmed, cloneMode, copyProjects);
             await setActiveInstance(copied.id);
+            await fetchInstances(true);
             setCopyInstanceName('');
             setCopyTargetId(null);
             setIsCopyOpen(false);
@@ -180,7 +182,7 @@ export function InstanceSelector() {
                 source: 'InstanceSelector.tsx',
                 triggerComponent: 'InstanceSelector',
                 triggerAction: 'handleCopy',
-                context: { sourceInstanceId: target.config.id, copyInstanceName: trimmed, cloneMode },
+                context: { sourceInstanceId: target.config.id, copyInstanceName: trimmed, cloneMode, copyProjects },
             });
             useErrorStore.getState().openErrorModal(captured);
             showToast(`${t('common.error')}: ${e?.message || e}`, 'error');
@@ -533,6 +535,7 @@ export function InstanceSelector() {
                                         setCopyTargetId(target.config.id);
                                         setCopyInstanceName(`${target.config.name} Copy`);
                                         setCloneMode('full');
+                                        setCopyProjects(true);
                                         setIsOpen(false);
                                         setIsCopyOpen(true);
                                     }
@@ -753,6 +756,7 @@ export function InstanceSelector() {
                                                     setCopyTargetId(inst.config.id);
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCloneMode('full');
+                                                    setCopyProjects(true);
                                                     setIsOpen(false);
                                                     setIsCopyOpen(true);
                                                 }}
@@ -1039,6 +1043,25 @@ export function InstanceSelector() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Copy Workspace Projects & Folders Option */}
+                        <div className="mb-5 p-3 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#071a27]/50 flex items-center justify-between gap-3">
+                            <div className="min-w-0 pr-2">
+                                <label htmlFor="inst-selector-copy-projects" className="font-bold text-xs text-gray-900 dark:text-gray-100 cursor-pointer block">
+                                    {t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}
+                                </label>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                                    {t('instances.copy_projects_desc', 'Duplicate opened workspaces, project states, and recent folder paths into the new profile.')}
+                                </p>
+                            </div>
+                            <input
+                                id="inst-selector-copy-projects"
+                                type="checkbox"
+                                checked={copyProjects}
+                                onChange={(e) => setCopyProjects(e.target.checked)}
+                                className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer shrink-0"
+                            />
                         </div>
 
                         <div className="flex justify-end items-center gap-2.5 pt-2">

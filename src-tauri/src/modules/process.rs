@@ -89,8 +89,103 @@ pub fn is_process_running_by_name(target_name: &str) -> bool {
     false
 }
 
+pub(crate) const NON_IDE_BINARIES: &[&str] = &[
+    "esbuild",
+    "esbuild.exe",
+    "cargo",
+    "cargo.exe",
+    "rustc",
+    "rustc.exe",
+    "rust-analyzer",
+    "rust-analyzer.exe",
+    "node",
+    "node.exe",
+    "npm",
+    "npm.cmd",
+    "npm.exe",
+    "pnpm",
+    "pnpm.cmd",
+    "pnpm.exe",
+    "yarn",
+    "yarn.cmd",
+    "yarn.exe",
+    "bun",
+    "bun.exe",
+    "git",
+    "git.exe",
+    "python",
+    "python.exe",
+    "python3",
+    "python3.exe",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
+    "cmd",
+    "cmd.exe",
+    "bash",
+    "bash.exe",
+    "sh",
+    "sh.exe",
+    "conhost",
+    "conhost.exe",
+    "tar",
+    "tar.exe",
+    "curl",
+    "curl.exe",
+    "aria2c",
+    "aria2c.exe",
+    "agm",
+    "agm.exe",
+];
+
+pub(crate) fn is_non_ide_binary(name: &str, exe_path: &str, args_str: &str) -> bool {
+    let name_lower = name.to_lowercase();
+    let exe_lower = exe_path.to_lowercase().replace('\\', "/");
+    let args_lower = args_str.to_lowercase().replace('\\', "/");
+
+    // Check exact binary name or binary with extension
+    if NON_IDE_BINARIES
+        .iter()
+        .any(|&b| name_lower == b || name_lower == format!("{}.exe", b))
+    {
+        return true;
+    }
+
+    // Check if executable path points into build or package manager directories
+    if exe_lower.contains("/node_modules/")
+        || exe_lower.contains("/target/debug/")
+        || exe_lower.contains("/target/release/")
+        || exe_lower.contains("/.cargo/")
+        || exe_lower.contains("/.rustup/")
+    {
+        return true;
+    }
+
+    // Check command line arguments for package manager execution
+    if args_lower.contains("node_modules")
+        && (name_lower.contains("node") || name_lower.contains("esbuild"))
+    {
+        return true;
+    }
+
+    false
+}
+
+pub(crate) fn exe_file_name(exe_path: &str) -> &str {
+    let normalized = exe_path.trim_end_matches(['/', '\\']);
+    normalized
+        .rsplit_once(['/', '\\'])
+        .map(|(_, file)| file)
+        .unwrap_or(normalized)
+}
+
 /// Helper process discriminator to filter out sub-processes, audio/gpu/renderers, crashpads, and language servers
 pub(crate) fn is_helper_process(name: &str, args_str: &str, exe_path: &str) -> bool {
+    if is_non_ide_binary(name, exe_path, args_str) {
+        return true;
+    }
+
     let name_lower = name.to_lowercase();
     let args_lower = args_str.to_lowercase();
     let exe_lower = exe_path.to_lowercase();
@@ -193,7 +288,7 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
 
         let is_helper = is_helper_process(&name, &args_str, &exe_path);
 
-        if is_helper {
+        if is_helper || is_non_ide_binary(&name, &exe_path, &args_str) {
             continue;
         }
 
@@ -270,6 +365,9 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
         }
 
         // Check if the process matches target_ide
+        let exe_file = exe_file_name(&exe_path);
+        let has_antigravity_name = name.contains("antigravity") || exe_file.contains("antigravity");
+
         let is_ide_match = if target_ide == Some("ide") {
             exe_path.contains("antigravity ide")
                 || exe_path.contains("antigravity-ide")
@@ -280,7 +378,7 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
             if ide_exe_paths.contains(&exe_path) {
                 false // Explicitly immune (it is an IDE)
             } else {
-                (exe_path.contains("antigravity") || name.contains("antigravity"))
+                has_antigravity_name
                     && !exe_path.contains("antigravity ide")
                     && !exe_path.contains("antigravity-ide")
                     && !name.contains("antigravity ide")
@@ -423,6 +521,10 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             continue;
         }
 
+        if is_non_ide_binary(&name, &exe_early, &args_str) {
+            continue;
+        }
+
         let is_instance_sandbox = args_str.contains(".antigravity_tools")
             || args_str.contains("/instances/")
             || args_str.contains("--user-data-dir");
@@ -545,6 +647,9 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
         let is_helper = is_helper_process(&name, &args_str, &exe_path);
 
         // Check if the process matches target_ide
+        let exe_file = exe_file_name(&exe_path);
+        let has_antigravity_name = name.contains("antigravity") || exe_file.contains("antigravity");
+
         let is_ide_match = if target_ide == Some("ide") {
             exe_path.contains("antigravity ide")
                 || exe_path.contains("antigravity-ide")
@@ -555,7 +660,7 @@ fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
             if ide_exe_paths.contains(&exe_path) {
                 false // Explicitly immune (it is an IDE)
             } else {
-                (exe_path.contains("antigravity") || name.contains("antigravity"))
+                has_antigravity_name
                     && !exe_path.contains("antigravity ide")
                     && !exe_path.contains("antigravity-ide")
                     && !name.contains("antigravity ide")
@@ -1353,7 +1458,7 @@ pub fn start_antigravity_with_fallback_path(
 
                 #[cfg(target_os = "windows")]
                 {
-                    cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
                 }
 
                 #[cfg(target_os = "linux")]
@@ -1427,6 +1532,12 @@ pub fn start_antigravity_with_fallback_path(
                         cmd.arg(arg);
                     }
                 }
+
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
+                }
+
                 #[cfg(target_os = "linux")]
                 clean_appimage_env(&mut cmd);
 
@@ -1500,7 +1611,7 @@ pub fn start_antigravity_with_fallback_path(
 
                 #[cfg(target_os = "windows")]
                 {
-                    cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
                 }
 
                 #[cfg(target_os = "linux")]
@@ -1607,6 +1718,9 @@ fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Op
 
             // Common helper process exclusion logic (strictly excludes language_server and sub-processes)
             let is_helper = is_helper_process(&name, &args_str, &exe_path);
+            if is_helper || is_non_ide_binary(&name, &exe_path, &args_str) {
+                continue;
+            }
 
             // Sanitize snapshot arguments to prevent engine parameters like --standalone from leaking into relaunch
             let clean_args = sanitize_restart_args(&args);
@@ -1651,13 +1765,17 @@ fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Op
                 }
             }
 
+            let exe_file = exe_file_name(&exe_path);
+            let has_antigravity_name =
+                name.contains("antigravity") || exe_file.contains("antigravity");
+
             let is_ide_match = if target_ide == Some("ide") {
                 exe_path.contains("antigravity ide")
                     || exe_path.contains("antigravity-ide")
                     || name.contains("antigravity ide")
                     || name.contains("antigravity-ide")
             } else {
-                (exe_path.contains("antigravity") || name.contains("antigravity"))
+                has_antigravity_name
                     && !exe_path.contains("antigravity ide")
                     && !exe_path.contains("antigravity-ide")
                     && !name.contains("antigravity ide")
@@ -2464,5 +2582,39 @@ mod tests {
         assert!(!cleaned.contains(&"--subclient_type".to_string()));
         assert!(cleaned.contains(&"--user-data-dir=/tmp/test".to_string()));
         assert!(cleaned.contains(&"/path/to/project".to_string()));
+    }
+
+    #[test]
+    fn test_is_non_ide_binary_filters_build_tools() {
+        assert!(is_non_ide_binary(
+            "esbuild.exe",
+            "D:/work/Antigravity-Manager/node_modules/esbuild/esbuild.exe",
+            ""
+        ));
+        assert!(is_non_ide_binary(
+            "cargo.exe",
+            "C:/Users/User/.cargo/bin/cargo.exe",
+            "test"
+        ));
+        assert!(is_non_ide_binary(
+            "rustc.exe",
+            "C:/Users/User/.cargo/bin/rustc.exe",
+            ""
+        ));
+        assert!(is_non_ide_binary(
+            "node.exe",
+            "C:/Program Files/nodejs/node.exe",
+            "vite"
+        ));
+        assert!(!is_non_ide_binary(
+            "antigravity.exe",
+            "C:/Program Files/Antigravity/antigravity.exe",
+            ""
+        ));
+        assert!(!is_non_ide_binary(
+            "antigravity",
+            "/usr/bin/antigravity",
+            ""
+        ));
     }
 }

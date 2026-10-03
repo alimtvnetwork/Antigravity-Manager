@@ -53,6 +53,36 @@ fn main() {
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
             cmd_instances(&cmd_args)
         }
+        "duplicate" | "instance-duplicate" => {
+            let mut forward_args = vec!["duplicate".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
+        "clone" | "instance-clone" => {
+            let mut forward_args = vec!["clone".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
+        "count" | "instance-count" | "instances-count" => {
+            let mut forward_args = vec!["count".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
+        "copy-projects" | "copy_projects" => {
+            let mut forward_args = vec!["copy-projects".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
+        "copy-settings" | "copy_settings" => {
+            let mut forward_args = vec!["copy-settings".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
+        "settings" | "instance-settings" => {
+            let mut forward_args = vec!["settings".to_string()];
+            forward_args.extend(cmd_args);
+            cmd_instances(&forward_args);
+        }
         "create" | "create-instance" | "create_instance" | "instance-create"
         | "intrance-create" | "intrance_create" => {
             let mut forward_args = vec!["create".to_string()];
@@ -8799,6 +8829,411 @@ fn cmd_instances_import(args: &[String]) {
     }
 }
 
+fn cmd_instance_duplicate_or_clone(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let copy_projects = args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("--copy-projects") || a.eq_ignore_ascii_case("-cp"));
+    let should_launch = args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("--launch") || a.eq_ignore_ascii_case("-l"));
+
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+
+    let start_idx = if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("duplicate") || s.eq_ignore_ascii_case("clone"))
+        .unwrap_or(false)
+    {
+        1
+    } else {
+        0
+    };
+
+    if non_flag_args.len() < start_idx + 2 {
+        eprintln!("Usage: agm instance duplicate <source> <new_name> [--copy-projects] [--launch]");
+        std::process::exit(1);
+    }
+
+    let source_spec = &non_flag_args[start_idx];
+    let new_name = non_flag_args[start_idx + 1].clone();
+
+    let resolved_src = match instance::resolve_instance_id(source_spec) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("[ERROR] Could not resolve source instance '{}': {}", source_spec, e);
+            std::process::exit(1);
+        }
+    };
+
+    match instance::copy_instance_with_options(&resolved_src, new_name, Some("full"), copy_projects) {
+        Ok(mut cfg) => {
+            if let Ok(exe_path) = instance::clone_instance_executable(&cfg.id) {
+                cfg.executable_path = Some(exe_path);
+            }
+            if should_launch {
+                let _ = instance::launch_instance(&cfg.id);
+            }
+
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&cfg).unwrap_or_default());
+            } else {
+                println!(
+                    "[SUCCESS] Duplicated instance '{}' into '{}' (ID: {}, copy_projects: {})",
+                    source_spec, cfg.name, cfg.id, copy_projects
+                );
+                if should_launch {
+                    println!("  [✓] Launched instance '{}' window", cfg.id);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to duplicate instance: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_instance_count(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    match instance::count_instances() {
+        Ok(val) => {
+            if is_json {
+                println!("{}", serde_json::to_string_pretty(&val).unwrap_or_default());
+            } else {
+                let total = val.get("total").and_then(|v| v.as_u64()).unwrap_or(0);
+                let active = val.get("active").and_then(|v| v.as_u64()).unwrap_or(0);
+                let running = val.get("running").and_then(|v| v.as_u64()).unwrap_or(0);
+                let active_id = val.get("active_instance_id").and_then(|v| v.as_str()).unwrap_or("default");
+                println!("\nAntigravity Instances Summary:");
+                println!("  Total registered:  {}", total);
+                println!("  Active profile:    {} (count: {})", active_id, active);
+                println!("  Running instances: {}", running);
+            }
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to count instances: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_instance_copy_projects(args: &[String]) {
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+
+    let mut from_spec: Option<String> = None;
+    let mut to_spec: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg_lower = args[i].to_lowercase();
+        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src") && i + 1 < args.len() {
+            from_spec = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len() {
+            to_spec = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    if from_spec.is_none() || to_spec.is_none() {
+        let start_idx = if non_flag_args
+            .first()
+            .map(|s| s.eq_ignore_ascii_case("copy-projects") || s.eq_ignore_ascii_case("copy_projects"))
+            .unwrap_or(false)
+        {
+            1
+        } else {
+            0
+        };
+
+        if from_spec.is_none() && non_flag_args.len() > start_idx {
+            from_spec = Some(non_flag_args[start_idx].clone());
+        }
+        if to_spec.is_none() && non_flag_args.len() > start_idx + 1 {
+            to_spec = Some(non_flag_args[start_idx + 1].clone());
+        }
+    }
+
+    let (src, dst) = match (from_spec, to_spec) {
+        (Some(s), Some(d)) => (s, d),
+        _ => {
+            eprintln!("Usage: agm instance copy-projects --from <src> --to <dest>");
+            std::process::exit(1);
+        }
+    };
+
+    match instance::copy_instance_projects(&src, &dst) {
+        Ok(count) => {
+            println!("[SUCCESS] Copied {} workspace project(s) from '{}' to '{}'.", count, src, dst);
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to copy projects: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_instance_copy_settings(args: &[String]) {
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+
+    let mut from_spec: Option<String> = None;
+    let mut to_spec: Option<String> = None;
+    let mut exe_path: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg_lower = args[i].to_lowercase();
+        if (arg_lower == "--from" || arg_lower == "-f" || arg_lower == "--src") && i + 1 < args.len() {
+            from_spec = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--to" || arg_lower == "-t" || arg_lower == "--dst") && i + 1 < args.len() {
+            to_spec = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--exe" || arg_lower == "-e") && i + 1 < args.len() {
+            exe_path = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    if let Some(ref ep) = exe_path {
+        if let Some(detected_inst) = instance::find_instance_by_executable(ep) {
+            println!("[*] Resolved instance '{}' from executable path '{}'", detected_inst, ep);
+            if from_spec.is_none() {
+                from_spec = Some(detected_inst);
+            } else if to_spec.is_none() {
+                to_spec = Some(detected_inst);
+            }
+        } else {
+            eprintln!("[WARN] Could not find any registered instance matching executable '{}'", ep);
+        }
+    }
+
+    if from_spec.is_none() || to_spec.is_none() {
+        let start_idx = if non_flag_args
+            .first()
+            .map(|s| s.eq_ignore_ascii_case("copy-settings") || s.eq_ignore_ascii_case("copy_settings"))
+            .unwrap_or(false)
+        {
+            1
+        } else {
+            0
+        };
+
+        if from_spec.is_none() && non_flag_args.len() > start_idx {
+            from_spec = Some(non_flag_args[start_idx].clone());
+        }
+        if to_spec.is_none() && non_flag_args.len() > start_idx + 1 {
+            to_spec = Some(non_flag_args[start_idx + 1].clone());
+        }
+    }
+
+    let (src, dst) = match (from_spec, to_spec) {
+        (Some(s), Some(d)) => (s, d),
+        _ => {
+            eprintln!("Usage: agm instance copy-settings --from <src> --to <dest> [--exe <path>]");
+            std::process::exit(1);
+        }
+    };
+
+    match instance::copy_instance_settings(&src, &dst) {
+        Ok(_) => {
+            println!("[SUCCESS] Copied theme and Antigravity settings from '{}' to '{}'.", src, dst);
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to copy settings: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_instance_settings(args: &[String]) {
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+
+    let start_idx = if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("settings") || s.eq_ignore_ascii_case("setting"))
+        .unwrap_or(false)
+    {
+        1
+    } else {
+        0
+    };
+
+    let subaction = non_flag_args.get(start_idx).map(|s| s.to_lowercase());
+
+    let mut target_instance: Option<String> = None;
+    let is_all = args.iter().any(|a| a.eq_ignore_ascii_case("--all"));
+    let mut out_file: Option<String> = None;
+    let mut in_file: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg_lower = args[i].to_lowercase();
+        if (arg_lower == "--instance" || arg_lower == "-i" || arg_lower == "--inst") && i + 1 < args.len() {
+            target_instance = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--out" || arg_lower == "-o") && i + 1 < args.len() {
+            out_file = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if (arg_lower == "--file" || arg_lower == "-f") && i + 1 < args.len() {
+            in_file = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    let target_ref = if is_all {
+        None
+    } else {
+        target_instance.as_deref()
+    };
+
+    match subaction.as_deref() {
+        Some("enforce-defaults") | Some("enforce") | Some("defaults") => {
+            match instance::enforce_default_settings(target_ref) {
+                Ok(count) => {
+                    println!("[SUCCESS] Enforced default settings across {} instance(s).", count);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to enforce default settings: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("set-turbo") | Some("turbo") => {
+            let is_disabled = args.iter().any(|a| {
+                a.eq_ignore_ascii_case("--disable")
+                    || a.eq_ignore_ascii_case("--off")
+                    || a.eq_ignore_ascii_case("disable")
+                    || a.eq_ignore_ascii_case("off")
+                    || a.eq_ignore_ascii_case("false")
+            });
+            let enabled = !is_disabled;
+
+            match instance::set_instance_turbo_mode(target_ref, enabled) {
+                Ok(count) => {
+                    println!(
+                        "[SUCCESS] Set antigravity.turboMode = {} across {} instance(s).",
+                        enabled, count
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set turbo mode: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("set-plan-review") | Some("plan-review") | Some("plan") => {
+            let is_ask = args.iter().any(|a| {
+                a.eq_ignore_ascii_case("--ask")
+                    || a.eq_ignore_ascii_case("--ask-first")
+                    || a.eq_ignore_ascii_case("ask")
+                    || a.eq_ignore_ascii_case("false")
+            });
+            let always_proceed = !is_ask;
+
+            match instance::set_instance_plan_review(target_ref, always_proceed) {
+                Ok(count) => {
+                    println!(
+                        "[SUCCESS] Set antigravity.planReviewAlwaysProceed = {} across {} instance(s).",
+                        always_proceed, count
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set plan review policy: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("export") => {
+            let inst_spec = target_instance.as_deref().unwrap_or("active");
+            match instance::export_instance_settings(inst_spec) {
+                Ok(json_str) => {
+                    if let Some(ref path) = out_file {
+                        if let Err(e) = fs::write(path, &json_str) {
+                            eprintln!("[ERROR] Failed to write to '{}': {}", path, e);
+                            std::process::exit(1);
+                        }
+                        println!("[SUCCESS] Exported instance '{}' settings to '{}'.", inst_spec, path);
+                    } else {
+                        println!("{}", json_str);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to export settings: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("import") => {
+            let file_path = match in_file {
+                Some(f) => f,
+                None => {
+                    eprintln!("Usage: agm instance settings import [--instance <id> | --all] --file <file>");
+                    std::process::exit(1);
+                }
+            };
+            let content = match fs::read_to_string(&file_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to read settings file '{}': {}", file_path, e);
+                    std::process::exit(1);
+                }
+            };
+
+            match instance::import_instance_settings(target_ref, &content) {
+                Ok(count) => {
+                    println!("[SUCCESS] Imported settings into {} instance(s).", count);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to import settings: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            println!("AGM Instance Settings CLI:");
+            println!("  agm instance settings enforce-defaults [--all | --instance <id>]");
+            println!("  agm instance settings set-turbo [--all | --instance <id>] [--enable | --disable]");
+            println!("  agm instance settings set-plan-review [--all | --instance <id>] [--always-proceed | --ask]");
+            println!("  agm instance settings export [--instance <id>] [--out <file>]");
+            println!("  agm instance settings import [--instance <id> | --all] --file <file>");
+        }
+    }
+}
+
 fn cmd_instances(args: &[String]) {
     let non_flag_args: Vec<String> = args
         .iter()
@@ -8947,6 +9382,11 @@ fn cmd_instances(args: &[String]) {
         println!(
             "  create, add <name> [options]      Create a new isolated sandbox instance profile"
         );
+        println!("  duplicate, clone <src> <new>      Duplicate instance profile with optional project copying");
+        println!("  count [--json]                    Display summary of total, active, and running instance counts");
+        println!("  copy-projects --from <s> --to <d> Copy workspace projects and recent paths between instances");
+        println!("  copy-settings --from <s> --to <d> Deep-merge theme, Antigravity, and policy settings");
+        println!("  settings <action> [options]       Configure defaults, turboMode, planReview, export, or import");
         println!("  switch, use <inst> <account>      Switch an instance profile's bound account credentials directly");
         println!("  ff, rotate [inst]                 Fast-forward / smart-rotate account for an instance (or all)");
         println!("  auto-switch [action]              Inspect or configure background auto-profile switcher");
@@ -8962,12 +9402,21 @@ fn cmd_instances(args: &[String]) {
         println!("  --from, -f <source_instance>      Clone from default or another instance. Omit for a new empty instance");
         println!("  --data-only, --do                 Create isolated data directory structure without cloning executable");
         println!("  --launch, -l                      Immediately launch the instance window after creation");
+        println!("\nDuplicate / Clone Options:");
+        println!("  --copy-projects, -cp              Copy open workspace projects and recent paths to cloned instance");
+        println!("  --launch, -l                      Immediately launch the instance window after duplication");
         println!("\nGeneral Options:");
         println!("  --json, -j                        Output result in structured JSON format");
         println!("  --force, -f                       Bypass confirmation prompt for destructive actions");
         println!("\nExamples:");
         println!("  agm instances                                          # List all instances and running statuses");
         println!("  agm instances create \"backend-dev\"                     # Create instance with next available account");
+        println!("  agm instances duplicate #1 \"Worker-2\" --copy-projects  # Duplicate instance #1 including open projects");
+        println!("  agm instances count                                    # Count total, active, and running instances");
+        println!("  agm instances copy-projects --from #1 --to #2          # Copy workspace projects from #1 to #2");
+        println!("  agm instances copy-settings --from #1 --to #2          # Deep-merge settings from #1 to #2");
+        println!("  agm instances settings set-turbo --enable              # Enable turboMode across all instances");
+        println!("  agm instances settings enforce-defaults                # Enforce performance baseline defaults");
         println!("  agm instances create \"qa-test\" -a dev@gmail.com       # Create instance bound to dev@gmail.com");
         println!("  agm instances create \"stage-clone\" --from a-6650       # Clone settings from a-6650");
         println!("  agm instances switch #2 dev2@gmail.com                 # Switch instance #2 to dev2@gmail.com");
@@ -8985,6 +9434,48 @@ fn cmd_instances(args: &[String]) {
     }
 
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    // Subcommand: agm instances duplicate / clone
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("duplicate")
+            || non_flag_args[0].eq_ignore_ascii_case("clone"))
+    {
+        cmd_instance_duplicate_or_clone(args);
+        return;
+    }
+
+    // Subcommand: agm instances count
+    if !non_flag_args.is_empty() && non_flag_args[0].eq_ignore_ascii_case("count") {
+        cmd_instance_count(args);
+        return;
+    }
+
+    // Subcommand: agm instances copy-projects
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("copy-projects")
+            || non_flag_args[0].eq_ignore_ascii_case("copy_projects"))
+    {
+        cmd_instance_copy_projects(args);
+        return;
+    }
+
+    // Subcommand: agm instances copy-settings
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("copy-settings")
+            || non_flag_args[0].eq_ignore_ascii_case("copy_settings"))
+    {
+        cmd_instance_copy_settings(args);
+        return;
+    }
+
+    // Subcommand: agm instances settings
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("settings")
+            || non_flag_args[0].eq_ignore_ascii_case("setting"))
+    {
+        cmd_instance_settings(args);
+        return;
+    }
 
     // Subcommand: agm instances observe [target]
     if !non_flag_args.is_empty()

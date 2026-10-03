@@ -153,116 +153,119 @@ export function NavSettings({
 
     return (
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* 1. Antigravity Quick Clean (Recycle) Icon Button */}
-            <button
-                type="button"
-                onClick={() => {
-                    setIsPrefsOpen(false);
-                    setIsCleanModalOpen(true);
-                    window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
-                }}
-                className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer text-gray-700 dark:text-gray-300"
-                title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
-                aria-label="Quick Clean"
-            >
-                <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-
-            {/* 2. Combined Theme & Language Dropdown Button */}
-            <div className="relative" ref={prefsRef}>
+            {/* 1. Quick Clean + Theme/Language Preferences Segmented Pill Capsule */}
+            <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438]/90 border border-gray-200/60 dark:border-[#15334d] p-0.5 shadow-xs">
+                {/* Antigravity Quick Clean (Recycle) Icon Button */}
                 <button
                     type="button"
                     onClick={() => {
-                        const next = !isPrefsOpen;
-                        setIsPrefsOpen(next);
-                        if (next) {
-                            window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
-                        }
+                        setIsPrefsOpen(false);
+                        setIsCleanModalOpen(true);
+                        window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'clean-modal' } }));
                     }}
-                    className="h-7 px-2 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center gap-1 transition-all duration-150 ease-out shadow-xs cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-slate-700"
-                    title="Theme & Language Preferences"
+                    className="w-7 h-7 rounded-l-full hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-150 ease-out cursor-pointer text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60 pr-1 mr-0.5"
+                    title={t('nav.quick_clean', 'Antigravity Cache & Retention Clean')}
+                    aria-label="Quick Clean"
                 >
-                    {theme === 'light' ? (
-                        <Sun className="w-3 h-3 text-amber-500 shrink-0" />
-                    ) : (
-                        <Moon className="w-3 h-3 text-blue-400 shrink-0" />
-                    )}
-                    <span className="uppercase">{currentLangItem.short}</span>
-                    <ChevronDown className={`w-2.5 h-2.5 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
+                    <RotateCcw className="w-3.5 h-3.5" />
                 </button>
 
-                {isPrefsOpen && (
-                    <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
-                        <div className="flex items-center justify-between px-3 pb-1.5 mb-1 border-b border-gray-100 dark:border-slate-800">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                                {t('nav.preferences', 'Preferences')}
-                            </span>
+                {/* Combined Theme & Language Dropdown Button */}
+                <div className="relative" ref={prefsRef}>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const next = !isPrefsOpen;
+                            setIsPrefsOpen(next);
+                            if (next) {
+                                window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
+                            }
+                        }}
+                        className="h-7 px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
+                        title="Theme & Language Preferences"
+                    >
+                        {theme === 'light' ? (
+                            <Sun className="w-3 h-3 text-amber-500 shrink-0" />
+                        ) : (
+                            <Moon className="w-3 h-3 text-blue-400 shrink-0" />
+                        )}
+                        <span className="uppercase">{currentLangItem.short}</span>
+                        <ChevronDown className={`w-2.5 h-2.5 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isPrefsOpen && (
+                        <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
+                            <div className="flex items-center justify-between px-3 pb-1.5 mb-1 border-b border-gray-100 dark:border-slate-800">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                    {t('nav.preferences', 'Preferences')}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPrefsOpen(false)}
+                                    className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    title={t('common.close', 'Close')}
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                Appearance
+                            </div>
                             <button
                                 type="button"
-                                onClick={() => setIsPrefsOpen(false)}
-                                className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                title={t('common.close', 'Close')}
+                                onClick={(e) => {
+                                    onThemeToggle(e);
+                                    setIsPrefsOpen(false);
+                                }}
+                                className="w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
                             >
-                                <X className="w-3.5 h-3.5" />
+                                <span className="flex items-center gap-2">
+                                    {theme === 'light' ? <Moon className="w-3.5 h-3.5 text-blue-500" /> : <Sun className="w-3.5 h-3.5 text-amber-500" />}
+                                    <span>{theme === 'light' ? t('nav.theme_to_dark', 'Switch to Dark Mode') : t('nav.theme_to_light', 'Switch to Light Mode')}</span>
+                                </span>
                             </button>
-                        </div>
-                        <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                            Appearance
-                        </div>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                onThemeToggle(e);
-                                setIsPrefsOpen(false);
-                            }}
-                            className="w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-                        >
-                            <span className="flex items-center gap-2">
-                                {theme === 'light' ? <Moon className="w-3.5 h-3.5 text-blue-500" /> : <Sun className="w-3.5 h-3.5 text-amber-500" />}
-                                <span>{theme === 'light' ? t('nav.theme_to_dark', 'Switch to Dark Mode') : t('nav.theme_to_light', 'Switch to Light Mode')}</span>
-                            </span>
-                        </button>
 
-                        <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
-                        <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                            <Globe className="w-3 h-3" />
-                            <span>Language</span>
+                            <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
+                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                <span>Language</span>
+                            </div>
+                            <div className="max-h-56 overflow-y-auto">
+                                {LANGUAGES.map((lang) => {
+                                    const isCurrent = lang.code === currentLanguage;
+                                    return (
+                                        <button
+                                            key={lang.code}
+                                            type="button"
+                                            onClick={() => {
+                                                onLanguageChange(lang.code);
+                                                setIsPrefsOpen(false);
+                                            }}
+                                            className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
+                                                isCurrent ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'
+                                            }`}
+                                        >
+                                            <span>{lang.label}</span>
+                                            {isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
-                        <div className="max-h-56 overflow-y-auto">
-                            {LANGUAGES.map((lang) => {
-                                const isCurrent = lang.code === currentLanguage;
-                                return (
-                                    <button
-                                        key={lang.code}
-                                        type="button"
-                                        onClick={() => {
-                                            onLanguageChange(lang.code);
-                                            setIsPrefsOpen(false);
-                                        }}
-                                        className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
-                                            isCurrent ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'
-                                        }`}
-                                    >
-                                        <span>{lang.label}</span>
-                                        {isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}
             {isTauri() && (
-                <div className="flex items-center gap-1 shrink-0 z-50">
+                <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438]/90 border border-gray-200/60 dark:border-[#15334d] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0">
                     <button
                         type="button"
                         id="btn-window-minimize"
                         name="window-minimize"
                         data-xpath="//*[@id='btn-window-minimize']"
                         onClick={handleMinimize}
-                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
+                        className="w-7 h-7 rounded-l-full hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
                         title={t('common.minimize', 'Minimize')}
                         aria-label="Minimize"
                     >
@@ -275,7 +278,7 @@ export function NavSettings({
                         name="window-maximize"
                         data-xpath="//*[@id='btn-window-maximize']"
                         onClick={handleToggleMaximize}
-                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer"
+                        className="w-7 h-7 hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
                         title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                         aria-label={isMaximized ? "Restore" : "Maximize"}
                     >
@@ -297,7 +300,7 @@ export function NavSettings({
                         name="window-close"
                         data-xpath="//*[@id='btn-window-close']"
                         onClick={handleClose}
-                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer group"
+                        className="w-7 h-7 rounded-r-full hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out cursor-pointer group"
                         title={t('common.close', 'Close')}
                         aria-label="Close"
                     >

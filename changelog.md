@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.127.0] - 2026-10-03
+
+### Added
+- Unified instance settings synchronization and deep copy via CLI (`agm instance copy-settings`) and UI modal (`InstanceSettingsModal`) covering themes, turbo mode, browser policy, and file permissions. (Thanks to @aukgit)
+- Open projects and workspace folder copy parity (`workspaceStorage`, `state.vscdb`) during duplication in CLI (`agm instance duplicate --copy-projects`, `agm instance copy-projects`) and UI clone modal. (Thanks to @aukgit)
+- Default baseline settings enforcement and fast toggles for turbo mode and plan review across single or all instances (`agm instance settings enforce-defaults`, `set-turbo`, `set-plan-review`). (Thanks to @aukgit)
+- Instance settings JSON export/import and UI clipboard Copy/Paste with undo/redo snapshot history. (Thanks to @aukgit)
+- Instance count and status reporting CLI command (`agm instance count`). (Thanks to @aukgit)
+
+### Changed
+- Combined navbar header buttons into seamless, unified segmented pill control capsules for Quick Clean + Preferences and Window Controls (Minimize, Maximize, Close). (Thanks to @aukgit)
+
+---
+
 ## [v4.126.1] - 2026-10-03
 
 ### Fixed
@@ -232,6 +246,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.127.0 (2026-10-03)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.126.1 (2026-10-03)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
