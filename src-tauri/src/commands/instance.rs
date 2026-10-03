@@ -21,8 +21,10 @@ pub fn create_instance(
 
     if let Some(ref acc_id) = bound_account_id {
         if from_instance_id.is_some() {
-            let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            let _ = rt.block_on(instance::switch_account_to_instance(acc_id, Some(&cfg.id)));
+            let _ = tauri::async_runtime::block_on(instance::switch_account_to_instance(
+                acc_id,
+                Some(&cfg.id),
+            ));
             if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                 cfg.bound_account_id = Some(acc.id);
                 cfg.bound_email = Some(acc.email);
@@ -166,7 +168,7 @@ pub fn update_auto_switcher_config(
     app_config.auto_profile_switcher = config;
     crate::modules::config::save_app_config(&app_config)?;
     if is_enabled {
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let _ = crate::modules::auto_switcher::check_and_rotate_if_needed().await;
         });
     }

@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.130.0 (2026-10-04)**:
+        -   **[Stability] Startup Crash & White Screen Resolution**:
+            -   **Description**: Resolved an immediate startup crash (`0xc0000409`) where synchronous `tokio::spawn` calls in Tauri's `.setup()` hook panicked on non-Tokio worker threads. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)
+        -   **[Core & Commands] Asynchronous Command Safety**:
+            -   **Description**: Replaced ad-hoc `tokio::runtime::Runtime::new()` and `tokio::spawn` calls in instance management commands with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn` to guarantee execution safety across both GUI and CLI contexts. (Thanks to @aukgit)
+
     *   **v4.129.0 (2026-10-03)**:
         -   **[Audit & History] Instance Action Toolbar Audit Option & Switch History Modal**:
             -   **Description**: Added a dedicated `Audit` button to instance card action toolbars and list view pill capsules opening the new `InstanceAuditTrailModal` to display total switch counts, the last 2–3 account transitions (`From Account` → `To Account`), reasons, timestamps, and full payloads. (Thanks to @aukgit)

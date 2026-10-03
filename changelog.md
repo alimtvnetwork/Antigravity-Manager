@@ -1,5 +1,13 @@
 # Changelog
 
+## [v4.130.0] - 2026-10-04
+
+### Fixed
+- **Startup Crash & White Screen Resolution**: Fixed an immediate process termination (`0xc0000409` / `STATUS_FAIL_FAST_EXCEPTION`) caused by invoking `tokio::spawn` synchronously inside Tauri's `.setup()` hook on a non-Tokio worker thread during application launch. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking repository queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)
+- **Asynchronous Command Safety**: Replaced ad-hoc `tokio::runtime::Runtime::new()` and `tokio::spawn` calls in instance management commands with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn` to guarantee execution safety across both GUI and CLI contexts. (Thanks to @aukgit)
+
+---
+
 ## [v4.129.0] - 2026-10-03
 
 ### Added
@@ -304,6 +312,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.130.0 (2026-10-04)**:
+        -   **[Stability] Startup Crash & White Screen Resolution (PR #499)**:
+            -   **Description**: Resolved an immediate startup crash (`0xc0000409`) where synchronous `tokio::spawn` calls in Tauri's `.setup()` hook panicked on non-Tokio worker threads. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)
+
+
     *   **v4.129.0 (2026-10-03)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

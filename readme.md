@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.129.0-3B82F6?style=flat-square" alt="Version v4.129.0">
+    <img src="https://img.shields.io/badge/Version-v4.130.0-3B82F6?style=flat-square" alt="Version v4.130.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.129.0)**
+**Bar 2: Version-Based Installation (v4.130.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.129.0**: Per-instance audit option and switch history modal with 4-step execution lifecycle (prompts backup, reset, restore, verification), live PID detection, on-demand and 10-minute periodic quota and account sync engine, and instance action toolbar enhancements.
+> Latest version **v4.130.0**: Resolved startup blank white screen crash (0xc0000409) by migrating background prompt queue and instance PID quota scheduler daemons to Tauri async runtime spawn, eliminating thread-local runtime panics and ensuring reliable GUI window mounting and initialization. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

@@ -594,7 +594,7 @@ pub async fn save_config(
     }
 
     if config.auto_profile_switcher.is_enabled {
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let _ = crate::modules::auto_switcher::check_and_rotate_if_needed().await;
         });
     }

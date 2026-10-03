@@ -254,7 +254,7 @@ pub fn start_scheduler(
                 let handle_for_warmup = app_handle.clone();
                 let state_for_warmup = proxy_state.clone();
 
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     for (acc_id, email, model, token, pid, history_key) in tasks_to_run {
                         logger::log_info(&format!(
                             "[WeeklyWarmup] 🚀 Triggering weekly warmup for {} @ {}",
@@ -393,7 +393,7 @@ pub async fn trigger_warmup_for_account(account: &Account) {
 /// Bookkeeps enqueued prompts, checks whether projects are idle,
 /// and automatically pushes the first enqueued prompt (FIFO) if idle.
 pub fn start_prompt_queue_scheduler() {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         logger::log_info(
             "[PromptQueueScheduler] Background 10-minute prompt queue scheduler initialized.",
         );
@@ -408,7 +408,7 @@ pub fn start_prompt_queue_scheduler() {
             logger::log_info(
                 "[PromptQueueScheduler] Running 10-minute enqueued prompt bookkeeping cycle...",
             );
-            match tokio::task::spawn_blocking(|| {
+            match tauri::async_runtime::spawn_blocking(|| {
                 crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
             })
             .await
@@ -444,7 +444,7 @@ pub fn start_prompt_queue_scheduler() {
 /// Inspects live running PIDs, matches active authenticated accounts from instance storage,
 /// and synchronizes real-time Gemini quotas and credits across all instances.
 pub fn start_instance_pid_quota_scheduler() {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         logger::log_info(
             "[InstancePidQuotaScheduler] Background 10-minute instance PID & quota scheduler initialized.",
         );

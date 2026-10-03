@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.129.0)
+> Professional AI Account Management & Protocol Proxy System (v4.130.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.129.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.130.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.129.0**: Per-instance audit option and switch history modal with 4-step execution lifecycle (prompts backup, reset, restore, verification), live PID detection, on-demand and 10-minute periodic quota and account sync engine, and instance action toolbar enhancements.
+> Latest version **v4.130.0**: Resolved startup blank white screen crash (0xc0000409) by migrating background prompt queue and instance PID quota scheduler daemons to Tauri async runtime spawn, eliminating thread-local runtime panics and ensuring reliable GUI window mounting and initialization. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
