@@ -29,6 +29,7 @@ import {
     LayoutGrid,
     List,
     Layers,
+    History,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -38,11 +39,13 @@ import type { InstanceStatus } from '../services/instanceService';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import InstanceTable from '../components/instances/InstanceTable';
 import PromptTreeViewModal from '../components/instances/PromptTreeViewModal';
+import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 import { showToast } from '../components/common/ToastContainer';
+
 
 const INSTANCE_THEMES = [
     {
@@ -121,6 +124,8 @@ export default function Instances() {
         setDefaultInstance,
         switchAccountToInstance,
         cleanAndRestartWorkspace,
+        syncInstance,
+        syncAllInstances,
     } = useInstanceStore();
 
     const {
@@ -147,6 +152,9 @@ export default function Instances() {
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
+    const [isSyncingAll, setIsSyncingAll] = useState(false);
+    const [syncingInstanceIds, setSyncingInstanceIds] = useState<Record<string, boolean>>({});
+    const [auditModalInstance, setAuditModalInstance] = useState<{ id: string; name: string; sequence_name?: string } | null>(null);
     const activeCardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -166,10 +174,12 @@ export default function Instances() {
                 setEditTargetId(null);
                 setSwitchTargetInstance(null);
                 setIsSettingsModalOpen(false);
+                setAuditModalInstance(null);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
+
     }, []);
 
     useEffect(() => {
@@ -371,6 +381,25 @@ export default function Instances() {
                         <button
                             type="button"
                             onClick={async () => {
+                                setIsSyncingAll(true);
+                                try {
+                                    await syncAllInstances();
+                                } catch (e: any) {
+                                    setActionError(e?.toString() || 'Failed to sync all instances and quotas');
+                                } finally {
+                                    setIsSyncingAll(false);
+                                }
+                            }}
+                            disabled={isLoading || isSyncingAll}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            title="Synchronize process PIDs and account quotas across all instances"
+                        >
+                            <RotateCw className={cn("w-3.5 h-3.5 text-cyan-500", isSyncingAll && "animate-spin")} />
+                            <span>Sync All</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
                                 try {
                                     const msg = await cleanAndRestartWorkspace();
                                     showToast(msg || 'Stuck Electron processes cleared & Antigravity restarted!', 'success');
@@ -386,6 +415,7 @@ export default function Instances() {
                             <span>Clean & Restart</span>
                         </button>
                     </div>
+
 
                     {/* Segmented Pill Group 2: Automation & Settings */}
                     <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
@@ -670,6 +700,25 @@ export default function Instances() {
                             setActionError(e?.toString() || 'Fast forward failed');
                         }
                     }}
+                    onAudit={(id, name) => {
+                        const target = instances.find((i) => i.config.id === id);
+                        setAuditModalInstance({
+                            id,
+                            name,
+                            sequence_name: target?.config.seq_num ? `Instance #${target.config.seq_num}` : undefined
+                        });
+                    }}
+                    onSync={async (id) => {
+                        setSyncingInstanceIds(prev => ({ ...prev, [id]: true }));
+                        try {
+                            await syncInstance(id);
+                        } catch (e: any) {
+                            setActionError(e?.toString() || 'Failed to sync instance');
+                        } finally {
+                            setSyncingInstanceIds(prev => ({ ...prev, [id]: false }));
+                        }
+                    }}
+                    syncingInstanceIds={syncingInstanceIds}
                     onSettings={(id) => {
                         const target = instances.find((i) => i.config.id === id);
                         setSettingsModalTarget(target || null);
@@ -689,6 +738,7 @@ export default function Instances() {
                     onSetDefault={setDefaultInstance}
                 />
             ) : (
+
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {filteredInstances.map((inst, index) => {
                         const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
@@ -1076,7 +1126,42 @@ export default function Instances() {
                                                     <FastForward className="w-3 h-3" />
                                                     <span>FF</span>
                                                 </button>
+
+                                                {/* Audit Button */}
+                                                <button
+                                                    onClick={() => setAuditModalInstance({
+                                                        id: inst.config.id,
+                                                        name: inst.config.name,
+                                                        sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
+                                                    })}
+                                                    className="btn btn-xs bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-300 hover:text-white border border-amber-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
+                                                    title="Open Audit Trail for this instance"
+                                                >
+                                                    <History className="w-3 h-3 text-amber-500" />
+                                                    <span>Audit</span>
+                                                </button>
+
+                                                {/* Sync Button */}
+                                                <button
+                                                    onClick={async () => {
+                                                        setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: true }));
+                                                        try {
+                                                            await syncInstance(inst.config.id);
+                                                        } catch (e: any) {
+                                                            setActionError(e?.toString() || 'Failed to sync instance');
+                                                        } finally {
+                                                            setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: false }));
+                                                        }
+                                                    }}
+                                                    disabled={Boolean(syncingInstanceIds[inst.config.id])}
+                                                    className="btn btn-xs bg-teal-500/10 hover:bg-teal-500 text-teal-700 dark:text-teal-300 hover:text-white border border-teal-500/25 rounded-lg gap-1 font-semibold cursor-pointer transition-colors"
+                                                    title="Sync PID and quota for this instance"
+                                                >
+                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds[inst.config.id] && "animate-spin")} />
+                                                    <span>Sync</span>
+                                                </button>
                                             </div>
+
 
                                             {/* Clean Secondary Utility Icon Buttons (Settings & Sync, Clone, Executable, Wipe, Delete) */}
                                             <div className="flex items-center gap-1 shrink-0">
@@ -1665,7 +1750,15 @@ export default function Instances() {
                 instanceId={promptTreeInstance?.id || ''}
                 instanceName={promptTreeInstance?.name || ''}
             />
+
+            {/* Instance Audit Trail & Switch History Modal */}
+            <InstanceAuditTrailModal
+                isOpen={Boolean(auditModalInstance)}
+                onClose={() => setAuditModalInstance(null)}
+                instance={auditModalInstance}
+            />
         </div>
         </div>
     );
 }
+

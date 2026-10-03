@@ -296,3 +296,34 @@ pub fn get_project_conversation_tree(
         only_running.unwrap_or(false),
     ))
 }
+
+#[tauri::command]
+pub fn get_instance_switch_history(
+    instance_id: String,
+    limit: Option<u32>,
+) -> Result<crate::modules::task_history_db::InstanceSwitchHistoryResponse, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    let l = limit.unwrap_or(50) as usize;
+    crate::modules::task_history_db::get_instance_switch_history(&resolved_id, l)
+}
+
+#[tauri::command]
+pub fn get_instance_audit_trail(
+    instance_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<crate::modules::task_history_db::TaskRecord>, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    let l = limit.unwrap_or(50) as usize;
+    crate::modules::task_history_db::get_instance_audit_trail(&resolved_id, l)
+}
+
+#[tauri::command]
+pub async fn sync_instance_pid_and_quota(instance_id: String) -> Result<InstanceStatus, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    instance::sync_instance_pid_and_quota_logic(&resolved_id).await
+}
+
+#[tauri::command]
+pub async fn sync_all_instances_and_quotas() -> Result<Vec<InstanceStatus>, String> {
+    instance::sync_all_instances_and_quotas_logic().await
+}

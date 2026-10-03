@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "agm-alim"
-version = "4.128.1"
+version = "4.129.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

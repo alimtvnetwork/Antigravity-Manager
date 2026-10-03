@@ -1,0 +1,43 @@
+{
+  "task_id": "104-instance-audit-trail-and-pid-quota-sync",
+  "subtask_id": "03-frontend-audit-modal-and-card-actions",
+  "title": "Frontend Instance Action Toolbar & Audit Modal Specialist",
+  "status": "COMPLETED",
+  "owner": "Worker-02",
+  "modified_files": [
+    "src/types/audit.ts",
+    "src/services/instanceService.ts",
+    "src/stores/useInstanceStore.ts",
+    "src/components/instances/InstanceAuditTrailModal.tsx",
+    "src/pages/Instances.tsx",
+    "src/components/instances/InstanceTable.tsx"
+  ],
+  "deliverables": {
+    "types": [
+      "SwitchBackupStep",
+      "SwitchResetStep",
+      "SwitchRestoreStep",
+      "SwitchVerificationStep",
+      "SwitchAuditSteps",
+      "InstanceSwitchRecord",
+      "InstanceSwitchHistoryResponse"
+    ],
+    "services": [
+      "getInstanceSwitchHistory",
+      "getInstanceAuditTrail",
+      "syncInstancePidAndQuota",
+      "syncAllInstancesAndQuotas"
+    ],
+    "store": [
+      "syncInstance",
+      "syncAllInstances"
+    ],
+    "components": [
+      "InstanceAuditTrailModal with 4-step stepper (backup, reset, restore, verify), click-to-unmask email, refresh header capsule, and raw facts drawer",
+      "Card action toolbar Audit and Sync buttons in Instances.tsx",
+      "Top toolbar primary capsule Sync All button with spin animation in Instances.tsx",
+      "Table action capsule 100% parity Audit and Sync buttons in InstanceTable.tsx"
+    ]
+  },
+  "completed_at": "2026-10-03T15:09:00Z"
+}

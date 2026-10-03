@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as instanceService from '../services/instanceService';
 import * as accountService from '../services/accountService';
 import { useErrorStore } from './error-store';
+import { showToast } from '../components/common/ToastContainer';
 import type { Account } from '../types/account';
 import type {
     InstanceConfig,
@@ -49,6 +50,8 @@ interface InstanceState {
     }>;
     cleanAndRestartWorkspace: () => Promise<string>;
     resumeRecentProjectPrompts: (instanceId?: string) => Promise<instanceService.AutoResumeResult>;
+    syncInstance: (instanceId: string) => Promise<void>;
+    syncAllInstances: () => Promise<void>;
 }
 
 let instanceSelectionEpoch = 0;
@@ -659,4 +662,47 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             throw err;
         }
     },
+
+    syncInstance: async (instanceId: string) => {
+        try {
+            const updated = await instanceService.syncInstancePidAndQuota(instanceId);
+            set(state => ({
+                instances: state.instances.map(inst =>
+                    inst.config.id === instanceId ? updated : inst
+                ),
+            }));
+            const { useAccountStore } = await import('./useAccountStore');
+            await Promise.all([
+                get().fetchInstances(true),
+                useAccountStore.getState().fetchAccounts(),
+                useAccountStore.getState().fetchCurrentAccount(),
+            ]);
+            showToast(`Synchronized PID & quota for instance '${updated?.config?.name || instanceId}'`, 'success');
+        } catch (err: any) {
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.syncInstance' });
+            showToast(`Sync failed: ${err?.message || err}`, 'error');
+            throw err;
+        }
+    },
+
+    syncAllInstances: async () => {
+        try {
+            const updatedList = await instanceService.syncAllInstancesAndQuotas();
+            if (updatedList && updatedList.length > 0) {
+                set({ instances: updatedList });
+            }
+            const { useAccountStore } = await import('./useAccountStore');
+            await Promise.all([
+                get().fetchInstances(true),
+                useAccountStore.getState().fetchAccounts(),
+                useAccountStore.getState().fetchCurrentAccount(),
+            ]);
+            showToast(`Synchronized PID & quota across all instances`, 'success');
+        } catch (err: any) {
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.syncAllInstances' });
+            showToast(`Sync all failed: ${err?.message || err}`, 'error');
+            throw err;
+        }
+    },
 }));
+

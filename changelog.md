@@ -1,5 +1,23 @@
 # Changelog
 
+## [v4.129.0] - 2026-10-03
+
+### Added
+- **Instance Action Toolbar Audit Option**: Added a dedicated `Audit` button to the bottom action row on instance cards and table view pill capsules, opening the new `InstanceAuditTrailModal`. (Thanks to @aukgit)
+- **Interactive Instance Switch History Modal**: Displays total switch counts, the last 2–3 account transitions (`From Account` → `To Account` with click-to-unmask toggle), duration, trigger reasons, and raw fact payloads. (Thanks to @aukgit)
+- **Multi-Step Switch Lifecycle Tracking**: Instrumented account rotation and instance switching to track 4 explicit verified steps in SQLite:
+  1. *Prompts Backup*: Active workspace projects captured, prompt counts, and backup batch IDs.
+  2. *Account Reset*: Safe process termination (PIDs), lock cleanup, and authentication credential injection.
+  3. *Prompts Restore*: Resume task generation (`.antigravity_resume_task.json`), channel stabilization, and prompt re-injection.
+  4. *Post-Restore Verification*: Verification check confirming prompt files and active session restoration succeeded. (Thanks to @aukgit)
+- **Live PID Detection & Quota Synchronization Engine**: Added user-initiated `Sync` button on instance cards and top toolbar to detect running Antigravity PIDs, read authenticated accounts from `state.vscdb`, reconcile bindings, and refresh real-time Gemini credits and quotas. (Thanks to @aukgit)
+- **10-Minute Periodic Quota Sync Scheduler**: Implemented a background scheduler (`start_instance_pid_quota_scheduler`) running every 600s to keep running instance PIDs and credit balances fresh automatically. (Thanks to @aukgit)
+
+### Fixed
+- Fixed default instance switch audit tracking to prevent uncompleted `AuditTask` drops and ensure the canonical `"default"` instance ID is recorded across split history databases and `hot_tasks_cache`. (Thanks to @aukgit)
+
+---
+
 ## [v4.128.1] - 2026-10-03
 
 ### Fixed
@@ -286,6 +304,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.129.0 (2026-10-03)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.128.1 (2026-10-03)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

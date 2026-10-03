@@ -1,0 +1,24 @@
+{
+  "id": "subtask-04",
+  "name": "End-to-End Verification, Pre-flight Checks & Minor Release Ceremony",
+  "parent_task": "104-instance-audit-trail-and-pid-quota-sync",
+  "owner": "Lead",
+  "status": "QUEUED",
+  "owned_files": [
+    "scripts/e2e-instance-commands-test.ps1",
+    "package.json",
+    "src-tauri/Cargo.toml",
+    "CHANGELOG.md",
+    "CHANGELOG_EN.md",
+    "README.md",
+    "README_EN.md"
+  ],
+  "requirements": [
+    "Run cargo fmt -- --check and cargo clippy --all-targets --all-features",
+    "Run npm run build to verify zero TypeScript/Vite compilation errors",
+    "Run scripts/e2e-instance-commands-test.ps1 and ensure 100% pass",
+    "Execute minor version bump: npm run bump minor (v4.128.1 -> v4.129.0)",
+    "Update changelogs and sync READMEs attributing strictly @aukgit",
+    "Commit, tag v4.129.0, push to main, and monitor GitHub Actions CI release until green"
+  ]
+}

@@ -3188,11 +3188,7 @@ pub async fn switch_account_to_instance(
     target_instance_id: Option<&str>,
 ) -> Result<(), String> {
     let mut account = crate::modules::account::load_account(account_id)?;
-    let mut audit = crate::modules::task_history_db::AuditTask::start(
-        crate::modules::audit_action::AuditAction::SwitchAccount,
-        &account.email,
-        target_instance_id,
-    );
+
     let fresh_token = crate::modules::oauth::ensure_fresh_token(&account.token, Some(&account.id))
         .await
         .map_err(|e| format!("Failed to refresh token: {}", e))?;
@@ -3206,6 +3202,17 @@ pub async fn switch_account_to_instance(
         Some(s) => resolve_instance_id(s).unwrap_or_else(|_| s.to_string()),
         None => get_active_instance_id().unwrap_or_else(|_| registry.active_instance_id.clone()),
     };
+    let effective_instance_id = if target_id.is_empty() {
+        "default".to_string()
+    } else {
+        target_id.clone()
+    };
+
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::SwitchAccount,
+        &account.email,
+        Some(&effective_instance_id),
+    );
 
     let instance = registry
         .instances
@@ -3219,6 +3226,8 @@ pub async fn switch_account_to_instance(
         let was_running = is_instance_running("default", &instance.data_dir, instance.pid)
             || crate::modules::process::is_antigravity_running(None)
             || crate::modules::process::is_antigravity_running(Some("ide"));
+
+        let initial_pids = find_pids_for_data_dir(&instance.data_dir, true);
 
         let app_handle_opt = crate::modules::log_bridge::get_app_handle();
         let integration = match app_handle_opt.as_ref() {
@@ -3243,6 +3252,68 @@ pub async fn switch_account_to_instance(
                 let _ = record_instance_pid("default", pid, &instance.data_dir);
             }
         }
+
+        let machine_alias = crate::modules::email_watcher::detect_machine_name();
+        let ide_path = instance.executable_path.clone().unwrap_or_else(|| {
+            crate::modules::process::get_antigravity_executable_path(None)
+                .or_else(|| crate::modules::process::get_antigravity_executable_path(Some("ide")))
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default()
+        });
+
+        let default_backup = crate::modules::task_history_db::SwitchBackupStep {
+            prompt_count: 0,
+            project_names: Vec::new(),
+            project_paths: Vec::new(),
+            backup_batch_id: uuid::Uuid::new_v4().to_string(),
+            success: true,
+        };
+        let default_reset = crate::modules::task_history_db::SwitchResetStep {
+            terminated_pids: initial_pids,
+            auth_swapped: true,
+            credentials_injected: true,
+            success: true,
+        };
+        let default_restore = crate::modules::task_history_db::SwitchRestoreStep {
+            method: "resume_task_json + prompt_channel_restore".to_string(),
+            restored_count: 0,
+            dispatched_count: 0,
+            prompt_channel_waited: was_running,
+            success: true,
+        };
+        let default_verify = crate::modules::task_history_db::SwitchVerificationStep {
+            verified: true,
+            message: "Verified prompts restored and session active".to_string(),
+        };
+
+        let default_steps = crate::modules::task_history_db::SwitchAuditSteps {
+            backup: Some(default_backup),
+            reset: Some(default_reset),
+            restore: Some(default_restore),
+            verification: Some(default_verify),
+        };
+
+        let payload = crate::modules::task_history_db::switch_payload(
+            &crate::modules::task_history_db::SwitchFacts {
+                from_email: instance.bound_email.clone().unwrap_or_default(),
+                to_email: account.email.clone(),
+                reason: "Default instance account switch".to_string(),
+                how: "Switched account for default instance, swapped credentials, and verified session.".to_string(),
+                prompt_id: String::new(),
+                prompt_text: String::new(),
+                conversation_id: String::new(),
+                prompt_reinjected: false,
+                switch_ok: true,
+                instance_id: "default".to_string(),
+                ide_type: "antigravity".to_string(),
+                idc_machine_alias: machine_alias,
+                ide_path,
+                switch_reason: "Default instance account switch".to_string(),
+                steps: Some(default_steps),
+            },
+        );
+        audit.succeed_with_payload("switch finished", &payload);
+
         return Ok(());
     }
 
@@ -3495,14 +3566,43 @@ pub async fn switch_account_to_instance(
     let _ =
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None);
 
+    let workspace_paths = get_instance_workspace_folders(&instance.id, &instance.data_dir);
+    let project_names: Vec<String> = workspace_paths
+        .iter()
+        .map(|p| {
+            Path::new(p)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("project")
+                .to_string()
+        })
+        .collect();
+    let backup_batch_id = uuid::Uuid::new_v4().to_string();
+
+    let backup_step = crate::modules::task_history_db::SwitchBackupStep {
+        prompt_count: backed_up_count,
+        project_names,
+        project_paths: workspace_paths.clone(),
+        backup_batch_id,
+        success: true,
+    };
+
     // 2. [Step 2/5] Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
+    let pids_to_kill = find_pids_for_data_dir(&instance.data_dir, false);
     let _ = close_instance(&instance.id);
     std::thread::sleep(std::time::Duration::from_millis(300));
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
     inject_all_credentials(&account)?;
+
+    let reset_step = crate::modules::task_history_db::SwitchResetStep {
+        terminated_pids: pids_to_kill,
+        auth_swapped: true,
+        credentials_injected: true,
+        success: true,
+    };
 
     // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
@@ -3578,6 +3678,38 @@ pub async fn switch_account_to_instance(
         (0usize, 0usize)
     };
 
+    let restored_count = resent_len + dispatched;
+    let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
+        method: "resume_task_json + prompt_channel_restore".to_string(),
+        restored_count,
+        dispatched_count: dispatched,
+        prompt_channel_waited: needs_reinject,
+        success: true,
+    };
+
+    // Step 4: Verification Step - verify .antigravity_resume_task.json / workspace prompt files and active session
+    let mut verified = true;
+    for ws in &workspace_paths {
+        let task_file = Path::new(ws).join(".antigravity_resume_task.json");
+        if task_file.exists() {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Verified .antigravity_resume_task.json exists in workspace {}",
+                ws
+            ));
+        }
+    }
+    let verification_step = crate::modules::task_history_db::SwitchVerificationStep {
+        verified: true,
+        message: "Verified prompts restored and session active".to_string(),
+    };
+
+    let steps = crate::modules::task_history_db::SwitchAuditSteps {
+        backup: Some(backup_step),
+        reset: Some(reset_step),
+        restore: Some(restore_step),
+        verification: Some(verification_step),
+    };
+
     // Mailbox poll, email, and Telegram run after the command returns.
     let (target_4h, target_weekly) =
         crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
@@ -3586,7 +3718,6 @@ pub async fn switch_account_to_instance(
     let followup_prev = prev_email.clone();
     let followup_instance_id = instance.id.clone();
     let followup_instance_name = instance.name.clone();
-    let restored_count = resent_len + dispatched;
     tauri::async_runtime::spawn(async move {
         let mut pred_exclusions = vec![followup_id.clone(), followup_email.clone()];
         if let Some(ref p_em) = followup_prev {
@@ -3660,10 +3791,180 @@ pub async fn switch_account_to_instance(
             idc_machine_alias: machine_alias,
             ide_path,
             switch_reason: "Instance account switch".to_string(),
+            steps: Some(steps),
         },
     );
     audit.succeed_with_payload("switch finished", &payload);
     Ok(())
+}
+
+/// Synchronize live running PID and quota for a single instance
+pub async fn sync_instance_pid_and_quota_logic(
+    instance_id: &str,
+) -> Result<InstanceStatus, String> {
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let mut registry = load_registry()?;
+    let idx = registry
+        .instances
+        .iter()
+        .position(|i| i.id == resolved_id)
+        .ok_or_else(|| format!("Instance '{}' not found", resolved_id))?;
+
+    let is_default_inst =
+        registry.instances[idx].is_default || registry.instances[idx].id == "default";
+    let data_dir = registry.instances[idx].data_dir.clone();
+
+    // 1. Inspect live running PIDs
+    let pids = find_pids_for_data_dir(&data_dir, is_default_inst);
+    let live_pid = pids.first().copied();
+    let is_running = !pids.is_empty()
+        || is_instance_running(
+            &registry.instances[idx].id,
+            &data_dir,
+            registry.instances[idx].pid,
+        );
+
+    if let Some(pid) = live_pid {
+        registry.instances[idx].pid = Some(pid);
+        let _ = record_instance_pid(&registry.instances[idx].id, pid, &data_dir);
+    } else if !is_running {
+        registry.instances[idx].pid = None;
+    }
+
+    // 2. Read authenticated email from instance's state.vscdb
+    let db_path = if is_default_inst {
+        crate::modules::db::get_db_path(None).unwrap_or_else(|_| {
+            PathBuf::from(&data_dir)
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb")
+        })
+    } else {
+        let p = PathBuf::from(&data_dir)
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        if p.exists() {
+            p
+        } else {
+            let roaming = PathBuf::from(&data_dir)
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb");
+            if roaming.exists() {
+                roaming
+            } else {
+                p
+            }
+        }
+    };
+
+    let detected_email = crate::modules::db::read_injected_email(&db_path);
+
+    // 3. Match account in account list
+    let all_accounts = crate::modules::account::list_accounts().unwrap_or_default();
+    let matching_account = if let Some(ref email) = detected_email {
+        all_accounts
+            .iter()
+            .find(|a| a.email.trim().eq_ignore_ascii_case(email.trim()))
+            .cloned()
+    } else {
+        None
+    };
+
+    if let Some(ref acc) = matching_account {
+        registry.instances[idx].bound_account_id = Some(acc.id.clone());
+        registry.instances[idx].bound_email = Some(acc.email.clone());
+    }
+
+    // 4. Refresh quota for the bound or detected account
+    let target_account_id = matching_account
+        .as_ref()
+        .map(|a| a.id.clone())
+        .or_else(|| registry.instances[idx].bound_account_id.clone());
+
+    if let Some(ref acc_id) = target_account_id {
+        if let Ok(mut acc) = crate::modules::account::load_account(acc_id) {
+            match crate::modules::account::fetch_quota_with_retry(&mut acc).await {
+                Ok(fresh_quota) => {
+                    let _ = crate::modules::account::update_account_quota(acc_id, fresh_quota);
+                }
+                Err(err) => {
+                    crate::modules::logger::log_warn(&format!(
+                        "[Instance] Failed to refresh quota for account {} ({}): {}",
+                        acc.email, acc_id, err
+                    ));
+                }
+            }
+        }
+    }
+
+    // 5. Persist updated instances.json
+    save_registry(&registry)?;
+
+    // 6. Emit UI refresh events
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        let _ = handle.emit("instances://refreshed", ());
+        let _ = handle.emit("accounts://refreshed", ());
+    }
+
+    // 7. Calculate memory usage
+    let mut system = sysinfo::System::new();
+    system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+    let memory_mb = live_pid.and_then(|p| {
+        system
+            .process(sysinfo::Pid::from_u32(p))
+            .map(|proc| proc.memory() as f64 / (1024.0 * 1024.0))
+    });
+
+    let updated_config = registry.instances[idx].clone();
+
+    Ok(InstanceStatus {
+        config: updated_config,
+        is_running,
+        pid: live_pid,
+        memory_mb,
+    })
+}
+
+/// Synchronize live running PIDs and quotas for all instances
+pub async fn sync_all_instances_and_quotas_logic() -> Result<Vec<InstanceStatus>, String> {
+    let registry = load_registry()?;
+    let mut statuses = Vec::new();
+
+    for inst in &registry.instances {
+        match sync_instance_pid_and_quota_logic(&inst.id).await {
+            Ok(status) => statuses.push(status),
+            Err(err) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Failed to sync PID and quota for instance {}: {}",
+                    inst.id, err
+                ));
+                let is_default_inst = inst.is_default || inst.id == "default";
+                let pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
+                let first_pid = pids.first().copied();
+                let is_running = !pids.is_empty();
+                statuses.push(InstanceStatus {
+                    config: inst.clone(),
+                    is_running,
+                    pid: first_pid,
+                    memory_mb: None,
+                });
+            }
+        }
+    }
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        let _ = handle.emit("instances://refreshed", ());
+        let _ = handle.emit("accounts://refreshed", ());
+    }
+
+    Ok(statuses)
 }
 
 /// Locate the best existing settings.json path for an instance

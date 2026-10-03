@@ -3,6 +3,8 @@ import {
     Play,
     Square,
     RotateCcw,
+    RotateCw,
+    History,
     Zap,
     SlidersHorizontal,
     Copy,
@@ -24,6 +26,9 @@ interface InstanceTableProps {
     onStop: (id: string) => void;
     onSwitch: (id: string) => void;
     onFastForward: (id: string) => void;
+    onAudit?: (id: string, name: string) => void;
+    onSync?: (id: string) => void;
+    syncingInstanceIds?: Record<string, boolean>;
     onSettings: (id: string) => void;
     onClone: (id: string, name: string) => void;
     onDelete: (id: string) => void;
@@ -32,6 +37,7 @@ interface InstanceTableProps {
     onSetDefault?: (id: string) => void;
 }
 
+
 export default function InstanceTable({
     instances,
     activeInstanceId,
@@ -39,6 +45,9 @@ export default function InstanceTable({
     onStop,
     onSwitch,
     onFastForward,
+    onAudit,
+    onSync,
+    syncingInstanceIds,
     onSettings,
     onClone,
     onDelete,
@@ -284,6 +293,30 @@ export default function InstanceTable({
                                             >
                                                 <Zap className="w-3 h-3 fill-current" />
                                             </button>
+
+                                            {onAudit && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onAudit(inst.config.id, inst.config.name)}
+                                                    className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                                    title="Audit Trail"
+                                                >
+                                                    <History className="w-3 h-3" />
+                                                </button>
+                                            )}
+
+                                            {onSync && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSync(inst.config.id)}
+                                                    disabled={Boolean(syncingInstanceIds?.[inst.config.id])}
+                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                    title="Sync PID and Quota"
+                                                >
+                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds?.[inst.config.id] && "animate-spin")} />
+                                                </button>
+                                            )}
+
 
                                             <button
                                                 type="button"

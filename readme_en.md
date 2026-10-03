@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.128.1)
+> Professional AI Account Management & Protocol Proxy System (v4.129.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.128.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.129.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.128.1**: Rust compilation and type alignment fixes, Supabase workspace lease & lock table, uniform accounts segmented pill capsule toolbar, audit pagination with two-tier SQLite cache, first-class Supabase tab, and instance card/list view modes.
+> Latest version **v4.129.0**: Per-instance audit option and switch history modal with 4-step execution lifecycle (prompts backup, reset, restore, verification), live PID detection, on-demand and 10-minute periodic quota and account sync engine, and instance action toolbar enhancements.
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

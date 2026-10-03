@@ -1,0 +1,20 @@
+{
+  "id": "subtask-01",
+  "name": "Backend Multi-Step Lifecycle Instrumentation & Audit Trail Queries",
+  "parent_task": "104-instance-audit-trail-and-pid-quota-sync",
+  "owner": "Worker-01",
+  "status": "COMPLETED",
+  "owned_files": [
+    "src-tauri/src/modules/task_history_db.rs",
+    "src-tauri/src/modules/instance.rs",
+    "src-tauri/src/commands/instance.rs",
+    "src-tauri/src/lib.rs"
+  ],
+  "requirements": [
+    "Define SwitchAuditSteps, SwitchBackupStep, SwitchResetStep, SwitchRestoreStep, SwitchVerificationStep, InstanceSwitchRecord, and InstanceSwitchHistoryResponse in task_history_db.rs",
+    "Implement get_instance_switch_history and get_instance_audit_trail functions querying tasks and hot_tasks_cache with instance_id filter",
+    "Instrument switch_account_to_instance in instance.rs to record the 4 explicit steps: backup (projects, counts), reset (PIDs, auth swap), restore (injection, method), verification (post-restore check)",
+    "Fix default instance audit tracking so instance_id is recorded as 'default' rather than empty and AuditTask is never dropped with false failure",
+    "Register get_instance_switch_history and get_instance_audit_trail in commands/instance.rs and lib.rs"
+  ]
+}

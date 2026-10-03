@@ -562,6 +562,10 @@ pub fn run() {
                     // Start prompt queue scheduler daemon (10-minute ticker)
                     modules::scheduler::start_prompt_queue_scheduler();
                     info!("Prompt queue scheduler daemon started in headless mode.");
+
+                    // Start instance PID and quota scheduler daemon (10-minute ticker)
+                    modules::scheduler::start_instance_pid_quota_scheduler();
+                    info!("Instance PID and quota scheduler daemon started in headless mode.");
                 }
                 Err(e) => {
                     error!("Failed to load config for headless mode: {}", e);
@@ -744,6 +748,10 @@ pub fn run() {
             // Start prompt queue scheduler daemon (10-minute ticker)
             modules::scheduler::start_prompt_queue_scheduler();
             info!("Prompt queue scheduler daemon initialized.");
+
+            // Start instance PID and quota scheduler daemon (10-minute ticker)
+            modules::scheduler::start_instance_pid_quota_scheduler();
+            info!("Instance PID and quota scheduler daemon initialized.");
 
             // Start auto profile switcher daemon
             modules::auto_switcher::start_auto_switcher();
@@ -1046,6 +1054,10 @@ pub fn run() {
             commands::assign_project_to_instance,
             commands::get_instance_workspace_folders,
             commands::get_project_conversation_tree,
+            commands::get_instance_switch_history,
+            commands::get_instance_audit_trail,
+            commands::sync_instance_pid_and_quota,
+            commands::sync_all_instances_and_quotas,
             // Email and Mailbox Management commands
             commands::get_email_settings,
             commands::save_email_settings,

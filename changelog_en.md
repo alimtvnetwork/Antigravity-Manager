@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.129.0 (2026-10-03)**:
+        -   **[Audit & History] Instance Action Toolbar Audit Option & Switch History Modal**:
+            -   **Description**: Added a dedicated `Audit` button to instance card action toolbars and list view pill capsules opening the new `InstanceAuditTrailModal` to display total switch counts, the last 2–3 account transitions (`From Account` → `To Account`), reasons, timestamps, and full payloads. (Thanks to @aukgit)
+        -   **[Core & Lifecycle] Multi-Step Switch Lifecycle Tracking**:
+            -   **Description**: Instrumented instance rotation with 4 explicit verified steps in SQLite: 1) Prompts backup (projects captured, prompt count), 2) Process reset (terminated PIDs, lock cleanup, auth swap), 3) Prompts restore (resume task generation, channel stabilization), 4) Post-restore verification confirming active session restoration succeeded. (Thanks to @aukgit)
+        -   **[Sync & Quotas] Live PID Detection & 10-Minute Quota Sync Engine**:
+            -   **Description**: Added user-facing `Sync` button on instance cards and top toolbar to detect live running Antigravity PIDs, read authenticated accounts from `state.vscdb`, update bindings, and fetch fresh Gemini quotas, complemented by an automatic 10-minute background scheduler daemon. (Thanks to @aukgit)
+        -   **[Fix] Default Instance Switch Audit Invariants**:
+            -   **Description**: Resolved early drop bug during default instance rotation to ensure audit tasks complete cleanly with canonical `"default"` instance ID recorded in history. (Thanks to @aukgit)
+
     *   **v4.128.1 (2026-10-03)**:
         -   **[Build & Core] Rust Compilation Fixes & Type Alignment**:
             -   **Description**: Fixed Rust compilation errors in `instance.rs` and `account.rs` by properly converting `get_antigravity_executable_path` `PathBuf` to `String`, resolved `cannot move out of type AuditTask` in `task_history_db.rs` by cloning `task.id`, and enhanced CLI E2E test parsing. (Thanks to @aukgit)

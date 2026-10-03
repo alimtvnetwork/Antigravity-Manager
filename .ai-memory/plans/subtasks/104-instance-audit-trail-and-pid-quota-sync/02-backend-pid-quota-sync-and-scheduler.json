@@ -1,0 +1,20 @@
+{
+  "id": "subtask-02",
+  "name": "Live PID Detection, Account Discovery & 10-Minute Quota Sync Engine",
+  "parent_task": "104-instance-audit-trail-and-pid-quota-sync",
+  "owner": "Worker-01",
+  "status": "COMPLETED",
+  "owned_files": [
+    "src-tauri/src/modules/instance.rs",
+    "src-tauri/src/modules/scheduler.rs",
+    "src-tauri/src/commands/instance.rs",
+    "src-tauri/src/lib.rs"
+  ],
+  "requirements": [
+    "Implement sync_instance_pid_and_quota_logic in instance.rs: detect live running PID via find_pids_for_data_dir/is_instance_running, read active authenticated account email from state.vscdb via db::read_injected_email, reconcile bound account, and refresh quota via account::fetch_quota_with_retry",
+    "Implement sync_all_instances_and_quotas_logic in instance.rs iterating across all instances",
+    "Expose sync_instance_pid_and_quota and sync_all_instances_and_quotas commands in commands/instance.rs and lib.rs",
+    "Add start_instance_pid_quota_scheduler in scheduler.rs running every 600s (10 minutes) to keep running instances, PIDs, and credits updated automatically",
+    "Initialize the 10-minute scheduler in lib.rs"
+  ]
+}

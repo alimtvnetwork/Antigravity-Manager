@@ -439,3 +439,40 @@ pub fn start_prompt_queue_scheduler() {
         }
     });
 }
+
+/// Start instance PID and quota synchronization scheduler that runs every 10 minutes (600s).
+/// Inspects live running PIDs, matches active authenticated accounts from instance storage,
+/// and synchronizes real-time Gemini quotas and credits across all instances.
+pub fn start_instance_pid_quota_scheduler() {
+    tokio::spawn(async move {
+        logger::log_info(
+            "[InstancePidQuotaScheduler] Background 10-minute instance PID & quota scheduler initialized.",
+        );
+        // Quiet delay after startup
+        tokio::time::sleep(Duration::from_secs(35)).await;
+
+        let mut interval = time::interval(Duration::from_secs(600));
+        interval.tick().await; // consume initial tick
+
+        loop {
+            interval.tick().await;
+            logger::log_info(
+                "[InstancePidQuotaScheduler] Running 10-minute instance PID and quota sync cycle...",
+            );
+            match crate::modules::instance::sync_all_instances_and_quotas_logic().await {
+                Ok(statuses) => {
+                    logger::log_info(&format!(
+                        "Periodic 10-minute instance PID and quota sync completed ({} instances inspected)",
+                        statuses.len()
+                    ));
+                }
+                Err(err) => {
+                    logger::log_warn(&format!(
+                        "[InstancePidQuotaScheduler] Periodic instance PID and quota sync failed: {}",
+                        err
+                    ));
+                }
+            }
+        }
+    });
+}

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../stores/error-store';
 import type { Account } from '../types/account';
+import type { InstanceSwitchHistoryResponse } from '../types/audit';
 import { parseFlexibleDate } from '../utils/format';
 
 export interface InstanceConfig {
@@ -772,3 +773,64 @@ export function pickBestCandidateAccount(
 }
 
 export const selectNextBestProfile = findBestRotationProfile;
+
+export async function getInstanceSwitchHistory(
+    instanceId: string,
+    limit: number = 5
+): Promise<InstanceSwitchHistoryResponse> {
+    try {
+        return await invoke('get_instance_switch_history', { instanceId, limit });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.getInstanceSwitchHistory',
+            endpoint: 'get_instance_switch_history',
+            triggerAction: 'get_instance_switch_history',
+            context: { instanceId, limit },
+        });
+        throw e;
+    }
+}
+
+export async function getInstanceAuditTrail(
+    instanceId: string,
+    limit: number = 50
+): Promise<any[]> {
+    try {
+        return await invoke('get_instance_audit_trail', { instanceId, limit });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.getInstanceAuditTrail',
+            endpoint: 'get_instance_audit_trail',
+            triggerAction: 'get_instance_audit_trail',
+            context: { instanceId, limit },
+        });
+        throw e;
+    }
+}
+
+export async function syncInstancePidAndQuota(instanceId: string): Promise<InstanceStatus> {
+    try {
+        return await invoke('sync_instance_pid_and_quota', { instanceId });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.syncInstancePidAndQuota',
+            endpoint: 'sync_instance_pid_and_quota',
+            triggerAction: 'sync_instance_pid_and_quota',
+            context: { instanceId },
+        });
+        throw e;
+    }
+}
+
+export async function syncAllInstancesAndQuotas(): Promise<InstanceStatus[]> {
+    try {
+        return await invoke('sync_all_instances_and_quotas');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.syncAllInstancesAndQuotas',
+            endpoint: 'sync_all_instances_and_quotas',
+            triggerAction: 'sync_all_instances_and_quotas',
+        });
+        throw e;
+    }
+}
