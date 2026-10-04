@@ -1,0 +1,69 @@
+[
+  {
+    "taskCode": "Task-01",
+    "title": "Architecture Specification Component Spec and RCA",
+    "description": "Author 01-architecture-spec.md, 02-component-spec.md, 03-root-cause-analysis.md, master plan, and subtasks",
+    "assignedAgentRole": "Lead",
+    "ownedFiles": [
+      "02-spec/21-app/129-antigravity-ide-full-deploy-and-gitmap-delegation/01-architecture-spec.md",
+      "02-spec/21-app/129-antigravity-ide-full-deploy-and-gitmap-delegation/02-component-spec.md",
+      "02-spec/21-app/129-antigravity-ide-full-deploy-and-gitmap-delegation/03-root-cause-analysis.md",
+      ".ai-memory/plans/129-antigravity-ide-full-deploy-and-gitmap-delegation.md"
+    ]
+  },
+  {
+    "taskCode": "Task-02",
+    "title": "Default Instance Theme Presets Plugins and Skills Inventory and Extraction",
+    "description": "Inspect and extract Default instance workbench.colorTheme, custom_theme_mode, plugins, skills, and configuration layout",
+    "assignedAgentRole": "Worker 01",
+    "ownedFiles": [
+      "src-tauri/src/modules/instance.rs"
+    ]
+  },
+  {
+    "taskCode": "Task-03",
+    "title": "Standalone PowerShell Full Deployment Script in repo-secrets",
+    "description": "Author deploy-antigravity-ide-fleet.ps1 in repo-secrets and local deployment script for zero-touch setup on any machine",
+    "assignedAgentRole": "Worker 01",
+    "ownedFiles": [
+      "scripts/deploy-antigravity-ide-fleet.ps1"
+    ]
+  },
+  {
+    "taskCode": "Task-04",
+    "title": "GitMap CLI Remote Delegation Command and Recipe Integration",
+    "description": "Modify gitmap delegation recipe/script to support delegating full Antigravity IDE deployment to remote machines via gitmap",
+    "assignedAgentRole": "Worker 02",
+    "ownedFiles": [
+      "src-tauri/src/modules/gitmap.rs"
+    ]
+  },
+  {
+    "taskCode": "Task-05",
+    "title": "Antigravity Manager Copy Instance Theme Presets Plugins and Skills Parity",
+    "description": "Update copy_instance_with_options and sync_instance_settings to faithfully copy theme, presets, plugins, and skills",
+    "assignedAgentRole": "Worker 02",
+    "ownedFiles": [
+      "src-tauri/src/modules/instance.rs",
+      "src/pages/Instances.tsx"
+    ]
+  },
+  {
+    "taskCode": "Task-06",
+    "title": "Verification and End-to-End Deployment Simulation Suite",
+    "description": "Verify script deployment, theme and plugin preservation, skills copying, and gitmap delegation recipes",
+    "assignedAgentRole": "Worker 02",
+    "ownedFiles": [
+      "scratch/verify_ide_deployment.py"
+    ]
+  },
+  {
+    "taskCode": "Task-07",
+    "title": "Plan Consolidation and Single Atomic GitMap Push",
+    "description": "Consolidate plan into completed plans folder, update spec/plan indexes, check secrets gate, and commit push via gitmap cpf",
+    "assignedAgentRole": "Lead",
+    "ownedFiles": [
+      ".ai-memory/plans/completed/129-antigravity-ide-full-deploy-and-gitmap-delegation.md"
+    ]
+  }
+]
