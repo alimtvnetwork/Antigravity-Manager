@@ -7,7 +7,7 @@ target_files:
   - src/pages/Instances.tsx
   - src/components/instances/PromptTreeViewModal.tsx
   - src-tauri/tests/per_instance_prompt_liveness_test.rs
-status: pending
+status: completed
 ---
 
 # 02 — Frontend Status Logic Remediation & Per-Instance E2E Test Verification
@@ -140,10 +140,10 @@ cd src-tauri && cargo clippy --all-targets --all-features
 
 ## 4. Acceptance Criteria Checklist
 
-- [ ] **AC-1**: `src/pages/Instances.tsx` has zero references to `c.status === 'RUNNING'`.
-- [ ] **AC-2**: `src/components/instances/PromptTreeViewModal.tsx` has zero references to `c.status === 'RUNNING'`.
-- [ ] **AC-3**: Default profile running `Antigravity-Manager` displays a running badge strictly on `Antigravity-Manager`; `SpecBuilder` and `coding-guidelines` display as idle.
-- [ ] **AC-4**: Instance 8159 running `coding-guidelines` displays a running badge strictly on `coding-guidelines`; `Antigravity-Manager` and `SpecBuilder` display as idle.
-- [ ] **AC-5**: Any stopped instance (`is_running == false`) immediately and unconditionally evaluates all projects to idle with `INSTANCE_PROCESS_DEAD` rationale.
-- [ ] **AC-6**: Active AGY workers in one instance never bleed into running status of another instance.
-- [ ] **AC-7**: All integration tests in `src-tauri/tests/per_instance_prompt_liveness_test.rs` pass cleanly.
+- [x] **AC-1**: `src/pages/Instances.tsx` has zero references to `c.status === 'RUNNING'`.
+- [x] **AC-2**: `src/components/instances/PromptTreeViewModal.tsx` has zero references to `c.status === 'RUNNING'`.
+- [x] **AC-3**: Default profile running `Antigravity-Manager` displays a running badge strictly on `Antigravity-Manager`; `SpecBuilder` and `coding-guidelines` display as idle.
+- [x] **AC-4**: Instance 8159 running `coding-guidelines` displays a running badge strictly on `coding-guidelines`; `Antigravity-Manager` and `SpecBuilder` display as idle.
+- [x] **AC-5**: Any stopped instance (`is_running == false`) immediately and unconditionally evaluates all projects to idle with `INSTANCE_PROCESS_DEAD` rationale.
+- [x] **AC-6**: Active AGY workers in one instance never bleed into running status of another instance.
+- [x] **AC-7**: All integration tests in `src-tauri/tests/per_instance_prompt_liveness_test.rs` pass cleanly.
