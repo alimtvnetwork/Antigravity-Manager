@@ -80,7 +80,7 @@ DIST_DIR="dist_dmg_${ARCH_ARG}"
 # Staging cleanup trap
 trap 'rm -rf "$DIST_DIR"' EXIT
 
-echo "📦 Starting DMG package build (with quarantine fix script)..."
+echo "📦 Starting DMG package build (with quarantine fix scripts & installer)..."
 echo "Version     : $VERSION"
 echo "Architecture: $ARCH_ARG"
 
@@ -136,22 +136,72 @@ cp -R "$SRC_APP_PATH" "$DIST_DIR/"
 
 TARGET_BUNDLE="$DIST_DIR/$(basename "$SRC_APP_PATH")"
 
-# Strip quarantine and apply ad-hoc code signature to bundle in staging directory
+# Strip quarantine, provenance, and apply ad-hoc code signature to bundle in staging directory
 echo "Stripping quarantine and applying ad-hoc signature to staging bundle..."
 xattr -cr "$TARGET_BUNDLE" 2>/dev/null || true
-xattr -d com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
-find "$TARGET_BUNDLE" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
-if command -v codesign &>/dev/null; then
+xattr -rd com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
+xattr -rd com.apple.provenance "$TARGET_BUNDLE" 2>/dev/null || true
+find "$TARGET_BUNDLE" -exec xattr -c {} + 2>/dev/null || true
+macos_major=0
+if command -v sw_vers &>/dev/null; then
+    macos_major=$(sw_vers -productVersion | cut -d. -f1)
+fi
+if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
     codesign --force --deep --sign - "$TARGET_BUNDLE" 2>/dev/null || true
 fi
 
-# 4. Copy and configure Fix_Damaged.command
-echo "Including Fix_Damaged.command in DMG root..."
-chmod +x "scripts/Fix_Damaged.command"
-cp "scripts/Fix_Damaged.command" "$DIST_DIR/"
-chmod +x "$DIST_DIR/Fix_Damaged.command"
-xattr -cr "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
-xattr -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
+# 4. Copy and configure Install_Or_Repair.command, Fix_Damaged.command, and fix_app.sh
+echo "Including Install_Or_Repair.command, Fix_Damaged.command, and fix_app.sh in DMG root..."
+if [ -f "scripts/Install_Or_Repair.command" ]; then
+    cp "scripts/Install_Or_Repair.command" "$DIST_DIR/Install_Or_Repair.command"
+    chmod +x "$DIST_DIR/Install_Or_Repair.command"
+    xattr -cr "$DIST_DIR/Install_Or_Repair.command" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$DIST_DIR/Install_Or_Repair.command" 2>/dev/null || true
+
+    # Provide 1-Click alias so it sorts first in Finder window
+    cp "scripts/Install_Or_Repair.command" "$DIST_DIR/1-Click_Install_Or_Repair.command"
+    chmod +x "$DIST_DIR/1-Click_Install_Or_Repair.command"
+    xattr -cr "$DIST_DIR/1-Click_Install_Or_Repair.command" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$DIST_DIR/1-Click_Install_Or_Repair.command" 2>/dev/null || true
+fi
+
+if [ -f "scripts/Fix_Damaged.command" ]; then
+    cp "scripts/Fix_Damaged.command" "$DIST_DIR/Fix_Damaged.command"
+    chmod +x "$DIST_DIR/Fix_Damaged.command"
+    xattr -cr "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
+
+    # Provide 2-Click alias for repairing trash lockout
+    cp "scripts/Fix_Damaged.command" "$DIST_DIR/2-Click_Fix_Trash_Error.command"
+    chmod +x "$DIST_DIR/2-Click_Fix_Trash_Error.command"
+    xattr -cr "$DIST_DIR/2-Click_Fix_Trash_Error.command" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$DIST_DIR/2-Click_Fix_Trash_Error.command" 2>/dev/null || true
+fi
+
+if [ -f "scripts/fix_app.sh" ]; then
+    cp "scripts/fix_app.sh" "$DIST_DIR/"
+    chmod +x "$DIST_DIR/fix_app.sh"
+    xattr -cr "$DIST_DIR/fix_app.sh" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$DIST_DIR/fix_app.sh" 2>/dev/null || true
+fi
+
+# 5. Optionally build native macOS PKG package with root postinstall script and include inside DMG
+PRIMARY_PKG_NAME="Antigravity.Manager.Tools_${VERSION}_${ARCH_ARG}.pkg"
+if command -v pkgbuild &>/dev/null; then
+    echo "Creating native macOS PKG installer ($PRIMARY_PKG_NAME)..."
+    rm -f "$PRIMARY_PKG_NAME"
+    PKG_ARGS=(--component "$SRC_APP_PATH" --install-location /Applications)
+    if [ -d "scripts/pkg-scripts" ]; then
+        chmod +x scripts/pkg-scripts/* 2>/dev/null || true
+        PKG_ARGS+=(--scripts "scripts/pkg-scripts")
+    fi
+    if pkgbuild "${PKG_ARGS[@]}" "$PRIMARY_PKG_NAME" 2>/dev/null; then
+        echo "✅ Created PKG installer: $PRIMARY_PKG_NAME"
+        cp "$PRIMARY_PKG_NAME" "$DIST_DIR/Install_Antigravity_Manager.pkg" 2>/dev/null || true
+        xattr -cr "$DIST_DIR/Install_Antigravity_Manager.pkg" 2>/dev/null || true
+        xattr -d com.apple.quarantine "$DIST_DIR/Install_Antigravity_Manager.pkg" 2>/dev/null || true
+    fi
+fi
 
 # Include quick installation and troubleshooting guide
 cat << 'EOF' > "$DIST_DIR/Install_Guide.txt"
@@ -160,38 +210,52 @@ cat << 'EOF' > "$DIST_DIR/Install_Guide.txt"
   Antigravity Manager Tools - macOS Installation & Troubleshooting
 ======================================================================
 
-【1. 正常安装 / Normal Installation】
-  拖拽 "Antigravity Manager Tools.app" 图标到 "Applications" 文件夹。
-  Drag "Antigravity Manager Tools.app" into the "Applications" folder.
+【方案一：官方 PKG 安装器 (推荐，彻底免除隔离报错) / Option 1: macOS PKG Installer】
+  双击本目录下的 "Install_Antigravity_Manager.pkg"。
+  通过 macOS 原生系统安装器一键安装，自动配置看门人权限、清理废纸篓锁定并刷新系统注册。
+  Double-click "Install_Antigravity_Manager.pkg" to install via Apple's
+  standard installer wizard with automated permissions & trash self-healing.
 
-【2. 若提示 "已损坏，移到废纸篓" / If prompted "App is damaged / Move to Trash"】
-  双击本 DMG 中的 "Fix_Damaged.command" 脚本即可一键修复隔离属性与权限。
-  Double-click "Fix_Damaged.command" in this folder to clear Gatekeeper quarantine.
+----------------------------------------------------------------------
 
-【3. 若提示 "应用在废纸篓中" / If prompted "... because it is in the Trash"】
-  双击 "Fix_Damaged.command"，脚本会自动清理废纸篓冲突副本并刷新 LaunchServices。
-  Double-click "Fix_Damaged.command" to purge trashed duplicates and refresh LaunchServices.
+【方案二：一键脚本安装与全自动修复 / Option 2: 1-Click Script Installer】
+  双击本目录下的 "1-Click_Install_Or_Repair.command"。
+  脚本将自动解除废纸篓锁定、净化隔离属性、安装到 /Applications 并启动。
+  Double-click "1-Click_Install_Or_Repair.command" to install and launch.
 
-【4. 命令行一键安装 / Terminal One-Line Command】
+----------------------------------------------------------------------
+
+【方案三：手动拖拽安装 / Option 3: Manual Drag-and-Drop Installation】
+  1. 拖拽 "Antigravity Manager Tools.app" 图标到 "Applications" 文件夹。
+     Drag "Antigravity Manager Tools.app" into the "Applications" folder.
+
+  2. 若启动时提示 "已损坏" 或 "因为已将它丢弃到废纸篓"：
+     If prompted "App is damaged" or "... because it is in the Trash":
+     双击本目录下的 "2-Click_Fix_Trash_Error.command" 即可一秒解除锁定。
+     Double-click "2-Click_Fix_Trash_Error.command" in this folder.
+
+----------------------------------------------------------------------
+
+【方案四：终端一键安装命令 / Option 4: Terminal Command】
   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ======================================================================
 EOF
 
-# 5. Create /Applications symlink for drag-and-drop install
+# 6. Create /Applications symlink for drag-and-drop install
 ln -s /Applications "$DIST_DIR/Applications"
 
-# 6. Build DMG with hdiutil
+# 7. Build DMG with hdiutil
 PRIMARY_DMG_NAME="Antigravity.Manager.Tools_${VERSION}_${ARCH_ARG}.dmg"
 echo "Creating DMG image ($PRIMARY_DMG_NAME)..."
 rm -f "$PRIMARY_DMG_NAME"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$PRIMARY_DMG_NAME"
 
-# 7. Strip quarantine from DMG itself
+# 8. Strip quarantine from DMG itself
 echo "Stripping quarantine attributes from output DMG..."
 xattr -d com.apple.quarantine "$PRIMARY_DMG_NAME" 2>/dev/null || true
 xattr -cr "$PRIMARY_DMG_NAME" 2>/dev/null || true
 
-# 8. Place DMG in release bundle directory if present
+# 9. Place DMG and PKG in release bundle directory if present
 BUNDLE_DMG_DIRS=(
     "src-tauri/target/${TARGET_ARG}/release/bundle/dmg"
     "src-tauri/target/${RUST_TARGET}/release/bundle/dmg"
@@ -199,13 +263,17 @@ BUNDLE_DMG_DIRS=(
     "src-tauri/target/${ARCH_ARG}-apple-darwin/release/bundle/dmg"
 )
 for bdd in "${BUNDLE_DMG_DIRS[@]}"; do
-    if [ -n "$bdd" ] && [ -d "$bdd" ]; then
+    if [ -n "$bdd" ]; then
+        mkdir -p "$bdd"
         echo "Updating release bundle directory: $bdd/$PRIMARY_DMG_NAME"
         cp "$PRIMARY_DMG_NAME" "$bdd/$PRIMARY_DMG_NAME"
         xattr -cr "$bdd/$PRIMARY_DMG_NAME" 2>/dev/null || true
+        if [ -f "$PRIMARY_PKG_NAME" ]; then
+            cp "$PRIMARY_PKG_NAME" "$bdd/$PRIMARY_PKG_NAME" 2>/dev/null || true
+        fi
         # Overwrite any unpatched Tauri DMG in the bundle folder
         for existing_dmg in "$bdd"/*.dmg; do
-            if [ -f "$existing_dmg" ] && [ "$existing_dmg" != "$bdd/$PRIMARY_DMG_NAME" ]; then
+            if [ -f "$existing_dmg" ] && [ "$existing_dmg" != "$bdd/$PRIMARY_DMG_NAME" ] && [ "$existing_dmg" != "$bdd/$MANUAL_DMG_NAME" ]; then
                 echo "Replacing unpatched Tauri DMG ($existing_dmg) with patched DMG..."
                 cp "$PRIMARY_DMG_NAME" "$existing_dmg"
                 xattr -cr "$existing_dmg" 2>/dev/null || true
@@ -219,6 +287,7 @@ MANUAL_DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
 cp "$PRIMARY_DMG_NAME" "$MANUAL_DMG_NAME"
 xattr -cr "$MANUAL_DMG_NAME" 2>/dev/null || true
 
-echo "✅ DMG Packaging complete!"
+echo "✅ DMG & PKG Packaging complete!"
 echo "Primary DMG: $PWD/$PRIMARY_DMG_NAME"
 echo "Manual Fix : $PWD/$MANUAL_DMG_NAME"
+[ -f "$PRIMARY_PKG_NAME" ] && echo "Primary PKG: $PWD/$PRIMARY_PKG_NAME"

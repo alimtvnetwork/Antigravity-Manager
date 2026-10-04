@@ -109,9 +109,22 @@ pub fn resolve_default_install_dir(
                     PathBuf::from(".")
                 }
             }
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(target_os = "macos")]
             {
-                PathBuf::from("/Applications/Antigravity Manager Tools.app")
+                let app_dir = PathBuf::from("/Applications");
+                if app_dir.exists() {
+                    app_dir
+                } else {
+                    dirs::home_dir()
+                        .map(|h| h.join("Applications"))
+                        .unwrap_or_else(|| PathBuf::from("/Applications"))
+                }
+            }
+            #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+            {
+                dirs::home_dir()
+                    .map(|h| h.join(".local/bin"))
+                    .unwrap_or_else(|| PathBuf::from("/usr/local/bin"))
             }
         })
 }
@@ -716,6 +729,7 @@ pub fn open_ui(args: &[String]) {
 
     #[cfg(target_os = "macos")]
     {
+        let mut launch_ok = false;
         match Command::new("open").arg(&exe_to_launch).output() {
             Ok(output) => {
                 if output.status.success() {
@@ -723,6 +737,7 @@ pub fn open_ui(args: &[String]) {
                         "[OK] Antigravity Manager UI launched via open: {:?}",
                         exe_to_launch
                     );
+                    launch_ok = true;
                 } else {
                     let err = String::from_utf8_lossy(&output.stderr);
                     eprintln!(
@@ -731,9 +746,53 @@ pub fn open_ui(args: &[String]) {
                         err.trim()
                     );
                     eprintln!(
-                        "[STACK TRACE] Backtrace:\n{:?}",
-                        std::backtrace::Backtrace::capture()
+                        "[STACK TRACE] Diagnostic Backtrace:\n{:?}",
+                        std::backtrace::Backtrace::force_capture()
                     );
+
+                    eprintln!("[RECOVERY] LaunchServices error or trash conflict detected. Purging stale trash references, resetting LaunchServices, and re-registering...");
+                    let _ = Command::new("bash")
+                        .arg("-c")
+                        .arg(r#"
+                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
+                            osascript -e '
+                            tell application "Finder"
+                                try
+                                    set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
+                                    repeat with tItem in tMatches
+                                        try
+                                            move tItem to (POSIX file "/tmp") with replacing
+                                        end try
+                                    end repeat
+                                end try
+                            end tell' 2>/dev/null || true
+                            rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+
+                            find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r ta; do
+                                if [ -n "$ta" ]; then
+                                    [ -n "$lsregister" ] && "$lsregister" -u "$ta" 2>/dev/null || true
+                                    chflags -R nouchg,noschg "$ta" 2>/dev/null || true
+                                    rm -rf "$ta" 2>/dev/null || true
+                                fi
+                            done
+                            if [ -n "$lsregister" ]; then
+                                "$lsregister" -gc 2>/dev/null || true
+                                "$lsregister" -u "$1" 2>/dev/null || true
+                                "$lsregister" -f -r "$1" 2>/dev/null || true
+                                killall launchservicesd Finder Dock 2>/dev/null || true
+                            fi
+                        "#)
+                        .arg("bash")
+                        .arg(&exe_to_launch)
+                        .status();
+
+                    std::thread::sleep(Duration::from_millis(800));
+                    if let Ok(retry_out) = Command::new("open").arg(&exe_to_launch).output() {
+                        if retry_out.status.success() {
+                            println!("[OK] Antigravity Manager UI launched after LaunchServices recovery: {:?}", exe_to_launch);
+                            launch_ok = true;
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -743,8 +802,53 @@ pub fn open_ui(args: &[String]) {
                 );
                 eprintln!(
                     "[STACK TRACE] Backtrace:\n{:?}",
-                    std::backtrace::Backtrace::capture()
+                    std::backtrace::Backtrace::force_capture()
                 );
+            }
+        }
+
+        if !launch_ok {
+            let internal_bins = [
+                exe_to_launch.join("Contents/MacOS/agm-alim"),
+                exe_to_launch.join("Contents/MacOS/Antigravity Manager Tools"),
+                exe_to_launch.join("Contents/MacOS/agm"),
+            ];
+            for ib in &internal_bins {
+                if ib.exists() {
+                    eprintln!("[INFO] Attempting fallback direct binary launch: {:?}", ib);
+                    let mut cmd = Command::new(ib);
+                    if let Ok(home) = std::env::var("HOME") {
+                        let log_dir =
+                            std::path::PathBuf::from(home).join("Library/Logs/AntigravityManager");
+                        let _ = std::fs::create_dir_all(&log_dir);
+                        if let Ok(f) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(log_dir.join("updater_binary.log"))
+                        {
+                            if let Ok(f2) = f.try_clone() {
+                                cmd.stdout(f);
+                                cmd.stderr(f2);
+                            }
+                        }
+                    }
+                    match cmd.spawn() {
+                        Ok(child) => {
+                            println!(
+                                "[OK] Antigravity Manager core binary launched (PID: {})",
+                                child.id()
+                            );
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("[ERROR] Direct binary launch failed for {:?}: {}", ib, e);
+                            eprintln!(
+                                "[STACK TRACE]\n{:?}",
+                                std::backtrace::Backtrace::force_capture()
+                            );
+                        }
+                    }
+                }
             }
         }
     }

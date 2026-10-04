@@ -6,21 +6,21 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 APP_NAME="Antigravity Manager Tools"
 BUNDLE_ID="com.lbjlaq.antigravity-tools"
 
-# Formatting colors
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Persistent diagnostic logging configuration
 LOG_DIR="$HOME/Library/Logs/AntigravityManager"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/dmg_repair.log"
+LOG_FILE="$LOG_DIR/dmg_install.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-echo -e "\n\033[1;30m[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] Starting ${APP_NAME} Quick Repair Tool\033[0m"
+echo -e "\n\033[1;30m[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] Starting ${APP_NAME} 1-Click Installer & Repair\033[0m"
 
 # Error stack trace trap for maximum transparency and failure diagnostics
 report_error_stack() {
@@ -44,7 +44,7 @@ report_error_stack() {
         echo -e "\033[1;33m   [STACK TRACE]\033[0m" >&2
         for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
             local fn="${FUNCNAME[$i]}"
-            local src="${BASH_SOURCE[$i]:-Fix_Damaged.command}"
+            local src="${BASH_SOURCE[$i]:-Install_Or_Repair.command}"
             local ln="${BASH_LINENO[$((i - 1))]}"
             echo -e "     -> at ${fn}() in ${src}:${ln}" >&2
         done
@@ -153,8 +153,8 @@ dump_diagnostic_state() {
     echo -e "\033[1;36m============================================================================\033[0m\n"
 }
 
-# Function to launch the repaired application safely with multiple fallback layers
-launch_repaired_application() {
+# Function to launch the installed application safely with multiple fallback layers
+launch_installed_application() {
     local target_app="$1"
     local app_name="$2"
     local lsregister_bin="$3"
@@ -162,7 +162,7 @@ launch_repaired_application() {
     local open_err=""
 
     echo ""
-    echo -e "🚀 正在尝试直接启动应用 / Launching ${app_name}: ${CYAN}${target_app}${NC}..."
+    echo -e "🚀 正在启动应用 / Launching application: ${CYAN}${target_app}${NC}..."
 
     if open_err=$(open "$target_app" 2>&1); then
         echo -e "${GREEN}🎉 应用已顺利启动! / Launched successfully via LaunchServices!${NC}"
@@ -206,7 +206,7 @@ launch_repaired_application() {
 
     sleep 1
     if open_err=$(open "$target_app" 2>&1); then
-        echo -e "${GREEN}🎉 二次重试启动成功! / Launched on retry!${NC}"
+        echo -e "${GREEN}🎉 重试启动成功! / Launched successfully on retry!${NC}"
         return 0
     fi
     echo -e "${YELLOW}⚠️  二次重试提示: ${open_err}${NC}"
@@ -232,14 +232,14 @@ launch_repaired_application() {
     fi
 
     dump_diagnostic_state "$target_app"
-    echo -e "${YELLOW}如果系统弹出 Gatekeeper 提示，请前往: 系统设置 -> 隐私与安全性 -> 点击【仍要打开】${NC}"
-    echo -e "${YELLOW}If prompted by Gatekeeper, navigate to: System Settings -> Privacy & Security -> Click 'Open Anyway'${NC}"
+    echo -e "${YELLOW}提示: 如果 macOS 提示“无法打开未知名开发者”，请前往: 系统设置 -> 隐私与安全性 -> 点击【仍要打开】${NC}"
+    echo -e "${YELLOW}Tip: If Gatekeeper blocks opening, go to: System Settings -> Privacy & Security -> Click 'Open Anyway'${NC}"
     return 1
 }
 
-echo -e "${GREEN}====================================================${NC}"
-echo -e "${GREEN}   ${APP_NAME} - 快速修复助手 / Quick Repair${NC}"
-echo -e "${GREEN}====================================================${NC}"
+echo -e "${CYAN}================================================================${NC}"
+echo -e "${CYAN}   🚀 ${APP_NAME} - 一键安装与全自动修复 / One-Click Installer${NC}"
+echo -e "${CYAN}================================================================${NC}"
 echo ""
 
 # 1. 查找 LaunchServices 注册工具 lsregister
@@ -275,8 +275,8 @@ if [ -f "$LAUNCH_AGENT_PLIST" ]; then
     rm -f "$LAUNCH_AGENT_PLIST" 2>/dev/null || true
 fi
 
-# 3. 深度扫描并清理废纸篓 (Trash) 与 LaunchServices 中的冲突残留副本 (如 "... 13-20-55-339.app")
-echo -e "🔍 正在检查废纸篓残留 / Inspecting Trash for quarantined items..."
+# 3. 彻底清理废纸篓 (Trash) 冲突项与解除 LaunchServices 废纸篓锁定
+echo -e "🧹 正在深度清理废纸篓冲突与反注册 LaunchServices / Purging Trash & LaunchServices..."
 TRASHED_APPS=()
 
 # 扫描用户废纸篓顶层条目
@@ -302,8 +302,7 @@ if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
     while IFS= read -r ls_path; do
         if [ -n "$ls_path" ]; then
             if [[ "$ls_path" == *".Trash"* || "$ls_path" == *".Trashes"* ]]; then
-                echo -e "${YELLOW}⚠️  检测到 LaunchServices 指向废纸篓路径 / Stale LaunchServices Trash entry: $ls_path${NC}"
-                "$LSREGISTER" -u "$ls_path" 2>/dev/null || true
+                [ -n "$LSREGISTER" ] && "$LSREGISTER" -u "$ls_path" 2>/dev/null || true
                 TRASHED_APPS+=("$ls_path")
             fi
         fi
@@ -336,211 +335,153 @@ tell application "Finder"
 end tell' 2>/dev/null || true
 rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
-# 彻底清理废纸篓副本与解除文件锁定
-if [ ${#TRASHED_APPS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}⚠️  发现 ${#TRASHED_APPS[@]} 个废纸篓冲突副本，正在彻底清除并注销注册... / Purging trashed duplicates:${NC}"
-    for ta in "${TRASHED_APPS[@]}"; do
-        if [ -n "$ta" ] && { [ -e "$ta" ] || [ -d "$ta" ]; }; then
-            echo -e "   🗑️  正在注销与清理 / Purging: $ta"
-            if [ -n "$LSREGISTER" ]; then
-                "$LSREGISTER" -u "$ta" 2>/dev/null || true
-            fi
-            chflags -R nouchg,noschg "$ta" 2>/dev/null || true
-            rm -rf "$ta" 2>/dev/null || sudo rm -rf "$ta" 2>/dev/null || true
-        fi
-    done
-    echo -e "${GREEN}✅ 废纸篓冲突副本已全部清理完毕 / Trash duplicates purged successfully.${NC}"
-fi
+# 执行废纸篓物理删除与注销
+for ta in "${TRASHED_APPS[@]}"; do
+    if [ -n "$ta" ] && { [ -e "$ta" ] || [ -d "$ta" ]; }; then
+        [ -n "$LSREGISTER" ] && "$LSREGISTER" -u "$ta" 2>/dev/null || true
+        chflags -R nouchg,noschg "$ta" 2>/dev/null || true
+        rm -rf "$ta" 2>/dev/null || sudo rm -rf "$ta" 2>/dev/null || true
+    fi
+done
 
 # 运行 LaunchServices 垃圾回收以清除死路径
 if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
     "$LSREGISTER" -gc 2>/dev/null || true
 fi
 
-# 4. 动态查找有效应用程序路径
-APP_PATH=""
+# 4. 定位源应用程序包
+SOURCE_APP=""
+if [ -d "$DIR/${APP_NAME}.app" ]; then
+    SOURCE_APP="$DIR/${APP_NAME}.app"
+elif [ -d "$DIR/Antigravity Tools.app" ]; then
+    SOURCE_APP="$DIR/Antigravity Tools.app"
+elif [ -d "$DIR/agm-alim.app" ]; then
+    SOURCE_APP="$DIR/agm-alim.app"
+else
+    SOURCE_APP=$(find "$DIR" -maxdepth 2 -name "*.app" -type d 2>/dev/null | head -n 1)
+fi
 
-# 4.1 优先在系统或用户 Applications 目录查找已安装版本
-CANDIDATES=(
-    "/Applications/${APP_NAME}.app"
-    "$HOME/Applications/${APP_NAME}.app"
-    "/Applications/Antigravity Tools.app"
-    "$HOME/Applications/Antigravity Tools.app"
-    "/Applications/Anti-Gravity Tools.app"
-    "$HOME/Applications/Anti-Gravity Tools.app"
-    "/Applications/agm-alim.app"
-    "$HOME/Applications/agm-alim.app"
-)
-for candidate in "${CANDIDATES[@]}"; do
-    if [ -d "$candidate" ]; then
-        APP_PATH="$candidate"
-        break
+if [ -z "$SOURCE_APP" ] || [ ! -d "$SOURCE_APP" ]; then
+    echo -e "${RED}❌ 未在安装包中找到应用程序 / Source application bundle not found in $DIR${NC}"
+    dump_diagnostic_state ""
+    exit 1
+fi
+
+echo -e "📦 发现源应用包 / Source package: ${BLUE}$SOURCE_APP${NC}"
+
+# 5. 目标路径选择 (优先 /Applications，无权限退回 $HOME/Applications)
+DEST_DIR="/Applications"
+if [ ! -d "$DEST_DIR" ] || [ ! -w "$DEST_DIR" ]; then
+    DEST_DIR="$HOME/Applications"
+    mkdir -p "$DEST_DIR" 2>/dev/null || true
+fi
+TARGET_APP="${DEST_DIR}/${APP_NAME}.app"
+
+echo -e "🚀 正在安装到 / Installing to: ${CYAN}$TARGET_APP${NC}..."
+
+# 清除目标位置已有版本与注销
+if [ -d "$TARGET_APP" ]; then
+    [ -n "$LSREGISTER" ] && "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
+    rm -rf "$TARGET_APP" 2>/dev/null || sudo rm -rf "$TARGET_APP" 2>/dev/null || true
+fi
+
+# 复制新版本
+cp -R "$SOURCE_APP" "$TARGET_APP" 2>/dev/null || sudo cp -R "$SOURCE_APP" "$TARGET_APP"
+
+# 清理遗留历史包名
+for legacy in "Antigravity Tools.app" "Anti-Gravity Tools.app" "agm-alim.app"; do
+    if [ -d "${DEST_DIR}/${legacy}" ] && [ "${DEST_DIR}/${legacy}" != "$TARGET_APP" ]; then
+        rm -rf "${DEST_DIR}/${legacy}" 2>/dev/null || true
     fi
 done
 
-# 4.2 如果在系统目录未找到，或者当前运行在 DMG / 解压目录中，定位本地源应用
-SOURCE_APP_IN_DIR=""
-if [ -d "$DIR/${APP_NAME}.app" ]; then
-    SOURCE_APP_IN_DIR="$DIR/${APP_NAME}.app"
-elif [ -d "$DIR/Antigravity Tools.app" ]; then
-    SOURCE_APP_IN_DIR="$DIR/Antigravity Tools.app"
-elif [ -d "$DIR/agm-alim.app" ]; then
-    SOURCE_APP_IN_DIR="$DIR/agm-alim.app"
-else
-    LOCAL_APP=$(find "$DIR" -maxdepth 2 -name "*.app" -type d 2>/dev/null | head -n 1)
-    if [ -n "$LOCAL_APP" ] && [ -d "$LOCAL_APP" ]; then
-        SOURCE_APP_IN_DIR="$LOCAL_APP"
-    fi
+# 6. 全面净化隔离属性并配置权限
+echo -e "🔧 正在净化隔离属性与授予执行权限 / Stripping quarantine attributes & setting permissions..."
+chmod -R u+rwX "$TARGET_APP" 2>/dev/null || sudo chmod -R u+rwX "$TARGET_APP" 2>/dev/null || true
+if [ -d "$TARGET_APP/Contents/MacOS" ]; then
+    chmod -R +x "$TARGET_APP/Contents/MacOS" 2>/dev/null || sudo chmod -R +x "$TARGET_APP/Contents/MacOS" 2>/dev/null || true
 fi
 
-# 4.3 如果 /Applications 中未安装应用，但同级目录存在源应用，自动安装到 /Applications
-if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-    if [ -n "$SOURCE_APP_IN_DIR" ] && [ -d "$SOURCE_APP_IN_DIR" ]; then
-        TARGET_DEST="/Applications"
-        if [ ! -w "$TARGET_DEST" ]; then
-            TARGET_DEST="$HOME/Applications"
-            mkdir -p "$TARGET_DEST" 2>/dev/null || true
+xattr -cr "$TARGET_APP" 2>/dev/null || true
+xattr -rd com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
+xattr -rd com.apple.provenance "$TARGET_APP" 2>/dev/null || true
+find "$TARGET_APP" -exec xattr -c {} + 2>/dev/null || true
+find "$TARGET_APP" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
+find "$TARGET_APP" -exec xattr -d com.apple.provenance {} + 2>/dev/null || true
+
+# 7. 注册 Gatekeeper 与本地自签名
+macos_major=0
+if command -v sw_vers &>/dev/null; then
+    macos_major=$(sw_vers -productVersion | cut -d. -f1)
+fi
+
+if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
+    echo -e "🔐 向 Gatekeeper 注册信任 / Registering with Gatekeeper..."
+    spctl --add "$TARGET_APP" 2>/dev/null || sudo spctl --add "$TARGET_APP" 2>/dev/null || true
+fi
+
+if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
+    echo -e "🔏 补充本地自签名 / Applying local ad-hoc codesign..."
+    codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || true
+fi
+
+# 8. 重构并刷新 LaunchServices
+if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
+    echo -e "🔄 刷新 LaunchServices 应用程序数据库 / Refreshing LaunchServices..."
+    "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
+    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -f -r "$TARGET_APP" 2>/dev/null || true
+    killall launchservicesd 2>/dev/null || true
+    killall Finder 2>/dev/null || true
+    killall Dock 2>/dev/null || true
+    sleep 1
+fi
+
+# 9. 配置命令行 CLI 软链接
+MACOS_BIN_DIR="${TARGET_APP}/Contents/MacOS"
+if [ -d "$MACOS_BIN_DIR" ]; then
+    CLI_BIN=""
+    for candidate_name in "agm" "agm-alim" "${APP_NAME}" "Antigravity Tools" "antigravity-tools"; do
+        if [ -x "${MACOS_BIN_DIR}/${candidate_name}" ]; then
+            CLI_BIN="${MACOS_BIN_DIR}/${candidate_name}"
+            break
         fi
-        echo -e "📦 正在将应用安全复制到 ${TARGET_DEST}... / Copying app to ${TARGET_DEST}..."
-        APP_PATH="${TARGET_DEST}/${APP_NAME}.app"
-        rm -rf "$APP_PATH" 2>/dev/null || sudo rm -rf "$APP_PATH" 2>/dev/null || true
-        cp -R "$SOURCE_APP_IN_DIR" "$APP_PATH" || sudo cp -R "$SOURCE_APP_IN_DIR" "$APP_PATH"
-        echo -e "${GREEN}✅ 已成功安装到 / Installed to: $APP_PATH${NC}"
-    fi
-fi
+    done
+    if [ -n "$CLI_BIN" ]; then
+        chmod +x "$CLI_BIN" 2>/dev/null || true
+        USER_BIN="$HOME/.local/bin"
+        mkdir -p "$USER_BIN" 2>/dev/null || true
+        ln -sf "$CLI_BIN" "${USER_BIN}/agm" 2>/dev/null || true
+        ln -sf "$CLI_BIN" "${USER_BIN}/agm-alim" 2>/dev/null || true
+        echo -e "🔗 已配置命令行工具 / Configured CLI symlinks: ${CYAN}${USER_BIN}/agm, ${USER_BIN}/agm-alim${NC}"
 
-# 4.4 兜底模糊匹配 Applications 目录
-if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-    SEARCH_APP=$(find /Applications "$HOME/Applications" -maxdepth 2 \( -iname "*antigravity*.app" -o -iname "*agm*.app" \) -type d 2>/dev/null | head -n 1)
-    if [ -n "$SEARCH_APP" ] && [ -d "$SEARCH_APP" ]; then
-        APP_PATH="$SEARCH_APP"
-    fi
-fi
+        SHELL_RCS=()
+        [ -f "$HOME/.zshrc" ] && SHELL_RCS+=("$HOME/.zshrc")
+        [ -f "$HOME/.bashrc" ] && SHELL_RCS+=("$HOME/.bashrc")
+        [ -f "$HOME/.bash_profile" ] && SHELL_RCS+=("$HOME/.bash_profile")
+        [ ${#SHELL_RCS[@]} -eq 0 ] && SHELL_RCS+=("$HOME/.zshrc")
 
-# 5. 执行权限与隔离属性深度修复
-if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
-    TARGET_NAME=$(basename "$APP_PATH" .app)
-    echo -e "📍 目标应用路径 / Target application path: ${BLUE}$APP_PATH${NC}"
-
-    macos_major=0
-    if command -v sw_vers &>/dev/null; then
-        macos_major=$(sw_vers -productVersion | cut -d. -f1)
-    fi
-
-    echo "🔧 正在递归清除 Gatekeeper 隔离属性与文件锁定 / Clearing quarantine attributes..."
-    chmod -R u+rwX "$APP_PATH" 2>/dev/null || sudo chmod -R u+rwX "$APP_PATH" 2>/dev/null || true
-    if [ -d "$APP_PATH/Contents/MacOS" ]; then
-        chmod -R +x "$APP_PATH/Contents/MacOS" 2>/dev/null || sudo chmod -R +x "$APP_PATH/Contents/MacOS" 2>/dev/null || true
-    fi
-
-    # 清除各种 macOS 隔离与溯源标记
-    xattr -cr "$APP_PATH" 2>/dev/null || true
-    xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
-    xattr -rd com.apple.provenance "$APP_PATH" 2>/dev/null || true
-    find "$APP_PATH" -exec xattr -c {} + 2>/dev/null || true
-    find "$APP_PATH" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
-    find "$APP_PATH" -exec xattr -d com.apple.provenance {} + 2>/dev/null || true
-
-    # 若仍有顽固隔离标记则请求 sudo 一次性彻底清除
-    if xattr -r "$APP_PATH" 2>/dev/null | grep -qE "com.apple.quarantine|com.apple.provenance"; then
-        echo -e "${YELLOW}提示: 当前目录权限受限，请输入开机密码授权 (输入时不显示):${NC}"
-        echo -e "${YELLOW}Note: Permissions restricted. Please enter login password (keystrokes hidden):${NC}"
-        sudo chmod -R u+rwX "$APP_PATH" 2>/dev/null || true
-        sudo chmod -R +x "$APP_PATH/Contents/MacOS" 2>/dev/null || true
-        sudo xattr -cr "$APP_PATH" 2>/dev/null || true
-        sudo xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
-        sudo xattr -rd com.apple.provenance "$APP_PATH" 2>/dev/null || true
-        sudo find "$APP_PATH" -exec xattr -c {} + 2>/dev/null || true
-    fi
-    echo -e "${GREEN}✅ 隔离属性与权限已完全净化 / Quarantine attributes cleared.${NC}"
-
-    # 向 Gatekeeper 注册 (macOS 13+ Ventura / Sonoma / Sequoia)
-    if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
-        echo "🔐 正在向看门人注册应用 / Registering app with Gatekeeper (spctl)..."
-        spctl --add "$APP_PATH" 2>/dev/null || sudo spctl --add "$APP_PATH" 2>/dev/null || true
-        echo -e "${GREEN}✅ 看门人注册完成 / Gatekeeper registration done.${NC}"
-    fi
-
-    # 应用本地自签名 (macOS 15 以前版本应用)
-    if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
-        echo "🔏 正在应用本地自签名 / Applying local ad-hoc codesign..."
-        codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || sudo codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
-        echo -e "${GREEN}✅ 本地签名完成 / Ad-hoc codesign done.${NC}"
-    fi
-
-    # 正确重构 LaunchServices 数据库：强制重新注册，通知 launchservicesd
-    if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
-        echo "🔄 正在重构并刷新 LaunchServices 应用程序数据库 / Refreshing LaunchServices database..."
-        "$LSREGISTER" -u "$APP_PATH" 2>/dev/null || true
-        "$LSREGISTER" -gc 2>/dev/null || true
-        "$LSREGISTER" -f -r "$APP_PATH" 2>/dev/null || true
-        killall launchservicesd 2>/dev/null || true
-        killall Finder 2>/dev/null || true
-        killall Dock 2>/dev/null || true
-        sleep 1
-        echo -e "${GREEN}✅ LaunchServices 数据库已重构注册 / LaunchServices refreshed.${NC}"
-    fi
-
-    # 检查并创建 CLI 软链接
-    MACOS_BIN_DIR="${APP_PATH}/Contents/MacOS"
-    if [ -d "$MACOS_BIN_DIR" ]; then
-        CLI_BIN=""
-        for candidate_name in "agm" "agm-alim" "${APP_NAME}" "Antigravity Tools" "antigravity-tools"; do
-            if [ -x "${MACOS_BIN_DIR}/${candidate_name}" ]; then
-                CLI_BIN="${MACOS_BIN_DIR}/${candidate_name}"
-                break
+        for rc in "${SHELL_RCS[@]}"; do
+            if [ -f "$rc" ] && grep -qF "${USER_BIN}" "$rc" 2>/dev/null; then
+                continue
             fi
+            echo "" >> "$rc" 2>/dev/null || true
+            echo "export PATH=\"${USER_BIN}:\$PATH\"" >> "$rc" 2>/dev/null || true
+            echo "➕ 已添加 ${USER_BIN} 到 PATH / Added ${USER_BIN} to PATH in $rc"
         done
-        if [ -z "$CLI_BIN" ]; then
-            for f in "${MACOS_BIN_DIR}"/*; do
-                if [ -f "$f" ] && [ -x "$f" ]; then
-                    CLI_BIN="$f"
-                    break
-                fi
-            done
-        fi
-        if [ -n "$CLI_BIN" ]; then
-            chmod +x "$CLI_BIN" 2>/dev/null || true
-            USER_BIN="$HOME/.local/bin"
-            mkdir -p "$USER_BIN" 2>/dev/null || true
-            ln -sf "$CLI_BIN" "${USER_BIN}/agm" 2>/dev/null || true
-            ln -sf "$CLI_BIN" "${USER_BIN}/agm-alim" 2>/dev/null || true
-            echo -e "🔗 已配置命令行工具 / Configured CLI symlinks: ${CYAN}${USER_BIN}/agm, ${USER_BIN}/agm-alim${NC}"
-
-            SHELL_RCS=()
-            [ -f "$HOME/.zshrc" ] && SHELL_RCS+=("$HOME/.zshrc")
-            [ -f "$HOME/.bashrc" ] && SHELL_RCS+=("$HOME/.bashrc")
-            [ -f "$HOME/.bash_profile" ] && SHELL_RCS+=("$HOME/.bash_profile")
-            [ ${#SHELL_RCS[@]} -eq 0 ] && SHELL_RCS+=("$HOME/.zshrc")
-
-            for rc in "${SHELL_RCS[@]}"; do
-                if [ -f "$rc" ] && grep -qF "${USER_BIN}" "$rc" 2>/dev/null; then
-                    continue
-                fi
-                echo "" >> "$rc" 2>/dev/null || true
-                echo "export PATH=\"${USER_BIN}:\$PATH\"" >> "$rc" 2>/dev/null || true
-                echo "➕ 已添加 ${USER_BIN} 到 PATH / Added ${USER_BIN} to PATH in $rc"
-            done
-        fi
     fi
-
-    echo ""
-    echo -e "${GREEN}====================================================${NC}"
-    echo -e "${GREEN}   ✅ 修复完成! / Repair complete!${NC}"
-    echo -e "${GREEN}====================================================${NC}"
-    echo "您现在可以正常打开 $TARGET_NAME 了。"
-    echo "You can now open $TARGET_NAME normally."
-
-    osascript -e "display notification \"修复成功，现在可以正常打开应用了\" with title \"$TARGET_NAME\" sound name \"Glass\"" 2>/dev/null || true
-
-    # 启动应用
-    launch_repaired_application "$APP_PATH" "$APP_NAME" "$LSREGISTER"
-else
-    echo -e "${RED}⚠️  未找到应用文件 / Application bundle not found${NC}"
-    echo "请确保将 '${APP_NAME}.app' 放置在 /Applications 或与本修复脚本位于同一目录下。"
-    echo "Please ensure '${APP_NAME}.app' is in /Applications or in the same folder as this script."
-    dump_diagnostic_state ""
 fi
+
+echo ""
+echo -e "${GREEN}====================================================${NC}"
+echo -e "${GREEN}   🎉 安装与修复成功! / Installation Complete!${NC}"
+echo -e "${GREEN}====================================================${NC}"
+echo "应用程序位置 / Installed to: $TARGET_APP"
+
+osascript -e "display notification \"安装与修复成功，正在启动...\" with title \"$APP_NAME\" sound name \"Glass\"" 2>/dev/null || true
+
+# 10. 启动应用
+launch_installed_application "$TARGET_APP" "$APP_NAME" "$LSREGISTER"
 
 echo ""
 echo "详细运行日志与诊断信息保存在 / Log file: $LOG_FILE"

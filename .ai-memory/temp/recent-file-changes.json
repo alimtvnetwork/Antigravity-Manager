@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-10-04T16:50:23Z",
+  "updated_at": "2026-10-04T17:43:07Z",
   "files": [
     ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".ai-memory/cicd-index.md",
@@ -23,6 +23,8 @@
     "install.sh",
     "package.json",
     "scripts/Fix_Damaged.command",
+    "scripts/Install_Or_Repair.command",
+    "scripts/fix_app.sh",
     "scripts/package_dmg.sh",
     "src-tauri/Cargo.lock",
     "src-tauri/Cargo.toml",
@@ -42,6 +44,7 @@
     "src-tauri/src/modules/email_watcher.rs",
     "src-tauri/src/modules/instance.rs",
     "src-tauri/src/modules/iterative_codec.rs",
+    "src-tauri/src/modules/logger.rs",
     "src-tauri/src/modules/process.rs",
     "src-tauri/src/modules/repo_db.rs",
     "src-tauri/src/modules/supabase_client.rs",

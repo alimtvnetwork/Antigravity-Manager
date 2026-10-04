@@ -256,6 +256,14 @@ jobs:
             sed -i.bak "s/\.app\.tar\.gz/_${ARCH}.app.tar.gz/g" "$UPDATER_JSON" 2>/dev/null || true
           fi
 
+      # 4. 重新打包 macOS DMG，注入修复与安装脚本并净化隔离属性
+      - name: Repackage macOS DMG with Fix Scripts and Clean Quarantine
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          chmod +x scripts/package_dmg.sh scripts/Fix_Damaged.command scripts/Install_Or_Repair.command scripts/fix_app.sh scripts/pkg-scripts/* 2>/dev/null || true
+          ./scripts/package_dmg.sh ${{ matrix.args }}
+
       # 1. 上传 updater.json 到 Artifacts (供后续合并使用)
       - name: Upload updater json
         uses: actions/upload-artifact@v4
@@ -303,6 +311,7 @@ jobs:
           name: release-assets-${{ matrix.platform }}-${{ strategy.job-index }}
           path: |
             src-tauri/target/**/release/bundle/dmg/*.dmg
+            src-tauri/target/**/release/bundle/dmg/*.pkg
             src-tauri/target/**/release/bundle/deb/*.deb
             src-tauri/target/**/release/bundle/appimage/*.AppImage
             src-tauri/target/**/release/bundle/msi/*.msi
@@ -513,6 +522,7 @@ jobs:
           mkdir -p release-files
           find all-artifacts -type f \( \
             -name "*.dmg" -o \
+            -name "*.pkg" -o \
             -name "*.deb" -o \
             -name "*.AppImage" -o \
             -name "*.msi" -o \

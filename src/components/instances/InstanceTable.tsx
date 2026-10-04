@@ -18,7 +18,6 @@ import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
 import type { InstanceStatus } from '../../services/instanceService';
 import { useAccountStore } from '../../stores/useAccountStore';
-import { WaterDrainProgressBar } from '../common/WaterDrainProgressBar';
 import { QuotaProgressBar } from '../accounts/QuotaProgressBar';
 
 export type InstanceActionType = 'launch' | 'stop' | 'switch' | 'fast-forward' | 'wipe' | 'delete' | 'sync' | null;

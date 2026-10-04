@@ -1,0 +1,95 @@
+#!/bin/bash
+set -E
+
+# Resolve configurations
+APP_NAME="Antigravity Manager Tools"
+BUNDLE_ID="com.lbjlaq.antigravity-tools"
+TARGET_APP="/Applications/${APP_NAME}.app"
+
+# Persistent diagnostic logging
+LOG_DIR="/Library/Logs/AntigravityManager"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="$LOG_DIR/pkg_postinstall.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] Executing PKG postinstall for ${APP_NAME}..."
+
+# 1. Strip all Gatekeeper quarantine and provenance extended attributes
+echo "Stripping quarantine attributes from $TARGET_APP..."
+xattr -cr "$TARGET_APP" 2>/dev/null || true
+xattr -rd com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
+xattr -rd com.apple.provenance "$TARGET_APP" 2>/dev/null || true
+find "$TARGET_APP" -exec xattr -c {} + 2>/dev/null || true
+
+# 2. Enforce execution permissions
+chmod -R u+rwX,go+rX "$TARGET_APP" 2>/dev/null || true
+if [ -d "$TARGET_APP/Contents/MacOS" ]; then
+    chmod -R +x "$TARGET_APP/Contents/MacOS" 2>/dev/null || true
+fi
+
+# 3. Locate lsregister
+LSREGISTER=""
+for cand in \
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"; do
+    if [ -x "$cand" ]; then
+        LSREGISTER="$cand"
+        break
+    fi
+done
+
+# 4. Sweep and unregister conflicting trash copies across all user homes and root (running as root)
+echo "Sweeping trash directories to purge conflicting trashed bundles..."
+for user_home in /Users/* /var/root; do
+    if [ -d "$user_home/.Trash" ]; then
+        find "$user_home/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r t_item; do
+            if [ -n "$t_item" ]; then
+                [ -n "$LSREGISTER" ] && "$LSREGISTER" -u "$t_item" 2>/dev/null || true
+                chflags -R nouchg,noschg "$t_item" 2>/dev/null || true
+                rm -rf "$t_item" 2>/dev/null || true
+            fi
+        done
+    fi
+done
+
+# Check external volume trashes
+for ext_trash in /Volumes/*/.Trashes/* /.Trashes/*; do
+    if [ -d "$ext_trash" ]; then
+        find "$ext_trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r t_item; do
+            if [ -n "$t_item" ]; then
+                [ -n "$LSREGISTER" ] && "$LSREGISTER" -u "$t_item" 2>/dev/null || true
+                chflags -R nouchg,noschg "$t_item" 2>/dev/null || true
+                rm -rf "$t_item" 2>/dev/null || true
+            fi
+        done
+    fi
+done
+
+# 5. Register Gatekeeper trust
+if command -v spctl &>/dev/null; then
+    spctl --add "$TARGET_APP" 2>/dev/null || true
+fi
+
+# 6. Rebuild and refresh LaunchServices registrations
+if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
+    echo "Refreshing LaunchServices database..."
+    "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
+    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -f -r "$TARGET_APP" 2>/dev/null || true
+    killall launchservicesd Finder Dock 2>/dev/null || true
+fi
+
+# 7. Configure global CLI symlinks in /usr/local/bin
+mkdir -p /usr/local/bin 2>/dev/null || true
+for bin_candidate in "agm-alim" "agm"; do
+    if [ -x "$TARGET_APP/Contents/MacOS/$bin_candidate" ]; then
+        ln -sf "$TARGET_APP/Contents/MacOS/$bin_candidate" "/usr/local/bin/agm" 2>/dev/null || true
+        ln -sf "$TARGET_APP/Contents/MacOS/$bin_candidate" "/usr/local/bin/agm-alim" 2>/dev/null || true
+        break
+    fi
+done
+
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] PKG postinstall finished successfully."
+exit 0

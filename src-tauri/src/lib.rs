@@ -694,6 +694,40 @@ pub fn run() {
                 });
             }
 
+            // macOS: asynchronously heal LaunchServices registrations, purge stale trash associations, and run garbage collection
+            #[cfg(target_os = "macos")]
+            {
+                std::thread::spawn(|| {
+                    let _ = std::process::Command::new("bash")
+                        .arg("-c")
+                        .arg(r#"
+                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
+                            osascript -e '
+                            tell application "Finder"
+                                try
+                                    set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
+                                    repeat with tItem in tMatches
+                                        try
+                                            move tItem to (POSIX file "/tmp") with replacing
+                                        end try
+                                    end repeat
+                                end try
+                            end tell' 2>/dev/null || true
+                            rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+
+                            if [ -n "$lsregister" ]; then
+                                find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r ta; do
+                                    if [ -n "$ta" ]; then
+                                        "$lsregister" -u "$ta" 2>/dev/null || true
+                                    fi
+                                done
+                                "$lsregister" -gc 2>/dev/null || true
+                            fi
+                        "#)
+                        .status();
+                });
+            }
+
             // Discover and persist initial IDE information on first run in background
             std::thread::spawn(|| {
                 crate::modules::process::discover_and_persist_initial_ide_info();

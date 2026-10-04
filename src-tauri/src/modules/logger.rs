@@ -77,7 +77,41 @@ pub fn init_logger() {
     // Recommended practice when using tracing_appender::non_blocking (if manual flushing is not needed)
     std::mem::forget(_guard);
 
-    info!("Log system initialized (Console + File persistence)");
+    // Install panic hook to capture panic stack traces into file, tracing, and stderr
+    std::panic::set_hook(Box::new(|panic_info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let location = panic_info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown location".to_string());
+        let payload = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            (*s).to_string()
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "unknown panic payload".to_string()
+        };
+        let err_msg = format!(
+            "CRITICAL PANIC at {}: {}\n[STACK TRACE]\n{:?}",
+            location, payload, backtrace
+        );
+        eprintln!("{}", err_msg);
+        tracing::error!("{}", err_msg);
+        if let Ok(log_dir) = get_log_dir() {
+            let _ = std::fs::write(log_dir.join("panic.log"), &err_msg);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let mac_log_dir =
+                    std::path::PathBuf::from(home).join("Library/Logs/AntigravityManager");
+                let _ = std::fs::create_dir_all(&mac_log_dir);
+                let _ = std::fs::write(mac_log_dir.join("panic.log"), &err_msg);
+            }
+        }
+    }));
+
+    info!("Log system initialized (Console + File persistence + Panic stack trace capture)");
 
     // Auto-cleanup logs older than 7 days
     if let Err(e) = cleanup_old_logs(7) {

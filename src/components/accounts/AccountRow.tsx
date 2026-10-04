@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { findQuotaModel } from '../../config/modelConfig';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { formatDateTime, formatDateOnly } from '../../utils/date';
-import { QuotaItem } from './QuotaItem';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import { Gemini } from '@lobehub/icons';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Lock, AlertTriangle } from 'lucide-react';
+import { Clock, Lock } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
 
