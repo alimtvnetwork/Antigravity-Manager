@@ -563,13 +563,31 @@ fn get_cached_antigravity_processes() -> Vec<CachedProcessInfo> {
             .join(" ");
 
         let is_non_ide = crate::modules::process::is_non_ide_binary(&name, &exe, &args_str);
+        let is_self_process = if let Ok(current) = std::env::current_exe() {
+            let cur_str = current.to_string_lossy().to_lowercase().replace('\\', "/");
+            !cur_str.is_empty()
+                && (exe == cur_str
+                    || name
+                        == current
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_lowercase())
+        } else {
+            false
+        };
         let is_antigravity = !is_non_ide
+            && !is_self_process
             && (name.contains("antigravity")
                 || exe.contains("antigravity")
                 || exe.contains("/tmp/.mount_")
                 || name == "apprun")
             && !name.contains("agm")
             && !exe.contains("agm")
+            && !name.contains("antigravity-manager")
+            && !exe.contains("antigravity-manager")
+            && !name.contains("antigravity_manager")
+            && !exe.contains("antigravity_manager")
             && !name.contains("webview")
             && !exe.contains("webview")
             && !args_str.contains("embedded-browser-webview");
@@ -643,6 +661,14 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || exe.contains(".antigravity_tools")
             || matches_cloned_exe;
 
+        let is_default_candidate = is_default
+            && !has_instance_marker
+            && (!has_user_data_arg || args_str.contains(clean_target))
+            && !is_helper
+            && !args_str.contains(".antigravity_tools")
+            && !args_str.contains("/instances/")
+            && !args_str.contains("\\instances\\");
+
         if (has_user_data_arg && has_instance_marker && !is_helper)
             || (matches_cloned_exe && !is_helper)
         {
@@ -650,8 +676,22 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             if args_str.contains(clean_target) || matches_cloned_exe {
                 matched_pids.push(pid_u32);
             }
-        } else if is_default && !has_instance_marker && !is_helper {
-            default_candidate_pids.push(pid_u32);
+        } else if is_default_candidate {
+            let exe_path = std::path::Path::new(exe);
+            let has_ide_markers = if let Some(parent) = exe_path.parent() {
+                parent.join("resources").join("app.asar").exists()
+                    || parent.join("resources").join("bin").join("language_server.exe").exists()
+                    || parent.join("resources").join("bin").join("language_server").exists()
+                    || exe.ends_with("antigravity.exe")
+                    || exe.ends_with("/antigravity")
+                    || name == "antigravity.exe"
+                    || name == "antigravity"
+            } else {
+                true
+            };
+            if has_ide_markers {
+                default_candidate_pids.push(pid_u32);
+            }
         }
     }
 
@@ -2145,11 +2185,20 @@ pub fn resolve_instance_pid_for_switch(
 /// (for example the macOS `open` wrapper exited) does it search once and save the real PID,
 /// so the next check is a single-process lookup again.
 pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option<u32>) -> bool {
+    let is_default = instance_id == "default" || instance_id == "__default__";
     let saved = config_pid.or_else(|| get_instance_saved_pid(instance_id));
-    if saved.map(saved_pid_matches).unwrap_or(false) {
-        return true;
+    if let Some(pid) = saved {
+        if saved_pid_matches(pid) {
+            if is_default {
+                let pids = find_pids_for_data_dir(data_dir, true);
+                if pids.contains(&pid) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+        }
     }
-    let is_default = instance_id == "default";
     let pids = find_pids_for_data_dir(data_dir, is_default);
     let Some(pid) = pids.first().copied() else {
         return false;

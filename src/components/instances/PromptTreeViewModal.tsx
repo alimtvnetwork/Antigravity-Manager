@@ -102,7 +102,7 @@ function getPromptTailSnippet(text: string, fallbackSnippet?: string): string {
     }
     const trimmed = text.trim();
     if (!trimmed) return '';
-    const words = trimmed.split(/\s+/);
+    const words = trimmed.split(/\s+/).filter(Boolean);
     if (words.length <= 12) {
         return words.join(' ');
     }
@@ -156,7 +156,7 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
 // Pre-formatter to ensure inline markdown headings and paragraph line gaps have explicit spacing
 function formatPromptForMarkdown(text: string): string {
     if (!text) return '';
-    let formatted = text;
+    let formatted = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
     // Separate inline markdown headings attached to paragraph text:
     // e.g. "# High Priority Instruction Hi there." -> "# High Priority Instruction\n\nHi there."
@@ -194,6 +194,14 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
     if (isGhostConversation(conv)) {
         return true;
     }
+    const isEmptyPrompt =
+        conv.prompt_word_count === 0 ||
+        !conv.prompt_preview_200w ||
+        conv.prompt_preview_200w.trim().length === 0;
+    // 0-word empty untitled conversations must NEVER be treated as running or active
+    if (isEmptyPrompt) {
+        return true;
+    }
     if (Boolean(conv.is_running)) {
         return false;
     }
@@ -205,8 +213,7 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
         title === 'new conversation' ||
         title === 'conversation' ||
         title === (conv.short_id || '').toLowerCase();
-    const isEmptyPrompt = !conv.prompt_preview_200w || conv.prompt_preview_200w.trim().length === 0;
-    return isUntitled || isEmptyPrompt;
+    return isUntitled;
 }
 
 export const isUntitledOrEmpty = isStaleOrEmptyConversation;
@@ -322,6 +329,7 @@ interface RichMarkdownRendererProps {
     content: string;
     showAllWords?: boolean;
     onToggleExpand?: () => void;
+    isTruncated?: boolean;
 }
 
 // Rich Markdown renderer component
@@ -482,7 +490,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
         flushList(i);
 
         if (!trimmed) {
-            elements.push(<br key={`br-${i}`} className="my-2" />);
+            elements.push(<br key={`br-${i}`} className="my-1.5 block select-none" />);
             continue;
         }
 
@@ -564,7 +572,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
                     >
                         {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
                     </span>
-                    <br className="my-1 block select-none" />
+                    <br className="my-1.5 block select-none" />
                 </div>
             );
         } else {
@@ -573,7 +581,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
                         {parseInlineMarkdown(line)}
                     </p>
-                    <br className="my-1 block select-none" />
+                    <br className="my-1.5 block select-none" />
                 </div>
             );
         }
@@ -807,7 +815,9 @@ export default function PromptTreeViewModal({
                     setExpandedProjects({ [target.project_id]: true });
                     setSelectedProject(target);
                     if (target.conversations && target.conversations.length > 0) {
-                        const runningConv = target.conversations.find((c) => Boolean(c.is_running));
+                        const runningConv = target.conversations.find(
+                            (c) => Boolean(c.is_running) && !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                        );
                         if (runningConv) {
                             selectConversation(runningConv, target);
                             if (isStaleOrEmptyConversation(runningConv)) {
@@ -818,7 +828,7 @@ export default function PromptTreeViewModal({
                             return;
                         }
                         const candidateConvs = target.conversations.filter(
-                            (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
+                            (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
                         );
                         if (candidateConvs.length > 0) {
                             const sortedConvs = [...candidateConvs].sort((a, b) => {
@@ -872,7 +882,11 @@ export default function PromptTreeViewModal({
             const runningCandidates: RunningCand[] = [];
             for (const proj of prioritized) {
                 for (const conv of proj.conversations) {
-                    if (Boolean(conv.is_running)) {
+                    if (
+                        Boolean(conv.is_running) &&
+                        !isGhostConversation(conv) &&
+                        !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()))
+                    ) {
                         runningCandidates.push({
                             conv,
                             proj,
@@ -900,7 +914,7 @@ export default function PromptTreeViewModal({
             const runningProj = prioritized.find((p) => Boolean(p.is_running) && p.conversations.length > 0);
             if (runningProj) {
                 const candidateConvs = runningProj.conversations.filter(
-                    (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
+                    (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
                 );
                 if (candidateConvs.length > 0) {
                     const sortedConvs = [...candidateConvs].sort((a, b) => {
@@ -925,7 +939,7 @@ export default function PromptTreeViewModal({
             if (firstProj) {
                 setExpandedProjects({ [firstProj.project_id]: true });
                 const candidateConvs = firstProj.conversations.filter(
-                    (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
+                    (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
                 );
                 if (candidateConvs.length > 0) {
                     const sortedConvs = [...candidateConvs].sort((a, b) => {
@@ -1143,13 +1157,40 @@ export default function PromptTreeViewModal({
 
     // Handle Resend / Send Now Prompt Action (Immediate injection / writes .antigravity_resume_task.json)
     const handleResendPrompt = useCallback(async () => {
-        const conv = selectedConversationRef.current || selectedConversation;
-        const proj = selectedProjectRef.current || selectedProject;
-        if (!conv) return;
+        let conv = selectedConversationRef.current || selectedConversation;
+        let proj = selectedProjectRef.current || selectedProject;
+
+        // Fallback: If selectedConversation is null, find most recent non-empty conversation in selectedProject
+        if (!conv && proj && proj.conversations.length > 0) {
+            const candidates = proj.conversations.filter(
+                (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            if (candidates.length > 0) {
+                const sorted = [...candidates].sort((a, b) => {
+                    const aTime = new Date(a.last_modified).getTime() || 0;
+                    const bTime = new Date(b.last_modified).getTime() || 0;
+                    return bTime - aTime;
+                });
+                conv = sorted[0];
+            }
+        }
+
+        // Fallback: If selectedProject is null but selectedConversation exists, resolve selectedProject from tree nodes
+        if (!proj && conv) {
+            for (const p of treeData) {
+                if (p.conversations.some((c) => c.conversation_id === conv?.conversation_id)) {
+                    proj = p;
+                    break;
+                }
+            }
+        }
+
+        if (!conv && !proj) return;
+
         try {
             setIsResending(true);
             setActionMsg('Dispatching prompt to running instance...');
-            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.prompt_preview_200w || '';
+            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '';
             if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)') {
                 promptContent = `${promptContent}\n\n${confirmationSuffix}`;
             }
@@ -1159,7 +1200,7 @@ export default function PromptTreeViewModal({
             if (repoPath) {
                 const taskPath = `${repoPath.replace(/[\\/]+$/, '')}/.antigravity_resume_task.json`;
                 const payload = {
-                    prompt_id: conv.conversation_id || `prompt-${Date.now()}`,
+                    prompt_id: conv?.conversation_id || `prompt-${Date.now()}`,
                     project_id: proj?.project_id || '',
                     instance_id: proj?.instance_id || instanceId || 'default',
                     repo_path: repoPath,
@@ -1180,9 +1221,10 @@ export default function PromptTreeViewModal({
             }
 
             // 2. Trigger auto resume command
+            const targetInstId = proj?.instance_id || instanceId || 'default';
             try {
                 await invoke('resume_recent_project_prompts', {
-                    instanceId: proj?.instance_id || instanceId || 'default',
+                    instanceId: targetInstId,
                     maxAgeSeconds: 3600,
                 });
             } catch {
@@ -1195,7 +1237,6 @@ export default function PromptTreeViewModal({
             } catch {}
 
             // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
-            const targetInstId = proj?.instance_id || instanceId || 'default';
             try {
                 await focusOrLaunchInstance(targetInstId);
             } catch (focusErr) {
@@ -1209,7 +1250,7 @@ export default function PromptTreeViewModal({
         } finally {
             setIsResending(false);
         }
-    }, [selectedConversation, selectedProject, editedPromptText, activePromptText, confirmationSuffix, instanceId]);
+    }, [selectedConversation, selectedProject, treeData, editedPromptText, activePromptText, confirmationSuffix, instanceId]);
 
     // Modal-level hotkey listener: 'N' or 'n' key triggers Send Now / Resend prompt
     useEffect(() => {
@@ -1460,6 +1501,19 @@ export default function PromptTreeViewModal({
         return getPromptTailSnippet(activePromptText, selectedConversation?.prompt_tail_snippet);
     }, [activePromptText, selectedConversation?.prompt_tail_snippet]);
 
+    const instanceSeqNum = selectedConversation?.instance_seq_num 
+        ?? selectedProject?.instance_seq_num 
+        ?? 1;
+
+    const instanceExeName = selectedConversation?.instance_exe_name 
+        ?? selectedProject?.instance_exe_name 
+        ?? 'Antigravity.exe';
+
+    const instanceNameDisplay = selectedConversation?.instance_name 
+        ?? selectedProject?.instance_name 
+        ?? instanceName 
+        ?? 'default';
+
     const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
         const isRunning = Boolean(conv.is_running);
@@ -1544,6 +1598,7 @@ export default function PromptTreeViewModal({
                 <div
                     onClick={() => {
                         setSelectedProject(project);
+                        setShowAllWords(false);
                         setExpandedProjects((prev) => ({
                             ...prev,
                             [project.project_id]: !isProjectExpanded,
@@ -2006,10 +2061,10 @@ export default function PromptTreeViewModal({
                                             )}
                                             {/* Instance Identity Trio */}
                                             <span
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shadow-2xs"
                                                 title="Instance Identity Trio: Sequence · Executable · Instance Name"
                                             >
-                                                [#{selectedConversation.instance_seq_num ?? selectedProject?.instance_seq_num ?? 1} · {selectedConversation.instance_exe_name ?? selectedProject?.instance_exe_name ?? 'Antigravity.exe'} · {selectedConversation.instance_name ?? selectedProject?.instance_name ?? 'default'}]
+                                                [#{instanceSeqNum} · {instanceExeName} · {instanceNameDisplay}]
                                             </span>
                                             {tailSnippet && (
                                                 <span
@@ -2154,9 +2209,9 @@ export default function PromptTreeViewModal({
                                             )}
                                             <span
                                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
-                                                title="Instance Identity: Sequence · Executable · Instance Name"
+                                                title="Instance Identity Trio: Sequence · Executable · Instance Name"
                                             >
-                                                [#{selectedConversation?.instance_seq_num ?? selectedProject?.instance_seq_num ?? 1} · {selectedConversation?.instance_exe_name ?? selectedProject?.instance_exe_name ?? 'Antigravity.exe'} · {selectedConversation?.instance_name ?? selectedProject?.instance_name ?? 'default'}]
+                                                [#{instanceSeqNum} · {instanceExeName} · {instanceNameDisplay}]
                                             </span>
                                             {tailSnippet && (
                                                 <span className="text-[10px] italic text-slate-400 truncate max-w-xs" title={`Ending text: ${tailSnippet}`}>
@@ -2243,6 +2298,7 @@ export default function PromptTreeViewModal({
                                                     content={displayedMarkdown}
                                                     showAllWords={showAllWords}
                                                     onToggleExpand={() => setShowAllWords(!showAllWords)}
+                                                    isTruncated={isTruncated}
                                                 />
                                                 {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
                                                     <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#15334d]/50 flex items-center">
@@ -2251,10 +2307,10 @@ export default function PromptTreeViewModal({
                                                                 e.stopPropagation();
                                                                 setShowAllWords(!showAllWords);
                                                             }}
-                                                            className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1"
-                                                            title="Click to expand full prompt text"
+                                                            title="Click to expand or collapse full prompt text"
+                                                            className="cursor-pointer text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 select-none"
                                                         >
-                                                            {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
+                                                            {showAllWords ? '... [Collapse Full Text]' : '... [Expand Full Text]'}
                                                         </span>
                                                     </div>
                                                 )}
@@ -2325,7 +2381,7 @@ export default function PromptTreeViewModal({
                                                     formatPromptForMarkdown(activePromptText).split('\n').map((line, idx, arr) => (
                                                         <span key={`raw-line-${idx}`} className="block">
                                                             {line || <br className="my-1.5 block select-none" />}
-                                                            {idx < arr.length - 1 && <br className="my-1 block select-none" />}
+                                                            {idx < arr.length - 1 && <br className="my-1.5 block select-none" />}
                                                         </span>
                                                     ))
                                                 ) : (
@@ -2518,7 +2574,26 @@ export default function PromptTreeViewModal({
                                     Full Prompt Instruction
                                 </label>
                                 <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-900 dark:text-slate-100 leading-relaxed max-h-[600px] overflow-y-auto select-text shadow-inner">
-                                    <RichMarkdownRenderer content={inspectorPrompt.text} />
+                                    <RichMarkdownRenderer
+                                        content={inspectorPrompt.text}
+                                        showAllWords={showAllWords}
+                                        onToggleExpand={() => setShowAllWords(!showAllWords)}
+                                        isTruncated={inspectorPrompt.text.trim().endsWith('...') || inspectorPrompt.text.trim().endsWith('…')}
+                                    />
+                                    {(inspectorPrompt.text.trim().endsWith('...') || inspectorPrompt.text.trim().endsWith('…') || showAllWords) && (
+                                        <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#15334d]/50 flex items-center">
+                                            <span
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowAllWords(!showAllWords);
+                                                }}
+                                                title="Click to expand or collapse full prompt text"
+                                                className="cursor-pointer text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 select-none"
+                                            >
+                                                {showAllWords ? '... [Collapse Full Text]' : '... [Expand Full Text]'}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -98,13 +98,17 @@ export const isNodeOwnedByInstance = (
     node: AgmProjectTreeNode,
     instConfig: { id: string; is_default?: boolean; seq_num?: number }
 ): boolean => {
-    if (instConfig.is_default && isDefaultOwned(node.instance_id, instConfig.id)) {
-        return true;
+    if (instConfig.is_default) {
+        return isDefaultOwned(node.instance_id, instConfig.id);
+    }
+    // Non-default instance never owns default nodes
+    if (node.instance_id === 'default' || node.instance_id === '__default__') {
+        return false;
     }
     if (node.instance_id === instConfig.id) {
         return true;
     }
-    const hasSeqNum = typeof instConfig.seq_num === 'number';
+    const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
     if (hasSeqNum && node.instance_seq_num === instConfig.seq_num) {
         return true;
     }
