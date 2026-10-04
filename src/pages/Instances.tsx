@@ -46,9 +46,10 @@ import {
 } from '../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
-import InstanceTable from '../components/instances/InstanceTable';
+import InstanceTable, { type InstanceActionType } from '../components/instances/InstanceTable';
 import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
+import ModalDialog from '../components/common/ModalDialog';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
@@ -174,6 +175,9 @@ export default function Instances() {
     const [isSyncingAll, setIsSyncingAll] = useState(false);
     const [syncingInstanceIds, setSyncingInstanceIds] = useState<Record<string, boolean>>({});
     const [auditModalInstance, setAuditModalInstance] = useState<{ id: string; name: string; sequence_name?: string } | null>(null);
+    const [actionState, setActionState] = useState<Record<string, InstanceActionType>>({});
+    const [deleteModalTarget, setDeleteModalTarget] = useState<InstanceStatus | null>(null);
+    const [wipeModalTarget, setWipeModalTarget] = useState<InstanceStatus | null>(null);
     const activeCardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -194,6 +198,8 @@ export default function Instances() {
                 setSwitchTargetInstance(null);
                 setIsSettingsModalOpen(false);
                 setAuditModalInstance(null);
+                setDeleteModalTarget(null);
+                setWipeModalTarget(null);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -385,38 +391,106 @@ export default function Instances() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (deletingId) return;
-        setActionError(null);
-        if (window.confirm(t('instances.confirm_delete', 'Are you sure you want to delete this profile?'))) {
-            try {
-                setDeletingId(id);
-                await deleteInstance(id);
-            } catch (e: any) {
-                setActionError(e?.toString() || 'Failed to delete instance');
-            } finally {
-                setDeletingId(null);
-            }
+    const handleDelete = (id: string) => {
+        const target = instances.find((i) => i.config.id === id);
+        if (target) {
+            setDeleteModalTarget(target);
         }
     };
 
-    const handleWipeSession = async (id: string) => {
+    const handleConfirmDelete = async () => {
+        if (!deleteModalTarget) return;
+        const targetId = deleteModalTarget.config.id;
+        setActionState((prev) => ({ ...prev, [targetId]: 'delete' }));
+        setDeletingId(targetId);
         setActionError(null);
-        if (window.confirm(t('instances.confirm_wipe', 'Wipe session tokens for this profile? User preferences will be kept.'))) {
-            try {
-                await wipeSession(id);
-            } catch (e: any) {
-                setActionError(e?.toString() || 'Failed to wipe session');
-            }
+        try {
+            await deleteInstance(targetId);
+            setDeleteModalTarget(null);
+            showToast(t('instances.deleted_toast', 'Profile deleted successfully'), 'success');
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to delete instance');
+        } finally {
+            setDeletingId(null);
+            setActionState((prev) => ({ ...prev, [targetId]: null }));
+        }
+    };
+
+    const handleWipeSession = (id: string) => {
+        const target = instances.find((i) => i.config.id === id);
+        if (target) {
+            setWipeModalTarget(target);
+        }
+    };
+
+    const handleConfirmWipe = async () => {
+        if (!wipeModalTarget) return;
+        const targetId = wipeModalTarget.config.id;
+        setActionState((prev) => ({ ...prev, [targetId]: 'wipe' }));
+        setActionError(null);
+        try {
+            await wipeSession(targetId);
+            setWipeModalTarget(null);
+            showToast(`Session tokens wiped for '${wipeModalTarget.config.name}'`, 'success');
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to wipe session');
+        } finally {
+            setActionState((prev) => ({ ...prev, [targetId]: null }));
         }
     };
 
     const handleLaunch = async (id: string) => {
+        if (actionState[id]) return;
+        setActionState((prev) => ({ ...prev, [id]: 'launch' }));
         setActionError(null);
         try {
             await launchInstance(id);
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to launch instance');
+        } finally {
+            setActionState((prev) => ({ ...prev, [id]: null }));
+        }
+    };
+
+    const handleStop = async (id: string) => {
+        if (actionState[id]) return;
+        setActionState((prev) => ({ ...prev, [id]: 'stop' }));
+        setActionError(null);
+        try {
+            await stopInstance(id);
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to stop instance');
+        } finally {
+            setActionState((prev) => ({ ...prev, [id]: null }));
+        }
+    };
+
+    const handleFastForward = async (id: string) => {
+        if (actionState[id]) return;
+        setActionState((prev) => ({ ...prev, [id]: 'fast-forward' }));
+        setActionError(null);
+        try {
+            const msg = await fastForwardInstance(id);
+            showToast(msg || 'Rotated to next best profile!', 'success');
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Fast forward failed');
+        } finally {
+            setActionState((prev) => ({ ...prev, [id]: null }));
+        }
+    };
+
+    const handleSync = async (id: string) => {
+        if (actionState[id]) return;
+        setActionState((prev) => ({ ...prev, [id]: 'sync' }));
+        setSyncingInstanceIds((prev) => ({ ...prev, [id]: true }));
+        setActionError(null);
+        try {
+            await syncInstance(id);
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to sync instance');
+        } finally {
+            setSyncingInstanceIds((prev) => ({ ...prev, [id]: false }));
+            setActionState((prev) => ({ ...prev, [id]: null }));
         }
     };
 
@@ -834,20 +908,14 @@ export default function Instances() {
                     instances={filteredInstances}
                     activeInstanceId={activeInstanceId}
                     searchQuery={searchQuery}
+                    actionState={actionState}
                     onLaunch={handleLaunch}
-                    onStop={stopInstance}
+                    onStop={handleStop}
                     onSwitch={(id) => {
                         const target = instances.find((i) => i.config.id === id);
                         if (target) setSwitchTargetInstance(target);
                     }}
-                    onFastForward={async (id) => {
-                        try {
-                            const msg = await fastForwardInstance(id);
-                            showToast(msg || 'Rotated to next best profile!', 'success');
-                        } catch (e: any) {
-                            setActionError(e?.toString() || 'Fast forward failed');
-                        }
-                    }}
+                    onFastForward={handleFastForward}
                     onAudit={(id, name) => {
                         const target = instances.find((i) => i.config.id === id);
                         setAuditModalInstance({
@@ -856,16 +924,7 @@ export default function Instances() {
                             sequence_name: target?.config.seq_num ? `Instance #${target.config.seq_num}` : undefined
                         });
                     }}
-                    onSync={async (id) => {
-                        setSyncingInstanceIds(prev => ({ ...prev, [id]: true }));
-                        try {
-                            await syncInstance(id);
-                        } catch (e: any) {
-                            setActionError(e?.toString() || 'Failed to sync instance');
-                        } finally {
-                            setSyncingInstanceIds(prev => ({ ...prev, [id]: false }));
-                        }
-                    }}
+                    onSync={handleSync}
                     syncingInstanceIds={syncingInstanceIds}
                     onSettings={(id) => {
                         const target = instances.find((i) => i.config.id === id);
@@ -937,6 +996,9 @@ export default function Instances() {
                         const effectiveExePath =
                             inst.config.executable_path || (inst.config.is_default ? defaultExePath : null);
 
+                        const currentAction = actionState[inst.config.id] || null;
+                        const isBusy = Boolean(currentAction);
+
                         return (
                             <div
                                 key={inst.config.id}
@@ -985,6 +1047,7 @@ export default function Instances() {
                                                     </span>
                                                 ) : (
                                                     <button
+                                                        disabled={isBusy}
                                                         onClick={async () => {
                                                             try {
                                                                 await setDefaultInstance(inst.config.id);
@@ -993,7 +1056,7 @@ export default function Instances() {
                                                                 setActionError(e?.toString() || 'Failed to set default profile');
                                                             }
                                                         }}
-                                                        className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#15334d] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                                        className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#15334d] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Set as default profile"
                                                     >
                                                         <Star className="w-2.5 h-2.5" />
@@ -1008,30 +1071,33 @@ export default function Instances() {
                                                     </span>
                                                 ) : (
                                                     <button
+                                                        disabled={isBusy}
                                                         onClick={() => setActiveInstance(inst.config.id)}
-                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer"
+                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Set as active instance for account switches"
                                                     >
                                                         Set Active
                                                     </button>
                                                 )}
                                                 <button
+                                                    disabled={isBusy}
                                                     onClick={() => {
                                                         setEditTargetId(inst.config.id);
                                                         setEditInstanceName(inst.config.name);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                                                    className="p-1 rounded-[5px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title={t('instances.edit_title', 'Rename profile')}
                                                 >
                                                     <Pencil className="w-3 h-3" />
                                                 </button>
                                                 <button
+                                                    disabled={isBusy}
                                                     onClick={() => {
                                                         setCopyTargetId(inst.config.id);
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
                                                         setCopyProjects(true);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer"
+                                                    className="p-1 rounded-[5px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Clone / Duplicate profile settings and extensions"
                                                 >
                                                     <Copy className="w-3 h-3" />
@@ -1039,11 +1105,15 @@ export default function Instances() {
                                                 {!inst.config.is_default && (
                                                     <button
                                                         onClick={() => handleDelete(inst.config.id)}
-                                                        disabled={inst.is_running || deletingId === inst.config.id}
-                                                        className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
+                                                        disabled={inst.is_running || isBusy || deletingId === inst.config.id}
+                                                        className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                                         title="Delete profile"
                                                     >
-                                                        <Trash2 className="w-3 h-3" />
+                                                        {currentAction === 'delete' ? (
+                                                            <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                        ) : (
+                                                            <Trash2 className="w-3 h-3" />
+                                                        )}
                                                     </button>
                                                 )}
                                             </div>
@@ -1336,57 +1406,71 @@ export default function Instances() {
                                             {inst.is_running ? (
                                                 <button
                                                     type="button"
-                                                    onClick={() => stopInstance(inst.config.id)}
-                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                                                    disabled={isBusy}
+                                                    onClick={() => handleStop(inst.config.id)}
+                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Stop Instance"
                                                 >
-                                                    <Square className="w-3 h-3 fill-current" />
+                                                    {currentAction === 'stop' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Square className="w-3 h-3 fill-current" />
+                                                    )}
                                                 </button>
                                             ) : (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => handleLaunch(inst.config.id)}
-                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Launch Instance"
                                                 >
-                                                    <Play className="w-3 h-3 fill-current" />
+                                                    {currentAction === 'launch' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-emerald-500" />
+                                                    ) : (
+                                                        <Play className="w-3 h-3 fill-current" />
+                                                    )}
                                                 </button>
                                             )}
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => setSwitchTargetInstance(inst)}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Switch Account"
                                             >
-                                                <ArrowRightLeft className="w-3 h-3" />
+                                                {currentAction === 'switch' ? (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-slate-500" />
+                                                ) : (
+                                                    <ArrowRightLeft className="w-3 h-3" />
+                                                )}
                                             </button>
 
                                             <button
                                                 type="button"
-                                                onClick={async () => {
-                                                    try {
-                                                        const msg = await fastForwardInstance(inst.config.id);
-                                                        showToast(msg || `Rotated ${inst.config.name} to next best profile!`, 'success');
-                                                    } catch (e: any) {
-                                                        setActionError(e?.toString() || 'Fast forward failed');
-                                                    }
-                                                }}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                disabled={isBusy}
+                                                onClick={() => handleFastForward(inst.config.id)}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Fast Forward to Next Best"
                                             >
-                                                <FastForward className="w-3 h-3" />
+                                                {currentAction === 'fast-forward' ? (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-slate-500" />
+                                                ) : (
+                                                    <FastForward className="w-3 h-3" />
+                                                )}
                                             </button>
 
                                             {/* Softened Audit Button (VS Code slate theme) */}
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => setAuditModalInstance({
                                                     id: inst.config.id,
                                                     name: inst.config.name,
                                                     sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
                                                 })}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Audit Trail"
                                             >
                                                 <History className="w-3 h-3" />
@@ -1394,21 +1478,12 @@ export default function Instances() {
 
                                             <button
                                                 type="button"
-                                                onClick={async () => {
-                                                    setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: true }));
-                                                    try {
-                                                        await syncInstance(inst.config.id);
-                                                    } catch (e: any) {
-                                                        setActionError(e?.toString() || 'Failed to sync instance');
-                                                    } finally {
-                                                        setSyncingInstanceIds(prev => ({ ...prev, [inst.config.id]: false }));
-                                                    }
-                                                }}
-                                                disabled={Boolean(syncingInstanceIds[inst.config.id])}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                                                disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
+                                                onClick={() => handleSync(inst.config.id)}
+                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Sync PID and Quota"
                                             >
-                                                <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds[inst.config.id] && "animate-spin")} />
+                                                <RotateCw className={cn("w-3 h-3 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-spin")} />
                                             </button>
                                         </div>
 
@@ -1417,9 +1492,10 @@ export default function Instances() {
                                             {/* Slot 1: Prompts */}
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
                                                 className={cn(
-                                                    "w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] border transition-colors cursor-pointer relative",
+                                                    "w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] border transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
                                                     hasActiveTask
                                                         ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 border-cyan-400/50 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
                                                         : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -1435,11 +1511,12 @@ export default function Instances() {
                                             {/* Slot 2: Settings */}
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => {
                                                     setSettingsModalTarget(inst);
                                                     setIsSettingsModalOpen(true);
                                                 }}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Settings & Sync"
                                             >
                                                 <SlidersHorizontal className="w-3 h-3" />
@@ -1448,12 +1525,13 @@ export default function Instances() {
                                             {/* Slot 3: Clone Profile */}
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => {
                                                     setCopyTargetId(inst.config.id);
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCopyProjects(true);
                                                 }}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Clone Profile"
                                             >
                                                 <Copy className="w-3 h-3" />
@@ -1462,8 +1540,9 @@ export default function Instances() {
                                             {/* Slot 4: Clone Binary / Executable */}
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => handleCloneExecutable(inst.config.id)}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Clone Binary / Executable"
                                             >
                                                 <Cpu className="w-3 h-3" />
@@ -1473,11 +1552,15 @@ export default function Instances() {
                                             <button
                                                 type="button"
                                                 onClick={() => handleWipeSession(inst.config.id)}
-                                                disabled={inst.is_running}
+                                                disabled={inst.is_running || isBusy}
                                                 className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                 title="Wipe Credentials"
                                             >
-                                                <RotateCcw className="w-3 h-3" />
+                                                {currentAction === 'wipe' ? (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
+                                                ) : (
+                                                    <RotateCcw className="w-3 h-3" />
+                                                )}
                                             </button>
 
                                             {/* Slot 6: Delete Profile (or invisible placeholder for default) */}
@@ -1485,11 +1568,15 @@ export default function Instances() {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(inst.config.id)}
-                                                    disabled={inst.is_running || deletingId === inst.config.id}
+                                                    disabled={inst.is_running || isBusy || deletingId === inst.config.id}
                                                     className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Delete Profile"
                                                 >
-                                                    <Trash2 className="w-3 h-3" />
+                                                    {currentAction === 'delete' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-3 h-3" />
+                                                    )}
                                                 </button>
                                             ) : (
                                                 <div className="w-full invisible" aria-hidden="true" />
@@ -1746,16 +1833,20 @@ export default function Instances() {
                                             </div>
 
                                             <button
-                                                disabled={isCurrent || isLoading}
+                                                disabled={isCurrent || isLoading || Boolean(actionState[switchTargetInstance.config.id])}
                                                 onClick={async () => {
+                                                    const targetId = switchTargetInstance.config.id;
+                                                    setActionState((prev) => ({ ...prev, [targetId]: 'switch' }));
                                                     setActionError(null);
                                                     try {
-                                                        await switchAccountToInstance(acc.id, switchTargetInstance.config.id);
+                                                        await switchAccountToInstance(acc.id, targetId);
                                                         showToast(`Switched ${switchTargetInstance.config.name} to ${acc.email}`, 'success');
                                                         setSwitchTargetInstance(null);
                                                         setAccountSearchQuery('');
                                                     } catch (e: any) {
                                                         setActionError(e?.toString() || 'Failed to switch account');
+                                                    } finally {
+                                                        setActionState((prev) => ({ ...prev, [targetId]: null }));
                                                     }
                                                 }}
                                                 className={cn(
@@ -1763,7 +1854,12 @@ export default function Instances() {
                                                     isCurrent ? "btn-disabled opacity-50" : "btn-primary"
                                                 )}
                                             >
-                                                {isCurrent ? 'Current' : 'Select'}
+                                                {actionState[switchTargetInstance.config.id] === 'switch' ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <RotateCw className="w-3 h-3 animate-spin" />
+                                                        <span>Switching...</span>
+                                                    </span>
+                                                ) : isCurrent ? 'Current' : 'Select'}
                                             </button>
                                         </div>
                                     );
@@ -1789,26 +1885,26 @@ export default function Instances() {
             {/* Copy / Duplicate Modal */}
             {copyTargetId && (
                 <div
-                    className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                     onClick={() => {
                         setCopyTargetId(null);
                         setCopyInstanceName('');
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200/80 dark:border-base-100 transition-all"
+                        className="bg-white dark:bg-[#071a27] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#15334d] transition-all"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                        <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#15334d] mb-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
+                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/50 dark:border-cyan-800/40 shadow-xs">
                                     <Copy className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-gray-900 dark:text-base-content">
+                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">
                                         {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                                     </h3>
-                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
                                         {t('instances.copy_modal_subtitle', 'Create an isolated duplicate of this profile environment')}
                                     </p>
                                 </div>
@@ -1819,14 +1915,14 @@ export default function Instances() {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-base-100 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-[#0c2438] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
                             {t('instances.copy_name_label', 'New Profile Name')}
                         </label>
                         <input
@@ -1835,41 +1931,41 @@ export default function Instances() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="w-full px-4 py-3 bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all shadow-xs"
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#040e16] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 dark:focus:border-cyan-400 transition-all shadow-xs placeholder-gray-400 dark:placeholder-slate-500"
                             autoFocus
                         />
 
                         {/* Scope Selection Cards */}
                         <div className="mb-5 space-y-2">
-                            <span className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <span className="block text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                                 {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
                             </span>
                             <div className="grid grid-cols-1 gap-2.5">
                                 <div
                                     onClick={() => setCloneMode('full')}
                                     className={cn(
-                                        "p-3 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
+                                        "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'full'
-                                            ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20 shadow-xs"
-                                            : "border-gray-200 dark:border-base-100 bg-gray-50/50 dark:bg-base-100/60 hover:border-gray-300 dark:hover:border-base-300"
+                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/70 dark:bg-[#092236] ring-1 ring-blue-500/30 dark:ring-cyan-500/30 shadow-xs"
+                                            : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e] hover:bg-gray-100/60 dark:hover:bg-[#091f30]"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                                            cloneMode === 'full' ? "border-indigo-600 bg-indigo-600" : "border-gray-400 dark:border-gray-600"
+                                            cloneMode === 'full' ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500" : "border-gray-400 dark:border-slate-500"
                                         )}>
-                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#071a27]" />}
                                         </div>
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
                                             <span>{t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}</span>
-                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-cyan-950/80 text-blue-700 dark:text-cyan-300 border border-blue-200/60 dark:border-cyan-800/60">
                                                 Full
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed mt-0.5">
+                                        <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed mt-1">
                                             {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, extensions, cache, and state.')}
                                         </p>
                                     </div>
@@ -1878,28 +1974,28 @@ export default function Instances() {
                                 <div
                                     onClick={() => setCloneMode('profile')}
                                     className={cn(
-                                        "p-3 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
+                                        "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'profile'
-                                            ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20 shadow-xs"
-                                            : "border-gray-200 dark:border-base-100 bg-gray-50/50 dark:bg-base-100/60 hover:border-gray-300 dark:hover:border-base-300"
+                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/70 dark:bg-[#092236] ring-1 ring-blue-500/30 dark:ring-cyan-500/30 shadow-xs"
+                                            : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e] hover:bg-gray-100/60 dark:hover:bg-[#091f30]"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                                            cloneMode === 'profile' ? "border-indigo-600 bg-indigo-600" : "border-gray-400 dark:border-gray-600"
+                                            cloneMode === 'profile' ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500" : "border-gray-400 dark:border-slate-500"
                                         )}>
-                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#071a27]" />}
                                         </div>
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
                                             <span>{t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}</span>
-                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
                                                 Preferences
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed mt-0.5">
+                                        <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed mt-1">
                                             {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets without bulky runtime session state.')}
                                         </p>
                                     </div>
@@ -1908,12 +2004,24 @@ export default function Instances() {
                         </div>
 
                         {/* Copy Workspace Projects & Folders Option */}
-                        <div className="mb-5 p-3 rounded-xl border border-gray-200 dark:border-base-100 bg-gray-50/50 dark:bg-base-100/50 flex items-center justify-between gap-3">
+                        <div
+                            onClick={() => setCopyProjects(!copyProjects)}
+                            className={cn(
+                                "mb-5 p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer",
+                                copyProjects
+                                    ? "border-blue-500/60 dark:border-cyan-500/60 bg-blue-50/50 dark:bg-[#092236]/80 ring-1 ring-blue-500/20 dark:ring-cyan-500/20 shadow-xs"
+                                    : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e]"
+                            )}
+                        >
                             <div className="min-w-0 pr-2">
-                                <label htmlFor="instances-page-copy-projects" className="font-bold text-xs text-gray-900 dark:text-gray-100 cursor-pointer block">
+                                <label
+                                    htmlFor="instances-page-copy-projects"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="font-bold text-xs text-gray-900 dark:text-white cursor-pointer block"
+                                >
                                     {t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}
                                 </label>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                                <p className="text-[11px] text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">
                                     {t('instances.copy_projects_desc', 'Duplicate opened workspaces, project states, and recent folder paths into the new profile.')}
                                 </p>
                             </div>
@@ -1922,18 +2030,19 @@ export default function Instances() {
                                 type="checkbox"
                                 checked={copyProjects}
                                 onChange={(e) => setCopyProjects(e.target.checked)}
+                                onClick={(e) => e.stopPropagation()}
                                 className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer shrink-0"
                             />
                         </div>
 
-                        <div className="flex justify-end items-center gap-2.5 pt-2">
+                        <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#15334d]">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-base-100 hover:bg-gray-100 dark:hover:bg-base-100 transition-all duration-200 active:scale-95 cursor-pointer"
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] hover:bg-gray-100 dark:hover:bg-[#0c2438] transition-all duration-200 active:scale-95 cursor-pointer"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -1941,7 +2050,7 @@ export default function Instances() {
                                 type="button"
                                 onClick={handleCopy}
                                 disabled={!copyInstanceName.trim()}
-                                className="px-5 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                                className="px-5 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-cyan-500/30 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
                             >
                                 <Copy className="w-3.5 h-3.5" />
                                 <span>{t('instances.duplicate', 'Duplicate')}</span>
@@ -2044,6 +2153,90 @@ export default function Instances() {
                 onClose={() => setAuditModalInstance(null)}
                 instance={auditModalInstance}
             />
+
+            {/* Bespoke Delete Confirmation Modal */}
+            <ModalDialog
+                isOpen={Boolean(deleteModalTarget)}
+                title={t('instances.delete_title', 'Delete Profile')}
+                type="confirm"
+                isDestructive={true}
+                isLoading={deletingId === deleteModalTarget?.config.id}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setDeleteModalTarget(null)}
+                confirmText={t('common.delete', 'Delete')}
+                cancelText={t('common.cancel', 'Cancel')}
+            >
+                {deleteModalTarget && (
+                    <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
+                            {t(
+                                'instances.delete_warning',
+                                'Are you sure you want to delete this profile? This will permanently delete the isolated profile data directory and all settings.'
+                            )}
+                        </div>
+                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.name', 'Profile Name')}:</span>
+                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                        #{deleteModalTarget.config.seq_num ?? 0}
+                                    </span>
+                                    {deleteModalTarget.config.name}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1 pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
+                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.data_dir', 'Data Directory')}:</span>
+                                <span className="font-mono text-[11px] text-gray-700 dark:text-slate-300 break-all bg-white dark:bg-[#071a27] p-1.5 rounded-lg border border-gray-200 dark:border-[#15334d]">
+                                    {deleteModalTarget.config.data_dir}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </ModalDialog>
+
+            {/* Bespoke Wipe Session Confirmation Modal */}
+            <ModalDialog
+                isOpen={Boolean(wipeModalTarget)}
+                title={t('instances.wipe_title', 'Wipe Credentials')}
+                type="confirm"
+                isDestructive={true}
+                isLoading={actionState[wipeModalTarget?.config.id || ''] === 'wipe'}
+                onConfirm={handleConfirmWipe}
+                onCancel={() => setWipeModalTarget(null)}
+                confirmText={t('instances.wipe_confirm', 'Wipe Credentials')}
+                cancelText={t('common.cancel', 'Cancel')}
+            >
+                {wipeModalTarget && (
+                    <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-300">
+                            {t(
+                                'instances.wipe_warning',
+                                'This will clear all saved account credentials and session tokens from this profile without deleting its workspace or configurations.'
+                            )}
+                        </div>
+                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.name', 'Profile Name')}:</span>
+                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                        #{wipeModalTarget.config.seq_num ?? 0}
+                                    </span>
+                                    {wipeModalTarget.config.name}
+                                </span>
+                            </div>
+                            {wipeModalTarget.config.bound_email && (
+                                <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
+                                    <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.bound_account', 'Bound Account')}:</span>
+                                    <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                                        {wipeModalTarget.config.bound_email}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </ModalDialog>
         </div>
         </div>
     );

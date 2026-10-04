@@ -20,10 +20,13 @@ import type { InstanceStatus } from '../../services/instanceService';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { WaterDrainProgressBar } from '../common/WaterDrainProgressBar';
 
+export type InstanceActionType = 'launch' | 'stop' | 'switch' | 'fast-forward' | 'wipe' | 'delete' | 'sync' | null;
+
 interface InstanceTableProps {
     instances: InstanceStatus[];
     activeInstanceId?: string | null;
     searchQuery?: string;
+    actionState?: Record<string, InstanceActionType>;
     onLaunch: (id: string) => void;
     onStop: (id: string) => void;
     onSwitch: (id: string) => void;
@@ -52,6 +55,7 @@ function formatShortPath(fullPath: string): string {
 export default function InstanceTable({
     instances,
     activeInstanceId,
+    actionState,
     onLaunch,
     onStop,
     onSwitch,
@@ -118,11 +122,15 @@ export default function InstanceTable({
                             const mainModel = models.find((m) => m.name.toLowerCase().includes('pro')) || models.find((m) => m.name.toLowerCase().includes('flash')) || models[0] || null;
                             const percentage = mainModel ? Math.round(mainModel.percentage) : null;
 
+                            const currentAction = actionState?.[inst.config.id] || null;
+                            const isBusy = Boolean(currentAction);
+
                             return (
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
                                         "transition-colors duration-150 border-b border-slate-200/80 dark:border-slate-800/80 last:border-b-0",
+                                        isBusy && "opacity-75",
                                         isActive
                                             ? "bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]"
                                             : "hover:bg-slate-50/80 dark:hover:bg-[#0d253a]/70"
@@ -148,8 +156,9 @@ export default function InstanceTable({
                                             ) : onSetDefault ? (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => onSetDefault(inst.config.id)}
-                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Set as default profile"
                                                 >
                                                     Set Default
@@ -162,8 +171,9 @@ export default function InstanceTable({
                                             ) : (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => onSetActive(inst.config.id)}
-                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer"
+                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Set as active target for account rotations"
                                                 >
                                                     Set Active
@@ -294,45 +304,66 @@ export default function InstanceTable({
                                             {inst.is_running ? (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => onStop(inst.config.id)}
-                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
                                                     title="Stop Instance"
                                                 >
-                                                    <Square className="w-3 h-3 fill-current" />
+                                                    {currentAction === 'stop' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Square className="w-3 h-3 fill-current" />
+                                                    )}
                                                 </button>
                                             ) : (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => onLaunch(inst.config.id)}
-                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
                                                     title="Launch Instance"
                                                 >
-                                                    <Play className="w-3 h-3 fill-current" />
+                                                    {currentAction === 'launch' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-emerald-500" />
+                                                    ) : (
+                                                        <Play className="w-3 h-3 fill-current" />
+                                                    )}
                                                 </button>
                                             )}
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => onSwitch(inst.config.id)}
-                                                className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                 title="Switch Account"
                                             >
-                                                <RotateCcw className="w-3 h-3" />
+                                                {currentAction === 'switch' ? (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-sky-500" />
+                                                ) : (
+                                                    <RotateCcw className="w-3 h-3" />
+                                                )}
                                             </button>
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => onFastForward(inst.config.id)}
-                                                className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                 title="Fast Forward to Best Candidate"
                                             >
-                                                <Zap className="w-3 h-3 fill-current" />
+                                                {currentAction === 'fast-forward' ? (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
+                                                ) : (
+                                                    <Zap className="w-3 h-3 fill-current" />
+                                                )}
                                             </button>
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => onOpenPromptTree(inst.config.id)}
-                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                 title="Prompts & Conversations"
                                             >
                                                 <Layers className="w-3 h-3" />
@@ -341,8 +372,9 @@ export default function InstanceTable({
                                             {onAudit && (
                                                 <button
                                                     type="button"
+                                                    disabled={isBusy}
                                                     onClick={() => onAudit(inst.config.id, inst.config.name)}
-                                                    className="px-2 py-1 text-slate-500 hover:text-amber-500 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                    className="px-2 py-1 text-slate-500 hover:text-amber-500 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                     title="Audit Trail"
                                                 >
                                                     <History className="w-3 h-3" />
@@ -353,18 +385,19 @@ export default function InstanceTable({
                                                 <button
                                                     type="button"
                                                     onClick={() => onSync(inst.config.id)}
-                                                    disabled={Boolean(syncingInstanceIds?.[inst.config.id])}
+                                                    disabled={isBusy || Boolean(syncingInstanceIds?.[inst.config.id])}
                                                     className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                     title="Sync PID and Quota"
                                                 >
-                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", syncingInstanceIds?.[inst.config.id] && "animate-spin")} />
+                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", (currentAction === 'sync' || syncingInstanceIds?.[inst.config.id]) && "animate-spin")} />
                                                 </button>
                                             )}
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => onSettings(inst.config.id)}
-                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                 title="Settings & Sync"
                                             >
                                                 <SlidersHorizontal className="w-3 h-3" />
@@ -372,8 +405,9 @@ export default function InstanceTable({
 
                                             <button
                                                 type="button"
+                                                disabled={isBusy}
                                                 onClick={() => onClone(inst.config.id, inst.config.name)}
-                                                className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
                                                 title="Clone / Duplicate Profile"
                                             >
                                                 <Copy className="w-3 h-3" />
@@ -383,11 +417,15 @@ export default function InstanceTable({
                                                 <button
                                                     type="button"
                                                     onClick={() => onDelete(inst.config.id)}
-                                                    disabled={inst.is_running}
+                                                    disabled={inst.is_running || isBusy}
                                                     className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Delete Profile"
                                                 >
-                                                    <Trash2 className="w-3 h-3" />
+                                                    {currentAction === 'delete' ? (
+                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-3 h-3" />
+                                                    )}
                                                 </button>
                                             )}
                                         </div>

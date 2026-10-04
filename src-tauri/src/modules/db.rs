@@ -359,14 +359,12 @@ pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
         return Ok(());
     }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
     let _ = conn.execute(
-        "DELETE FROM ItemTable WHERE key IN (?, ?, ?, ?, ?)",
+        "DELETE FROM ItemTable WHERE key IN (?, ?)",
         [
             "antigravityUnifiedStateSync.oauthToken",
             "antigravityUnifiedStateSync.userStatus",
-            "antigravityUnifiedStateSync.enterprisePreferences",
-            "jetskiStateSync.agentManagerInitState",
-            "antigravityOnboarding",
         ],
     );
     crate::modules::logger::log_info(&format!(

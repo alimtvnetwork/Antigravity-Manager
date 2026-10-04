@@ -263,7 +263,7 @@ pub fn update_instance_app_storage(
             if let Some(p) = inst_db.parent() {
                 let _ = fs::create_dir_all(p);
             }
-            let _ = fs::copy(&default_db, &inst_db);
+            let _ = safe_clone_sqlite_db(&default_db, &inst_db);
             let _ = crate::modules::db::sanitize_session(&inst_db);
         }
     }
@@ -809,6 +809,28 @@ pub fn create_instance_with_account(
         let _ = fs::copy(default_settings, dest_settings);
     }
 
+    // Also copy security_presets.json and antigravity_policies.json from default directory if they exist
+    for file_name in &["security_presets.json", "antigravity_policies.json"] {
+        let default_file = default_dir.join("User").join(file_name);
+        let dest_file = user_dir.join(file_name);
+        if default_file.exists() && !dest_file.exists() {
+            let _ = fs::copy(&default_file, &dest_file);
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let roaming_user = instance_home_dir
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User");
+            let _ = fs::create_dir_all(&roaming_user);
+            let roaming_dest = roaming_user.join(file_name);
+            if default_file.exists() && !roaming_dest.exists() {
+                let _ = fs::copy(&default_file, &roaming_dest);
+            }
+        }
+    }
+
     let next_seq = registry
         .instances
         .iter()
@@ -1069,6 +1091,80 @@ pub fn copy_instance_with_options(
             ));
         }
 
+        // Specifically ensure state.vscdb is cloned using safe_clone_sqlite_db
+        let src_vscdb = src_path
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        let dst_vscdb = dst_path
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+        if src_vscdb.exists() {
+            if let Err(e) = safe_clone_sqlite_db(&src_vscdb, &dst_vscdb) {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Failed to safe-clone state.vscdb: {}",
+                    e
+                ));
+            }
+        } else if source.is_default || source.id == "default" {
+            let default_vscdb = get_default_antigravity_data_dir()
+                .join("User")
+                .join("globalStorage")
+                .join("state.vscdb");
+            if default_vscdb.exists() {
+                let _ = safe_clone_sqlite_db(&default_vscdb, &dst_vscdb);
+            }
+        }
+
+        // Copy security_presets.json and antigravity_policies.json across all target directories
+        let mut dst_user_targets = vec![dst_path.join("User")];
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(dst_home) = get_instance_home_dir(&new_instance.id) {
+                let dst_appdata_user = dst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User");
+                let _ = fs::create_dir_all(&dst_appdata_user);
+                dst_user_targets.push(dst_appdata_user);
+            }
+        }
+
+        for file_name in &["security_presets.json", "antigravity_policies.json"] {
+            let mut candidate_srcs = vec![src_path.join("User").join(file_name)];
+            if let Some(src_home) = source_profile_home(&source) {
+                #[cfg(target_os = "windows")]
+                candidate_srcs.push(
+                    src_home
+                        .join("AppData")
+                        .join("Roaming")
+                        .join("Antigravity")
+                        .join("User")
+                        .join(file_name),
+                );
+            }
+            candidate_srcs.push(
+                get_default_antigravity_data_dir()
+                    .join("User")
+                    .join(file_name),
+            );
+
+            if let Some(found_src) = candidate_srcs.iter().find(|p| p.is_file()) {
+                for target_dir in &dst_user_targets {
+                    let _ = fs::create_dir_all(target_dir);
+                    let _ = fs::copy(found_src, target_dir.join(file_name));
+                }
+                crate::modules::logger::log_info(&format!(
+                    "[Instance] Copied {} from {} to {} target user directories",
+                    file_name,
+                    found_src.display(),
+                    dst_user_targets.len()
+                ));
+            }
+        }
+
         purge_volatile_instance_sessions(&dst_path);
 
         let is_tos = new_instance
@@ -1198,6 +1294,13 @@ pub fn copy_instance_with_options(
         ));
     }
 
+    if let Err(err) = copy_instance_settings(&source.id, &new_instance.id) {
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Deep settings copy failed from '{}' to '{}': {}",
+            source.id, new_instance.id, err
+        ));
+    }
+
     if copy_projects {
         let _ = crate::modules::repo_db::detect_running_projects(&source.id);
         if let Err(err) =
@@ -1208,7 +1311,12 @@ pub fn copy_instance_with_options(
                 err
             ));
         }
-        let _ = copy_instance_projects(&source.id, &new_instance.id);
+        if let Err(err) = copy_instance_projects(&source.id, &new_instance.id) {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Workspace projects copy failed: {}",
+                err
+            ));
+        }
     } else {
         let ws_main = dst_path.join("User").join("workspaceStorage");
         let has_ws = ws_main.exists();
@@ -1272,16 +1380,24 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
 
 /// Settings and workspace databases that must survive a clone even if a later
 /// file in the full tree is locked.
-const REQUIRED_IDE_REL_PATHS: &[&str] = &[
+pub const REQUIRED_IDE_REL_PATHS: &[&str] = &[
     "User/settings.json",
     "User/keybindings.json",
+    "User/security_presets.json",
+    "User/antigravity_policies.json",
     "User/snippets",
     "User/globalStorage",
     "User/workspaceStorage",
 ];
 
 /// Directories under `~/.gemini` that hold IDE settings and repo databases.
-const GEMINI_CLONE_DIRS: &[&str] = &["antigravity", "antigravity-ide", "antigravity-cli"];
+pub const GEMINI_CLONE_DIRS: &[&str] = &[
+    "antigravity",
+    "antigravity-ide",
+    "antigravity-cli",
+    "policies",
+    "config",
+];
 
 fn copy_required_ide_files(src: &Path, dst: &Path) -> Result<(), String> {
     for rel in REQUIRED_IDE_REL_PATHS {
@@ -1297,7 +1413,11 @@ fn copy_required_ide_files(src: &Path, dst: &Path) -> Result<(), String> {
                 fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create parent for {}: {}", rel, e))?;
             }
-            fs::copy(&from, &to).map_err(|e| format!("Failed to copy {}: {}", rel, e))?;
+            if rel.ends_with(".vscdb") || rel.ends_with(".db") {
+                safe_clone_sqlite_db(&from, &to)?;
+            } else {
+                fs::copy(&from, &to).map_err(|e| format!("Failed to copy {}: {}", rel, e))?;
+            }
         }
     }
     Ok(())
@@ -1447,6 +1567,19 @@ pub fn copy_source_user_settings(
         ));
     }
 
+    // Also explicitly ensure security_presets.json and antigravity_policies.json are copied into all dst_dirs
+    for file_name in &["security_presets.json", "antigravity_policies.json"] {
+        for src_user in &src_user_dirs {
+            let p = src_user.join(file_name);
+            if p.is_file() {
+                for dst in &dst_dirs {
+                    let _ = fs::copy(&p, dst.join(file_name));
+                }
+                break;
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1507,14 +1640,131 @@ fn copy_gemini_trees(src_home: &Path, dst_home: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    let has_dst = dst.exists();
-    if !has_dst {
-        fs::create_dir_all(dst)?;
+/// Clones an SQLite database safely even when active processes hold open locks or WAL files.
+/// First attempts a read-only rusqlite connection with SQLite Online Backup API (2s busy_timeout, WAL mode).
+/// If the backup API fails or is unavailable, falls back to direct file copying including `-wal` and `-shm` sidecars.
+pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> {
+    if !src_db.exists() {
+        return Ok(());
     }
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+
+    if let Some(parent) = dst_db.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create destination directory {}: {}",
+                parent.display(),
+                e
+            )
+        })?;
+    }
+
+    // Attempt 1: Online SQLite Backup API via read-only connection
+    let try_backup = || -> Result<(), String> {
+        let src_conn = rusqlite::Connection::open_with_flags(
+            src_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )
+        .map_err(|e| format!("Failed to open source SQLite db in read-only mode: {}", e))?;
+
+        let _ = src_conn.pragma_update(None, "busy_timeout", 2000);
+        let _ = src_conn.pragma_update(None, "journal_mode", "WAL");
+
+        if dst_db.exists() {
+            let _ = fs::remove_file(dst_db);
+        }
+        let mut sidecar_wal = dst_db.as_os_str().to_os_string();
+        sidecar_wal.push("-wal");
+        let _ = fs::remove_file(PathBuf::from(sidecar_wal));
+        let mut sidecar_shm = dst_db.as_os_str().to_os_string();
+        sidecar_shm.push("-shm");
+        let _ = fs::remove_file(PathBuf::from(sidecar_shm));
+
+        let mut dst_conn = rusqlite::Connection::open(dst_db)
+            .map_err(|e| format!("Failed to open destination SQLite db: {}", e))?;
+
+        let _ = dst_conn.pragma_update(None, "busy_timeout", 2000);
+        let _ = dst_conn.pragma_update(None, "journal_mode", "WAL");
+
+        let backup = rusqlite::backup::Backup::new(&src_conn, &mut dst_conn)
+            .map_err(|e| format!("Failed to initialize SQLite backup: {}", e))?;
+
+        backup
+            .run_to_completion(100, std::time::Duration::from_millis(5), None)
+            .map_err(|e| format!("SQLite backup run failed: {}", e))?;
+
+        Ok(())
+    };
+
+    if let Err(err) = try_backup() {
+        crate::modules::logger::log_info(&format!(
+            "[Instance] Online SQLite backup for {} failed ({}); falling back to file copy",
+            src_db.display(),
+            err
+        ));
+
+        // Attempt 2: Fallback direct file copy with -wal and -shm sidecars
+        fs::copy(src_db, dst_db).map_err(|e| {
+            format!(
+                "Failed to copy SQLite database file {} to {}: {}",
+                src_db.display(),
+                dst_db.display(),
+                e
+            )
+        })?;
+
+        for suffix in &["-wal", "-shm"] {
+            let mut src_sidecar = src_db.as_os_str().to_os_string();
+            src_sidecar.push(suffix);
+            let src_sidecar_path = PathBuf::from(src_sidecar);
+
+            let mut dst_sidecar = dst_db.as_os_str().to_os_string();
+            dst_sidecar.push(suffix);
+            let dst_sidecar_path = PathBuf::from(dst_sidecar);
+
+            if src_sidecar_path.exists() {
+                let _ = fs::copy(&src_sidecar_path, &dst_sidecar_path);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        if let Err(e) = fs::create_dir_all(dst) {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Failed to create directory {}: {}",
+                dst.display(),
+                e
+            ));
+            return Ok(());
+        }
+    }
+
+    let entries = match fs::read_dir(src) {
+        Ok(entries) => entries,
+        Err(e) => {
+            crate::modules::logger::log_warn(&format!(
+                "[Instance] Failed to read directory {}: {}",
+                src.display(),
+                e
+            ));
+            return Ok(());
+        }
+    };
+
+    for entry_result in entries {
+        let entry = match entry_result {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+
         let file_name = entry.file_name();
         let name_str = file_name.to_string_lossy().to_lowercase();
 
@@ -1530,9 +1780,23 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
 
         let dest_child = dst.join(&file_name);
-        let is_directory = file_type.is_dir();
-        if is_directory {
-            copy_dir_recursive(&entry.path(), &dest_child)?;
+        if file_type.is_dir() {
+            let _ = copy_dir_recursive(&entry.path(), &dest_child);
+        } else if name_str.ends_with(".vscdb") || name_str.ends_with(".db") {
+            if let Err(e) = safe_clone_sqlite_db(&entry.path(), &dest_child) {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Failed to safe clone SQLite db {}: {}",
+                    entry.path().display(),
+                    e
+                ));
+            }
+        } else if name_str.ends_with(".vscdb-wal")
+            || name_str.ends_with(".vscdb-shm")
+            || name_str.ends_with(".db-wal")
+            || name_str.ends_with(".db-shm")
+        {
+            // Handled alongside parent database in safe_clone_sqlite_db
+            continue;
         } else {
             let _ = fs::copy(entry.path(), dest_child);
         }
