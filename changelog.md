@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.143.0] - 2026-10-04
+
+### Added
+- **跨实例运行提示词隔离与进程精确存活检测 (Per-Instance Prompt Liveness Isolation & Process-Gated Running Detection)**: 彻底修复多实例管理页面中提示词运行状态跨实例污染问题——某实例正在运行 Coding Guideline，却错误在 Default 实例卡片上显示"RUNNING"徽章。重构 `get_project_conversation_tree`（`src-tauri/src/commands/instance.rs`）支持 `instance_id: Option<String>` 参数；在 `src-tauri/src/modules/repo_db.rs` 中按实例分区缓存键（`tree:{instance_id}:...`），并引入严格进程存活门控：若目标实例 OS 进程已终止，其所有项目与对话的 `is_running` 强制设为 `false`，彻底消除 10 分钟盲目近期性假设导致的"死实例被误报为运行中"缺陷；输出结构化 `[PROMPT_LIVENESS_PROBE]` 审计日志，完整记录 instance_id、PID、工作区目录及判定依据。 (Thanks to @aukgit)
+- **前端实例卡片运行状态严格按实例隔离 (Frontend Per-Instance Card Running State Scoping)**: 在 `src/pages/Instances.tsx` 与 `src/components/instances/PromptTreeViewModal.tsx` 中消除全局项目树泄漏——实例卡片不再使用宽松 `node.instance_name === inst.config.name` 字符串匹配，改为严格 `node.instance_id === inst.config.id` 精确绑定；`isProjRunning` 与 `hasActiveTask` 计算强制先判断 `inst.is_running`，确保已停止实例的所有项目绝无"运行中"状态；`PromptTreeViewModal` 移除全局树兜底逻辑，实例无项目时显示空状态，绝不泄漏其他实例项目。 (Thanks to @aukgit)
+- **深度实例克隆引擎：完整设置、主题与安全预设同步 (Deep Instance Clone Engine: Full Settings, Themes & Security Presets Copy)**: 彻底重构克隆流程，解决克隆出的实例缺失用户设置、主题配置、安全预设及项目工作区的严重问题。扩展 `REQUIRED_IDE_REL_PATHS` 覆盖 `User/settings.json`、`User/keybindings.json`、`User/security_presets.json`、`User/antigravity_policies.json`、`User/snippets`、`User/globalStorage`、`User/workspaceStorage`；扩展 `GEMINI_CLONE_DIRS` 覆盖 `antigravity`、`antigravity-ide`、`antigravity-cli`、`policies`、`config`；引入 `safe_clone_sqlite_db` 安全复制 SQLite 数据库（含 WAL 锁文件重试与 Backup API），并在 CLI/工具链克隆入口统一注入 `resolve_instance_id` 与 `copy_instance_settings` 深度合并。 (Thanks to @aukgit)
+- **实例操作卡片互斥进度遮罩与行级锁定 (Instance Card Mutex Glass Overlay & Row-Level Action Locking)**: 在 `src/pages/Instances.tsx` 与 `src/components/instances/InstanceTable.tsx` 中实现卡片与表格行级操作互斥——当启动、停止、切换或删除等异步操作进行中时，为对应实例卡片叠加半透明玻璃遮罩并禁用所有交互按钮；操作按钮显示内联旋转动画（`animate-spin`）与进度颜色反馈，防止重复点击并给予清晰的操作进度感知。 (Thanks to @aukgit)
+- **应用内删除确认弹窗替换系统原生对话框 (In-App Delete Confirmation Modal Replaces Native Window.confirm)**: 删除与清空会话操作不再弹出 Windows 系统原生 `confirm` 对话框，改为风格统一的深色玻璃 React 模态弹窗，展示实例名称、序号与破坏性操作警告图标，并提供取消与确认按钮。 (Thanks to @aukgit)
+
+### Fixed
+- **实例设置模态弹窗图标胶囊化与横向溢出修复 (Instance Settings Modal Icon Capsule Redesign & Overflow Fix)**: 重构 `src/components/instances/InstanceSettingsModal.tsx`，将冗长文字说明转换为 Lucide 图标胶囊（`Copy`, `FolderSync`, `Layers`, `Sliders` 等），消除"Copy Now"与"Copy Folders"按钮与下拉菜单重叠问题；滚动容器添加 `overflow-x-hidden`，`<select>` 组件强制 `min-w-0 flex-1 truncate` 防止超长实例名撑破布局，全面提升设置模态可用性。 (Thanks to @aukgit)
+- **跨实例运行提示词状态污染根因修复 (Root Cause Fix: Cross-Instance Running Prompt State Bleed)**: 修复 `src-tauri/src/modules/repo_db.rs` 中 `compute_project_conversation_tree` 全局扫描无 `instance_id` 过滤、`is_running` 仅依赖 `last_modified` 近期性（`age < 600`）而不检测进程存活的双重根因缺陷；新增隔离集成测试 `src-tauri/tests/per_instance_prompt_liveness_test.rs`（标注 `#[ignore]`）验证两个不同数据目录的实例返回完全独立的项目集合。 (Thanks to @aukgit)
+
+---
+
 ## [v4.142.0] - 2026-10-04
 
 ### Added
@@ -465,6 +480,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.143.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.142.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
