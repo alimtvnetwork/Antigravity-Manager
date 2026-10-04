@@ -72,8 +72,10 @@ pub fn handle_cli_arguments() -> bool {
                 std::process::exit(1);
             }
             let source_id = &rest_args[0];
+            let resolved_src =
+                instance::resolve_instance_id(source_id).unwrap_or_else(|_| source_id.clone());
             let target_name = rest_args[1..].join(" ");
-            match instance::copy_instance(source_id, target_name, None) {
+            match instance::copy_instance(&resolved_src, target_name, None) {
                 Ok(new_config) => {
                     println!("[CLI] Successfully cloned profile:");
                     println!("  ID:       {}", new_config.id);
@@ -365,8 +367,10 @@ fn handle_instance_subcommand(args: &[String]) {
                 std::process::exit(1);
             }
             let source_id = &args[1];
+            let resolved_src =
+                instance::resolve_instance_id(source_id).unwrap_or_else(|_| source_id.clone());
             let target_name = args[2..].join(" ");
-            match instance::copy_instance(source_id, target_name, None) {
+            match instance::copy_instance(&resolved_src, target_name, None) {
                 Ok(new_config) => {
                     println!(
                         "[SUCCESS] Cloned profile '{}' -> '{}' ({})",

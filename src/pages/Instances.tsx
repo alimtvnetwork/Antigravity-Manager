@@ -69,6 +69,27 @@ function truncatePath(fullPath?: string | null): string {
     return `...${sep}${parts.slice(-2).join(sep)}`;
 }
 
+function getActionLabel(action: InstanceActionType): string {
+    switch (action) {
+        case 'launch':
+            return 'Launching...';
+        case 'stop':
+            return 'Stopping...';
+        case 'switch':
+            return 'Switching...';
+        case 'fast-forward':
+            return 'Rotating...';
+        case 'sync':
+            return 'Syncing...';
+        case 'wipe':
+            return 'Wiping...';
+        case 'delete':
+            return 'Deleting...';
+        default:
+            return 'Processing...';
+    }
+}
+
 const INSTANCE_THEMES = [
     {
         name: 'Indigo',
@@ -397,25 +418,34 @@ export default function Instances() {
     const handleDelete = (id: string) => {
         const target = instances.find((i) => i.config.id === id);
         if (target) {
+            if (target.is_running) {
+                showToast('Cannot delete an actively running instance. Please stop it first.', 'warning');
+                return;
+            }
             setDeleteModalTarget(target);
         }
     };
 
     const handleConfirmDelete = async () => {
         if (!deleteModalTarget) return;
+        if (deleteModalTarget.is_running) {
+            showToast('Cannot delete an actively running instance. Please stop it first.', 'warning');
+            setDeleteModalTarget(null);
+            return;
+        }
         const targetId = deleteModalTarget.config.id;
         setActionState((prev) => ({ ...prev, [targetId]: 'delete' }));
         setDeletingId(targetId);
         setActionError(null);
         try {
             await deleteInstance(targetId);
-            setDeleteModalTarget(null);
             showToast(t('instances.deleted_toast', 'Profile deleted successfully'), 'success');
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to delete instance');
         } finally {
             setDeletingId(null);
             setActionState((prev) => ({ ...prev, [targetId]: null }));
+            setDeleteModalTarget(null);
         }
     };
 
@@ -433,12 +463,12 @@ export default function Instances() {
         setActionError(null);
         try {
             await wipeSession(targetId);
-            setWipeModalTarget(null);
             showToast(`Session tokens wiped for '${wipeModalTarget.config.name}'`, 'success');
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to wipe session');
         } finally {
             setActionState((prev) => ({ ...prev, [targetId]: null }));
+            setWipeModalTarget(null);
         }
     };
 
@@ -1007,12 +1037,22 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "group rounded-xl border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "group relative rounded-xl border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
                                         ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
                                         : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421]"
                                 )}
                             >
+                                {/* Card Mutex Overlay when action is executing */}
+                                {isBusy && (
+                                    <div className="absolute inset-0 bg-white/75 dark:bg-[#071a27]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-xl pointer-events-auto cursor-wait select-none">
+                                        <RotateCw className="w-5 h-5 animate-spin text-blue-500 dark:text-cyan-400" />
+                                        <span className="text-xs font-bold text-gray-800 dark:text-cyan-200 tracking-wide font-mono">
+                                            {getActionLabel(currentAction)}
+                                        </span>
+                                    </div>
+                                )}
+
                                 <div className={cn(
                                     "flex flex-col flex-1 justify-between min-w-0",
                                     cardDensity === 'compact' ? "p-2.5" : "p-3.5"

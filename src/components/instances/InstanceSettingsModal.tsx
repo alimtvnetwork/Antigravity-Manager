@@ -14,7 +14,6 @@ import {
     FileCode,
     SlidersHorizontal,
     Sparkles,
-    ChevronDown,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../../utils/env';
@@ -60,8 +59,6 @@ export function InstanceSettingsModal({
             return null;
         }
     });
-    const [isPasteMenuOpen, setIsPasteMenuOpen] = useState<boolean>(false);
-    const pasteMenuRef = useRef<HTMLDivElement>(null);
 
     // Settings state
     const [isTurboMode, setIsTurboMode] = useState<boolean>(true);
@@ -78,16 +75,6 @@ export function InstanceSettingsModal({
     const [isOperating, setIsOperating] = useState<boolean>(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (pasteMenuRef.current && !pasteMenuRef.current.contains(e.target as Node)) {
-                setIsPasteMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     // Sync selected target when modal opens or targetInstance changes
     useEffect(() => {
@@ -358,7 +345,6 @@ export function InstanceSettingsModal({
             return;
         }
         setIsOperating(true);
-        setIsPasteMenuOpen(false);
         try {
             let msg = '';
             if (mode === 'both' || mode === 'settings') {
@@ -619,10 +605,10 @@ export function InstanceSettingsModal({
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/* Turbo Mode Card */}
-                            <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-3">
+                            <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-2.5">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2">
-                                        <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                                        <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
                                             <Zap className="w-4 h-4 fill-current" />
                                         </div>
                                         <div>
@@ -630,12 +616,12 @@ export function InstanceSettingsModal({
                                                 Turbo Mode
                                             </div>
                                             <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                                                Auto-confirm non-destructive edits
+                                                Auto-confirm safe edits
                                             </div>
                                         </div>
                                     </div>
                                     <span className={cn(
-                                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0",
                                         isTurboMode
                                             ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30"
                                             : "bg-gray-200 dark:bg-slate-800 text-gray-600 dark:text-gray-400"
@@ -644,37 +630,41 @@ export function InstanceSettingsModal({
                                     </span>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-1">
+                                {/* Segmented Switch Capsule */}
+                                <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
                                     <button
                                         type="button"
                                         disabled={isOperating}
                                         onClick={() => handleSetTurboMode(false)}
+                                        title={isTurboMode ? "Click to disable Auto-Confirm (Turbo Mode)" : "Click to enable Auto-Confirm (Turbo Mode)"}
                                         className={cn(
-                                            "flex-1 py-1 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
+                                            "flex-1 py-1 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5",
                                             isTurboMode
-                                                ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-xs"
-                                                : "bg-gray-100 dark:bg-[#15334d] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-[#15334d] hover:bg-gray-200"
+                                                ? "bg-amber-600 text-white shadow-xs"
+                                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
                                         )}
                                     >
-                                        Toggle ({isTurboMode ? 'Disable' : 'Enable'})
+                                        <Zap className="w-3.5 h-3.5 fill-current" />
+                                        <span>Auto-Confirm: {isTurboMode ? 'ON' : 'OFF'}</span>
                                     </button>
                                     <button
                                         type="button"
                                         disabled={isOperating}
                                         onClick={() => handleSetTurboMode(true)}
-                                        className="py-1 px-2 rounded-lg text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 transition-colors cursor-pointer"
-                                        title="Apply this turbo mode state to all instances"
+                                        className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                                        title="Apply this Auto-Confirm state across all instances"
                                     >
-                                        Apply to All
+                                        <Sliders className="w-3 h-3" />
+                                        <span>Apply All</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Plan Review Card */}
-                            <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-3">
+                            <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-2.5">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2">
-                                        <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                                        <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
                                             <CheckCircle2 className="w-4 h-4" />
                                         </div>
                                         <div>
@@ -682,12 +672,12 @@ export function InstanceSettingsModal({
                                                 Plan Review
                                             </div>
                                             <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                                                Always Proceed vs Ask Permission
+                                                Proceed vs require prompt
                                             </div>
                                         </div>
                                     </div>
                                     <span className={cn(
-                                        "px-2 py-0.5 rounded text-[10px] font-bold",
+                                        "px-2 py-0.5 rounded text-[10px] font-bold shrink-0",
                                         isAlwaysProceed
                                             ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                                             : "bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30"
@@ -696,30 +686,39 @@ export function InstanceSettingsModal({
                                     </span>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-1">
+                                {/* Segmented Switch Capsule */}
+                                <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
                                     <button
                                         type="button"
                                         disabled={isOperating}
                                         onClick={() => handleSetPlanReview(false, !isAlwaysProceed)}
-                                        className="flex-1 py-1 px-2 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-[#15334d] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#15334d] hover:bg-gray-200 dark:hover:bg-[#1c4161] transition-colors cursor-pointer"
+                                        title={isAlwaysProceed ? "Click to require permission before executing plans" : "Click to always proceed without asking"}
+                                        className={cn(
+                                            "flex-1 py-1 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                                            isAlwaysProceed
+                                                ? "bg-emerald-600 text-white shadow-xs"
+                                                : "bg-blue-600 text-white shadow-xs"
+                                        )}
                                     >
-                                        Set: {isAlwaysProceed ? 'Ask Permission' : 'Always Proceed'}
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>{isAlwaysProceed ? 'Always Proceed' : 'Ask Permission'}</span>
                                     </button>
                                     <button
                                         type="button"
                                         disabled={isOperating}
                                         onClick={() => handleSetPlanReview(true, isAlwaysProceed)}
-                                        className="py-1 px-2 rounded-lg text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 transition-colors cursor-pointer"
-                                        title="Apply current plan review setting across all instances"
+                                        className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                                        title="Apply current Plan Review setting across all instances"
                                     >
-                                        Apply to All
+                                        <Sliders className="w-3 h-3" />
+                                        <span>Apply All</span>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Enforce Baseline Defaults Action */}
-                        <div className="mt-3 p-3 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/40 dark:bg-[#071a27]/40 flex items-center justify-between gap-3">
+                        <div className="mt-3 p-3 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/40 dark:bg-[#071a27]/40 flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                                 <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
                                 <div>
@@ -727,26 +726,30 @@ export function InstanceSettingsModal({
                                         Default Baseline Alignment
                                     </div>
                                     <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                                        Reset and propagate standard themes and configurations from default installation
+                                        Reset and propagate standard baseline settings & themes from default profile
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs shrink-0">
                                 <button
                                     type="button"
                                     disabled={isOperating}
                                     onClick={() => handleEnforceDefaults(false)}
-                                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#15334d] border border-gray-200 dark:border-[#15334d] transition-colors cursor-pointer"
+                                    title="Enforce baseline settings onto target profile"
+                                    className="px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-l-md transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                    Enforce Target
+                                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                                    <span>Enforce Target</span>
                                 </button>
                                 <button
                                     type="button"
                                     disabled={isOperating}
                                     onClick={() => handleEnforceDefaults(true)}
-                                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 transition-colors cursor-pointer"
+                                    title="Enforce baseline settings across all profiles"
+                                    className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-r-md transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                    Enforce All
+                                    <Sliders className="w-3 h-3" />
+                                    <span>Enforce All</span>
                                 </button>
                             </div>
                         </div>
@@ -803,75 +806,51 @@ export function InstanceSettingsModal({
                                 </select>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                 {/* Copy Both Action Button */}
                                 <button
                                     type="button"
                                     disabled={isOperating || !replicationSourceId}
                                     onClick={() => handleCopyBothDirect(replicationSourceId)}
                                     className="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                                    title="Copy both settings and workspaces directly into the target profile and update buffer"
+                                    title="Copy both settings and workspaces directly into target and update buffer"
                                 >
                                     <Copy className="w-3.5 h-3.5" />
                                     <span>Copy Both</span>
                                 </button>
 
-                                {/* Split Paste Button */}
-                                <div className="relative shrink-0" ref={pasteMenuRef}>
-                                    <div className="inline-flex rounded-lg shadow-xs overflow-hidden">
-                                        <button
-                                            type="button"
-                                            disabled={isOperating || !clipboardBuffer}
-                                            onClick={() => handlePasteFromBuffer('both')}
-                                            className="shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                                            title="Paste both settings & workspaces from buffer into target"
-                                        >
-                                            <ClipboardPaste className="w-3.5 h-3.5" />
-                                            <span>Paste Both</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            disabled={isOperating || !clipboardBuffer}
-                                            onClick={() => setIsPasteMenuOpen(!isPasteMenuOpen)}
-                                            className="shrink-0 px-1.5 py-1.5 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white border-l border-emerald-500/50 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
-                                            title="Paste Options"
-                                        >
-                                            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isPasteMenuOpen && "rotate-180")} />
-                                        </button>
-                                    </div>
-
-                                    {/* Split Paste Dropdown Menu */}
-                                    {isPasteMenuOpen && (
-                                        <div className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
-                                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-slate-800 mb-1">
-                                                Replication Paste
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePasteFromBuffer('both')}
-                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-                                            >
-                                                <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                                <span>Paste Both</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePasteFromBuffer('settings')}
-                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-                                            >
-                                                <Sliders className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                                <span>Paste Settings Only</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePasteFromBuffer('workspaces')}
-                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-                                            >
-                                                <FolderSync className="w-3.5 h-3.5 text-teal-500 shrink-0" />
-                                                <span>Paste Workspaces Only</span>
-                                            </button>
-                                        </div>
-                                    )}
+                                {/* Split Paste Segmented Pill Controls */}
+                                <div className="inline-flex rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-0.5 divide-x divide-emerald-500/20 shadow-2xs">
+                                    <button
+                                        type="button"
+                                        disabled={isOperating || !clipboardBuffer}
+                                        onClick={() => handlePasteFromBuffer('both')}
+                                        className="px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 rounded-l-md"
+                                        title="Paste both settings & workspaces from buffer into target"
+                                    >
+                                        <ClipboardPaste className="w-3.5 h-3.5" />
+                                        <span>Paste Both</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isOperating || !clipboardBuffer}
+                                        onClick={() => handlePasteFromBuffer('settings')}
+                                        className="px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                                        title="Paste settings only from buffer into target"
+                                    >
+                                        <Sliders className="w-3 h-3" />
+                                        <span>Settings</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isOperating || !clipboardBuffer}
+                                        onClick={() => handlePasteFromBuffer('workspaces')}
+                                        className="px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 rounded-r-md"
+                                        title="Paste workspaces and folders only from buffer into target"
+                                    >
+                                        <FolderSync className="w-3 h-3" />
+                                        <span>Folders</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -879,26 +858,28 @@ export function InstanceSettingsModal({
                         {/* Individual Cards for Settings and Workspaces */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/* Copy Settings Card */}
-                            <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <Sliders className="w-4 h-4 text-blue-500 shrink-0" />
-                                        <span className="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">
-                                            Settings & Themes
+                            <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Sliders className="w-4 h-4 text-blue-500 shrink-0" />
+                                            <span className="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">
+                                                Settings & Themes
+                                            </span>
+                                        </div>
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 shrink-0">
+                                            settings.json
                                         </span>
                                     </div>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 shrink-0">
-                                        settings.json
-                                    </span>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1" title="Copies color themes, policies, and Antigravity preferences into target">
+                                        Copies color themes, policies, and Antigravity preferences.
+                                    </p>
                                 </div>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title="Copies color themes, policies, and Antigravity preferences into target">
-                                    Copies color themes, policies, and Antigravity preferences into target.
-                                </p>
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="space-y-2 pt-1">
                                     <select
                                         value={copySettingsSourceId}
                                         onChange={(e) => setCopySettingsSourceId(e.target.value)}
-                                        className="min-w-0 flex-1 truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2 py-1 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        className="w-full truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                                     >
                                         {candidateSources.map((inst, idx) => {
                                             const seq = inst.config.seq_num ?? idx + 1;
@@ -916,36 +897,38 @@ export function InstanceSettingsModal({
                                         type="button"
                                         disabled={isOperating || !copySettingsSourceId}
                                         onClick={handleCopySettings}
-                                        className="shrink-0 whitespace-nowrap px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                        className="w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                                         title="Copy settings and themes from source to target profile"
                                     >
                                         <Sliders className="w-3 h-3" />
-                                        <span>Copy Now</span>
+                                        <span>Copy Settings Now</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Copy Projects/Workspaces Card */}
-                            <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <FolderSync className="w-4 h-4 text-teal-500 shrink-0" />
-                                        <span className="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">
-                                            Workspaces & Folders
+                            <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <FolderSync className="w-4 h-4 text-teal-500 shrink-0" />
+                                            <span className="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">
+                                                Workspaces & Folders
+                                            </span>
+                                        </div>
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 shrink-0">
+                                            workspaceStorage
                                         </span>
                                     </div>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 shrink-0">
-                                        workspaceStorage
-                                    </span>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1" title="Copies open projects, workspace storage, and recent folder state">
+                                        Copies open projects, workspace storage, and recent folder state.
+                                    </p>
                                 </div>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title="Copies open projects, workspace storage, and recent folder state">
-                                    Copies open projects, workspace storage, and recent folder state.
-                                </p>
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="space-y-2 pt-1">
                                     <select
                                         value={copyProjectsSourceId}
                                         onChange={(e) => setCopyProjectsSourceId(e.target.value)}
-                                        className="min-w-0 flex-1 truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2 py-1 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        className="w-full truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                                     >
                                         {candidateSources.map((inst, idx) => {
                                             const seq = inst.config.seq_num ?? idx + 1;
@@ -963,11 +946,11 @@ export function InstanceSettingsModal({
                                         type="button"
                                         disabled={isOperating || !copyProjectsSourceId}
                                         onClick={handleCopyProjects}
-                                        className="shrink-0 whitespace-nowrap px-3 py-1 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                        className="w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                                         title="Copy workspaces and project folders from source to target profile"
                                     >
                                         <FolderSync className="w-3 h-3" />
-                                        <span>Copy Folders</span>
+                                        <span>Copy Folders Now</span>
                                     </button>
                                 </div>
                             </div>
@@ -1007,52 +990,65 @@ export function InstanceSettingsModal({
                             </div>
                         </div>
 
-                        {/* Action buttons row */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={handleCopyToClipboard}
-                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Copy className="w-3.5 h-3.5 text-blue-500" />
-                                <span>Copy to Clipboard</span>
-                            </button>
+                        {/* Group JSON tools into a contiguous segmented pill capsule ([Copy | Paste | Export | Import | Raw Editor]) */}
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="inline-flex items-center rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyToClipboard}
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-l-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    title="Copy settings JSON to clipboard"
+                                >
+                                    <Copy className="w-3.5 h-3.5 text-blue-500" />
+                                    <span>Copy</span>
+                                </button>
 
-                            <button
-                                type="button"
-                                disabled={isOperating}
-                                onClick={handlePasteFromClipboard}
-                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <ClipboardPaste className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>Paste & Apply</span>
-                            </button>
+                                <button
+                                    type="button"
+                                    disabled={isOperating}
+                                    onClick={handlePasteFromClipboard}
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                                    title="Paste settings JSON from clipboard and apply"
+                                >
+                                    <ClipboardPaste className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span>Paste</span>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={handleExportJsonFile}
-                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Download className="w-3.5 h-3.5 text-indigo-500" />
-                                <span>Export JSON</span>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExportJsonFile}
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    title="Export settings to JSON file"
+                                >
+                                    <Download className="w-3.5 h-3.5 text-indigo-500" />
+                                    <span>Export</span>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Upload className="w-3.5 h-3.5 text-purple-500" />
-                                <span>Import JSON File</span>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    title="Import settings from JSON file"
+                                >
+                                    <Upload className="w-3.5 h-3.5 text-purple-500" />
+                                    <span>Import</span>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setIsJsonExpanded(!isJsonExpanded)}
-                                className="ml-auto text-xs text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
-                            >
-                                {isJsonExpanded ? 'Hide Raw JSON Editor' : 'Show Raw JSON Editor'}
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsJsonExpanded(!isJsonExpanded)}
+                                    className={cn(
+                                        "px-2.5 py-1.5 text-xs font-medium rounded-r-md flex items-center gap-1.5 transition-colors cursor-pointer",
+                                        isJsonExpanded
+                                            ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-cyan-300 font-semibold"
+                                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d]"
+                                    )}
+                                    title={isJsonExpanded ? "Hide Raw JSON Editor" : "Show Raw JSON Editor"}
+                                >
+                                    <FileCode className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Raw Editor</span>
+                                </button>
+                            </div>
                         </div>
 
                         {/* Expandable Raw JSON Area */}

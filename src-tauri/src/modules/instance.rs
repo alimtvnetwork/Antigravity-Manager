@@ -1038,11 +1038,13 @@ pub fn copy_instance_with_options(
     clone_mode: Option<&str>,
     copy_projects: bool,
 ) -> Result<InstanceConfig, String> {
+    let resolved_source_id =
+        resolve_instance_id(source_id).unwrap_or_else(|_| source_id.to_string());
     let registry = load_registry()?;
     let source = registry
         .instances
         .iter()
-        .find(|i| i.id == source_id)
+        .find(|i| i.id == resolved_source_id || i.id == source_id)
         .ok_or_else(|| format!("Source instance {} not found", source_id))?
         .clone();
 
@@ -1442,7 +1444,36 @@ pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> 
         if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
             let _ = copy_gemini_trees(&src_home, &dst_home);
         }
+    } else if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
+        if let Some(sys_home) = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .ok()
+            .map(PathBuf::from)
+        {
+            let _ = copy_gemini_trees(&sys_home, &dst_home);
+        }
     }
+
+    let system_home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()
+        .map(PathBuf::from);
+    let dst_data_gemini = PathBuf::from(&dest.data_dir).join(".gemini");
+    for name in &["policies", "config"] {
+        let mut src_opt = source_profile_home(source).map(|h| h.join(".gemini").join(name));
+        if src_opt.as_ref().map(|p| !p.exists()).unwrap_or(true) {
+            if let Some(ref sys) = system_home {
+                let sys_candidate = sys.join(".gemini").join(name);
+                if sys_candidate.exists() {
+                    src_opt = Some(sys_candidate);
+                }
+            }
+        }
+        if let Some(src_p) = src_opt.filter(|p| p.exists()) {
+            let _ = copy_dir_recursive(&src_p, &dst_data_gemini.join(name));
+        }
+    }
+
     copy_source_user_settings(source, dest)?;
     Ok(())
 }
@@ -1616,10 +1647,24 @@ fn copy_gemini_trees(src_home: &Path, dst_home: &Path) -> Result<(), String> {
     fs::create_dir_all(dst_home.join(".gemini"))
         .map_err(|e| format!("Failed to create dest .gemini: {}", e))?;
 
+    let system_home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()
+        .map(PathBuf::from);
+
     for name in GEMINI_CLONE_DIRS {
-        let src = src_home.join(".gemini").join(name);
+        let mut src = src_home.join(".gemini").join(name);
         if !src.exists() {
-            continue;
+            if let Some(ref sys) = system_home {
+                let sys_candidate = sys.join(".gemini").join(name);
+                if sys_candidate.exists() {
+                    src = sys_candidate;
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
         }
         let dst = dst_home.join(".gemini").join(name);
         copy_dir_recursive(&src, &dst).map_err(|e| {
@@ -1641,8 +1686,9 @@ fn copy_gemini_trees(src_home: &Path, dst_home: &Path) -> Result<(), String> {
 }
 
 /// Clones an SQLite database safely even when active processes hold open locks or WAL files.
-/// First attempts a read-only rusqlite connection with SQLite Online Backup API (2s busy_timeout, WAL mode).
-/// If the backup API fails or is unavailable, falls back to direct file copying including `-wal` and `-shm` sidecars.
+/// First attempts a read-only rusqlite connection in immutable URI mode (?mode=ro&immutable=1) with SQLite Online Backup API.
+/// Executes incremental backup loop (step(100)) with exponential backoff (up to 2.5s) to handle transient busy/locked writes.
+/// If the backup API fails or is unavailable, falls back to direct shared file copying including `-wal` and `-shm` sidecars.
 pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> {
     if !src_db.exists() {
         return Ok(());
@@ -1658,15 +1704,34 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
         })?;
     }
 
-    // Attempt 1: Online SQLite Backup API via read-only connection
+    // Attempt 1: Online SQLite Backup API via read-only connection in immutable URI mode
     let try_backup = || -> Result<(), String> {
+        let clean_src = src_db.to_string_lossy().replace('\\', "/");
+        let uri_primary = format!(
+            "file:///{}?mode=ro&immutable=1",
+            clean_src.trim_start_matches('/')
+        );
+        let uri_alt = format!("file:{}?mode=ro&immutable=1", clean_src);
+
         let src_conn = rusqlite::Connection::open_with_flags(
-            src_db,
+            &uri_primary,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
         )
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                &uri_alt,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        })
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                src_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        })
         .map_err(|e| format!("Failed to open source SQLite db in read-only mode: {}", e))?;
 
-        let _ = src_conn.pragma_update(None, "busy_timeout", 2000);
+        let _ = src_conn.pragma_update(None, "busy_timeout", 2500);
         let _ = src_conn.pragma_update(None, "journal_mode", "WAL");
 
         if dst_db.exists() {
@@ -1682,28 +1747,62 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
         let mut dst_conn = rusqlite::Connection::open(dst_db)
             .map_err(|e| format!("Failed to open destination SQLite db: {}", e))?;
 
-        let _ = dst_conn.pragma_update(None, "busy_timeout", 2000);
+        let _ = dst_conn.pragma_update(None, "busy_timeout", 2500);
         let _ = dst_conn.pragma_update(None, "journal_mode", "WAL");
 
         let backup = rusqlite::backup::Backup::new(&src_conn, &mut dst_conn)
             .map_err(|e| format!("Failed to initialize SQLite backup: {}", e))?;
 
-        backup
-            .run_to_completion(100, std::time::Duration::from_millis(5), None)
-            .map_err(|e| format!("SQLite backup run failed: {}", e))?;
+        let start_time = std::time::Instant::now();
+        let max_wait = std::time::Duration::from_millis(2500);
+        let mut backoff = std::time::Duration::from_millis(10);
+
+        loop {
+            match backup.step(100) {
+                Ok(rusqlite::backup::StepResult::Done) => break,
+                Ok(rusqlite::backup::StepResult::More) => {
+                    backoff = std::time::Duration::from_millis(10);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Ok(rusqlite::backup::StepResult::Busy)
+                | Ok(rusqlite::backup::StepResult::Locked) => {
+                    if start_time.elapsed() >= max_wait {
+                        return Err(
+                            "SQLite backup timed out due to transient lock/busy state".to_string()
+                        );
+                    }
+                    std::thread::sleep(backoff);
+                    backoff = (backoff * 2).min(std::time::Duration::from_millis(250));
+                }
+                Err(e) => {
+                    return Err(format!("SQLite backup step error: {}", e));
+                }
+            }
+        }
 
         Ok(())
     };
 
     if let Err(err) = try_backup() {
         crate::modules::logger::log_info(&format!(
-            "[Instance] Online SQLite backup for {} failed ({}); falling back to file copy",
+            "[Instance] Online SQLite backup for {} failed ({}); falling back to shared file copy",
             src_db.display(),
             err
         ));
 
         // Attempt 2: Fallback direct file copy with -wal and -shm sidecars
-        fs::copy(src_db, dst_db).map_err(|e| {
+        let copy_shared = |from: &Path, to: &Path| -> std::io::Result<u64> {
+            match fs::copy(from, to) {
+                Ok(bytes) => Ok(bytes),
+                Err(_) => {
+                    let mut reader = fs::File::open(from)?;
+                    let mut writer = fs::File::create(to)?;
+                    std::io::copy(&mut reader, &mut writer)
+                }
+            }
+        };
+
+        copy_shared(src_db, dst_db).map_err(|e| {
             format!(
                 "Failed to copy SQLite database file {} to {}: {}",
                 src_db.display(),
@@ -1722,7 +1821,7 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
             let dst_sidecar_path = PathBuf::from(dst_sidecar);
 
             if src_sidecar_path.exists() {
-                let _ = fs::copy(&src_sidecar_path, &dst_sidecar_path);
+                let _ = copy_shared(&src_sidecar_path, &dst_sidecar_path);
             }
         }
     }
@@ -1798,7 +1897,24 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
             // Handled alongside parent database in safe_clone_sqlite_db
             continue;
         } else {
-            let _ = fs::copy(entry.path(), dest_child);
+            match fs::copy(entry.path(), &dest_child) {
+                Ok(_) => {}
+                Err(err) => {
+                    let copy_stream = || -> std::io::Result<u64> {
+                        let mut reader = fs::File::open(entry.path())?;
+                        let mut writer = fs::File::create(&dest_child)?;
+                        std::io::copy(&mut reader, &mut writer)
+                    };
+                    if let Err(e) = copy_stream() {
+                        crate::modules::logger::log_warn(&format!(
+                            "[Instance] Could not copy file {}: primary: {}, fallback: {}",
+                            entry.path().display(),
+                            err,
+                            e
+                        ));
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -4719,9 +4835,39 @@ pub fn merge_state_vscdb_recent_paths(from_inst: &InstanceConfig, to_inst: &Inst
 
     let src_db_path = src_vscdb_candidates.into_iter().find(|p| p.is_file());
     if let Some(src_db) = src_db_path {
-        if let Ok(conn_src) = rusqlite::Connection::open(&src_db) {
+        let clean_src = src_db.to_string_lossy().replace('\\', "/");
+        let uri_primary = format!(
+            "file:///{}?mode=ro&immutable=1",
+            clean_src.trim_start_matches('/')
+        );
+        let uri_alt = format!("file:{}?mode=ro&immutable=1", clean_src);
+
+        let conn_src_res = rusqlite::Connection::open_with_flags(
+            &uri_primary,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                &uri_alt,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        })
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                &src_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        });
+
+        if let Ok(conn_src) = conn_src_res {
+            let _ = conn_src.pragma_update(None, "busy_timeout", 2500);
             let mut stmt = match conn_src.prepare(
-                "SELECT key, value FROM ItemTable WHERE key LIKE '%recentlyOpened%' OR key LIKE '%history.%' OR key LIKE '%openedPaths%'",
+                "SELECT key, value FROM ItemTable \
+                 WHERE key LIKE '%recentlyOpened%' \
+                    OR key LIKE '%history.%' \
+                    OR key LIKE '%openedPaths%' \
+                    OR key LIKE 'profileAssociations.%' \
+                    OR key = 'workbench.colorTheme'",
             ) {
                 Ok(s) => s,
                 Err(_) => return,
@@ -4773,6 +4919,7 @@ pub fn merge_state_vscdb_recent_paths(from_inst: &InstanceConfig, to_inst: &Inst
                     let _ = fs::create_dir_all(parent);
                 }
                 if let Ok(conn_dst) = rusqlite::Connection::open(&dst_db) {
+                    let _ = conn_dst.pragma_update(None, "busy_timeout", 2500);
                     let _ = conn_dst.execute(
                         "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
                         [],
@@ -4981,7 +5128,13 @@ pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, Strin
                         }
                         for dst_ws in &dst_ws_dirs {
                             let target = dst_ws.join(&name);
-                            let _ = copy_dir_recursive(&entry.path(), &target);
+                            if let Err(e) = copy_dir_recursive(&entry.path(), &target) {
+                                crate::modules::logger::log_warn(&format!(
+                                    "[Instance] Warning: Failed to copy workspace folder {}: {}",
+                                    entry.path().display(),
+                                    e
+                                ));
+                            }
                         }
                     }
                 }
@@ -5105,65 +5258,174 @@ pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> 
         .ok_or_else(|| format!("Destination instance '{}' not found", to_id))?
         .clone();
 
-    // 1. Find source settings.json
-    let src_settings_path = find_instance_settings_path(&from_inst)
-        .ok_or_else(|| format!("No settings.json found for source instance '{}'", from_id))?;
-
-    let content = fs::read_to_string(&src_settings_path)
-        .map_err(|e| format!("Failed to read source settings: {}", e))?;
-    let src_json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Invalid JSON in source settings: {}", e))?;
-
-    // 2. Extract theme, antigravity, and policy settings
-    let mut extracted = serde_json::Map::new();
-    if let serde_json::Value::Object(map) = src_json {
-        for (k, v) in map {
-            let k_lower = k.to_lowercase();
-            let is_theme = k.starts_with("workbench.")
-                && (k_lower.contains("theme") || k_lower.contains("color"));
-            let is_antigravity = k.starts_with("antigravity.");
-            let is_policy = k_lower.contains("policy");
-            if is_theme || is_antigravity || is_policy {
-                extracted.insert(k, v);
+    // 1. Gather all potential source User directories
+    let mut src_user_dirs: Vec<PathBuf> = Vec::new();
+    let from_data_user = PathBuf::from(&from_inst.data_dir).join("User");
+    if from_data_user.exists() {
+        src_user_dirs.push(from_data_user);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(home) = get_instance_home_dir(&from_inst.id) {
+            let home_user = home
+                .join("AppData")
+                .join("Roaming")
+                .join("Antigravity")
+                .join("User");
+            if home_user.exists() && !src_user_dirs.contains(&home_user) {
+                src_user_dirs.push(home_user);
+            }
+        }
+        if from_inst.is_default || from_inst.id == "default" {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let p = PathBuf::from(appdata).join("Antigravity").join("User");
+                if p.exists() && !src_user_dirs.contains(&p) {
+                    src_user_dirs.push(p);
+                }
+            }
+            let default_user = get_default_antigravity_data_dir().join("User");
+            if default_user.exists() && !src_user_dirs.contains(&default_user) {
+                src_user_dirs.push(default_user);
             }
         }
     }
 
-    if extracted.is_empty() {
-        return Ok(());
+    // 2. Find source settings.json
+    let src_settings_path = find_instance_settings_path(&from_inst).or_else(|| {
+        src_user_dirs
+            .iter()
+            .map(|d| d.join("settings.json"))
+            .find(|p| p.is_file())
+    });
+
+    if let Some(src_path) = src_settings_path {
+        if let Ok(content) = fs::read_to_string(&src_path) {
+            if let Ok(serde_json::Value::Object(mut src_map)) = serde_json::from_str(&content) {
+                // Strip window.title from source to preserve destination identity
+                src_map.remove("window.title");
+
+                let dst_settings_paths = get_instance_settings_targets(&to_inst);
+                for dst_path in dst_settings_paths {
+                    if let Some(parent) = dst_path.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
+                    let mut target_json: serde_json::Value = if dst_path.exists() {
+                        fs::read_to_string(&dst_path)
+                            .ok()
+                            .and_then(|s| serde_json::from_str(&s).ok())
+                            .unwrap_or_else(|| serde_json::json!({}))
+                    } else {
+                        serde_json::json!({})
+                    };
+
+                    if !target_json.is_object() {
+                        target_json = serde_json::json!({});
+                    }
+
+                    // Preserve existing target window.title if present
+                    let existing_title = target_json.get("window.title").cloned();
+
+                    deep_merge_json(
+                        &mut target_json,
+                        &serde_json::Value::Object(src_map.clone()),
+                    );
+
+                    // Reassert target identity (window.title)
+                    if let Some(title_val) = existing_title {
+                        if let serde_json::Value::Object(ref mut t_map) = target_json {
+                            t_map.insert("window.title".to_string(), title_val);
+                        }
+                    } else {
+                        let computed = compute_instance_window_title(&to_inst);
+                        if let serde_json::Value::Object(ref mut t_map) = target_json {
+                            t_map.insert(
+                                "window.title".to_string(),
+                                serde_json::Value::String(computed),
+                            );
+                        }
+                    }
+
+                    if let Ok(pretty) = serde_json::to_string_pretty(&target_json) {
+                        let _ = fs::write(&dst_path, pretty);
+                    }
+                }
+            }
+        }
     }
 
-    // 3. Collect destination settings paths
-    let dst_settings_paths = get_instance_settings_targets(&to_inst);
-    for dst_path in dst_settings_paths {
-        if let Some(parent) = dst_path.parent() {
-            let _ = fs::create_dir_all(parent);
+    // 3. Destination user directories
+    let dst_user_dirs: Vec<PathBuf> = get_instance_settings_targets(&to_inst)
+        .into_iter()
+        .filter_map(|p| p.parent().map(|parent| parent.to_path_buf()))
+        .collect();
+
+    // 4. Copy keybindings.json, security_presets.json, and antigravity_policies.json
+    for file_name in &[
+        "keybindings.json",
+        "security_presets.json",
+        "antigravity_policies.json",
+    ] {
+        let mut candidate_src = src_user_dirs
+            .iter()
+            .map(|d| d.join(file_name))
+            .find(|p| p.is_file());
+
+        if candidate_src.is_none()
+            && (*file_name == "security_presets.json" || *file_name == "antigravity_policies.json")
+        {
+            let def_p = get_default_antigravity_data_dir()
+                .join("User")
+                .join(file_name);
+            if def_p.is_file() {
+                candidate_src = Some(def_p);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                if candidate_src.is_none() {
+                    if let Ok(appdata) = std::env::var("APPDATA") {
+                        let appdata_p = PathBuf::from(appdata)
+                            .join("Antigravity")
+                            .join("User")
+                            .join(file_name);
+                        if appdata_p.is_file() {
+                            candidate_src = Some(appdata_p);
+                        }
+                    }
+                }
+            }
         }
-        let mut target_json: serde_json::Value = if dst_path.exists() {
-            fs::read_to_string(&dst_path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_else(|| serde_json::json!({}))
-        } else {
-            serde_json::json!({})
-        };
 
-        if !target_json.is_object() {
-            target_json = serde_json::json!({});
-        }
-
-        deep_merge_json(
-            &mut target_json,
-            &serde_json::Value::Object(extracted.clone()),
-        );
-
-        if let Ok(pretty) = serde_json::to_string_pretty(&target_json) {
-            let _ = fs::write(&dst_path, pretty);
+        if let Some(found_src) = candidate_src {
+            for dst_dir in &dst_user_dirs {
+                let _ = fs::create_dir_all(dst_dir);
+                let _ = fs::copy(&found_src, dst_dir.join(file_name));
+            }
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Copied {} from {} to {} destination directories",
+                file_name,
+                found_src.display(),
+                dst_user_dirs.len()
+            ));
         }
     }
+
+    // 5. Copy snippets/
+    for src_dir in &src_user_dirs {
+        let src_snippets = src_dir.join("snippets");
+        if src_snippets.is_dir() {
+            for dst_dir in &dst_user_dirs {
+                let dst_snippets = dst_dir.join("snippets");
+                let _ = copy_dir_recursive(&src_snippets, &dst_snippets);
+            }
+            break;
+        }
+    }
+
+    // 6. Ensure target window title is freshly injected
+    let _ = inject_instance_settings(&to_inst);
 
     crate::modules::logger::log_info(&format!(
-        "[Instance] Successfully merged settings from '{}' to '{}'",
+        "[Instance] Successfully synchronized full settings, keybindings, presets, and snippets from '{}' to '{}'",
         from_id, to_id
     ));
     Ok(())

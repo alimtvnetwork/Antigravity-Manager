@@ -52,9 +52,10 @@ pub fn copy_instance(
     clone_mode: Option<String>,
     copy_projects: Option<bool>,
 ) -> Result<InstanceConfig, String> {
+    let resolved_src = instance::resolve_instance_id(&source_id).unwrap_or(source_id);
     let should_copy_projs = copy_projects.unwrap_or(true);
     instance::copy_instance_with_options(
-        &source_id,
+        &resolved_src,
         target_name,
         clone_mode.as_deref(),
         should_copy_projs,
