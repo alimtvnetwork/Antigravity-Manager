@@ -7,9 +7,9 @@
   - `src-tauri/src/modules/repo_db.rs` (Tree evaluation, Gate 0-4 liveness detection, prompt dispatchers)
   - `src-tauri/tests/per_instance_prompt_liveness_test.rs` (Multi-instance E2E test harness)
 - **Related Specs & Plans**:
-  - [01-architecture-spec.md](file:///d:/work/Antigravity-Manager/02-spec/21-app/123-prompt-running-instance-detection-and-audit-logging/01-architecture-spec.md)
-  - [master plan](file:///d:/work/Antigravity-Manager/.ai-memory/plans/123-prompt-running-instance-detection-and-audit-logging.md)
-  - [02-audit-logging-e2e-tests-and-verification.md](file:///d:/work/Antigravity-Manager/.ai-memory/plans/subtasks/123-prompt-running-instance-detection-and-audit-logging/02-audit-logging-e2e-tests-and-verification.md)
+  - [01-architecture-spec.md](01-architecture-spec.md)
+  - [master plan](../../../.ai-memory/plans/123-prompt-running-instance-detection-and-audit-logging.md)
+  - [02-audit-logging-e2e-tests-and-verification.md](../../../.ai-memory/plans/subtasks/123-prompt-running-instance-detection-and-audit-logging/02-audit-logging-e2e-tests-and-verification.md)
 
 ---
 
