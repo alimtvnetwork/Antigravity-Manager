@@ -90,6 +90,33 @@ function getActionLabel(action: InstanceActionType): string {
     }
 }
 
+function isDefaultOwned(nodeInstId: string, cfgId: string): boolean {
+    const isDefaultAlias = nodeInstId === 'default' || nodeInstId === '__default__';
+    const isIdMatch = nodeInstId === cfgId;
+    return isDefaultAlias || isIdMatch;
+}
+
+export const isNodeOwnedByInstance = (
+    node: AgmProjectTreeNode,
+    instConfig: { id: string; is_default?: boolean; seq_num?: number }
+): boolean => {
+    if (instConfig.is_default && isDefaultOwned(node.instance_id, instConfig.id)) {
+        return true;
+    }
+    if (node.instance_id === instConfig.id) {
+        return true;
+    }
+    const hasSeqNum = typeof instConfig.seq_num === 'number';
+    if (hasSeqNum && node.instance_seq_num === instConfig.seq_num) {
+        return true;
+    }
+    const hasNodeInstId = Boolean(node.instance_id);
+    if (hasNodeInstId && node.instance_id.length >= 4 && instConfig.id.endsWith(node.instance_id)) {
+        return true;
+    }
+    return false;
+};
+
 const INSTANCE_THEMES = [
     {
         name: 'Indigo',
@@ -247,7 +274,7 @@ export default function Instances() {
             if (Array.isArray(data)) {
                 setProjectTreeNodes(data);
                 const running = data.filter(
-                    (node) => Boolean(node.is_running) || Boolean(node.conversations?.some((c) => Boolean(c.is_running)))
+                    (node) => Boolean(node.is_running)
                 );
                 setRunningTreeNodes(running);
             }
@@ -1013,10 +1040,8 @@ export default function Instances() {
                         const geminiModel = geminiPro || geminiFlash;
 
                         const hasActiveTask = Boolean(inst.is_running) && runningTreeNodes.some((node) => {
-                            const isInstanceMatch = inst.config.is_default
-                                ? (node.instance_id === 'default' || node.instance_id === '__default__' || !node.instance_id || node.instance_id === inst.config.id)
-                                : node.instance_id === inst.config.id;
-                            const isNodeRunning = Boolean(node.is_running) || Boolean(node.conversations?.some((c) => Boolean(c.is_running)));
+                            const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
+                            const isNodeRunning = Boolean(node.is_running);
                             return isInstanceMatch && isNodeRunning;
                         });
 
@@ -1357,28 +1382,17 @@ export default function Instances() {
 
                                         {/* Active / Recent Projects Section */}
                                         {(() => {
-                                            const instanceProjects = projectTreeNodes.filter((node) => {
-                                                if (inst.config.is_default) {
-                                                    return (
-                                                        node.instance_id === 'default' ||
-                                                        node.instance_id === '__default__' ||
-                                                        !node.instance_id ||
-                                                        node.instance_id === inst.config.id
-                                                    );
-                                                }
-                                                return node.instance_id === inst.config.id;
-                                            });
+                                            const instanceProjects = projectTreeNodes.filter((node) => isNodeOwnedByInstance(node, inst.config));
 
                                             const sortedProjects = [...instanceProjects].sort((a, b) => {
-                                                const aRunning =
-                                                    Boolean(inst.is_running) &&
-                                                    (Boolean(a.is_running) ||
-                                                        Boolean(a.conversations?.some((c) => Boolean(c.is_running))));
-                                                const bRunning =
-                                                    Boolean(inst.is_running) &&
-                                                    (Boolean(b.is_running) ||
-                                                        Boolean(b.conversations?.some((c) => Boolean(c.is_running))));
-                                                if (aRunning !== bRunning) return aRunning ? -1 : 1;
+                                                const isARunning = Boolean(inst.is_running) && Boolean(a.is_running);
+                                                const isBRunning = Boolean(inst.is_running) && Boolean(b.is_running);
+                                                if (isARunning) {
+                                                    if (!isBRunning) return -1;
+                                                }
+                                                if (isBRunning) {
+                                                    if (!isARunning) return 1;
+                                                }
                                                 const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
                                                 const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
                                                 if (bLatest !== aLatest) return bLatest - aLatest;
@@ -1403,10 +1417,7 @@ export default function Instances() {
                                                     {displayedProjects.length > 0 ? (
                                                         <div className="space-y-1">
                                                             {displayedProjects.map((proj) => {
-                                                                const isProjRunning =
-                                                                    Boolean(inst.is_running) &&
-                                                                    (Boolean(proj.is_running) ||
-                                                                        Boolean(proj.conversations?.some((c) => Boolean(c.is_running))));
+                                                                const isProjRunning = Boolean(inst.is_running) && Boolean(proj.is_running);
                                                                 const totalTurns = proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
 
                                                                 return (
