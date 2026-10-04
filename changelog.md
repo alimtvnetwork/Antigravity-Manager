@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.149.0] - 2026-10-05
+
+### Added
+- **提示词树换行格式化与 `<br />` 标签垂直间距 (Prompt Tree Vertical Line Gaps via `<br />` Tags & Markdown Formatting)**: 彻底解决提示词预览与原始内容视图中段落挤压粘连、缺少空行垂直间距的问题。在 `RichMarkdownRenderer` 中将空行显式渲染为 `<br className="my-2" />` 标签，为段落设置 `my-2` 垂直留白；在 `parseInlineMarkdown` 中把文本内换行符统一转换为 `<br className="my-1" />` 元素；在原始代码文本（Raw View）中废除单块字符串展示，按行切分并以 `<br className="my-1.5" />` 显式折行隔离，使长文本提示词排版规整清晰。 (Thanks to @aukgit)
+- **省略号 "..." 点击全文展开与工具栏展开收起切换 (Click-to-Expand "..." Ellipsis & Full Text Toggle)**: 为截断提示词末尾的省略号 "..." 赋予交互响应能力，点击省略号即可直接展开全文或折叠；在提示词指令工具栏词数旁新增一键 `[Expand (Full Text)]` / `[Collapse]` 显式切换按钮，彻底解决过去点击省略号无任何响应的操作痛点。 (Thanks to @aukgit)
+- **全局快捷键 'N' 与即时发送分发 (Hotkey 'N' & Live Send Now Dispatch)**: 在提示词树弹窗挂载模态级全局键盘监听，在非输入框焦点状态下按下 `N` 或 `n` 键即可即时触发提示词向 IDE 工作区注入（生成 `.antigravity_resume_task.json` 并调用 `resume_recent_project_prompts`）；“Send Now”按钮同步绑定 `<kbd>N</kbd>` 快捷键标识并在分发成功时弹出即时操作反馈。 (Thanks to @aukgit)
+- **提示词视图头部三元组与结尾摘要胶囊 (Header Metadata Trio & Concluding Tail Snippet)**: 在提示词检查器顶栏与指令卡片中新增深色玻璃分段胶囊，实时展示提示词全局序号（`#P001`）、实例标识三元组（`[#实例序号 · 可执行文件名 · 实例名]`，如 `[#1 · Antigravity.exe · default]`），以及结尾 10-15 词尾部摘要（`“… ending with: '...'”`），极大增强多提示词定位与实例归属辨识度。 (Thanks to @aukgit)
+
+### Fixed
+- **运行中项目状态误报与严格时效门禁 (`white-presentation-v1` False Positive Liveness Fix)**: 彻底修复默认实例下在仅运行 Antigravity 时、未活跃项目（如 `white-presentation-v1`）被永久误报为 `RUNNING` 的深层缺陷。在 `src-tauri/src/modules/repo_db.rs` 中重构项目与会话活跃度判断机制：存活检测要求必须同时满足实例进程存活，且会话摘要（`conversation_summaries.db`）或活动提示词的更新时间戳必须在近 120 秒以内；消除前缀子串模糊匹配中的短前缀误匹配，彻底终结历史陈旧记录导致的虚假运行状态。 (Thanks to @aukgit)
+- **空标题无内容会话智能过滤 (Empty 0-Word Untitled Conversation Filtering)**: 在前后端双层过滤掉标题以 `Untitled` 开头且提示词内容为空（0 词数）的幽灵会话节点，避免 IDE 初始未命名空对话污染项目提示词树视图。 (Thanks to @aukgit)
+
+---
+
 ## [v4.148.0] - 2026-10-04
 
 ### Fixed
@@ -522,6 +536,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.149.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.148.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

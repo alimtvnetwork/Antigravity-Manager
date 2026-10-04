@@ -6030,6 +6030,41 @@ pub fn count_instances() -> Result<serde_json::Value, String> {
     }))
 }
 
+/// Resolve the executable binary name (e.g. "Antigravity.exe" or "Antigravity") for an instance
+pub fn resolve_instance_exe_name(instance_id: &str, executable_path: Option<&str>) -> String {
+    let is_default =
+        instance_id == "default" || instance_id == "__default__" || instance_id.is_empty();
+    if is_default {
+        #[cfg(target_os = "windows")]
+        let default_exe = "Antigravity.exe";
+        #[cfg(not(target_os = "windows"))]
+        let default_exe = "Antigravity";
+
+        if let Ok(config) = crate::modules::config::load_app_config() {
+            if let Some(ide_path) = config.antigravity_ide_executable {
+                if let Some(file_name) = Path::new(&ide_path).file_name().and_then(|n| n.to_str()) {
+                    if !file_name.trim().is_empty() {
+                        return file_name.to_string();
+                    }
+                }
+            }
+        }
+        default_exe.to_string()
+    } else {
+        if let Some(ep) = executable_path {
+            if let Some(file_name) = Path::new(ep).file_name().and_then(|n| n.to_str()) {
+                if !file_name.trim().is_empty() {
+                    return file_name.to_string();
+                }
+            }
+        }
+        #[cfg(target_os = "windows")]
+        return format!("Antigravity-{}.exe", instance_id);
+        #[cfg(not(target_os = "windows"))]
+        return format!("Antigravity-{}", instance_id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -7024,5 +7059,23 @@ mod clone_tree_tests {
             assert!(paths.contains(&user_app));
             assert!(paths.contains(&user_macos_bin));
         }
+    }
+
+    #[test]
+    fn test_resolve_instance_exe_name() {
+        let default_exe = resolve_instance_exe_name("default", None);
+        #[cfg(target_os = "windows")]
+        assert!(default_exe.ends_with(".exe"));
+        #[cfg(not(target_os = "windows"))]
+        assert!(!default_exe.is_empty());
+
+        let custom_exe = resolve_instance_exe_name("custom-1", Some("/opt/bin/my-ide"));
+        assert_eq!(custom_exe, "my-ide");
+
+        let fallback_exe = resolve_instance_exe_name("inst-2", None);
+        #[cfg(target_os = "windows")]
+        assert_eq!(fallback_exe, "Antigravity-inst-2.exe");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(fallback_exe, "Antigravity-inst-2");
     }
 }

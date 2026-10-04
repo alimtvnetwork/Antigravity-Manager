@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.149.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
     *   **v4.148.0 (2026-10-04)**:
         -   **[CI Test Targets Gate] Integration Test Async Invocation Correction**: Resolved the remaining E0277 compiler error in test target compilation reported by `gitmap pe` on CI runners. Corrected `test_case_antigravity_cli_discovery` in `src-tauri/tests/per_instance_prompt_liveness_test.rs` which was erroneously calling `.await` on a non-future return type `()`, ensuring clean integration test target compilation across all platforms. (Thanks to @aukgit)
 

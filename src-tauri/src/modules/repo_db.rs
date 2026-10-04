@@ -1649,7 +1649,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 let matches_proj = p.project_id == project_id || p.repo_path == project_id;
                 if matches_inst && matches_proj {
                     let has_running_status = p.status == "running";
-                    let is_fresh = p.updated_at >= now - 300;
+                    let is_fresh = (now - p.updated_at) <= 120;
                     if has_running_status && is_fresh {
                         crate::modules::logger::log_instance_prompt_audit(
                             norm_inst,
@@ -1736,7 +1736,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                    AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
                    AND status = 'running'
                    AND updated_at >= ?3",
-                params![project_id, norm_inst, now - 300],
+                params![project_id, norm_inst, now - 120],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1802,25 +1802,27 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                     for item in rows.flatten() {
                         let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
-                        // 15-Minute TTL: Parse _last_time_str or check turn age. If older than 900 seconds, treat as stale
+                        // 120-Second TTL: Parse _last_time_str or check turn age. If older than 120 seconds, treat as stale
                         let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
-                        let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                            .map(|dt| dt.timestamp() >= now - 900)
+                        let conv_time = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                            .map(|dt| dt.timestamp())
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
                                     &norm_time,
                                     "%Y-%m-%dT%H:%M:%S",
                                 )
-                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                .map(|dt| dt.and_utc().timestamp())
                             })
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
                                     &_last_time_str,
                                     "%Y-%m-%d %H:%M:%S",
                                 )
-                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                .map(|dt| dt.and_utc().timestamp())
                             })
-                            .unwrap_or(false);
+                            .unwrap_or(0);
+
+                        let is_recent = conv_time > 0 && (now - conv_time <= 120);
 
                         if !is_recent {
                             continue;
@@ -2370,25 +2372,27 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                     for item in rows.flatten() {
                         let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
-                        // 15-Minute TTL: Parse _last_time_str or check turn age. If older than 900 seconds, treat as stale
+                        // 120-Second TTL: Parse _last_time_str or check turn age. If older than 120 seconds, treat as stale
                         let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
-                        let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                            .map(|dt| dt.timestamp() >= now - 900)
+                        let conv_time = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                            .map(|dt| dt.timestamp())
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
                                     &norm_time,
                                     "%Y-%m-%dT%H:%M:%S",
                                 )
-                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                .map(|dt| dt.and_utc().timestamp())
                             })
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
                                     &_last_time_str,
                                     "%Y-%m-%d %H:%M:%S",
                                 )
-                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                .map(|dt| dt.and_utc().timestamp())
                             })
-                            .unwrap_or(false);
+                            .unwrap_or(0);
+
+                        let is_recent = conv_time > 0 && (now - conv_time <= 120);
 
                         let is_idle_count = not_fully_idle == 0;
                         let has_idle_status = status.contains("IDLE")
@@ -2415,7 +2419,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                         };
 
                         if is_conv_running {
-                            active_conv_prefixes.push((norm_inst.clone(), prefix_8, prompt_preview.clone(), now));
+                            active_conv_prefixes.push((norm_inst.clone(), prefix_8, prompt_preview.clone(), conv_time));
                         }
 
                         if let Some(ws_uris_raw) = ws_uris_opt {
@@ -2470,7 +2474,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                         .or_insert((false, None, now));
 
                     let is_running_status = status == "running";
-                    let is_fresh = (now - updated_at) <= 300;
+                    let is_fresh = (now - updated_at) <= 120;
                     if is_running_status && is_fresh {
                         entry.0 = true;
                     }
@@ -2515,11 +2519,16 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
         // Check if project_id or repo_path matches any active conversation prefix strictly within the same instance
         if !is_running {
             for (pfx_inst, pfx, snippet, l_time) in &active_conv_prefixes {
-                if pfx_inst == &norm_inst && (p.id.contains(pfx) || p.repo_path.contains(pfx)) {
-                    is_running = true;
-                    prompt_snippet = snippet.clone();
-                    last_time = *l_time;
-                    break;
+                if pfx.len() >= 6
+                    && pfx_inst == &norm_inst
+                    && (p.id.contains(pfx) || p.repo_path.contains(pfx))
+                {
+                    if now - *l_time <= 120 {
+                        is_running = true;
+                        prompt_snippet = snippet.clone();
+                        last_time = *l_time;
+                        break;
+                    }
                 }
             }
         }
@@ -3480,7 +3489,15 @@ pub struct AgmConversationNode {
     pub is_running: bool,
     pub step_count: usize,
     pub instance_id: String,
+    #[serde(default)]
+    pub instance_seq_num: Option<u32>,
+    #[serde(default)]
+    pub instance_name: String,
+    #[serde(default)]
+    pub instance_exe_name: String,
     pub prompt_preview_200w: String,
+    #[serde(default)]
+    pub prompt_tail_snippet: String,
     pub prompt_word_count: usize,
     pub last_modified: String,
 }
@@ -3497,6 +3514,8 @@ pub struct AgmProjectTreeNode {
     pub instance_id: String,
     pub instance_seq_num: Option<u32>,
     pub instance_name: String,
+    #[serde(default)]
+    pub instance_exe_name: String,
     pub bound_email: Option<String>,
     pub is_running: bool,
     pub conversations: Vec<AgmConversationNode>,
@@ -3629,6 +3648,35 @@ pub fn extract_prompt_words_preview(raw_text: &str, max_words: usize) -> (String
     } else {
         let truncated = meaningful_tokens[..limit].join(" ");
         (format!("{} ...", truncated), total_words)
+    }
+}
+
+/// Extract trailing snippet (last 10-15 words) of user prompt
+pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> String {
+    let cleaned = extract_clean_user_prompt(raw_text);
+    let mut meaningful_tokens: Vec<&str> = Vec::new();
+    for line in cleaned.lines() {
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if t.len() == 40 && t.chars().all(|c| c.is_ascii_hexdigit()) {
+            continue;
+        }
+        for word in t.split_whitespace() {
+            meaningful_tokens.push(word);
+        }
+    }
+    let total = meaningful_tokens.len();
+    if total == 0 {
+        return String::new();
+    }
+    let count = tail_word_count.clamp(1, 15);
+    if total <= count {
+        meaningful_tokens.join(" ")
+    } else {
+        let tail_slice = &meaningful_tokens[total - count..];
+        tail_slice.join(" ")
     }
 }
 
@@ -3966,17 +4014,19 @@ fn compute_project_conversation_tree(
                             }
 
                             let norm_time = last_time_str.trim().replacen(' ', "T", 1);
-                            let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                                .map(|dt| dt.timestamp() >= now - 900)
+                            let conv_ts = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                                .map(|dt| dt.timestamp())
                                 .or_else(|_| {
                                     chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
-                                        .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                        .map(|dt| dt.and_utc().timestamp())
                                 })
                                 .or_else(|_| {
                                     chrono::NaiveDateTime::parse_from_str(&last_time_str, "%Y-%m-%d %H:%M:%S")
-                                        .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                        .map(|dt| dt.and_utc().timestamp())
                                 })
-                                .unwrap_or(false);
+                                .unwrap_or(0);
+
+                            let is_recent = conv_ts > 0 && (now - conv_ts <= 120);
 
                             let is_idle_count = not_fully_idle == 0;
                             let has_idle_status = status.contains("IDLE")
@@ -3996,6 +4046,12 @@ fn compute_project_conversation_tree(
                             let effective_prompt = transcript_prompt
                                 .filter(|s| !s.trim().is_empty())
                                 .unwrap_or_else(|| preview.clone());
+
+                            // Ghost conversation filter: skip untitled / empty title with empty prompt
+                            let is_untitled_candidate = title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
+                            if is_untitled_candidate && effective_prompt.trim().is_empty() {
+                                continue;
+                            }
 
                             let mut assigned_paths: Vec<String> = Vec::new();
                             if let Some(ws_raw) = ws_uris_opt {
@@ -4085,12 +4141,59 @@ fn compute_project_conversation_tree(
                 .unwrap_or_else(|_| proj.instance_id.clone())
         };
 
+        let (instance_seq_num, instance_name, bound_email, inst_pid, instance_exe_name) =
+            if proj.instance_id == "default"
+                || proj.instance_id == "__default__"
+                || proj.instance_id.is_empty()
+            {
+                let exe_name = crate::modules::instance::resolve_instance_exe_name("default", None);
+                (
+                    Some(1),
+                    "default".to_string(),
+                    default_email.clone(),
+                    crate::modules::process::get_antigravity_pids(None)
+                        .first()
+                        .copied(),
+                    exe_name,
+                )
+            } else if let Some(inst) = registry
+                .instances
+                .iter()
+                .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
+            {
+                let exe_name = crate::modules::instance::resolve_instance_exe_name(
+                    &inst.id,
+                    inst.executable_path.as_deref(),
+                );
+                (
+                    inst.seq_num,
+                    inst.name.clone(),
+                    inst.bound_email.clone(),
+                    inst.pid,
+                    exe_name,
+                )
+            } else {
+                let exe_name =
+                    crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
+                (None, proj.instance_id.clone(), None, None, exe_name)
+            };
+
         let mut conv_nodes: Vec<AgmConversationNode> = Vec::new();
         if let Some(raw_convs) =
             convs_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
         {
             for (cid, title, raw_prompt, status, is_run, steps, last_mod, conv_inst_id) in raw_convs
             {
+                let (preview_200w, word_count) = extract_prompt_words_preview(raw_prompt, word_cap);
+
+                // Filter out empty "Untitled Conversation" (0 Words) nodes
+                let is_untitled =
+                    title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
+                let is_empty_prompt = raw_prompt.trim().is_empty() || word_count == 0;
+                if is_untitled && is_empty_prompt {
+                    continue;
+                }
+
                 let effective_is_run = is_inst_alive && *is_run;
                 if only_running && !effective_is_run {
                     continue;
@@ -4106,12 +4209,47 @@ fn compute_project_conversation_tree(
                 } else {
                     (conv_nodes.len() as i64) + 1
                 };
-                let (preview_200w, word_count) = extract_prompt_words_preview(raw_prompt, word_cap);
                 let short_id = if cid.len() >= 8 {
                     cid[..8].to_string()
                 } else {
                     cid.clone()
                 };
+                let tail_snippet = extract_prompt_tail_snippet(raw_prompt, 12);
+
+                let (c_inst_seq, c_inst_name, c_inst_exe) =
+                    if conv_inst_id == &proj.instance_id || conv_inst_id.is_empty() {
+                        (
+                            instance_seq_num,
+                            instance_name.clone(),
+                            instance_exe_name.clone(),
+                        )
+                    } else if conv_inst_id == "default" || conv_inst_id == "__default__" {
+                        (
+                            Some(1),
+                            "default".to_string(),
+                            crate::modules::instance::resolve_instance_exe_name("default", None),
+                        )
+                    } else if let Some(inst) = registry
+                        .instances
+                        .iter()
+                        .find(|i| i.id == *conv_inst_id || i.name == *conv_inst_id)
+                    {
+                        (
+                            inst.seq_num,
+                            inst.name.clone(),
+                            crate::modules::instance::resolve_instance_exe_name(
+                                &inst.id,
+                                inst.executable_path.as_deref(),
+                            ),
+                        )
+                    } else {
+                        (
+                            None,
+                            conv_inst_id.clone(),
+                            crate::modules::instance::resolve_instance_exe_name(conv_inst_id, None),
+                        )
+                    };
+
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
@@ -4132,8 +4270,12 @@ fn compute_project_conversation_tree(
                     },
                     is_running: effective_is_run,
                     step_count: *steps,
-                    instance_id: proj.instance_id.clone(),
+                    instance_id: conv_inst_id.clone(),
+                    instance_seq_num: c_inst_seq,
+                    instance_name: c_inst_name,
+                    instance_exe_name: c_inst_exe,
                     prompt_preview_200w: preview_200w,
+                    prompt_tail_snippet: tail_snippet,
                     prompt_word_count: word_count,
                     last_modified: last_mod.clone(),
                 });
@@ -4148,11 +4290,22 @@ fn compute_project_conversation_tree(
                 if conv_nodes.iter().any(|c| c.conversation_id == cid) {
                     continue;
                 }
-                let is_run = is_inst_alive && ap.status == "running";
+                let (preview_200w, word_count) =
+                    extract_prompt_words_preview(&ap.prompt_content, word_cap);
+
+                let title = extract_smart_prompt_summary(&ap.prompt_content, 60);
+                let is_untitled =
+                    title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
+                let is_empty_prompt = ap.prompt_content.trim().is_empty() || word_count == 0;
+                if is_untitled && is_empty_prompt {
+                    continue;
+                }
+
+                let is_run =
+                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 120);
                 if only_running && !is_run {
                     continue;
                 }
-                let title = extract_smart_prompt_summary(&ap.prompt_content, 60);
                 let c_seq = if let Some(ref conn) = conn_opt {
                     ensure_conversation_sequence_in_conn(
                         conn,
@@ -4164,13 +4317,48 @@ fn compute_project_conversation_tree(
                 } else {
                     (conv_nodes.len() as i64) + 1
                 };
-                let (preview_200w, word_count) =
-                    extract_prompt_words_preview(&ap.prompt_content, word_cap);
                 let short_id = if cid.len() >= 8 {
                     cid[..8].to_string()
                 } else {
                     cid.clone()
                 };
+                let tail_snippet = extract_prompt_tail_snippet(&ap.prompt_content, 12);
+
+                let (c_inst_seq, c_inst_name, c_inst_exe) = if ap.instance_id == proj.instance_id
+                    || ap.instance_id.is_empty()
+                {
+                    (
+                        instance_seq_num,
+                        instance_name.clone(),
+                        instance_exe_name.clone(),
+                    )
+                } else if ap.instance_id == "default" || ap.instance_id == "__default__" {
+                    (
+                        Some(1),
+                        "default".to_string(),
+                        crate::modules::instance::resolve_instance_exe_name("default", None),
+                    )
+                } else if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == ap.instance_id || i.name == ap.instance_id)
+                {
+                    (
+                        inst.seq_num,
+                        inst.name.clone(),
+                        crate::modules::instance::resolve_instance_exe_name(
+                            &inst.id,
+                            inst.executable_path.as_deref(),
+                        ),
+                    )
+                } else {
+                    (
+                        None,
+                        ap.instance_id.clone(),
+                        crate::modules::instance::resolve_instance_exe_name(&ap.instance_id, None),
+                    )
+                };
+
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
@@ -4182,14 +4370,36 @@ fn compute_project_conversation_tree(
                     is_running: is_run,
                     step_count: 0,
                     instance_id: ap.instance_id.clone(),
+                    instance_seq_num: c_inst_seq,
+                    instance_name: c_inst_name,
+                    instance_exe_name: c_inst_exe,
                     prompt_preview_200w: preview_200w,
+                    prompt_tail_snippet: tail_snippet,
                     prompt_word_count: word_count,
                     last_modified: ap.updated_at.to_string(),
                 });
             }
         }
 
-        let has_active_conv = conv_nodes.iter().any(|c| c.is_running);
+        let has_active_conv = conv_nodes.iter().any(|c| {
+            if !c.is_running {
+                return false;
+            }
+            let norm_time = c.last_modified.trim().replacen(' ', "T", 1);
+            let conv_ts = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                .map(|dt| dt.timestamp())
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
+                        .map(|dt| dt.and_utc().timestamp())
+                })
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(&c.last_modified, "%Y-%m-%d %H:%M:%S")
+                        .map(|dt| dt.and_utc().timestamp())
+                })
+                .or_else(|_| c.last_modified.parse::<i64>().ok())
+                .unwrap_or(0);
+            conv_ts > 0 && (now - conv_ts <= 120)
+        });
         let has_conv_nodes = !conv_nodes.is_empty();
 
         let (proj_is_running, rationale) = if !is_inst_alive {
@@ -4234,34 +4444,6 @@ fn compute_project_conversation_tree(
             proj.instance_id, proj.repo_name, proj_is_running, rationale
         ));
 
-        let (instance_seq_num, instance_name, bound_email, inst_pid) = if proj.instance_id
-            == "default"
-            || proj.instance_id == "__default__"
-            || proj.instance_id.is_empty()
-        {
-            (
-                Some(1),
-                "default".to_string(),
-                default_email.clone(),
-                crate::modules::process::get_antigravity_pids(None)
-                    .first()
-                    .copied(),
-            )
-        } else if let Some(inst) = registry
-            .instances
-            .iter()
-            .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
-        {
-            (
-                inst.seq_num,
-                inst.name.clone(),
-                inst.bound_email.clone(),
-                inst.pid,
-            )
-        } else {
-            (None, proj.instance_id.clone(), None, None)
-        };
-
         crate::modules::logger::log_instance_prompt_audit(
             &proj.instance_id,
             &instance_name,
@@ -4292,6 +4474,7 @@ fn compute_project_conversation_tree(
             instance_id: proj.instance_id.clone(),
             instance_seq_num,
             instance_name,
+            instance_exe_name,
             bound_email,
             is_running: proj_is_running,
             conversations: conv_nodes,
@@ -5859,5 +6042,22 @@ mod tests {
         let (preview, count) = extract_prompt_words_preview(&two_hundred_fifty_words, 200);
         assert_eq!(count, 250);
         assert!(preview.ends_with("word200 ..."));
+    }
+
+    #[test]
+    fn test_extract_prompt_tail_snippet() {
+        let text = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen";
+        let snippet = extract_prompt_tail_snippet(text, 12);
+        assert_eq!(
+            snippet,
+            "five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen"
+        );
+
+        let short_text = "hello world";
+        let short_snippet = extract_prompt_tail_snippet(short_text, 12);
+        assert_eq!(short_snippet, "hello world");
+
+        let empty_snippet = extract_prompt_tail_snippet("   ", 12);
+        assert_eq!(empty_snippet, "");
     }
 }
