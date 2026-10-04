@@ -227,6 +227,13 @@ pub fn log_error(message: &str) {
     error!("{}", message);
 }
 
+fn format_pid_value(process_pid: Option<u32>) -> String {
+    match process_pid {
+        Some(pid) => pid.to_string(),
+        None => "none".to_string(),
+    }
+}
+
 /// Format structured audit log string for instance prompt and project liveness evaluation
 pub fn format_instance_prompt_audit(
     instance_id: &str,
@@ -239,21 +246,9 @@ pub fn format_instance_prompt_audit(
     is_running: bool,
     rationale: &str,
 ) -> String {
-    let pid_str = process_pid
-        .map(|p| p.to_string())
-        .unwrap_or_else(|| "none".to_string());
-
+    let pid_str = format_pid_value(process_pid);
     format!(
-        "[InstancePromptAudit] instance_id='{}' resolved_name='{}' project='{}' repo_path='{}' db_path='{}' pid={} criteria='{}' is_running={} rationale='{}'",
-        instance_id,
-        resolved_name,
-        project_name,
-        repo_path,
-        db_path_evaluated,
-        pid_str,
-        criteria_evaluated,
-        is_running,
-        rationale
+        "[InstancePromptAudit] instance_id='{instance_id}' resolved_name='{resolved_name}' project='{project_name}' repo_path='{repo_path}' db_path='{db_path_evaluated}' pid={pid_str} criteria='{criteria_evaluated}' is_running={is_running} rationale='{rationale}'"
     )
 }
 
@@ -269,18 +264,16 @@ pub fn log_instance_prompt_audit(
     is_running: bool,
     rationale: &str,
 ) {
-    info!(
-        "{}",
-        format_instance_prompt_audit(
-            instance_id,
-            resolved_name,
-            project_name,
-            repo_path,
-            db_path_evaluated,
-            process_pid,
-            criteria_evaluated,
-            is_running,
-            rationale
-        )
+    let line = format_instance_prompt_audit(
+        instance_id,
+        resolved_name,
+        project_name,
+        repo_path,
+        db_path_evaluated,
+        process_pid,
+        criteria_evaluated,
+        is_running,
+        rationale,
     );
+    info!("{line}");
 }

@@ -1761,3 +1761,702 @@ async fn test_case_composite_keying_isolation_same_repo_path() {
     assert_eq!(running_8159.len(), 1);
     assert_eq!(running_8159[0].repo_name, "coding-guidelines");
 }
+
+// ----------------------------------------------------------------------------
+// Section 3.2 Matrix: Test Cases A through F
+// ----------------------------------------------------------------------------
+
+fn insert_case_a_summaries(conn: &Connection) {
+    let now = chrono::Utc::now();
+    let agm_time = (now - chrono::Duration::seconds(30)).to_rfc3339();
+    let spec_time = (now - chrono::Duration::seconds(60)).to_rfc3339();
+    let cg_time = (now - chrono::Duration::seconds(120)).to_rfc3339();
+
+    insert_conversation_summary(
+        conn,
+        "conv-agm-1",
+        "AGM Task",
+        "Refactoring",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/Antigravity-Manager",
+        &agm_time,
+    );
+    insert_conversation_summary(
+        conn,
+        "conv-spec-1",
+        "Spec Task",
+        "Editing",
+        "CASCADE_RUN_STATUS_COMPLETED",
+        0,
+        "d:/work/SpecBuilder",
+        &spec_time,
+    );
+    insert_conversation_summary(
+        conn,
+        "conv-cg-1",
+        "CG Task",
+        "Guidelines",
+        "CASCADE_RUN_STATUS_IDLE",
+        0,
+        "d:/work/coding-guidelines",
+        &cg_time,
+    );
+}
+
+fn assert_case_a_conversations(
+    evaluated_convs: &[(String, String, String, String, bool, i32, String)],
+) {
+    let agm_conv = evaluated_convs
+        .iter()
+        .find(|c| c.0 == "conv-agm-1")
+        .unwrap();
+    let spec_conv = evaluated_convs
+        .iter()
+        .find(|c| c.0 == "conv-spec-1")
+        .unwrap();
+    let cg_conv = evaluated_convs.iter().find(|c| c.0 == "conv-cg-1").unwrap();
+    assert!(
+        agm_conv.4,
+        "Antigravity-Manager conversation must be running"
+    );
+    assert!(!spec_conv.4, "SpecBuilder conversation must NOT be running");
+    assert!(
+        !cg_conv.4,
+        "coding-guidelines conversation must NOT be running"
+    );
+}
+
+fn evaluate_case_a_projects(
+    evaluated_convs: &[(String, String, String, String, bool, i32, String)],
+) -> (
+    ProjectLivenessEvaluation,
+    ProjectLivenessEvaluation,
+    ProjectLivenessEvaluation,
+) {
+    let agm_conv = evaluated_convs
+        .iter()
+        .find(|c| c.0 == "conv-agm-1")
+        .unwrap();
+    let spec_conv = evaluated_convs
+        .iter()
+        .find(|c| c.0 == "conv-spec-1")
+        .unwrap();
+    let cg_conv = evaluated_convs.iter().find(|c| c.0 == "conv-cg-1").unwrap();
+
+    let (eval_agm, _) = evaluate_project_liveness_record(
+        "default",
+        "p-agm",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        true,
+        agm_conv.4,
+        false,
+    );
+    let (eval_spec, _) = evaluate_project_liveness_record(
+        "default",
+        "p-spec",
+        "SpecBuilder",
+        "d:/work/SpecBuilder",
+        true,
+        spec_conv.4,
+        false,
+    );
+    let (eval_cg, _) = evaluate_project_liveness_record(
+        "default",
+        "p-cg",
+        "coding-guidelines",
+        "d:/work/coding-guidelines",
+        true,
+        cg_conv.4,
+        false,
+    );
+    (eval_agm, eval_spec, eval_cg)
+}
+
+fn assert_case_a_evaluations(
+    eval_agm: &ProjectLivenessEvaluation,
+    eval_spec: &ProjectLivenessEvaluation,
+    eval_cg: &ProjectLivenessEvaluation,
+) {
+    assert!(eval_agm.is_running);
+    assert!(!eval_spec.is_running);
+    assert!(!eval_cg.is_running);
+    assert!(eval_agm.rationale.contains("ACTIVE_IN_FLIGHT_TASKS"));
+    assert!(eval_spec.rationale.contains("IDLE"));
+    assert!(eval_cg.rationale.contains("IDLE"));
+}
+
+fn assert_case_a_running_filter(is_agm_running: bool, is_spec_running: bool, is_cg_running: bool) {
+    let p_agm = build_mock_project(
+        "p-agm",
+        "Antigravity-Manager",
+        "default",
+        is_agm_running,
+        vec![],
+    );
+    let p_spec = build_mock_project("p-spec", "SpecBuilder", "default", is_spec_running, vec![]);
+    let p_cg = build_mock_project(
+        "p-cg",
+        "coding-guidelines",
+        "default",
+        is_cg_running,
+        vec![],
+    );
+    let running_only = filter_running_projects(vec![p_agm, p_spec, p_cg]);
+    assert_eq!(running_only.len(), 1);
+    assert_eq!(running_only[0].repo_name, "Antigravity-Manager");
+}
+
+#[tokio::test]
+async fn test_case_a_sequence_1_default_running_agm_only() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let default_db_path = sandbox
+        .path()
+        .join("home/.gemini/antigravity/conversation_summaries.db");
+    let conn = init_summaries_db(&default_db_path);
+    insert_case_a_summaries(&conn);
+
+    let evaluated_convs = evaluate_instance_conversations_with_ttl(&default_db_path, true, 900);
+    assert_eq!(evaluated_convs.len(), 3);
+    assert_case_a_conversations(&evaluated_convs);
+
+    let (eval_agm, eval_spec, eval_cg) = evaluate_case_a_projects(&evaluated_convs);
+    assert_case_a_evaluations(&eval_agm, &eval_spec, &eval_cg);
+    assert_case_a_running_filter(
+        eval_agm.is_running,
+        eval_spec.is_running,
+        eval_cg.is_running,
+    );
+}
+
+fn insert_case_b_default(conn_def: &Connection, agm_time: &str) {
+    insert_conversation_summary(
+        conn_def,
+        "conv-def-agm",
+        "AGM Task",
+        "Active on default",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/Antigravity-Manager",
+        agm_time,
+    );
+}
+
+fn insert_case_b_8159(conn_8159: &Connection, cg_time: &str, agm_time: &str, spec_time: &str) {
+    insert_conversation_summary(
+        conn_8159,
+        "conv-8159-cg",
+        "CG Rules",
+        "Active",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/coding-guidelines",
+        cg_time,
+    );
+    insert_conversation_summary(
+        conn_8159,
+        "conv-8159-agm",
+        "AGM",
+        "Dormant",
+        "CASCADE_RUN_STATUS_IDLE",
+        0,
+        "d:/work/Antigravity-Manager",
+        agm_time,
+    );
+    insert_conversation_summary(
+        conn_8159,
+        "conv-8159-spec",
+        "Spec",
+        "Dormant",
+        "CASCADE_RUN_STATUS_IDLE",
+        0,
+        "d:/work/SpecBuilder",
+        spec_time,
+    );
+}
+
+fn assert_case_b_conversations(
+    convs_8159: &[(String, String, String, String, bool, i32, String)],
+    convs_def: &[(String, String, String, String, bool, i32, String)],
+) {
+    let cg = convs_8159.iter().find(|c| c.0 == "conv-8159-cg").unwrap();
+    let agm = convs_8159.iter().find(|c| c.0 == "conv-8159-agm").unwrap();
+    let spec = convs_8159.iter().find(|c| c.0 == "conv-8159-spec").unwrap();
+    let def_agm = convs_def.iter().find(|c| c.0 == "conv-def-agm").unwrap();
+
+    assert!(cg.4, "coding-guidelines must be running on 8159");
+    assert!(!agm.4, "Antigravity-Manager must NOT be running on 8159");
+    assert!(!spec.4, "SpecBuilder must NOT be running on 8159");
+    assert!(def_agm.4, "Default AGM must be running");
+}
+
+fn evaluate_case_b_projects(
+    convs_8159: &[(String, String, String, String, bool, i32, String)],
+) -> (
+    ProjectLivenessEvaluation,
+    ProjectLivenessEvaluation,
+    ProjectLivenessEvaluation,
+) {
+    let cg_conv = convs_8159.iter().find(|c| c.0 == "conv-8159-cg").unwrap();
+    let agm_conv = convs_8159.iter().find(|c| c.0 == "conv-8159-agm").unwrap();
+    let spec_conv = convs_8159.iter().find(|c| c.0 == "conv-8159-spec").unwrap();
+
+    let (eval_cg, _) = evaluate_project_liveness_record(
+        "default-copy-8159",
+        "p-cg-8159",
+        "coding-guidelines",
+        "d:/work/coding-guidelines",
+        true,
+        cg_conv.4,
+        false,
+    );
+    let (eval_agm, _) = evaluate_project_liveness_record(
+        "default-copy-8159",
+        "p-agm-8159",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        true,
+        agm_conv.4,
+        false,
+    );
+    let (eval_spec, _) = evaluate_project_liveness_record(
+        "default-copy-8159",
+        "p-spec-8159",
+        "SpecBuilder",
+        "d:/work/SpecBuilder",
+        true,
+        spec_conv.4,
+        false,
+    );
+    (eval_cg, eval_agm, eval_spec)
+}
+
+fn assert_case_b_evaluations(
+    eval_cg: &ProjectLivenessEvaluation,
+    eval_agm: &ProjectLivenessEvaluation,
+    eval_spec: &ProjectLivenessEvaluation,
+) {
+    assert!(eval_cg.is_running);
+    assert!(!eval_agm.is_running);
+    assert!(!eval_spec.is_running);
+    assert!(eval_cg.rationale.contains("ACTIVE_IN_FLIGHT_TASKS"));
+    assert!(eval_agm.rationale.contains("IDLE"));
+    assert!(eval_spec.rationale.contains("IDLE"));
+}
+
+fn assert_case_b_running_filter(is_cg_running: bool, is_agm_running: bool, is_spec_running: bool) {
+    let p_cg = build_mock_project(
+        "p-cg",
+        "coding-guidelines",
+        "default-copy-8159",
+        is_cg_running,
+        vec![],
+    );
+    let p_agm = build_mock_project(
+        "p-agm",
+        "Antigravity-Manager",
+        "default-copy-8159",
+        is_agm_running,
+        vec![],
+    );
+    let p_spec = build_mock_project(
+        "p-spec",
+        "SpecBuilder",
+        "default-copy-8159",
+        is_spec_running,
+        vec![],
+    );
+    let running = filter_running_projects(vec![p_cg, p_agm, p_spec]);
+    assert_eq!(running.len(), 1);
+    assert_eq!(running[0].repo_name, "coding-guidelines");
+}
+
+#[tokio::test]
+async fn test_case_b_sequence_2_instance_8159_running_cg_only() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let def_db = sandbox
+        .path()
+        .join("home/.gemini/antigravity/conversation_summaries.db");
+    let inst_db = sandbox
+        .path()
+        .join("instances/default-copy-8159/home/.gemini/antigravity/conversation_summaries.db");
+
+    let now = chrono::Utc::now();
+    let cg_time = (now - chrono::Duration::seconds(45)).to_rfc3339();
+    let agm_time = (now - chrono::Duration::seconds(60)).to_rfc3339();
+    let spec_time = (now - chrono::Duration::seconds(120)).to_rfc3339();
+
+    insert_case_b_default(&init_summaries_db(&def_db), &agm_time);
+    insert_case_b_8159(
+        &init_summaries_db(&inst_db),
+        &cg_time,
+        &agm_time,
+        &spec_time,
+    );
+
+    let convs_8159 = evaluate_instance_conversations_with_ttl(&inst_db, true, 900);
+    let convs_def = evaluate_instance_conversations_with_ttl(&def_db, true, 900);
+    assert_case_b_conversations(&convs_8159, &convs_def);
+
+    let (eval_cg, eval_agm, eval_spec) = evaluate_case_b_projects(&convs_8159);
+    assert_case_b_evaluations(&eval_cg, &eval_agm, &eval_spec);
+    assert_case_b_running_filter(
+        eval_cg.is_running,
+        eval_agm.is_running,
+        eval_spec.is_running,
+    );
+}
+
+fn setup_mock_instances_registry(sandbox_path: &Path) {
+    let instances_dir = sandbox_path.join("instances");
+    fs::create_dir_all(&instances_dir).expect("create instances dir");
+    let registry_json = serde_json::json!({
+        "active_instance_id": "default",
+        "instances": [
+            {
+                "id": "default", "name": "Default Profile",
+                "data_dir": sandbox_path.join("default_data").to_string_lossy(),
+                "is_default": true, "seq_num": 1, "created_at": 1000, "last_used": 1000
+            },
+            {
+                "id": "default-copy-8159", "name": "Instance 8159",
+                "data_dir": sandbox_path.join("inst_8159_data").to_string_lossy(),
+                "is_default": false, "seq_num": 2, "created_at": 2000, "last_used": 2000
+            }
+        ]
+    });
+    fs::write(
+        instances_dir.join("instances.json"),
+        serde_json::to_string_pretty(&registry_json).unwrap(),
+    )
+    .expect("write instances.json");
+}
+
+fn assert_suffix_resolutions() {
+    use antigravity_tools_lib::modules::instance::{get_instance_home_dir, resolve_instance_id};
+    assert_eq!(
+        resolve_instance_id("8159"),
+        Ok("default-copy-8159".to_string())
+    );
+    assert_eq!(
+        resolve_instance_id("-8159"),
+        Ok("default-copy-8159".to_string())
+    );
+    assert_eq!(
+        resolve_instance_id("inst-8159"),
+        Ok("default-copy-8159".to_string())
+    );
+    assert_eq!(resolve_instance_id("default"), Ok("default".to_string()));
+
+    let home_8159 = get_instance_home_dir("8159").expect("get home dir");
+    let home_str = home_8159.to_string_lossy().replace('\\', "/");
+    assert!(
+        home_str.contains("default-copy-8159/home"),
+        "home dir must contain default-copy-8159/home"
+    );
+}
+
+#[tokio::test]
+async fn test_case_c_suffix_alias_resolution_for_cloned_instances() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    setup_mock_instances_registry(sandbox.path());
+    assert_suffix_resolutions();
+
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+fn insert_case_d_records(conn: &Connection, id_def: &str, id_8159: &str, now: i64) {
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id_def,
+            "default",
+            "Antigravity-Manager",
+            "d:/work/Antigravity-Manager",
+            "c:/ws/def",
+            1,
+            now,
+            now
+        ],
+    )
+    .expect("insert default running project");
+
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id_8159,
+            "default-copy-8159",
+            "Antigravity-Manager",
+            "d:/work/Antigravity-Manager",
+            "c:/ws/8159",
+            0,
+            now,
+            now
+        ],
+    )
+    .expect("insert 8159 running project");
+}
+
+fn assert_case_d_isolation(conn: &Connection, id_def: &str, id_8159: &str, now: i64) {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM running_projects", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        count, 2,
+        "Both instances must retain their respective project records"
+    );
+
+    conn.execute(
+        "UPDATE running_projects SET updated_at = ?1 WHERE id = ?2",
+        params![now + 10, id_def],
+    )
+    .unwrap();
+    let def_run: i32 = conn
+        .query_row(
+            "SELECT is_running FROM running_projects WHERE id = ?1",
+            params![id_def],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let s8159_run: i32 = conn
+        .query_row(
+            "SELECT is_running FROM running_projects WHERE id = ?1",
+            params![id_8159],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(def_run, 1);
+    assert_eq!(s8159_run, 0);
+}
+
+#[tokio::test]
+async fn test_case_d_database_primary_key_composite_isolation() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    let conn = antigravity_tools_lib::modules::repo_db::connect_db().expect("connect repo db");
+    let now = chrono::Utc::now().timestamp();
+    let (id_def, id_8159) = (
+        "antigravity-manager-hash__default",
+        "antigravity-manager-hash__default-copy-8159",
+    );
+
+    insert_case_d_records(&conn, id_def, id_8159, now);
+    assert_case_d_isolation(&conn, id_def, id_8159, now);
+
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+fn insert_case_e_prompts(conn: &Connection, now: i64) {
+    conn.execute(
+        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            "p-queued",
+            "p-agm",
+            "default",
+            "d:/work/Antigravity-Manager",
+            "queued",
+            "gemini-1.5-pro",
+            "queued",
+            now,
+            now
+        ],
+    ).expect("insert queued prompt");
+
+    conn.execute(
+        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            "p-backed",
+            "p-agm",
+            "default",
+            "d:/work/Antigravity-Manager",
+            "backed",
+            "gemini-1.5-pro",
+            "backed_up",
+            now,
+            now
+        ],
+    ).expect("insert backed_up prompt");
+
+    conn.execute(
+        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            "p-stale",
+            "p-agm",
+            "default",
+            "d:/work/Antigravity-Manager",
+            "stale",
+            "gemini-1.5-pro",
+            "running",
+            now - 600,
+            now - 500
+        ],
+    ).expect("insert stale running prompt");
+}
+
+fn assert_case_e_gating(conn: &Connection, db_path: &Path, now: i64) {
+    let fresh_running_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM active_prompts WHERE status = 'running' AND updated_at > ?1",
+            params![now - 300],
+            |r| r.get(0),
+        )
+        .expect("query fresh running");
+    assert_eq!(
+        fresh_running_count, 0,
+        "Queued, backed_up, and stale prompts do not evaluate as running"
+    );
+
+    let evaluated = evaluate_instance_conversations_with_ttl(db_path, true, 900);
+    assert_eq!(evaluated.len(), 1);
+    assert!(
+        !evaluated[0].4,
+        "Stale turn (> 900s) must NOT evaluate as running"
+    );
+
+    let (eval, log_line) = evaluate_project_liveness_record(
+        "default",
+        "p-agm",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        true,
+        evaluated[0].4,
+        false,
+    );
+    assert!(
+        !eval.is_running,
+        "Stale turn results in project evaluated as idle"
+    );
+    assert!(eval.rationale.contains("IDLE"));
+    assert!(log_line.contains("is_running=false"));
+}
+
+#[tokio::test]
+async fn test_case_e_stale_and_queued_prompts_do_not_trigger_running() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    let conn = antigravity_tools_lib::modules::repo_db::connect_db().expect("connect repo db");
+    let now = chrono::Utc::now().timestamp();
+    insert_case_e_prompts(&conn, now);
+
+    let db_path = sandbox
+        .path()
+        .join("home/.gemini/antigravity/conversation_summaries.db");
+    let summaries_conn = init_summaries_db(&db_path);
+    let stale_time = (chrono::Utc::now() - chrono::Duration::seconds(1200)).to_rfc3339();
+    insert_conversation_summary(
+        &summaries_conn,
+        "conv-stale",
+        "Stale",
+        "Stale",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/Antigravity-Manager",
+        &stale_time,
+    );
+
+    assert_case_e_gating(&conn, &db_path, now);
+
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+fn assert_case_f_formatted_pid() {
+    use antigravity_tools_lib::modules::logger::format_instance_prompt_audit;
+    let log_pid = format_instance_prompt_audit(
+        "default",
+        "Default Profile",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        "c:/data/conversation_summaries.db",
+        Some(11628),
+        "ProjectConversationTreeLiveness",
+        true,
+        "ACTIVE_IN_FLIGHT_TASKS",
+    );
+    assert!(log_pid.starts_with("[InstancePromptAudit]"));
+    assert!(log_pid.contains("instance_id='default'"));
+    assert!(log_pid.contains("resolved_name='Default Profile'"));
+    assert!(log_pid.contains("project='Antigravity-Manager'"));
+    assert!(log_pid.contains("repo_path='d:/work/Antigravity-Manager'"));
+    assert!(log_pid.contains("db_path='c:/data/conversation_summaries.db'"));
+    assert!(log_pid.contains("pid=11628"));
+    assert!(log_pid.contains("criteria='ProjectConversationTreeLiveness'"));
+    assert!(log_pid.contains("is_running=true"));
+    assert!(log_pid.contains("rationale='ACTIVE_IN_FLIGHT_TASKS'"));
+}
+
+fn assert_case_f_formatted_none() {
+    use antigravity_tools_lib::modules::logger::{
+        format_instance_prompt_audit, log_instance_prompt_audit,
+    };
+    let log_none = format_instance_prompt_audit(
+        "default-copy-8159",
+        "Instance 8159",
+        "SpecBuilder",
+        "d:/work/SpecBuilder",
+        "c:/data/conversation_summaries.db",
+        None,
+        "ProjectConversationTreeLiveness",
+        false,
+        "IDLE_NO_ACTIVE_TASKS",
+    );
+    assert!(log_none.contains("pid=none"));
+    assert!(log_none.contains("is_running=false"));
+    assert!(log_none.contains("criteria='ProjectConversationTreeLiveness'"));
+    assert!(log_none.contains("rationale='IDLE_NO_ACTIVE_TASKS'"));
+
+    log_instance_prompt_audit(
+        "default",
+        "Default Profile",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        "c:/data/conversation_summaries.db",
+        Some(11628),
+        "ProjectConversationTreeLiveness",
+        true,
+        "ACTIVE_IN_FLIGHT_TASKS",
+    );
+    log_instance_prompt_audit(
+        "default-copy-8159",
+        "Instance 8159",
+        "SpecBuilder",
+        "d:/work/SpecBuilder",
+        "c:/data/conversation_summaries.db",
+        None,
+        "ProjectConversationTreeLiveness",
+        false,
+        "IDLE_NO_ACTIVE_TASKS",
+    );
+}
+
+#[tokio::test]
+async fn test_case_f_audit_log_formatting_and_emission() {
+    assert_case_f_formatted_pid();
+    assert_case_f_formatted_none();
+}
