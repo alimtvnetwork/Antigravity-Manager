@@ -1347,6 +1347,41 @@ pub fn clean_appimage_env(cmd: &mut Command) {
     }
 }
 
+/// Helper to construct argument list for macOS `open` command.
+///
+/// Ensures `-n` and `-a` are passed, and that `--args` is added BEFORE any application flags
+/// (such as `--new-window` or custom args), so they are never interpreted as `open` flags.
+pub(crate) fn format_macos_open_args(
+    app_identifier: &str,
+    args: Option<&[String]>,
+    new_window: bool,
+) -> Vec<String> {
+    let mut cmd_args = vec![
+        "-n".to_string(),
+        "-a".to_string(),
+        app_identifier.to_string(),
+    ];
+    let valid_args: Vec<&str> = args
+        .map(|a| {
+            a.iter()
+                .map(|s| s.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if !valid_args.is_empty() || new_window {
+        cmd_args.push("--args".to_string());
+        for arg in valid_args {
+            cmd_args.push(arg.to_string());
+        }
+        if new_window && !cmd_args.iter().any(|a| a == "--new-window") {
+            cmd_args.push("--new-window".to_string());
+        }
+    }
+    cmd_args
+}
+
 /// Start Antigravity with optional snapshot path & args fallback
 #[allow(unused_mut)]
 pub fn start_antigravity_with_fallback_path(
@@ -1408,20 +1443,8 @@ pub fn start_antigravity_with_fallback_path(
                 // macOS: if .app directory, use open
                 if path_str.ends_with(".app") || path.is_dir() {
                     let mut cmd = Command::new("open");
-                    cmd.arg("-a").arg(&path_str);
-
-                    // Add startup arguments (must be after --args for macOS open)
-                    if let Some(ref args) = args {
-                        let valid_args: Vec<_> =
-                            args.iter().filter(|a| !a.trim().is_empty()).collect();
-                        if !valid_args.is_empty() {
-                            cmd.arg("--args");
-                            for arg in valid_args {
-                                cmd.arg(arg);
-                            }
-                        }
-                    }
-                    cmd.arg("--new-window");
+                    let open_args = format_macos_open_args(&path_str, args.as_deref(), true);
+                    cmd.args(&open_args);
 
                     cmd.spawn()
                         .map_err(|e| format!("Startup failed (open): {}", e))?;
@@ -1491,21 +1514,16 @@ pub fn start_antigravity_with_fallback_path(
             #[cfg(target_os = "macos")]
             {
                 let path_str = pref_path.to_string_lossy();
-                let mut cmd = Command::new("open");
-                if let Some(app_idx) = path_str.find(".app") {
-                    cmd.arg("-a").arg(&path_str[..app_idx + 4]);
+                let app_target = if let Some(app_idx) = path_str.find(".app") {
+                    &path_str[..app_idx + 4]
                 } else {
-                    cmd.arg("-a").arg(&*path_str);
-                }
-                if let Some(ref args) = args {
-                    let valid_args: Vec<_> = args.iter().filter(|a| !a.trim().is_empty()).collect();
-                    if !valid_args.is_empty() {
-                        cmd.arg("--args");
-                        for arg in valid_args {
-                            cmd.arg(arg);
-                        }
-                    }
-                }
+                    &*path_str
+                };
+
+                let mut cmd = Command::new("open");
+                let open_args = format_macos_open_args(app_target, args.as_deref(), false);
+                cmd.args(&open_args);
+
                 let output = cmd
                     .output()
                     .map_err(|e| format!("Execute open command failed: {}", e))?;
@@ -1565,19 +1583,8 @@ pub fn start_antigravity_with_fallback_path(
         } else {
             "Antigravity"
         };
-        cmd.args(["-a", app_name]);
-
-        // Add startup arguments (must be after --args for macOS open)
-        if let Some(ref args) = args {
-            let valid_args: Vec<_> = args.iter().filter(|a| !a.trim().is_empty()).collect();
-            if !valid_args.is_empty() {
-                cmd.arg("--args");
-                for arg in valid_args {
-                    cmd.arg(arg);
-                }
-            }
-        }
-        cmd.arg("--new-window");
+        let open_args = format_macos_open_args(app_name, args.as_deref(), true);
+        cmd.args(&open_args);
 
         let output = cmd
             .output()
@@ -1986,6 +1993,37 @@ pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::
     detect_antigravity_with_diagnostics(target_ide).ok()
 }
 
+/// Helper to construct candidate search paths for macOS IDE discovery.
+pub(crate) fn get_macos_candidate_paths(
+    folder_name: &str,
+    home_dir: Option<&std::path::Path>,
+) -> Vec<String> {
+    let mut candidates = vec![
+        format!("/Applications/{}.app", folder_name),
+        format!(
+            "/Applications/{}.app/Contents/MacOS/{}",
+            folder_name, folder_name
+        ),
+        format!(
+            "/Applications/{}.app/Contents/MacOS/Antigravity",
+            folder_name
+        ),
+        format!("/Applications/{}.app/Contents/MacOS/Electron", folder_name),
+    ];
+
+    if let Some(home) = home_dir {
+        let home_str = home.to_string_lossy().replace('\\', "/");
+        let home_clean = home_str.trim_end_matches('/');
+        let user_app = format!("{}/Applications/{}.app", home_clean, folder_name);
+        candidates.push(user_app.clone());
+        candidates.push(format!("{}/Contents/MacOS/{}", user_app, folder_name));
+        candidates.push(format!("{}/Contents/MacOS/Antigravity", user_app));
+        candidates.push(format!("{}/Contents/MacOS/Electron", user_app));
+    }
+
+    candidates
+}
+
 /// Audit standard installation locations and collect diagnostics
 fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Vec<String>) {
     let mut checked = Vec::new();
@@ -2002,11 +2040,9 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
 
     #[cfg(target_os = "macos")]
     {
+        let home = dirs::home_dir();
         for folder_name in folder_names {
-            let candidates = [
-                format!("/Applications/{}.app", folder_name),
-                format!("/Applications/{}.app/Contents/MacOS/Electron", folder_name),
-            ];
+            let candidates = get_macos_candidate_paths(folder_name, home.as_deref());
             for c in candidates {
                 checked.push(c.clone());
                 let p = std::path::PathBuf::from(c);
@@ -2015,12 +2051,23 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
                 }
             }
         }
-        if let Some(home) = dirs::home_dir() {
-            for folder_name in folder_names {
-                let p = home.join(format!("Applications/{}.app", folder_name));
-                checked.push(p.to_string_lossy().to_string());
-                if p.exists() {
-                    return (Some(p), checked);
+
+        // Spotlight mdfind fallback for non-standard directory installations
+        for folder_name in folder_names {
+            let query = format!("kMDItemFSName == '{}.app'", folder_name);
+            checked.push(format!("mdfind: {}", query));
+            if let Ok(output) = std::process::Command::new("mdfind").arg(&query).output() {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        let trimmed = line.trim();
+                        if !trimmed.is_empty() {
+                            let p = std::path::PathBuf::from(trimmed);
+                            if p.exists() {
+                                return (Some(p), checked);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2616,5 +2663,101 @@ mod tests {
             "/usr/bin/antigravity",
             ""
         ));
+    }
+
+    #[test]
+    fn test_format_macos_open_args_with_no_args() {
+        let args = format_macos_open_args("Antigravity", None, true);
+        assert_eq!(
+            args,
+            vec!["-n", "-a", "Antigravity", "--args", "--new-window"]
+        );
+    }
+
+    #[test]
+    fn test_format_macos_open_args_with_custom_args() {
+        let custom = vec![
+            "--user-data-dir=/tmp/test".to_string(),
+            "/path/to/workspace".to_string(),
+        ];
+        let args = format_macos_open_args("/Applications/Antigravity.app", Some(&custom), true);
+        assert_eq!(
+            args,
+            vec![
+                "-n",
+                "-a",
+                "/Applications/Antigravity.app",
+                "--args",
+                "--user-data-dir=/tmp/test",
+                "/path/to/workspace",
+                "--new-window"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_format_macos_open_args_snapshot_no_new_window() {
+        let snapshot_args = vec!["--user-data-dir=/tmp/snapshot".to_string()];
+        let args = format_macos_open_args(
+            "/Applications/Antigravity IDE.app",
+            Some(&snapshot_args),
+            false,
+        );
+        assert_eq!(
+            args,
+            vec![
+                "-n",
+                "-a",
+                "/Applications/Antigravity IDE.app",
+                "--args",
+                "--user-data-dir=/tmp/snapshot"
+            ]
+        );
+
+        let no_args = format_macos_open_args("Antigravity", None, false);
+        assert_eq!(no_args, vec!["-n", "-a", "Antigravity"]);
+    }
+
+    #[test]
+    fn test_get_macos_candidate_paths() {
+        let home = std::path::Path::new("/Users/developer");
+        let paths = get_macos_candidate_paths("Antigravity", Some(home));
+        assert_eq!(
+            paths,
+            vec![
+                "/Applications/Antigravity.app".to_string(),
+                "/Applications/Antigravity.app/Contents/MacOS/Antigravity".to_string(),
+                "/Applications/Antigravity.app/Contents/MacOS/Antigravity".to_string(),
+                "/Applications/Antigravity.app/Contents/MacOS/Electron".to_string(),
+                "/Users/developer/Applications/Antigravity.app".to_string(),
+                "/Users/developer/Applications/Antigravity.app/Contents/MacOS/Antigravity"
+                    .to_string(),
+                "/Users/developer/Applications/Antigravity.app/Contents/MacOS/Antigravity"
+                    .to_string(),
+                "/Users/developer/Applications/Antigravity.app/Contents/MacOS/Electron".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_macos_candidate_paths_ide() {
+        let home = std::path::Path::new("/Users/developer");
+        let paths = get_macos_candidate_paths("Antigravity IDE", Some(home));
+        assert_eq!(
+            paths,
+            vec![
+                "/Applications/Antigravity IDE.app".to_string(),
+                "/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE".to_string(),
+                "/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity".to_string(),
+                "/Applications/Antigravity IDE.app/Contents/MacOS/Electron".to_string(),
+                "/Users/developer/Applications/Antigravity IDE.app".to_string(),
+                "/Users/developer/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE"
+                    .to_string(),
+                "/Users/developer/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity"
+                    .to_string(),
+                "/Users/developer/Applications/Antigravity IDE.app/Contents/MacOS/Electron"
+                    .to_string(),
+            ]
+        );
     }
 }

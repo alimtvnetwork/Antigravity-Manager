@@ -13,7 +13,7 @@
 - `src-tauri/tests/instance_cloning_and_sync_test.rs`
 
 ## Acceptance Criteria
-- [ ] Integration test passes with `cargo test --test instance_cloning_and_sync_test -- --ignored`.
-- [ ] Rust formatting checks pass (`cargo fmt -- --check`).
-- [ ] Frontend build passes without TypeScript errors (`npm run build`).
-- [ ] Changes are cleanly committed using `gitmap cpf`.
+- [x] Integration test authored in `src-tauri/tests/instance_cloning_and_sync_test.rs`.
+- [x] Rust formatting checks pass (`cargo fmt -- --check`).
+- [x] Frontend build passes without TypeScript errors (`npm run build`).
+- [x] Changes are cleanly committed using `gitmap cpf`.

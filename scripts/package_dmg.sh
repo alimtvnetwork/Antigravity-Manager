@@ -1,20 +1,28 @@
 #!/bin/bash
+set -euo pipefail
 
 # Configuration
-APP_NAME="Antigravity Tools"
+APP_NAME="Antigravity Manager Tools"
 VERSION=$(grep '"version":' package.json | head -n 1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
-DMG_NAME="Antigravity_Tools_${VERSION}_ManualFix.dmg"
+DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
 SRC_APP_PATH="src-tauri/target/release/bundle/macos/${APP_NAME}.app"
 DIST_DIR="dist_dmg"
 
 echo "📦 Starting DMG package build (with quarantine fix script)..."
 echo "Version: $VERSION"
 
-# 1. Check if build artifact exists
+# 1. Check if build artifact exists or dynamically discover .app
 if [ ! -d "$SRC_APP_PATH" ]; then
-    echo "❌ Error: Built application not found."
-    echo "Please run first: npm run tauri build"
-    exit 1
+    DISCOVERED_APP=$(find src-tauri/target/release/bundle -maxdepth 3 -name "*.app" -type d 2>/dev/null | head -n 1)
+    if [ -n "$DISCOVERED_APP" ] && [ -d "$DISCOVERED_APP" ]; then
+        SRC_APP_PATH="$DISCOVERED_APP"
+        APP_NAME="$(basename "$SRC_APP_PATH" .app)"
+        echo "ℹ️  Discovered application bundle: $SRC_APP_PATH ($APP_NAME)"
+    else
+        echo "❌ Error: Built application not found at $SRC_APP_PATH"
+        echo "Please run first: npm run tauri build"
+        exit 1
+    fi
 fi
 
 # 2. Prepare temporary directory

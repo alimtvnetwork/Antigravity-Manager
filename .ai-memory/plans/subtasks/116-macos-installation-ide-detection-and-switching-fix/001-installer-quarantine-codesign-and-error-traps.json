@@ -1,0 +1,15 @@
+{
+  "task": "Task-01",
+  "status": "DONE",
+  "filesChanged": [
+    "install.sh",
+    "scripts/Fix_Damaged.command",
+    "scripts/package_dmg.sh"
+  ],
+  "checks": "bash syntax / check -> exit 0",
+  "acceptance": {
+    "ac1": "PASS macOS installation script hardened with quarantine removal, codesign, and dynamic app discovery"
+  },
+  "assumptions": [],
+  "blockers": []
+}

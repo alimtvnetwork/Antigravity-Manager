@@ -27,6 +27,6 @@
    - When the promise resolves or rejects, clear `actionState[id] = null`.
 
 ## Acceptance Criteria
-- [ ] Deleting an instance opens an in-app glass confirmation modal; zero `window.confirm` calls remain.
-- [ ] Clicking Play/Stop immediately disables the instance card/row buttons and renders an animated spinner.
-- [ ] Concurrent or spam clicks are completely blocked.
+- [x] Deleting an instance opens an in-app glass confirmation modal; zero `window.confirm` calls remain.
+- [x] Clicking Play/Stop immediately disables the instance card/row buttons and renders an animated spinner.
+- [x] Concurrent or spam clicks are completely blocked.

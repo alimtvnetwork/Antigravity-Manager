@@ -7,6 +7,7 @@
 #   DRY_RUN     - Set to "1" to print commands without executing
 
 set -euo pipefail
+set -E
 
 # Visual Formatting & Colors
 INDENT="    "
@@ -36,6 +37,25 @@ success() { echo -e "${INDENT}${GREEN}[OK]${NC} $1"; }
 warn()    { echo -e "${INDENT}${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${INDENT}${RED}[ERROR]${NC} $1" >&2; exit 1; }
 step()    { echo -e "\n${INDENT}${CYAN}==>${NC} ${BOLD}$1${NC}"; }
+
+# POSIX error stack trace trap
+report_error_stack() {
+    local exit_code="$?"
+    local line_no="${1:-$LINENO}"
+    local bash_cmd="${BASH_COMMAND:-unknown}"
+    if [[ "$exit_code" -ne 0 ]]; then
+        echo -e "\n${INDENT}${RED}[ERROR]${NC} Command '${bash_cmd}' failed with exit code ${exit_code} at line ${line_no}." >&2
+        if [[ ${#FUNCNAME[@]} -gt 1 ]]; then
+            echo -e "${INDENT}${YELLOW}[STACK TRACE]${NC}" >&2
+            for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
+                local fn="${FUNCNAME[$i]}"
+                local src="${BASH_SOURCE[$i]:-install.sh}"
+                local ln="${BASH_LINENO[$((i - 1))]}"
+                echo -e "${INDENT}  -> at ${fn}() in ${src}:${ln}" >&2
+            done
+        fi
+    fi
+}
 
 run() {
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -188,8 +208,11 @@ detect_current_version() {
     elif [[ "$PLATFORM" == "macos" ]]; then
         local plist_paths=(
             "/Applications/${APP_NAME}.app/Contents/Info.plist"
+            "${HOME}/Applications/${APP_NAME}.app/Contents/Info.plist"
             "/Applications/Antigravity Tools.app/Contents/Info.plist"
+            "${HOME}/Applications/Antigravity Tools.app/Contents/Info.plist"
             "/Applications/Anti-Gravity Tools.app/Contents/Info.plist"
+            "${HOME}/Applications/Anti-Gravity Tools.app/Contents/Info.plist"
         )
         for p in "${plist_paths[@]}"; do
             if [[ -f "$p" ]]; then
@@ -1006,8 +1029,12 @@ close_tool_processes() {
     step "Closing active tool processes and WebViews ($context)"
     killall -9 agm-alim 2>/dev/null || true
     killall -9 antigravity-tools 2>/dev/null || true
+    killall -9 "Antigravity Manager Tools" 2>/dev/null || true
+    killall -9 "Antigravity Tools" 2>/dev/null || true
     pkill -9 -f "agm-alim" 2>/dev/null || true
     pkill -9 -f "antigravity-tools" 2>/dev/null || true
+    pkill -9 -f "Antigravity Manager Tools" 2>/dev/null || true
+    pkill -9 -f "Antigravity Tools" 2>/dev/null || true
     pkill -9 -f "WebKitWebProcess" 2>/dev/null || true
     pkill -9 -f "electron.*antigravity" 2>/dev/null || true
     sleep 0.5
@@ -1260,37 +1287,140 @@ install_macos() {
     step "Installing ${APP_NAME}..."
 
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        info "[DRY-RUN] Clearing quarantine attributes from DMG: $DOWNLOAD_PATH"
+        run xattr -cr "$DOWNLOAD_PATH"
+        run xattr -r -d com.apple.quarantine "$DOWNLOAD_PATH"
         run hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen
-        run cp -R "<mount>/${APP_NAME}.app" /Applications/
-        run hdiutil detach "<mount>"
-        run sudo xattr -rd com.apple.quarantine "/Applications/${APP_NAME}.app"
-        return
+        run cp -R "<mount>/*.app" /Applications/
+        run hdiutil detach "<mount>" -force -quiet
+        run xattr -r -d com.apple.quarantine "/Applications/${APP_NAME}.app"
+        run xattr -cr "/Applications/${APP_NAME}.app"
+        run codesign --force --deep --sign - "/Applications/${APP_NAME}.app"
+        return 0
     fi
 
-    # Mount DMG
+    # 1. Remove quarantine from downloaded DMG
+    info "Clearing quarantine attributes from downloaded package..."
+    xattr -cr "$DOWNLOAD_PATH" 2>/dev/null || true
+    xattr -r -d com.apple.quarantine "$DOWNLOAD_PATH" 2>/dev/null || true
+
+    # 2. Mount DMG cleanly
+    info "Mounting disk image..."
     local mount_output mount_point
     mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen 2>&1)
-    mount_point=$(echo "$mount_output" | grep -o '/Volumes/.*' | head -n1)
+    mount_point=$(echo "$mount_output" | grep -o '/Volumes/.*' | head -n1 | sed -e 's/[[:space:]]*$//')
 
-    if [[ -z "$mount_point" ]]; then
+    if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
         error "Failed to mount DMG. Output: $mount_output"
     fi
 
-    # Copy app to /Applications
-    if [[ -d "/Applications/${APP_NAME}.app" ]]; then
-        info "Removing existing installation in /Applications..."
-        rm -rf "/Applications/${APP_NAME}.app"
+    # 3. Dynamic discovery of .app bundle inside $mount_point
+    local source_app
+    source_app=$(find "$mount_point" -maxdepth 2 -name "*.app" -type d 2>/dev/null | head -n1)
+    if [[ -z "$source_app" || ! -d "$source_app" ]]; then
+        hdiutil detach "$mount_point" -force -quiet 2>/dev/null || true
+        error "No .app bundle discovered inside mounted DMG at $mount_point"
     fi
-    cp -R "${mount_point}/${APP_NAME}.app" /Applications/
 
-    # Unmount DMG
-    hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+    local app_bundle_name
+    app_bundle_name="$(basename "$source_app")"
+    info "Discovered application bundle: $app_bundle_name"
 
-    # Remove quarantine attribute to avoid "app is damaged" error
-    info "Removing quarantine attribute..."
-    sudo xattr -rd com.apple.quarantine "/Applications/${APP_NAME}.app" 2>/dev/null || true
+    # 4. Destination permissions: Try /Applications/, fall back to $HOME/Applications/
+    local dest_dir="/Applications"
+    if [[ ! -w "$dest_dir" ]]; then
+        info "/Applications is not writable; falling back to ${HOME}/Applications..."
+        dest_dir="${HOME}/Applications"
+        mkdir -p "$dest_dir" 2>/dev/null || true
+    fi
 
-    success "${APP_NAME} installed to /Applications!"
+    local target_app="${dest_dir}/${app_bundle_name}"
+
+    # 5. Remove any existing app at target destination before copying
+    if [[ -d "$target_app" ]]; then
+        info "Removing existing installation at $target_app..."
+        rm -rf "$target_app" 2>/dev/null || true
+    fi
+
+    # Also clean up any legacy application bundle names in target destination
+    for legacy_name in "Antigravity Tools.app" "Anti-Gravity Tools.app"; do
+        local legacy_path="${dest_dir}/${legacy_name}"
+        if [[ -d "$legacy_path" && "$legacy_path" != "$target_app" ]]; then
+            info "Removing legacy bundle at $legacy_path..."
+            rm -rf "$legacy_path" 2>/dev/null || true
+        fi
+    done
+
+    # 6. Copy discovered .app bundle to destination directory
+    info "Copying $app_bundle_name to $dest_dir..."
+    cp -R "$source_app" "$dest_dir/"
+
+    # 7. Unmount DMG volume cleanly
+    info "Unmounting disk image..."
+    hdiutil detach "$mount_point" -force -quiet 2>/dev/null || true
+
+    # 8. Strip Gatekeeper quarantine on target app without requiring sudo
+    info "Stripping Gatekeeper quarantine attributes from $target_app..."
+    xattr -r -d com.apple.quarantine "$target_app" 2>/dev/null || true
+    xattr -cr "$target_app" 2>/dev/null || true
+
+    # 9. Apply ad-hoc local code signature if codesign is present
+    if command -v codesign &>/dev/null; then
+        info "Applying ad-hoc code signature..."
+        codesign --force --deep --sign - "$target_app" 2>/dev/null || true
+    fi
+
+    # 10. CLI symlink: Check for agm or agm-alim binary inside Contents/MacOS/
+    local macos_bin_dir="${target_app}/Contents/MacOS"
+    local cli_bin=""
+    if [[ -d "$macos_bin_dir" ]]; then
+        for candidate_name in "agm" "agm-alim" "${BINARY_NAME}" "antigravity-tools"; do
+            if [[ -x "${macos_bin_dir}/${candidate_name}" ]]; then
+                cli_bin="${macos_bin_dir}/${candidate_name}"
+                break
+            fi
+        done
+        # Fallback to main app binary if specific name not found
+        if [[ -z "$cli_bin" ]]; then
+            cli_bin=$(find "$macos_bin_dir" -type f -perm +111 2>/dev/null | head -n1)
+        fi
+    fi
+
+    if [[ -n "$cli_bin" && -f "$cli_bin" ]]; then
+        local user_bin="${HOME}/.local/bin"
+        mkdir -p "$user_bin" 2>/dev/null || true
+        ln -sf "$cli_bin" "${user_bin}/agm" 2>/dev/null || true
+        ln -sf "$cli_bin" "${user_bin}/agm-alim" 2>/dev/null || true
+        info "CLI binary symlinked to ${user_bin}/agm and ${user_bin}/agm-alim"
+
+        # Ensure $HOME/.local/bin is in PATH in shell config
+        if [[ ":$PATH:" != *":${user_bin}:"* ]]; then
+            local shell_rcs=()
+            [[ -f "$HOME/.zshrc" || "${SHELL:-}" == *"zsh"* ]] && shell_rcs+=("$HOME/.zshrc")
+            [[ -f "$HOME/.bashrc" || "${SHELL:-}" == *"bash"* ]] && shell_rcs+=("$HOME/.bashrc")
+            [[ -f "$HOME/.bash_profile" ]] && shell_rcs+=("$HOME/.bash_profile")
+            if [[ ${#shell_rcs[@]} -eq 0 ]]; then
+                shell_rcs+=("$HOME/.zshrc")
+            fi
+
+            for rc in "${shell_rcs[@]}"; do
+                if [[ -f "$rc" ]] && grep -qF "${user_bin}" "$rc" 2>/dev/null; then
+                    continue
+                fi
+                echo "" >> "$rc" 2>/dev/null || true
+                echo "export PATH=\"${user_bin}:\$PATH\"" >> "$rc" 2>/dev/null || true
+                info "Added ${user_bin} to PATH in $rc"
+            done
+            warn "To use 'agm' immediately in this terminal, run: export PATH=\"${user_bin}:\$PATH\""
+        fi
+    fi
+
+    # 11. Success report with clear next steps
+    success "${APP_NAME} installed to ${target_app}!"
+    echo ""
+    info "Next steps:"
+    info "  1. You can launch '${app_bundle_name%.app}' from ${dest_dir}"
+    info "  2. Or run 'agm' / 'agm-alim' in terminal"
 }
 
 # Post-install cleanup: guarantees temporary download files and directory removal
@@ -1398,6 +1528,7 @@ main() {
     echo -e "${INDENT}${BLUE}========================================${NC}"
     echo ""
 
+    trap 'report_error_stack "$LINENO"' ERR
     trap cleanup EXIT INT TERM
 
     detect_platform

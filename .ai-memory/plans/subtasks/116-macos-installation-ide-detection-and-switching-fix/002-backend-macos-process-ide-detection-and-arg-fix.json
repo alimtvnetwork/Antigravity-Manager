@@ -1,0 +1,13 @@
+{
+  "task": "Task-02",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/process.rs"
+  ],
+  "checks": "targeted test / clippy -> exit 0",
+  "acceptance": {
+    "ac1": "PASS macOS open arguments formatted correctly and Spotlight mdfind search integrated"
+  },
+  "assumptions": [],
+  "blockers": []
+}
