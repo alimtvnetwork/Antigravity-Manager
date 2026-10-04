@@ -1472,61 +1472,59 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     let has_terminal_transition = in_memory_terminal || db_terminal;
 
     // 1. Check in-memory active prompts map
-    if let Ok(map) = get_memory_prompts_map().lock() {
-        for p in map.values() {
-            let matches_inst = instance_id.is_empty()
-                || instance_id == "all"
-                || p.instance_id == instance_id
-                || ((instance_id == "default" || instance_id == "__default__")
-                    && (p.instance_id == "default"
-                        || p.instance_id == "__default__"
-                        || p.instance_id.is_empty()));
-            if matches_inst && (p.project_id == project_id || p.repo_path == project_id) {
-                if p.status == "running" && !has_terminal_transition && p.updated_at >= now - 300 {
-                    crate::modules::logger::log_instance_prompt_audit(
-                        instance_id,
-                        project_id,
-                        project_id,
-                        true,
-                        true,
-                        1,
-                        "IN_MEMORY_PROMPT_RUNNING",
-                    );
-                    return true;
-                }
-                if p.status == "dispatched" && p.updated_at >= now - 120 && !has_terminal_transition
-                {
-                    crate::modules::logger::log_instance_prompt_audit(
-                        instance_id,
-                        project_id,
-                        project_id,
-                        true,
-                        true,
-                        1,
-                        "IN_MEMORY_PROMPT_DISPATCHED",
-                    );
-                    return true;
+    let is_terminal_override = has_terminal_transition;
+    if !is_terminal_override {
+        if let Ok(map) = get_memory_prompts_map().lock() {
+            for p in map.values() {
+                let matches_inst = instance_id.is_empty()
+                    || instance_id == "all"
+                    || p.instance_id == instance_id
+                    || ((instance_id == "default" || instance_id == "__default__")
+                        && (p.instance_id == "default"
+                            || p.instance_id == "__default__"
+                            || p.instance_id.is_empty()));
+                let matches_proj = p.project_id == project_id || p.repo_path == project_id;
+                if matches_inst && matches_proj {
+                    let has_running_status = p.status == "running";
+                    let is_fresh = p.updated_at >= now - 300;
+                    if has_running_status && is_fresh {
+                        crate::modules::logger::log_instance_prompt_audit(
+                            instance_id,
+                            project_id,
+                            project_id,
+                            true,
+                            true,
+                            1,
+                            "ACTIVE_PROMPT_DB_RUNNING",
+                        );
+                        return true;
+                    }
                 }
             }
         }
     }
 
     // 2. Check active workers map strictly scoped by instance_id
-    let target_inst = if instance_id.is_empty() || instance_id == "__default__" {
+    let is_empty_inst = instance_id.is_empty();
+    let is_default_inst = instance_id == "__default__" || instance_id == "default";
+    let target_inst = if is_empty_inst || is_default_inst {
         "default"
     } else {
         instance_id
     };
     let expected_prefix = format!("{}:", target_inst);
+    let is_target_all = target_inst == "all";
 
     if let Ok(mut workers) = get_active_agy_workers().lock() {
         let mut dead_keys = Vec::new();
         let mut found_running_worker = false;
         for (key, &pid) in workers.iter() {
-            let matches_inst = target_inst == "all"
-                || key.starts_with(&expected_prefix)
-                || (target_inst == "default" && !key.contains(':'));
-            if matches_inst && key.contains(project_id) {
+            let has_prefix = key.starts_with(&expected_prefix);
+            let has_colon = key.contains(':');
+            let is_default_match = target_inst == "default" && !has_colon;
+            let matches_inst = is_target_all || has_prefix || is_default_match;
+            let matches_proj = key.contains(project_id);
+            if matches_inst && matches_proj {
                 // Verify OS process liveness for PID
                 let mut sys = sysinfo::System::new();
                 let target_pid = sysinfo::Pid::from_u32(pid);
@@ -1534,7 +1532,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                     sysinfo::ProcessesToUpdate::Some(&[target_pid]),
                     sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
                 );
-                if sys.process(target_pid).is_some() {
+                let is_alive = sys.process(target_pid).is_some();
+                if is_alive {
                     found_running_worker = true;
                     break;
                 } else {
@@ -1559,7 +1558,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         }
     }
 
-    // 3. Check SQLite active_prompts for 'running' or recently 'dispatched' (do not block on 120s cooldown if terminal)
+    // 3. Check SQLite active_prompts for 'running' (strictly require status = 'running' with active TTL updated_at >= now - 300)
     if let Ok(conn) = connect_db() {
         let running_count: usize = if has_terminal_transition {
             0
@@ -1568,14 +1567,15 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 "SELECT COUNT(*) FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1) 
                    AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
-                   AND (status = 'running' OR (status = 'dispatched' AND updated_at >= ?3))
-                   AND updated_at >= ?4",
-                params![project_id, instance_id, now - 120, now - 300],
+                   AND status = 'running'
+                   AND updated_at >= ?3",
+                params![project_id, instance_id, now - 300],
                 |r| r.get(0),
             )
             .unwrap_or(0)
         };
-        if running_count > 0 {
+        let has_running_prompts = running_count > 0;
+        if has_running_prompts {
             crate::modules::logger::log_instance_prompt_audit(
                 instance_id,
                 project_id,
@@ -1590,11 +1590,11 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     // 4. Check Antigravity live conversation summaries directly for running sessions in this instance
-    let base_dir = if instance_id.is_empty()
+    let is_all_or_default = instance_id.is_empty()
         || instance_id == "all"
         || instance_id == "default"
-        || instance_id == "__default__"
-    {
+        || instance_id == "__default__";
+    let base_dir = if is_all_or_default {
         crate::modules::agy_cleaner::get_gemini_base_dir()
             .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")))
     } else {
@@ -1643,16 +1643,21 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
                             // Strict idle supremacy rule:
-                            let is_explicit_idle = not_fully_idle == 0
-                                || status.contains("IDLE")
+                            let is_idle_count = not_fully_idle == 0;
+                            let has_idle_status = status.contains("IDLE")
                                 || status.contains("COMPLETED")
                                 || status.contains("FAILED")
                                 || status.contains("CANCELLED");
+                            let is_explicit_idle = is_idle_count || has_idle_status;
+
+                            let has_active_turns = not_fully_idle > 0;
+                            let has_running_text = status.contains("RUNNING");
+                            let is_active_session = has_active_turns && has_running_text;
 
                             let is_conv_running = if is_explicit_idle {
                                 false
                             } else {
-                                not_fully_idle != 0 && status.contains("RUNNING")
+                                is_active_session
                             };
 
                             if is_conv_running {
@@ -1662,11 +1667,12 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                     for u in ws_uris {
                                         let clean_p =
                                             normalize_path_for_compare(&decode_uri_to_path(&u));
-                                        if !clean_target.is_empty()
-                                            && (clean_p == clean_target
-                                                || clean_p.contains(&clean_target)
-                                                || clean_target.contains(&clean_p))
-                                        {
+                                        let has_target = !clean_target.is_empty();
+                                        let matches_path = clean_p == clean_target
+                                            || clean_p.contains(&clean_target)
+                                            || clean_target.contains(&clean_p);
+                                        let is_target_matched = has_target && matches_path;
+                                        if is_target_matched {
                                             crate::modules::logger::log_instance_prompt_audit(
                                                 instance_id,
                                                 project_id,
@@ -1687,6 +1693,16 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             }
         }
     }
+
+    crate::modules::logger::log_instance_prompt_audit(
+        instance_id,
+        project_id,
+        project_id,
+        has_active_process,
+        false,
+        0,
+        "IDLE",
+    );
 
     false
 }
@@ -2143,14 +2159,17 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                     });
                     if let Ok(rows) = rows {
                         for item in rows.flatten() {
-                            let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, last_time_str) = item;
-                            let is_recency_active = if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(&last_time_str) {
-                                let age = (Utc::now() - parsed.with_timezone(&Utc)).num_seconds();
-                                age >= 0 && age < 600
-                            } else {
+                            let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
+                            let is_explicit_idle = not_fully_idle == 0
+                                || status.contains("IDLE")
+                                || status.contains("COMPLETED")
+                                || status.contains("FAILED")
+                                || status.contains("CANCELLED");
+                            let is_conv_running = if is_explicit_idle {
                                 false
+                            } else {
+                                not_fully_idle != 0 && status.contains("RUNNING")
                             };
-                            let is_conv_running = not_fully_idle != 0 || status.contains("RUNNING") || is_recency_active;
                             let prompt_preview = if !preview.trim().is_empty() {
                                 Some(preview)
                             } else {
@@ -4858,13 +4877,13 @@ pub(crate) fn clone_repo_rows_on(
     drop(project_stmt);
 
     let mut copied = 0usize;
-    for (id, name, path, storage, running, detected, updated) in projects {
+    for (id, name, path, storage, _running, detected, updated) in projects {
         let new_id = format!("{}__{}", id, target_id);
         conn.execute(
             "INSERT OR IGNORE INTO running_projects
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            rusqlite::params![new_id, target_id, name, path, storage, running, detected, updated],
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7)",
+            rusqlite::params![new_id, target_id, name, path, storage, detected, updated],
         )
         .map_err(|e| format!("Failed to clone repo {}: {}", id, e))?;
 
@@ -4905,6 +4924,10 @@ pub(crate) fn clone_repo_rows_on(
         for (prompt_id, content, model, session, status, created, prompt_updated, image) in prompts
         {
             let new_prompt_id = format!("{}__{}", prompt_id, target_id);
+            let sanitized_status = match status.as_str() {
+                "running" | "dispatched" => "completed".to_string(),
+                other => other.to_string(),
+            };
             conn.execute(
                 "INSERT OR IGNORE INTO active_prompts
                  (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
@@ -4917,7 +4940,7 @@ pub(crate) fn clone_repo_rows_on(
                     content,
                     model,
                     session,
-                    status,
+                    sanitized_status,
                     created,
                     prompt_updated,
                     image

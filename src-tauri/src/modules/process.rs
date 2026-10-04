@@ -2013,20 +2013,13 @@ pub fn discover_and_persist_initial_ide_info() -> Option<std::path::PathBuf> {
 
     match detect_antigravity_with_diagnostics(None) {
         Ok(path) => {
-            let is_empty = config
-                .antigravity_executable
-                .as_ref()
-                .map(|s| s.trim().is_empty())
-                .unwrap_or(true);
-            if is_empty {
-                let path_str = path.to_string_lossy().to_string();
-                config.antigravity_executable = Some(path_str);
-                if let Err(e) = crate::modules::config::save_app_config(&config) {
-                    crate::modules::logger::log_warn(&format!(
-                        "[IDE Discovery] Failed to persist discovered IDE to config: {}",
-                        e
-                    ));
-                }
+            let path_str = path.to_string_lossy().to_string();
+            config.antigravity_executable = Some(path_str);
+            if let Err(e) = crate::modules::config::save_app_config(&config) {
+                crate::modules::logger::log_warn(&format!(
+                    "[IDE Discovery] Failed to persist discovered IDE to config: {}",
+                    e
+                ));
             }
             crate::modules::logger::log_info(&format!(
                 "[IDE Discovery] First-time startup located Antigravity IDE: {:?}",

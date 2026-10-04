@@ -1334,11 +1334,7 @@ install_macos() {
 
     # 4. Destination permissions: Try /Applications/, fall back to $HOME/Applications/
     local dest_dir="/Applications"
-    if [[ ! -w "$dest_dir" ]] && ! mkdir -p "$dest_dir" 2>/dev/null; then
-        info "/Applications is not writable; falling back to ${HOME}/Applications..."
-        dest_dir="${HOME}/Applications"
-        mkdir -p "$dest_dir" 2>/dev/null || true
-    elif [[ ! -w "$dest_dir" ]]; then
+    if [[ ! -d "$dest_dir" || ! -w "$dest_dir" ]]; then
         info "/Applications is not writable; falling back to ${HOME}/Applications..."
         dest_dir="${HOME}/Applications"
         mkdir -p "$dest_dir" 2>/dev/null || true
@@ -1350,6 +1346,13 @@ install_macos() {
     if [[ -d "$target_app" ]]; then
         info "Removing existing installation at $target_app..."
         rm -rf "$target_app" 2>/dev/null || true
+        if [[ -d "$target_app" && "$dest_dir" != "${HOME}/Applications" ]]; then
+            warn "Unable to remove existing $target_app in $dest_dir (permission denied). Falling back to ${HOME}/Applications..."
+            dest_dir="${HOME}/Applications"
+            mkdir -p "$dest_dir" 2>/dev/null || true
+            target_app="${dest_dir}/${app_bundle_name}"
+            rm -rf "$target_app" 2>/dev/null || true
+        fi
     fi
 
     # Also clean up any legacy application bundle names in target destination
@@ -1419,24 +1422,25 @@ install_macos() {
         ln -sf "$cli_bin" "${user_bin}/agm-alim" 2>/dev/null || true
         info "CLI binary symlinked to ${user_bin}/agm and ${user_bin}/agm-alim"
 
-        # Ensure $HOME/.local/bin is in PATH in shell config (.zshrc / .bashrc)
-        if [[ ":$PATH:" != *":${user_bin}:"* ]]; then
-            local shell_rcs=()
-            [[ -f "$HOME/.zshrc" ]] && shell_rcs+=("$HOME/.zshrc")
-            [[ -f "$HOME/.bashrc" ]] && shell_rcs+=("$HOME/.bashrc")
-            [[ -f "$HOME/.bash_profile" ]] && shell_rcs+=("$HOME/.bash_profile")
-            if [[ ${#shell_rcs[@]} -eq 0 ]]; then
-                shell_rcs+=("$HOME/.zshrc")
-            fi
+        # Ensure $HOME/.local/bin is in PATH in shell rc files (.zshrc, .bashrc, .bash_profile)
+        local shell_rcs=()
+        [[ -f "$HOME/.zshrc" ]] && shell_rcs+=("$HOME/.zshrc")
+        [[ -f "$HOME/.bashrc" ]] && shell_rcs+=("$HOME/.bashrc")
+        [[ -f "$HOME/.bash_profile" ]] && shell_rcs+=("$HOME/.bash_profile")
+        if [[ ${#shell_rcs[@]} -eq 0 ]]; then
+            shell_rcs+=("$HOME/.zshrc")
+        fi
 
-            for rc in "${shell_rcs[@]}"; do
-                if [[ -f "$rc" ]] && grep -qF "${user_bin}" "$rc" 2>/dev/null; then
-                    continue
-                fi
-                echo "" >> "$rc" 2>/dev/null || true
-                echo "export PATH=\"${user_bin}:\$PATH\"" >> "$rc" 2>/dev/null || true
-                info "Added ${user_bin} to PATH in $rc"
-            done
+        for rc in "${shell_rcs[@]}"; do
+            if [[ -f "$rc" ]] && grep -qF "${user_bin}" "$rc" 2>/dev/null; then
+                continue
+            fi
+            echo "" >> "$rc" 2>/dev/null || true
+            echo "export PATH=\"${user_bin}:\$PATH\"" >> "$rc" 2>/dev/null || true
+            info "Added ${user_bin} to PATH in $rc"
+        done
+
+        if [[ ":$PATH:" != *":${user_bin}:"* ]]; then
             warn "To use 'agm' immediately in this terminal, run: export PATH=\"${user_bin}:\$PATH\""
         fi
     fi

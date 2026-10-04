@@ -8,6 +8,15 @@ report_error_stack() {
     local cmd="${BASH_COMMAND:-unknown}"
     if [ "$exit_code" -ne 0 ]; then
         echo "❌ [ERROR] Command '$cmd' failed at line $line_no with exit code $exit_code" >&2
+        if [ ${#FUNCNAME[@]} -gt 1 ]; then
+            echo "   [STACK TRACE]" >&2
+            for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
+                local fn="${FUNCNAME[$i]}"
+                local src="${BASH_SOURCE[$i]:-package_dmg.sh}"
+                local ln="${BASH_LINENO[$((i - 1))]}"
+                echo "     -> at ${fn}() in ${src}:${ln}" >&2
+            done
+        fi
     fi
 }
 trap 'report_error_stack "$LINENO"' ERR

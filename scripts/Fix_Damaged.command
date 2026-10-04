@@ -91,17 +91,42 @@ if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
     MACOS_BIN_DIR="${APP_PATH}/Contents/MacOS"
     if [ -d "$MACOS_BIN_DIR" ]; then
         CLI_BIN=""
-        for candidate_name in "agm" "agm-alim" "antigravity-tools"; do
+        for candidate_name in "agm" "agm-alim" "${APP_NAME}" "Antigravity Tools" "antigravity-tools"; do
             if [ -x "${MACOS_BIN_DIR}/${candidate_name}" ]; then
                 CLI_BIN="${MACOS_BIN_DIR}/${candidate_name}"
                 break
             fi
         done
+        if [ -z "$CLI_BIN" ]; then
+            for f in "${MACOS_BIN_DIR}"/*; do
+                if [ -f "$f" ] && [ -x "$f" ]; then
+                    CLI_BIN="$f"
+                    break
+                fi
+            done
+        fi
         if [ -n "$CLI_BIN" ]; then
             USER_BIN="$HOME/.local/bin"
             mkdir -p "$USER_BIN" 2>/dev/null || true
             ln -sf "$CLI_BIN" "${USER_BIN}/agm" 2>/dev/null || true
             ln -sf "$CLI_BIN" "${USER_BIN}/agm-alim" 2>/dev/null || true
+            echo "🔗 已配置命令行工具 / Configured CLI symlinks: ${USER_BIN}/agm, ${USER_BIN}/agm-alim"
+
+            # 确保 $HOME/.local/bin 存在于 shell 配置文件中
+            SHELL_RCS=()
+            [ -f "$HOME/.zshrc" ] && SHELL_RCS+=("$HOME/.zshrc")
+            [ -f "$HOME/.bashrc" ] && SHELL_RCS+=("$HOME/.bashrc")
+            [ -f "$HOME/.bash_profile" ] && SHELL_RCS+=("$HOME/.bash_profile")
+            [ ${#SHELL_RCS[@]} -eq 0 ] && SHELL_RCS+=("$HOME/.zshrc")
+
+            for rc in "${SHELL_RCS[@]}"; do
+                if [ -f "$rc" ] && grep -qF "${USER_BIN}" "$rc" 2>/dev/null; then
+                    continue
+                fi
+                echo "" >> "$rc" 2>/dev/null || true
+                echo "export PATH=\"${USER_BIN}:\$PATH\"" >> "$rc" 2>/dev/null || true
+                echo "➕ 已添加 ${USER_BIN} 到 PATH / Added ${USER_BIN} to PATH in $rc"
+            done
         fi
     fi
 
