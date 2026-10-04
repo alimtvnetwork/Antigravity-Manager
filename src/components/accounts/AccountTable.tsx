@@ -59,7 +59,7 @@ import { cn } from '../../utils/cn';
 import { Gemini, Claude } from '@lobehub/icons';
 
 import { useConfigStore } from '../../stores/useConfigStore';
-import { QuotaItem } from './QuotaItem';
+import { QuotaProgressBar } from './QuotaProgressBar';
 import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
@@ -1145,7 +1145,7 @@ function AccountTable({
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
                             {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[190px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -1198,7 +1198,7 @@ function AccountTable({
                             </th>
 
                             {/* Column 2: Weekly Quota Column */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[170px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
                                     <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>
