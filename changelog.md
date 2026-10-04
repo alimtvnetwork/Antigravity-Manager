@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.145.0] - 2026-10-04
+
+### Fixed
+- **Rust 后端编译与 Rusqlite Backup 特性支持 (Rust Compilation & Rusqlite Backup Feature Activation)**: 彻底修复 CI/CD 编译流程中 `rusqlite::backup` 因底层库未开启 feature 门控导致的 `cannot find backup in rusqlite` 编译中断问题；在 `src-tauri/Cargo.toml` 中显式为 rusqlite 开启 `features = ["bundled", "backup"]`，确保在线 SQLite 零停机热备份引擎在 Linux、macOS 与 Windows 全平台顺利编译运行。 (Thanks to @aukgit)
+- **多实例项目库 ID 借用类型一致性修复 (Repo DB Instance ID Dereference Fix)**: 修复 `src-tauri/src/modules/repo_db.rs` 中在过滤多实例活跃会话时，`owning_inst_id`（`&String`）与实例结构体字段（`String`）因缺少解引用导致的 `can't compare String with &String`（E0277）编译错误。 (Thanks to @aukgit)
+
+### Added
+- **macOS 全系统版本 Gatekeeper 深度加固正式版 (Full macOS 13-15 Gatekeeper Hardening Release)**: 正式交付适用于 macOS 13 (Ventura)、14 (Sonoma) 与 15 (Sequoia) 的防“已损坏移到废纸篓”安装与运行加固补丁，包含 `awk` 确定性卷宗解析、全层级递归隔离属性清除、`spctl --add` Gatekeeper 评估登记、安装阶段实时 IDE 探测回显，以及 `$HOME/Applications/` 用户自定义目录与磁盘级堆栈日志完整支持。 (Thanks to @aukgit)
+
+---
+
 ## [v4.144.0] - 2026-10-04
 
 ### Added
@@ -490,6 +501,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.145.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.144.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

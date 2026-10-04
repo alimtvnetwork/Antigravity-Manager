@@ -3636,7 +3636,7 @@ fn compute_project_conversation_tree(
                     } else if let Some(inst) = registry
                         .instances
                         .iter()
-                        .find(|i| i.id == owning_inst_id || i.name == owning_inst_id)
+                        .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
                     {
                         crate::modules::instance::is_instance_running(
                             &inst.id,
