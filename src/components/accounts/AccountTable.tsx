@@ -60,7 +60,6 @@ import { Gemini, Claude } from '@lobehub/icons';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import { QuotaItem } from './QuotaItem';
-import { QuotaProgressBar } from './QuotaProgressBar';
 import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
@@ -717,7 +716,7 @@ function AccountRowContent({
             </td>
 
             {/* 4H 模型配额列 */}
-            <td className="px-2 py-0.5 align-middle">
+            <td className="px-2 py-0.5 align-middle min-w-[220px]">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -757,7 +756,7 @@ function AccountRowContent({
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2 py-0.5 align-middle min-w-[200px]">
+            <td className="px-2 py-0.5 align-middle min-w-[220px]">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
