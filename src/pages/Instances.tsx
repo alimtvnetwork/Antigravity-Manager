@@ -59,6 +59,7 @@ import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 import { showToast } from '../components/common/ToastContainer';
 import { WaterDrainProgressBar } from '../components/common/WaterDrainProgressBar';
+import { QuotaProgressBar } from '../components/accounts/QuotaProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';
@@ -1038,6 +1039,7 @@ export default function Instances() {
                         const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
                         const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
                         const geminiModel = geminiPro || geminiFlash;
+                        const weeklyQuota = boundAccount?.quota?.weekly;
 
                         const hasActiveTask = Boolean(inst.is_running) && runningTreeNodes.some((node) => {
                             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);

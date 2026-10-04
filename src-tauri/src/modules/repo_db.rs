@@ -4361,8 +4361,7 @@ fn compute_project_conversation_tree(
                     continue;
                 }
 
-                let is_run =
-                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 60);
+                let is_run = is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 60);
                 if only_running && !is_run {
                     continue;
                 }

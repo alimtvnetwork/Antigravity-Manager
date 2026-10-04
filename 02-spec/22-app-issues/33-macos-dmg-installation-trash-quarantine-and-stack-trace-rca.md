@@ -10,10 +10,12 @@ When users attempt to install, launch, or update Antigravity Manager Tools on ma
 3. **Fatal LaunchServices Trash Lockout**:
    Attempting to open the application (via double-clicking the DMG icon, dragging to `/Applications`, clicking the Dock/Spotlight shortcut, running `open -a "Antigravity Manager Tools"`, or via `install.sh` / auto-updater) fails with:
    `You can’t open the application “Antigravity Manager Tools 13-20-55-339” because it is in the Trash.`
-4. **Script Crash & Silent Failure**:
-   When users attempted to run `Install_Or_Repair.command` or `Fix_Damaged.command`, `open` returned exit error code `-10810` (which does not contain the word `"Trash"` in stderr), causing scripts to skip the recovery branch. Furthermore, fallback binary launches discarded stderr to `/dev/null`, preventing diagnostics.
-5. **Missing Diagnostics & Stack Traces**:
-   Users who encountered DMG installation failure had no persistent logs or stack traces to diagnose whether `hdiutil`, `xattr`, `spctl`, `codesign`, or LaunchServices failed.
+4. **AppleScript Container Specifier Failure**:
+   Previous attempts to bypass TCC via AppleScript used `move tItem to (POSIX file "/tmp") with replacing`. In Finder AppleScript, `POSIX file` without `as alias` is a raw file URL record (`furl`), not a Finder container. Finder threw error `-10010` (`Handler can't handle objects of this class`), silently failing to move items out of Trash.
+5. **Script Syntax & Local Variable Error**:
+   In `scripts/fix_app.sh`, `local bin_log` and `local bin_pid` were invoked outside of any shell function at the root script level, causing bash to abort on error.
+6. **Missing Diagnostics & Stack Traces**:
+   When DMG installation failed, users had insufficient diagnostic traces to pinpoint whether architecture mismatch (x86_64 vs arm64), dynamic library linkage, LaunchServices, codesign, or Gatekeeper caused the failure.
 
 ---
 
@@ -28,11 +30,12 @@ When users attempt to install, launch, or update Antigravity Manager Tools on ma
 ### 2.3 LaunchServices Database Poisoning
 - **Mechanism**: macOS LaunchServices caches bundle identifiers (e.g. `com.lbjlaq.antigravity-tools`). When an app is trashed, LaunchServices points the registered application path to `~/.Trash/Antigravity Manager Tools 13-20-55-339.app`. Any subsequent launch request directed at the application or bundle ID triggers LaunchServices to inspect the target; seeing it located inside `~/.Trash/`, macOS refuses execution and displays:
   `You can’t open the application “Antigravity Manager Tools 13-20-55-339” because it is in the Trash.`
-  Even if a new copy is dragged into `/Applications`, LaunchServices remains bound to the trashed instance until the database unregisters the trashed path (`lsregister -u`), garbage collects dead entries (`lsregister -gc`), and force-registers the new path (`lsregister -f -r`).
+  Even if a new copy is dragged into `/Applications`, LaunchServices remains bound to the trashed instance until the database unregisters the trashed path (`lsregister -u`), garbage collects dead entries across domains (`lsregister -gc -R -v -apps u,s,l`), and force-registers the new path (`lsregister -f -r`).
 
-### 2.4 macOS TCC Privacy Protection on `~/.Trash`
-- **Mechanism**: On macOS 10.15+, `$HOME/.Trash` is protected by Transparency, Consent, and Control (TCC). Shell commands (`rm -rf ~/.Trash/*`) run from non-privileged Terminal sessions fail with `Operation not permitted`. Previous attempts to invoke `osascript -e 'tell application "Finder" to delete (every item of trash...)'` failed because Finder's `delete` command only moves items *into* trash, throwing an error when called on items already in the trash.
-- **Resolution**: Use AppleScript to tell Finder to `move anItem to (POSIX file "/tmp") with replacing`. Once moved to `/tmp`, TCC restrictions do not apply, and `rm -rf /tmp/Antigravity*` cleanly wipes the files.
+### 2.4 macOS TCC Privacy Protection on `~/.Trash` & AppleScript Alias Requirement
+- **Mechanism**: On macOS 10.15+, `$HOME/.Trash` is protected by Transparency, Consent, and Control (TCC). Shell commands (`rm -rf ~/.Trash/*`) run from non-privileged Terminal sessions fail with `Operation not permitted`.
+- **Flaw**: Using `move tItem to (POSIX file "/tmp")` failed because Finder's `move` command requires a folder alias object.
+- **Resolution**: Use `set destFolder to (POSIX file "/private/tmp") as alias` with `move anItem to destFolder with replacing`. Clean `/private/tmp` before and after.
 
 ### 2.5 Silent `open` Error Handling (`open_err` Never Contains "Trash")
 - **Mechanism**: When LaunchServices blocks a trashed app, the GUI alert displays the message, but the CLI command `open` returns:
@@ -46,51 +49,52 @@ When users attempt to install, launch, or update Antigravity Manager Tools on ma
 
 ### 2.7 Missing Stack Traces in Rust Panic & Updater Handlers
 - **Mechanism**: `std::backtrace::Backtrace::capture()` was disabled in release mode without `RUST_BACKTRACE=1`.
-- **Resolution**: Upgrade to `std::backtrace::Backtrace::force_capture()` across `logger.rs` and `delegate_updater.rs`, and persist panic logs to `~/Library/Logs/AntigravityManager/panic.log`.
+- **Resolution**: Upgrade to `std::backtrace::Backtrace::force_capture()` across `logger.rs` and `delegate_updater.rs`, and persist panic logs and crash stack traces to `~/Library/Logs/AntigravityManager/crash_stacktrace.log`.
 
-### 2.8 Native PKG Absence in DMG
-- **Mechanism**: Drag-and-drop `.app` installation inherits DMG quarantine. A native `.pkg` installer runs with installer root privileges, executing `scripts/pkg-scripts/postinstall` to cleanly install, purge trash, strip quarantine, and refresh LaunchServices.
-- **Resolution**: Build a native `.pkg` installer using `pkgbuild` with `postinstall` script and place it inside the DMG root as `Install_Antigravity_Manager.pkg` and publish as release asset.
+### 2.8 Native PKG Architecture & Preinstall Cleanup
+- **Mechanism**: Drag-and-drop `.app` installation cannot execute code prior to launch. A native `.pkg` installer runs with root privileges, executing `preinstall` to clean trash and stale registrations before payload deployment, followed by `postinstall` to strip quarantine, add Gatekeeper trust, and re-register LaunchServices.
+- **Resolution**: Provide `scripts/pkg-scripts/preinstall` and `scripts/pkg-scripts/postinstall`, build `Install_Antigravity_Manager.pkg`, and bundle inside DMG and release assets.
 
 ---
 
 ## 3. Engineering Resolution
 
-1. **Unconditional LaunchServices Recovery (`Install_Or_Repair.command` & `Fix_Damaged.command`)**:
-   - Replaced conditional `open_err` check with unconditional recovery on any `open` error.
-   - Bypassed TCC via AppleScript Finder move-to-`/tmp` then `rm -rf`.
-   - Stripped immutable flags with `chflags -R nouchg,noschg`.
-   - Executed `lsregister -gc`, `lsregister -u`, and `lsregister -f -r`.
-   - Replaced silent `nohup >/dev/null` with persistent logging to `$LOG_DIR/binary_launch.log`.
+1. **Working AppleScript TCC Eviction Pattern (`Install_Or_Repair.command`, `Fix_Damaged.command`, `fix_app.sh`, `install.sh`)**:
+   - Switched to `set destFolder to (POSIX file "/private/tmp") as alias`.
+   - Iterated over `every item of trash` matching `Antigravity` or `agm`.
+   - Purged destination `/private/tmp` before and after move.
+   - Cleared file flags via `chflags -R nouchg,noschg`.
 
-2. **System Crash Dumps & Stack Traces**:
-   - In `dump_diagnostic_state`, inspect `~/Library/Logs/DiagnosticReports/` for recent `.ips` and `.crash` files of `agm` / `agm-alim` and output thread backtraces.
-   - Captured unified macOS system logs via `log show --predicate 'process == "agm-alim" || process == "open"' --last 2m`.
-   - Added `otool -L` dynamic library inspection and `file` architecture verification.
+2. **Full-Domain LaunchServices Regeneration**:
+   - Replaced plain `lsregister -gc` with `lsregister -gc -R -v -apps u,s,l`.
+   - Forced re-registration of target app via `lsregister -f -r "$TARGET_APP"`.
+   - Reloaded Dock and Finder to synchronize UI state.
 
-3. **Rust Backend Hardening (`src-tauri/src/modules/logger.rs`, `delegate_updater.rs`, `lib.rs`)**:
-   - Upgraded to `std::backtrace::Backtrace::force_capture()` in panic hook and updater.
-   - Persisted panic logs to `$HOME/Library/Logs/AntigravityManager/panic.log`.
-   - In updater, executed unconditional LaunchServices and trash purge on `open` failure, logging direct binary spawns to `updater_binary.log`.
-   - In `lib.rs` startup thread, swept trash via AppleScript `/tmp` bypass and `lsregister -gc`.
+3. **PKG Preinstall & Postinstall Architecture**:
+   - Created `scripts/pkg-scripts/preinstall`: terminates running processes, runs console user Finder AppleScript eviction, unregisters existing bundle, and purges stale `/Applications` directory.
+   - Enhanced `scripts/pkg-scripts/postinstall`: strips quarantine recursively, enforces executable permissions, registers with Gatekeeper (`spctl --add`), refreshes LaunchServices across all domains, and creates CLI symlinks.
 
-4. **Native PKG & DMG UX Architecture (`scripts/package_dmg.sh`, `scripts/pkg-scripts/postinstall`, `release.yml`)**:
-   - Created `scripts/pkg-scripts/postinstall` to strip quarantine, clean all user trash, and refresh LaunchServices at root level.
-   - Built `Install_Antigravity_Manager.pkg` using `pkgbuild` and placed it directly inside the DMG.
-   - Included clear numbered options in DMG:
-     - `Install_Antigravity_Manager.pkg` (Option 1: Recommended macOS PKG installer)
-     - `1-Click_Install_Or_Repair.command` (Option 2: 1-Click script installer)
-     - `2-Click_Fix_Trash_Error.command` (Option 3: 1-Click repair for drag-and-drop trash errors)
-     - `Antigravity Manager Tools.app` (Manual bundle)
-     - `Applications` (Symlink)
-     - `Install_Guide.txt` (Comprehensive installation guide)
+4. **Deep System Diagnostics & Crash Stack Traces**:
+   - Enriched `dump_diagnostic_state`:
+     - Hardware & Rosetta translation status (`machdep.cpu.brand_string`, `sysctl.proc_translated`).
+     - Gatekeeper deep audit (`spctl -a -vvvv`).
+     - Extended attributes with values (`xattr -lv`).
+     - Codesign verification and entitlements dump (`codesign -d --entitlements :-`).
+     - Crash reports and IPS thread backtraces from `~/Library/Logs/DiagnosticReports/` in the last 120 minutes.
+     - Unified macOS system logs for LaunchServices and process lifecycles.
+     - Direct binary launch stderr log tail (`binary_launch.log`).
+
+5. **Rust Backend Hardening**:
+   - Upgraded to `std::backtrace::Backtrace::force_capture()` across `logger.rs` and `delegate_updater.rs`.
+   - In `logger.rs`, enriched panic hook with thread name, process ID, timestamp, and appended to `$HOME/Library/Logs/AntigravityManager/crash_stacktrace.log`.
+   - In `delegate_updater.rs` and `lib.rs`, repaired AppleScript trash eviction and full-domain LaunchServices garbage collection.
 
 ---
 
 ## 4. Prevention & Quality Guards
 
-1. **Unconditional LaunchServices Recovery**: Never gate LaunchServices / trash repair on specific error strings from `open` because OSStatus error codes (such as -10810) do not contain human-readable keywords in stderr.
-2. **TCC Bypass Pattern**: Never rely on shell `rm -rf ~/.Trash/*` on modern macOS; always move items out of trash to `/tmp` using Finder AppleScript before deleting.
+1. **AppleScript Container Rule**: Always cast POSIX paths to `as alias` (e.g., `(POSIX file "/private/tmp") as alias`) when supplying target folders to Finder's `move` command.
+2. **Unconditional LaunchServices Recovery**: Never gate LaunchServices / trash repair on specific error strings from `open` because OSStatus error codes (such as -10810) do not contain human-readable keywords in stderr.
 3. **Mandatory Persistent Logging**: Never discard process output to `>/dev/null` in installation or repair scripts. Always pipe to `$LOG_DIR/*.log`.
 4. **Crash Report Extraction**: Always inspect `~/Library/Logs/DiagnosticReports/` when diagnosing macOS process launch failures to obtain native system thread backtraces.
 5. **Forced Backtraces**: Always use `Backtrace::force_capture()` in Rust panics and recovery blocks rather than `Backtrace::capture()` so backtraces are not dropped in release builds.

@@ -791,7 +791,9 @@ pub fn open_ui(args: &[String]) {
                         .status();
 
                     std::thread::sleep(Duration::from_millis(800));
-                    if let Ok(retry_out) = Command::new("open").arg("-n").arg(&exe_to_launch).output() {
+                    if let Ok(retry_out) =
+                        Command::new("open").arg("-n").arg(&exe_to_launch).output()
+                    {
                         if retry_out.status.success() {
                             println!("[OK] Antigravity Manager UI launched after LaunchServices recovery: {:?}", exe_to_launch);
                             launch_ok = true;
