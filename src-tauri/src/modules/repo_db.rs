@@ -3643,36 +3643,58 @@ fn ensure_conversation_sequence_in_conn(
     .unwrap_or(next_seq)
 }
 
-/// Extract clean user prompt up to `max_words` (e.g. 200 words) and return `(preview_text, total_word_count)`
+/// Extract clean user prompt up to `max_words` (e.g. 200 words) and return `(preview_text, total_word_count)`.
+/// Preserves line breaks (`\n`) and vertical paragraph gaps rather than flattening all text into a single line.
 pub fn extract_prompt_words_preview(raw_text: &str, max_words: usize) -> (String, usize) {
     let cleaned = extract_clean_user_prompt(raw_text);
-    let mut meaningful_tokens: Vec<&str> = Vec::new();
+    let mut total_words = 0;
+    let mut selected_lines: Vec<String> = Vec::new();
+    let mut words_collected = 0;
+    let limit = max_words.max(1);
+    let mut reached_limit = false;
+
     for line in cleaned.lines() {
         let t = line.trim();
-        if t.is_empty() {
-            continue;
-        }
         // Skip standalone 40-char git SHA lines
         if t.len() == 40 && t.chars().all(|c| c.is_ascii_hexdigit()) {
             continue;
         }
-        for word in t.split_whitespace() {
-            meaningful_tokens.push(word);
+        let line_words: Vec<&str> = t.split_whitespace().collect();
+        let count = line_words.len();
+        total_words += count;
+
+        if !reached_limit {
+            if count == 0 {
+                // Preserve blank line between paragraphs if previous line wasn't blank
+                if !selected_lines.is_empty()
+                    && !selected_lines.last().map(|s| s.is_empty()).unwrap_or(false)
+                {
+                    selected_lines.push(String::new());
+                }
+            } else if words_collected + count <= limit {
+                selected_lines.push(line.to_string());
+                words_collected += count;
+            } else {
+                let remaining = limit.saturating_sub(words_collected);
+                if remaining > 0 {
+                    let truncated_line = line_words[..remaining].join(" ");
+                    selected_lines.push(format!("{} ...", truncated_line));
+                } else if !selected_lines.is_empty() {
+                    let last_idx = selected_lines.len() - 1;
+                    selected_lines[last_idx] = format!("{} ...", selected_lines[last_idx]);
+                }
+                words_collected = limit;
+                reached_limit = true;
+            }
         }
     }
 
-    let total_words = meaningful_tokens.len();
     if total_words == 0 {
         return (String::new(), 0);
     }
 
-    let limit = max_words.max(1);
-    if total_words <= limit {
-        (meaningful_tokens.join(" "), total_words)
-    } else {
-        let truncated = meaningful_tokens[..limit].join(" ");
-        (format!("{} ...", truncated), total_words)
-    }
+    let preview = selected_lines.join("\n").trim().to_string();
+    (preview, total_words)
 }
 
 /// Extract trailing snippet (last 10-15 words) of user prompt
