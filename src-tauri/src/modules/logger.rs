@@ -226,3 +226,19 @@ pub fn log_warn(message: &str) {
 pub fn log_error(message: &str) {
     error!("{}", message);
 }
+
+/// Emit structured audit log for instance prompt and project liveness evaluation
+pub fn log_instance_prompt_audit(
+    instance_id: &str,
+    project_name: &str,
+    repo_path: &str,
+    is_instance_active: bool,
+    is_running: bool,
+    active_tasks: usize,
+    rationale: &str,
+) {
+    info!(
+        "[InstancePromptAudit] instance='{}' project='{}' path='{}' is_instance_active={} is_running={} active_tasks={} rationale='{}'",
+        instance_id, project_name, repo_path, is_instance_active, is_running, active_tasks, rationale
+    );
+}

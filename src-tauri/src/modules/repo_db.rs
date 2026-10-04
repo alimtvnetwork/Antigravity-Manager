@@ -112,6 +112,31 @@ pub struct AutoResumeResult {
     pub resumed_prompts: Vec<AutoResumePromptInfo>,
 }
 
+/// Telemetry record for instance prompt liveness probe
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptLivenessProbe {
+    pub target_instance_id: String,
+    pub target_instance_name: String,
+    pub data_dir: String,
+    pub is_instance_alive: bool,
+    pub matched_pids: Vec<u32>,
+    pub workspace_folders_count: usize,
+    pub evaluated_projects_count: usize,
+    pub running_projects_count: usize,
+}
+
+/// Detailed evaluation record for an individual project's liveness
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectLivenessEvaluation {
+    pub project_id: String,
+    pub repo_name: String,
+    pub repo_path: String,
+    pub is_running: bool,
+    pub active_tasks_count: usize,
+    pub non_idle_convs_count: usize,
+    pub rationale: String,
+}
+
 /// Get path to the dedicated split repo prompts SQLite database
 pub fn get_repo_db_path() -> Result<PathBuf, String> {
     let mut path = crate::modules::account::get_data_dir()?;
@@ -493,6 +518,9 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                                         entry.file_name().to_string_lossy()
                                     );
 
+                                    let is_project_active = is_instance_active
+                                        && is_prompt_running_for_project(&raw_path, instance_id);
+
                                     projects.push(RunningProject {
                                         id: project_id,
                                         instance_id: instance_id.to_string(),
@@ -501,7 +529,7 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                                         workspace_storage_path: Some(
                                             ws_folder.to_string_lossy().to_string(),
                                         ),
-                                        is_running: is_instance_active,
+                                        is_running: is_project_active,
                                         last_detected_at: now,
                                     });
                                 }
@@ -531,6 +559,14 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     p.last_detected_at,
                     now,
                 ],
+            );
+        }
+
+        // If instance is not active, ensure all projects belonging to this instance are marked is_running = 0
+        if !is_instance_active {
+            let _ = conn.execute(
+                "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE instance_id = ?2",
+                params![now, target_id],
             );
         }
     }
@@ -1422,8 +1458,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         conn.query_row(
             "SELECT status FROM active_prompts 
              WHERE (project_id = ?1 OR repo_path = ?1) 
+               AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
              ORDER BY updated_at DESC, created_at DESC LIMIT 1",
-            params![project_id],
+            params![project_id, instance_id],
             |r| r.get::<_, String>(0),
         )
         .map(|s| s == "completed" || s == "failed")
@@ -1471,8 +1508,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             conn.query_row(
                 "SELECT COUNT(*) FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1) 
+                   AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
                    AND status = 'running'",
-                params![project_id],
+                params![project_id, instance_id],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1480,8 +1518,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             conn.query_row(
                 "SELECT COUNT(*) FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1) 
-                   AND (status = 'running' OR (status = 'dispatched' AND updated_at >= ?2))",
-                params![project_id, now - 120],
+                   AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
+                   AND (status = 'running' OR (status = 'dispatched' AND updated_at >= ?3))",
+                params![project_id, instance_id, now - 120],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1491,9 +1530,19 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         }
     }
 
-    // 4. Check Antigravity live conversation summaries directly for running sessions
-    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
+    // 4. Check Antigravity live conversation summaries directly for running sessions in this instance
+    let base_dir = if instance_id.is_empty()
+        || instance_id == "all"
+        || instance_id == "default"
+        || instance_id == "__default__"
+    {
+        crate::modules::agy_cleaner::get_gemini_base_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")))
+    } else {
+        crate::modules::instance::get_instance_home_dir(instance_id)
+            .ok()
+            .map(|h| h.join(".gemini").join("antigravity"))
+    };
     if let Some(base_dir) = base_dir {
         let summaries_db = base_dir.join("conversation_summaries.db");
         if summaries_db.exists() {
@@ -1532,18 +1581,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                     });
                     if let Ok(rows) = rows {
                         for item in rows.flatten() {
-                            let (status, not_fully_idle, ws_uris_opt, last_time_str) = item;
-                            let is_recency_active = if let Ok(parsed) =
-                                chrono::DateTime::parse_from_rfc3339(&last_time_str)
-                            {
-                                let age = (Utc::now() - parsed.with_timezone(&Utc)).num_seconds();
-                                age >= 0 && age < 600
-                            } else {
-                                false
-                            };
-                            let is_conv_running = not_fully_idle != 0
-                                || status.contains("RUNNING")
-                                || is_recency_active;
+                            let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
+                            let is_conv_running = not_fully_idle != 0 || status.contains("RUNNING");
                             if is_conv_running {
                                 if let Some(ws_uris_raw) = ws_uris_opt {
                                     let ws_uris: Vec<String> =
@@ -3252,16 +3291,18 @@ pub fn get_project_conversation_tree(
     max_words: usize,
     only_running: bool,
 ) -> Vec<AgmProjectTreeNode> {
-    get_project_conversation_tree_cached(max_words, only_running, false)
+    get_project_conversation_tree_cached(None, max_words, only_running, false)
 }
 
 /// Retrieve project conversation tree with cache control
 pub fn get_project_conversation_tree_cached(
+    instance_id: Option<&str>,
     max_words: usize,
     only_running: bool,
     force: bool,
 ) -> Vec<AgmProjectTreeNode> {
-    let cache_key = format!("tree:{}:{}", max_words, only_running);
+    let inst_key = instance_id.unwrap_or("all");
+    let cache_key = format!("tree:{}:{}:{}", inst_key, max_words, only_running);
     let now = Utc::now().timestamp();
 
     if !force {
@@ -3281,7 +3322,7 @@ pub fn get_project_conversation_tree_cached(
         }
     }
 
-    let tree_nodes = compute_project_conversation_tree(max_words, only_running);
+    let tree_nodes = compute_project_conversation_tree(instance_id, max_words, only_running);
 
     let project_count = tree_nodes.len();
     let conversation_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
@@ -3299,7 +3340,7 @@ pub fn get_project_conversation_tree_cached(
                     ttl_seconds = excluded.ttl_seconds",
                 params![
                     &cache_key,
-                    "all",
+                    inst_key,
                     &json_str,
                     project_count as i64,
                     conversation_count as i64,
@@ -3314,15 +3355,26 @@ pub fn get_project_conversation_tree_cached(
 
 /// Core computation of project conversation tree across instances and summaries
 fn compute_project_conversation_tree(
+    target_instance: Option<&str>,
     max_words: usize,
     only_running: bool,
 ) -> Vec<AgmProjectTreeNode> {
-    let _ = discover_running_prompts_from_antigravity("__default__");
-    let _ = detect_running_projects("__default__");
-
+    let target = target_instance.filter(|t| !t.is_empty() && *t != "all");
     let registry = crate::modules::instance::load_registry().unwrap_or_default();
-    for inst in &registry.instances {
-        let _ = detect_running_projects(&inst.id);
+
+    if let Some(target_id) = target {
+        if target_id == "default" || target_id == "__default__" {
+            let _ = discover_running_prompts_from_antigravity("__default__");
+            let _ = detect_running_projects("__default__");
+        } else {
+            let _ = detect_running_projects(target_id);
+        }
+    } else {
+        let _ = discover_running_prompts_from_antigravity("__default__");
+        let _ = detect_running_projects("__default__");
+        for inst in &registry.instances {
+            let _ = detect_running_projects(&inst.id);
+        }
     }
 
     let default_email = crate::modules::account::get_current_account()
@@ -3330,7 +3382,59 @@ fn compute_project_conversation_tree(
         .flatten()
         .map(|a| a.email);
 
-    let projects = list_running_projects().unwrap_or_default();
+    let all_projects = list_running_projects().unwrap_or_default();
+    let projects: Vec<RunningProject> = if let Some(target_id) = target {
+        if target_id == "default" || target_id == "__default__" {
+            all_projects
+                .into_iter()
+                .filter(|p| {
+                    p.instance_id == "default"
+                        || p.instance_id == "__default__"
+                        || p.instance_id.is_empty()
+                })
+                .collect()
+        } else {
+            all_projects
+                .into_iter()
+                .filter(|p| p.instance_id == target_id)
+                .collect()
+        }
+    } else {
+        all_projects
+    };
+
+    // Telemetry probe logging for instance liveness
+    if let Some(target_id) = target {
+        let (inst_name, data_dir, pids, is_alive) = if target_id == "default"
+            || target_id == "__default__"
+        {
+            let is_running = crate::modules::process::is_antigravity_running(None);
+            (
+                "default".to_string(),
+                "default".to_string(),
+                vec![],
+                is_running,
+            )
+        } else if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == target_id || i.name == target_id)
+        {
+            let pids =
+                crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+            let is_running =
+                crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+            (inst.name.clone(), inst.data_dir.clone(), pids, is_running)
+        } else {
+            (target_id.to_string(), "unknown".to_string(), vec![], false)
+        };
+
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_LIVENESS_PROBE] instance_id=\"{}\" name=\"{}\" data_dir=\"{}\" alive={} pids={:?} workspaces={}",
+            target_id, inst_name, data_dir, is_alive, pids, projects.len()
+        ));
+    }
+
     let conn_opt = connect_db().ok();
 
     let mut convs_by_path: std::collections::HashMap<
@@ -3347,10 +3451,58 @@ fn compute_project_conversation_tree(
         }
     }
 
-    let candidate_dirs = crate::modules::agy_cleaner::get_gemini_candidate_dirs();
+    let candidate_dirs: Vec<(PathBuf, String)> = if let Some(target_id) = target {
+        if target_id == "default" || target_id == "__default__" {
+            let mut list = Vec::new();
+            if let Some(home) = dirs::home_dir() {
+                for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                    let p = home.join(".gemini").join(sub);
+                    if p.exists() {
+                        list.push((p, "default".to_string()));
+                    }
+                }
+            }
+            list
+        } else {
+            let mut list = Vec::new();
+            if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(target_id) {
+                for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                    let p = inst_home.join(".gemini").join(sub);
+                    if p.exists() {
+                        list.push((p, target_id.to_string()));
+                    }
+                }
+            }
+            list
+        }
+    } else {
+        let mut list = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                let p = home.join(".gemini").join(sub);
+                if p.exists() {
+                    list.push((p, "default".to_string()));
+                }
+            }
+        }
+        for inst in &registry.instances {
+            if !inst.is_default && inst.id != "default" {
+                if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(&inst.id) {
+                    for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                        let p = inst_home.join(".gemini").join(sub);
+                        if p.exists() {
+                            list.push((p, inst.id.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        list
+    };
+
     let mut seen_tree_cids = std::collections::HashSet::new();
 
-    for base in &candidate_dirs {
+    for (base, owning_inst_id) in &candidate_dirs {
         let summaries_db = base.join("conversation_summaries.db");
         if summaries_db.exists() {
             let s_conn = Connection::open_with_flags(
@@ -3370,6 +3522,23 @@ fn compute_project_conversation_tree(
             });
 
             if let Ok(s_conn) = s_conn {
+                let is_owning_inst_alive =
+                    if owning_inst_id == "default" || owning_inst_id == "__default__" {
+                        crate::modules::process::is_antigravity_running(None)
+                    } else if let Some(inst) = registry
+                        .instances
+                        .iter()
+                        .find(|i| i.id == owning_inst_id || i.name == owning_inst_id)
+                    {
+                        crate::modules::instance::is_instance_running(
+                            &inst.id,
+                            &inst.data_dir,
+                            inst.pid,
+                        )
+                    } else {
+                        false
+                    };
+
                 let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
                 if let Ok(mut stmt) = s_conn.prepare(
                     "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
@@ -3393,16 +3562,7 @@ fn compute_project_conversation_tree(
                             if !seen_tree_cids.insert(cid.clone()) {
                                 continue;
                             }
-                            let is_recency_active = if let Ok(parsed) =
-                                chrono::DateTime::parse_from_rfc3339(&last_time_str)
-                            {
-                                let age = (Utc::now() - parsed.with_timezone(&Utc)).num_seconds();
-                                age >= 0 && age < 600
-                            } else {
-                                false
-                            };
-                            let is_conv_running =
-                                not_fully_idle != 0 || status.contains("RUNNING") || is_recency_active;
+                            let is_conv_running = is_owning_inst_alive && (not_fully_idle != 0 || status.contains("RUNNING"));
                             let (steps, transcript_prompt) = inspect_conversation_transcript(base, &cid);
                             let effective_prompt = transcript_prompt
                                 .filter(|s| !s.trim().is_empty())
@@ -3431,7 +3591,7 @@ fn compute_project_conversation_tree(
                                     is_conv_running,
                                     steps,
                                     last_time_str.clone(),
-                                    "default".to_string(),
+                                    owning_inst_id.clone(),
                                 ));
                             }
                         }
@@ -3458,6 +3618,21 @@ fn compute_project_conversation_tree(
             continue;
         }
 
+        let is_inst_alive = if proj.instance_id == "default"
+            || proj.instance_id == "__default__"
+            || proj.instance_id.is_empty()
+        {
+            crate::modules::process::is_antigravity_running(None)
+        } else if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
+        {
+            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+        } else {
+            false
+        };
+
         let p_seq = if let Some(ref conn) = conn_opt {
             ensure_project_sequence_in_conn(
                 conn,
@@ -3473,12 +3648,32 @@ fn compute_project_conversation_tree(
 
         let mut conv_nodes: Vec<AgmConversationNode> = Vec::new();
         if let Some(raw_convs) = convs_by_path.get(&norm_path) {
-            for (cid, title, raw_prompt, status, is_run, steps, last_mod, inst) in raw_convs {
-                if only_running && !*is_run {
+            for (cid, title, raw_prompt, status, is_run, steps, last_mod, conv_inst_id) in raw_convs
+            {
+                let matches_inst = if proj.instance_id == "default"
+                    || proj.instance_id == "__default__"
+                    || proj.instance_id.is_empty()
+                {
+                    conv_inst_id == "default" || conv_inst_id == "__default__"
+                } else {
+                    conv_inst_id == &proj.instance_id
+                };
+                if !matches_inst {
+                    continue;
+                }
+
+                let effective_is_run = is_inst_alive && *is_run;
+                if only_running && !effective_is_run {
                     continue;
                 }
                 let c_seq = if let Some(ref conn) = conn_opt {
-                    ensure_conversation_sequence_in_conn(conn, cid, &project_key, title, inst)
+                    ensure_conversation_sequence_in_conn(
+                        conn,
+                        cid,
+                        &project_key,
+                        title,
+                        conv_inst_id,
+                    )
                 } else {
                     (conv_nodes.len() as i64) + 1
                 };
@@ -3499,14 +3694,14 @@ fn compute_project_conversation_tree(
                     } else {
                         title.clone()
                     },
-                    status: if *is_run {
+                    status: if effective_is_run {
                         "RUNNING".to_string()
                     } else if status.trim().is_empty() {
                         "IDLE".to_string()
                     } else {
                         status.clone()
                     },
-                    is_running: *is_run,
+                    is_running: effective_is_run,
                     step_count: *steps,
                     instance_id: proj.instance_id.clone(),
                     prompt_preview_200w: preview_200w,
@@ -3518,12 +3713,28 @@ fn compute_project_conversation_tree(
 
         if let Some(aps) = active_prompts_by_path.get(&norm_path) {
             for ap in aps {
+                let matches_inst = if proj.instance_id == "default"
+                    || proj.instance_id == "__default__"
+                    || proj.instance_id.is_empty()
+                {
+                    ap.instance_id == "default"
+                        || ap.instance_id == "__default__"
+                        || ap.instance_id.is_empty()
+                } else {
+                    ap.instance_id == proj.instance_id
+                };
+                if !matches_inst {
+                    continue;
+                }
+
                 let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
                 if conv_nodes.iter().any(|c| c.conversation_id == cid) {
                     continue;
                 }
-                let is_run =
-                    ap.status == "running" || ap.status == "queued" || ap.status == "backed_up";
+                let is_run = is_inst_alive
+                    && (ap.status == "running"
+                        || ap.status == "queued"
+                        || ap.status == "backed_up");
                 if only_running && !is_run {
                     continue;
                 }
@@ -3564,7 +3775,37 @@ fn compute_project_conversation_tree(
             }
         }
 
-        let proj_is_running = conv_nodes.iter().any(|c| c.is_running);
+        let has_active_conv = conv_nodes.iter().any(|c| c.is_running);
+        let has_active_prompt = is_prompt_running_for_project(&project_key, &proj.instance_id)
+            || is_prompt_running_for_project(&proj.repo_path, &proj.instance_id);
+
+        let proj_is_running = is_inst_alive && (has_active_conv || has_active_prompt);
+
+        let rationale = if !is_inst_alive {
+            "INSTANCE_PROCESS_DEAD: instance PID not found or process terminated -> forced idle"
+                .to_string()
+        } else if proj_is_running {
+            "ACTIVE_IN_FLIGHT_TASKS: active prompt or non-idle conversation detected -> marked running".to_string()
+        } else {
+            "IDLE: process alive but no in-flight tasks or active conversations -> marked idle"
+                .to_string()
+        };
+
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_LIVENESS_PROBE][PROJECT] instance_id=\"{}\" project=\"{}\" is_running={} rationale=\"{}\"",
+            proj.instance_id, proj.repo_name, proj_is_running, rationale
+        ));
+
+        crate::modules::logger::log_instance_prompt_audit(
+            &proj.instance_id,
+            &proj.repo_name,
+            &proj.repo_path,
+            is_inst_alive,
+            proj_is_running,
+            if has_active_prompt { 1 } else { 0 },
+            &rationale,
+        );
+
         if only_running && !proj_is_running && conv_nodes.is_empty() {
             continue;
         }
