@@ -56,21 +56,31 @@ trap 'report_error_stack "$LINENO" "$BASH_COMMAND"' ERR
 dump_diagnostic_state() {
     local target="${1:-}"
     echo -e "\n\033[1;36m==================== [SYSTEM DIAGNOSTICS & STACK TRACE] ====================\033[0m"
-    echo -e "\033[1;33m[1] System Information:\033[0m"
+    echo -e "\033[1;33m[1] System Information & Hardware Architecture:\033[0m"
     if command -v sw_vers &>/dev/null; then
         sw_vers 2>/dev/null | sed 's/^/    /' || true
     fi
-    echo "    Kernel: $(uname -a 2>/dev/null || true)"
-    echo "    User  : $(whoami 2>/dev/null || true) (UID: $(id -u 2>/dev/null || true))"
-    echo "    Shell : ${SHELL:-bash} (BASH_VERSION: ${BASH_VERSION:-unknown})"
-    echo "    Log   : ${LOG_FILE}"
+    echo "    Kernel : $(uname -a 2>/dev/null || true)"
+    echo "    Machine: $(uname -m 2>/dev/null || true)"
+    if command -v sysctl &>/dev/null; then
+        local cpu_brand
+        cpu_brand="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"
+        [ -n "$cpu_brand" ] && echo "    CPU    : $cpu_brand"
+        local translated
+        translated="$(sysctl -n sysctl.proc_translated 2>/dev/null || true)"
+        [ -n "$translated" ] && echo "    Rosetta: Translated=$translated (1=x86 binary running via Rosetta on Apple Silicon)"
+    fi
+    echo "    User   : $(whoami 2>/dev/null || true) (UID: $(id -u 2>/dev/null || true), GID: $(id -g 2>/dev/null || true))"
+    echo "    Console: $(stat -f '%Su' /dev/console 2>/dev/null || echo "unknown")"
+    echo "    Shell  : ${SHELL:-bash} (BASH_VERSION: ${BASH_VERSION:-unknown})"
+    echo "    Log    : ${LOG_FILE}"
 
     echo -e "\033[1;33m[2] Gatekeeper Status:\033[0m"
     if command -v spctl &>/dev/null; then
         spctl --status 2>&1 | sed 's/^/    /' || true
         if [ -n "$target" ] && [ -d "$target" ]; then
             echo "    Assessment for target bundle:"
-            spctl -a -vvv "$target" 2>&1 | sed 's/^/      /' || true
+            spctl -a -vvvv "$target" 2>&1 | sed 's/^/      /' || true
         fi
     else
         echo "    spctl not available"
@@ -79,11 +89,13 @@ dump_diagnostic_state() {
     echo -e "\033[1;33m[3] Target Application Attributes & Signatures:\033[0m"
     if [ -n "$target" ] && [ -d "$target" ]; then
         echo "    Path: $target"
-        echo "    Extended Attributes (xattr -l):"
-        xattr -l "$target" 2>&1 | sed 's/^/      /' || echo "      (none)"
+        echo "    Extended Attributes (xattr -lv):"
+        xattr -lv "$target" 2>&1 | sed 's/^/      /' || echo "      (none)"
         if command -v codesign &>/dev/null; then
-            echo "    Codesign Verification (codesign -vvv --deep --strict):"
-            codesign -vvv --deep --strict "$target" 2>&1 | sed 's/^/      /' || true
+            echo "    Codesign Verification (codesign -vvvv --deep --strict):"
+            codesign -vvvv --deep --strict "$target" 2>&1 | sed 's/^/      /' || true
+            echo "    Codesign Entitlements:"
+            codesign -d --entitlements :- "$target" 2>&1 | sed 's/^/      /' || true
         fi
     else
         echo "    Target bundle not found at path: '$target'"
@@ -95,7 +107,7 @@ dump_diagnostic_state() {
             BEGIN { RS = "--------------------------------------------------------------------------------"; FS = "\n" }
             /com\.lbjlaq\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
                 for (i = 1; i <= NF; i++) {
-                    if ($i ~ /^[[:space:]]*(path|identifier|name):/) print "    " $i
+                    if ($i ~ /^[[:space:]]*(path|identifier|name|version|flags):/) print "    " $i
                 }
             }
         ' || echo "    (none registered)"
@@ -103,8 +115,22 @@ dump_diagnostic_state() {
         echo "    lsregister binary not located"
     fi
 
-    echo -e "\033[1;33m[5] Lingering Trash Artifacts:\033[0m"
-    find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | sed 's/^/    /' || echo "    (clean)"
+    echo -e "\033[1;33m[5] Lingering Trash Artifacts across All Volumes:\033[0m"
+    local found_trash=0
+    for t_dir in "$HOME/.Trash" "/.Trashes" /Volumes/*/.Trashes; do
+        if [ -d "$t_dir" ]; then
+            while IFS= read -r t_item; do
+                if [ -n "$t_item" ]; then
+                    found_trash=1
+                    echo "    Trashed item: $t_item"
+                    ls -ld "$t_item" 2>/dev/null | sed 's/^/      /' || true
+                fi
+            done < <(find "$t_dir" -maxdepth 2 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null || true)
+        fi
+    done
+    if [ "$found_trash" -eq 0 ]; then
+        echo "    (clean - no Antigravity items in Trash)"
+    fi
 
     echo -e "\033[1;33m[6] Active LaunchAgents:\033[0m"
     find "$HOME/Library/LaunchAgents" -iname "*antigravity*" 2>/dev/null | sed 's/^/    /' || echo "    (none)"
@@ -120,18 +146,18 @@ dump_diagnostic_state() {
                 if [ -n "$cr_path" ] && [ -f "$cr_path" ]; then
                     found_crash=1
                     echo "    Crash Report: $cr_path"
-                    head -n 35 "$cr_path" 2>/dev/null | sed 's/^/      /' || true
+                    head -n 45 "$cr_path" 2>/dev/null | sed 's/^/      /' || true
                 fi
-            done < <(find "$cr_dir" -maxdepth 1 \( -iname "*agm*" -o -iname "*antigravity*" \) -mmin -60 2>/dev/null | head -n 3 || true)
+            done < <(find "$cr_dir" -maxdepth 1 \( -iname "*agm*" -o -iname "*antigravity*" \) -mmin -120 2>/dev/null | head -n 3 || true)
         fi
     done
     if [ "$found_crash" -eq 0 ]; then
-        echo "    (no recent crash reports found in last 60 minutes)"
+        echo "    (no recent crash reports found in last 120 minutes)"
     fi
 
-    echo -e "\033[1;33m[9] macOS Unified System Log Extracts:\033[0m"
+    echo -e "\033[1;33m[9] macOS Unified System Log Extracts (LaunchServices & Process Lifecycle):\033[0m"
     if command -v log &>/dev/null; then
-        log show --predicate 'process == "agm-alim" || process == "open"' --last 2m --style compact 2>/dev/null | tail -n 15 | sed 's/^/    /' || echo "    (no log entries)"
+        log show --predicate 'process == "agm-alim" || process == "agm" || process == "open" || subsystem == "com.apple.LaunchServices"' --last 3m --style compact 2>/dev/null | tail -n 20 | sed 's/^/    /' || echo "    (no log entries)"
     else
         echo "    (log command not available)"
     fi
@@ -146,9 +172,16 @@ dump_diagnostic_state() {
             echo "    Format : $(file "$t_bin" 2>/dev/null || true)"
             if command -v otool &>/dev/null; then
                 echo "    Dynamic libraries (otool -L):"
-                otool -L "$t_bin" 2>/dev/null | head -n 12 | sed 's/^/      /' || true
+                otool -L "$t_bin" 2>/dev/null | head -n 15 | sed 's/^/      /' || true
             fi
         fi
+    fi
+
+    echo -e "\033[1;33m[11] Direct Binary Launch Log Tail:\033[0m"
+    if [ -f "$LOG_DIR/binary_launch.log" ]; then
+        tail -n 25 "$LOG_DIR/binary_launch.log" 2>/dev/null | sed 's/^/    /' || echo "    (empty)"
+    else
+        echo "    (no direct binary launch log recorded)"
     fi
     echo -e "\033[1;36m============================================================================\033[0m\n"
 }
@@ -172,19 +205,23 @@ launch_installed_application() {
     echo -e "${YELLOW}⚠️  LaunchServices 启动遇到障碍 (open exited with error): ${open_err}${NC}"
     echo -e "${YELLOW}🔄 执行全方位废纸篓脱困、LaunchServices 深度重置与反注册恢复...${NC}"
 
-    # 1. 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /tmp 并删除
+    # 1. 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /private/tmp 并彻底销毁
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
     osascript -e '
     tell application "Finder"
         try
-            set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-            repeat with tItem in tMatches
+            set destFolder to (POSIX file "/private/tmp") as alias
+            repeat with anItem in (every item of trash)
                 try
-                    move tItem to (POSIX file "/tmp") with replacing
+                    set n to name of anItem as text
+                    if n contains "Antigravity" or n contains "agm" then
+                        move anItem to destFolder with replacing
+                    end if
                 end try
             end repeat
         end try
     end tell' 2>/dev/null || true
-    rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
     # 2. 深度清理本地 Trash 目录与解除锁定
     find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r t_item; do
@@ -195,17 +232,17 @@ launch_installed_application() {
         fi
     done
 
-    # 3. 运行 LaunchServices 垃圾回收与强制重置注册
+    # 3. 运行 LaunchServices 垃圾回收与强制重置注册 (跨所有 domain: user, system, local)
     if [ -n "$lsregister_bin" ] && [ -x "$lsregister_bin" ]; then
-        echo -e "🧹 正在执行 LaunchServices 垃圾回收与重置 (lsregister -gc & -u)..."
-        "$lsregister_bin" -gc 2>/dev/null || true
+        echo -e "🧹 正在执行 LaunchServices 垃圾回收与重置 (lsregister -gc -R -apps u,s,l)..."
         "$lsregister_bin" -u "$target_app" 2>/dev/null || true
+        "$lsregister_bin" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister_bin" -gc 2>/dev/null || true
         "$lsregister_bin" -f -r "$target_app" 2>/dev/null || true
-        killall launchservicesd Finder Dock 2>/dev/null || true
+        killall Finder Dock 2>/dev/null || true
     fi
 
     sleep 1
-    if open_err=$(open "$target_app" 2>&1); then
+    if open_err=$(open -n "$target_app" 2>&1) || open_err=$(open "$target_app" 2>&1); then
         echo -e "${GREEN}🎉 重试启动成功! / Launched successfully on retry!${NC}"
         return 0
     fi
@@ -321,19 +358,23 @@ if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
     ' || true)
 fi
 
-# 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /tmp 并物理清理
+# 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /private/tmp 并物理清理
+rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 osascript -e '
 tell application "Finder"
     try
-        set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-        repeat with tItem in tMatches
+        set destFolder to (POSIX file "/private/tmp") as alias
+        repeat with anItem in (every item of trash)
             try
-                move tItem to (POSIX file "/tmp") with replacing
+                set n to name of anItem as text
+                if n contains "Antigravity" or n contains "agm" then
+                    move anItem to destFolder with replacing
+                end if
             end try
         end repeat
     end try
 end tell' 2>/dev/null || true
-rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
 # 执行废纸篓物理删除与注销
 for ta in "${TRASHED_APPS[@]}"; do
@@ -344,9 +385,9 @@ for ta in "${TRASHED_APPS[@]}"; do
     fi
 done
 
-# 运行 LaunchServices 垃圾回收以清除死路径
+# 运行 LaunchServices 垃圾回收以清除死路径 (跨 user, system, local 域)
 if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
-    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -gc -R -v -apps u,s,l 2>/dev/null || "$LSREGISTER" -gc 2>/dev/null || true
 fi
 
 # 4. 定位源应用程序包
@@ -420,20 +461,18 @@ if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
     spctl --add "$TARGET_APP" 2>/dev/null || sudo spctl --add "$TARGET_APP" 2>/dev/null || true
 fi
 
-if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
+if command -v codesign &>/dev/null; then
     echo -e "🔏 补充本地自签名 / Applying local ad-hoc codesign..."
     codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || true
 fi
 
 # 8. 重构并刷新 LaunchServices
 if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
-    echo -e "🔄 刷新 LaunchServices 应用程序数据库 / Refreshing LaunchServices..."
+    echo -e "🔄 刷新 LaunchServices 应用程序数据库 (全域重置) / Refreshing LaunchServices..."
     "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
-    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -gc -R -v -apps u,s,l 2>/dev/null || "$LSREGISTER" -gc 2>/dev/null || true
     "$LSREGISTER" -f -r "$TARGET_APP" 2>/dev/null || true
-    killall launchservicesd 2>/dev/null || true
-    killall Finder 2>/dev/null || true
-    killall Dock 2>/dev/null || true
+    killall Finder Dock 2>/dev/null || true
     sleep 1
 fi
 

@@ -103,19 +103,23 @@ if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
     ' || true)
 fi
 
-# 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /tmp 并删除
+# 绕过 TCC 限制：通过 AppleScript 将废纸篓内冲突项移出到 /private/tmp 并删除
+rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 osascript -e '
 tell application "Finder"
     try
-        set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-        repeat with tItem in tMatches
+        set destFolder to (POSIX file "/private/tmp") as alias
+        repeat with anItem in (every item of trash)
             try
-                move tItem to (POSIX file "/tmp") with replacing
+                set n to name of anItem as text
+                if n contains "Antigravity" or n contains "agm" then
+                    move anItem to destFolder with replacing
+                end if
             end try
         end repeat
     end try
 end tell' 2>/dev/null || true
-rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
 for ta in "${TRASHED_APPS[@]}"; do
     if [ -n "$ta" ] && { [ -e "$ta" ] || [ -d "$ta" ]; }; then
@@ -126,7 +130,7 @@ for ta in "${TRASHED_APPS[@]}"; do
 done
 
 if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
-    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -gc -R -v -apps u,s,l 2>/dev/null || "$LSREGISTER" -gc 2>/dev/null || true
 fi
 
 # 4. 动态搜索有效应用路径
@@ -164,18 +168,22 @@ if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
         spctl --add "$APP_PATH" 2>/dev/null || sudo spctl --add "$APP_PATH" 2>/dev/null || true
     fi
 
+    if command -v codesign &>/dev/null; then
+        codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || sudo codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
+    fi
+
     if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
         echo "🔄 Refreshing LaunchServices database..."
         "$LSREGISTER" -u "$APP_PATH" 2>/dev/null || true
-        "$LSREGISTER" -gc 2>/dev/null || true
+        "$LSREGISTER" -gc -R -v -apps u,s,l 2>/dev/null || "$LSREGISTER" -gc 2>/dev/null || true
         "$LSREGISTER" -f -r "$APP_PATH" 2>/dev/null || true
-        killall launchservicesd Finder Dock 2>/dev/null || true
+        killall Finder Dock 2>/dev/null || true
         sleep 1
     fi
 
     echo "✅ Fix successful! The app should now launch normally."
     echo "Launching $APP_PATH..."
-    if ! open "$APP_PATH" 2>/dev/null; then
+    if ! open -n "$APP_PATH" 2>/dev/null && ! open "$APP_PATH" 2>/dev/null; then
         direct_bin="${APP_PATH}/Contents/MacOS/agm-alim"
         [ ! -x "$direct_bin" ] && direct_bin="${APP_PATH}/Contents/MacOS/${APP_NAME}"
         [ ! -x "$direct_bin" ] && direct_bin="${APP_PATH}/Contents/MacOS/agm"
@@ -183,9 +191,9 @@ if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
             echo "Directly launching core binary..."
             chmod +x "$direct_bin" 2>/dev/null || true
             xattr -cr "$direct_bin" 2>/dev/null || true
-            local bin_log="$LOG_DIR/binary_launch.log"
+            bin_log="$LOG_DIR/binary_launch.log"
             nohup "$direct_bin" >> "$bin_log" 2>&1 &
-            local bin_pid=$!
+            bin_pid=$!
             sleep 2
             if kill -0 "$bin_pid" 2>/dev/null; then
                 echo "🎉 Core binary running (PID: $bin_pid)"

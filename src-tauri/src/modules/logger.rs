@@ -91,14 +91,25 @@ pub fn init_logger() {
         } else {
             "unknown panic payload".to_string()
         };
+        let timestamp = chrono::Local::now().to_rfc3339();
+        let pid = std::process::id();
+        let thread = std::thread::current();
+        let thread_name = thread.name().unwrap_or("unnamed");
         let err_msg = format!(
-            "CRITICAL PANIC at {}: {}\n[STACK TRACE]\n{:?}",
-            location, payload, backtrace
+            "[{timestamp}] [PID: {pid}] CRITICAL PANIC on thread '{thread_name}' at {location}: {payload}\n[STACK TRACE]\n{backtrace:?}\n"
         );
         eprintln!("{}", err_msg);
         tracing::error!("{}", err_msg);
         if let Ok(log_dir) = get_log_dir() {
             let _ = std::fs::write(log_dir.join("panic.log"), &err_msg);
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("crash_stacktrace.log"))
+            {
+                let _ = writeln!(f, "{err_msg}");
+            }
         }
         #[cfg(target_os = "macos")]
         {
@@ -107,6 +118,14 @@ pub fn init_logger() {
                     std::path::PathBuf::from(home).join("Library/Logs/AntigravityManager");
                 let _ = std::fs::create_dir_all(&mac_log_dir);
                 let _ = std::fs::write(mac_log_dir.join("panic.log"), &err_msg);
+                use std::io::Write;
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(mac_log_dir.join("crash_stacktrace.log"))
+                {
+                    let _ = writeln!(f, "{err_msg}");
+                }
             }
         }
     }));

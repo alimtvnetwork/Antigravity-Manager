@@ -1433,19 +1433,23 @@ install_macos() {
         ' || true)
     fi
 
-    # Bypass TCC: use AppleScript to move matching trashed items to /tmp and remove
+    # Bypass TCC: use AppleScript to move matching trashed items to /private/tmp and remove
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
     osascript -e '
     tell application "Finder"
         try
-            set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-            repeat with tItem in tMatches
+            set destFolder to (POSIX file "/private/tmp") as alias
+            repeat with anItem in (every item of trash)
                 try
-                    move tItem to (POSIX file "/tmp") with replacing
+                    set n to name of anItem as text
+                    if n contains "Antigravity" or n contains "agm" then
+                        move anItem to destFolder with replacing
+                    end if
                 end try
             end repeat
         end try
     end tell' 2>/dev/null || true
-    rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
     if [[ ${#trashed_apps[@]} -gt 0 ]]; then
         info "Found ${#trashed_apps[@]} stale application bundle(s) in Trash poisoning LaunchServices; purging..."
@@ -1460,7 +1464,7 @@ install_macos() {
     fi
 
     if [[ -n "$lsregister_bin" ]]; then
-        "$lsregister_bin" -gc 2>/dev/null || true
+        "$lsregister_bin" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister_bin" -gc 2>/dev/null || true
     fi
 
     # 1. Remove quarantine from downloaded DMG
@@ -1563,21 +1567,19 @@ install_macos() {
         spctl --add "$target_app" 2>/dev/null || true
     fi
 
-    # 10. Apply ad-hoc local code signature if codesign is present (skipped on macOS 15+ Sequoia where ad-hoc signing is rejected by AMFI)
-    if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
+    # 10. Apply ad-hoc local code signature if codesign is present
+    if command -v codesign &>/dev/null; then
         info "Applying ad-hoc code signature..."
         codesign --force --deep --sign - "$target_app" 2>/dev/null || true
     fi
 
-    # 11. Refresh LaunchServices database registration: force re-register and reload daemon
+    # 11. Refresh LaunchServices database registration: force re-register and reload daemon across all domains
     if [[ -n "$lsregister_bin" ]]; then
         info "Registering application with LaunchServices..."
         "$lsregister_bin" -u "$target_app" 2>/dev/null || true
-        "$lsregister_bin" -gc 2>/dev/null || true
+        "$lsregister_bin" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister_bin" -gc 2>/dev/null || true
         "$lsregister_bin" -f -r "$target_app" 2>/dev/null || true
-        killall launchservicesd 2>/dev/null || true
-        killall Finder 2>/dev/null || true
-        killall Dock 2>/dev/null || true
+        killall Finder Dock 2>/dev/null || true
         sleep 1
     fi
 

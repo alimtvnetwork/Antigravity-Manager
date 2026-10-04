@@ -701,27 +701,33 @@ pub fn run() {
                     let _ = std::process::Command::new("bash")
                         .arg("-c")
                         .arg(r#"
-                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
+                            rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
                             osascript -e '
                             tell application "Finder"
                                 try
-                                    set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-                                    repeat with tItem in tMatches
+                                    set destFolder to (POSIX file "/private/tmp") as alias
+                                    repeat with anItem in (every item of trash)
                                         try
-                                            move tItem to (POSIX file "/tmp") with replacing
+                                            set n to name of anItem as text
+                                            if n contains "Antigravity" or n contains "agm" then
+                                                move anItem to destFolder with replacing
+                                            end if
                                         end try
                                     end repeat
                                 end try
                             end tell' 2>/dev/null || true
-                            rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+                            rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
+                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
                             if [ -n "$lsregister" ]; then
                                 find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r ta; do
                                     if [ -n "$ta" ]; then
+                                        chflags -R nouchg,noschg "$ta" 2>/dev/null || true
                                         "$lsregister" -u "$ta" 2>/dev/null || true
+                                        rm -rf "$ta" 2>/dev/null || true
                                     fi
                                 done
-                                "$lsregister" -gc 2>/dev/null || true
+                                "$lsregister" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister" -gc 2>/dev/null || true
                             fi
                         "#)
                         .status();

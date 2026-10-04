@@ -1,0 +1,81 @@
+#!/bin/bash
+set -E
+
+# Configurations
+APP_NAME="Antigravity Manager Tools"
+BUNDLE_ID="com.lbjlaq.antigravity-tools"
+TARGET_APP="/Applications/${APP_NAME}.app"
+
+# Persistent diagnostic logging
+LOG_DIR="/Library/Logs/AntigravityManager"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="$LOG_DIR/pkg_preinstall.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] Executing PKG preinstall for ${APP_NAME}..."
+
+# 1. Terminate running processes
+killall "agm-alim" 2>/dev/null || true
+killall "${APP_NAME}" 2>/dev/null || true
+killall "Antigravity Tools" 2>/dev/null || true
+killall "agm" 2>/dev/null || true
+
+# 2. Evict trashed apps via console user Finder AppleScript to bypass TCC
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+    sudo -u "$CONSOLE_USER" osascript -e '
+    tell application "Finder"
+        try
+            set destFolder to (POSIX file "/private/tmp") as alias
+            repeat with anItem in (every item of trash)
+                try
+                    set n to name of anItem as text
+                    if n contains "Antigravity" or n contains "agm" then
+                        move anItem to destFolder with replacing
+                    end if
+                end try
+            end repeat
+        end try
+    end tell' 2>/dev/null || true
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+fi
+
+# 3. Sweep all user trash folders as root and clear flags
+for user_home in /Users/* /var/root; do
+    if [ -d "$user_home/.Trash" ]; then
+        find "$user_home/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r t_item; do
+            if [ -n "$t_item" ]; then
+                chflags -R nouchg,noschg "$t_item" 2>/dev/null || true
+                rm -rf "$t_item" 2>/dev/null || true
+            fi
+        done
+    fi
+done
+
+# 4. Locate lsregister
+LSREGISTER=""
+for cand in \
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister" \
+    "/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"; do
+    if [ -x "$cand" ]; then
+        LSREGISTER="$cand"
+        break
+    fi
+done
+
+# 5. Unregister existing Target App from LaunchServices before installation
+if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
+fi
+
+# 6. Remove existing bundle in /Applications to ensure clean overwrite
+if [ -d "$TARGET_APP" ]; then
+    chflags -R nouchg,noschg "$TARGET_APP" 2>/dev/null || true
+    rm -rf "$TARGET_APP" 2>/dev/null || true
+fi
+
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)] PKG preinstall completed successfully."
+exit 0

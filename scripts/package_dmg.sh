@@ -142,11 +142,7 @@ xattr -cr "$TARGET_BUNDLE" 2>/dev/null || true
 xattr -rd com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
 xattr -rd com.apple.provenance "$TARGET_BUNDLE" 2>/dev/null || true
 find "$TARGET_BUNDLE" -exec xattr -c {} + 2>/dev/null || true
-macos_major=0
-if command -v sw_vers &>/dev/null; then
-    macos_major=$(sw_vers -productVersion | cut -d. -f1)
-fi
-if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
+if command -v codesign &>/dev/null; then
     codesign --force --deep --sign - "$TARGET_BUNDLE" 2>/dev/null || true
 fi
 
@@ -246,14 +242,19 @@ ln -s /Applications "$DIST_DIR/Applications"
 
 # 7. Build DMG with hdiutil
 PRIMARY_DMG_NAME="Antigravity.Manager.Tools_${VERSION}_${ARCH_ARG}.dmg"
+MANUAL_DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
 echo "Creating DMG image ($PRIMARY_DMG_NAME)..."
-rm -f "$PRIMARY_DMG_NAME"
+rm -f "$PRIMARY_DMG_NAME" "$MANUAL_DMG_NAME"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$PRIMARY_DMG_NAME"
 
 # 8. Strip quarantine from DMG itself
 echo "Stripping quarantine attributes from output DMG..."
 xattr -d com.apple.quarantine "$PRIMARY_DMG_NAME" 2>/dev/null || true
 xattr -cr "$PRIMARY_DMG_NAME" 2>/dev/null || true
+
+# Also generate friendly ManualFix named DMG for direct setup downloads
+cp "$PRIMARY_DMG_NAME" "$MANUAL_DMG_NAME"
+xattr -cr "$MANUAL_DMG_NAME" 2>/dev/null || true
 
 # 9. Place DMG and PKG in release bundle directory if present
 BUNDLE_DMG_DIRS=(
@@ -268,8 +269,11 @@ for bdd in "${BUNDLE_DMG_DIRS[@]}"; do
         echo "Updating release bundle directory: $bdd/$PRIMARY_DMG_NAME"
         cp "$PRIMARY_DMG_NAME" "$bdd/$PRIMARY_DMG_NAME"
         xattr -cr "$bdd/$PRIMARY_DMG_NAME" 2>/dev/null || true
+        cp "$MANUAL_DMG_NAME" "$bdd/$MANUAL_DMG_NAME"
+        xattr -cr "$bdd/$MANUAL_DMG_NAME" 2>/dev/null || true
         if [ -f "$PRIMARY_PKG_NAME" ]; then
             cp "$PRIMARY_PKG_NAME" "$bdd/$PRIMARY_PKG_NAME" 2>/dev/null || true
+            cp "$PRIMARY_PKG_NAME" "$bdd/Install_Antigravity_Manager.pkg" 2>/dev/null || true
         fi
         # Overwrite any unpatched Tauri DMG in the bundle folder
         for existing_dmg in "$bdd"/*.dmg; do
@@ -281,11 +285,6 @@ for bdd in "${BUNDLE_DMG_DIRS[@]}"; do
         done
     fi
 done
-
-# Also generate friendly ManualFix named DMG for direct setup downloads
-MANUAL_DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
-cp "$PRIMARY_DMG_NAME" "$MANUAL_DMG_NAME"
-xattr -cr "$MANUAL_DMG_NAME" 2>/dev/null || true
 
 echo "✅ DMG & PKG Packaging complete!"
 echo "Primary DMG: $PWD/$PRIMARY_DMG_NAME"

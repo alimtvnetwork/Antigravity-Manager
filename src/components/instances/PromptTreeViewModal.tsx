@@ -109,20 +109,91 @@ function getPromptTailSnippet(text: string, fallbackSnippet?: string): string {
     return words.slice(-12).join(' ');
 }
 
-// Helper to truncate text at word limit
+// Helper to truncate text at word limit while strictly preserving original line breaks and newlines
 function getTruncatedText(text: string, maxWords: number): { displayText: string; isTruncated: boolean; totalWords: number } {
     const trimmed = text.trim();
     if (!trimmed) return { displayText: '', isTruncated: false, totalWords: 0 };
-    const words = trimmed.split(/\s+/);
-    if (words.length <= maxWords) {
-        return { displayText: text, isTruncated: false, totalWords: words.length };
+    const allWords = trimmed.split(/\s+/).filter(Boolean);
+    const totalWords = allWords.length;
+    if (totalWords <= maxWords) {
+        return { displayText: text, isTruncated: false, totalWords };
     }
-    const truncated = words.slice(0, maxWords).join(' ');
-    return { displayText: `${truncated}...`, isTruncated: true, totalWords: words.length };
+
+    const lines = text.split('\n');
+    const selectedLines: string[] = [];
+    let wordsCollected = 0;
+
+    for (const line of lines) {
+        const lineWords = line.trim().split(/\s+/).filter(Boolean);
+        if (lineWords.length === 0) {
+            if (selectedLines.length > 0 && selectedLines[selectedLines.length - 1] !== '') {
+                selectedLines.push('');
+            }
+            continue;
+        }
+
+        if (wordsCollected + lineWords.length <= maxWords) {
+            selectedLines.push(line);
+            wordsCollected += lineWords.length;
+        } else {
+            const remaining = maxWords - wordsCollected;
+            if (remaining > 0) {
+                selectedLines.push(lineWords.slice(0, remaining).join(' ') + ' ...');
+            } else if (selectedLines.length > 0) {
+                selectedLines[selectedLines.length - 1] = selectedLines[selectedLines.length - 1] + ' ...';
+            }
+            break;
+        }
+    }
+
+    return {
+        displayText: selectedLines.join('\n').trim(),
+        isTruncated: true,
+        totalWords,
+    };
 }
 
-// Helper to check if a conversation is stale or empty (immune if actively running)
+// Pre-formatter to ensure inline markdown headings and paragraph line gaps have explicit spacing
+function formatPromptForMarkdown(text: string): string {
+    if (!text) return '';
+    let formatted = text;
+
+    // Separate inline markdown headings attached to paragraph text:
+    // e.g. "# High Priority Instruction Hi there." -> "# High Priority Instruction\n\nHi there."
+    formatted = formatted.replace(
+        /^(#{1,4}\s+[A-Za-z0-9_\-\s]{2,40}?)([\.\:\!\?])\s+([A-Z])/gm,
+        '$1$2\n\n$3'
+    );
+    formatted = formatted.replace(
+        /^(#{1,4}\s+High Priority Instruction|#{1,4}\s+Instruction|#{1,4}\s+Overview|#{1,4}\s+Notice|#{1,4}\s+Task|#{1,4}\s+Plan)\s+([A-Z])/gm,
+        '$1\n\n$2'
+    );
+
+    return formatted;
+}
+
+// Helper to check if a conversation has zero prompt content and untitled title (true ghost node)
+export function isGhostConversation(conv: AgmConversationNode): boolean {
+    const title = (conv.title || '').trim().toLowerCase();
+    const isUntitled =
+        !title ||
+        title === 'untitled' ||
+        title.startsWith('untitled conversation') ||
+        title === 'new conversation' ||
+        title === 'conversation' ||
+        title === (conv.short_id || '').toLowerCase();
+    const isEmptyPrompt =
+        conv.prompt_word_count === 0 ||
+        !conv.prompt_preview_200w ||
+        conv.prompt_preview_200w.trim().length === 0;
+    return isUntitled && isEmptyPrompt;
+}
+
+// Helper to check if a conversation is stale or empty (exempt if actively running with content)
 export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
+    if (isGhostConversation(conv)) {
+        return true;
+    }
     if (Boolean(conv.is_running)) {
         return false;
     }
@@ -267,7 +338,8 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
         return <div className="text-xs text-slate-400 italic">No content to preview.</div>;
     }
 
-    const lines = content.split('\n');
+    const formattedContent = formatPromptForMarkdown(content);
+    const lines = formattedContent.split('\n');
     const elements: React.ReactNode[] = [];
     let inCodeBlock = false;
     let codeLanguage = '';
@@ -473,30 +545,36 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
             continue;
         }
 
-        // Standard paragraph
+        // Standard paragraph with explicit <br /> line gap
         const isTrailingEllipsis = trimmed.endsWith('...') || trimmed.endsWith('…');
         if (isTrailingEllipsis && onToggleExpand) {
             const cleanLine = line.replace(/(\.{3}|…)\s*$/, '');
             elements.push(
-                <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-2 leading-relaxed whitespace-pre-wrap break-words">
-                    {parseInlineMarkdown(cleanLine)}
+                <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
+                    <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words inline">
+                        {parseInlineMarkdown(cleanLine)}
+                    </p>
                     <span
                         onClick={(e) => {
                             e.stopPropagation();
                             onToggleExpand();
                         }}
                         title="Click to expand full prompt text"
-                        className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1"
+                        className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1.5 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1.5 inline-block select-none"
                     >
                         {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
                     </span>
-                </p>
+                    <br className="my-1 block select-none" />
+                </div>
             );
         } else {
             elements.push(
-                <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-2 leading-relaxed whitespace-pre-wrap break-words">
-                    {parseInlineMarkdown(line)}
-                </p>
+                <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
+                    <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+                        {parseInlineMarkdown(line)}
+                    </p>
+                    <br className="my-1 block select-none" />
+                </div>
             );
         }
     }
@@ -1111,7 +1189,20 @@ export default function PromptTreeViewModal({
                 // non-fatal fallback
             }
 
-            setActionMsg("Prompt Dispatched (via Hotkey 'N' or Send Now)!");
+            // 3. Copy prompt content to clipboard so user can paste immediately
+            try {
+                await navigator.clipboard.writeText(promptContent);
+            } catch {}
+
+            // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
+            const targetInstId = proj?.instance_id || instanceId || 'default';
+            try {
+                await focusOrLaunchInstance(targetInstId);
+            } catch (focusErr) {
+                console.warn('focusOrLaunchInstance error', focusErr);
+            }
+
+            setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to dispatch prompt');
@@ -1358,9 +1449,9 @@ export default function PromptTreeViewModal({
         [activeFilter]
     );
 
-    // Active prompt truncation for Preview mode
+    // Active prompt truncation for Preview mode (default preview word threshold: 120 words)
     const { displayText: previewDisplayText, isTruncated, totalWords } = useMemo(() => {
-        return getTruncatedText(activePromptText, 500);
+        return getTruncatedText(activePromptText, 120);
     }, [activePromptText]);
 
     const displayedMarkdown = showAllWords || !isTruncated ? activePromptText : previewDisplayText;
@@ -1422,7 +1513,7 @@ export default function PromptTreeViewModal({
 
         const filteredConvs = project.conversations.filter((c) => {
             if (activeFilter === 'archived') return true;
-            return !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c));
+            return !isGhostConversation(c);
         });
 
         const totalProjectPrompts = filteredConvs.reduce(
@@ -1435,8 +1526,7 @@ export default function PromptTreeViewModal({
         const staleConversations: AgmConversationNode[] = [];
 
         sortedConvs.forEach((conv) => {
-            const isEmptyGhost = !conv.is_running && (conv.prompt_word_count === 0 || !conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()) && isStaleOrEmptyConversation(conv);
-            if (isEmptyGhost && activeFilter !== 'archived') {
+            if (isGhostConversation(conv) && activeFilter !== 'archived') {
                 return;
             }
             if (isStaleOrEmptyConversation(conv)) {
@@ -2174,7 +2264,7 @@ export default function PromptTreeViewModal({
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                                                 <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                                                     {isTruncated && !showAllWords
-                                                        ? `Truncated at 500 words (${totalWords} total)`
+                                                        ? `Truncated preview at 120 words (${totalWords} total)`
                                                         : `Showing all ${activeWordCount} words`}
                                                 </div>
 
@@ -2184,7 +2274,7 @@ export default function PromptTreeViewModal({
                                                             type="button"
                                                             onClick={() => setShowAllWords(!showAllWords)}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-blue-50 dark:bg-[#0c2438] text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-[#15334d] hover:bg-blue-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                                                            title={showAllWords ? 'Collapse preview to 500 words' : 'Expand full prompt'}
+                                                            title={showAllWords ? 'Collapse preview to 120 words' : 'Expand full prompt'}
                                                         >
                                                             {showAllWords ? (
                                                                 <>
@@ -2227,15 +2317,15 @@ export default function PromptTreeViewModal({
                                         </div>
                                     )}
 
-                                    {/* Tab 2: Raw Mode (Monospace Clean Text) */}
+                                    {/* Tab 2: Raw Mode (Monospace Clean Text with Explicit <br /> Line Gaps) */}
                                     {viewMode === 'raw' && (
                                         <div className="space-y-3">
                                             <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
                                                 {activePromptText ? (
-                                                    activePromptText.split('\n').map((line, idx, arr) => (
-                                                        <span key={`raw-line-${idx}`}>
-                                                            {line}
-                                                            {idx < arr.length - 1 && <br className="my-1.5" />}
+                                                    formatPromptForMarkdown(activePromptText).split('\n').map((line, idx, arr) => (
+                                                        <span key={`raw-line-${idx}`} className="block">
+                                                            {line || <br className="my-1.5 block select-none" />}
+                                                            {idx < arr.length - 1 && <br className="my-1 block select-none" />}
                                                         </span>
                                                     ))
                                                 ) : (

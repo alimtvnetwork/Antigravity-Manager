@@ -754,20 +754,24 @@ pub fn open_ui(args: &[String]) {
                     let _ = Command::new("bash")
                         .arg("-c")
                         .arg(r#"
-                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
+                            rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
                             osascript -e '
                             tell application "Finder"
                                 try
-                                    set tMatches to (every item of trash whose name contains "Antigravity" or name contains "agm")
-                                    repeat with tItem in tMatches
+                                    set destFolder to (POSIX file "/private/tmp") as alias
+                                    repeat with anItem in (every item of trash)
                                         try
-                                            move tItem to (POSIX file "/tmp") with replacing
+                                            set n to name of anItem as text
+                                            if n contains "Antigravity" or n contains "agm" then
+                                                move anItem to destFolder with replacing
+                                            end if
                                         end try
                                     end repeat
                                 end try
                             end tell' 2>/dev/null || true
-                            rm -rf /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+                            rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
 
+                            lsregister=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n 1)
                             find "$HOME/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r ta; do
                                 if [ -n "$ta" ]; then
                                     [ -n "$lsregister" ] && "$lsregister" -u "$ta" 2>/dev/null || true
@@ -776,10 +780,10 @@ pub fn open_ui(args: &[String]) {
                                 fi
                             done
                             if [ -n "$lsregister" ]; then
-                                "$lsregister" -gc 2>/dev/null || true
                                 "$lsregister" -u "$1" 2>/dev/null || true
+                                "$lsregister" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister" -gc 2>/dev/null || true
                                 "$lsregister" -f -r "$1" 2>/dev/null || true
-                                killall launchservicesd Finder Dock 2>/dev/null || true
+                                killall Finder Dock 2>/dev/null || true
                             fi
                         "#)
                         .arg("bash")
@@ -787,7 +791,7 @@ pub fn open_ui(args: &[String]) {
                         .status();
 
                     std::thread::sleep(Duration::from_millis(800));
-                    if let Ok(retry_out) = Command::new("open").arg(&exe_to_launch).output() {
+                    if let Ok(retry_out) = Command::new("open").arg("-n").arg(&exe_to_launch).output() {
                         if retry_out.status.success() {
                             println!("[OK] Antigravity Manager UI launched after LaunchServices recovery: {:?}", exe_to_launch);
                             launch_ok = true;

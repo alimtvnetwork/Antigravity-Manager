@@ -40,8 +40,28 @@ for cand in \
     fi
 done
 
-# 4. Sweep and unregister conflicting trash copies across all user homes and root (running as root)
+# 4. Sweep and unregister conflicting trash copies across all user homes and root
 echo "Sweeping trash directories to purge conflicting trashed bundles..."
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+    sudo -u "$CONSOLE_USER" osascript -e '
+    tell application "Finder"
+        try
+            set destFolder to (POSIX file "/private/tmp") as alias
+            repeat with anItem in (every item of trash)
+                try
+                    set n to name of anItem as text
+                    if n contains "Antigravity" or n contains "agm" then
+                        move anItem to destFolder with replacing
+                    end if
+                end try
+            end repeat
+        end try
+    end tell' 2>/dev/null || true
+    rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
+fi
+
 for user_home in /Users/* /var/root; do
     if [ -d "$user_home/.Trash" ]; then
         find "$user_home/.Trash" -maxdepth 1 \( -iname "*antigravity*" -o -iname "*agm*" \) 2>/dev/null | while read -r t_item; do
@@ -72,13 +92,13 @@ if command -v spctl &>/dev/null; then
     spctl --add "$TARGET_APP" 2>/dev/null || true
 fi
 
-# 6. Rebuild and refresh LaunchServices registrations
+# 6. Rebuild and refresh LaunchServices registrations across domains
 if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
-    echo "Refreshing LaunchServices database..."
+    echo "Refreshing LaunchServices database across all domains..."
     "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
-    "$LSREGISTER" -gc 2>/dev/null || true
+    "$LSREGISTER" -gc -R -v -apps u,s,l 2>/dev/null || "$LSREGISTER" -gc 2>/dev/null || true
     "$LSREGISTER" -f -r "$TARGET_APP" 2>/dev/null || true
-    killall launchservicesd Finder Dock 2>/dev/null || true
+    killall Finder Dock 2>/dev/null || true
 fi
 
 # 7. Configure global CLI symlinks in /usr/local/bin

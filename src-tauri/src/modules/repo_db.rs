@@ -4072,7 +4072,7 @@ fn compute_project_conversation_tree(
                                 })
                                 .unwrap_or(0);
 
-                            let is_recent = conv_ts > 0 && (now - conv_ts <= 120);
+                            let is_recent = conv_ts > 0 && (now - conv_ts <= 60);
 
                             let is_idle_count = not_fully_idle == 0;
                             let has_idle_status = status.contains("IDLE")
@@ -4093,10 +4093,14 @@ fn compute_project_conversation_tree(
                                 .filter(|s| !s.trim().is_empty())
                                 .unwrap_or_else(|| preview.clone());
 
-                            // Ghost conversation filter: skip untitled / empty title with empty prompt
-                            let is_untitled_candidate = title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
+                            // Ghost conversation filter: skip untitled / empty title with empty prompt (regardless of running status)
+                            let is_untitled_candidate = title.trim().is_empty()
+                                || title.to_lowercase().starts_with("untitled")
+                                || title.to_lowercase() == "new conversation";
                             let (_, eff_wc) = extract_prompt_words_preview(&effective_prompt, 5);
-                            if is_untitled_candidate && (effective_prompt.trim().is_empty() || eff_wc == 0) {
+                            if (is_untitled_candidate && (effective_prompt.trim().is_empty() || eff_wc == 0))
+                                || (effective_prompt.trim().is_empty() && eff_wc == 0)
+                            {
                                 continue;
                             }
 
@@ -4111,6 +4115,15 @@ fn compute_project_conversation_tree(
                                     }
                                 }
                             }
+
+                            // Prefix-length / valid path guard: if marked running but no decodable path >= 6 chars, force idle
+                            let is_conv_running = if is_conv_running
+                                && !assigned_paths.iter().any(|p| p.len() >= 6)
+                            {
+                                false
+                            } else {
+                                is_conv_running
+                            };
                             if assigned_paths.is_empty() {
                                 assigned_paths.push("__unassigned__".to_string());
                             }
@@ -4349,7 +4362,7 @@ fn compute_project_conversation_tree(
                 }
 
                 let is_run =
-                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 120);
+                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 60);
                 if only_running && !is_run {
                     continue;
                 }
@@ -4445,7 +4458,7 @@ fn compute_project_conversation_tree(
                 })
                 .or_else(|_| c.last_modified.parse::<i64>().ok())
                 .unwrap_or(0);
-            conv_ts > 0 && (now - conv_ts <= 120)
+            conv_ts > 0 && (now - conv_ts <= 60)
         });
         let has_conv_nodes = !conv_nodes.is_empty();
 
