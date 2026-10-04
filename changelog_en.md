@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.139.0 (2026-10-04)**:
+        -   **[Auto-Switcher] Quota Threshold Evaluation Fix & Unbanned Models**:
+            -   **Description**: Removed outdated hardcoded filters banning models containing `3.0` and `3.1` in `auto_switcher.rs`, restoring `Gemini 3.1 Pro (High)` for quota monitoring and candidate selection. Updated `evaluate_account_period_status` to evaluate the lowest remaining quota bottleneck across all actively consumed models (<100%), immediately triggering account rotation when `Gemini 3.1 Pro` drops to 6%. Lowered Google quota interval floor to 10s so configured caution (60s) and critical (40s) intervals are properly honored. (Thanks to @aukgit)
+        -   **[Telemetry & Daemon] Daemon Next-Check Countdown & Real-Time Status**:
+            -   **Description**: Persisted `next_check_timestamp`, `check_interval_seconds`, and `current_stage` in `AutoSwitcherRuntimeState`, exposed `get_auto_switcher_daemon_status` Tauri command, and integrated a live ticking countdown pill (`[⏱ {countdown}s Next Check]`) with stage status badges in the Instances page toolbar and Auto Switcher settings card. (Thanks to @aukgit)
+        -   **[Instance Dashboard] Recent & Running Projects with Double-Click Deep Link**:
+            -   **Description**: Rendered active and recent project chips on instance cards below the executable path (configurable 1–3 projects, default 3) with `RUNNING` indicators and turn counts. Double-clicking any project chip immediately opens `PromptTreeViewModal` auto-focused and expanded on that project. (Thanks to @aukgit)
+        -   **[Card Density] Normal vs Compact Card Density Sizing Options**:
+            -   **Description**: Added a card density toggle (`[Normal Cards]` vs `[Compact Cards]`) in the toolbar with adaptive 5–6 column grid layouts and compact card padding (`p-2.5`) to monitor more running instances simultaneously. (Thanks to @aukgit)
+        -   **[Prompt Continuity] Async 5-Second Post-Launch Prompt Restoration & Scope Fix**:
+            -   **Description**: Replaced the previous 14-second synchronous blocking freeze with an asynchronous 5-second post-launch prompt restoration task, cleanly preserving variables scope and passing Clippy and cargo compilation. (Thanks to @aukgit)
+        -   **[Testing & Quality] Isolated Local End-to-End Test Suite**:
+            -   **Description**: Added `src-tauri/tests/auto_switcher_e2e_test.rs` covering threshold failover triggers, prompt snapshotting, and 5-second post-launch restoration, strictly isolated with `#[ignore]` so it never runs during CI/CD. (Thanks to @aukgit)
+
     *   **v4.138.0 (2026-10-04)**:
         -   **[Prompt Inspector] Running Instance & Conversation Targeted Auto-Selection**:
             -   **Description**: When opening `PromptTreeViewModal` on an instance, the modal automatically detects active running projects and conversations, expanding solely the targeted project and conversation nodes and selecting the running prompt turn in the inspection pane. If no prompt is currently running, it auto-expands the primary active project and selects its latest conversation, completely eliminating blind mass-expansion of all 29+ projects. (Thanks to @aukgit)

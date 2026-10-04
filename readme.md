@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.138.0-3B82F6?style=flat-square" alt="Version v4.138.0">
+    <img src="https://img.shields.io/badge/Version-v4.139.0-3B82F6?style=flat-square" alt="Version v4.139.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.138.0)**
+**Bar 2: Version-Based Installation (v4.139.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.138.0**: Implemented targeted auto-selection and expansion of active running projects and conversation turns on `PromptTreeViewModal` open, preventing mass expansion of 29+ projects; added a configurable background auto-sync interval dropdown (`15s`, `30s`, `1m`, `2m`, `Off`) with a strict safety floor of 15 seconds that bypasses SQLite disk caches without flickering UI scroll or discarding dirty textarea inputs; demoted stale/empty prompt turns to the bottom under a collapsible `📁 Archived / Stale Prompts` group with immunity for active running prompts; added an instance-scoped Archive / Less Favorite project toggle (`Archive` / `ArchiveRestore`) persisting to local storage with bottom collapsible grouping and filter pills; integrated an active prompt badge on instance cards. (Thanks to @aukgit)
+> Latest version **v4.139.0**: Resolved auto-switcher quota threshold evaluation failure by eliminating outdated Gemini 3.0/3.1 model ban filters, ensuring depleted active models (such as Gemini 3.1 Pro at 6%) immediately trigger account failovers before exhaustion; added real-time auto-switcher daemon next-check countdown timer badge (`[⏱ {countdown}s Next Check]`) and stage telemetry across the Instances toolbar and Settings; replaced synchronous blocking freezes during account switches with an asynchronous 5-second post-launch prompt restoration task; added active/recent projects chips on instance cards with double-click deep linking into `PromptTreeViewModal`; added card density sizing options (`Normal Cards` vs `Compact Cards`); and introduced an isolated local end-to-end integration test suite (`#[ignore]`). (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

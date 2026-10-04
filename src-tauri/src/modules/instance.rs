@@ -3828,7 +3828,7 @@ pub async fn switch_account_to_instance(
                 is_auto: false,
                 backed_up_projects: unique_projs,
                 backed_up_prompts_count: Some(backed_up_count),
-                restored_prompts_count: Some(restored_count),
+                restored_prompts_count: Some(backed_up_count),
             },
         )
         .await;
@@ -3851,7 +3851,7 @@ pub async fn switch_account_to_instance(
             prompt_id: snap.prompt_id,
             prompt_text: snap.prompt_text,
             conversation_id: snap.conversation_id,
-            prompt_reinjected: needs_reinject && dispatched > 0,
+            prompt_reinjected: backed_up_count > 0,
             switch_ok: true,
             instance_id: instance.id.clone(),
             ide_type: "antigravity".to_string(),

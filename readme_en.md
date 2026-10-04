@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.138.0)
+> Professional AI Account Management & Protocol Proxy System (v4.139.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.138.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.139.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.138.0**: Implemented targeted auto-selection and expansion of active running projects and conversation turns on `PromptTreeViewModal` open, preventing mass expansion of 29+ projects; added a configurable background auto-sync interval dropdown (`15s`, `30s`, `1m`, `2m`, `Off`) with a strict safety floor of 15 seconds that bypasses SQLite disk caches without flickering UI scroll or discarding dirty textarea inputs; demoted stale/empty prompt turns to the bottom under a collapsible `📁 Archived / Stale Prompts` group with immunity for active running prompts; added an instance-scoped Archive / Less Favorite project toggle (`Archive` / `ArchiveRestore`) persisting to local storage with bottom collapsible grouping and filter pills; integrated an active prompt badge on instance cards. (Thanks to @aukgit)
+> Latest version **v4.139.0**: Resolved auto-switcher quota threshold evaluation failure by eliminating outdated Gemini 3.0/3.1 model ban filters, ensuring depleted active models (such as Gemini 3.1 Pro at 6%) immediately trigger account failovers before exhaustion; added real-time auto-switcher daemon next-check countdown timer badge (`[⏱ {countdown}s Next Check]`) and stage telemetry across the Instances toolbar and Settings; replaced synchronous blocking freezes during account switches with an asynchronous 5-second post-launch prompt restoration task; added active/recent projects chips on instance cards with double-click deep linking into `PromptTreeViewModal`; added card density sizing options (`Normal Cards` vs `Compact Cards`); and introduced an isolated local end-to-end integration test suite (`#[ignore]`). (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

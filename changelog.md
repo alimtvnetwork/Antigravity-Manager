@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.139.0] - 2026-10-04
+
+### Added
+- **自动轮换阈值评估修复与模型封禁解除 (Auto-Switcher Threshold Evaluation Fix & Unbanned Models)**: 彻底移除 `auto_switcher.rs` 中针对 `3.0` 与 `3.1` 模型的硬编码封禁过滤，恢复 `Gemini 3.1 Pro (High)` 的配额评估与候选评分资格；重构 `evaluate_account_period_status` 逻辑，在评估目标模型之余计算所有活跃消耗模型中的最低剩余配额瓶颈，当 `Gemini 3.1 Pro` 跌至 6% 时立即精准触发轮换；下调谷歌配额检查下限至 10s，确保谨慎与紧急检查频率不被过度钳位。 (Thanks to @aukgit)
+- **守护进程下一次检查倒计时与实时遥测 (Daemon Next-Check Countdown & Telemetry)**: 在 `AutoSwitcherRuntimeState` 中持久化 `next_check_timestamp`、`check_interval_seconds` 与 `current_stage`，新增 `get_auto_switcher_daemon_status` Tauri 命令与前端轮询/事件联动；在实例页面顶栏与设置页常驻展示秒级实时倒计时胶囊（`[⏱ {countdown}s Next Check]`）及阶段状态。 (Thanks to @aukgit)
+- **实例卡片最近/运行中项目展示与双击直达 (Instance Card Recent Projects with Double-Click Deep Link)**: 在实例卡片数据目录与路径下方展示 1–3 个活跃或最近运行的项目芯片（支持在设置中配置上限 1–3，默认 3），并标明 `RUNNING` 徽章与提示词轮次计数；双击项目芯片直接呼出提示词树弹窗（`PromptTreeViewModal`）并自动聚焦展开该项目。 (Thanks to @aukgit)
+- **卡片显示密度切换 (Card Density Toggle)**: 在实例页面视图切换胶囊旁新增卡片密度选项（`[Normal Cards]` 与 `[Compact Cards]`），紧凑模式下自适应 5–6 列排版与紧凑内边距，方便一屏监控多套运行实例。 (Thanks to @aukgit)
+- **本地端到端测试套件 (Isolated Local E2E Test Suite)**: 在 `src-tauri/tests/auto_switcher_e2e_test.rs` 中编写完整的端到端自动化测试，涵盖低配额轮换触发、提示词备份快照与 5 秒异步注入验证，配置 `#[ignore]` 严格与 CI/CD 隔离。 (Thanks to @aukgit)
+
+### Fixed
+- **异步 5 秒启动延迟提示词自动恢复与作用域修复 (Async 5-Second Post-Launch Prompt Restore & Scope Fix)**: 彻底移除账号切换时原本 14 秒的同步阻塞等待，改为在 IDE 进程启动后由后台异步任务严格延时 5 秒触发提示词恢复与注入；修复提示词快照计数与重注入标志变量作用域，确保跨平台编译与 Clippy 检查通过。 (Thanks to @aukgit)
+
+---
+
 ## [v4.138.0] - 2026-10-04
 
 ### Added
@@ -409,6 +423,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.139.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.138.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
