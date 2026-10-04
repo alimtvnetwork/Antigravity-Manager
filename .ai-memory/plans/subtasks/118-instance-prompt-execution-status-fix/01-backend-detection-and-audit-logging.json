@@ -1,0 +1,15 @@
+{
+  "task": "Task-04",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/repo_db.rs",
+    "src-tauri/src/modules/instance.rs",
+    "src-tauri/src/modules/logger.rs"
+  ],
+  "checks": "cargo fmt & clippy -> exit 0",
+  "acceptance": {
+    "ac1": "PASS backend detection isolated per instance"
+  },
+  "assumptions": [],
+  "blockers": []
+}
