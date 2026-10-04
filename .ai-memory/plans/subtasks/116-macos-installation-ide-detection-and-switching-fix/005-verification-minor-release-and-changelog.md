@@ -10,7 +10,7 @@ target_files:
   - CHANGELOG_EN.md
   - README.md
   - README_EN.md
-status: pending
+status: completed
 ---
 
 # 005 — Verification, Pre-flight Checks, Minor Release Bump, and Changelog Synchronization
