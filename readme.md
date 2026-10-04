@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.141.0-3B82F6?style=flat-square" alt="Version v4.141.0">
+    <img src="https://img.shields.io/badge/Version-v4.142.0-3B82F6?style=flat-square" alt="Version v4.142.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.141.0)**
+**Bar 2: Version-Based Installation (v4.142.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -147,7 +147,7 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.137.0** (Latest) | 2026-10-04 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.137.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.137.0/install.sh \| bash` | `git checkout v4.137.0` |
+| **v4.142.0** (Latest) | 2026-10-04 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.142.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.142.0/install.sh \| bash` | `git checkout v4.142.0` |
 | **v4.65.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh \| bash` | `git checkout v4.65.0` |
 | **v4.64.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.sh \| bash` | `git checkout v4.64.0` |
 | **v4.63.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.sh \| bash` | `git checkout v4.63.0` |
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.141.0**: Resolved macOS installation failure ("damaged app, move to Trash") by clearing Gatekeeper quarantine attributes before and after mounting DMG (`xattr -cr`), dynamically discovering `.app` bundles, gracefully falling back to user `$HOME/Applications/` without requiring `sudo`, applying local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`), and symlinking `agm` CLI to `~/.local/bin/`; added system-level POSIX `ERR` trap capturing line numbers, commands, and call stack traces in `install.sh`; fixed macOS `/usr/bin/open` argument sequence ensuring application parameters and window options strictly follow `--args`; branched macOS instance launching between `.app` bundles and shell scripts with full `.gemini` home folders and `app_storage.json` parity; proactively discovered and persisted Antigravity IDE information on first-time startup via `discover_and_persist_initial_ide_info()` with rich backtraces; and overhauled `Fix_Damaged.command` repair script. (Thanks to @aukgit)
+> Latest version **v4.142.0**: Resolved macOS installation failure ("damaged app, move to Trash") by clearing Gatekeeper quarantine attributes before and after mounting DMG (`xattr -cr`), dynamically discovering `.app` bundles, gracefully falling back to user `$HOME/Applications/` without requiring `sudo`, applying local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`), and symlinking `agm` CLI to `~/.local/bin/`; added system-level POSIX `ERR` trap capturing line numbers, commands, and call stack traces in `install.sh`; fixed macOS `/usr/bin/open` argument sequence ensuring application parameters and window options strictly follow `--args`; branched macOS instance launching between `.app` bundles and shell scripts with full `.gemini` home folders and `app_storage.json` parity; proactively discovered and persisted Antigravity IDE information on first-time startup via `discover_and_persist_initial_ide_info()` with rich backtraces; and overhauled `Fix_Damaged.command` repair script. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

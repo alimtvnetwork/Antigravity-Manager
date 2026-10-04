@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.141.0)
+> Professional AI Account Management & Protocol Proxy System (v4.142.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.141.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.142.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.141.0**: Resolved macOS installation failure ("damaged app, move to Trash") by clearing Gatekeeper quarantine attributes before and after mounting DMG (`xattr -cr`), dynamically discovering `.app` bundles, gracefully falling back to user `$HOME/Applications/` without requiring `sudo`, applying local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`), and symlinking `agm` CLI to `~/.local/bin/`; added system-level POSIX `ERR` trap capturing line numbers, commands, and call stack traces in `install.sh`; fixed macOS `/usr/bin/open` argument sequence ensuring application parameters and window options strictly follow `--args`; branched macOS instance launching between `.app` bundles and shell scripts with full `.gemini` home folders and `app_storage.json` parity; proactively discovered and persisted Antigravity IDE information on first-time startup via `discover_and_persist_initial_ide_info()` with rich backtraces; and overhauled `Fix_Damaged.command` repair script. (Thanks to @aukgit)
+> Latest version **v4.142.0**: Resolved macOS installation failure ("damaged app, move to Trash") by clearing Gatekeeper quarantine attributes before and after mounting DMG (`xattr -cr`), dynamically discovering `.app` bundles, gracefully falling back to user `$HOME/Applications/` without requiring `sudo`, applying local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`), and symlinking `agm` CLI to `~/.local/bin/`; added system-level POSIX `ERR` trap capturing line numbers, commands, and call stack traces in `install.sh`; fixed macOS `/usr/bin/open` argument sequence ensuring application parameters and window options strictly follow `--args`; branched macOS instance launching between `.app` bundles and shell scripts with full `.gemini` home folders and `app_storage.json` parity; proactively discovered and persisted Antigravity IDE information on first-time startup via `discover_and_persist_initial_ide_info()` with rich backtraces; and overhauled `Fix_Damaged.command` repair script. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

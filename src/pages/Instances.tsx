@@ -31,6 +31,9 @@ import {
     List,
     Layers,
     History,
+    Check,
+    FolderSync,
+    Sliders,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -1885,23 +1888,23 @@ export default function Instances() {
             {/* Copy / Duplicate Modal */}
             {copyTargetId && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
                     onClick={() => {
                         setCopyTargetId(null);
                         setCopyInstanceName('');
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-[#071a27] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#15334d] transition-all"
+                        className="bg-white dark:bg-[#081a29] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#153a54] ring-1 ring-black/5 dark:ring-white/5 transition-all"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#15334d] mb-4">
+                        <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#153a54] mb-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/50 dark:border-cyan-800/40 shadow-xs">
+                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-[#0c283f] text-blue-600 dark:text-cyan-400 border border-blue-200/60 dark:border-cyan-500/30 shadow-xs">
                                     <Copy className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">
+                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white tracking-tight">
                                         {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                                     </h3>
                                     <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
@@ -1915,7 +1918,7 @@ export default function Instances() {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-[#0c2438] transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#122e47] transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
@@ -1931,13 +1934,13 @@ export default function Instances() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#040e16] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 dark:focus:border-cyan-400 transition-all shadow-xs placeholder-gray-400 dark:placeholder-slate-500"
+                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#051320] border border-gray-200 dark:border-[#173d5c] text-gray-900 dark:text-white rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-cyan-500/40 focus:border-blue-500 dark:focus:border-cyan-400 transition-all shadow-inner placeholder-gray-400 dark:placeholder-slate-500"
                             autoFocus
                         />
 
                         {/* Scope Selection Cards */}
-                        <div className="mb-5 space-y-2">
-                            <span className="block text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                        <div className="mb-4 space-y-2">
+                            <span className="block text-[11px] font-bold text-gray-500 dark:text-cyan-400/90 uppercase tracking-wider mb-2">
                                 {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
                             </span>
                             <div className="grid grid-cols-1 gap-2.5">
@@ -1946,22 +1949,27 @@ export default function Instances() {
                                     className={cn(
                                         "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'full'
-                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/70 dark:bg-[#092236] ring-1 ring-blue-500/30 dark:ring-cyan-500/30 shadow-xs"
-                                            : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e] hover:bg-gray-100/60 dark:hover:bg-[#091f30]"
+                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#0c283f] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]"
+                                            : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d] hover:bg-gray-100/60 dark:hover:bg-[#092033]"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                                            cloneMode === 'full' ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500" : "border-gray-400 dark:border-slate-500"
+                                            cloneMode === 'full'
+                                                ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500"
+                                                : "border-gray-400 dark:border-slate-500 bg-transparent"
                                         )}>
-                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#071a27]" />}
+                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#081a29]" />}
                                         </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                                            <span>{t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}</span>
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-cyan-950/80 text-blue-700 dark:text-cyan-300 border border-blue-200/60 dark:border-cyan-800/60">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center justify-between gap-1.5">
+                                            <span className="flex items-center gap-1.5">
+                                                <Layers className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
+                                                <span>{t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}</span>
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-cyan-100 dark:bg-cyan-950/80 text-cyan-800 dark:text-cyan-300 border border-cyan-300/50 dark:border-cyan-500/30">
                                                 Full
                                             </span>
                                         </div>
@@ -1976,22 +1984,27 @@ export default function Instances() {
                                     className={cn(
                                         "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'profile'
-                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/70 dark:bg-[#092236] ring-1 ring-blue-500/30 dark:ring-cyan-500/30 shadow-xs"
-                                            : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e] hover:bg-gray-100/60 dark:hover:bg-[#091f30]"
+                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#0c283f] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]"
+                                            : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d] hover:bg-gray-100/60 dark:hover:bg-[#092033]"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                                            cloneMode === 'profile' ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500" : "border-gray-400 dark:border-slate-500"
+                                            cloneMode === 'profile'
+                                                ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500"
+                                                : "border-gray-400 dark:border-slate-500 bg-transparent"
                                         )}>
-                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#071a27]" />}
+                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#081a29]" />}
                                         </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                                            <span>{t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}</span>
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center justify-between gap-1.5">
+                                            <span className="flex items-center gap-1.5">
+                                                <Sliders className="w-3.5 h-3.5 text-indigo-500 dark:text-blue-400 shrink-0" />
+                                                <span>{t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}</span>
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                                 Preferences
                                             </span>
                                         </div>
@@ -2009,40 +2022,43 @@ export default function Instances() {
                             className={cn(
                                 "mb-5 p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer",
                                 copyProjects
-                                    ? "border-blue-500/60 dark:border-cyan-500/60 bg-blue-50/50 dark:bg-[#092236]/80 ring-1 ring-blue-500/20 dark:ring-cyan-500/20 shadow-xs"
-                                    : "border-gray-200 dark:border-[#15334d] bg-gray-50/50 dark:bg-[#061521] hover:border-gray-300 dark:hover:border-[#204a6e]"
+                                    ? "border-blue-500/70 dark:border-cyan-400/70 bg-blue-50/60 dark:bg-[#0c283f] ring-1 ring-blue-500/20 dark:ring-cyan-400/20 shadow-xs dark:shadow-[0_0_12px_rgba(6,182,212,0.1)]"
+                                    : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d]"
                             )}
                         >
                             <div className="min-w-0 pr-2">
                                 <label
                                     htmlFor="instances-page-copy-projects"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="font-bold text-xs text-gray-900 dark:text-white cursor-pointer block"
+                                    className="font-bold text-xs text-gray-900 dark:text-white cursor-pointer flex items-center gap-1.5"
                                 >
-                                    {t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}
+                                    <FolderSync className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                                    <span>{t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}</span>
                                 </label>
                                 <p className="text-[11px] text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">
                                     {t('instances.copy_projects_desc', 'Duplicate opened workspaces, project states, and recent folder paths into the new profile.')}
                                 </p>
                             </div>
-                            <input
-                                id="instances-page-copy-projects"
-                                type="checkbox"
-                                checked={copyProjects}
-                                onChange={(e) => setCopyProjects(e.target.checked)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer shrink-0"
-                            />
+                            <div
+                                className={cn(
+                                    "w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-200 shrink-0 shadow-xs",
+                                    copyProjects
+                                        ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500 text-white"
+                                        : "border-gray-300 dark:border-slate-600 bg-white dark:bg-[#040e16]"
+                                )}
+                            >
+                                {copyProjects && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            </div>
                         </div>
 
-                        <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#15334d]">
+                        <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#153a54]">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] hover:bg-gray-100 dark:hover:bg-[#0c2438] transition-all duration-200 active:scale-95 cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#153a54] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -2050,7 +2066,7 @@ export default function Instances() {
                                 type="button"
                                 onClick={handleCopy}
                                 disabled={!copyInstanceName.trim()}
-                                className="px-5 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-cyan-500/30 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
                             >
                                 <Copy className="w-3.5 h-3.5" />
                                 <span>{t('instances.duplicate', 'Duplicate')}</span>
