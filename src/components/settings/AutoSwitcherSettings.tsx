@@ -23,6 +23,11 @@ import {
 import { showToast } from '../common/ToastContainer';
 import { AutoProfileSwitcherConfig } from '../../types/config';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { cn } from '../../utils/cn';
+import {
+    getAutoSwitcherDaemonStatus,
+    type AutoSwitcherDaemonStatus,
+} from '../../services/instanceService';
 
 interface AutoSwitcherSettingsProps {
     config?: AutoProfileSwitcherConfig;
@@ -56,6 +61,58 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
     const [isActionsOpen, setIsActionsOpen] = useState(false);
     const actionsRef = React.useRef<HTMLDivElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [daemonStatus, setDaemonStatus] = useState<AutoSwitcherDaemonStatus | null>(null);
+    const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+
+    React.useEffect(() => {
+        let unlisten: (() => void) | undefined;
+        let isMounted = true;
+
+        const fetchStatus = () => {
+            getAutoSwitcherDaemonStatus()
+                .then((status) => {
+                    if (!isMounted) return;
+                    setDaemonStatus(status);
+                    if (status.next_check_in_seconds !== undefined) {
+                        setRemainingSeconds(Math.max(0, status.next_check_in_seconds));
+                    }
+                })
+                .catch(() => {});
+        };
+
+        fetchStatus();
+
+        import('@tauri-apps/api/event').then(({ listen }) => {
+            if (!isMounted) return;
+            listen<AutoSwitcherDaemonStatus>('auto-switcher://status-tick', (event) => {
+                if (!isMounted) return;
+                if (event.payload) {
+                    setDaemonStatus(event.payload);
+                    if (event.payload.next_check_in_seconds !== undefined) {
+                        setRemainingSeconds(Math.max(0, event.payload.next_check_in_seconds));
+                    }
+                }
+            }).then((unsub) => {
+                if (isMounted) {
+                    unlisten = unsub;
+                } else {
+                    unsub();
+                }
+            }).catch(() => {});
+        });
+
+        const pollTimer = setInterval(fetchStatus, 3000);
+        const tickTimer = setInterval(() => {
+            setRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+
+        return () => {
+            isMounted = false;
+            clearInterval(pollTimer);
+            clearInterval(tickTimer);
+            if (unlisten) unlisten();
+        };
+    }, []);
 
     React.useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -234,6 +291,52 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
             {/* Config details when enabled */}
             {currentConfig.is_enabled && (
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                    {/* Live Evaluation Countdown & Status Stage Badge */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[5px] bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] shadow-2xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="relative flex h-2.5 w-2.5 shrink-0">
+                                <span className={cn(
+                                    "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                                    daemonStatus?.is_daemon_running ? "bg-emerald-400" : "bg-slate-400"
+                                )} />
+                                <span className={cn(
+                                    "relative inline-flex rounded-full h-2.5 w-2.5",
+                                    daemonStatus?.is_daemon_running ? "bg-emerald-500" : "bg-slate-400"
+                                )} />
+                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                    Next evaluation in {remainingSeconds > 0 ? remainingSeconds : (daemonStatus?.next_check_in_seconds ?? currentConfig.check_interval_seconds)}s
+                                </span>
+                                {(() => {
+                                    const stage = daemonStatus?.current_stage || 'Normal';
+                                    const isCritical = stage.toLowerCase() === 'critical';
+                                    const isCaution = stage.toLowerCase() === 'caution';
+                                    return (
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded-[5px] text-[10px] font-bold uppercase tracking-wider border",
+                                            isCritical
+                                                ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                                                : isCaution
+                                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                        )}>
+                                            Stage: {stage}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-slate-400">
+                            {daemonStatus?.current_quota_percent !== undefined && (
+                                <span>Quota: <strong className="text-blue-600 dark:text-cyan-400">{daemonStatus.current_quota_percent.toFixed(0)}%</strong></span>
+                            )}
+                            {daemonStatus?.monitored_instance_count !== undefined && (
+                                <span>Monitored: <strong className="text-slate-700 dark:text-slate-200">{daemonStatus.monitored_instance_count}</strong></span>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Polling Interval */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2">

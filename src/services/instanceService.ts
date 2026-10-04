@@ -889,3 +889,44 @@ export function setArchivedProjectsForInstance(instanceId: string, projectIds: s
     } catch {}
 }
 
+export interface AutoSwitcherDaemonStatus {
+    is_daemon_running: boolean;
+    last_evaluated_at: number;
+    next_check_timestamp: number;
+    next_check_in_seconds: number;
+    check_interval_seconds: number;
+    current_stage: string;
+    active_account_email?: string;
+    current_quota_percent: number;
+    monitored_instance_count: number;
+}
+
+export async function getAutoSwitcherDaemonStatus(): Promise<AutoSwitcherDaemonStatus> {
+    try {
+        return await invoke('get_auto_switcher_daemon_status');
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.getAutoSwitcherDaemonStatus',
+            endpoint: 'get_auto_switcher_daemon_status',
+            triggerAction: 'get_auto_switcher_daemon_status',
+        });
+        throw e;
+    }
+}
+
+export function getInstanceCardDensity(): 'normal' | 'compact' {
+    try {
+        const val = localStorage.getItem('agm_instance_card_density');
+        if (val === 'compact' || val === 'normal') {
+            return val;
+        }
+    } catch {}
+    return 'normal';
+}
+
+export function setInstanceCardDensity(density: 'normal' | 'compact'): void {
+    try {
+        localStorage.setItem('agm_instance_card_density', density);
+    } catch {}
+}
+

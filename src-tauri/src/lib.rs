@@ -1043,6 +1043,7 @@ pub fn run() {
             commands::export_instances_json,
             commands::import_instances_json,
             commands::get_auto_switcher_status,
+            commands::get_auto_switcher_daemon_status,
             commands::get_auto_switcher_config,
             commands::update_auto_switcher_config,
             commands::toggle_auto_switcher,

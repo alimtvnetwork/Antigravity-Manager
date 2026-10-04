@@ -43,6 +43,10 @@ pub struct QuotaPeriodStatus {
     pub seconds_until_reset: Option<i64>,
     pub is_period_finished: bool,
     pub is_depleted_before_finish: bool,
+    #[serde(default)]
+    pub is_low_quota: bool,
+    #[serde(default)]
+    pub below_threshold: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +63,22 @@ struct AutoSwitcherRuntimeState {
     pub last_check_timestamp: i64,
     pub last_switch_timestamp: Option<i64>,
     pub last_switch_reason: Option<String>,
+    pub next_check_timestamp: i64,
+    pub check_interval_seconds: u32,
+    pub current_stage: String, // "normal" | "caution" | "critical"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoSwitcherDaemonStatus {
+    pub is_daemon_running: bool,
+    pub last_evaluated_at: i64,
+    pub next_check_timestamp: i64,
+    pub next_check_in_seconds: i64,
+    pub check_interval_seconds: u32,
+    pub current_stage: String,
+    pub active_account_email: Option<String>,
+    pub current_quota_percent: f64,
+    pub monitored_instance_count: usize,
 }
 
 static RUNTIME_STATE: Lazy<Mutex<AutoSwitcherRuntimeState>> = Lazy::new(|| {
@@ -67,6 +87,9 @@ static RUNTIME_STATE: Lazy<Mutex<AutoSwitcherRuntimeState>> = Lazy::new(|| {
         last_check_timestamp: 0,
         last_switch_timestamp: None,
         last_switch_reason: None,
+        next_check_timestamp: 0,
+        check_interval_seconds: 120,
+        current_stage: "normal".to_string(),
     })
 });
 
@@ -117,23 +140,20 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
 
     let mut min_pct: Option<f64> = None;
 
-    // 1. Minimum across models matching target (and non-banned flash models when target is flash)
+    // 1. Minimum across models matching target (and flash models when target is flash)
     for m in &quota_data.models {
         let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
         let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        let is_flash = is_flash_target && name_lower.contains("flash");
         if is_direct || is_flash {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
     }
 
-    // 2. Minimum across any actively consumed non-banned models (percentage < 100)
+    // 2. Minimum across any actively consumed models (percentage < 100)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-        if !is_banned && m.percentage < 100 {
+        if m.percentage < 100 {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
@@ -183,18 +203,14 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
 }
 
 /// Hierarchical model quota evaluation:
-/// 1. Primary: Gemini 3.8 Flash (banning 3.0 / 3.1 Flash)
+/// 1. Primary: Gemini Flash
 /// 2. Fallback: Claude Sonnet 4.6 / Claude Sonnet
 pub fn evaluate_hierarchical_quota(account: &Account) -> Option<(String, f64, bool)> {
     let quota_data = account.quota.as_ref()?;
 
-    // 1. Check Gemini 3.8 Flash (Primary)
+    // 1. Check Gemini Flash (Primary)
     for m in &quota_data.models {
         let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-        if is_banned {
-            continue;
-        }
         let is_gemini_flash = (name_lower.contains("3.8") && name_lower.contains("flash"))
             || (name_lower.contains("gemini") && name_lower.contains("flash"));
         if is_gemini_flash {
@@ -215,13 +231,9 @@ pub fn evaluate_hierarchical_quota(account: &Account) -> Option<(String, f64, bo
         }
     }
 
-    // 3. Any other non-banned Gemini model
+    // 3. Any other Gemini model
     for m in &quota_data.models {
         let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-        if is_banned {
-            continue;
-        }
         if name_lower.contains("gemini") {
             let pct = m.percentage as f64;
             let is_primary = false;
@@ -262,11 +274,11 @@ pub fn evaluate_account_period_status(
     let is_flash_target = target.contains("flash");
 
     let mut matched_model: Option<&crate::models::quota::ModelQuota> = None;
+    // 1. Evaluate configured target_model first
     for m in &quota_data.models {
         let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
         let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        let is_flash = is_flash_target && name_lower.contains("flash");
         if is_direct || is_flash {
             match matched_model {
                 Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
@@ -276,11 +288,9 @@ pub fn evaluate_account_period_status(
         }
     }
 
-    // Also check if any non-banned model has been consumed below 100% or <= threshold_percent
+    // 2. In addition, evaluate lowest remaining quota across all models that are actively consumed (remaining < 100%)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-        if !is_banned && (m.percentage as f64 <= threshold_percent || m.percentage < 100) {
+        if m.percentage < 100 || (m.percentage as f64) <= threshold_percent {
             match matched_model {
                 Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
                 None => matched_model = Some(m),
@@ -348,6 +358,7 @@ pub fn evaluate_account_period_status(
     };
 
     let is_low_quota = quota_percent <= threshold_percent;
+    let below_threshold = is_low_quota;
     let mut is_depleted_before_finish = false;
     if is_low_quota {
         if reset_timestamp.is_some() {
@@ -368,6 +379,8 @@ pub fn evaluate_account_period_status(
         seconds_until_reset,
         is_period_finished,
         is_depleted_before_finish,
+        is_low_quota,
+        below_threshold,
     })
 }
 
@@ -656,15 +669,7 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
             // Take minimum bottleneck across weekly quota groups
             weekly_quota_percent = weekly_values.into_iter().fold(100.0, f64::min);
         } else {
-            let valid_models: Vec<_> = quota_data
-                .models
-                .iter()
-                .filter(|m| {
-                    let name = m.name.to_lowercase();
-                    let is_banned = name.contains("3.0") || name.contains("3.1");
-                    !is_banned
-                })
-                .collect();
+            let valid_models: Vec<_> = quota_data.models.iter().collect();
 
             if !valid_models.is_empty() {
                 let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
@@ -715,23 +720,20 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
         }
     }
 
-    // 2. Minimum across models matching target (and non-banned flash models when target is flash)
+    // 2. Minimum across models matching target (and flash models when target is flash)
     for m in &quota_data.models {
         let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
         let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && !is_banned && name_lower.contains("flash");
+        let is_flash = is_flash_target && name_lower.contains("flash");
         if is_direct || is_flash {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
     }
 
-    // 3. Minimum across any actively consumed non-banned models (percentage < 100)
+    // 3. Minimum across any actively consumed models (percentage < 100)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_banned = name_lower.contains("3.0") || name_lower.contains("3.1");
-        if !is_banned && m.percentage < 100 {
+        if m.percentage < 100 {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
@@ -770,15 +772,8 @@ pub fn calculate_weekly_window_quota(account: &Account, target_model: &str) -> O
         return Some(weekly_values.into_iter().fold(100.0, f64::min));
     }
 
-    // Fallback across non-banned models
-    let valid_models: Vec<_> = quota_data
-        .models
-        .iter()
-        .filter(|m| {
-            let name = m.name.to_lowercase();
-            !name.contains("3.0") && !name.contains("3.1")
-        })
-        .collect();
+    // Fallback across models
+    let valid_models: Vec<_> = quota_data.models.iter().collect();
 
     if !valid_models.is_empty() {
         let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
@@ -1710,7 +1705,11 @@ pub async fn check_and_rotate_with_options(
             .or_else(|| calculate_account_quota(&bound_acc, &switcher_cfg.target_model))
             .unwrap_or(100.0);
 
-        let below_threshold = quota_percent <= effective_low_threshold
+        let below_threshold = period_status
+            .as_ref()
+            .map(|s| s.below_threshold)
+            .unwrap_or(false)
+            || quota_percent <= effective_low_threshold
             || quota_percent <= switcher_cfg.critical_threshold_percent;
         if below_threshold || force {
             let _ = instance::resolve_instance_pid_for_switch(
@@ -1982,21 +1981,39 @@ pub async fn check_and_rotate_for_threshold(
     check_and_rotate_with_options(custom_threshold, force).await
 }
 
-/// Google quota checks are never faster than 2 minutes.
-/// The old 5-minute default (300) is now 2 minutes. A higher custom value is kept.
-pub const MIN_GOOGLE_QUOTA_CHECK_SECONDS: u32 = 120;
+/// Minimum Google quota check frequency bound (lowered to 10s so configured caution/critical ladders are respected)
+pub const MIN_GOOGLE_QUOTA_CHECK_SECONDS: u32 = 10;
 
 pub fn google_quota_interval_seconds(configured: u32) -> u32 {
-    let secs = if configured == 300 {
-        MIN_GOOGLE_QUOTA_CHECK_SECONDS
-    } else {
-        configured
-    };
+    let secs = if configured == 300 { 120 } else { configured };
     secs.max(MIN_GOOGLE_QUOTA_CHECK_SECONDS)
 }
 
+pub fn determine_quota_stage(
+    quota_percent: Option<f64>,
+    cfg: &AutoProfileSwitcherConfig,
+) -> &'static str {
+    let Some(quota) = quota_percent else {
+        return "normal";
+    };
+
+    let caution_threshold = if cfg.low_quota_threshold_percent > cfg.critical_threshold_percent {
+        cfg.low_quota_threshold_percent
+    } else {
+        18.0
+    };
+
+    if quota <= cfg.critical_threshold_percent {
+        "critical"
+    } else if quota < caution_threshold {
+        "caution"
+    } else {
+        "normal"
+    }
+}
+
 /// Calculate dynamic polling interval based on credit quota ladder.
-/// Every branch waits at least 2 minutes before the next Google quota check.
+/// Configured caution (e.g. 60s) and critical (e.g. 40s) intervals are properly respected.
 pub fn calculate_next_interval_seconds(
     quota_percent: Option<f64>,
     cfg: &AutoProfileSwitcherConfig,
@@ -2237,6 +2254,36 @@ pub fn get_status() -> AutoSwitcherStatus {
     }
 }
 
+/// Get high-precision daemon runtime status, including next check countdown and current stage
+pub fn get_daemon_status() -> AutoSwitcherDaemonStatus {
+    let status = get_status();
+    let now = chrono::Utc::now().timestamp();
+    let state = RUNTIME_STATE.lock().unwrap();
+
+    let next_in_secs = (state.next_check_timestamp - now).max(0);
+    AutoSwitcherDaemonStatus {
+        is_daemon_running: state.is_running,
+        last_evaluated_at: state.last_check_timestamp,
+        next_check_timestamp: state.next_check_timestamp,
+        next_check_in_seconds: next_in_secs,
+        check_interval_seconds: state.check_interval_seconds,
+        current_stage: state.current_stage.clone(),
+        active_account_email: status.active_account_email,
+        current_quota_percent: status.current_quota_percent.unwrap_or(100.0),
+        monitored_instance_count: status.monitored_instance_count,
+    }
+}
+
+/// Emit daemon status tick event to frontend
+pub fn emit_daemon_status() {
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        let daemon_status = get_daemon_status();
+        let _ = handle.emit("auto-switcher://status-tick", &daemon_status);
+        let _ = handle.emit("auto-switcher://daemon-status", &daemon_status);
+    }
+}
+
 /// Check active instance health passively without spawning IDE windows or stealing OS window focus
 pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
     let app_config = config::load_app_config()?;
@@ -2303,8 +2350,19 @@ pub fn start_auto_switcher() {
                     Some(a) => Some(a.min(q)),
                     None => Some(q),
                 });
+            let stage = determine_quota_stage(lowest_monitored_quota, &switcher_cfg).to_string();
             let interval_secs =
                 calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg) as u64;
+
+            let now = chrono::Utc::now().timestamp();
+            let next_check_timestamp = now + interval_secs as i64;
+            {
+                let mut state = RUNTIME_STATE.lock().unwrap();
+                state.next_check_timestamp = next_check_timestamp;
+                state.check_interval_seconds = interval_secs as u32;
+                state.current_stage = stage;
+            }
+            emit_daemon_status();
 
             let tick = 30u64;
             let mut elapsed = 0u64;
@@ -2315,6 +2373,7 @@ pub fn start_auto_switcher() {
                 }
                 tokio::time::sleep(Duration::from_secs(sleep_dur)).await;
                 elapsed += sleep_dur;
+                emit_daemon_status();
 
                 let latest_cfg = config::load_app_config()
                     .unwrap_or_default()
@@ -2340,6 +2399,7 @@ pub fn start_auto_switcher() {
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));
             }
+            emit_daemon_status();
         }
     });
 
@@ -2352,7 +2412,7 @@ pub fn start_auto_switcher() {
             let interval = app_config
                 .auto_profile_switcher
                 .watchdog_interval_seconds
-                .max(MIN_GOOGLE_QUOTA_CHECK_SECONDS);
+                .max(60);
             tokio::time::sleep(Duration::from_secs(interval as u64)).await;
 
             if let Err(e) = check_and_recover_crashed_instance().await {
@@ -2427,13 +2487,13 @@ mod tests {
         assert_eq!(calculate_next_interval_seconds(Some(85.0), &cfg), 120);
         assert_eq!(calculate_next_interval_seconds(Some(25.0), &cfg), 120);
         assert_eq!(calculate_next_interval_seconds(Some(19.0), &cfg), 120);
-        assert_eq!(calculate_next_interval_seconds(Some(17.9), &cfg), 120);
-        assert_eq!(calculate_next_interval_seconds(Some(16.0), &cfg), 120);
-        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 120);
-        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 120);
-        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 120);
+        assert_eq!(calculate_next_interval_seconds(Some(17.9), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(16.0), &cfg), 60);
+        assert_eq!(calculate_next_interval_seconds(Some(15.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(Some(5.0), &cfg), 40);
+        assert_eq!(calculate_next_interval_seconds(Some(0.0), &cfg), 40);
         assert_eq!(google_quota_interval_seconds(600), 600);
-        assert_eq!(google_quota_interval_seconds(40), 120);
+        assert_eq!(google_quota_interval_seconds(40), 40);
     }
 
     #[test]
@@ -2828,5 +2888,46 @@ mod tests {
         cooldown_pool.sort_by(|(_, a_last), (_, b_last)| a_last.cmp(b_last));
         assert_eq!(cooldown_pool[0].0.id, "acc-cd2"); // used 40m ago comes before used 10m ago
         assert_eq!(cooldown_pool[1].0.id, "acc-cd1");
+    }
+
+    #[test]
+    fn test_gemini_3_1_pro_low_quota_failover_trigger() {
+        let now_sec = 1790080000;
+        let mut acc = make_test_account(
+            "acc-gemini31",
+            "test@gemini.local",
+            "gemini-3.8-flash",
+            100,
+            "2026-09-22T14:30:00Z",
+        );
+        if let Some(ref mut q) = acc.quota {
+            q.models.push(crate::models::quota::ModelQuota {
+                name: "Gemini 3.1 Pro".to_string(),
+                percentage: 6,
+                reset_time: "2026-09-22T14:30:00Z".to_string(),
+                display_name: None,
+                supports_images: None,
+                supports_thinking: None,
+                thinking_budget: None,
+                recommended: None,
+                max_tokens: None,
+                max_output_tokens: None,
+                supported_mime_types: None,
+            });
+        }
+
+        let status = evaluate_account_period_status(&acc, "gemini-3.8-flash", 15.0, now_sec);
+        assert!(status.is_some());
+        let stat = status.unwrap();
+        assert_eq!(stat.quota_percent, 6.0);
+        assert!(stat.is_low_quota);
+        assert!(stat.below_threshold);
+    }
+
+    #[test]
+    fn test_daemon_status_telemetry() {
+        let status = get_daemon_status();
+        assert_eq!(status.check_interval_seconds, 120);
+        assert_eq!(status.current_stage, "normal");
     }
 }

@@ -1,0 +1,36 @@
+[
+  {
+    "taskCode": "Task-01",
+    "title": "Subtask 1: Backend Auto-Switcher Threshold Fix, Daemon Timer Telemetry & 5s Prompt Restoration",
+    "assignedAgentRole": "Worker 01",
+    "description": "Fix 3.1/3.0 model bans in auto_switcher.rs, evaluate lowest active model against threshold, add daemon next-check timestamp and telemetry, implement asynchronous 5-second post-launch prompt restoration, and create isolated #[ignore] e2e test.",
+    "ownedFiles": [
+      "src-tauri/src/modules/auto_switcher.rs",
+      "src-tauri/src/modules/instance.rs",
+      "src-tauri/src/commands/instance.rs",
+      "src-tauri/src/models/config.rs",
+      "src-tauri/tests/auto_switcher_e2e_test.rs"
+    ]
+  },
+  {
+    "taskCode": "Task-02",
+    "title": "Subtask 2: Frontend Instance Cards Recent Projects, Double-Click Deep Link, Card Sizing & Daemon Countdown",
+    "assignedAgentRole": "Worker 02",
+    "description": "Display up to 3 recent/running projects on instance cards with turn counts, double-click to open PromptTreeViewModal focused on project, add card density toggle, display daemon countdown timer in toolbar and settings, and verify modern progress bar.",
+    "ownedFiles": [
+      "src/pages/Instances.tsx",
+      "src/components/instances/PromptTreeViewModal.tsx",
+      "src/pages/Settings.tsx",
+      "src/components/settings/AutoSwitcherSettings.tsx",
+      "src/services/instanceService.ts",
+      "src/types/config.ts"
+    ]
+  },
+  {
+    "taskCode": "Task-03",
+    "title": "Subtask 3: Pre-flight Verification, Local E2E Execution & GitMap Atomic Commit",
+    "assignedAgentRole": "Lead Orchestrator",
+    "description": "Execute cargo fmt -- --check, npm run build, run isolated local e2e test, and execute atomic GitMap commit and push.",
+    "ownedFiles": []
+  }
+]

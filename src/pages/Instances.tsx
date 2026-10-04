@@ -27,6 +27,7 @@ import {
     X,
     SlidersHorizontal,
     LayoutGrid,
+    Grid3X3,
     List,
     Layers,
     History,
@@ -35,7 +36,14 @@ import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
-import type { InstanceStatus } from '../services/instanceService';
+import { useConfigStore } from '../stores/useConfigStore';
+import {
+    type InstanceStatus,
+    getInstanceCardDensity,
+    setInstanceCardDensity,
+    getAutoSwitcherDaemonStatus,
+    type AutoSwitcherDaemonStatus,
+} from '../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import InstanceTable from '../components/instances/InstanceTable';
@@ -192,22 +200,49 @@ export default function Instances() {
 
     }, []);
 
+    const { config } = useConfigStore();
     const [runningTreeNodes, setRunningTreeNodes] = useState<AgmProjectTreeNode[]>([]);
+    const [projectTreeNodes, setProjectTreeNodes] = useState<AgmProjectTreeNode[]>([]);
+    const [daemonStatus, setDaemonStatus] = useState<AutoSwitcherDaemonStatus | null>(null);
+    const [daemonCountdown, setDaemonCountdown] = useState<number>(0);
 
     const fetchRunningTasks = async () => {
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                 maxWords: 50,
-                onlyRunning: true,
+                onlyRunning: false,
                 force: false,
             });
             if (Array.isArray(data)) {
-                setRunningTreeNodes(data);
+                setProjectTreeNodes(data);
+                const running = data.filter(
+                    (node) => Boolean(node.is_running) || Boolean(node.conversations?.some((c) => c.is_running || c.status === 'RUNNING'))
+                );
+                setRunningTreeNodes(running);
             }
         } catch {
             // Silently ignore background polling error
         }
     };
+
+    const fetchDaemonTelemetry = async () => {
+        try {
+            const status = await getAutoSwitcherDaemonStatus();
+            setDaemonStatus(status);
+            if (status.next_check_in_seconds !== undefined) {
+                setDaemonCountdown(Math.max(0, status.next_check_in_seconds));
+            }
+        } catch {
+            // Silently ignore
+        }
+    };
+
+    useEffect(() => {
+        const ticker = setInterval(() => {
+            setDaemonCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(ticker);
+    }, []);
 
     useEffect(() => {
         if (!isTauri()) return;
@@ -215,10 +250,12 @@ export default function Instances() {
         fetchSwitcherStatus();
         fetchAccounts();
         fetchRunningTasks();
+        fetchDaemonTelemetry();
         const timer = setInterval(() => {
             fetchInstances(true);
             fetchSwitcherStatus();
             fetchRunningTasks();
+            fetchDaemonTelemetry();
         }, 3000);
 
         let unlistenList: (() => void)[] = [];
@@ -230,18 +267,27 @@ export default function Instances() {
                 'prompt://dispatched',
                 'prompt://resumed',
             ];
-            Promise.all(
-                events.map((ev) =>
+            Promise.all([
+                ...events.map((ev) =>
                     listen(ev, async () => {
                         await Promise.all([
                             fetchInstances(true),
                             fetchSwitcherStatus(),
                             fetchAccounts(),
                             fetchRunningTasks(),
+                            fetchDaemonTelemetry(),
                         ]);
                     })
-                )
-            ).then((unsubscribers) => {
+                ),
+                listen<AutoSwitcherDaemonStatus>('auto-switcher://status-tick', (event) => {
+                    if (event.payload) {
+                        setDaemonStatus(event.payload);
+                        if (event.payload.next_check_in_seconds !== undefined) {
+                            setDaemonCountdown(Math.max(0, event.payload.next_check_in_seconds));
+                        }
+                    }
+                }),
+            ]).then((unsubscribers) => {
                 unlistenList = unsubscribers;
             });
         });
@@ -255,11 +301,17 @@ export default function Instances() {
     const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
         return (localStorage.getItem('agm_instance_view_mode') as 'card' | 'list') || 'card';
     });
-    const [promptTreeInstance, setPromptTreeInstance] = useState<{ id: string; name: string } | null>(null);
+    const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>(() => getInstanceCardDensity());
+    const [promptTreeInstance, setPromptTreeInstance] = useState<{ id: string; name: string; projectId?: string } | null>(null);
 
     const handleSetViewMode = (mode: 'card' | 'list') => {
         setViewMode(mode);
         localStorage.setItem('agm_instance_view_mode', mode);
+    };
+
+    const handleSetCardDensity = (density: 'normal' | 'compact') => {
+        setCardDensity(density);
+        setInstanceCardDensity(density);
     };
 
     const filteredInstances = instances.filter((inst) => {
@@ -486,6 +538,20 @@ export default function Instances() {
                             )}
                             <span>Auto-Switch: {switcherStatus?.is_running ? 'ON' : 'OFF'}</span>
                         </button>
+                        {switcherStatus?.is_running && (
+                            <div
+                                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-cyan-300"
+                                title={`Auto-Switcher daemon next check in ${daemonCountdown}s (${daemonStatus?.current_stage || 'Normal'} stage, interval ${daemonStatus?.check_interval_seconds || 60}s)`}
+                            >
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                                </span>
+                                <span className="font-mono text-[11px] whitespace-nowrap">
+                                    ⏱ {daemonCountdown}s Next Check
+                                </span>
+                            </div>
+                        )}
                         <button
                             type="button"
                             onClick={async () => {
@@ -519,6 +585,40 @@ export default function Instances() {
 
                     {/* Segmented Group 3: View Mode & Creation */}
                     <div className="flex items-center gap-2">
+                        {/* Density Switcher Capsule (when viewMode === 'card') */}
+                        {viewMode === 'card' && (
+                            <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetCardDensity('normal')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-[5px] transition-colors cursor-pointer",
+                                        cardDensity === 'normal'
+                                            ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                    )}
+                                    title="Normal Cards"
+                                >
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Normal Cards</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetCardDensity('compact')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-[5px] transition-colors cursor-pointer",
+                                        cardDensity === 'compact'
+                                            ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                    )}
+                                    title="Compact Cards"
+                                >
+                                    <Grid3X3 className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Compact Cards</span>
+                                </button>
+                            </div>
+                        )}
+
                         {/* View Switcher Capsule */}
                         <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                             <button
@@ -782,7 +882,11 @@ export default function Instances() {
                 />
             ) : (
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className={cn(
+                    cardDensity === 'compact'
+                        ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2"
+                        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+                )}>
                     {filteredInstances.map((inst, index) => {
                         const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
                         const seqNumber = originalIndex !== -1 ? originalIndex + 1 : index + 1;
@@ -831,7 +935,10 @@ export default function Instances() {
                                         : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/30"
                                 )}
                             >
-                                <div className="p-3.5 flex flex-col flex-1 justify-between min-w-0">
+                                <div className={cn(
+                                    "flex flex-col flex-1 justify-between min-w-0",
+                                    cardDensity === 'compact' ? "p-2.5" : "p-3.5"
+                                )}>
                                     {/* Card Top */}
                                     <div className="min-w-0">
                                         <div className="flex items-start justify-between gap-2 mb-2.5">
@@ -1119,6 +1226,88 @@ export default function Instances() {
                                                 </div>
                                             ) : null}
                                         </div>
+
+                                        {/* Active / Recent Projects Section */}
+                                        {(() => {
+                                            const instanceProjects = projectTreeNodes.filter((node) => {
+                                                return (
+                                                    node.instance_id === inst.config.id ||
+                                                    node.instance_name === inst.config.name ||
+                                                    (inst.config.is_default && (node.instance_id === 'default' || node.instance_id === '__default__' || !node.instance_id))
+                                                );
+                                            });
+
+                                            const sortedProjects = [...instanceProjects].sort((a, b) => {
+                                                const aRunning = a.is_running || a.conversations?.some((c) => c.is_running || c.status === 'RUNNING');
+                                                const bRunning = b.is_running || b.conversations?.some((c) => c.is_running || c.status === 'RUNNING');
+                                                if (aRunning !== bRunning) return aRunning ? -1 : 1;
+                                                const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
+                                                const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
+                                                if (bLatest !== aLatest) return bLatest - aLatest;
+                                                return a.repo_name.localeCompare(b.repo_name);
+                                            });
+
+                                            const maxP = config?.instance_card_max_projects || 3;
+                                            const displayedProjects = sortedProjects.slice(0, maxP);
+
+                                            return (
+                                                <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/80 border border-gray-200/70 dark:border-[#15334d] text-xs">
+                                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#15334d]/60">
+                                                        <span className="flex items-center gap-1">
+                                                            <Folder className="w-3 h-3 text-blue-500" />
+                                                            <span>Active / Recent Projects</span>
+                                                        </span>
+                                                        <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono bg-gray-200/70 dark:bg-[#15334d] text-slate-600 dark:text-slate-300">
+                                                            {instanceProjects.length}
+                                                        </span>
+                                                    </div>
+
+                                                    {displayedProjects.length > 0 ? (
+                                                        <div className="space-y-1">
+                                                            {displayedProjects.map((proj) => {
+                                                                const isProjRunning = proj.is_running || proj.conversations?.some((c) => c.is_running || c.status === 'RUNNING');
+                                                                const totalTurns = proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
+
+                                                                return (
+                                                                    <div
+                                                                        key={proj.project_id}
+                                                                        onDoubleClick={() => setPromptTreeInstance({
+                                                                            id: inst.config.id,
+                                                                            name: inst.config.name,
+                                                                            projectId: proj.project_id
+                                                                        })}
+                                                                        className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/50 dark:border-[#15334d]/60 transition-colors cursor-pointer group/proj"
+                                                                        title="Double-click to open in Prompt Tree"
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                                                            <Folder className="w-3 h-3 shrink-0 text-slate-400 group-hover/proj:text-blue-500 transition-colors" />
+                                                                            <span className="truncate font-medium text-[11px] text-slate-800 dark:text-slate-200" title={proj.repo_name}>
+                                                                                {proj.repo_name}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 shrink-0">
+                                                                            {isProjRunning && (
+                                                                                <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-400/30 flex items-center gap-0.5">
+                                                                                    <span className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />
+                                                                                    RUNNING
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-gray-100 dark:bg-[#0c2438] border border-gray-200/50 dark:border-[#15334d]">
+                                                                                {totalTurns} turns
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-[10px] text-gray-400 dark:text-slate-500 italic py-1 text-center">
+                                                            No recent projects
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
@@ -1827,6 +2016,7 @@ export default function Instances() {
                 }}
                 instanceId={promptTreeInstance?.id || ''}
                 instanceName={promptTreeInstance?.name || ''}
+                initialSelectedProjectId={promptTreeInstance?.projectId}
             />
 
             {/* Instance Audit Trail & Switch History Modal */}

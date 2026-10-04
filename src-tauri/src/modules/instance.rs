@@ -1856,6 +1856,33 @@ pub fn get_instance_workspace_folders(instance_id: &str, data_dir: &str) -> Vec<
     folders
 }
 
+/// Resolve workspace roots for an instance by its ID
+pub fn get_instance_workspace_paths(instance_id: &str) -> Vec<String> {
+    let registry = load_registry().unwrap_or_default();
+    let data_dir = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .map(|i| i.data_dir.as_str())
+        .unwrap_or("");
+    get_instance_workspace_folders(instance_id, data_dir)
+}
+
+/// Restore and re-inject prompts for a freshly restarted instance
+pub fn restore_and_inject_prompts_for_instance(
+    instance_id: &str,
+    _workspace_roots: &[String],
+) -> Result<usize, String> {
+    let _ =
+        crate::modules::backup_prompts_db::restore_running_prompts(Some(instance_id), false, None);
+    let resent =
+        crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20)
+            .unwrap_or_default();
+    let dispatched = crate::modules::repo_db::dispatch_running_prompts(instance_id).unwrap_or(0);
+    let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
+    Ok(resent.len() + dispatched)
+}
+
 /// Snapshot all currently open or registered workspace project directories for an instance.
 pub fn snapshot_active_workspaces(instance_id: &str) -> Vec<String> {
     let registry = match load_registry() {
@@ -3612,8 +3639,7 @@ pub async fn switch_account_to_instance(
 
     // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
     let backed_up_count =
-        crate::modules::repo_db::requeue_running_conversations_for_instance(&instance.id)
-            .unwrap_or(0);
+        crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
     let _ =
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None);
 
@@ -3704,38 +3730,27 @@ pub async fn switch_account_to_instance(
             .map_err(|e| e.to_string())?;
     }
 
-    let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
-        crate::modules::repo_db::count_backed_up_prompts(&instance.id),
-    );
-    let (resent_len, dispatched) = if needs_reinject {
-        wait_for_instance_prompt_channel(&instance.id);
-        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts(
-            Some(&instance.id),
-            false,
-            None,
-        );
-        let resent =
-            crate::modules::repo_db::resend_running_commands_for_instance(Some(&instance.id), 20)
-                .unwrap_or_default();
-        let dispatched =
-            crate::modules::repo_db::dispatch_running_prompts(&instance.id).unwrap_or(0);
-        let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(&instance.id);
-        (resent.len(), dispatched)
-    } else {
+    let target_inst_id = instance.id.clone();
+    let target_inst_data_dir = instance.data_dir.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         crate::modules::logger::log_info(&format!(
-            "[Instance] No backed-up prompt for '{}'; skipping the prompt-channel wait",
-            instance.id
+            "[PromptRestore] 5s post-launch delay elapsed. Restoring prompts for instance {}",
+            target_inst_id
         ));
-        (0usize, 0usize)
-    };
+        let workspace_roots =
+            crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
+        let _ = crate::modules::instance::restore_and_inject_prompts_for_instance(
+            &target_inst_id,
+            &workspace_roots,
+        );
+    });
 
-    let restored_count = resent_len + dispatched;
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
-        method: "resume_task_json + prompt_channel_restore".to_string(),
-        restored_count,
-        dispatched_count: dispatched,
-        prompt_channel_waited: needs_reinject,
+        method: "resume_task_json + async_5s_prompt_restore".to_string(),
+        restored_count: backed_up_count,
+        dispatched_count: 0,
+        prompt_channel_waited: false,
         success: true,
     };
 

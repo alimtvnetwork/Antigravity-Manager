@@ -105,6 +105,7 @@ function Settings() {
         },
         hidden_menu_items: [],  // Menu display settings: do not hide any menu items by default
         instance_clone_mode: 'full',
+        instance_card_max_projects: 3,
         auto_profile_switcher: {
             is_enabled: true,
             check_interval_seconds: 60,
@@ -224,6 +225,7 @@ function Settings() {
                     keep_count: 40,
                 },
                 training_api_enabled: config.training_api_enabled ?? false,
+                instance_card_max_projects: config.instance_card_max_projects ?? 3,
             });
         }
     }, [config]);
@@ -1144,6 +1146,33 @@ function Settings() {
                                         </option>
                                         <option value="profile">
                                             {t('settings.instance.mode_profile', 'Profile Only (Only User configuration and keybindings)')}
+                                        </option>
+                                    </select>
+                                </div>
+                                {/* Max projects on instance cards */}
+                                <div className="border-t border-gray-200 dark:border-base-200 pt-6 mt-6">
+                                    <h3 className="font-medium text-gray-900 dark:text-base-content mb-1">
+                                        {t('settings.instance.max_projects_title', 'Max Projects on Instance Cards')}
+                                    </h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                        {t('settings.instance.max_projects_desc', 'Set the maximum number of recent or active projects displayed directly on each instance card (1 to 3).')}
+                                    </p>
+                                    <select
+                                        className="w-full px-4 py-3 border border-gray-200 dark:border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-base-content bg-gray-50 dark:bg-base-200 text-sm"
+                                        value={formData.instance_card_max_projects ?? 3}
+                                        onChange={(e) => {
+                                            const count = parseInt(e.target.value, 10) || 3;
+                                            setFormData({ ...formData, instance_card_max_projects: count });
+                                        }}
+                                    >
+                                        <option value={1}>
+                                            1 {t('settings.instance.projects_count_1', 'Project')}
+                                        </option>
+                                        <option value={2}>
+                                            2 {t('settings.instance.projects_count_2', 'Projects')}
+                                        </option>
+                                        <option value={3}>
+                                            3 {t('settings.instance.projects_count_3', 'Projects (Default)')}
                                         </option>
                                     </select>
                                 </div>

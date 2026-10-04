@@ -84,6 +84,7 @@ interface PromptTreeViewModalProps {
     onClose: () => void;
     instanceId: string;
     instanceName: string;
+    initialSelectedProjectId?: string;
 }
 
 type ViewMode = 'preview' | 'raw' | 'edit';
@@ -489,6 +490,7 @@ export default function PromptTreeViewModal({
     onClose,
     instanceId,
     instanceName,
+    initialSelectedProjectId,
 }: PromptTreeViewModalProps) {
     const { instances } = useInstanceStore();
     const [treeData, setTreeData] = useState<AgmProjectTreeNode[]>([]);
@@ -688,6 +690,44 @@ export default function PromptTreeViewModal({
                 return;
             }
 
+            // Direct deep-link focus if initialSelectedProjectId is provided
+            if (initialSelectedProjectId) {
+                const target = data.find((p) => p.project_id === initialSelectedProjectId);
+                if (target) {
+                    setExpandedProjects({ [target.project_id]: true });
+                    setSelectedProject(target);
+                    if (target.conversations && target.conversations.length > 0) {
+                        const runningConv = target.conversations.find((c) => c.is_running === true || c.status === 'RUNNING');
+                        if (runningConv) {
+                            setExpandedConversations({ [runningConv.conversation_id]: true });
+                            selectConversation(runningConv, target, Math.max(runningConv.step_count || 1, 1));
+                            if (isStaleOrEmptyConversation(runningConv)) {
+                                setExpandedStaleGroups({ [target.project_id]: true });
+                            } else {
+                                setExpandedStaleGroups({});
+                            }
+                            return;
+                        }
+                        const sortedConvs = [...target.conversations].sort((a, b) => {
+                            const aTime = new Date(a.last_modified).getTime() || 0;
+                            const bTime = new Date(b.last_modified).getTime() || 0;
+                            return bTime - aTime;
+                        });
+                        const winningConv = sortedConvs[0];
+                        setExpandedConversations({ [winningConv.conversation_id]: true });
+                        selectConversation(winningConv, target, Math.max(winningConv.step_count || 1, 1));
+                        if (isStaleOrEmptyConversation(winningConv)) {
+                            setExpandedStaleGroups({ [target.project_id]: true });
+                        } else {
+                            setExpandedStaleGroups({});
+                        }
+                    } else {
+                        setSelectedConversation(null);
+                    }
+                    return;
+                }
+            }
+
             // Target non-archived projects in prioritized order
             const nonArchived = data.filter((p) => !currentArchivedIds.includes(p.project_id));
             const targetPool = nonArchived.length > 0 ? nonArchived : data;
@@ -786,7 +826,7 @@ export default function PromptTreeViewModal({
                 }
             }
         },
-        [selectConversation]
+        [selectConversation, initialSelectedProjectId]
     );
 
     const loadTree = async (
@@ -882,7 +922,7 @@ export default function PromptTreeViewModal({
             setPinnedProjectIds(latestPinned);
             loadTree(true, false, latestArchived, latestPinned);
         }
-    }, [isOpen, instanceId]);
+    }, [isOpen, instanceId, initialSelectedProjectId]);
 
     // Configurable auto-sync interval timer (minimum 15s floor)
     useEffect(() => {

@@ -160,6 +160,12 @@ pub fn get_auto_switcher_status(
 }
 
 #[tauri::command]
+pub async fn get_auto_switcher_daemon_status(
+) -> Result<crate::modules::auto_switcher::AutoSwitcherDaemonStatus, String> {
+    Ok(crate::modules::auto_switcher::get_daemon_status())
+}
+
+#[tauri::command]
 pub fn update_auto_switcher_config(
     config: crate::models::config::AutoProfileSwitcherConfig,
 ) -> Result<(), String> {
