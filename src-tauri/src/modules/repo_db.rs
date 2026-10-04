@@ -1249,7 +1249,13 @@ pub fn verify_prompts_running() -> usize {
             ) {
                 let ag_count: usize = conn
                     .query_row(
-                        "SELECT COUNT(*) FROM conversation_summaries WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
+                        "SELECT COUNT(*) FROM conversation_summaries 
+                         WHERE not_fully_idle != 0 
+                           AND status LIKE '%RUNNING%' 
+                           AND status NOT LIKE '%IDLE%' 
+                           AND status NOT LIKE '%COMPLETED%' 
+                           AND status NOT LIKE '%FAILED%' 
+                           AND status NOT LIKE '%CANCELLED%'",
                         [],
                         |row| row.get(0),
                     )
@@ -2314,7 +2320,13 @@ pub fn is_any_prompt_actively_running() -> bool {
                 let _ = conn.pragma_update(None, "busy_timeout", 3000);
                 let count: i32 = conn
                     .query_row(
-                        "SELECT COUNT(*) FROM conversation_summaries WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
+                        "SELECT COUNT(*) FROM conversation_summaries 
+                         WHERE not_fully_idle != 0 
+                           AND status LIKE '%RUNNING%' 
+                           AND status NOT LIKE '%IDLE%' 
+                           AND status NOT LIKE '%COMPLETED%' 
+                           AND status NOT LIKE '%FAILED%' 
+                           AND status NOT LIKE '%CANCELLED%'",
                         [],
                         |row| row.get(0),
                     )
@@ -3555,7 +3567,7 @@ fn compute_project_conversation_tree(
         if target_id == "default" || target_id == "__default__" {
             let mut list = Vec::new();
             if let Some(home) = dirs::home_dir() {
-                for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                for sub in &["antigravity", "antigravity-ide"] {
                     let p = home.join(".gemini").join(sub);
                     if p.exists() {
                         list.push((p, "default".to_string()));
@@ -3566,7 +3578,7 @@ fn compute_project_conversation_tree(
         } else {
             let mut list = Vec::new();
             if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(target_id) {
-                for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                for sub in &["antigravity", "antigravity-ide"] {
                     let p = inst_home.join(".gemini").join(sub);
                     if p.exists() {
                         list.push((p, target_id.to_string()));
@@ -3578,7 +3590,7 @@ fn compute_project_conversation_tree(
     } else {
         let mut list = Vec::new();
         if let Some(home) = dirs::home_dir() {
-            for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+            for sub in &["antigravity", "antigravity-ide"] {
                 let p = home.join(".gemini").join(sub);
                 if p.exists() {
                     list.push((p, "default".to_string()));
@@ -3588,7 +3600,7 @@ fn compute_project_conversation_tree(
         for inst in &registry.instances {
             if !inst.is_default && inst.id != "default" {
                 if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(&inst.id) {
-                    for sub in &["antigravity", "antigravity-cli", "antigravity-ide"] {
+                    for sub in &["antigravity", "antigravity-ide"] {
                         let p = inst_home.join(".gemini").join(sub);
                         if p.exists() {
                             list.push((p, inst.id.clone()));
@@ -3662,15 +3674,23 @@ fn compute_project_conversation_tree(
                             if !seen_tree_cids.insert(cid.clone()) {
                                 continue;
                             }
-                            let is_explicit_idle = not_fully_idle == 0
-                                || status.contains("IDLE")
+                            let is_idle_count = not_fully_idle == 0;
+                            let has_idle_status = status.contains("IDLE")
                                 || status.contains("COMPLETED")
                                 || status.contains("FAILED")
                                 || status.contains("CANCELLED");
-                            let is_conv_running = if is_explicit_idle || !is_owning_inst_alive {
+                            let is_explicit_idle = is_idle_count || has_idle_status;
+
+                            let has_active_turns = not_fully_idle > 0;
+                            let has_running_text = status.contains("RUNNING");
+                            let is_active_session = has_active_turns && has_running_text;
+
+                            let is_conv_running = if is_explicit_idle {
                                 false
+                            } else if is_owning_inst_alive && is_active_session {
+                                true
                             } else {
-                                not_fully_idle != 0 && status.contains("RUNNING")
+                                false
                             };
                             let (steps, transcript_prompt) = inspect_conversation_transcript(base, &cid);
                             let effective_prompt = transcript_prompt
@@ -5086,6 +5106,74 @@ mod tests {
         assert_eq!(source_projects, 1);
         assert_eq!(target_projects, 1);
         assert_eq!(target_prompts, 1);
+
+        let cloned_running: i64 = conn
+            .query_row(
+                "SELECT is_running FROM running_projects WHERE instance_id = 'copy-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(cloned_running, 0);
+
+        let cloned_status: String = conn
+            .query_row(
+                "SELECT status FROM active_prompts WHERE instance_id = 'copy-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(cloned_status, "completed");
+    }
+
+    #[test]
+    fn test_worker_scoping_and_idle_supremacy() {
+        // Test key matching logic
+        let default_key = "default:/work/antigravity-manager";
+        let inst_8159_key = "8159:/work/coding-guidelines";
+
+        let target_default = "default";
+        let default_prefix = format!("{}:", target_default);
+
+        // Instance "default" checking "coding-guidelines" -> worker on 8159 should NOT match
+        let matches_default = (target_default == "all"
+            || inst_8159_key.starts_with(&default_prefix)
+            || (target_default == "default" && !inst_8159_key.contains(':')))
+            && inst_8159_key.contains("coding-guidelines");
+        assert!(!matches_default);
+
+        // Instance "8159" checking "antigravity-manager" -> worker on default should NOT match
+        let target_8159 = "8159";
+        let prefix_8159 = format!("{}:", target_8159);
+        let matches_8159 = (target_8159 == "all"
+            || default_key.starts_with(&prefix_8159)
+            || (target_8159 == "default" && !default_key.contains(':')))
+            && default_key.contains("antigravity-manager");
+        assert!(!matches_8159);
+
+        // Instance "8159" checking "coding-guidelines" -> should match
+        let matches_self = (target_8159 == "all"
+            || inst_8159_key.starts_with(&prefix_8159)
+            || (target_8159 == "default" && !inst_8159_key.contains(':')))
+            && inst_8159_key.contains("coding-guidelines");
+        assert!(matches_self);
+
+        // Test idle supremacy logic
+        let not_fully_idle = 0;
+        let status = "CASCADE_RUN_STATUS_RUNNING";
+        let is_explicit_idle = not_fully_idle == 0
+            || status.contains("IDLE")
+            || status.contains("COMPLETED")
+            || status.contains("FAILED")
+            || status.contains("CANCELLED");
+        assert!(is_explicit_idle);
+
+        let is_running = if is_explicit_idle {
+            false
+        } else {
+            not_fully_idle != 0 && status.contains("RUNNING")
+        };
+        assert!(!is_running);
     }
 
     #[test]
