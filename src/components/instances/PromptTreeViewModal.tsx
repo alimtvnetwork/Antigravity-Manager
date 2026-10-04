@@ -19,7 +19,6 @@ import {
     ChevronRight,
     ChevronDown,
     ChevronUp,
-    Sparkles,
     RotateCw,
     RotateCcw,
     ListPlus,
@@ -29,6 +28,7 @@ import {
     Clock,
     Archive,
     ArchiveRestore,
+    ExternalLink,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useInstanceStore } from '../../stores/useInstanceStore';
@@ -38,6 +38,7 @@ import {
     setPromptTreeSyncInterval,
     getArchivedProjectsForInstance,
     setArchivedProjectsForInstance,
+    focusOrLaunchInstance,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
 
@@ -72,13 +73,6 @@ export interface AgmProjectTreeNode {
     conversations: AgmConversationNode[];
 }
 
-export interface PromptTurnNode {
-    turnNumber: number;
-    title: string;
-    text: string;
-    wordCount: number;
-}
-
 interface PromptTreeViewModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -106,36 +100,6 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
     }
     const truncated = words.slice(0, maxWords).join(' ');
     return { displayText: truncated, isTruncated: true, totalWords: words.length };
-}
-
-// Helper to derive prompt turns for Layer 3
-function getPromptTurns(conv: AgmConversationNode): PromptTurnNode[] {
-    const rawText = conv.prompt_preview_200w || '';
-    const wordCount = conv.prompt_word_count || countWords(rawText);
-    const steps = Math.min(Math.max(conv.step_count || 1, 1), 10);
-
-    if (steps > 1) {
-        const turns: PromptTurnNode[] = [];
-        for (let i = 1; i <= steps; i++) {
-            const isLatest = i === steps;
-            turns.push({
-                turnNumber: i,
-                title: isLatest ? `Turn #${i} (Latest)` : `Turn #${i}`,
-                text: isLatest ? rawText : `[Turn #${i}] Checkpoint prompt in conversation ${conv.short_id || conv.conversation_id}`,
-                wordCount: isLatest ? wordCount : Math.max(15, Math.round(wordCount / steps)),
-            });
-        }
-        return turns;
-    }
-
-    return [
-        {
-            turnNumber: 1,
-            title: 'Turn #1',
-            text: rawText || 'No prompt content recorded for this conversation.',
-            wordCount,
-        },
-    ];
 }
 
 // Helper to check if a conversation is stale or empty (immune if actively running)
@@ -207,7 +171,7 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
             nodes.push(
                 <code
                     key={`code-${match.index}`}
-                    className="px-1.5 py-0.5 rounded-[4px] bg-slate-100 dark:bg-[#071a27] text-pink-600 dark:text-pink-400 font-mono text-[11px] border border-slate-200 dark:border-[#15334d]"
+                    className="px-1.5 py-0.5 rounded-[4px] bg-slate-100 dark:bg-[#071a27] text-cyan-700 dark:text-cyan-300 font-mono text-[11px] border border-slate-200 dark:border-cyan-900/40"
                 >
                     {inlineCode}
                 </code>
@@ -401,6 +365,7 @@ function RichMarkdownRenderer({ content }: { content: string }) {
         flushList(i);
 
         if (!trimmed) {
+            elements.push(<div key={`spacer-${i}`} className="h-3 min-h-[0.75rem]" />);
             continue;
         }
 
@@ -465,7 +430,7 @@ function RichMarkdownRenderer({ content }: { content: string }) {
 
         // Standard paragraph
         elements.push(
-            <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-1 leading-relaxed">
+            <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-1 leading-relaxed whitespace-pre-wrap break-words">
                 {parseInlineMarkdown(line)}
             </p>
         );
@@ -524,13 +489,16 @@ export default function PromptTreeViewModal({
     const [isCopiedText, setIsCopiedText] = useState(false);
     const [isCopiedRaw, setIsCopiedRaw] = useState(false);
 
+    const [selectedProjectScope, setSelectedProjectScope] = useState<string>('all');
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isFocusing, setIsFocusing] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+
     const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
-    const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({});
     const [expandedStaleGroups, setExpandedStaleGroups] = useState<Record<string, boolean>>({});
 
     const [selectedProject, setSelectedProject] = useState<AgmProjectTreeNode | null>(null);
     const [selectedConversation, setSelectedConversation] = useState<AgmConversationNode | null>(null);
-    const [selectedTurnNumber, setSelectedTurnNumber] = useState<number>(1);
     const [activePromptText, setActivePromptText] = useState<string>('');
     const [editedPromptText, setEditedPromptText] = useState<string>('');
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -546,8 +514,6 @@ export default function PromptTreeViewModal({
     selectedConversationRef.current = selectedConversation;
     const selectedProjectRef = useRef(selectedProject);
     selectedProjectRef.current = selectedProject;
-    const selectedTurnNumberRef = useRef(selectedTurnNumber);
-    selectedTurnNumberRef.current = selectedTurnNumber;
     const activePromptTextRef = useRef(activePromptText);
     activePromptTextRef.current = activePromptText;
 
@@ -658,26 +624,13 @@ export default function PromptTreeViewModal({
         files: string[];
     } | null>(null);
 
-    // Select conversation and initialize turn #1 / latest
-    const selectConversation = useCallback((conv: AgmConversationNode, project: AgmProjectTreeNode, turnNumber = 1) => {
+    // Select conversation directly (2-tier leaf)
+    const selectConversation = useCallback((conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         setSelectedProject(project);
         setSelectedConversation(conv);
-        setSelectedTurnNumber(turnNumber);
-        const turns = getPromptTurns(conv);
-        const activeTurn = turns.find((t) => t.turnNumber === turnNumber) || turns[turns.length - 1] || turns[0];
-        const text = activeTurn?.text || conv.prompt_preview_200w || '';
+        const text = conv.prompt_preview_200w || '';
         setActivePromptText(text);
         setEditedPromptText(text);
-        setShowAllWords(false);
-    }, []);
-
-    // Select specific prompt turn
-    const selectPromptTurn = useCallback((turn: PromptTurnNode, conv: AgmConversationNode, project: AgmProjectTreeNode) => {
-        setSelectedProject(project);
-        setSelectedConversation(conv);
-        setSelectedTurnNumber(turn.turnNumber);
-        setActivePromptText(turn.text);
-        setEditedPromptText(turn.text);
         setShowAllWords(false);
     }, []);
 
@@ -699,8 +652,7 @@ export default function PromptTreeViewModal({
                     if (target.conversations && target.conversations.length > 0) {
                         const runningConv = target.conversations.find((c) => c.is_running === true || c.status === 'RUNNING');
                         if (runningConv) {
-                            setExpandedConversations({ [runningConv.conversation_id]: true });
-                            selectConversation(runningConv, target, Math.max(runningConv.step_count || 1, 1));
+                            selectConversation(runningConv, target);
                             if (isStaleOrEmptyConversation(runningConv)) {
                                 setExpandedStaleGroups({ [target.project_id]: true });
                             } else {
@@ -714,8 +666,7 @@ export default function PromptTreeViewModal({
                             return bTime - aTime;
                         });
                         const winningConv = sortedConvs[0];
-                        setExpandedConversations({ [winningConv.conversation_id]: true });
-                        selectConversation(winningConv, target, Math.max(winningConv.step_count || 1, 1));
+                        selectConversation(winningConv, target);
                         if (isStaleOrEmptyConversation(winningConv)) {
                             setExpandedStaleGroups({ [target.project_id]: true });
                         } else {
@@ -772,8 +723,7 @@ export default function PromptTreeViewModal({
                 runningCandidates.sort((a, b) => b.timestamp - a.timestamp);
                 const winning = runningCandidates[0];
                 setExpandedProjects({ [winning.proj.project_id]: true });
-                setExpandedConversations({ [winning.conv.conversation_id]: true });
-                selectConversation(winning.conv, winning.proj, Math.max(winning.conv.step_count || 1, 1));
+                selectConversation(winning.conv, winning.proj);
                 if (isStaleOrEmptyConversation(winning.conv)) {
                     setExpandedStaleGroups({ [winning.proj.project_id]: true });
                 } else {
@@ -792,8 +742,7 @@ export default function PromptTreeViewModal({
                 });
                 const winningConv = sortedConvs[0];
                 setExpandedProjects({ [runningProj.project_id]: true });
-                setExpandedConversations({ [winningConv.conversation_id]: true });
-                selectConversation(winningConv, runningProj, Math.max(winningConv.step_count || 1, 1));
+                selectConversation(winningConv, runningProj);
                 if (isStaleOrEmptyConversation(winningConv)) {
                     setExpandedStaleGroups({ [runningProj.project_id]: true });
                 } else {
@@ -813,8 +762,7 @@ export default function PromptTreeViewModal({
                         return bTime - aTime;
                     });
                     const winningConv = sortedConvs[0];
-                    setExpandedConversations({ [winningConv.conversation_id]: true });
-                    selectConversation(winningConv, firstProj, Math.max(winningConv.step_count || 1, 1));
+                    selectConversation(winningConv, firstProj);
                     if (isStaleOrEmptyConversation(winningConv)) {
                         setExpandedStaleGroups({ [firstProj.project_id]: true });
                     } else {
@@ -863,10 +811,9 @@ export default function PromptTreeViewModal({
                 const targetPinned = overridePinnedIds || pinnedProjectIds;
                 performAutoSelection(finalData, targetArchived, targetPinned);
             } else {
-                // Background sync: match existing selected conversation and turn in place
+                // Background sync: match existing selected conversation in place
                 const currentConv = selectedConversationRef.current;
                 const currentProj = selectedProjectRef.current;
-                const currentTurn = selectedTurnNumberRef.current;
                 const currentActiveText = activePromptTextRef.current;
 
                 if (currentConv && currentProj) {
@@ -878,12 +825,7 @@ export default function PromptTreeViewModal({
                         );
                         if (updatedConv) {
                             setSelectedConversation(updatedConv);
-                            const turns = getPromptTurns(updatedConv);
-                            const activeTurn =
-                                turns.find((t) => t.turnNumber === currentTurn) ||
-                                turns[turns.length - 1] ||
-                                turns[0];
-                            const freshText = activeTurn?.text || updatedConv.prompt_preview_200w || '';
+                            const freshText = updatedConv.prompt_preview_200w || '';
                             setActivePromptText(freshText);
                             // Do not clobber user's dirty textarea edits
                             setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
@@ -1123,6 +1065,21 @@ export default function PromptTreeViewModal({
         }
     };
 
+    const handleFocusIde = async () => {
+        try {
+            setIsFocusing(true);
+            const targetId = selectedProject?.instance_id || instanceId || 'default';
+            setActionMsg(`Focusing or launching IDE instance '${targetId}'...`);
+            const wasFocused = await focusOrLaunchInstance(targetId);
+            setActionMsg(wasFocused ? 'Antigravity IDE window focused!' : 'Antigravity IDE launched!');
+            setTimeout(() => setActionMsg(null), 3000);
+        } catch (err: any) {
+            setError(err?.toString() || 'Failed to focus IDE');
+        } finally {
+            setIsFocusing(false);
+        }
+    };
+
     // Extract images and file paths from text
     const extractAssets = (text: string) => {
         const images: string[] = [];
@@ -1185,6 +1142,11 @@ export default function PromptTreeViewModal({
             );
         }
 
+        // 1.5 Project Scope Filter
+        if (selectedProjectScope !== 'all') {
+            list = list.filter((p) => p.project_id === selectedProjectScope);
+        }
+
         // 2. Filter Pills
         if (activeFilter === 'running') {
             list = list.filter((p) => p.is_running || p.conversations.some((c) => c.is_running || c.status === 'RUNNING'));
@@ -1230,7 +1192,7 @@ export default function PromptTreeViewModal({
             activeProjects: activeList,
             archivedProjects: archivedList,
         };
-    }, [treeData, searchQuery, activeFilter, pinnedProjectIds, archivedProjectIds]);
+    }, [treeData, searchQuery, activeFilter, pinnedProjectIds, archivedProjectIds, selectedProjectScope]);
 
     // Sort conversations inside each project: Running at top -> Descending by last_modified
     const sortConversations = useCallback(
@@ -1263,103 +1225,45 @@ export default function PromptTreeViewModal({
 
     const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-        const isConvExpanded = Boolean(expandedConversations[conv.conversation_id]);
-        const promptTurns = getPromptTurns(conv);
         const isRunning = conv.is_running || conv.status === 'RUNNING';
 
         return (
-            <div key={conv.conversation_id} className="space-y-0.5">
-                {/* Conversation Row */}
-                <div
-                    onClick={() => {
-                        selectConversation(conv, project, 1);
-                        setExpandedConversations((prev) => ({
-                            ...prev,
-                            [conv.conversation_id]: !isConvExpanded,
-                        }));
-                    }}
-                    onDoubleClick={() => openInspector(conv, project.repo_path)}
-                    className={cn(
-                        'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
-                        isConvSelected
-                            ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
-                    )}
-                    title="Click to view prompts; double-click for Full inspector"
-                >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        {isConvExpanded ? (
-                            <ChevronDown className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                        ) : (
-                            <ChevronRight className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                        )}
-                        <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-blue-500 opacity-70')} />
-                        <span className="truncate text-[11px]">
-                            {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                            className={cn(
-                                'text-[9px] font-mono px-1 rounded-[3px]',
-                                isConvSelected
-                                    ? 'bg-blue-700/80 text-white'
-                                    : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
-                            )}
-                        >
-                            {conv.step_count || 1} stp
-                        </span>
-                        {isRunning && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                RUNNING
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Layer 3: Prompts Inside Conversation */}
-                {isConvExpanded && (
-                    <div className="ml-5 pl-2 border-l border-slate-200 dark:border-[#15334d]/50 space-y-0.5 py-0.5">
-                        {promptTurns.map((turn) => {
-                            const isTurnSelected =
-                                selectedConversation?.conversation_id === conv.conversation_id &&
-                                selectedTurnNumber === turn.turnNumber;
-
-                            return (
-                                <div
-                                    key={turn.turnNumber}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        selectPromptTurn(turn, conv, project);
-                                    }}
-                                    className={cn(
-                                        'group flex items-center justify-between rounded-[5px] px-2 py-1 text-[11px] cursor-pointer transition-colors',
-                                        isTurnSelected
-                                            ? 'bg-cyan-600 text-white font-semibold shadow-2xs'
-                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]'
-                                    )}
-                                    title={`Click to load ${turn.title} (${turn.wordCount} words)`}
-                                >
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                        <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                                        <span className="truncate">{turn.title}</span>
-                                    </div>
-                                    <span
-                                        className={cn(
-                                            'text-[10px] font-mono shrink-0 px-1 rounded-[3px]',
-                                            isTurnSelected
-                                                ? 'text-cyan-100'
-                                                : 'text-slate-400 dark:text-slate-500'
-                                        )}
-                                    >
-                                        {turn.wordCount}w
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
+            <div
+                key={conv.conversation_id}
+                onClick={() => selectConversation(conv, project)}
+                onDoubleClick={() => openInspector(conv, project.repo_path)}
+                className={cn(
+                    'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
+                    isConvSelected
+                        ? 'bg-blue-600 text-white font-medium shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
                 )}
+                title="Click to view prompt; double-click for Full inspector"
+            >
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-blue-500 opacity-70')} />
+                    <span className="truncate text-[11px]">
+                        {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
+                    </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                        className={cn(
+                            'text-[9px] font-mono px-1 rounded-[3px]',
+                            isConvSelected
+                                ? 'bg-blue-700/80 text-white'
+                                : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
+                        )}
+                    >
+                        {conv.step_count || 1} stp
+                    </span>
+                    {isRunning && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            RUNNING
+                        </span>
+                    )}
+                </div>
             </div>
         );
     };
@@ -1650,10 +1554,29 @@ export default function PromptTreeViewModal({
 
                 {/* Main Split View */}
                 <div className="flex flex-1 overflow-hidden">
-                    {/* Left Panel: 3-Layer Project -> Conversation -> Prompt Tree */}
+                    {/* Left Panel: 2-Tier Project -> Conversation Tree */}
                     <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#15334d] bg-slate-50/50 dark:bg-[#071a27]/60">
-                        {/* Search Input & Filter Pills */}
+                        {/* Search Input & Filter Controls */}
                         <div className="p-3 border-b border-slate-200 dark:border-[#15334d] shrink-0 space-y-2">
+                            {/* Project Scope Dropdown */}
+                            <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c2438] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#15334d]">
+                                <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <select
+                                    value={selectedProjectScope}
+                                    onChange={(e) => setSelectedProjectScope(e.target.value)}
+                                    className="w-full text-xs font-medium bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                                    title="Filter tree by project scope"
+                                >
+                                    <option value="all" className="dark:bg-[#0c2438]">All Projects ({treeData.length})</option>
+                                    {treeData.map((p) => (
+                                        <option key={p.project_id} value={p.project_id} className="dark:bg-[#0c2438]">
+                                            {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Search Input */}
                             <div className="relative">
                                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                                 <input
@@ -1665,35 +1588,60 @@ export default function PromptTreeViewModal({
                                 />
                             </div>
 
-                            {/* Search Filter Pills */}
-                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
-                                {(
-                                    [
-                                        { id: 'all', label: 'All' },
-                                        { id: 'running', label: 'Running' },
-                                        { id: 'latest_conv', label: 'Latest Conv' },
-                                        { id: 'latest_prompt', label: 'Latest Prompt' },
-                                        { id: 'pinned', label: 'Pinned' },
-                                        { id: 'archived', label: `Archived (${archivedCount})` },
-                                    ] as const
-                                ).map((pill) => {
-                                    const isActive = activeFilter === pill.id;
-                                    return (
-                                        <button
-                                            key={pill.id}
-                                            type="button"
-                                            onClick={() => setActiveFilter(pill.id)}
-                                            className={cn(
-                                                "px-2 py-0.5 text-[10px] font-medium rounded-[5px] transition-colors whitespace-nowrap cursor-pointer border",
-                                                isActive
-                                                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold"
-                                                    : "bg-slate-100 dark:bg-[#0c2438] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d]/80"
-                                            )}
-                                        >
-                                            {pill.label}
-                                        </button>
-                                    );
-                                })}
+                            {/* Segmented Pill Capsule for Filters */}
+                            <div className="flex items-center justify-between gap-1 pt-0.5">
+                                <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#15334d] bg-white/80 dark:bg-[#0c2438]/80 backdrop-blur-xs p-0.5 shadow-2xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
+                                        className={cn(
+                                            "px-2.5 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer",
+                                            activeFilter === 'running'
+                                                ? "bg-blue-600 text-white shadow-2xs font-semibold"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        )}
+                                    >
+                                        Running
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveFilter(activeFilter === 'latest_conv' ? 'all' : 'latest_conv')}
+                                        className={cn(
+                                            "px-2.5 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer",
+                                            activeFilter === 'latest_conv'
+                                                ? "bg-blue-600 text-white shadow-2xs font-semibold"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        )}
+                                    >
+                                        Latest
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveFilter(activeFilter === 'pinned' ? 'all' : 'pinned')}
+                                        className={cn(
+                                            "px-2.5 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer",
+                                            activeFilter === 'pinned'
+                                                ? "bg-blue-600 text-white shadow-2xs font-semibold"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        )}
+                                    >
+                                        Pinned
+                                    </button>
+                                </div>
+
+                                {/* Scope / State Dropdown (All vs Archived) */}
+                                <select
+                                    value={activeFilter === 'archived' ? 'archived' : 'all'}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === 'archived') setActiveFilter('archived');
+                                        else setActiveFilter('all');
+                                    }}
+                                    className="text-[10px] font-medium bg-white dark:bg-[#0c2438] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d] rounded-full px-2 py-0.5 focus:outline-none cursor-pointer"
+                                >
+                                    <option value="all" className="dark:bg-[#0c2438]">All ({treeData.length})</option>
+                                    <option value="archived" className="dark:bg-[#0c2438]">Archived ({archivedCount})</option>
+                                </select>
                             </div>
                         </div>
 
@@ -1764,10 +1712,10 @@ export default function PromptTreeViewModal({
                                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
-                                            {selectedConversation.is_running ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                                            {selectedConversation.is_running && (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                    <span>ACTIVE RUNNING</span>
+                                                    <span>RUNNING</span>
                                                     {instancePid ? (
                                                         <span className="font-mono text-[9px] opacity-80">(PID: {instancePid})</span>
                                                     ) : null}
@@ -1775,23 +1723,28 @@ export default function PromptTreeViewModal({
                                                         {formatDuration(elapsedSeconds)}
                                                     </span>
                                                 </span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 rounded-[5px] text-[10px] font-bold border bg-slate-100 text-slate-600 border-slate-200 dark:bg-[#071a27] dark:text-slate-400 dark:border-[#15334d]">
-                                                    QUEUED / IDLE
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            {selectedProject && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
+                                                    <Folder className="w-3 h-3 text-blue-500" />
+                                                    <span>{selectedProject.repo_name}</span>
                                                 </span>
                                             )}
-                                            <span className="rounded-[5px] bg-blue-50 dark:bg-[#071a27] text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-[#15334d] px-2 py-0.5 text-[10px] font-mono">
-                                                Turn #{selectedTurnNumber}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                                            <span>Conv ID: {selectedConversation.conversation_id}</span>
-                                            <span>·</span>
-                                            <span>Modified: {selectedConversation.last_modified}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDetailsModalOpen(true)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                title="View full conversation & project details"
+                                            >
+                                                <FileText className="w-3 h-3 text-slate-400" />
+                                                <span>Details</span>
+                                            </button>
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons: Copy Text, Copy With Images, Save Images, Suffix Dropdown, Resend, Enqueue, Full */}
+                                    {/* Action Buttons: Copy Text, Copy With Images, Save Images, Suffix Dropdown, Focus IDE, Resend, Enqueue, Full */}
                                     <div className="flex flex-wrap items-center gap-1.5">
                                         {/* Copy Text Button (clean text only) */}
                                         <button
@@ -1849,6 +1802,18 @@ export default function PromptTreeViewModal({
                                             <option value="Double check all edge cases">Suffix: Double check all edge cases</option>
                                             <option value="Verify build and tests">Suffix: Verify build and tests</option>
                                         </select>
+
+                                        {/* Focus IDE Button */}
+                                        <button
+                                            type="button"
+                                            onClick={handleFocusIde}
+                                            disabled={isFocusing}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-sky-50 dark:bg-[#0c2438] text-sky-700 dark:text-sky-300 border border-sky-300/60 dark:border-[#15334d] hover:bg-sky-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                            title="Focus Antigravity IDE window or launch instance"
+                                        >
+                                            <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500', isFocusing && 'animate-spin')} />
+                                            <span>Focus IDE</span>
+                                        </button>
 
                                         {/* Resend Button */}
                                         <button
@@ -2089,9 +2054,9 @@ export default function PromptTreeViewModal({
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
                                 <Layers className="h-12 w-12 stroke-1 mb-3 opacity-40" />
-                                <p className="text-sm font-medium">Select a project, conversation, or prompt turn from the left tree</p>
+                                <p className="text-sm font-medium">Select a project or conversation from the left tree</p>
                                 <p className="text-xs mt-1">
-                                    Expand conversation nodes to access specific prompt turns, preview rich Markdown, or resend instructions.
+                                    Click any conversation node to preview prompt content, focus the IDE window, or resend instructions.
                                 </p>
                             </div>
                         )}
@@ -2208,6 +2173,153 @@ export default function PromptTreeViewModal({
                                     <RichMarkdownRenderer content={inspectorPrompt.text} />
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Conversation & Project Details Modal */}
+            {isDetailsModalOpen && (
+                <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl flex flex-col">
+                        {/* Details Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#15334d] px-5 py-3.5 bg-slate-50 dark:bg-[#071a27] shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <FileText className="h-4 w-4 text-blue-500" />
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                    Conversation & Project Details
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsDetailsModalOpen(false)}
+                                className="rounded-[5px] p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                title="Close Details"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Details Modal Body */}
+                        <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh] text-xs">
+                            {/* Conversation Section */}
+                            <div className="space-y-2">
+                                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Conversation Info
+                                </div>
+                                <div className="bg-slate-50 dark:bg-[#071a27] rounded-lg p-3 border border-slate-200/80 dark:border-[#15334d]/80 space-y-2">
+                                    <div>
+                                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Title</span>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                            {selectedConversation?.title || selectedConversation?.short_id || 'Untitled'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Conversation ID</span>
+                                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                                            <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 break-all">
+                                                {selectedConversation?.conversation_id || 'N/A'}
+                                            </span>
+                                            {selectedConversation?.conversation_id && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(selectedConversation.conversation_id);
+                                                        setCopiedField('conv_id');
+                                                        setTimeout(() => setCopiedField(null), 2000);
+                                                    }}
+                                                    className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#15334d] shrink-0 cursor-pointer"
+                                                >
+                                                    {copiedField === 'conv_id' ? 'Copied!' : 'Copy'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Status</span>
+                                            <span className={cn('font-semibold', selectedConversation?.is_running ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-400')}>
+                                                {selectedConversation?.is_running ? 'RUNNING' : 'QUEUED / IDLE'}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Step Count</span>
+                                            <span className="font-mono text-slate-800 dark:text-slate-200">
+                                                {selectedConversation?.step_count || 1}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                                        <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Last Modified</span>
+                                        <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                                            {selectedConversation?.last_modified || 'N/A'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Project Section */}
+                            {selectedProject && (
+                                <div className="space-y-2">
+                                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                        Project & Instance Info
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-[#071a27] rounded-lg p-3 border border-slate-200/80 dark:border-[#15334d]/80 space-y-2">
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Repository Name</span>
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                {selectedProject.repo_name}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Repository Path</span>
+                                            <div className="flex items-center justify-between gap-2 mt-0.5">
+                                                <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 break-all">
+                                                    {selectedProject.repo_path || 'N/A'}
+                                                </span>
+                                                {selectedProject.repo_path && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(selectedProject.repo_path);
+                                                            setCopiedField('repo_path');
+                                                            setTimeout(() => setCopiedField(null), 2000);
+                                                        }}
+                                                        className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#15334d] shrink-0 cursor-pointer"
+                                                    >
+                                                        {copiedField === 'repo_path' ? 'Copied!' : 'Copy'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                                            <div>
+                                                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Instance ID</span>
+                                                <span className="font-mono text-slate-800 dark:text-slate-200">
+                                                    {selectedProject.instance_id || instanceId || 'default'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Project ID</span>
+                                                <span className="font-mono text-slate-800 dark:text-slate-200 truncate block">
+                                                    {selectedProject.project_id}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Details Modal Footer */}
+                        <div className="flex items-center justify-end border-t border-slate-200 dark:border-[#15334d] px-5 py-3 bg-slate-50 dark:bg-[#071a27] shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsDetailsModalOpen(false)}
+                                className="px-4 py-1.5 rounded-[5px] bg-slate-200 dark:bg-[#15334d] text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-[#1c4466] text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>

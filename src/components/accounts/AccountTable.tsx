@@ -64,7 +64,9 @@ import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../ut
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
 import { supabaseService, WorkspaceLease } from '../../services/supabaseService';
-import { formatDateTime } from '../../utils/date';
+import { formatDateTime, formatDateOnly } from '../../utils/date';
+
+const formatDateTimeShort = (val?: number | string | Date | null) => formatDateOnly(val);
 
 // ============================================================================
 // 类型定义
@@ -267,7 +269,7 @@ function SortableAccountRow({
                 isFocused
                     ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                     : isCurrent
-                    ? "bg-slate-900/90 dark:bg-[#091b2c] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-slate-800/90 dark:hover:bg-[#0c2438]"
+                    ? "bg-blue-50/70 dark:bg-[#091b2c] border-l-blue-600 dark:border-l-amber-400 border-blue-200 dark:border-amber-400/40 font-semibold text-blue-900 dark:text-amber-300 shadow-xs ring-1 ring-blue-400/30 dark:ring-amber-400/30 hover:bg-blue-100/60 dark:hover:bg-[#0c2438]"
                     : selected
                     ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
                     : isDragging
@@ -540,7 +542,7 @@ function AccountRowContent({
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-300 dark:text-amber-300 font-bold drop-shadow-xs"
+                            ? "text-blue-900 dark:text-amber-300 font-bold drop-shadow-xs"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-cyan-300"
                         )}
                         title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
@@ -555,7 +557,7 @@ function AccountRowContent({
 
                     <div className="flex items-center gap-1 shrink-0">
                         {isCurrent ? (
-                            <span className="px-1.5 py-0.2 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30 text-[9px] font-bold shadow-xs">
+                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-bold shadow-xs">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         ) : null}
@@ -713,60 +715,66 @@ function AccountRowContent({
                 </div>
             </td>
 
-            {/* 模型配额列 (永久可见，禁止隐藏) */}
+            {/* 4H 模型配额列 */}
             <td className="px-2 py-0.5 align-middle">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
-                        "flex items-center justify-center gap-2 py-1 px-3 rounded-lg border group/error",
+                        "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
                         account.validation_blocked ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20" : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20"
                     )}>
                         <div className={cn(
-                            "flex items-center gap-1.5",
+                            "flex items-center gap-1",
                             account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
                         )}>
-                            {account.validation_blocked ? <Clock className="w-3 h-3" /> : (account.quota?.is_forbidden ? <Lock className="w-3 h-3" /> : <Ban className="w-3 h-3" />)}
+                            {account.validation_blocked ? <Clock className="w-2.5 h-2.5" /> : (account.quota?.is_forbidden ? <Lock className="w-2.5 h-2.5" /> : <Ban className="w-2.5 h-2.5" />)}
                             <span className={cn(
-                                "text-[10px] font-bold",
+                                "text-[9px] font-bold truncate max-w-[80px]",
                                 account.validation_blocked ? "text-amber-700/80 dark:text-amber-400" : "text-red-700/80 dark:text-red-400"
                             )}>
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
                             </span>
                         </div>
                         <div className={cn(
-                            "w-px h-3",
+                            "w-px h-2.5",
                             account.validation_blocked ? "bg-amber-200 dark:bg-amber-800/50" : "bg-red-200 dark:bg-red-800/50"
                         )} />
                         <button
                             onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center shrink-0"
                         >
                             {t('accounts.view_error')}
                         </button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 gap-1.5 py-0">
-                        <QuotaItem
-                            label="4h"
-                            percentage={fourHourModel?.percentage ?? 0}
-                            resetTime={fourHourModel?.resetTime}
-                            isProtected={fourHourModel?.isProtected}
-                            liveLimit={fourHourModel?.liveLimit}
-                            Icon={fourHourModel?.Icon || (modelFilter === 'claude' ? Claude.Color : Gemini.Color)}
-                        />
-                        <QuotaItem
-                            label={t('accounts.table.weekly_quota', 'Weekly')}
-                            percentage={weeklyCell.percentage}
-                            resetTime={weeklyCell.resetTime}
-                            Icon={modelFilter === 'claude' ? Claude.Color : Gemini.Color}
-                        />
-                    </div>
+                    <QuotaItem
+                        label=""
+                        percentage={fourHourModel?.percentage ?? 0}
+                        resetTime={fourHourModel?.resetTime}
+                        isProtected={fourHourModel?.isProtected}
+                        liveLimit={fourHourModel?.liveLimit}
+                        Icon={fourHourModel?.Icon || (modelFilter === 'claude' ? Claude.Color : Gemini.Color)}
+                    />
                 )}
             </td>
 
-            {/* 最后使用时间列 */}
-            <td className="px-2 py-0.5 align-middle whitespace-nowrap">
-                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 font-mono">
-                    {formatDateTime(account.last_used)}
+            {/* Weekly 配额列 */}
+            <td className="px-2 py-0.5 align-middle">
+                {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
+                    <span className="text-[10px] text-gray-400 italic">--</span>
+                ) : (
+                    <QuotaItem
+                        label=""
+                        percentage={weeklyCell.percentage}
+                        resetTime={weeklyCell.resetTime}
+                        Icon={modelFilter === 'claude' ? Claude.Color : Gemini.Color}
+                    />
+                )}
+            </td>
+
+            {/* 最后使用时间列 (紧凑展示，95px) */}
+            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px]">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono" title={formatDateTime(account.last_used)}>
+                    {formatDateTimeShort(account.last_used)}
                 </span>
             </td>
 
@@ -779,7 +787,7 @@ function AccountRowContent({
                     : selected
                     ? "bg-blue-50/90 dark:bg-[#0f273d]"
                     : isCurrent
-                    ? "bg-slate-900/90 dark:bg-[#091b2c]"
+                    ? "bg-blue-50/70 dark:bg-[#091b2c]"
                     : "bg-white dark:bg-[#081826]",
                 !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50/80 dark:group-hover:bg-[#0f273d]/60" : ""
             )}>
@@ -1139,7 +1147,8 @@ function AccountTable({
                                 />
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[320px] whitespace-nowrap">
+                            {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[190px] whitespace-nowrap">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -1148,26 +1157,27 @@ function AccountTable({
                                             "inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase font-medium",
                                             sortConfig.key === 'reset_time' && "text-blue-600 dark:text-blue-400 font-semibold"
                                         )}
-                                        title={t('accounts.table.sort_by_reset_time', '点击按配额重置时间排序')}
+                                        title={t('accounts.table.sort_by_reset_time', 'Sort by reset time')}
                                     >
-                                        <span>4h / {t('accounts.table.weekly_quota', 'Weekly')}</span>
+                                        <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
+                                        <span>4H {t('accounts.table.quota', 'Quota')}</span>
                                         {sortConfig.key === 'reset_time' ? (
-                                            sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
                                         ) : (
-                                            <ArrowUpDown className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-60 hover:opacity-100" />
+                                            <ArrowUpDown className="w-3 h-3 text-gray-400 opacity-60" />
                                         )}
                                     </button>
 
-                                    {/* Gemini / Claude 视图切换药丸按钮 */}
-                                    <div className="inline-flex items-center p-0.5 rounded-md bg-slate-200/80 dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 text-[10px] font-semibold">
+                                    {/* Gemini / Claude Pill Switch */}
+                                    <div className="inline-flex items-center p-0.5 rounded-md bg-slate-200/80 dark:bg-slate-900 border border-slate-300/80 dark:border-slate-800 text-[9px] font-semibold">
                                         <button
                                             type="button"
                                             onClick={() => setModelFilter('gemini')}
                                             className={cn(
-                                                "px-2 py-0.5 rounded-[5px] transition-all cursor-pointer font-medium",
+                                                "px-1.5 py-0.5 rounded-[4px] transition-all cursor-pointer font-medium",
                                                 modelFilter === 'gemini'
-                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-xs"
-                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-2xs"
+                                                    : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Gemini"
                                         >
@@ -1177,10 +1187,10 @@ function AccountTable({
                                             type="button"
                                             onClick={() => setModelFilter('claude')}
                                             className={cn(
-                                                "px-2 py-0.5 rounded-[5px] transition-all cursor-pointer font-medium",
+                                                "px-1.5 py-0.5 rounded-[4px] transition-all cursor-pointer font-medium",
                                                 modelFilter === 'claude'
-                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-xs"
-                                                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                                                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-500/30 dark:border-cyan-400/30 shadow-2xs"
+                                                    : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                                             )}
                                             title="Only show Claude"
                                         >
@@ -1189,7 +1199,17 @@ function AccountTable({
                                     </div>
                                 </div>
                             </th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[150px] whitespace-nowrap">
+
+                            {/* Column 2: Weekly Quota Column */}
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[170px] whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                    <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>
+                                </div>
+                            </th>
+
+                            {/* Column 3: Reclaimed Whitespace for Date Column (Shrink to 95px) */}
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[95px] whitespace-nowrap">
                                 <button
                                     type="button"
                                     onClick={() => handleSortToggle('last_used')}
@@ -1197,13 +1217,13 @@ function AccountTable({
                                         "inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase font-medium",
                                         sortConfig.key === 'last_used' && "text-blue-600 dark:text-blue-400 font-semibold"
                                     )}
-                                    title={t('accounts.table.sort_by_last_used', '点击按最后使用时间排序')}
+                                    title={t('accounts.table.sort_by_last_used', 'Sort by last used')}
                                 >
-                                    <span>{t('accounts.table.last_used')}</span>
+                                    <span>{t('accounts.table.last_used_short', 'Used')}</span>
                                     {sortConfig.key === 'last_used' ? (
-                                        sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                        sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
                                     ) : (
-                                        <ArrowUpDown className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-60 hover:opacity-100" />
+                                        <ArrowUpDown className="w-3 h-3 text-gray-400 opacity-60" />
                                     )}
                                 </button>
                             </th>

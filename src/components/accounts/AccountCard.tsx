@@ -183,7 +183,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             isFocused
                 ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
-                ? "bg-slate-900/90 dark:bg-[#091b2c] border-l-amber-400 dark:border-l-amber-400 border-amber-400/50 dark:border-amber-400/40 font-semibold text-amber-300 dark:text-amber-300 shadow-sm ring-1 ring-amber-400/30 hover:bg-slate-800/90 dark:hover:bg-[#0c2438]"
+                ? "bg-blue-50/70 dark:bg-[#091b2c] border-l-blue-600 dark:border-l-amber-400 border-blue-200 dark:border-amber-400/40 font-semibold text-blue-900 dark:text-amber-300 shadow-xs ring-1 ring-blue-400/30 dark:ring-amber-400/30 hover:bg-blue-100/60 dark:hover:bg-[#0c2438]"
                 : selected
                 ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
                 : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
@@ -205,7 +205,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         isFocused || selected
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
-                            ? "text-amber-300 dark:text-amber-300 font-bold"
+                            ? "text-blue-900 dark:text-amber-300 font-bold"
                             : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {account.email}
@@ -213,7 +213,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                     <div className="flex items-center justify-between w-full gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {isCurrent && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30 text-[9px] font-bold shadow-xs">
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-bold shadow-xs">
                                     {t('accounts.current').toUpperCase()}
                                 </span>
                             )}

@@ -55,6 +55,12 @@ export default function ThemeManager() {
             root.style.setProperty('--primary', palette.primary);
             root.style.setProperty('--fg', palette.fg);
 
+            // Additional semantic mappings for components
+            root.style.setProperty('--app-bg', palette.bg);
+            root.style.setProperty('--app-surface', palette.surface);
+            root.style.setProperty('--app-primary', palette.primary);
+            root.style.setProperty('--app-border', isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)');
+
             // Set Tauri window background color
             // Skip on Linux due to crash with transparent windows + softbuffer
             try {

@@ -92,6 +92,11 @@ pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError
 }
 
 #[tauri::command]
+pub fn focus_or_launch_instance(instance_id: String) -> Result<bool, crate::error::AppError> {
+    instance::focus_or_launch_instance(&instance_id)
+}
+
+#[tauri::command]
 pub fn clone_instance_executable(instance_id: String) -> Result<String, crate::error::AppError> {
     instance::clone_instance_executable(&instance_id)
 }
@@ -128,8 +133,10 @@ pub fn set_default_instance(instance_id: String) -> Result<(), String> {
 pub async fn switch_account_to_instance(
     account_id: String,
     instance_id: Option<String>,
-) -> Result<(), String> {
-    instance::switch_account_to_instance(&account_id, instance_id.as_deref()).await
+) -> Result<(), crate::error::AppError> {
+    instance::switch_account_to_instance(&account_id, instance_id.as_deref())
+        .await
+        .map_err(crate::error::AppError::Process)
 }
 
 #[tauri::command]

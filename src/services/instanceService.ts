@@ -198,11 +198,28 @@ export async function launchInstance(instanceId: string): Promise<void> {
     try {
         return await invoke('launch_instance', { instanceId });
     } catch (e: any) {
-        useErrorStore.getState().captureError(e, {
+        const captured = useErrorStore.getState().captureError(e, {
             source: 'instanceService.launchInstance',
             endpoint: 'launch_instance',
             triggerAction: 'launch_instance',
+            context: { instanceId },
         });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
+}
+
+export async function focusOrLaunchInstance(instanceId: string): Promise<boolean> {
+    try {
+        return await invoke('focus_or_launch_instance', { instanceId });
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.focusOrLaunchInstance',
+            endpoint: 'focus_or_launch_instance',
+            triggerAction: 'focus_or_launch_instance',
+            context: { instanceId },
+        });
+        useErrorStore.getState().openErrorModal(captured);
         throw e;
     }
 }
@@ -274,11 +291,13 @@ export async function switchAccountToInstance(accountId: string, instanceId?: st
     try {
         return await invoke('switch_account_to_instance', { accountId, instanceId });
     } catch (e: any) {
-        useErrorStore.getState().captureError(e, {
+        const captured = useErrorStore.getState().captureError(e, {
             source: 'instanceService.switchAccountToInstance',
             endpoint: 'switch_account_to_instance',
             triggerAction: 'switch_account_to_instance',
+            context: { accountId, instanceId },
         });
+        useErrorStore.getState().openErrorModal(captured);
         throw e;
     }
 }

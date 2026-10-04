@@ -81,11 +81,11 @@ const INSTANCE_THEMES = [
         dot: 'bg-emerald-500',
     },
     {
-        name: 'Purple',
-        accentBar: 'from-purple-500 via-fuchsia-500 to-purple-600',
-        badge: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-400/30',
-        emailPill: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60',
-        dot: 'bg-purple-500',
+        name: 'Cyan',
+        accentBar: 'from-cyan-500 via-sky-500 to-blue-500',
+        badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-400/30',
+        emailPill: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/60',
+        dot: 'bg-cyan-500',
     },
     {
         name: 'Amber',
@@ -95,25 +95,25 @@ const INSTANCE_THEMES = [
         dot: 'bg-amber-500',
     },
     {
-        name: 'Cyan',
-        accentBar: 'from-cyan-500 via-sky-500 to-blue-500',
-        badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-400/30',
-        emailPill: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/60',
-        dot: 'bg-cyan-500',
+        name: 'Sky',
+        accentBar: 'from-sky-500 via-blue-500 to-cyan-600',
+        badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-400/30',
+        emailPill: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/60',
+        dot: 'bg-sky-500',
     },
     {
-        name: 'Rose',
-        accentBar: 'from-rose-500 via-pink-500 to-red-500',
-        badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-400/30',
-        emailPill: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
-        dot: 'bg-rose-500',
+        name: 'Teal',
+        accentBar: 'from-teal-500 via-emerald-500 to-teal-600',
+        badge: 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-400/30',
+        emailPill: 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800/60',
+        dot: 'bg-teal-500',
     },
     {
-        name: 'Violet',
-        accentBar: 'from-violet-500 via-purple-500 to-indigo-500',
-        badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-400/30',
-        emailPill: 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60',
-        dot: 'bg-violet-500',
+        name: 'Slate',
+        accentBar: 'from-slate-500 via-gray-500 to-slate-600',
+        badge: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-400/30',
+        emailPill: 'bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800',
+        dot: 'bg-slate-500',
     },
 ];
 
@@ -924,15 +924,24 @@ export default function Instances() {
                             return isInstanceMatch && isNodeRunning;
                         });
 
+                        // Resolve effective executable path for display
+                        const defaultExePath =
+                            (config as any)?.antigravity_ide_executable ||
+                            (config as any)?.antigravity_executable ||
+                            'Antigravity IDE (Default System Path)';
+
+                        const effectiveExePath =
+                            inst.config.executable_path || (inst.config.is_default ? defaultExePath : null);
+
                         return (
                             <div
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "group rounded-xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "group rounded-xl border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
                                         ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
-                                        : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/30"
+                                        : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421]"
                                 )}
                             >
                                 <div className={cn(
@@ -941,8 +950,8 @@ export default function Instances() {
                                 )}>
                                     {/* Card Top */}
                                     <div className="min-w-0">
-                                        <div className="flex items-start justify-between gap-2 mb-2.5">
-                                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                        <div className="flex items-center justify-between gap-2 mb-2.5 h-6 flex-nowrap min-w-0">
+                                            <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-nowrap overflow-hidden">
                                                 <span
                                                     className={cn(
                                                         "w-2.5 h-2.5 rounded-full shrink-0",
@@ -952,22 +961,22 @@ export default function Instances() {
                                                 <span className="px-1.5 py-0.5 rounded-[5px] text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
                                                     #{seqNumber}
                                                 </span>
-                                                <h3 className={cn("font-bold text-xs truncate max-w-[120px]", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
+                                                <h3 className={cn("font-bold text-xs truncate shrink min-w-0", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
                                                 {hasActiveTask && (
                                                     <button
                                                         type="button"
                                                         onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
-                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                                        className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                                         title="Active prompt/task running - Click to open Prompt Tree"
                                                     >
                                                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
-                                                        <span>Prompt Active</span>
+                                                        <span>Prompt</span>
                                                     </button>
                                                 )}
                                                 {inst.config.is_default ? (
-                                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
+                                                    <span className="h-5 px-1.5 rounded-[5px] text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 flex items-center justify-center shrink-0">
                                                         DEFAULT
                                                     </span>
                                                 ) : (
@@ -980,7 +989,7 @@ export default function Instances() {
                                                                 setActionError(e?.toString() || 'Failed to set default profile');
                                                             }
                                                         }}
-                                                        className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-base-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                                        className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#15334d] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
                                                         title="Set as default profile"
                                                     >
                                                         <Star className="w-2.5 h-2.5" />
@@ -1037,17 +1046,21 @@ export default function Instances() {
                                         </div>
 
                                         {/* Bound Account / Email Section: Compact py-1 px-2.5 rounded-md */}
-                                        <div className="py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5">
+                                        <div className={cn(
+                                            "py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5 transition-all duration-200",
+                                            "group-hover:border-amber-400/40 dark:group-hover:border-amber-400/50 dark:group-hover:bg-[#050f18]"
+                                        )}>
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                <Mail className="w-3 h-3 text-gray-400 shrink-0" />
+                                                <Mail className="w-3 h-3 text-gray-400 group-hover:text-amber-400 transition-colors shrink-0" />
                                                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
                                                     Account:
                                                 </span>
                                                 {displayEmail ? (
                                                     <span
                                                         className={cn(
-                                                            "px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs",
-                                                            theme.emailPill
+                                                            "px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors",
+                                                            theme.emailPill,
+                                                            "group-hover:text-amber-600 dark:group-hover:text-amber-300"
                                                         )}
                                                         title={displayEmail}
                                                     >
@@ -1198,27 +1211,25 @@ export default function Instances() {
                                                 </button>
                                             </div>
 
-                                            {/* Custom executable path badge */}
-                                            {inst.config.executable_path ? (
-                                                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/40 dark:border-purple-800/30 text-[10px] group transition-colors">
-                                                    <div className="flex items-center gap-1 min-w-0 flex-1 text-purple-700 dark:text-purple-300" title={inst.config.executable_path}>
-                                                        <Cpu className="w-3 h-3 shrink-0 text-purple-500" />
-                                                        <span className="truncate font-mono" title={inst.config.executable_path}>{truncatePath(inst.config.executable_path)}</span>
+                                            {/* Executable path badge (renders for custom instances AND default instance) */}
+                                            {effectiveExePath ? (
+                                                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-[#15334d] text-[10px] group/exe transition-colors">
+                                                    <div className="flex items-center gap-1 min-w-0 flex-1 text-slate-700 dark:text-slate-300" title={effectiveExePath}>
+                                                        <Cpu className="w-3 h-3 shrink-0 text-cyan-500" />
+                                                        <span className="truncate font-mono" title={effectiveExePath}>{truncatePath(effectiveExePath)}</span>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={async (e) => {
                                                             e.stopPropagation();
-                                                            if (inst.config.executable_path) {
-                                                                try {
-                                                                    await navigator.clipboard.writeText(inst.config.executable_path);
-                                                                    showToast('Executable path copied to clipboard', 'info');
-                                                                } catch {
-                                                                    showToast('Failed to copy executable path', 'error');
-                                                                }
+                                                            try {
+                                                                await navigator.clipboard.writeText(effectiveExePath);
+                                                                showToast('Executable path copied to clipboard', 'info');
+                                                            } catch {
+                                                                showToast('Failed to copy executable path', 'error');
                                                             }
                                                         }}
-                                                        className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-purple-200/60 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 transition-opacity cursor-pointer shrink-0"
+                                                        className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-slate-200 dark:hover:bg-[#15334d] text-slate-500 dark:text-slate-300 transition-opacity cursor-pointer shrink-0"
                                                         title="Copy executable path"
                                                     >
                                                         <Copy className="w-3 h-3" />

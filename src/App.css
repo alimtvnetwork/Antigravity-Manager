@@ -95,12 +95,27 @@ body {
   border: none;
 }
 
-html {
-  background-color: #f5faf9;
+/* Dynamic theme variable binding */
+html,
+body,
+#root {
+  background-color: var(--app-bg, #f5faf9);
+  color: var(--fg, #111827);
 }
 
-html.dark {
-  background-color: #071a27;
+.dark html,
+.dark body,
+.dark #root {
+  background-color: var(--app-bg, #071a27);
+  color: var(--fg, #e5e7eb);
+}
+
+/* Dynamic surface containers */
+.theme-surface {
+  background-color: var(--app-surface, #ffffff);
+}
+.dark .theme-surface {
+  background-color: var(--app-surface, #0e2433);
 }
 
 /* 全局样式 */
@@ -111,7 +126,6 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5faf9;
 }
 
 /* LobeHub UI flex center fallback for @lobehub/icons avatar components */
@@ -123,12 +137,6 @@ body {
 }
 .lobe-flex svg {
   display: block;
-}
-
-/* Dark mode override for body strictly */
-.dark body {
-  background-color: #071a27;
-  /* matches base-300 commonly used */
 }
 
 #root {
@@ -341,20 +349,16 @@ a {
 }
 
 html[class*="palette-"],
-html.palette-midnight,
 html.palette-vscode-dark,
 html.palette-tokyo-night,
 html.palette-one-dark,
 html.palette-github-dark,
-html.palette-monokai,
-html.palette-editorial,
+html.palette-obsidian,
+html.palette-mint-terminal,
 html.palette-green-choice,
 html.palette-green-choice-dark,
 html.palette-clean-wide,
-html.palette-riseup,
-html.palette-dracula,
-html.palette-purple,
-html.palette-obsidian,
+html.palette-cobalt,
 html.palette-vscode-navy-gold {
   background-color: var(--bg);
   color: var(--fg);
@@ -362,35 +366,9 @@ html.palette-vscode-navy-gold {
 
 html[class*="palette-"] .dark\:bg-base-100,
 html[class*="palette-"] .dark\:bg-base-200,
-html.palette-midnight .dark\:bg-base-100,
-html.palette-vscode-dark .dark\:bg-base-100,
-html.palette-tokyo-night .dark\:bg-base-100,
-html.palette-one-dark .dark\:bg-base-100,
-html.palette-github-dark .dark\:bg-base-100,
-html.palette-monokai .dark\:bg-base-100,
-html.palette-editorial .dark\:bg-base-100,
-html.palette-green-choice .dark\:bg-base-100,
-html.palette-green-choice-dark .dark\:bg-base-100,
-html.palette-clean-wide .dark\:bg-base-100,
-html.palette-riseup .dark\:bg-base-100,
-html.palette-dracula .dark\:bg-base-100,
-html.palette-purple .dark\:bg-base-100,
-html.palette-obsidian .dark\:bg-base-100,
-html.palette-vscode-navy-gold .dark\:bg-base-100,
-html.palette-midnight .dark\:bg-base-200,
-html.palette-vscode-dark .dark\:bg-base-200,
-html.palette-tokyo-night .dark\:bg-base-200,
-html.palette-one-dark .dark\:bg-base-200,
-html.palette-github-dark .dark\:bg-base-200,
-html.palette-monokai .dark\:bg-base-200,
-html.palette-editorial .dark\:bg-base-200,
-html.palette-green-choice .dark\:bg-base-200,
-html.palette-green-choice-dark .dark\:bg-base-200,
-html.palette-clean-wide .dark\:bg-base-200,
-html.palette-riseup .dark\:bg-base-200,
-html.palette-dracula .dark\:bg-base-200,
-html.palette-purple .dark\:bg-base-200,
-html.palette-obsidian .dark\:bg-base-200,
-html.palette-vscode-navy-gold .dark\:bg-base-200 {
+html[class*="palette-"] .dark\:bg-\[\#0c2438\],
+html[class*="palette-"] .dark\:bg-\[\#071a27\],
+html[class*="palette-"] .dark\:bg-\[\#0a1e30\],
+html[class*="palette-"] .dark\:bg-\[\#081826\] {
   background-color: var(--surface) !important;
 }
