@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.140.0] - 2026-10-04
+
+### Added
+- **多实例自动轮换低配额精准热切 (Multi-Instance Low-Quota Failover & Candidate Isolation)**: 重构多实例配额监控机制，新增候选账户配额独立评估体系（`calculate_candidate_quota`），杜绝候选账户因历史不相关模型配额耗尽而被误淘汰；强制将候选轮换实例绑定为当前待轮换实例，实现就地平滑热切；在多实例轮换循环中动态维护已分配候选账户集合，杜绝并发竞争下重复分配同一账号。 (Thanks to @aukgit)
+- **后台守护进程启动加速与秒级倒计时遥测 (Daemon Startup Acceleration & Live Telemetry Ticker)**: 将后台自动切换守护进程启动静默期由 60 秒缩短至 3 秒，就绪后即刻对低配额活跃实例执行主动检查；将心跳遥测发射频率提升至 5 秒一次，确保前端 `[⏱ {countdown}s Next Check]` 倒计时与状态遥测绝对平滑同步。 (Thanks to @aukgit)
+- **隔离式本地端到端测试用例扩充 (Isolated Local E2E Test Suite Extension)**: 在 `src-tauri/tests/auto_switcher_e2e_test.rs` 中新增配额周期边界状态与候选隔离测试用例（`test_e2e_candidate_quota_not_disqualified_by_other_depleted_models`、`test_e2e_period_finished_does_not_suppress_low_quota_rotation`），严格添加 `#[ignore]` 属性，保障本地可按需测试而绝不污染 CI/CD 流程。 (Thanks to @aukgit)
+
+### Fixed
+- **低配额周期结束错误跳过轮换修复 (Fix False Skip on Period Finished During Low Quota)**: 彻底消除 `check_and_rotate_with_options` 中因 `is_period_finished`（重置时间已过）导致低配额账户（如 `Gemini 3.1 Pro (High)` 跌至 6%）被误判为“等待重置”并直接 `continue` 跳过轮换的致命缺陷；确保只要账户配额低于配置阈值（`<= threshold_percent`），必定无条件执行轮换。 (Thanks to @aukgit)
+- **全局 5 秒后台异步延迟提示词恢复与通道注入 (Async 5-Second Post-Launch Prompt Restore Across All Routes)**: 在 `integration.rs`（`on_account_switch`）、`auto_switcher.rs`（`execute_profile_rotation_with_context`）与 `instance.rs`（`switch_account_to_instance`）所有账号切换与实例启动路径中，彻底消除导致主线程卡顿的同步阻塞等待；启动独立的 Tokio 异步后台任务，在 IDE 启动后严格延时 5 秒触发 `.antigravity_resume_task.json` 提示词自动恢复、重新分发与通道注入，保障极致运行时性能与无感切换体验。 (Thanks to @aukgit)
+
+---
+
 ## [v4.139.0] - 2026-10-04
 
 ### Added
@@ -423,6 +436,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.140.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.139.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

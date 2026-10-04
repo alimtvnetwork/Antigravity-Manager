@@ -3744,6 +3744,12 @@ pub async fn switch_account_to_instance(
             &target_inst_id,
             &workspace_roots,
         );
+        let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+            Some(&target_inst_id),
+            false,
+            None,
+        );
+        let _ = crate::modules::repo_db::dispatch_running_prompts(&target_inst_id);
     });
 
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {

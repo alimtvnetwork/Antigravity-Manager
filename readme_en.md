@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.139.0)
+> Professional AI Account Management & Protocol Proxy System (v4.140.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.139.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.140.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.139.0**: Resolved auto-switcher quota threshold evaluation failure by eliminating outdated Gemini 3.0/3.1 model ban filters, ensuring depleted active models (such as Gemini 3.1 Pro at 6%) immediately trigger account failovers before exhaustion; added real-time auto-switcher daemon next-check countdown timer badge (`[⏱ {countdown}s Next Check]`) and stage telemetry across the Instances toolbar and Settings; replaced synchronous blocking freezes during account switches with an asynchronous 5-second post-launch prompt restoration task; added active/recent projects chips on instance cards with double-click deep linking into `PromptTreeViewModal`; added card density sizing options (`Normal Cards` vs `Compact Cards`); and introduced an isolated local end-to-end integration test suite (`#[ignore]`). (Thanks to @aukgit)
+> Latest version **v4.140.0**: Resolved multi-instance auto-switcher failover where accounts with depleted quotas (e.g. Gemini 3.1 Pro at 6%) were skipped when period reset boundaries elapsed; implemented dedicated candidate quota evaluation (`calculate_candidate_quota`) preventing false candidate disqualification from secondary exhausted models; enforced in-place rotation on depleted instances; accelerated daemon startup to 3 seconds and shortened ticker emissions to 5 seconds for smooth real-time countdown synchronization (`[⏱ {countdown}s Next Check]`); unified universal asynchronous 5-second post-launch prompt restoration across all switch routes; and extended the isolated local E2E test suite. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

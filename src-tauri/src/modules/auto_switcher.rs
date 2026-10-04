@@ -244,6 +244,56 @@ pub fn evaluate_hierarchical_quota(account: &Account) -> Option<(String, f64, bo
     None
 }
 
+/// Specifically evaluate quota for a candidate account against target model:
+/// Evaluates candidate's quota for the target model or hierarchical match (0-100%).
+/// Unlike active account monitoring, this does NOT penalize candidate for unrelated exhausted models.
+pub fn calculate_candidate_quota(account: &Account, target_model: &str) -> Option<f64> {
+    let quota_data = account.quota.as_ref()?;
+    let target = target_model.to_lowercase();
+    let is_flash_target = target.contains("flash");
+
+    // 1. Direct target model match (and flash models when target is flash)
+    for m in &quota_data.models {
+        let name_lower = m.name.to_lowercase();
+        let is_direct = name_lower.contains(&target);
+        let is_flash = is_flash_target && name_lower.contains("flash");
+        if is_direct || is_flash {
+            return Some(m.percentage as f64);
+        }
+    }
+
+    // 2. Short-window buckets matching target or 4h/5h
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            for b in &g.buckets {
+                let win = b.window.to_lowercase();
+                let bid = b.bucket_id.to_lowercase();
+                let is_short = win.contains("5h")
+                    || win.contains("4h")
+                    || bid.contains("5h")
+                    || bid.contains("4h");
+                if is_short && (0.0..=1.0).contains(&b.remaining_fraction) {
+                    return Some((b.remaining_fraction * 100.0).round());
+                }
+            }
+        }
+    }
+
+    // 3. Hierarchical match (Gemini Flash -> Claude Sonnet -> other Gemini)
+    if let Some((_, pct, _)) = evaluate_hierarchical_quota(account) {
+        return Some(pct);
+    }
+
+    // 4. Fallback: average percentage across models
+    if !quota_data.models.is_empty() {
+        let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
+        let avg = total as f64 / quota_data.models.len() as f64;
+        return Some(avg);
+    }
+
+    None
+}
+
 /// Parse an ISO 8601 or RFC 3339 reset time string into UNIX timestamp (seconds)
 pub fn parse_reset_time_to_unix(reset_time_str: &str) -> Option<i64> {
     let trimmed = reset_time_str.trim();
@@ -888,17 +938,21 @@ pub fn select_candidate_profiles(
                 continue;
             }
 
-            let period_status =
-                evaluate_account_period_status(&acc, target_model, threshold, now_sec);
-            let is_period_finished = period_status
+            let is_period_finished = acc
+                .quota
                 .as_ref()
-                .map(|s| s.is_period_finished)
+                .and_then(|q| q.models.first())
+                .map(|m| {
+                    parse_reset_time_to_unix(&m.reset_time)
+                        .map(|ts| ts <= now_sec)
+                        .unwrap_or(false)
+                })
                 .unwrap_or(false);
-            let quota = period_status
-                .as_ref()
-                .map(|s| s.quota_percent)
-                .or_else(|| calculate_4h_window_quota(&acc, target_model))
-                .unwrap_or(0.0);
+            let quota = if is_period_finished {
+                100.0
+            } else {
+                calculate_candidate_quota(&acc, target_model).unwrap_or(0.0)
+            };
 
             // Strict 100% 4-Hour Quota Gate:
             // Candidate accounts must have 100% quota, OR their reset period has elapsed (eligible for live refresh).
@@ -906,7 +960,7 @@ pub fn select_candidate_profiles(
                 seen_account_ids.insert(acc.id.clone());
                 let score = score_candidate_account(&acc, target_model, now_sec);
                 let candidate = ProfileCandidate {
-                    instance_id: inst.id.clone(),
+                    instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
@@ -953,26 +1007,28 @@ pub fn select_candidate_profiles(
             }
         }
 
-        let period_status = evaluate_account_period_status(acc, target_model, threshold, now_sec);
-        let is_period_finished = period_status
+        let is_period_finished = acc
+            .quota
             .as_ref()
-            .map(|s| s.is_period_finished)
+            .and_then(|q| q.models.first())
+            .map(|m| {
+                parse_reset_time_to_unix(&m.reset_time)
+                    .map(|ts| ts <= now_sec)
+                    .unwrap_or(false)
+            })
             .unwrap_or(false);
-        let quota = period_status
-            .as_ref()
-            .map(|s| s.quota_percent)
-            .or_else(|| calculate_4h_window_quota(acc, target_model))
-            .unwrap_or(0.0);
+        let quota = if is_period_finished {
+            100.0
+        } else {
+            calculate_candidate_quota(acc, target_model).unwrap_or(0.0)
+        };
 
         // Strict 100% 4-Hour Quota Gate
         if quota >= 100.0 || is_period_finished {
             seen_account_ids.insert(acc.id.clone());
             let score = score_candidate_account(acc, target_model, now_sec);
-            let candidate_inst_id = bound_inst
-                .map(|i| i.id.clone())
-                .unwrap_or_else(|| current_instance_id.to_string());
             let candidate = ProfileCandidate {
-                instance_id: candidate_inst_id,
+                instance_id: current_instance_id.to_string(),
                 account_id: acc.id.clone(),
                 email: acc.email.clone(),
                 quota_percent: quota,
@@ -1021,15 +1077,12 @@ pub fn select_candidate_profiles(
                 }
             }
 
-            let quota = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
+            let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
             if quota > threshold {
                 seen_account_ids.insert(acc.id.clone());
                 let score = quota / 100.0;
-                let candidate_inst_id = bound_inst
-                    .map(|i| i.id.clone())
-                    .unwrap_or_else(|| current_instance_id.to_string());
                 let candidate = ProfileCandidate {
-                    instance_id: candidate_inst_id,
+                    instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
@@ -1187,9 +1240,9 @@ pub async fn select_and_verify_next_best_profile(
             Ok(fresh_q) => {
                 cand_acc.quota = Some(fresh_q);
                 let _ = account::save_account(&cand_acc);
-                let q_val = calculate_4h_window_quota(&cand_acc, target_model).unwrap_or(0.0);
+                let q_val = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_info(&format!(
-                    "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (4-hour window)",
+                    "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (candidate quota)",
                     candidate.email, q_val
                 ));
                 q_val
@@ -1531,46 +1584,52 @@ pub async fn execute_profile_rotation_with_context(
         .await;
     });
 
-    // Step 3: Retry only prompts the switch left backed_up. Do not restore the backup again.
-    tokio::time::sleep(std::time::Duration::from_secs(7)).await;
-    let resent_count = match crate::modules::repo_db::resend_running_commands_for_instance(
-        if inst_id == "default" {
-            None
-        } else {
-            Some(inst_id)
-        },
-        20,
-    ) {
-        Ok(resent) => {
-            logger::log_info(&format!(
-                "[AutoSwitcher] Post-switch re-injected {} backed-up running prompts across workspaces",
+    // Step 3: Asynchronous 5-second post-launch prompt re-injection and status notification
+    let target_inst_id_clone = inst_id.clone();
+    let proj_names_clone = proj_names.clone();
+    let backed_up_count_val = backed_up_count;
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let resent_count = match crate::modules::repo_db::resend_running_commands_for_instance(
+            if target_inst_id_clone == "default" {
+                None
+            } else {
+                Some(&target_inst_id_clone)
+            },
+            20,
+        ) {
+            Ok(resent) => {
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Post-switch re-injected {} backed-up running prompts across workspaces",
+                    resent.len()
+                ));
                 resent.len()
-            ));
-            resent.len()
-        }
-        Err(e) => {
-            logger::log_warn(&format!(
-                "[AutoSwitcher] Failed to resend backed-up running commands after switch: {}",
-                e
-            ));
-            0
-        }
-    };
+            }
+            Err(e) => {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Failed to resend backed-up running commands after switch: {}",
+                    e
+                ));
+                0
+            }
+        };
 
-    let dispatched_count = crate::modules::repo_db::dispatch_running_prompts(inst_id).unwrap_or(0);
-    let verified_running = crate::modules::repo_db::verify_prompts_running();
-    logger::log_info(&format!(
-        "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched, {} verified active running for instance '{}'",
-        resent_count, dispatched_count, verified_running, inst_id
-    ));
+        let dispatched_count =
+            crate::modules::repo_db::dispatch_running_prompts(&target_inst_id_clone).unwrap_or(0);
+        let verified_running = crate::modules::repo_db::verify_prompts_running();
+        logger::log_info(&format!(
+            "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched, {} verified active running for instance '{}'",
+            resent_count, dispatched_count, verified_running, target_inst_id_clone
+        ));
 
-    crate::modules::notification_hub::notify_post_switch_prompt_status(
-        inst_id,
-        backed_up_count,
-        resent_count + dispatched_count,
-        verified_running,
-        proj_names,
-    );
+        crate::modules::notification_hub::notify_post_switch_prompt_status(
+            &target_inst_id_clone,
+            backed_up_count_val,
+            resent_count + dispatched_count,
+            verified_running,
+            proj_names_clone,
+        );
+    });
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();
@@ -1651,7 +1710,7 @@ pub async fn check_and_rotate_with_options(
         return Ok(None);
     }
 
-    let in_use_account_ids = get_active_in_use_account_ids();
+    let mut in_use_account_ids = get_active_in_use_account_ids();
     let now = chrono::Utc::now().timestamp();
     {
         let mut state = RUNTIME_STATE.lock().unwrap();
@@ -1820,6 +1879,8 @@ pub async fn check_and_rotate_with_options(
                     credit_before_switch: Some(quota_percent),
                     threshold_activated: Some(switcher_cfg.critical_threshold_percent),
                 };
+                let rotated_acc_id = candidate.account_id.clone();
+                let rotated_email = candidate.email.clone();
                 execute_profile_rotation_with_context(
                     candidate,
                     reason.clone(),
@@ -1827,26 +1888,23 @@ pub async fn check_and_rotate_with_options(
                     Some(rot_ctx),
                 )
                 .await?;
+                in_use_account_ids.push(rotated_acc_id);
+                in_use_account_ids.push(rotated_email);
                 rotated_reasons.push(reason);
                 continue;
             }
         }
 
         // 2. Standard low-quota or depleted before finish check
-        if is_period_finished {
+        let is_low_quota = quota_percent <= effective_low_threshold || below_threshold;
+        let should_rotate = is_depleted_before_finish || is_low_quota;
+
+        if !should_rotate && is_period_finished {
             logger::log_info(&format!(
-                "[AutoSwitcher] Instance '{}' quota period finished (reset time reached). Ready for quota reset.",
-                inst.id
+                "[AutoSwitcher] Instance '{}' quota period finished (reset time reached). Quota is healthy ({:.1}%).",
+                inst.id, quota_percent
             ));
             continue;
-        }
-
-        let is_low_quota = quota_percent <= effective_low_threshold;
-        let mut should_rotate = false;
-        if is_depleted_before_finish {
-            should_rotate = true;
-        } else if is_low_quota {
-            should_rotate = true;
         }
 
         if should_rotate {
@@ -1932,6 +1990,8 @@ pub async fn check_and_rotate_with_options(
                     credit_before_switch: Some(quota_percent),
                     threshold_activated: Some(effective_low_threshold),
                 };
+                let rotated_acc_id = candidate.account_id.clone();
+                let rotated_email = candidate.email.clone();
                 execute_profile_rotation_with_context(
                     candidate,
                     reason.clone(),
@@ -1939,6 +1999,8 @@ pub async fn check_and_rotate_with_options(
                     Some(rot_ctx),
                 )
                 .await?;
+                in_use_account_ids.push(rotated_acc_id);
+                in_use_account_ids.push(rotated_email);
                 rotated_reasons.push(reason);
             } else {
                 logger::log_warn(&format!(
@@ -2315,10 +2377,15 @@ pub async fn check_and_recover_crashed_instance() -> Result<(), String> {
 pub fn start_auto_switcher() {
     tauri::async_runtime::spawn(async move {
         logger::log_info("[AutoSwitcher] Background daemon initialized.");
+        let now = chrono::Utc::now().timestamp();
         {
             let mut state = RUNTIME_STATE.lock().unwrap();
             state.is_running = true;
+            state.next_check_timestamp = now + 3;
+            state.check_interval_seconds = 120;
+            state.current_stage = "normal".to_string();
         }
+        emit_daemon_status();
 
         let initial_cfg = config::load_app_config()
             .unwrap_or_default()
@@ -2326,8 +2393,8 @@ pub fn start_auto_switcher() {
         let mut last_enabled = initial_cfg.is_enabled;
         let mut last_threshold = initial_cfg.low_quota_threshold_percent;
 
-        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        // Brief 3-second startup stabilization period: evaluate active instances without multi-minute delay
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         if last_enabled {
             if let Err(e) = evaluate_and_execute_startup_rotation().await {
@@ -2337,6 +2404,7 @@ pub fn start_auto_switcher() {
                 ));
             }
         }
+        emit_daemon_status();
 
         loop {
             let app_config = config::load_app_config().unwrap_or_default();
@@ -2364,7 +2432,7 @@ pub fn start_auto_switcher() {
             }
             emit_daemon_status();
 
-            let tick = 30u64;
+            let tick = 5u64;
             let mut elapsed = 0u64;
             while elapsed < interval_secs {
                 let sleep_dur = tick.min(interval_secs.saturating_sub(elapsed));

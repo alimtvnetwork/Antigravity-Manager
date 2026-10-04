@@ -96,6 +96,40 @@ async fn test_e2e_low_quota_detection_triggers_failover() {
 
 #[tokio::test]
 #[ignore = "local-only e2e test, run manually via cargo test --test auto_switcher_e2e_test -- --ignored"]
+async fn test_e2e_candidate_quota_not_disqualified_by_other_depleted_models() {
+    let mut candidate_acc =
+        create_sample_account("acc-cand", "cand@user.local", "gemini-3.8-flash", 100);
+    // Add another model that was exhausted to 0%
+    if let Some(ref mut q) = candidate_acc.quota {
+        q.models.push(ModelQuota {
+            name: "Claude 3.7 Sonnet".to_string(),
+            percentage: 0,
+            reset_time: "2026-10-04T22:00:00Z".to_string(),
+            display_name: None,
+            supports_images: None,
+            supports_thinking: None,
+            thinking_budget: None,
+            recommended: None,
+            max_tokens: None,
+            max_output_tokens: None,
+            supported_mime_types: None,
+        });
+    }
+
+    // Candidate must evaluate to 100% for target model gemini-3.8-flash, not 0%
+    let candidate_quota = antigravity_tools_lib::modules::auto_switcher::calculate_candidate_quota(
+        &candidate_acc,
+        "gemini-3.8-flash",
+    );
+    assert_eq!(
+        candidate_quota,
+        Some(100.0),
+        "Candidate should have 100% quota on target model"
+    );
+}
+
+#[tokio::test]
+#[ignore = "local-only e2e test, run manually via cargo test --test auto_switcher_e2e_test -- --ignored"]
 async fn test_e2e_prompt_backup_snapshotting() {
     let inst_id = "test-e2e-instance";
     let backup_repo_res = antigravity_tools_lib::modules::repo_db::backup_running_prompts(inst_id);
@@ -142,4 +176,24 @@ async fn test_e2e_daemon_status_and_intervals() {
     let daemon_status = get_daemon_status();
     assert!(daemon_status.check_interval_seconds >= 10);
     assert!(!daemon_status.current_stage.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "local-only e2e test, run manually via cargo test --test auto_switcher_e2e_test -- --ignored"]
+async fn test_e2e_period_finished_does_not_suppress_low_quota_rotation() {
+    let now_sec = chrono::Utc::now().timestamp();
+    let mut acc = create_sample_account("acc-active", "active@user.local", "gemini-3.8-flash", 6);
+    // Reset time is in the past (period finished)
+    if let Some(ref mut q) = acc.quota {
+        if let Some(m) = q.models.first_mut() {
+            m.reset_time = "2026-10-04T00:00:00Z".to_string();
+        }
+    }
+
+    let status = evaluate_account_period_status(&acc, "gemini-3.8-flash", 15.0, now_sec);
+    assert!(status.is_some());
+    let stat = status.unwrap();
+    assert!(stat.is_period_finished, "Period must be finished");
+    assert!(stat.is_low_quota, "Must still be detected as low quota");
+    assert!(stat.below_threshold, "below_threshold must still be true");
 }

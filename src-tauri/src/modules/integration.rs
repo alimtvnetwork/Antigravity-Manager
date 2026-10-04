@@ -415,26 +415,34 @@ impl SystemIntegration for DesktopIntegration {
         )?;
 
         // =========================================================================
-        // STEP 5: Re-Inject the Backed-Up Running Prompts
+        // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous 5-Second Post-Launch Restoration)
         // =========================================================================
-        let reinjected = if needs_reinject {
-            crate::modules::instance::wait_for_instance_prompt_channel("default");
-            crate::modules::logger::log_info(
-                "[Desktop] [Step 5/5] Re-injecting backed-up running prompts across workspaces...",
-            );
-            let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-                Some("default"),
-                false,
-                None,
-            );
-            crate::modules::repo_db::dispatch_running_prompts("default").unwrap_or(0) > 0
+        if needs_reinject {
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                crate::modules::logger::log_info(
+                    "[Desktop] [Step 5/5] 5s post-launch delay elapsed. Restoring prompts for instance default",
+                );
+                let workspace_roots =
+                    crate::modules::instance::get_instance_workspace_paths("default");
+                let _ = crate::modules::instance::restore_and_inject_prompts_for_instance(
+                    "default",
+                    &workspace_roots,
+                );
+                let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+                    Some("default"),
+                    false,
+                    None,
+                );
+                let _ = crate::modules::repo_db::dispatch_running_prompts("default");
+            });
+            note_prompt_reinjected(true);
         } else {
             crate::modules::logger::log_info(
-                "[Desktop] [Step 5/5] No backed-up prompt; skipping the prompt-channel wait",
+                "[Desktop] [Step 5/5] No backed-up prompt; skipping prompt restoration",
             );
-            false
-        };
-        note_prompt_reinjected(reinjected);
+            note_prompt_reinjected(false);
+        }
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
         if let Some(ref h) = self.app_handle {

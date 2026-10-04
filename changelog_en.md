@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.140.0 (2026-10-04)**:
+        -   **[Auto-Switcher] Multi-Instance Low-Quota Failover & Candidate Isolation**:
+            -   **Description**: Completely eliminated a critical flaw in `check_and_rotate_with_options` where accounts with depleted quotas (such as `Gemini 3.1 Pro (High)` sitting at 6%) were erroneously skipped with `continue` when their quota reset boundary had passed (`is_period_finished`). Guaranteed that low-quota conditions (`<= threshold_percent`) unconditionally trigger failover rotation regardless of reset timestamps. Isolated candidate account evaluations via dedicated `calculate_candidate_quota` to prevent false disqualifications from unrelated depleted models, locked candidate `instance_id` to the depleted instance for smooth in-place rotation, and dynamically tracked allocated candidate accounts across multi-instance iteration to prevent duplicate bindings. (Thanks to @aukgit)
+        -   **[Prompt Continuity] Universal Async 5-Second Post-Launch Prompt Restoration**:
+            -   **Description**: Eliminated all lingering synchronous blocking waits (`wait_for_instance_prompt_channel`, `sleep(7s)`) across `integration.rs`, `auto_switcher.rs`, and `instance.rs`. Prompt re-injection, backup dispatch, and channel restoration now spawn as a detached Tokio background task executing after an exact 5-second post-launch delay, delivering instant responsiveness without UI or command latency. (Thanks to @aukgit)
+        -   **[Daemon Engine] 3-Second Startup Acceleration & 5-Second Telemetry Ticker**:
+            -   **Description**: Reduced the auto-switcher startup stabilization delay from 60 seconds to 3 seconds, enabling immediate proactive checks for active instances upon application launch. Accelerated daemon status tick events from 30 seconds to 5 seconds for smooth, real-time frontend countdown synchronizations (`[⏱ {countdown}s Next Check]`). (Thanks to @aukgit)
+        -   **[Testing & Quality] Extended Isolated Local End-to-End Test Suite**:
+            -   **Description**: Extended `src-tauri/tests/auto_switcher_e2e_test.rs` with test cases verifying that period-finished boundaries do not suppress low-quota rotations and that candidate accounts with secondary depleted models are not falsely disqualified, strictly protected with `#[ignore]` attributes to run only on demand and never in CI/CD. (Thanks to @aukgit)
+
     *   **v4.139.0 (2026-10-04)**:
         -   **[Auto-Switcher] Quota Threshold Evaluation Fix & Unbanned Models**:
             -   **Description**: Removed outdated hardcoded filters banning models containing `3.0` and `3.1` in `auto_switcher.rs`, restoring `Gemini 3.1 Pro (High)` for quota monitoring and candidate selection. Updated `evaluate_account_period_status` to evaluate the lowest remaining quota bottleneck across all actively consumed models (<100%), immediately triggering account rotation when `Gemini 3.1 Pro` drops to 6%. Lowered Google quota interval floor to 10s so configured caution (60s) and critical (40s) intervals are properly honored. (Thanks to @aukgit)
