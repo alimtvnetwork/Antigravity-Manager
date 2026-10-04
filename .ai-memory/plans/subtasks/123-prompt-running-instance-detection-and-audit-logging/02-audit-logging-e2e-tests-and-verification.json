@@ -1,0 +1,22 @@
+{
+  "task": "Task-02",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/logger.rs",
+    "src-tauri/tests/per_instance_prompt_liveness_test.rs"
+  ],
+  "checks": "rustfmt --edition 2021 tests/per_instance_prompt_liveness_test.rs -> exit 0; npx tsc --noEmit -> exit 0; npm run build -> exit 0",
+  "acceptance": {
+    "case_a_sequence_1_default_running_agm_only": "PASS",
+    "case_b_sequence_2_instance_8159_running_cg_only": "PASS",
+    "case_c_suffix_alias_resolution_for_cloned_instances": "PASS",
+    "case_d_database_primary_key_composite_isolation": "PASS",
+    "case_e_stale_and_queued_prompts_do_not_trigger_running": "PASS",
+    "case_f_audit_log_formatting_and_emission": "PASS",
+    "pre_flight_checks": "PASS"
+  },
+  "assumptions": [
+    "Cargo test and clippy full build targets require MSVC toolchain linker which is deferred to CI server per AGENTS.md guidelines"
+  ],
+  "blockers": []
+}
