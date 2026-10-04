@@ -723,3 +723,450 @@ async fn test_case_4_process_termination_gating_forces_idle() {
     assert!(!probe.is_instance_alive);
     assert_eq!(probe.running_projects_count, 0);
 }
+
+// ----------------------------------------------------------------------------
+// Test Case 5: Suffix Matching for Cloned Instances
+// ----------------------------------------------------------------------------
+#[tokio::test]
+async fn test_e2e_suffix_matching_for_cloned_instances() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    let instances_dir = sandbox.path().join("instances");
+    fs::create_dir_all(&instances_dir).expect("create instances dir");
+
+    let registry_json = serde_json::json!({
+        "active_instance_id": "default",
+        "instances": [
+            {
+                "id": "default",
+                "name": "Default Instance",
+                "data_dir": sandbox.path().join("default_data").to_string_lossy(),
+                "is_default": true,
+                "seq_num": 1,
+                "created_at": 1000,
+                "last_used": 1000
+            },
+            {
+                "id": "default-copy-8159",
+                "name": "Instance 8159",
+                "data_dir": sandbox.path().join("inst_8159_data").to_string_lossy(),
+                "is_default": false,
+                "seq_num": 2,
+                "created_at": 2000,
+                "last_used": 2000
+            }
+        ]
+    });
+    fs::write(
+        instances_dir.join("instances.json"),
+        serde_json::to_string_pretty(&registry_json).unwrap(),
+    )
+    .expect("write instances.json");
+
+    // Suffix resolution tests
+    let res_8159 = antigravity_tools_lib::modules::instance::resolve_instance_id("8159");
+    assert_eq!(res_8159, Ok("default-copy-8159".to_string()));
+
+    let res_hyphen = antigravity_tools_lib::modules::instance::resolve_instance_id("-8159");
+    assert_eq!(res_hyphen, Ok("default-copy-8159".to_string()));
+
+    let res_inst = antigravity_tools_lib::modules::instance::resolve_instance_id("inst-8159");
+    assert_eq!(res_inst, Ok("default-copy-8159".to_string()));
+
+    let res_default = antigravity_tools_lib::modules::instance::resolve_instance_id("default");
+    assert_eq!(res_default, Ok("default".to_string()));
+
+    // Verify get_instance_home_dir targeting "8159" resolves to default-copy-8159/home
+    let home_8159 = antigravity_tools_lib::modules::instance::get_instance_home_dir("8159")
+        .expect("get instance home dir");
+    let home_path_str = home_8159.to_string_lossy().replace('\\', "/");
+    assert!(
+        home_path_str.contains("default-copy-8159/home"),
+        "home dir must target default-copy-8159/home, got: {}",
+        home_path_str
+    );
+
+    // Restore env
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Test Case 6: Strict Instance Scoping for Prompt Queue Dispatch
+// ----------------------------------------------------------------------------
+#[tokio::test]
+async fn test_e2e_prompt_queue_dispatch_strict_instance_scoping() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    let conn = antigravity_tools_lib::modules::repo_db::connect_db().expect("connect repo db");
+    let now = chrono::Utc::now().timestamp();
+
+    // Two prompts for the same repo path, but different instances:
+    // prompt-8159 was created EARLIER (now - 100) than prompt-def (now - 50)
+    conn.execute(
+        "INSERT INTO active_prompts 
+         (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            "prompt-8159",
+            "shared-proj",
+            "default-copy-8159",
+            "d:/work/shared-proj",
+            "Prompt for 8159",
+            "gemini-1.5-pro",
+            "queued",
+            now - 100,
+            now - 100
+        ],
+    )
+    .expect("insert prompt-8159");
+
+    conn.execute(
+        "INSERT INTO active_prompts 
+         (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            "prompt-def",
+            "shared-proj",
+            "default",
+            "d:/work/shared-proj",
+            "Prompt for default",
+            "gemini-1.5-pro",
+            "queued",
+            now - 50,
+            now - 50
+        ],
+    )
+    .expect("insert prompt-def");
+
+    // 1. Dispatching for "default" must NOT steal prompt-8159 despite prompt-8159 having an earlier created_at
+    let def_count = antigravity_tools_lib::modules::repo_db::check_and_dispatch_enqueued_prompts(
+        Some("default"),
+    )
+    .expect("dispatch for default");
+    assert_eq!(def_count, 1, "Default should dispatch its own prompt");
+
+    let status_def: String = conn
+        .query_row(
+            "SELECT status FROM active_prompts WHERE id = 'prompt-def'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("query status def");
+    assert_eq!(status_def, "dispatched");
+
+    let status_8159: String = conn
+        .query_row(
+            "SELECT status FROM active_prompts WHERE id = 'prompt-8159'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("query status 8159");
+    assert_eq!(
+        status_8159, "queued",
+        "prompt-8159 must remain queued and not stolen by default"
+    );
+
+    // 2. Dispatching for "default-copy-8159" should now dispatch prompt-8159
+    let s8159_count = antigravity_tools_lib::modules::repo_db::check_and_dispatch_enqueued_prompts(
+        Some("default-copy-8159"),
+    )
+    .expect("dispatch for 8159");
+    assert_eq!(s8159_count, 1, "8159 should dispatch its queued prompt");
+
+    let status_8159_after: String = conn
+        .query_row(
+            "SELECT status FROM active_prompts WHERE id = 'prompt-8159'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("query status 8159 after");
+    assert_eq!(status_8159_after, "dispatched");
+
+    // Restore env
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Test Case 7: Running Projects Primary Key Namespacing
+// ----------------------------------------------------------------------------
+#[tokio::test]
+async fn test_e2e_running_projects_primary_key_namespacing() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+    let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
+    std::env::set_var("ABV_DATA_DIR", sandbox.path());
+
+    let conn = antigravity_tools_lib::modules::repo_db::connect_db().expect("connect repo db");
+
+    let repo_name = "antigravity-manager";
+    let folder_hash = "abc123hash";
+    let base_id = format!("{}-{}", repo_name, folder_hash);
+
+    let id_default = format!("{}__{}", base_id, "default");
+    let id_8159 = format!("{}__{}", base_id, "default-copy-8159");
+
+    let now = chrono::Utc::now().timestamp();
+
+    // Insert project record for default instance
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id_default,
+            "default",
+            "Antigravity-Manager",
+            "d:/work/Antigravity-Manager",
+            "c:/data/User/workspaceStorage/abc123hash",
+            1,
+            now,
+            now
+        ],
+    )
+    .expect("insert default running project");
+
+    // Insert project record for cloned instance default-copy-8159 with same project name and folder hash
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id_8159,
+            "default-copy-8159",
+            "Antigravity-Manager",
+            "d:/work/Antigravity-Manager",
+            "c:/instances/default-copy-8159/home/User/workspaceStorage/abc123hash",
+            0,
+            now,
+            now
+        ],
+    )
+    .expect("insert 8159 running project");
+
+    // Verify both records coexist without primary key conflict
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM running_projects", [], |r| r.get(0))
+        .expect("count running projects");
+    assert_eq!(
+        count, 2,
+        "Both instances must retain their respective project records with composite primary keys"
+    );
+
+    // Verify each record can be queried by its composite ID
+    let row_def_running: i32 = conn
+        .query_row(
+            "SELECT is_running FROM running_projects WHERE id = ?1",
+            params![id_default],
+            |r| r.get(0),
+        )
+        .expect("query default record");
+    let row_8159_running: i32 = conn
+        .query_row(
+            "SELECT is_running FROM running_projects WHERE id = ?1",
+            params![id_8159],
+            |r| r.get(0),
+        )
+        .expect("query 8159 record");
+
+    assert_eq!(row_def_running, 1);
+    assert_eq!(row_8159_running, 0);
+
+    // Restore env
+    if let Some(prev) = prev_data_dir {
+        std::env::set_var("ABV_DATA_DIR", prev);
+    } else {
+        std::env::remove_var("ABV_DATA_DIR");
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Test Case 8: Dual-Instance Live Workspaces Isolation
+// ----------------------------------------------------------------------------
+#[tokio::test]
+async fn test_e2e_dual_instance_live_workspaces_isolation() {
+    let sandbox = tempdir().expect("create sandbox tempdir");
+
+    // 1. Setup Default instance db
+    let default_db_path = sandbox
+        .path()
+        .join("default")
+        .join("conversation_summaries.db");
+    let conn_default = init_summaries_db(&default_db_path);
+
+    let now_str = chrono::Utc::now().to_rfc3339();
+    let stale_time_str = (chrono::Utc::now() - chrono::Duration::seconds(1800)).to_rfc3339();
+
+    // Default: Antigravity-Manager RUNNING and active; SpecBuilder IDLE (not_fully_idle=0); coding-guidelines IDLE
+    insert_conversation_summary(
+        &conn_default,
+        "conv-agm-live",
+        "AGM Task",
+        "Active session on Default",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/Antigravity-Manager",
+        &now_str,
+    );
+    insert_conversation_summary(
+        &conn_default,
+        "conv-sb-idle",
+        "SpecBuilder Task",
+        "Stale turn on Default",
+        "CASCADE_RUN_STATUS_RUNNING",
+        0,
+        "d:/work/SpecBuilder",
+        &now_str,
+    );
+    insert_conversation_summary(
+        &conn_default,
+        "conv-cg-idle",
+        "CG Task",
+        "Idle on Default",
+        "CASCADE_RUN_STATUS_IDLE",
+        0,
+        "d:/work/coding-guidelines",
+        &stale_time_str,
+    );
+
+    // 2. Setup Cloned instance default-copy-8159 db
+    let inst_8159_db_path = sandbox
+        .path()
+        .join("default-copy-8159")
+        .join("conversation_summaries.db");
+    let conn_8159 = init_summaries_db(&inst_8159_db_path);
+
+    // 8159: coding-guidelines RUNNING and active; Antigravity-Manager cloned dormant artifact (not_fully_idle=0); SpecBuilder IDLE
+    insert_conversation_summary(
+        &conn_8159,
+        "conv-8159-cg-live",
+        "CG Task",
+        "Active session on 8159",
+        "CASCADE_RUN_STATUS_RUNNING",
+        1,
+        "d:/work/coding-guidelines",
+        &now_str,
+    );
+    insert_conversation_summary(
+        &conn_8159,
+        "conv-8159-agm-dormant",
+        "AGM Task",
+        "Cloned historical artifact on 8159",
+        "CASCADE_RUN_STATUS_RUNNING",
+        0,
+        "d:/work/Antigravity-Manager",
+        &now_str,
+    );
+    insert_conversation_summary(
+        &conn_8159,
+        "conv-8159-sb-idle",
+        "SpecBuilder Task",
+        "Idle on 8159",
+        "CASCADE_RUN_STATUS_IDLE",
+        0,
+        "d:/work/SpecBuilder",
+        &stale_time_str,
+    );
+
+    // Evaluate Default conversations
+    let def_convs = evaluate_instance_conversations_from_db(&default_db_path, true);
+    assert_eq!(def_convs.len(), 3);
+    let def_agm = def_convs.iter().find(|c| c.0 == "conv-agm-live").unwrap();
+    let def_sb = def_convs.iter().find(|c| c.0 == "conv-sb-idle").unwrap();
+    let def_cg = def_convs.iter().find(|c| c.0 == "conv-cg-idle").unwrap();
+
+    assert!(def_agm.4, "Default Antigravity-Manager must be running");
+    assert!(
+        !def_sb.4,
+        "Default SpecBuilder must be idle (not_fully_idle = 0)"
+    );
+    assert!(!def_cg.4, "Default coding-guidelines must be idle");
+
+    // Evaluate 8159 conversations
+    let s8159_convs = evaluate_instance_conversations_from_db(&inst_8159_db_path, true);
+    assert_eq!(s8159_convs.len(), 3);
+    let s8159_cg = s8159_convs
+        .iter()
+        .find(|c| c.0 == "conv-8159-cg-live")
+        .unwrap();
+    let s8159_agm = s8159_convs
+        .iter()
+        .find(|c| c.0 == "conv-8159-agm-dormant")
+        .unwrap();
+    let s8159_sb = s8159_convs
+        .iter()
+        .find(|c| c.0 == "conv-8159-sb-idle")
+        .unwrap();
+
+    assert!(s8159_cg.4, "8159 coding-guidelines must be running");
+    assert!(
+        !s8159_agm.4,
+        "8159 Antigravity-Manager must be idle (ZERO BLEED from Default, not_fully_idle = 0)"
+    );
+    assert!(!s8159_sb.4, "8159 SpecBuilder must be idle");
+
+    // Project-level evaluations
+    let (eval_def_agm, _) = evaluate_project_liveness_record(
+        "default",
+        "p-agm-def",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        true,
+        def_agm.4,
+        false,
+    );
+    let (eval_def_cg, _) = evaluate_project_liveness_record(
+        "default",
+        "p-cg-def",
+        "coding-guidelines",
+        "d:/work/coding-guidelines",
+        true,
+        def_cg.4,
+        false,
+    );
+    let (eval_8159_cg, _) = evaluate_project_liveness_record(
+        "default-copy-8159",
+        "p-cg-8159",
+        "coding-guidelines",
+        "d:/work/coding-guidelines",
+        true,
+        s8159_cg.4,
+        false,
+    );
+    let (eval_8159_agm, _) = evaluate_project_liveness_record(
+        "default-copy-8159",
+        "p-agm-8159",
+        "Antigravity-Manager",
+        "d:/work/Antigravity-Manager",
+        true,
+        s8159_agm.4,
+        false,
+    );
+
+    assert!(
+        eval_def_agm.is_running,
+        "Default: Antigravity-Manager must be running"
+    );
+    assert!(
+        !eval_def_cg.is_running,
+        "Default: coding-guidelines must NOT be running"
+    );
+    assert!(
+        eval_8159_cg.is_running,
+        "8159: coding-guidelines must be running"
+    );
+    assert!(
+        !eval_8159_agm.is_running,
+        "8159: Antigravity-Manager must NOT be running"
+    );
+}

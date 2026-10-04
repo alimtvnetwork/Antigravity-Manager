@@ -230,15 +230,29 @@ pub fn log_error(message: &str) {
 /// Emit structured audit log for instance prompt and project liveness evaluation
 pub fn log_instance_prompt_audit(
     instance_id: &str,
+    resolved_name: &str,
     project_name: &str,
     repo_path: &str,
-    is_instance_active: bool,
+    db_path_evaluated: &str,
+    process_pid: Option<u32>,
+    criteria_evaluated: &str,
     is_running: bool,
-    active_tasks: usize,
     rationale: &str,
 ) {
+    let pid_str = process_pid
+        .map(|p| p.to_string())
+        .unwrap_or_else(|| "none".to_string());
+
     info!(
-        "[InstancePromptAudit] instance='{}' project='{}' path='{}' is_instance_active={} is_running={} active_tasks={} rationale='{}'",
-        instance_id, project_name, repo_path, is_instance_active, is_running, active_tasks, rationale
+        "[InstancePromptAudit] instance_id='{}' resolved_name='{}' project='{}' repo_path='{}' db_path='{}' pid={} criteria='{}' is_running={} rationale='{}'",
+        instance_id,
+        resolved_name,
+        project_name,
+        repo_path,
+        db_path_evaluated,
+        pid_str,
+        criteria_evaluated,
+        is_running,
+        rationale
     );
 }

@@ -22,8 +22,9 @@ pub fn get_instances_dir() -> Result<PathBuf, String> {
 
 /// Resolve or create the isolated home directory for an instance
 pub fn get_instance_home_dir(instance_id: &str) -> Result<PathBuf, String> {
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     let instances_root = get_instances_dir()?;
-    let home_dir = instances_root.join(instance_id).join("home");
+    let home_dir = instances_root.join(&resolved_id).join("home");
     if !home_dir.exists() {
         fs::create_dir_all(&home_dir)
             .map_err(|e| format!("Failed to create instance home directory: {}", e))?;
@@ -3912,6 +3913,40 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     {
         return Ok(inst.id.clone());
     }
+
+    // Check suffix matching for IDs like "8159", "-8159", or "inst-8159"
+    let trimmed_suffix = clean
+        .trim_start_matches("ins-")
+        .trim_start_matches("instance-")
+        .trim_start_matches("inst-")
+        .trim_start_matches('-');
+
+    let suffix_matches: Vec<&InstanceConfig> = registry
+        .instances
+        .iter()
+        .filter(|i| {
+            i.id.ends_with(&format!("-{}", clean))
+                || i.name.ends_with(&format!("-{}", clean))
+                || i.id.ends_with(clean)
+                || (!trimmed_suffix.is_empty()
+                    && (i.id.ends_with(&format!("-{}", trimmed_suffix))
+                        || i.name.ends_with(&format!("-{}", trimmed_suffix))
+                        || i.id.ends_with(trimmed_suffix)))
+        })
+        .collect();
+
+    if suffix_matches.len() == 1 {
+        return Ok(suffix_matches[0].id.clone());
+    } else if suffix_matches.len() > 1 {
+        if let Some(hyphen_match) = suffix_matches.iter().find(|i| {
+            i.id.ends_with(&format!("-{}", clean))
+                || (!trimmed_suffix.is_empty() && i.id.ends_with(&format!("-{}", trimmed_suffix)))
+        }) {
+            return Ok(hyphen_match.id.clone());
+        }
+        return Ok(suffix_matches[0].id.clone());
+    }
+
     if clean.is_empty() {
         return Ok(registry.active_instance_id);
     }

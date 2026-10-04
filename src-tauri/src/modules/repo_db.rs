@@ -512,33 +512,38 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                                         .map(|n| n.to_string_lossy().to_string())
                                         .unwrap_or_else(|| "unnamed-project".to_string());
 
-                                    let project_id = format!(
+                                    let base_project_id = format!(
                                         "{}-{}",
                                         repo_name.to_lowercase(),
                                         entry.file_name().to_string_lossy()
                                     );
+                                    let composite_id =
+                                        format!("{}__{}", base_project_id, target_id);
 
                                     let is_project_active = is_instance_active
                                         && is_prompt_running_for_project(&raw_path, target_id);
 
+                                    let pid_opt = pids.first().copied();
                                     crate::modules::logger::log_instance_prompt_audit(
                                         target_id,
+                                        &instance.name,
                                         &repo_name,
                                         &raw_path,
-                                        is_instance_active,
+                                        &ws_folder.to_string_lossy(),
+                                        pid_opt,
+                                        "WorkspaceStorageScan + ProcessLiveness",
                                         is_project_active,
-                                        if is_project_active { 1 } else { 0 },
                                         if is_project_active {
-                                            "Active prompt detected in instance runtime"
+                                            "ACTIVE_IN_FLIGHT_TASKS"
                                         } else if !is_instance_active {
-                                            "Instance OS process is not alive"
+                                            "INSTANCE_PROCESS_DEAD"
                                         } else {
-                                            "No active prompt found; workspace is idle"
+                                            "IDLE_NO_ACTIVE_TASKS"
                                         },
                                     );
 
                                     projects.push(RunningProject {
-                                        id: project_id,
+                                        id: composite_id,
                                         instance_id: target_id.to_string(),
                                         repo_name,
                                         repo_path: raw_path,
@@ -1485,26 +1490,51 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
     let now = Utc::now().timestamp();
-    let norm_inst = if instance_id == "__default__" || instance_id.is_empty() {
-        "default"
-    } else {
-        instance_id
-    };
+    let resolved_inst =
+        crate::modules::instance::resolve_instance_id(instance_id).unwrap_or_else(|_| {
+            if instance_id == "__default__" || instance_id.is_empty() {
+                "default".to_string()
+            } else {
+                instance_id.to_string()
+            }
+        });
+    let norm_inst = resolved_inst.as_str();
 
     // 0. Dynamic process activity check: If no Antigravity process is actively running for this instance, prompt cannot be executing
-    let has_active_process = if norm_inst == "default" {
-        crate::modules::process::is_antigravity_running(None)
+    let (has_active_process, resolved_name, host_pid) = if norm_inst == "default" {
+        let is_running = crate::modules::process::is_antigravity_running(None);
+        let pid = crate::modules::process::get_antigravity_pids()
+            .first()
+            .copied();
+        (is_running, "default".to_string(), pid)
     } else if let Ok(registry) = crate::modules::instance::load_registry() {
-        if let Some(inst) = registry.instances.iter().find(|i| i.id == norm_inst) {
-            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+        if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == norm_inst || i.name == norm_inst)
+        {
+            let is_running =
+                crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+            (is_running, inst.name.clone(), inst.pid)
         } else {
-            false
+            (false, norm_inst.to_string(), None)
         }
     } else {
-        false
+        (false, norm_inst.to_string(), None)
     };
 
     if !has_active_process {
+        crate::modules::logger::log_instance_prompt_audit(
+            norm_inst,
+            &resolved_name,
+            project_id,
+            project_id,
+            "process_table",
+            None,
+            "Gate0:HostProcessLiveness",
+            false,
+            "INSTANCE_PROCESS_DEAD",
+        );
         return false;
     }
 
@@ -1561,13 +1591,15 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                     let is_fresh = p.updated_at >= now - 300;
                     if has_running_status && is_fresh {
                         crate::modules::logger::log_instance_prompt_audit(
-                            instance_id,
+                            norm_inst,
+                            &resolved_name,
                             project_id,
-                            project_id,
+                            &p.repo_path,
+                            "memory_prompts_map",
+                            host_pid,
+                            "Gate1:MemoryPromptsMap",
                             true,
-                            true,
-                            1,
-                            "ACTIVE_PROMPT_DB_RUNNING",
+                            "ACTIVE_PROMPT_MEMORY",
                         );
                         return true;
                     }
@@ -1577,17 +1609,26 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     // 2. Check active workers map strictly scoped by instance_id
-    let expected_prefix = format!("{}:", norm_inst);
+    let clean_target = normalize_path_for_compare(project_id);
 
     if let Ok(mut workers) = get_active_agy_workers().lock() {
         let mut dead_keys = Vec::new();
-        let mut found_running_worker = false;
+        let mut matched_worker: Option<(String, u32)> = None;
+
         for (key, &pid) in workers.iter() {
-            let has_prefix = key.starts_with(&expected_prefix);
-            let is_default_match = norm_inst == "default" && !key.contains(':');
-            let matches_inst = norm_inst == "all" || has_prefix || is_default_match;
-            let matches_proj = key.contains(project_id);
-            if matches_inst && matches_proj {
+            let (worker_inst, worker_path) = match key.split_once(':') {
+                Some((inst, path)) => (inst, path),
+                None => ("", key.as_str()),
+            };
+
+            let is_inst_match = norm_inst == "all"
+                || worker_inst.eq_ignore_ascii_case(norm_inst)
+                || (norm_inst == "default" && worker_inst.is_empty());
+
+            let clean_worker_path = normalize_path_for_compare(worker_path);
+            let is_path_match = !clean_target.is_empty() && clean_worker_path == clean_target;
+
+            if is_inst_match && is_path_match {
                 // Verify OS process liveness for PID
                 let mut sys = sysinfo::System::new();
                 let target_pid = sysinfo::Pid::from_u32(pid);
@@ -1597,7 +1638,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 );
                 let is_alive = sys.process(target_pid).is_some();
                 if is_alive {
-                    found_running_worker = true;
+                    matched_worker = Some((clean_worker_path, pid));
                     break;
                 } else {
                     dead_keys.push(key.clone());
@@ -1607,14 +1648,16 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         for k in dead_keys {
             workers.remove(&k);
         }
-        if found_running_worker {
+        if let Some((clean_worker_path, pid)) = matched_worker {
             crate::modules::logger::log_instance_prompt_audit(
-                instance_id,
+                norm_inst,
+                &resolved_name,
                 project_id,
-                project_id,
+                &clean_worker_path,
+                "active_agy_workers_map",
+                Some(pid),
+                "Gate2:ActiveAgyWorkers",
                 true,
-                true,
-                1,
                 "ACTIVE_WORKER_MATCHED",
             );
             return true;
@@ -1640,12 +1683,14 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         let has_running_prompts = running_count > 0;
         if has_running_prompts {
             crate::modules::logger::log_instance_prompt_audit(
-                instance_id,
+                norm_inst,
+                &resolved_name,
                 project_id,
                 project_id,
+                "active_prompts_table",
+                host_pid,
+                "Gate3:ActivePromptsSQLite",
                 true,
-                true,
-                running_count,
                 "ACTIVE_PROMPT_DB_RUNNING",
             );
             return true;
@@ -1654,7 +1699,6 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
 
     // 4. Check Antigravity live conversation summaries directly for running sessions in this instance
     let candidate_dirs = gemini_dirs_for_instance(norm_inst);
-    let clean_target = normalize_path_for_compare(project_id);
 
     for base_dir in candidate_dirs {
         let summaries_db = base_dir.join("conversation_summaries.db");
@@ -1697,6 +1741,29 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                     for item in rows.flatten() {
                         let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
+                        // 15-Minute TTL: Parse _last_time_str or check turn age. If older than 900 seconds, treat as stale
+                        let is_recent = chrono::DateTime::parse_from_rfc3339(&_last_time_str)
+                            .map(|dt| dt.timestamp() >= now - 900)
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(
+                                    &_last_time_str,
+                                    "%Y-%m-%d %H:%M:%S",
+                                )
+                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                            })
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(
+                                    &_last_time_str,
+                                    "%Y-%m-%dT%H:%M:%S",
+                                )
+                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                            })
+                            .unwrap_or(false);
+
+                        if !is_recent {
+                            continue;
+                        }
+
                         // Strict idle supremacy rule:
                         let is_idle_count = not_fully_idle == 0;
                         let has_idle_status = status.contains("IDLE")
@@ -1705,11 +1772,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             || status.contains("CANCELLED");
                         let is_explicit_idle = is_idle_count || has_idle_status;
 
-                        let is_conv_running = if is_explicit_idle {
-                            false
-                        } else {
-                            not_fully_idle != 0 || status.contains("RUNNING")
-                        };
+                        let is_conv_running =
+                            !is_explicit_idle && not_fully_idle > 0 && status.contains("RUNNING");
 
                         if is_conv_running {
                             if let Some(ws_uris_raw) = ws_uris_opt {
@@ -1719,18 +1783,17 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                     let clean_p =
                                         normalize_path_for_compare(&decode_uri_to_path(&u));
                                     let has_target = !clean_target.is_empty();
-                                    let matches_path = clean_p == clean_target
-                                        || clean_p.contains(&clean_target)
-                                        || clean_target.contains(&clean_p);
-                                    let is_target_matched = has_target && matches_path;
+                                    let is_target_matched = has_target && clean_p == clean_target;
                                     if is_target_matched {
                                         crate::modules::logger::log_instance_prompt_audit(
-                                            instance_id,
+                                            norm_inst,
+                                            &resolved_name,
                                             project_id,
                                             &clean_p,
+                                            &summaries_db.to_string_lossy(),
+                                            host_pid,
+                                            "Gate4:ConversationSummariesLiveTurn",
                                             true,
-                                            true,
-                                            1,
                                             "CONVERSATION_SUMMARY_ACTIVE_TURN",
                                         );
                                         return true;
@@ -1745,13 +1808,15 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     crate::modules::logger::log_instance_prompt_audit(
-        instance_id,
+        norm_inst,
+        &resolved_name,
         project_id,
         project_id,
-        has_active_process,
+        "all_evaluated_databases",
+        host_pid,
+        "Gate0-4:AllEvaluationsCompleted",
         false,
-        0,
-        "IDLE",
+        "IDLE_NO_ACTIVE_TASKS",
     );
 
     false
@@ -1825,10 +1890,12 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             .query_row(
                 "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
                  FROM active_prompts
-                 WHERE (project_id = ?1 OR repo_path = ?2) AND status IN ('backed_up', 'queued', 'pending')
+                 WHERE (project_id = ?1 OR repo_path = ?2)
+                   AND (instance_id = ?3 OR (?3 = 'default' AND (instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
+                   AND status IN ('backed_up', 'queued', 'pending')
                  ORDER BY created_at ASC
                  LIMIT 1",
-                params![&project_id, &repo_path],
+                params![&project_id, &repo_path, &inst_id],
                 |row| {
                     Ok(ActivePrompt {
                         id: row.get(0)?,
@@ -3915,37 +3982,49 @@ fn compute_project_conversation_tree(
             proj.instance_id, proj.repo_name, proj_is_running, rationale
         ));
 
-        let active_tasks_count = conv_nodes.iter().filter(|c| c.is_running).count()
-            + (if has_active_prompt { 1 } else { 0 });
+        let (instance_seq_num, instance_name, bound_email, inst_pid) = if proj.instance_id
+            == "default"
+            || proj.instance_id == "__default__"
+            || proj.instance_id.is_empty()
+        {
+            (
+                Some(1),
+                "default".to_string(),
+                default_email.clone(),
+                crate::modules::process::get_antigravity_pids()
+                    .first()
+                    .copied(),
+            )
+        } else if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
+        {
+            (
+                inst.seq_num,
+                inst.name.clone(),
+                inst.bound_email.clone(),
+                inst.pid,
+            )
+        } else {
+            (None, proj.instance_id.clone(), None, None)
+        };
 
         crate::modules::logger::log_instance_prompt_audit(
             &proj.instance_id,
+            &instance_name,
             &proj.repo_name,
             &proj.repo_path,
-            is_inst_alive,
+            proj.workspace_storage_path.as_deref().unwrap_or("none"),
+            inst_pid,
+            "ProjectConversationTreeLiveness",
             proj_is_running,
-            active_tasks_count,
             &rationale,
         );
 
         if only_running && !proj_is_running && conv_nodes.is_empty() {
             continue;
         }
-
-        let (instance_seq_num, instance_name, bound_email) = if proj.instance_id == "default"
-            || proj.instance_id == "__default__"
-            || proj.instance_id.is_empty()
-        {
-            (Some(1), "default".to_string(), default_email.clone())
-        } else if let Some(inst) = registry
-            .instances
-            .iter()
-            .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
-        {
-            (inst.seq_num, inst.name.clone(), inst.bound_email.clone())
-        } else {
-            (None, proj.instance_id.clone(), None)
-        };
 
         tree_nodes.push(AgmProjectTreeNode {
             seq_id: p_seq,
