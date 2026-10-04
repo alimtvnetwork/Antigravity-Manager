@@ -88,9 +88,12 @@ function getActionLabel(action: InstanceActionType): string {
     }
 }
 
-function isDefaultOwned(nodeInstId: string, cfgId: string): boolean {
+function isDefaultOwned(nodeInstId: string | undefined | null, cfgId: string): boolean {
+    if (!nodeInstId || nodeInstId.trim() === '') {
+        return false;
+    }
     const isDefaultAlias = nodeInstId === 'default' || nodeInstId === '__default__';
-    const isIdMatch = nodeInstId === cfgId;
+    const isIdMatch = Boolean(cfgId) && nodeInstId === cfgId;
     return isDefaultAlias || isIdMatch;
 }
 
@@ -98,6 +101,9 @@ export const isNodeOwnedByInstance = (
     node: AgmProjectTreeNode,
     instConfig: { id: string; is_default?: boolean; seq_num?: number }
 ): boolean => {
+    if (!node.instance_id || node.instance_id.trim() === '') {
+        return false;
+    }
     if (instConfig.is_default) {
         return isDefaultOwned(node.instance_id, instConfig.id);
     }
@@ -2333,4 +2339,3 @@ export default function Instances() {
         </div>
     );
 }
-

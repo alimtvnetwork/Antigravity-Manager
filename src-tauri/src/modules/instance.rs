@@ -588,6 +588,12 @@ fn get_cached_antigravity_processes() -> Vec<CachedProcessInfo> {
             && !exe.contains("antigravity-manager")
             && !name.contains("antigravity_manager")
             && !exe.contains("antigravity_manager")
+            && !name.contains("antigravity manager")
+            && !exe.contains("antigravity manager")
+            && !name.ends_with("manager.exe")
+            && !exe.ends_with("manager.exe")
+            && !name.ends_with("manager")
+            && !exe.ends_with("manager")
             && !name.contains("webview")
             && !exe.contains("webview")
             && !args_str.contains("embedded-browser-webview");
@@ -663,11 +669,13 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
 
         let is_default_candidate = is_default
             && !has_instance_marker
-            && (!has_user_data_arg || args_str.contains(clean_target))
+            && (!has_user_data_arg || (!clean_target.is_empty() && args_str.contains(clean_target)))
             && !is_helper
             && !args_str.contains(".antigravity_tools")
             && !args_str.contains("/instances/")
-            && !args_str.contains("\\instances\\");
+            && !args_str.contains("\\instances\\")
+            && !name.contains("manager")
+            && !exe.contains("manager");
 
         if (has_user_data_arg && has_instance_marker && !is_helper)
             || (matches_cloned_exe && !is_helper)
@@ -687,7 +695,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
                     || name == "antigravity.exe"
                     || name == "antigravity"
             } else {
-                true
+                name == "antigravity.exe" || name == "antigravity"
             };
             if has_ide_markers {
                 default_candidate_pids.push(pid_u32);

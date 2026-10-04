@@ -95,14 +95,11 @@ function countWords(str: string): number {
     return trimmed.split(/\s+/).length;
 }
 
-// Helper to extract concluding tail snippet (10-15 words)
+// Helper to extract concluding tail snippet (10-12 words)
 function getPromptTailSnippet(text: string, fallbackSnippet?: string): string {
-    if (fallbackSnippet && fallbackSnippet.trim()) {
-        return fallbackSnippet.trim();
-    }
-    const trimmed = text.trim();
-    if (!trimmed) return '';
-    const words = trimmed.split(/\s+/).filter(Boolean);
+    const source = text && text.trim() ? text.trim() : fallbackSnippet && fallbackSnippet.trim() ? fallbackSnippet.trim() : '';
+    if (!source) return '';
+    const words = source.split(/\s+/).filter(Boolean);
     if (words.length <= 12) {
         return words.join(' ');
     }
@@ -178,9 +175,13 @@ export function isGhostConversation(conv: AgmConversationNode): boolean {
     const isUntitled =
         !title ||
         title === 'untitled' ||
-        title.startsWith('untitled conversation') ||
+        title.startsWith('untitled') ||
         title === 'new conversation' ||
+        title.startsWith('new conversation') ||
         title === 'conversation' ||
+        title.startsWith('conversation-') ||
+        title.startsWith('chat-') ||
+        title === 'chat' ||
         title === (conv.short_id || '').toLowerCase();
     const isEmptyPrompt =
         conv.prompt_word_count === 0 ||
@@ -209,9 +210,13 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
     const isUntitled =
         !title ||
         title === 'untitled' ||
-        title.startsWith('untitled conversation') ||
+        title.startsWith('untitled') ||
         title === 'new conversation' ||
+        title.startsWith('new conversation') ||
         title === 'conversation' ||
+        title.startsWith('conversation-') ||
+        title.startsWith('chat-') ||
+        title === 'chat' ||
         title === (conv.short_id || '').toLowerCase();
     return isUntitled;
 }
@@ -302,7 +307,7 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
         rawNodes.push(text.substring(lastIndex));
     }
 
-    // Convert \n in text nodes to explicit <br className="my-1" /> elements
+    // Convert \n in text nodes to explicit <br className="my-1.5 block select-none" /> elements
     const nodes: React.ReactNode[] = [];
     rawNodes.forEach((node, nodeIdx) => {
         if (typeof node === 'string') {
@@ -311,7 +316,7 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
                 parts.forEach((part, pIdx) => {
                     if (part) nodes.push(part);
                     if (pIdx < parts.length - 1) {
-                        nodes.push(<br key={`br-${nodeIdx}-${pIdx}`} className="my-1" />);
+                        nodes.push(<br key={`br-${nodeIdx}-${pIdx}`} className="my-1.5 block select-none" />);
                     }
                 });
             } else {
@@ -333,7 +338,7 @@ interface RichMarkdownRendererProps {
 }
 
 // Rich Markdown renderer component
-function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMarkdownRendererProps) {
+function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncated }: RichMarkdownRendererProps) {
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {
@@ -555,8 +560,10 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
 
         // Standard paragraph with explicit <br /> line gap
         const isTrailingEllipsis = trimmed.endsWith('...') || trimmed.endsWith('…');
-        if (isTrailingEllipsis && onToggleExpand) {
-            const cleanLine = line.replace(/(\.{3}|…)\s*$/, '');
+        const isEndOfExpandedText = Boolean(showAllWords && isTruncated && i === lines.length - 1);
+
+        if ((isTrailingEllipsis || isEndOfExpandedText) && onToggleExpand) {
+            const cleanLine = isTrailingEllipsis ? line.replace(/(\.{3}|…)\s*$/, '') : line;
             elements.push(
                 <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words inline">
@@ -567,7 +574,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMar
                             e.stopPropagation();
                             onToggleExpand();
                         }}
-                        title="Click to expand full prompt text"
+                        title={showAllWords ? 'Click to collapse preview to 120 words' : 'Click to expand full prompt text'}
                         className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1.5 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1.5 inline-block select-none"
                     >
                         {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
@@ -1062,7 +1069,7 @@ export default function PromptTreeViewModal({
             })();
             setArchivedProjectIds(latestArchived);
             setPinnedProjectIds(latestPinned);
-            loadTree(true, false, latestArchived, latestPinned);
+            loadTree(true, true, latestArchived, latestPinned);
         }
     }, [isOpen, instanceId, initialSelectedProjectId]);
 
@@ -1160,7 +1167,7 @@ export default function PromptTreeViewModal({
         let conv = selectedConversationRef.current || selectedConversation;
         let proj = selectedProjectRef.current || selectedProject;
 
-        // Fallback: If selectedConversation is null, find most recent non-empty conversation in selectedProject
+        // Fallback 1: If selectedConversation is null, find most recent non-empty conversation in selectedProject
         if (!conv && proj && proj.conversations.length > 0) {
             const candidates = proj.conversations.filter(
                 (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
@@ -1172,14 +1179,37 @@ export default function PromptTreeViewModal({
                     return bTime - aTime;
                 });
                 conv = sorted[0];
+                selectConversation(conv, proj);
             }
         }
 
-        // Fallback: If selectedProject is null but selectedConversation exists, resolve selectedProject from tree nodes
+        // Fallback 2: If selectedProject is null but selectedConversation exists, resolve selectedProject from tree nodes
         if (!proj && conv) {
             for (const p of treeData) {
                 if (p.conversations.some((c) => c.conversation_id === conv?.conversation_id)) {
                     proj = p;
+                    setSelectedProject(p);
+                    break;
+                }
+            }
+        }
+
+        // Fallback 3: If both conv and proj are null, pick newest valid conversation across non-archived projects
+        if (!conv && !proj && treeData.length > 0) {
+            for (const p of treeData) {
+                if (archivedProjectIds.includes(p.project_id)) continue;
+                const candidates = p.conversations.filter(
+                    (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                );
+                if (candidates.length > 0) {
+                    proj = p;
+                    const sorted = [...candidates].sort((a, b) => {
+                        const aTime = new Date(a.last_modified).getTime() || 0;
+                        const bTime = new Date(b.last_modified).getTime() || 0;
+                        return bTime - aTime;
+                    });
+                    conv = sorted[0];
+                    selectConversation(conv, proj);
                     break;
                 }
             }
@@ -1190,7 +1220,9 @@ export default function PromptTreeViewModal({
         try {
             setIsResending(true);
             setActionMsg('Dispatching prompt to running instance...');
-            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '';
+            let promptContent = (!selectedConversation && conv)
+                ? (conv.prompt_preview_200w || '')
+                : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
             if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)') {
                 promptContent = `${promptContent}\n\n${confirmationSuffix}`;
             }
@@ -1250,7 +1282,7 @@ export default function PromptTreeViewModal({
         } finally {
             setIsResending(false);
         }
-    }, [selectedConversation, selectedProject, treeData, editedPromptText, activePromptText, confirmationSuffix, instanceId]);
+    }, [selectedConversation, selectedProject, treeData, archivedProjectIds, editedPromptText, activePromptText, confirmationSuffix, instanceId, selectConversation]);
 
     // Modal-level hotkey listener: 'N' or 'n' key triggers Send Now / Resend prompt
     useEffect(() => {
@@ -1383,6 +1415,7 @@ export default function PromptTreeViewModal({
     const openInspector = (conv: AgmConversationNode, repoPath: string) => {
         const text = activePromptText || conv.prompt_preview_200w || 'No prompt content preview available for this conversation.';
         const { images, files } = extractAssets(text);
+        setShowAllWords(true);
         setInspectorPrompt({
             title: conv.title || conv.short_id,
             text,
@@ -1498,25 +1531,25 @@ export default function PromptTreeViewModal({
     const displayedMarkdown = showAllWords || !isTruncated ? activePromptText : previewDisplayText;
     const activeWordCount = totalWords || countWords(activePromptText);
     const tailSnippet = useMemo(() => {
-        return getPromptTailSnippet(activePromptText, selectedConversation?.prompt_tail_snippet);
-    }, [activePromptText, selectedConversation?.prompt_tail_snippet]);
+        return getPromptTailSnippet(activePromptText, selectedConversation?.prompt_tail_snippet || selectedConversation?.prompt_preview_200w);
+    }, [activePromptText, selectedConversation?.prompt_tail_snippet, selectedConversation?.prompt_preview_200w]);
 
-    const instanceSeqNum = selectedConversation?.instance_seq_num 
-        ?? selectedProject?.instance_seq_num 
+    const instanceSeqNum = selectedConversation?.instance_seq_num
+        ?? selectedProject?.instance_seq_num
         ?? 1;
 
-    const instanceExeName = selectedConversation?.instance_exe_name 
-        ?? selectedProject?.instance_exe_name 
+    const instanceExeName = selectedConversation?.instance_exe_name
+        ?? selectedProject?.instance_exe_name
         ?? 'Antigravity.exe';
 
-    const instanceNameDisplay = selectedConversation?.instance_name 
-        ?? selectedProject?.instance_name 
-        ?? instanceName 
-        ?? 'default';
+    const instanceNameDisplay = selectedConversation?.instance_name
+        ?? selectedProject?.instance_name
+        ?? instanceName
+        ?? 'Default';
 
     const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-        const isRunning = Boolean(conv.is_running);
+        const isRunning = Boolean(conv.is_running) && !isGhostConversation(conv) && !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
 
         return (
             <div
@@ -2033,13 +2066,13 @@ export default function PromptTreeViewModal({
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-[#15334d] shrink-0">
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
                                                 #{selectedConversation.seq_code || 'P001'}
                                             </span>
                                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
-                                            {selectedConversation.is_running && (
+                                            {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
                                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                     <span>RUNNING</span>
@@ -2054,30 +2087,37 @@ export default function PromptTreeViewModal({
                                         </div>
                                         <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1">
                                             {selectedProject && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
                                                     <Folder className="w-3 h-3 text-blue-500" />
                                                     <span>{selectedProject.repo_name}</span>
                                                 </span>
                                             )}
                                             {/* Instance Identity Trio */}
-                                            <span
-                                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shadow-2xs"
-                                                title="Instance Identity Trio: Sequence · Executable · Instance Name"
+                                            <div
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[11px]"
+                                                title={`Instance Sequence #${instanceSeqNum} | Executable: ${instanceExeName} | Profile: ${instanceNameDisplay}`}
                                             >
-                                                [#{instanceSeqNum} · {instanceExeName} · {instanceNameDisplay}]
-                                            </span>
+                                                <span className="font-bold">#{instanceSeqNum}</span>
+                                                <span className="opacity-40">·</span>
+                                                <span className="text-[10.5px]">{instanceExeName}</span>
+                                                <span className="opacity-40">·</span>
+                                                <span className="font-semibold text-purple-800 dark:text-purple-200">{instanceNameDisplay}</span>
+                                            </div>
                                             {tailSnippet && (
-                                                <span
-                                                    className="text-[11px] italic text-slate-500 dark:text-slate-400 truncate max-w-sm sm:max-w-md"
+                                                <div
+                                                    className="hidden md:flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 italic truncate max-w-sm lg:max-w-md"
                                                     title={`Concluding text: ${tailSnippet}`}
                                                 >
-                                                    “… ending with: '{tailSnippet}'”
-                                                </span>
+                                                    <span className="opacity-60">… ending with:</span>
+                                                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
+                                                        '{tailSnippet}'
+                                                    </span>
+                                                </div>
                                             )}
                                             <button
                                                 type="button"
                                                 onClick={() => setIsDetailsModalOpen(true)}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                                 title="View full conversation & project details"
                                             >
                                                 <FileText className="w-3 h-3 text-slate-400" />
@@ -2459,9 +2499,34 @@ export default function PromptTreeViewModal({
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-2">
-                                <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                                <span>Select a conversation from the left hierarchy to inspect prompt history</span>
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-3 text-center">
+                                {selectedProject ? (
+                                    <>
+                                        <Folder className="w-8 h-8 text-amber-500/70" />
+                                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+                                            {selectedProject.repo_name}
+                                        </span>
+                                        <span className="text-slate-400 max-w-sm">
+                                            Select a conversation from the hierarchy, or press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded text-[10px] font-mono font-bold">N</kbd> to dispatch the latest prompt directly.
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleResendPrompt}
+                                            disabled={isResending}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#0c2438] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#15334d] hover:bg-emerald-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 mt-1"
+                                            title="Send latest prompt from this project [Hotkey: N]"
+                                        >
+                                            <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
+                                            <span>Send Now</span>
+                                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                                        <span>Select a conversation from the left hierarchy to inspect prompt history</span>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>

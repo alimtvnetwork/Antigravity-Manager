@@ -110,12 +110,12 @@ export default function InstanceTable({
                 <table className="w-full text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-2.5 py-2.5 w-10 text-center">#</th>
-                            <th className="px-3 py-2.5 min-w-[170px]">Profile & Account</th>
-                            <th className="px-3 py-2.5 min-w-[180px]">Model & Weekly Quota</th>
-                            <th className="px-2.5 py-2.5 min-w-[100px]">Status & PID</th>
-                            <th className="px-3 py-2.5 min-w-[150px]">File / Data Path</th>
-                            <th className="px-3 py-2.5 text-right min-w-[210px]">Actions</th>
+                            <th className="px-1 py-1.5 w-8 text-center">#</th>
+                            <th className="px-2 py-1.5 min-w-[140px] max-w-[180px]">Profile & Account</th>
+                            <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
+                            <th className="px-2 py-1.5 min-w-[90px] max-w-[120px]">Status & PID</th>
+                            <th className="px-2 py-1.5 min-w-[120px] max-w-[140px]">File / Data Path</th>
+                            <th className="px-2 py-1.5 text-right min-w-[180px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="font-medium">
@@ -181,16 +181,16 @@ export default function InstanceTable({
                                     )}
                                 >
                                     {/* 1. Sequence */}
-                                    <td className="px-2.5 py-2 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                                    <td className="px-1 py-1.5 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
                                         <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-[5px] bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d]">
                                             #{seq}
                                         </span>
                                     </td>
 
                                     {/* 2. Merged Profile & Account */}
-                                    <td className="px-3 py-2 whitespace-nowrap min-w-[170px]">
+                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[140px] max-w-[180px]">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px]">
                                                 {inst.config.name}
                                             </span>
                                             {isDefault ? (

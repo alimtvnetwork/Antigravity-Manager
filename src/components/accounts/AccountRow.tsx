@@ -99,16 +99,15 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         {account.email}
                     </span>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
                         {isCurrent && (
-                            <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[10px] font-bold shadow-xs">
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-semibold shadow-xs">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         )}
 
                         {isDisabled && (
                             <span
-                                className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-rose-200/50"
+                                className="px-1.5 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs"
                                 title={account.disabled_reason || t('accounts.disabled_tooltip')}
                             >
                                 <Ban className="w-2.5 h-2.5" />
@@ -118,7 +117,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
                         {account.proxy_disabled && (
                             <span
-                                className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-orange-200/50"
+                                className="px-1.5 py-0.5 rounded-[5px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs"
                                 title={account.proxy_disabled_reason || t('accounts.proxy_disabled_tooltip')}
                             >
                                 <Ban className="w-2.5 h-2.5" />
@@ -127,7 +126,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         )}
 
                         {account.quota?.is_forbidden && (
-                            <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-red-200/50" title={t('accounts.forbidden_tooltip')}>
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs" title={t('accounts.forbidden_tooltip')}>
                                 <Lock className="w-2.5 h-2.5" />
                                 <span>{t('accounts.forbidden')}</span>
                             </span>
@@ -164,9 +163,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2 py-0.5 align-middle min-w-[200px] w-1/2">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/40 dark:bg-slate-900/25 border-l border-slate-200/50 dark:border-slate-800/50">
                 {account.quota?.is_forbidden ? (
-                    <div className="flex items-center gap-1.5 text-[10px] text-red-500 dark:text-red-400 bg-red-50/50 dark:bg-red-900/10 p-1 rounded-md border border-red-100 dark:border-red-900/30">
+                    <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
                         <Ban className="w-3 h-3 shrink-0" />
                         <span className="truncate">{t('accounts.forbidden_msg')}</span>
                     </div>
@@ -180,7 +179,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2 py-0.5 align-middle min-w-[200px] w-1/2">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/40 dark:bg-slate-900/25">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (

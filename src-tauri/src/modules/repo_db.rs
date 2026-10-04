@@ -14,7 +14,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, Once, OnceLock};
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -24,6 +24,7 @@ use std::os::windows::process::CommandExt;
 static MEMORY_ACTIVE_PROMPTS: OnceLock<Mutex<HashMap<String, ActivePrompt>>> = OnceLock::new();
 static DISPATCHED_PROMPTS_CACHE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static ACTIVE_AGY_WORKERS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
+static STARTUP_PURGE_ONCE: Once = Once::new();
 
 fn get_memory_prompts_map() -> &'static Mutex<HashMap<String, ActivePrompt>> {
     MEMORY_ACTIVE_PROMPTS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -281,7 +282,49 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create prompt_tree_cache table: {}", e))?;
 
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_running_projects_inst_running 
+         ON running_projects(instance_id, is_running)",
+        [],
+    );
+
+    STARTUP_PURGE_ONCE.call_once(|| {
+        match purge_corrupted_running_projects(conn) {
+            Ok((del_proj, del_cache)) => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Startup purge executed: {} polluted running_projects rows deleted, {} prompt_tree_cache rows wiped",
+                    del_proj, del_cache
+                ));
+            }
+            Err(err) => {
+                crate::modules::logger::log_error(&format!(
+                    "[RepoDB] Startup purge error: {}", err
+                ));
+            }
+        }
+    });
+
     Ok(())
+}
+
+/// Purge corrupted and un-namespaced running_projects rows and clear stale prompt tree cache
+pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usize), String> {
+    let deleted_projects = conn
+        .execute(
+            "DELETE FROM running_projects 
+             WHERE workspace_storage_path IS NULL 
+                OR trim(workspace_storage_path) = '' 
+                OR instr(id, '__') = 0 
+                OR trim(instance_id) = ''",
+            [],
+        )
+        .map_err(|e| format!("Failed to purge corrupted running_projects: {}", e))?;
+
+    let deleted_cache = conn
+        .execute("DELETE FROM prompt_tree_cache", [])
+        .map_err(|e| format!("Failed to wipe prompt_tree_cache: {}", e))?;
+
+    Ok((deleted_projects, deleted_cache))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1006,7 +1049,7 @@ pub fn count_backed_up_prompts(instance_id: &str) -> usize {
     conn.query_row(
         "SELECT COUNT(*) FROM active_prompts
          WHERE status = 'backed_up'
-           AND (instance_id = ?1 OR (?1 = 'default' AND instance_id IN ('default', '__default__', '')))",
+           AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
         [instance_id],
         |row| row.get::<_, i64>(0),
     )
@@ -2166,7 +2209,12 @@ pub fn list_running_projects() -> Result<Vec<RunningProject>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at 
-             FROM running_projects ORDER BY last_detected_at DESC",
+             FROM running_projects 
+             WHERE workspace_storage_path IS NOT NULL 
+               AND trim(workspace_storage_path) != '' 
+               AND instr(id, '__') > 0 
+               AND trim(instance_id) != ''
+             ORDER BY last_detected_at DESC",
         )
         .map_err(|e| format!("Failed to prepare list projects query: {}", e))?;
 
@@ -2663,6 +2711,7 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         )
         .ok()
         .flatten()
+        .filter(|p| !p.trim().is_empty())
         .or_else(|| {
             let inst_data_dir = if canonical_inst == "default" {
                 crate::modules::instance::get_default_antigravity_data_dir()
@@ -2680,25 +2729,31 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         })
         .unwrap_or_default();
 
-    let _ = conn.execute(
-        "INSERT INTO running_projects 
-         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-         ON CONFLICT(id) DO UPDATE SET
-            workspace_storage_path = COALESCE(excluded.workspace_storage_path, running_projects.workspace_storage_path),
-            is_running = excluded.is_running,
-            updated_at = excluded.updated_at",
-        params![
-            &composite_proj_id,
-            &canonical_inst,
-            &clean_repo_name,
-            &prompt.repo_path,
-            &ws_path,
-            is_running_int,
-            now,
-            now
-        ],
-    );
+    if !ws_path.trim().is_empty() {
+        let _ = conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(id) DO UPDATE SET
+                workspace_storage_path = CASE 
+                    WHEN excluded.workspace_storage_path IS NOT NULL AND trim(excluded.workspace_storage_path) != '' 
+                    THEN excluded.workspace_storage_path 
+                    ELSE running_projects.workspace_storage_path 
+                END,
+                is_running = excluded.is_running,
+                updated_at = excluded.updated_at",
+            params![
+                &composite_proj_id,
+                &canonical_inst,
+                &clean_repo_name,
+                &prompt.repo_path,
+                &ws_path,
+                is_running_int,
+                now,
+                now
+            ],
+        );
+    }
 
     conn.execute(
         "INSERT OR REPLACE INTO active_prompts 
@@ -3265,8 +3320,8 @@ pub fn resend_running_commands_for_instance(
                 format!("{}__{}", prompt.project_id, inst_suffix)
             };
             let _ = conn.execute(
-                "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?1 OR id = ?2",
-                rusqlite::params![now, now, &composite_id, &prompt.project_id],
+                "UPDATE running_projects SET is_running = 1, last_detected_at = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![now, now, &composite_id],
             );
         }
 
@@ -3307,7 +3362,9 @@ pub fn auto_resume_recent_prompts(
         .prepare(
             "SELECT id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at 
              FROM running_projects 
-             WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
+             WHERE workspace_storage_path IS NOT NULL 
+               AND instr(id, '__') > 0 
+               AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
              ORDER BY last_detected_at DESC",
         )
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
@@ -3927,9 +3984,7 @@ fn compute_project_conversation_tree(
             all_projects
                 .into_iter()
                 .filter(|p| {
-                    p.instance_id == "default"
-                        || p.instance_id == "__default__"
-                        || p.instance_id.is_empty()
+                    p.instance_id == "default" || p.instance_id == "__default__"
                 })
                 .collect()
         } else {
@@ -3940,6 +3995,9 @@ fn compute_project_conversation_tree(
         }
     } else {
         all_projects
+            .into_iter()
+            .filter(|p| !p.instance_id.trim().is_empty())
+            .collect()
     };
 
     // Telemetry probe logging for instance liveness
@@ -3987,11 +4045,11 @@ fn compute_project_conversation_tree(
     > = std::collections::HashMap::new();
     if let Ok(active_list) = list_all_prompts() {
         for ap in active_list {
+            if ap.instance_id.trim().is_empty() {
+                continue;
+            }
             let key = normalize_path_for_compare(&ap.repo_path);
-            let inst = if ap.instance_id == "default"
-                || ap.instance_id == "__default__"
-                || ap.instance_id.is_empty()
-            {
+            let inst = if ap.instance_id == "default" || ap.instance_id == "__default__" {
                 "default".to_string()
             } else {
                 crate::modules::instance::resolve_instance_id(&ap.instance_id)
@@ -4180,10 +4238,7 @@ fn compute_project_conversation_tree(
             continue;
         }
 
-        let is_inst_alive = if proj.instance_id == "default"
-            || proj.instance_id == "__default__"
-            || proj.instance_id.is_empty()
-        {
+        let is_inst_alive = if proj.instance_id == "default" || proj.instance_id == "__default__" {
             crate::modules::process::is_antigravity_running(None)
         } else if let Some(inst) = registry
             .instances
@@ -4208,10 +4263,7 @@ fn compute_project_conversation_tree(
             (tree_nodes.len() as i64) + 1
         };
 
-        let norm_proj_inst = if proj.instance_id == "default"
-            || proj.instance_id == "__default__"
-            || proj.instance_id.is_empty()
-        {
+        let norm_proj_inst = if proj.instance_id == "default" || proj.instance_id == "__default__" {
             "default".to_string()
         } else {
             crate::modules::instance::resolve_instance_id(&proj.instance_id)
@@ -4219,10 +4271,7 @@ fn compute_project_conversation_tree(
         };
 
         let (instance_seq_num, instance_name, bound_email, inst_pid, instance_exe_name) =
-            if proj.instance_id == "default"
-                || proj.instance_id == "__default__"
-                || proj.instance_id.is_empty()
-            {
+            if proj.instance_id == "default" || proj.instance_id == "__default__" {
                 let exe_name = crate::modules::instance::resolve_instance_exe_name("default", None);
                 (
                     Some(1),
@@ -4294,7 +4343,7 @@ fn compute_project_conversation_tree(
                 let tail_snippet = extract_prompt_tail_snippet(raw_prompt, 12);
 
                 let (c_inst_seq, c_inst_name, c_inst_exe) =
-                    if conv_inst_id == &proj.instance_id || conv_inst_id.is_empty() {
+                    if conv_inst_id == &proj.instance_id {
                         (
                             instance_seq_num,
                             instance_name.clone(),
@@ -4400,9 +4449,7 @@ fn compute_project_conversation_tree(
                 };
                 let tail_snippet = extract_prompt_tail_snippet(&ap.prompt_content, 12);
 
-                let (c_inst_seq, c_inst_name, c_inst_exe) = if ap.instance_id == proj.instance_id
-                    || ap.instance_id.is_empty()
-                {
+                let (c_inst_seq, c_inst_name, c_inst_exe) = if ap.instance_id == proj.instance_id {
                     (
                         instance_seq_num,
                         instance_name.clone(),
@@ -4510,6 +4557,35 @@ fn compute_project_conversation_tree(
                     "IDLE_EMPTY_WORKSPACE: workspace storage folder not found -> marked idle".to_string(),
                 )
             } else {
+                let inst_expected_data_dir = if proj.instance_id == "default" || proj.instance_id == "__default__" {
+                    crate::modules::instance::get_default_antigravity_data_dir()
+                } else if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
+                {
+                    PathBuf::from(&inst.data_dir)
+                } else {
+                    PathBuf::from(&proj.instance_id)
+                };
+
+                let norm_inst_data_dir = normalize_path_for_compare(&inst_expected_data_dir.to_string_lossy());
+                let norm_ws_path = proj
+                    .workspace_storage_path
+                    .as_deref()
+                    .map(normalize_path_for_compare)
+                    .unwrap_or_default();
+
+                let is_ws_owned_by_instance = !norm_inst_data_dir.is_empty()
+                    && !norm_ws_path.is_empty()
+                    && norm_ws_path.starts_with(&norm_inst_data_dir);
+
+                if !is_ws_owned_by_instance {
+                    (
+                        false,
+                        "IDLE_EMPTY_WORKSPACE: workspace storage folder belongs to different instance -> marked idle".to_string(),
+                    )
+                } else {
                 // Only consider running if there is concrete active process evidence:
                 // 1) Active in-memory prompt within last 60 seconds
                 let has_active_mem = if let Ok(map) = get_memory_prompts_map().lock() {
@@ -4569,7 +4645,8 @@ fn compute_project_conversation_tree(
                     )
                 }
             }
-        };
+        }
+    };
 
         crate::modules::logger::log_info(&format!(
             "[PROMPT_LIVENESS_PROBE][PROJECT] instance_id=\"{}\" project=\"{}\" is_running={} rationale=\"{}\"",

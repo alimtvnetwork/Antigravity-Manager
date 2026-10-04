@@ -33,16 +33,16 @@ export function QuotaProgressBar({
 }: QuotaProgressBarProps) {
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
 
-    // Orange-to-red color progression:
-    // >= 75%: Vibrant emerald green
-    // >= 50%: Transitioning from green to amber
+    // VS Code teal/cyan/sky palette:
+    // >= 75%: Teal to cyan to sky
+    // >= 50%: Teal to cyan to amber
     // >= 25%: Warm amber to orange
-    // < 25%: High-alert Orange to vivid Red warning
+    // < 25%: Orange to rose
     const getTrackGradient = (pct: number) => {
-        if (pct >= 75) return 'bg-gradient-to-r from-[#1af18d] via-[#10b981] to-[#059669]';
-        if (pct >= 50) return 'bg-gradient-to-r from-[#059669] via-[#84cc16] to-[#eab308]';
-        if (pct >= 25) return 'bg-gradient-to-r from-[#eab308] via-[#f59e0b] to-[#f97316]';
-        return 'bg-gradient-to-r from-amber-500 via-[#ea580c] to-rose-600';
+        if (pct >= 75) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500';
+        if (pct >= 50) return 'bg-gradient-to-r from-teal-600 via-cyan-500 to-amber-400';
+        if (pct >= 25) return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
+        return 'bg-gradient-to-r from-orange-500 via-rose-500 to-rose-600';
     };
 
     const getPercentColorClass = (pct: number) => {
@@ -68,15 +68,15 @@ export function QuotaProgressBar({
         }
         switch (idx) {
             case 0:
-                return "bg-[#1af18d] border-[1.5px] border-[#12b27d] shadow-[0_0_8px_rgba(26,241,141,0.6)]";
+                return "bg-cyan-400 dark:bg-cyan-500 border-[1.5px] border-cyan-300 dark:border-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.4)]";
             case 1:
-                return "bg-[#059669] border-[1.5px] border-[#047857] shadow-none";
+                return "bg-teal-500 border-[1.5px] border-teal-400 shadow-none";
             case 2:
-                return "bg-[#eab308] border-[1.5px] border-[#ca8a04] shadow-none";
+                return "bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none";
             case 3:
-                return "bg-[#f97316] border-[1.5px] border-[#ea580c] shadow-none";
+                return "bg-orange-500 border-[1.5px] border-orange-400 shadow-none";
             default:
-                return "bg-rose-500 border-[1.5px] border-rose-600 shadow-none";
+                return "bg-rose-500 border-[1.5px] border-rose-400 shadow-none";
         }
     };
 

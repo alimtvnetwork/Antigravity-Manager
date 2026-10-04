@@ -557,13 +557,13 @@ function AccountRowContent({
 
                     <div className="flex items-center gap-1 shrink-0">
                         {isCurrent ? (
-                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-bold shadow-xs">
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-semibold shadow-xs">
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         ) : null}
                         {isDisabled ? (
                             <span
-                                className="px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-rose-200/50"
+                                className="px-1.5 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs"
                             >
                                 <Ban className="w-2.5 h-2.5" />
                                 <span>{t('accounts.disabled')}</span>
@@ -572,7 +572,7 @@ function AccountRowContent({
 
                         {account.proxy_disabled ? (
                             <span
-                                className="px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-orange-200/50"
+                                className="px-1.5 py-0.5 rounded-[5px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs"
                             >
                                 <Ban className="w-2.5 h-2.5" />
                                 <span>{t('accounts.proxy_disabled')}</span>
@@ -580,13 +580,13 @@ function AccountRowContent({
                         ) : null}
 
                         {account.quota?.is_forbidden ? (
-                            <span className="px-1.5 py-0.2 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-red-200/50">
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs">
                                 <Lock className="w-2.5 h-2.5" />
                                 <span>{t('accounts.forbidden')}</span>
                             </span>
                         ) : null}
                         {account.validation_blocked ? (
-                            <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[9px] font-bold flex items-center gap-0.5 shadow-xs border border-amber-200/50">
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-400/20 text-[9px] font-semibold flex items-center gap-0.5 shadow-xs">
                                 <Clock className="w-2.5 h-2.5" />
                                 <span>{validationBlockedLabel}</span>
                             </span>
@@ -716,7 +716,7 @@ function AccountRowContent({
             </td>
 
             {/* 4H 模型配额列 */}
-            <td className="px-2 py-0.5 align-middle min-w-[220px]">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/40 dark:bg-slate-900/25 border-l border-slate-200/50 dark:border-slate-800/50">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -756,7 +756,7 @@ function AccountRowContent({
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2 py-0.5 align-middle min-w-[220px]">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/40 dark:bg-slate-900/25">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
@@ -829,7 +829,7 @@ function AccountRowContent({
                                         className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-base-100 text-gray-700 dark:text-gray-300"
                                     >
                                         <div className="flex items-center gap-1.5 truncate">
-                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inst.is_running ? 'bg-teal-500' : 'bg-gray-400'}`} />
                                             <span className="truncate">{inst.config.name}</span>
                                         </div>
                                         {inst.config.id === activeInstanceId && (

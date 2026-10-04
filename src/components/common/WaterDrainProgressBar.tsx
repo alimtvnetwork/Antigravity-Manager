@@ -17,10 +17,10 @@ export function WaterDrainProgressBar({
 
     // Map track gradient according to clamped percentage
     const getTrackGradient = (pct: number) => {
-        if (pct >= 75) return 'bg-gradient-to-r from-[#1af18d] to-[#059669]';
-        if (pct >= 50) return 'bg-gradient-to-r from-[#059669] to-[#eab308]';
-        if (pct >= 25) return 'bg-gradient-to-r from-[#eab308] to-[#f97316]';
-        return 'bg-gradient-to-r from-[#f97316] to-[#ef4444]';
+        if (pct >= 75) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500';
+        if (pct >= 50) return 'bg-gradient-to-r from-teal-600 via-cyan-500 to-amber-400';
+        if (pct >= 25) return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
+        return 'bg-gradient-to-r from-orange-500 via-rose-500 to-rose-600';
     };
 
     // Specific checkpoint styling logic:
@@ -30,16 +30,16 @@ export function WaterDrainProgressBar({
             return "bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none";
         }
         switch (idx) {
-            case 0: // 1st bubble (100%): vibrant green with active glow
-                return "bg-[#1af18d] border-[1.5px] border-[#12b27d] shadow-[0_0_8px_rgba(26,241,141,0.6)]";
-            case 1: // 2nd bubble (75%): deep green, no glow
-                return "bg-[#059669] border-[1.5px] border-[#047857] shadow-none";
-            case 2: // 3rd bubble (50%): orangey yellow, no glow
-                return "bg-[#eab308] border-[1.5px] border-[#ca8a04] shadow-none";
+            case 0: // 1st bubble (100%): soft cyan with active glow
+                return "bg-cyan-400 dark:bg-cyan-500 border-[1.5px] border-cyan-300 dark:border-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.4)]";
+            case 1: // 2nd bubble (75%): teal, no glow
+                return "bg-teal-500 border-[1.5px] border-teal-400 shadow-none";
+            case 2: // 3rd bubble (50%): amber, no glow
+                return "bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none";
             case 3: // 4th bubble (25%): orange, no glow
-                return "bg-[#f97316] border-[1.5px] border-[#ea580c] shadow-none";
+                return "bg-orange-500 border-[1.5px] border-orange-400 shadow-none";
             default:
-                return "bg-[#ef4444] border-[1.5px] border-[#dc2626] shadow-none";
+                return "bg-rose-500 border-[1.5px] border-rose-400 shadow-none";
         }
     };
 
