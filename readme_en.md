@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.145.0)
+> Professional AI Account Management & Protocol Proxy System (v4.146.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.145.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.146.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.145.0**: Fixed Rust backend compilation across CI/CD runners by enabling the `backup` feature in `rusqlite` dependencies (`features = ["bundled", "backup"]`) and resolving instance ID borrow comparisons in `repo_db.rs`; officially published the full macOS Gatekeeper deep hardening release supporting macOS 13 (Ventura) through 15 (Sequoia) with recursive quarantine stripping, `spctl --add` registration, real-time IDE discovery echo, `$HOME/Applications/` path parity, and persistent diagnostic backtrace telemetry. (Thanks to @aukgit)
+> Latest version **v4.146.0**: Fixed Clippy and compilation gates in CI pipelines by adding a non-exhaustive wildcard match arm for `rusqlite::backup::StepResult`, unblocking release compilation on Linux and macOS; includes full rusqlite online hot-cloning backup support, repo DB borrow comparisons fix, and complete macOS 13–15 Gatekeeper deep hardening. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

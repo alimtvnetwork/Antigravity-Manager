@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.146.0] - 2026-10-04
+
+### Fixed
+- **Rusqlite 非穷尽枚举匹配修复与 Clippy 门禁通过 (Rusqlite Non-Exhaustive StepResult Match Arm & Clippy Pass)**: 修复在 Linux 与 macOS 持续集成流水线中因 `rusqlite::backup::StepResult` 属于 `#[non_exhaustive]` 枚举类型导致 `pattern Ok(_) not covered` (E0004) 的编译阻断问题；在 `src-tauri/src/modules/instance.rs` 的在线热备份事件循环中补充 `Ok(_) => break` 兜底匹配分支，使全平台 Clippy 检查与集成构建均能以零警告、零错误顺利通过。 (Thanks to @aukgit)
+
+---
+
 ## [v4.145.0] - 2026-10-04
 
 ### Fixed
@@ -501,6 +508,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.146.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.145.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -1874,6 +1874,7 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
                     std::thread::sleep(backoff);
                     backoff = (backoff * 2).min(std::time::Duration::from_millis(250));
                 }
+                Ok(_) => break,
                 Err(e) => {
                     return Err(format!("SQLite backup step error: {}", e));
                 }

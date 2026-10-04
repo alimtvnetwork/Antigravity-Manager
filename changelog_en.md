@@ -3,6 +3,9 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.146.0 (2026-10-04)**:
+        -   **[Clippy & Compilation Gate] Rusqlite Non-Exhaustive StepResult Match Arm**: Resolved the remaining E0004 compiler blockage in Linux and macOS CI pipelines caused by `rusqlite::backup::StepResult` being marked `#[non_exhaustive]`. Added a wildcard fallback arm (`Ok(_) => break`) to the online SQLite backup step loop in `src-tauri/src/modules/instance.rs`, ensuring `cargo clippy` and compilation pass with zero warnings across all CI environments. (Thanks to @aukgit)
+
     *   **v4.145.0 (2026-10-04)**:
         -   **[Rust Compilation & CI Gate] Rusqlite Backup Feature & Borrow Type Alignment**: Resolved all 7 CI/CD build breakages on Linux and macOS runners. Enabled the required `"backup"` feature for `rusqlite` in `src-tauri/Cargo.toml` (`features = ["bundled", "backup"]`), activating the `rusqlite::backup::Backup` online SQLite zero-downtime hot-cloning API. Fixed E0277 borrow type mismatch in `src-tauri/src/modules/repo_db.rs` where `owning_inst_id` (`&String`) was compared directly against struct `String` values. (Thanks to @aukgit)
         -   **[macOS Deep Gatekeeper Hardening Release]**: Formal production release for macOS 13 (Ventura), 14 (Sonoma), and 15 (Sequoia) addressing the "damaged, move to Trash" error via deterministic `awk` DMG volume parsing, recursive `xattr -d com.apple.quarantine` removal across all internal frameworks, Gatekeeper assessment registration with `spctl --add`, real-time installer IDE discovery echo, `$HOME/Applications/` path search expansion, and disk-persisted backtrace diagnostic logging. (Thanks to @aukgit)
