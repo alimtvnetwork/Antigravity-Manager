@@ -209,8 +209,12 @@ pub fn update_instance_app_storage(
         }
     }
 
-    // Also update <data_dir>/User/settings.json so the IDE window title bar visibly displays the bound account email
-    if let Some(email) = bound_email.map(str::trim).filter(|e| !e.is_empty()) {
+    // Also update <data_dir>/User/settings.json for initial workbench preferences
+    if bound_email
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .is_some()
+    {
         let user_dir = data_dir.join("User");
         let _ = fs::create_dir_all(&user_dir);
         let settings_path = user_dir.join("settings.json");
@@ -223,24 +227,25 @@ pub fn update_instance_app_storage(
         } else {
             serde_json::Map::new()
         };
-        let now_dt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-        settings_map.insert(
-            "window.title".to_string(),
-            serde_json::Value::String(format!(
-                "Antigravity — Account: {} — Date: {} — ${{rootName}} ${{activeEditorShort}}",
-                email, now_dt
-            )),
-        );
-        settings_map.insert(
-            "workbench.startupEditor".to_string(),
-            serde_json::Value::String("none".to_string()),
-        );
-        settings_map.insert(
-            "security.workspace.trust.enabled".to_string(),
-            serde_json::Value::Bool(false),
-        );
-        if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
-            let _ = fs::write(&settings_path, pretty);
+        let mut modified = false;
+        if !settings_map.contains_key("workbench.startupEditor") {
+            settings_map.insert(
+                "workbench.startupEditor".to_string(),
+                serde_json::Value::String("none".to_string()),
+            );
+            modified = true;
+        }
+        if !settings_map.contains_key("security.workspace.trust.enabled") {
+            settings_map.insert(
+                "security.workspace.trust.enabled".to_string(),
+                serde_json::Value::Bool(false),
+            );
+            modified = true;
+        }
+        if modified {
+            if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
+                let _ = fs::write(&settings_path, pretty);
+            }
         }
     }
 
@@ -426,6 +431,7 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             instances: vec![default_instance],
         };
         save_registry(&registry)?;
+        let _ = inject_instance_settings(&registry.instances[0]);
         return Ok(registry);
     }
 
@@ -477,6 +483,14 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
 
     if modified {
         let _ = save_registry(&registry);
+    }
+
+    static SYNCED_TITLES_ONCE: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    if !SYNCED_TITLES_ONCE.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        for inst in &registry.instances {
+            let _ = inject_instance_settings(inst);
+        }
     }
 
     Ok(registry)
@@ -956,6 +970,8 @@ pub fn create_instance_with_account(
         config
     };
 
+    let _ = inject_instance_settings(&config);
+
     Ok(config)
 }
 
@@ -1225,6 +1241,8 @@ pub fn copy_instance_with_options(
         purge_recent_project_paths(&new_instance);
     }
 
+    let _ = inject_instance_settings(&new_instance);
+
     Ok(new_instance)
 }
 
@@ -1246,6 +1264,8 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
     registry.instances[pos].name = trimmed.to_string();
     let updated = registry.instances[pos].clone();
     save_registry(&registry)?;
+
+    let _ = inject_instance_settings(&updated);
 
     Ok(updated)
 }
@@ -2099,6 +2119,7 @@ fn launch_instance_inner_with_extra_workspaces(
             crate::error::AppError::Config(format!("Instance {} not found", instance_id))
         })?;
 
+    let inst_config = registry.instances[pos].clone();
     let data_dir = registry.instances[pos].data_dir.clone();
     let is_default = registry.instances[pos].is_default;
     let custom_exe = registry.instances[pos].executable_path.clone();
@@ -2313,6 +2334,8 @@ fn launch_instance_inner_with_extra_workspaces(
         }
     }
 
+    let _ = inject_instance_settings(&inst_config);
+
     let exe_str = exe_path.to_string_lossy().to_string();
 
     #[cfg(target_os = "macos")]
@@ -2451,6 +2474,8 @@ fn launch_instance_inner_with_extra_workspaces(
         {
             crate::modules::process::clean_appimage_env(&mut cmd);
         }
+
+        let _ = inject_instance_settings(&inst_config);
 
         let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
@@ -4098,6 +4123,79 @@ pub fn get_instance_settings_targets(inst: &InstanceConfig) -> Vec<PathBuf> {
     }
 
     targets
+}
+
+/// Compute the IDE ending sequence for instance window title.
+/// For the default instance, returns "Antigravity".
+/// For other instances, returns "antigravity-{slug}" where slug is derived from the instance name.
+pub fn compute_ide_ending_sequence(inst: &InstanceConfig) -> String {
+    let is_default_instance = inst.is_default || inst.id == "default";
+    if is_default_instance {
+        return "Antigravity".to_string();
+    }
+
+    let slug: String = inst
+        .name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect();
+    let clean_slug = slug.trim_matches('-');
+
+    if clean_slug.is_empty() {
+        format!("antigravity-{}", inst.id)
+    } else {
+        format!("antigravity-{}", clean_slug)
+    }
+}
+
+/// Compute the native OS window title format for an instance profile.
+/// Guarantees the title begins with `#{seq} {name} - {suffix}` across platforms.
+pub fn compute_instance_window_title(inst: &InstanceConfig) -> String {
+    let seq = inst.seq_num.unwrap_or(1);
+    let suffix = compute_ide_ending_sequence(inst);
+    format!(
+        "#{} {} - {}${{separator}}${{dirty}}${{activeEditorShort}}${{separator}}${{rootName}}",
+        seq, inst.name, suffix
+    )
+}
+
+/// Injects instance settings (window.title) across all target locations for the instance
+pub fn inject_instance_settings(inst: &InstanceConfig) -> Result<(), String> {
+    let title = compute_instance_window_title(inst);
+    let targets = get_instance_settings_targets(inst);
+
+    for target in targets {
+        if let Some(parent) = target.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+
+        let mut settings_map: serde_json::Map<String, serde_json::Value> = if target.exists() {
+            fs::read_to_string(&target)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            serde_json::Map::new()
+        };
+
+        let has_expected_title = match settings_map.get("window.title") {
+            Some(serde_json::Value::String(val)) => val == &title,
+            _ => false,
+        };
+
+        if !has_expected_title {
+            settings_map.insert(
+                "window.title".to_string(),
+                serde_json::Value::String(title.clone()),
+            );
+            if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
+                let _ = fs::write(&target, pretty);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Recursively merge source JSON into dest JSON object
@@ -5898,5 +5996,157 @@ mod clone_tree_tests {
         );
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_compute_ide_ending_sequence() {
+        let default_inst = InstanceConfig {
+            id: "default".to_string(),
+            name: "Default".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: true,
+            pid: None,
+            seq_num: Some(1),
+        };
+        assert_eq!(compute_ide_ending_sequence(&default_inst), "Antigravity");
+
+        let default_by_id = InstanceConfig {
+            id: "default".to_string(),
+            name: "Main Workspace".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+        assert_eq!(compute_ide_ending_sequence(&default_by_id), "Antigravity");
+
+        let custom_inst = InstanceConfig {
+            id: "inst-8136".to_string(),
+            name: "8136".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(2),
+        };
+        assert_eq!(
+            compute_ide_ending_sequence(&custom_inst),
+            "antigravity-8136"
+        );
+
+        let fallback_inst = InstanceConfig {
+            id: "inst-xyz".to_string(),
+            name: "---".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(3),
+        };
+        assert_eq!(
+            compute_ide_ending_sequence(&fallback_inst),
+            "antigravity-inst-xyz"
+        );
+    }
+
+    #[test]
+    fn test_compute_instance_window_title() {
+        let default_inst = InstanceConfig {
+            id: "default".to_string(),
+            name: "Default".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: true,
+            pid: None,
+            seq_num: Some(1),
+        };
+        assert_eq!(
+            compute_instance_window_title(&default_inst),
+            "#1 Default - Antigravity${separator}${dirty}${activeEditorShort}${separator}${rootName}"
+        );
+
+        let custom_inst = InstanceConfig {
+            id: "inst-8136".to_string(),
+            name: "8136".to_string(),
+            data_dir: "/tmp/data".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(2),
+        };
+        assert_eq!(
+            compute_instance_window_title(&custom_inst),
+            "#2 8136 - antigravity-8136${separator}${dirty}${activeEditorShort}${separator}${rootName}"
+        );
+    }
+
+    #[test]
+    fn test_inject_instance_settings() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "agm_settings_test_{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let user_dir = temp_dir.join("User");
+        let _ = fs::create_dir_all(&user_dir);
+
+        let inst = InstanceConfig {
+            id: "inst-settings-test".to_string(),
+            name: "Settings Test".to_string(),
+            data_dir: temp_dir.to_string_lossy().to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: None,
+            bound_email: None,
+            created_at: 0,
+            last_used: 0,
+            is_default: false,
+            pid: None,
+            seq_num: Some(5),
+        };
+
+        assert!(inject_instance_settings(&inst).is_ok());
+
+        let settings_path = user_dir.join("settings.json");
+        assert!(settings_path.exists());
+        let content = fs::read_to_string(&settings_path).unwrap();
+        let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(
+            val.get("window.title").and_then(|v| v.as_str()),
+            Some("#5 Settings Test - antigravity-settings-test${separator}${dirty}${activeEditorShort}${separator}${rootName}")
+        );
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

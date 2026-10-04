@@ -789,15 +789,12 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "rounded-xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "group rounded-xl border transition-all flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
                                         ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
-                                        : "border-gray-200/80 dark:border-[#15334d] hover:border-gray-300 dark:hover:border-blue-500/40"
+                                        : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/30"
                                 )}
                             >
-                                {/* Top Accent Bar identifying profile color */}
-                                <div className={cn("h-1.5 w-full bg-gradient-to-r", theme.accentBar)} />
-
                                 <div className="p-3.5 flex flex-col flex-1 justify-between min-w-0">
                                     {/* Card Top */}
                                     <div className="min-w-0">
@@ -1161,28 +1158,31 @@ export default function Instances() {
                                         </div>
 
                                         {/* Row 2: Prompts, Settings, Clone, Executable, Wipe, Delete */}
-                                        <div className="flex items-center gap-1 w-full">
+                                        <div className="grid grid-cols-6 gap-1 w-full">
+                                            {/* Slot 1: Prompts */}
                                             <button
                                                 type="button"
                                                 onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                                 title="Prompt Tree"
                                             >
                                                 <Layers className="w-3 h-3" />
                                             </button>
 
+                                            {/* Slot 2: Settings */}
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     setSettingsModalTarget(inst);
                                                     setIsSettingsModalOpen(true);
                                                 }}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                                 title="Settings & Sync"
                                             >
                                                 <SlidersHorizontal className="w-3 h-3" />
                                             </button>
 
+                                            {/* Slot 3: Clone Profile */}
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -1190,44 +1190,62 @@ export default function Instances() {
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCopyProjects(true);
                                                 }}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                                 title="Clone Profile"
                                             >
                                                 <Copy className="w-3 h-3" />
                                             </button>
 
+                                            {/* Slot 4: Clone Binary / Executable */}
                                             <button
                                                 type="button"
                                                 onClick={() => handleCloneExecutable(inst.config.id)}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                                                title="Clone Binary"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Clone Binary / Executable"
                                             >
                                                 <Cpu className="w-3 h-3" />
                                             </button>
 
+                                            {/* Slot 5: Wipe Credentials */}
                                             <button
                                                 type="button"
                                                 onClick={() => handleWipeSession(inst.config.id)}
                                                 disabled={inst.is_running}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                 title="Wipe Credentials"
                                             >
                                                 <RotateCcw className="w-3 h-3" />
                                             </button>
 
-                                            {!inst.config.is_default && (
+                                            {/* Slot 6: Delete Profile (or invisible placeholder for default) */}
+                                            {!inst.config.is_default ? (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(inst.config.id)}
                                                     disabled={inst.is_running}
-                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Delete Profile"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
+                                            ) : (
+                                                <div className="w-full invisible" aria-hidden="true" />
                                             )}
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Bottom Accent Line with CSS3 Hover Animation */}
+                                <div className="relative w-full h-[3px] overflow-hidden rounded-b-xl">
+                                    <div
+                                        className={cn(
+                                            "absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform",
+                                            theme.accentBar,
+                                            isActive
+                                                ? "opacity-60 scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                                                : "opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+                                        )}
+                                    />
                                 </div>
                             </div>
                         );

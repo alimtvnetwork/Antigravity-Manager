@@ -1,0 +1,30 @@
+[
+  {
+    "title": "Subtask 1: Backend OS Window Title Formatting & Settings Injection",
+    "description": "Implement compute_ide_ending_sequence and compute_instance_window_title to format OS window title strictly as #{seq} {name} - {suffix} across Windows, macOS, and Linux in settings.json.",
+    "agent_role": "Worker 01",
+    "target_files": "src-tauri/src/modules/instance.rs",
+    "budget": 60
+  },
+  {
+    "title": "Subtask 2: Frontend Instance Card 6-Column Grid Standardization & Bottom CSS3 Hover Animation",
+    "description": "Standardize Row 2 buttons into a rigid 6-column grid with invisible spacer for Default instance, relocate header color accent to bottom line with CSS3 hover animation.",
+    "agent_role": "Worker 02",
+    "target_files": "src/pages/Instances.tsx",
+    "budget": 60
+  },
+  {
+    "title": "Subtask 3: Frontend Prompt Tree Modal Portal Stacking, Project Pinning/Refresh, Prioritization, Filter Pills, Image Actions & Confirmation Suffix Dropdown",
+    "description": "Mount PromptTreeViewModal via createPortal to document.body, fix full screen mode, add project refresh/pinning, prompt layering prioritization, filter pills, image handlers, and confirmation dropdown.",
+    "agent_role": "Worker 02",
+    "target_files": "src/components/instances/PromptTreeViewModal.tsx",
+    "budget": 100
+  },
+  {
+    "title": "Subtask 4: E2E Verification, Pre-flight Checks & Minor Release Ceremony",
+    "description": "Verify Rust formatting, frontend build, bump minor version to v4.137.0, update changelogs and READMEs with strict @aukgit attribution, and release.",
+    "agent_role": "Lead Orchestrator",
+    "target_files": "package.json, changelog.md, changelog_en.md, readme.md, readme_en.md",
+    "budget": 60
+  }
+]

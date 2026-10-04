@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.137.0 (2026-10-04)**:
+        -   **[Backend & OS Window Title] Standardized Instance Window Title Formatting**:
+            -   **Description**: Implemented `compute_ide_ending_sequence` and `compute_instance_window_title` in `src-tauri/src/modules/instance.rs`. Enforced strict window title formatting starting with `#{sequence} {instance_name} - {ide_ending_sequence}` (e.g. `#1 Default - Antigravity`, `#2 8136 - antigravity-8136`) across Windows, macOS, and Linux. Automatically injected into `<data_dir>/User/settings.json` across instance creation, duplication, renaming, launching, and startup registry synchronization. (Thanks to @aukgit)
+        -   **[Instances UI] 6-Column Card Action Grid & Bottom CSS3 Hover Glow Animation**:
+            -   **Description**: Standardized instance card Row 2 action buttons into a rigid 6-column grid (`grid grid-cols-6 gap-1 w-full`) with an invisible placeholder for `#1 Default`'s non-deletable slot, ensuring `[Clone]` and `[Executable]` maintain identical horizontal positions across all cards. Removed the heavy top color bar and relocated the accent indicator to a sleek bottom line with smooth CSS3 hover expansion and ambient glow animation (`group-hover:scale-x-100 group-hover:opacity-100`). (Thanks to @aukgit)
+        -   **[Prompt Inspector] Portal Body Stacking, Fullscreen Mode & Header Fix**:
+            -   **Description**: Mounted `PromptTreeViewModal` directly to `document.body` via React `createPortal` with elevated `z-[300]` stacking, resolving header clipping from the sticky navbar and removing ad-hoc margin hacks. Added a dedicated `[Full]` / `[Exit]` toggle button for immersive edge-to-edge full-screen inspection and editing. (Thanks to @aukgit)
+        -   **[Project Tree] Inline Single-Project Refresh & Pinning Mechanism**:
+            -   **Description**: Added inline `RotateCw` (instant cache-bypass refresh) and `Pin` (pin to top) buttons beside each project row in the tree view. Persisted pinned project IDs per instance in `localStorage` (`agm_pinned_projects_{instance_id}`). (Thanks to @aukgit)
+        -   **[Prompt Layering] Multi-Tier Prioritization & Search Filter Pills**:
+            -   **Description**: Implemented intelligent multi-tier sorting: Pinned projects first -> Actively running projects -> Recent activity timestamp -> Alphabetical name, with running conversations anchored to the top of each project tree. Added 5 quick filter pills under the search bar: `[All]`, `[Running]`, `[Latest Conv]`, `[Latest Prompt]`, and `[Pinned]`. (Thanks to @aukgit)
+        -   **[Prompt Actions] Multi-Mode Copy, Image Export & Confirmation Suffix Dropdown**:
+            -   **Description**: Added "Copy Text" (clean text only), "Copy With Images" (verbatim prompt), and "Save Images" (downloads extracted images to disk). Added a Confirmation Suffix dropdown with presets (`Is it done?`, `Is it released?`, `Are you sure about it?`, etc.) appended on resend. Upgraded running indicator to an animated pulse badge with real-time elapsed ticker and matched instance PID. (Thanks to @aukgit)
+
     *   **v4.136.0 (2026-10-04)**:
         -   **[UI & Components] Fluid Water-Drain Progress Bar & Milestone Checkpoints**:
             -   **Description**: Implemented an aesthetic, fluid water-drain styled progress bar component (`WaterDrainProgressBar`) featuring dual-stop gradient tones (`#1af18d` leading hue to `#12b27d` peak hue), inline milestone checkmark nodes (`[25, 50, 75, 100]`), smooth fluid shimmer, and a compact 18px height footprint without bloated padding. Integrated across account quota badges (`QuotaItem`), instance cards, and list tables (`InstanceTable`). (Thanks to @aukgit)

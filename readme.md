@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.136.0-3B82F6?style=flat-square" alt="Version v4.136.0">
+    <img src="https://img.shields.io/badge/Version-v4.137.0-3B82F6?style=flat-square" alt="Version v4.137.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.136.0)**
+**Bar 2: Version-Based Installation (v4.137.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -147,7 +147,7 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.136.0** (Latest) | 2026-10-04 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.136.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.136.0/install.sh \| bash` | `git checkout v4.136.0` |
+| **v4.137.0** (Latest) | 2026-10-04 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.137.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.137.0/install.sh \| bash` | `git checkout v4.137.0` |
 | **v4.65.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh \| bash` | `git checkout v4.65.0` |
 | **v4.64.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.64.0/install.sh \| bash` | `git checkout v4.64.0` |
 | **v4.63.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.63.0/install.sh \| bash` | `git checkout v4.63.0` |
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.136.0**: Implemented an aesthetic fluid water-drain styled progress bar (`WaterDrainProgressBar`) with milestone checkmark nodes across QuotaItem, InstanceTable, and Instances. Reorganized navbar into a 3-segment preferences capsule (`[Quick Clean] | [Theme Switcher] | [Language]`) and 3 direct route quick-access icons (`Accounts`, `Instances`, `Settings`) plus overflow hamburger menu. Added combined "Copy Both" and split "Paste" replication with `localStorage` buffer persistence in InstanceSettingsModal. Overhauled PromptTreeViewModal with fixed header positioning, 3-layer collapsible hierarchy (`Project -> Conversation -> Prompt`), untitled conversation grouping, Markdown preview/raw/edit modes, Full inspector button, Resend/Enqueue prompt triggers, and SQLite split-DB caching (`prompt_tree_cache`) in `repo_prompts.db`. Enforced prompt queue FIFO scheduling and terminal state bypass in backend. (Thanks to @aukgit)
+> Latest version **v4.137.0**: Standardized native OS instance window title formatting strictly to `#{sequence} {instance_name} - {ide_ending_sequence}` across Windows, macOS, and Linux, persisting into settings across the entire instance lifecycle. Standardized instance card Row 2 actions into a rigid 6-column grid with invisible alignment slot for `#1 Default`, and relocated header accent bar to a sleek bottom line with smooth CSS3 hover expansion and ambient glow animation. Mounted `PromptTreeViewModal` directly to `document.body` via React `createPortal` with `z-[300]` to eliminate header clipping, added edge-to-edge full-screen mode, single-project inline refresh (`RotateCw`) and pinning (`Pin`), multi-tier sorting prioritization (pinned $\rightarrow$ running $\rightarrow$ active $\rightarrow$ alphabetical), 5 search filter pills, multi-mode copy and image disk export, confirmation suffix dropdown presets, and animated running pulse badge with real-time elapsed ticker. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

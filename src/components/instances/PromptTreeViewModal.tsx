@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
     X,
     Folder,
@@ -7,6 +8,8 @@ import {
     Download,
     Upload,
     Maximize2,
+    Minimize2,
+    Pin,
     Copy,
     Check,
     FileText,
@@ -25,6 +28,7 @@ import {
     Edit3,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { useInstanceStore } from '../../stores/useInstanceStore';
 import { cn } from '../../utils/cn';
 
 export interface AgmConversationNode {
@@ -135,6 +139,13 @@ function isUntitledOrEmpty(conv: AgmConversationNode): boolean {
         title === (conv.short_id || '').toLowerCase();
     const isEmptyPrompt = !conv.prompt_preview_200w || conv.prompt_preview_200w.trim().length === 0;
     return isUntitled || isEmptyPrompt;
+}
+
+// Helper to strip markdown image syntax and data URIs for "Copy Text"
+function stripImagesFromPrompt(text: string): string {
+    return text
+        .replace(/!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/g, '')
+        .trim();
 }
 
 // Inline Markdown parser (Headings, bold, italic, code blocks, inline code, lists, images, blockquotes)
@@ -463,10 +474,29 @@ export default function PromptTreeViewModal({
     instanceId,
     instanceName,
 }: PromptTreeViewModalProps) {
+    const { instances } = useInstanceStore();
     const [treeData, setTreeData] = useState<AgmProjectTreeNode[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'latest_conv' | 'latest_prompt' | 'pinned'>('all');
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Pinned projects persisted in localStorage
+    const [pinnedProjectIds, setPinnedProjectIds] = useState<string[]>(() => {
+        try {
+            const stored = localStorage.getItem(`agm_pinned_projects_${instanceId || 'default'}`);
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const [refreshingProjectId, setRefreshingProjectId] = useState<string | null>(null);
+    const [confirmationSuffix, setConfirmationSuffix] = useState<string>('None (Send as is)');
+    const [isCopiedText, setIsCopiedText] = useState(false);
+    const [isCopiedRaw, setIsCopiedRaw] = useState(false);
+
     const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
     const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({});
     const [expandedUntitledGroups, setExpandedUntitledGroups] = useState<Record<string, boolean>>({});
@@ -483,6 +513,82 @@ export default function PromptTreeViewModal({
     const [isResending, setIsResending] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
     const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+    const currentInstance = useMemo(() => {
+        const targetId = selectedProject?.instance_id || instanceId || 'default';
+        return instances.find((i) => i.config.id === targetId);
+    }, [instances, selectedProject?.instance_id, instanceId]);
+
+    const instancePid = currentInstance?.pid;
+
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    useEffect(() => {
+        if (!selectedConversation?.is_running) {
+            setElapsedSeconds(0);
+            return;
+        }
+        const startTime = selectedConversation.last_modified
+            ? new Date(selectedConversation.last_modified).getTime()
+            : Date.now();
+        const updateElapsed = () => {
+            const now = Date.now();
+            const diff = Math.max(0, Math.floor((now - startTime) / 1000));
+            setElapsedSeconds(diff);
+        };
+        updateElapsed();
+        const timer = setInterval(updateElapsed, 1000);
+        return () => clearInterval(timer);
+    }, [selectedConversation?.conversation_id, selectedConversation?.is_running, selectedConversation?.last_modified]);
+
+    const formatDuration = (secs: number) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+    };
+
+    const togglePinProject = (projectId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setPinnedProjectIds((prev) => {
+            const next = prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId];
+            try {
+                localStorage.setItem(`agm_pinned_projects_${instanceId || 'default'}`, JSON.stringify(next));
+            } catch {}
+            return next;
+        });
+    };
+
+    const handleRefreshSingleProject = async (projectId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setRefreshingProjectId(projectId);
+        try {
+            const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
+                maxWords: 300,
+                onlyRunning: false,
+                force: true,
+            });
+            const relevant = instanceId
+                ? data.filter(
+                      (p) =>
+                          !p.instance_id ||
+                          p.instance_id === instanceId ||
+                          (p.instance_id === 'default' && instanceId === 'default')
+                  )
+                : data;
+            const finalData = relevant.length > 0 ? relevant : data;
+            setTreeData(finalData);
+
+            const updatedProject = finalData.find((p) => p.project_id === projectId);
+            if (updatedProject && selectedProject?.project_id === projectId) {
+                setSelectedProject(updatedProject);
+            }
+            setActionMsg(`Project ${updatedProject?.repo_name || ''} refreshed!`);
+            setTimeout(() => setActionMsg(null), 2500);
+        } catch (err: any) {
+            setError(err?.toString() || 'Failed to refresh project');
+        } finally {
+            setRefreshingProjectId(null);
+        }
+    };
 
     // Full screen prompt detail inspector
     const [inspectorPrompt, setInspectorPrompt] = useState<{
@@ -603,13 +709,47 @@ export default function PromptTreeViewModal({
         }
     };
 
+    // Handle Save Extracted Images to files
+    const handleSaveImages = () => {
+        const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
+        const { images } = extractAssets(text);
+        if (images.length === 0) {
+            setActionMsg('No embedded images found in this prompt.');
+            setTimeout(() => setActionMsg(null), 2500);
+            return;
+        }
+
+        images.forEach((imgUrl, index) => {
+            const a = document.createElement('a');
+            a.href = imgUrl;
+            let ext = 'png';
+            if (imgUrl.includes('image/jpeg') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg')) {
+                ext = 'jpg';
+            } else if (imgUrl.includes('image/webp') || imgUrl.endsWith('.webp')) {
+                ext = 'webp';
+            } else if (imgUrl.includes('image/svg') || imgUrl.endsWith('.svg')) {
+                ext = 'svg';
+            }
+            a.download = `prompt-image-${selectedConversation?.short_id || 'img'}-${index + 1}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        setActionMsg(`Saved ${images.length} image(s) to downloads!`);
+        setTimeout(() => setActionMsg(null), 3000);
+    };
+
     // Handle Resend Prompt Action (Immediate injection / writes .antigravity_resume_task.json)
     const handleResendPrompt = async () => {
         if (!selectedConversation) return;
         try {
             setIsResending(true);
             setActionMsg('Resending & injecting prompt to running instance...');
-            const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
+            let promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
+            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)') {
+                promptContent = `${promptContent}\n\n${confirmationSuffix}`;
+            }
             const repoPath = selectedProject?.repo_path || '';
 
             // 1. Write .antigravity_resume_task.json to project directory
@@ -748,22 +888,76 @@ export default function PromptTreeViewModal({
         });
     };
 
-    // Search filter across projects and conversations
+    // Search filter & multi-tier sorting across projects
     const filteredProjects = useMemo(() => {
-        if (!searchQuery.trim()) return treeData;
-        const q = searchQuery.toLowerCase();
-        return treeData.filter(
-            (p) =>
-                p.repo_name.toLowerCase().includes(q) ||
-                p.repo_path.toLowerCase().includes(q) ||
-                p.conversations.some(
-                    (c) =>
-                        c.title.toLowerCase().includes(q) ||
-                        c.conversation_id.toLowerCase().includes(q) ||
-                        c.prompt_preview_200w.toLowerCase().includes(q)
-                )
-        );
-    }, [treeData, searchQuery]);
+        let list = [...treeData];
+
+        // 1. Search filter
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            list = list.filter(
+                (p) =>
+                    p.repo_name.toLowerCase().includes(q) ||
+                    p.repo_path.toLowerCase().includes(q) ||
+                    p.conversations.some(
+                        (c) =>
+                            c.title.toLowerCase().includes(q) ||
+                            c.conversation_id.toLowerCase().includes(q) ||
+                            c.prompt_preview_200w.toLowerCase().includes(q)
+                    )
+            );
+        }
+
+        // 2. Filter Pills
+        if (activeFilter === 'running') {
+            list = list.filter((p) => p.is_running || p.conversations.some((c) => c.is_running));
+        } else if (activeFilter === 'pinned') {
+            list = list.filter((p) => pinnedProjectIds.includes(p.project_id));
+        } else if (activeFilter === 'latest_conv') {
+            list = list.filter((p) => p.conversations.length > 0);
+        } else if (activeFilter === 'latest_prompt') {
+            list = list.filter((p) => p.conversations.some((c) => c.step_count > 0 || Boolean(c.prompt_preview_200w)));
+        }
+
+        // 3. Multi-Tier Prioritization:
+        // Pinned first -> Actively running projects -> Recent activity (last_modified) -> Alphabetical
+        list.sort((a, b) => {
+            const aPinned = pinnedProjectIds.includes(a.project_id);
+            const bPinned = pinnedProjectIds.includes(b.project_id);
+            if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+            const aRunning = a.is_running || a.conversations.some((c) => c.is_running);
+            const bRunning = b.is_running || b.conversations.some((c) => c.is_running);
+            if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+            const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+            const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+            if (bLatest !== aLatest) return bLatest - aLatest;
+
+            return a.repo_name.localeCompare(b.repo_name);
+        });
+
+        return list;
+    }, [treeData, searchQuery, activeFilter, pinnedProjectIds]);
+
+    // Sort conversations inside each project: Running at top -> Descending by last_modified
+    const sortConversations = useCallback(
+        (convs: AgmConversationNode[]) => {
+            let sorted = [...convs];
+            if (activeFilter === 'running') {
+                sorted = sorted.filter((c) => c.is_running);
+            }
+            return sorted.sort((a, b) => {
+                if (a.is_running !== b.is_running) {
+                    return a.is_running ? -1 : 1;
+                }
+                const aTime = new Date(a.last_modified).getTime() || 0;
+                const bTime = new Date(b.last_modified).getTime() || 0;
+                return bTime - aTime;
+            });
+        },
+        [activeFilter]
+    );
 
     // Active prompt truncation for Preview mode
     const { displayText: previewDisplayText, isTruncated, totalWords } = useMemo(() => {
@@ -775,9 +969,21 @@ export default function PromptTreeViewModal({
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200">
-            <div className="flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl mt-12 sm:mt-14">
+    const modalContent = (
+        <div
+            className={cn(
+                "fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200",
+                isFullscreen ? "p-0" : "p-4 sm:p-6"
+            )}
+        >
+            <div
+                className={cn(
+                    "flex flex-col overflow-hidden bg-white dark:bg-[#0c2438] shadow-2xl transition-all",
+                    isFullscreen
+                        ? "h-full w-full rounded-none border-0"
+                        : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#15334d]"
+                )}
+            >
                 {/* Modal Header */}
                 <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#15334d] px-6 py-4 bg-slate-50/80 dark:bg-[#071a27] shrink-0">
                     <div className="flex items-center gap-3">
@@ -830,6 +1036,24 @@ export default function PromptTreeViewModal({
                                 <RefreshCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
                                 <span>Refresh</span>
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
+                                title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Mode'}
+                            >
+                                {isFullscreen ? (
+                                    <>
+                                        <Minimize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>Exit</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>Full</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
 
                         <button
@@ -860,8 +1084,8 @@ export default function PromptTreeViewModal({
                 <div className="flex flex-1 overflow-hidden">
                     {/* Left Panel: 3-Layer Project -> Conversation -> Prompt Tree */}
                     <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#15334d] bg-slate-50/50 dark:bg-[#071a27]/60">
-                        {/* Search Input */}
-                        <div className="p-3 border-b border-slate-200 dark:border-[#15334d] shrink-0">
+                        {/* Search Input & Filter Pills */}
+                        <div className="p-3 border-b border-slate-200 dark:border-[#15334d] shrink-0 space-y-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                                 <input
@@ -871,6 +1095,36 @@ export default function PromptTreeViewModal({
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full rounded-[5px] bg-white dark:bg-[#0c2438] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                 />
+                            </div>
+
+                            {/* Search Filter Pills */}
+                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
+                                {(
+                                    [
+                                        { id: 'all', label: 'All' },
+                                        { id: 'running', label: 'Running' },
+                                        { id: 'latest_conv', label: 'Latest Conv' },
+                                        { id: 'latest_prompt', label: 'Latest Prompt' },
+                                        { id: 'pinned', label: 'Pinned' },
+                                    ] as const
+                                ).map((pill) => {
+                                    const isActive = activeFilter === pill.id;
+                                    return (
+                                        <button
+                                            key={pill.id}
+                                            type="button"
+                                            onClick={() => setActiveFilter(pill.id)}
+                                            className={cn(
+                                                "px-2 py-0.5 text-[10px] font-medium rounded-[5px] transition-colors whitespace-nowrap cursor-pointer border",
+                                                isActive
+                                                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold"
+                                                    : "bg-slate-100 dark:bg-[#0c2438] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d]/80"
+                                            )}
+                                        >
+                                            {pill.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -884,6 +1138,7 @@ export default function PromptTreeViewModal({
                                 filteredProjects.map((project) => {
                                     const isProjectExpanded = Boolean(expandedProjects[project.project_id]);
                                     const isProjectSelected = selectedProject?.project_id === project.project_id;
+                                    const isPinned = pinnedProjectIds.includes(project.project_id);
 
                                     // Calculate total prompt count for Layer 1
                                     const totalProjectPrompts = project.conversations.reduce(
@@ -891,11 +1146,12 @@ export default function PromptTreeViewModal({
                                         0
                                     );
 
-                                    // Partition into normal conversations vs untitled/empty conversations
+                                    // Sort conversations inside project: Running at top -> Descending by last_modified
+                                    const sortedConvs = sortConversations(project.conversations);
                                     const normalConversations: AgmConversationNode[] = [];
                                     const untitledConversations: AgmConversationNode[] = [];
 
-                                    project.conversations.forEach((conv) => {
+                                    sortedConvs.forEach((conv) => {
                                         if (isUntitledOrEmpty(conv)) {
                                             untitledConversations.push(conv);
                                         } else {
@@ -933,12 +1189,36 @@ export default function PromptTreeViewModal({
                                                     <Folder className="h-4 w-4 text-amber-500 shrink-0" />
                                                     <span className="truncate">{project.repo_name}</span>
                                                 </div>
-                                                <span
-                                                    className="rounded-[5px] bg-slate-200 dark:bg-[#15334d] px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300 shrink-0"
-                                                    title={`${totalProjectPrompts} total prompt(s)`}
-                                                >
-                                                    {totalProjectPrompts} prompts
-                                                </span>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleRefreshSingleProject(project.project_id, e)}
+                                                        disabled={refreshingProjectId === project.project_id}
+                                                        className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                        title="Refresh this project"
+                                                    >
+                                                        <RotateCw className={cn("w-3 h-3", refreshingProjectId === project.project_id && "animate-spin text-blue-500")} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => togglePinProject(project.project_id, e)}
+                                                        className={cn(
+                                                            "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                                            isPinned
+                                                                ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                                                : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                                        )}
+                                                        title={isPinned ? "Unpin project" : "Pin project to top"}
+                                                    >
+                                                        <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
+                                                    </button>
+                                                    <span
+                                                        className="rounded-[5px] bg-slate-200 dark:bg-[#15334d] px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300"
+                                                        title={`${totalProjectPrompts} total prompt(s)`}
+                                                    >
+                                                        {totalProjectPrompts} prompts
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             {/* Layer 2: Conversations List */}
@@ -993,7 +1273,10 @@ export default function PromptTreeViewModal({
                                                                             {conv.step_count || 1} stp
                                                                         </span>
                                                                         {conv.is_running && (
-                                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" title="Running" />
+                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                                                                RUNNING
+                                                                            </span>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -1111,9 +1394,17 @@ export default function PromptTreeViewModal({
                                                                                             {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
                                                                                         </span>
                                                                                     </div>
-                                                                                    <span className="text-[9px] font-mono opacity-70">
-                                                                                        {conv.step_count || 1} stp
-                                                                                    </span>
+                                                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                                                        <span className="text-[9px] font-mono opacity-70">
+                                                                                            {conv.step_count || 1} stp
+                                                                                        </span>
+                                                                                        {conv.is_running && (
+                                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                                                                                RUNNING
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
 
                                                                                 {/* Layer 3 Prompts for Untitled Conversation */}
@@ -1185,16 +1476,22 @@ export default function PromptTreeViewModal({
                                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
-                                            <span
-                                                className={cn(
-                                                    'px-2 py-0.5 rounded-[5px] text-[10px] font-bold border',
-                                                    selectedConversation.is_running
-                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                                        : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-[#071a27] dark:text-slate-400 dark:border-[#15334d]'
-                                                )}
-                                            >
-                                                {selectedConversation.is_running ? 'RUNNING' : 'QUEUED / IDLE'}
-                                            </span>
+                                            {selectedConversation.is_running ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span>ACTIVE RUNNING</span>
+                                                    {instancePid ? (
+                                                        <span className="font-mono text-[9px] opacity-80">(PID: {instancePid})</span>
+                                                    ) : null}
+                                                    <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400 border-l border-emerald-400/40 pl-1">
+                                                        {formatDuration(elapsedSeconds)}
+                                                    </span>
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded-[5px] text-[10px] font-bold border bg-slate-100 text-slate-600 border-slate-200 dark:bg-[#071a27] dark:text-slate-400 dark:border-[#15334d]">
+                                                    QUEUED / IDLE
+                                                </span>
+                                            )}
                                             <span className="rounded-[5px] bg-blue-50 dark:bg-[#071a27] text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-[#15334d] px-2 py-0.5 text-[10px] font-mono">
                                                 Turn #{selectedTurnNumber}
                                             </span>
@@ -1206,8 +1503,65 @@ export default function PromptTreeViewModal({
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons: Resend, Enqueue, Full */}
-                                    <div className="flex items-center gap-2">
+                                    {/* Action Buttons: Copy Text, Copy With Images, Save Images, Suffix Dropdown, Resend, Enqueue, Full */}
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {/* Copy Text Button (clean text only) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const cleanText = stripImagesFromPrompt(activePromptText);
+                                                navigator.clipboard.writeText(cleanText);
+                                                setIsCopiedText(true);
+                                                setTimeout(() => setIsCopiedText(false), 2000);
+                                            }}
+                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                                            title="Copy clean prompt text (excluding embedded images)"
+                                        >
+                                            {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
+                                            <span>{isCopiedText ? 'Copied Text!' : 'Copy Text'}</span>
+                                        </button>
+
+                                        {/* Copy With Images Button (verbatim raw prompt) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(activePromptText);
+                                                setIsCopiedRaw(true);
+                                                setTimeout(() => setIsCopiedRaw(false), 2000);
+                                            }}
+                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                                            title="Copy raw prompt verbatim including markdown image syntax"
+                                        >
+                                            {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
+                                            <span>{isCopiedRaw ? 'Copied Verbatim!' : 'Copy With Images'}</span>
+                                        </button>
+
+                                        {/* Save Images Button */}
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveImages}
+                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                                            title="Extract and save embedded images"
+                                        >
+                                            <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                                            <span>Save Images</span>
+                                        </button>
+
+                                        {/* Confirmation Suffix Dropdown */}
+                                        <select
+                                            value={confirmationSuffix}
+                                            onChange={(e) => setConfirmationSuffix(e.target.value)}
+                                            className="rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                            title="Confirmation suffix appended on Resend"
+                                        >
+                                            <option value="None (Send as is)">Suffix: None (Send as is)</option>
+                                            <option value="Is it done?">Suffix: Is it done?</option>
+                                            <option value="Is it released?">Suffix: Is it released?</option>
+                                            <option value="Are you sure about it?">Suffix: Are you sure about it?</option>
+                                            <option value="Double check all edge cases">Suffix: Double check all edge cases</option>
+                                            <option value="Verify build and tests">Suffix: Verify build and tests</option>
+                                        </select>
+
                                         {/* Resend Button */}
                                         <button
                                             type="button"
@@ -1459,7 +1813,7 @@ export default function PromptTreeViewModal({
 
             {/* Full-Screen Prompt Inspector Modal */}
             {inspectorPrompt && (
-                <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
                     <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl">
                         {/* Inspector Header */}
                         <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#15334d] px-6 py-4 bg-slate-50 dark:bg-[#071a27] shrink-0">
@@ -1572,4 +1926,6 @@ export default function PromptTreeViewModal({
             )}
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }

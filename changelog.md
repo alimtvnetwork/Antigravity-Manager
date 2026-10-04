@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.137.0] - 2026-10-04
+
+### Added
+- **原生操作系统实例窗口标题标准化 (OS Instance Window Title Formatting)**: 实现 `compute_ide_ending_sequence` 与 `compute_instance_window_title`，将原生操作系统窗口标题、任务栏标签及缩略图预览严格标准化为 `#{sequence} {instance_name} - {ide_ending_sequence}`（如 `#1 Default - Antigravity`、`#2 8136 - antigravity-8136`），并在实例创建、克隆、重命名、启动及注册表启动同步等完整生命周期内自动注入 `<data_dir>/User/settings.json`，彻底解决多实例在任务栏中标题混淆的问题。 (Thanks to @aukgit)
+- **实例卡片 6 列操作网格标准化与底部 CSS3 悬浮动效 (Instance Card 6-Column Grid & Hover Animation)**: 将卡片操作按钮重构为严格的 6 列对称网格（`grid grid-cols-6 gap-1 w-full`），并在 `#1 Default` 卡片的第 6 槽位放置占位空间，确保克隆（`Clone`）与二进制克隆（`Executable`）在所有卡片中的水平列位置绝对统一；移除顶部生硬的彩色横条，转移至卡片底边并引入平滑的 CSS3 悬浮渐变缩放发光动效（`group-hover:scale-x-100 group-hover:opacity-100`），大幅提升界面专业度。 (Thanks to @aukgit)
+- **提示词树 Portal 挂载、全屏模式与顶部遮挡修复 (Prompt Tree Portal Mounting & Fullscreen Mode)**: 通过 React `createPortal` 将 `PromptTreeViewModal` 直接挂载至 `document.body` 并设置 `z-[300]`，彻底消除被固定顶栏遮挡问题并废除生硬的外边距补丁；新增全屏模式切换按钮（`[Full]` / `[Exit]`），支持全屏无缝沉浸式检查与编辑。 (Thanks to @aukgit)
+- **项目级即时刷新与本地置顶图钉机制 (Project-Level Refresh & Pinning)**: 在提示词树项目列表行内新增刷新图标（`RotateCw`，强制穿透 SQLite 磁盘缓存）与图钉置顶切换按钮（`Pin`），置顶状态按实例维度持久化至 `localStorage`（`agm_pinned_projects_{instance_id}`）。 (Thanks to @aukgit)
+- **多阶提示词排序分流与搜索筛选胶囊 (Prompt Layering Prioritization & Filter Pills)**: 实现多阶智能排序管线（置顶项目首位 $\rightarrow$ 正在运行项目居中 $\rightarrow$ 最近修改时间 $\rightarrow$ 首字母顺序；会话层正在运行会话绝对置顶）；搜索栏下方新增 `[All]`、`[Running]`、`[Latest Conv]`、`[Latest Prompt]`、`[Pinned]` 5 组快速筛选胶囊。 (Thanks to @aukgit)
+- **提示词多模式复制、图片本地导出与确认后缀下拉 (Prompt Resend, Image Actions & Confirmation Suffix)**: 新增“纯文本复制”、“含图完整复制”及“提取并导出本地图片”操作；新增重发确认后缀下拉选择器（`Is it done?`、`Is it released?`、`Are you sure about it?` 等预设），选中后自动将指令附加于提示词末尾触发重发；将会话运行指示器升级为呼吸动效徽章，并在头部常驻展示实时运行耗时计时器与匹配的进程 PID。 (Thanks to @aukgit)
+
+---
+
 ## [v4.136.0] - 2026-10-04
 
 ### Added
@@ -386,6 +398,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.137.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.136.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
