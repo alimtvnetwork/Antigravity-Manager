@@ -13,7 +13,7 @@ export default function ThemePicker() {
                     Pick a catalogue theme. The choice is saved with the rest of the app settings.
                 </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                 {THEME_PALETTES.map((palette) => {
                     const selected = current === palette.id;
                     return (
@@ -21,14 +21,14 @@ export default function ThemePicker() {
                             key={palette.id}
                             type="button"
                             onClick={() => updateTheme(palette.id)}
-                            className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${selected
+                            className={`flex items-center gap-2 rounded-[5px] border px-2.5 py-2 text-left transition-colors ${selected
                                 ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]'
                                 : 'border-gray-200 dark:border-base-300 hover:border-gray-400'
                                 }`}
                             style={{ backgroundColor: palette.surface, color: palette.fg }}
                         >
                             <span
-                                className="h-7 w-7 shrink-0 rounded-md border border-white/10"
+                                className="h-7 w-7 shrink-0 rounded-[5px] border border-white/10"
                                 style={{ background: `linear-gradient(135deg, ${palette.bg} 50%, ${palette.primary} 50%)` }}
                             />
                             <span className="min-w-0">

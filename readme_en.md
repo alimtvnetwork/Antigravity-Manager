@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.134.0)
+> Professional AI Account Management & Protocol Proxy System (v4.135.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.134.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.135.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.133.0**: Enhanced Accounts and Instances UI aesthetics with VS Code teal/cyan quota gradients, subtle row borders, 5-6px button radius standard, compact 4-per-row card grid, merged instance columns, and zero horizontal scrolling. Integrated Supabase repo-secrets auto-discovery, distributed lease locking preventing multi-instance account contention, and configurable email usage cooldown. (Thanks to @aukgit)
+> Latest version **v4.135.0**: Ingested 8 rich themes from WP-Exam into `THEME_PALETTES` (bringing total catalogue themes to 18) including Green Choice, Clean Wide, Riseup Gold, Dracula, and Obsidian Cyan. Added a sleek top-level header theme switcher (`ThemeSwitcherDropdown`) directly beside the route menu dropdown (`NavMenu`) for millisecond-level instant on-the-fly theme switching, updated global CSS palette mapping in `src/App.css`, and scaled settings `ThemePicker` to a responsive 6-column layout with 5–6px (`rounded-[5px]`) standard button geometry. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

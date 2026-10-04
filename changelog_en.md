@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.135.0 (2026-10-04)**:
+        -   **[Theming & Visual Design] WP-Exam Themes & Colors Ingestion (18 Themes Total)**:
+            -   **Description**: Ingested 8 rich, production-grade themes from WP-Exam into `THEME_PALETTES` (bringing total catalogue themes to 18): `Green Choice` (Emerald eco-luxury light), `Green Choice Dark` (botanical dark), `Clean Wide` (vivid indigo and deep slate light), `Riseup Gold` (warm gold and midnight navy dark), `Antigravity Dracula` (neon green & deep purple dark), `Letterly Purple` (electric indigo & violet dark), `Obsidian Cyan` (VS Code obsidian slate & cyan neon dark), and `Navy Gold` (dark navy gold). (Thanks to @aukgit)
+        -   **[Top Header UI] On-The-Fly Theme Switcher beside Menu Dropdown**:
+            -   **Description**: Implemented a sleek, non-intrusive on-the-fly theme switcher (`ThemeSwitcherDropdown`) mounted directly beside the central route menu (`NavMenu`) in `Navbar.tsx`. Features a rounded pill trigger with active dual-gradient preview swatch, palette name, chevron indicator, and an interactive popover card with 18 clickable themes adhering strictly to 5–6px (`rounded-[5px]`) corner radii and coordinated via `agm:dropdown-open` event bus. Enables millisecond-level instant theme switching across all views without requiring settings navigation or reloads. (Thanks to @aukgit)
+        -   **[CSS & Settings] Universal Palette Custom Properties & ThemePicker Scaling**:
+            -   **Description**: Added `html[class*="palette-"]` wildcard styles to `src/App.css` and mapped variables (`--bg`, `--surface`, `--primary`, `--fg`) to guarantee seamless dark/light surface overrides. Scaled the Settings `ThemePicker.tsx` grid to a 6-column layout with 5–6px corner radii. (Thanks to @aukgit)
+
     *   **v4.134.0 (2026-10-04)**:
         -   **[Release CI] Multi-Platform Release Asset Packaging Fix**:
             -   **Description**: Fixed artifact download pattern in GitHub Actions release workflow to ensure all cross-platform assets (Windows NSIS setup `.exe`, macOS `.dmg`, Linux `.deb` / `.AppImage`) are reliably bundled and published to official GitHub Releases for frictionless one-liner installation. (Thanks to @aukgit)

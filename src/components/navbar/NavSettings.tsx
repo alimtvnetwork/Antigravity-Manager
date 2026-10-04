@@ -36,7 +36,7 @@ export function NavSettings({
             if (customEvent.detail?.source !== 'nav-settings') {
                 setIsPrefsOpen(false);
             }
-            if (customEvent.detail?.source === 'instance-selector') {
+            if (customEvent.detail?.source === 'instance-selector' || customEvent.detail?.source === 'theme-switcher') {
                 setIsCleanModalOpen(false);
             }
         };

@@ -20,6 +20,14 @@ export const THEME_PALETTES: ThemePalette[] = [
     { id: 'github-dark', label: 'GitHub Dark HC', bg: '#0A0C10', surface: '#1C212C', primary: '#79C0FF', fg: '#FFFFFF', dark: true },
     { id: 'monokai', label: 'Monokai Pro', bg: '#2D2A2E', surface: '#3A363B', primary: '#FF6188', fg: '#FCFCFA', dark: true },
     { id: 'editorial', label: 'Warm Editorial', bg: '#0B0A09', surface: '#1D1A18', primary: '#FFAD01', fg: '#F7F5F2', dark: true },
+    { id: 'green-choice', label: 'Green Choice', bg: '#F4F8F5', surface: '#FFFFFF', primary: '#16A34A', fg: '#13201B', dark: false },
+    { id: 'green-choice-dark', label: 'Green Choice Dark', bg: '#0E1613', surface: '#16221E', primary: '#22C55E', fg: '#F0FDF4', dark: true },
+    { id: 'clean-wide', label: 'Clean Wide', bg: '#FFFFFF', surface: '#F8FAFC', primary: '#4F46E5', fg: '#0F172A', dark: false },
+    { id: 'riseup', label: 'Riseup Gold', bg: '#0A0A14', surface: '#141424', primary: '#E8C547', fg: '#FFF1D6', dark: true },
+    { id: 'dracula', label: 'Dracula', bg: '#191A21', surface: '#282A36', primary: '#BD93F9', fg: '#F8F8F2', dark: true },
+    { id: 'purple', label: 'Purple Violet', bg: '#0F0E1E', surface: '#18162F', primary: '#5C45FD', fg: '#FFFFFF', dark: true },
+    { id: 'obsidian', label: 'Obsidian Cyan', bg: '#0D1117', surface: '#161B22', primary: '#38BDF8', fg: '#F0F6FC', dark: true },
+    { id: 'vscode-navy-gold', label: 'Navy Gold', bg: '#0D1117', surface: '#161B22', primary: '#E8C547', fg: '#F0F6FC', dark: true },
 ];
 
 export function findPalette(id: string): ThemePalette {

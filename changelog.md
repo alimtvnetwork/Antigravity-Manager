@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.135.0] - 2026-10-04
+
+### Added
+- **WP-Exam 主题与调色板深度接入 (WP-Exam Themes & Colors Ingestion)**: 从 WP-Exam 引入 8 套高品质现代主题并扩充至 `THEME_PALETTES`（总计 18 套主题），涵盖 Green Choice（生态奢华浅色）、Green Choice Dark（绿色植物暗色）、Clean Wide（宽屏靛蓝浅色）、Riseup Gold（海军蓝金暗色）、Antigravity Dracula（德古拉暗夜紫）、Letterly Purple（极光电紫）、Obsidian Cyan（黑曜石青蓝）与 Navy Gold（海军暗金）。 (Thanks to @aukgit)
+- **顶栏常驻即时主题切换器 (Top Header On-The-Fly Theme Switcher)**: 在顶部导航栏路线下拉菜单（`NavMenu`）旁直接集成常驻的药丸胶囊主题切换器（`ThemeSwitcherDropdown`），支持实时双色渐变色块指示、活跃主题名称、18 套主题悬浮选择卡片与 `agm:dropdown-open` 全局事件联动，无需进入设置页即可在任意界面实现全局主题毫秒级即时切换与持久化存储。 (Thanks to @aukgit)
+
+### Improved
+- **全局 CSS 调色板映射与设置页平铺展示**: 在 `src/App.css` 中添加 `html[class*="palette-"]` 通用选择器规则与各主题变量绑定，确保 `--bg`、`--surface`、`--primary`、`--fg` 及深色表面类无缝覆盖；升级设置页 `ThemePicker.tsx` 网格布局至 6 列平铺响应式排版，所有主题卡片均遵循 5–6px（`rounded-[5px]`）标准圆角几何。 (Thanks to @aukgit)
+
+---
+
 ## [v4.134.0] - 2026-10-04
 
 ### Fixed
@@ -360,6 +371,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.135.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.134.0 (2026-10-04)**:
         -   **[Release CI] 跨平台发布包完整性修复**:
             -   **Description**: 修复 GitHub Actions 发布流程中的产物匹配模式，确保 Windows 安装包（`agm-alim-setup.exe`）、macOS（`.dmg`）及 Linux（`.deb` / `.AppImage`）在发布流程中完整下载并上传至 GitHub Releases。 (Thanks to @aukgit)

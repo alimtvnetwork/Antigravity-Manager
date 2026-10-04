@@ -10,6 +10,7 @@ import { NavLogo } from './NavLogo';
 import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
 import { InstanceSelector } from './InstanceSelector';
+import { ThemeSwitcherDropdown } from './ThemeSwitcherDropdown';
 import { ErrorQueueBadge } from '../errors/error-queue-badge';
 import type { NavItem } from './constants';
 
@@ -214,13 +215,14 @@ function Navbar() {
                     {/* Center draggable spacer */}
                     <div className="flex-1 h-full min-w-1" data-tauri-drag-region />
 
-                    {/* Compact nav menu */}
+                    {/* Compact nav menu & Theme Switcher */}
                     <div
-                        className="no-drag shrink-0 flex justify-center min-w-0 px-0.5 sm:px-1"
+                        className="no-drag shrink-0 flex items-center gap-1.5 sm:gap-2 justify-center min-w-0 px-0.5 sm:px-1"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
                         <NavMenu navItems={navItems} />
+                        <ThemeSwitcherDropdown />
                     </div>
 
                     {/* Center draggable spacer */}

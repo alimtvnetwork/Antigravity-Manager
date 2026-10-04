@@ -15,6 +15,7 @@
 ## Completed this run
 | `100` | [100-resume-same-conversation-and-pid-cache.md](../../02-spec/21-app/100-resume-same-conversation-and-pid-cache.md) | `DONE` | Same-conversation resume file, audit info modal, 2-minute quota floor, saved-PID check with a 10-minute process cache. |
 | `104` | [104-instance-settings-sync-duplication-and-navbar-combine.md](./completed/104-instance-settings-sync-duplication-and-navbar-combine.md) | `DONE` | Combined navbar buttons, unified duplicate parity, project/folder copy, deep settings sync, defaults enforcement, and JSON import/export with undo/redo. |
+| `107` | [107-wp-exam-themes-and-header-switcher.md](./completed/107-wp-exam-themes-and-header-switcher.md) | `DONE` | Ingested 8 themes from wp-exam into THEME_PALETTES (18 total), updated App.css and ThemePicker, and added Top-Level Header Theme Switcher beside NavMenu. |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
