@@ -444,6 +444,9 @@ pub fn run() {
             let proxy_state = commands::proxy::ProxyServiceState::new();
             let cf_state = Arc::new(commands::cloudflared::CloudflaredState::new());
 
+            // Discover and persist initial IDE information on first run
+            let _ = crate::modules::process::discover_and_persist_initial_ide_info();
+
             // Load config
             match modules::config::load_app_config() {
                 Ok(mut config) => {

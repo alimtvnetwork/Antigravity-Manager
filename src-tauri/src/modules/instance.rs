@@ -2682,12 +2682,28 @@ fn launch_instance_inner_with_extra_workspaces(
 
     #[cfg(target_os = "macos")]
     {
-        let mut cmd = Command::new("open");
-        // -n flag guarantees a new separate instance is spawned even if another is already running
-        cmd.arg("-n");
-        cmd.arg("-a");
-        cmd.arg(&exe_str);
-        cmd.arg("--args");
+        let is_app_bundle = exe_str.ends_with(".app") || exe_path.is_dir();
+        let mut cmd = if is_app_bundle {
+            let mut c = Command::new("open");
+            // -n flag guarantees a new separate instance is spawned even if another is already running
+            c.arg("-n");
+            c.arg("-a");
+            c.arg(&exe_str);
+            c.arg("--args");
+            c
+        } else {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(&exe_path) {
+                let mut permissions = metadata.permissions();
+                let mode = permissions.mode();
+                if mode & 0o111 == 0 {
+                    permissions.set_mode(mode | 0o755);
+                    let _ = std::fs::set_permissions(&exe_path, permissions);
+                }
+            }
+            Command::new(&exe_str)
+        };
+
         let has_custom_data = !is_default;
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
@@ -2697,7 +2713,27 @@ fn launch_instance_inner_with_extra_workspaces(
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
             if let Some(ref inst_home) = inst_home_opt {
                 let _ = fs::create_dir_all(inst_home);
+                let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
+                let gemini_dir = inst_home.join(".gemini").join("antigravity");
+                let _ = fs::create_dir_all(&gemini_ide_dir);
+                let _ = fs::create_dir_all(&gemini_dir);
+
+                // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
+                let is_tos = resolved_account
+                    .as_ref()
+                    .map(|a| a.token.is_gcp_tos)
+                    .unwrap_or(false);
+                let _ =
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+
                 cmd.env("HOME", inst_home);
+            } else {
+                let is_tos = resolved_account
+                    .as_ref()
+                    .map(|a| a.token.is_gcp_tos)
+                    .unwrap_or(false);
+                let _ =
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
             }
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
@@ -2723,9 +2759,14 @@ fn launch_instance_inner_with_extra_workspaces(
             .stderr(std::process::Stdio::null());
 
         let child = cmd.spawn().map_err(|e| {
+            let trace = std::backtrace::Backtrace::capture();
+            crate::modules::logger::log_error(&format!(
+                "[Instance] Failed to spawn macOS instance process (exe: {}, is_app_bundle: {}): {}. Backtrace:\n{:?}",
+                exe_str, is_app_bundle, e, trace
+            ));
             crate::error::AppError::Process(format!(
-                "Failed to spawn macOS instance process: {}",
-                e
+                "Failed to spawn macOS instance process: {} (trace: {:?})",
+                e, trace
             ))
         })?;
         // /usr/bin/open exits quickly (~20ms).
@@ -2972,8 +3013,23 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let cloned_path = {
         let launcher_sh = instance_bin_dir.join(format!("antigravity-{}", instance_id));
         let base_str = base_exe.to_string_lossy();
-        let script_content = format!("#!/bin/sh\nopen -n -a \"{}\" --args \"$@\"\n", base_str);
-        fs::write(&launcher_sh, script_content).map_err(|e| crate::error::AppError::Io(e))?;
+        let is_app_bundle = base_str.ends_with(".app") || base_exe.is_dir();
+        let script_content = if is_app_bundle {
+            format!(
+                "#!/bin/sh\nexec open -n -a \"{}\" --args \"$@\"\n",
+                base_str
+            )
+        } else {
+            format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str)
+        };
+        fs::write(&launcher_sh, script_content).map_err(|e| {
+            let trace = std::backtrace::Backtrace::capture();
+            crate::modules::logger::log_error(&format!(
+                "[Instance] Failed to write macOS launcher script {:?}: {}. Backtrace:\n{:?}",
+                launcher_sh, e, trace
+            ));
+            crate::error::AppError::Io(e)
+        })?;
         use std::os::unix::fs::PermissionsExt;
         let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
         launcher_sh

@@ -1993,6 +1993,53 @@ pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::
     detect_antigravity_with_diagnostics(target_ide).ok()
 }
 
+/// Discover Antigravity IDE on first-time startup or when unconfigured,
+/// persisting the located executable into gui_config.json.
+pub fn discover_and_persist_initial_ide_info() -> Result<(), crate::error::AppError> {
+    let mut config = crate::modules::config::load_app_config().unwrap_or_default();
+
+    if let Some(ref exe_str) = config.antigravity_executable {
+        if !exe_str.trim().is_empty() && std::path::Path::new(exe_str).exists() {
+            return Ok(());
+        }
+    }
+
+    match detect_antigravity_with_diagnostics(None) {
+        Ok(path) => {
+            let path_str = path.to_string_lossy().to_string();
+            config.antigravity_executable = Some(path_str);
+            crate::modules::logger::log_info(&format!(
+                "[IDE Discovery] First-time startup located Antigravity IDE: {:?}",
+                path
+            ));
+            if let Err(e) = crate::modules::config::save_app_config(&config) {
+                crate::modules::logger::log_warn(&format!(
+                    "[IDE Discovery] Failed to persist discovered IDE to config: {}",
+                    e
+                ));
+            }
+        }
+        Err(err) => {
+            crate::modules::logger::log_info(
+                "[IDE Discovery] No Antigravity IDE detected during first-time startup (standby for user manual launch or configuration)."
+            );
+            if let crate::error::AppError::IdeNotFound {
+                ref diagnostics,
+                ref stack_trace,
+                ..
+            } = err
+            {
+                crate::modules::logger::log_info(&format!(
+                    "[IDE Discovery Diagnostics]\n{}\nStack trace:\n{}",
+                    diagnostics, stack_trace
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Helper to construct candidate search paths for macOS IDE discovery.
 pub(crate) fn get_macos_candidate_paths(
     folder_name: &str,
@@ -2759,5 +2806,11 @@ mod tests {
                     .to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn test_discover_and_persist_initial_ide_info_runs_without_panic() {
+        let res = discover_and_persist_initial_ide_info();
+        assert!(res.is_ok());
     }
 }
