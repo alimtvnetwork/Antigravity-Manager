@@ -851,3 +851,41 @@ export async function syncAllInstancesAndQuotas(): Promise<InstanceStatus[]> {
         throw e;
     }
 }
+
+export type SyncInterval = '15s' | '30s' | '1m' | '2m' | 'off';
+
+export function getPromptTreeSyncInterval(): SyncInterval {
+    try {
+        const val = localStorage.getItem('agm_prompt_tree_sync_interval') as SyncInterval;
+        if (val === '15s' || val === '30s' || val === '1m' || val === '2m' || val === 'off') {
+            return val;
+        }
+    } catch {}
+    return '30s';
+}
+
+export function setPromptTreeSyncInterval(interval: SyncInterval): void {
+    try {
+        localStorage.setItem('agm_prompt_tree_sync_interval', interval);
+    } catch {}
+}
+
+export function getArchivedProjectsForInstance(instanceId: string): string[] {
+    try {
+        const key = `agm_archived_projects_${instanceId || 'default'}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+export function setArchivedProjectsForInstance(instanceId: string, projectIds: string[]): void {
+    try {
+        const key = `agm_archived_projects_${instanceId || 'default'}`;
+        localStorage.setItem(key, JSON.stringify(projectIds));
+    } catch {}
+}
+

@@ -3,6 +3,18 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.138.0 (2026-10-04)**:
+        -   **[Prompt Inspector] Running Instance & Conversation Targeted Auto-Selection**:
+            -   **Description**: When opening `PromptTreeViewModal` on an instance, the modal automatically detects active running projects and conversations, expanding solely the targeted project and conversation nodes and selecting the running prompt turn in the inspection pane. If no prompt is currently running, it auto-expands the primary active project and selects its latest conversation, completely eliminating blind mass-expansion of all 29+ projects. (Thanks to @aukgit)
+        -   **[Auto-Sync Engine] Configurable Background Auto-Sync Interval with 15s Safety Floor**:
+            -   **Description**: Added a configurable Sync Interval dropdown (`15s`, `30s`, `1m`, `2m`, `Off`) within the header segmented toolbar capsule beside `[Refresh]`, with a strict safety floor of 15 seconds. Background polling queries `get_project_conversation_tree` with `force: true` to bypass SQLite 60-second disk caching, silently updating the tree without full-screen loading spinners, disrupting scroll position, or discarding dirty prompt textarea input. (Thanks to @aukgit)
+        -   **[Tree Organization] Stale & Empty Prompts Demotion to Bottom Group**:
+            -   **Description**: Implemented intelligent stale/empty conversation detection (`isStaleOrEmptyConversation`), demoting old or untitled empty prompt turns to the bottom of each project tree under a collapsible `📁 Archived / Stale Prompts ({count})` group, while keeping active running prompts strictly immune and anchored at the top. (Thanks to @aukgit)
+        -   **[Project Archive] Per-Instance Project Archive / Less Favorite (Thumbs Down) Toggle**:
+            -   **Description**: Added an instance-scoped Archive / Less Favorite toggle button (`Archive` / `ArchiveRestore` icon) on project rows. Archiving persists in `localStorage` under `agm_archived_projects_{instanceId}` and automatically unpins the project, collapsing archived projects into a bottom `📁 Archived Projects ({count})` section without modifying filesystem folders or affecting other instances. Added an `[Archived ({count})]` filter pill for quick access and unarchiving. (Thanks to @aukgit)
+        -   **[Instance Dashboard] Real-Time Active Prompt Indicator & Action Grid Symmetry**:
+            -   **Description**: Added an active `Prompt Active` badge in the instance card header linking directly to `PromptTreeViewModal` when background prompts are running, while preserving full alignment across the 6-column action grid in Row 2. (Thanks to @aukgit)
+
     *   **v4.137.0 (2026-10-04)**:
         -   **[Backend & OS Window Title] Standardized Instance Window Title Formatting**:
             -   **Description**: Implemented `compute_ide_ending_sequence` and `compute_instance_window_title` in `src-tauri/src/modules/instance.rs`. Enforced strict window title formatting starting with `#{sequence} {instance_name} - {ide_ending_sequence}` (e.g. `#1 Default - Antigravity`, `#2 8136 - antigravity-8136`) across Windows, macOS, and Linux. Automatically injected into `<data_dir>/User/settings.json` across instance creation, duplication, renaming, launching, and startup registry synchronization. (Thanks to @aukgit)

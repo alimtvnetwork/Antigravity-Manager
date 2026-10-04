@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.138.0] - 2026-10-04
+
+### Added
+- **运行中实例与会话精准自动选中与展开 (Running Instance & Active Conversation Targeted Auto-Selection)**: 打开提示词树（`PromptTreeViewModal`）时，自动探测当前实例正在运行的项目与会话，仅精准展开目标项目与会话节点并高亮选中其运行轮次；若无正在运行任务，则自动展开首个有效项目并选中其最新会话；彻底废除盲目展开所有 29+ 项目的旧逻辑，确保右侧检查器第一时间呈现当前工作区上下文。 (Thanks to @aukgit)
+- **可配置后台自动同步轮询机制与 15s 安全下限 (Configurable Background Auto-Sync Interval with 15s Floor)**: 在弹窗顶栏分段药丸胶囊内集成同步间隔选择器（支持 `15s`、`30s`、`1m`、`2m`、`Off`，默认 30s），严格锁定最低 15 秒安全频率下限；轮询时通过 `force: true` 穿透 SQLite 磁盘缓存，静默刷新会话树而不触发全局遮罩，保持当前会话匹配与用户滚动位置，杜绝覆盖未保存的文本框编辑。 (Thanks to @aukgit)
+- **陈旧与空会话置底隔离与折叠归档 (Stale / Empty Prompts Demotion to Bottom)**: 优化空会话与无内容提示词判定逻辑（正在运行会话享受豁免免疫），将各项目下的陈旧空会话自动下沉至树形底部并归拢为折叠群组（`📁 Archived / Stale Prompts ({count})`），让高价值活跃会话始终稳居顶部。 (Thanks to @aukgit)
+- **实例维度项目归档/移入底栏机制 (Per-Instance Project Archive / Less Favorite Toggle)**: 在项目列表项操作区新增实例维度的归档按钮（`Archive` / `ArchiveRestore` 图标），支持将非关注项目标记为低优先级；归档状态按实例隔离持久化至 `localStorage`（`agm_archived_projects_{instanceId}`）并自动取消图钉置顶；归档项目收拢至列表底部折叠群组（`📁 Archived Projects ({count})`）且不影响文件系统或其他实例；搜索栏下方同步新增 `[Archived ({count})]` 快速筛选胶囊。 (Thanks to @aukgit)
+- **实例卡片活跃提示词联动徽章 (Instance Card Active Prompt Badge)**: 在实例卡片头部新增与提示词树联动的 `Prompt Active` 青色呼吸徽章，实时检测正在执行的后台提示词，点击可直接穿透呼出提示词树弹窗；保持第二行 6 列操作网格对称统一。 (Thanks to @aukgit)
+
+---
+
 ## [v4.137.0] - 2026-10-04
 
 ### Added
@@ -398,6 +409,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.138.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.137.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -36,9 +36,10 @@ import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
 import type { InstanceStatus } from '../services/instanceService';
+import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import InstanceTable from '../components/instances/InstanceTable';
-import PromptTreeViewModal from '../components/instances/PromptTreeViewModal';
+import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
 import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
@@ -191,19 +192,44 @@ export default function Instances() {
 
     }, []);
 
+    const [runningTreeNodes, setRunningTreeNodes] = useState<AgmProjectTreeNode[]>([]);
+
+    const fetchRunningTasks = async () => {
+        try {
+            const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
+                maxWords: 50,
+                onlyRunning: true,
+                force: false,
+            });
+            if (Array.isArray(data)) {
+                setRunningTreeNodes(data);
+            }
+        } catch {
+            // Silently ignore background polling error
+        }
+    };
+
     useEffect(() => {
         if (!isTauri()) return;
         fetchInstances();
         fetchSwitcherStatus();
         fetchAccounts();
+        fetchRunningTasks();
         const timer = setInterval(() => {
             fetchInstances(true);
             fetchSwitcherStatus();
+            fetchRunningTasks();
         }, 3000);
 
         let unlistenList: (() => void)[] = [];
         import('@tauri-apps/api/event').then(({ listen }) => {
-            const events = ['account://auto-switched', 'instance://switched', 'instance://rotated'];
+            const events = [
+                'account://auto-switched',
+                'instance://switched',
+                'instance://rotated',
+                'prompt://dispatched',
+                'prompt://resumed',
+            ];
             Promise.all(
                 events.map((ev) =>
                     listen(ev, async () => {
@@ -211,6 +237,7 @@ export default function Instances() {
                             fetchInstances(true),
                             fetchSwitcherStatus(),
                             fetchAccounts(),
+                            fetchRunningTasks(),
                         ]);
                     })
                 )
@@ -784,6 +811,15 @@ export default function Instances() {
                         const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
                         const geminiModel = geminiPro || geminiFlash;
 
+                        const hasActiveTask = runningTreeNodes.some((node) => {
+                            const isInstanceMatch =
+                                node.instance_id === inst.config.id ||
+                                node.instance_name === inst.config.name ||
+                                (inst.config.is_default && (node.instance_id === 'default' || node.instance_id === '__default__' || !node.instance_id));
+                            const isNodeRunning = Boolean(node.is_running) || Boolean(node.conversations?.some((c) => c.is_running));
+                            return isInstanceMatch && isNodeRunning;
+                        });
+
                         return (
                             <div
                                 key={inst.config.id}
@@ -812,6 +848,17 @@ export default function Instances() {
                                                 <h3 className={cn("font-bold text-xs truncate max-w-[120px]", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
+                                                {hasActiveTask && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
+                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                                        title="Active prompt/task running - Click to open Prompt Tree"
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                                                        <span>Prompt Active</span>
+                                                    </button>
+                                                )}
                                                 {inst.config.is_default ? (
                                                     <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 shrink-0">
                                                         DEFAULT
@@ -1163,10 +1210,18 @@ export default function Instances() {
                                             <button
                                                 type="button"
                                                 onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                                                title="Prompt Tree"
+                                                className={cn(
+                                                    "w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] border transition-colors cursor-pointer relative",
+                                                    hasActiveTask
+                                                        ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 border-cyan-400/50 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
+                                                        : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                )}
+                                                title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
                                             >
                                                 <Layers className="w-3 h-3" />
+                                                {hasActiveTask && (
+                                                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                                                )}
                                             </button>
 
                                             {/* Slot 2: Settings */}
@@ -1766,7 +1821,10 @@ export default function Instances() {
             {/* Project & Conversation Prompt Tree View Modal */}
             <PromptTreeViewModal
                 isOpen={Boolean(promptTreeInstance)}
-                onClose={() => setPromptTreeInstance(null)}
+                onClose={() => {
+                    setPromptTreeInstance(null);
+                    fetchRunningTasks();
+                }}
                 instanceId={promptTreeInstance?.id || ''}
                 instanceName={promptTreeInstance?.name || ''}
             />

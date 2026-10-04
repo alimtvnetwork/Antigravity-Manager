@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.137.0)
+> Professional AI Account Management & Protocol Proxy System (v4.138.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.137.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.138.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.137.0**: Standardized native OS instance window title formatting strictly to `#{sequence} {instance_name} - {ide_ending_sequence}` across Windows, macOS, and Linux, persisting into settings across the entire instance lifecycle. Standardized instance card Row 2 actions into a rigid 6-column grid with invisible alignment slot for `#1 Default`, and relocated header accent bar to a sleek bottom line with smooth CSS3 hover expansion and ambient glow animation. Mounted `PromptTreeViewModal` directly to `document.body` via React `createPortal` with `z-[300]` to eliminate header clipping, added edge-to-edge full-screen mode, single-project inline refresh (`RotateCw`) and pinning (`Pin`), multi-tier sorting prioritization (pinned $\rightarrow$ running $\rightarrow$ active $\rightarrow$ alphabetical), 5 search filter pills, multi-mode copy and image disk export, confirmation suffix dropdown presets, and animated running pulse badge with real-time elapsed ticker. (Thanks to @aukgit)
+> Latest version **v4.138.0**: Implemented targeted auto-selection and expansion of active running projects and conversation turns on `PromptTreeViewModal` open, preventing mass expansion of 29+ projects; added a configurable background auto-sync interval dropdown (`15s`, `30s`, `1m`, `2m`, `Off`) with a strict safety floor of 15 seconds that bypasses SQLite disk caches without flickering UI scroll or discarding dirty textarea inputs; demoted stale/empty prompt turns to the bottom under a collapsible `📁 Archived / Stale Prompts` group with immunity for active running prompts; added an instance-scoped Archive / Less Favorite project toggle (`Archive` / `ArchiveRestore`) persisting to local storage with bottom collapsible grouping and filter pills; integrated an active prompt badge on instance cards. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

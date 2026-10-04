@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     X,
@@ -26,9 +26,19 @@ import {
     Eye,
     Code,
     Edit3,
+    Clock,
+    Archive,
+    ArchiveRestore,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import {
+    type SyncInterval,
+    getPromptTreeSyncInterval,
+    setPromptTreeSyncInterval,
+    getArchivedProjectsForInstance,
+    setArchivedProjectsForInstance,
+} from '../../services/instanceService';
 import { cn } from '../../utils/cn';
 
 export interface AgmConversationNode {
@@ -127,8 +137,11 @@ function getPromptTurns(conv: AgmConversationNode): PromptTurnNode[] {
     ];
 }
 
-// Helper to check if a conversation is untitled or empty
-function isUntitledOrEmpty(conv: AgmConversationNode): boolean {
+// Helper to check if a conversation is stale or empty (immune if actively running)
+export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
+    if (conv.is_running === true || conv.status === 'RUNNING') {
+        return false;
+    }
     const title = (conv.title || '').trim().toLowerCase();
     const isUntitled =
         !title ||
@@ -140,6 +153,9 @@ function isUntitledOrEmpty(conv: AgmConversationNode): boolean {
     const isEmptyPrompt = !conv.prompt_preview_200w || conv.prompt_preview_200w.trim().length === 0;
     return isUntitled || isEmptyPrompt;
 }
+
+export const isUntitledOrEmpty = isStaleOrEmptyConversation;
+
 
 // Helper to strip markdown image syntax and data URIs for "Copy Text"
 function stripImagesFromPrompt(text: string): string {
@@ -477,9 +493,11 @@ export default function PromptTreeViewModal({
     const { instances } = useInstanceStore();
     const [treeData, setTreeData] = useState<AgmProjectTreeNode[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+    const [syncInterval, setSyncInterval] = useState<SyncInterval>(() => getPromptTreeSyncInterval());
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'latest_conv' | 'latest_prompt' | 'pinned'>('all');
+    const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>('all');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Pinned projects persisted in localStorage
@@ -492,6 +510,13 @@ export default function PromptTreeViewModal({
         }
     });
 
+    // Archived projects persisted in localStorage
+    const [archivedProjectIds, setArchivedProjectIds] = useState<string[]>(() => {
+        return getArchivedProjectsForInstance(instanceId);
+    });
+
+    const [isArchivedProjectsExpanded, setIsArchivedProjectsExpanded] = useState(false);
+
     const [refreshingProjectId, setRefreshingProjectId] = useState<string | null>(null);
     const [confirmationSuffix, setConfirmationSuffix] = useState<string>('None (Send as is)');
     const [isCopiedText, setIsCopiedText] = useState(false);
@@ -499,7 +524,7 @@ export default function PromptTreeViewModal({
 
     const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
     const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({});
-    const [expandedUntitledGroups, setExpandedUntitledGroups] = useState<Record<string, boolean>>({});
+    const [expandedStaleGroups, setExpandedStaleGroups] = useState<Record<string, boolean>>({});
 
     const [selectedProject, setSelectedProject] = useState<AgmProjectTreeNode | null>(null);
     const [selectedConversation, setSelectedConversation] = useState<AgmConversationNode | null>(null);
@@ -513,6 +538,16 @@ export default function PromptTreeViewModal({
     const [isResending, setIsResending] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
     const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+    // Live refs to prevent closure staleness in background auto-sync timer
+    const selectedConversationRef = useRef(selectedConversation);
+    selectedConversationRef.current = selectedConversation;
+    const selectedProjectRef = useRef(selectedProject);
+    selectedProjectRef.current = selectedProject;
+    const selectedTurnNumberRef = useRef(selectedTurnNumber);
+    selectedTurnNumberRef.current = selectedTurnNumber;
+    const activePromptTextRef = useRef(activePromptText);
+    activePromptTextRef.current = activePromptText;
 
     const currentInstance = useMemo(() => {
         const targetId = selectedProject?.instance_id || instanceId || 'default';
@@ -555,6 +590,27 @@ export default function PromptTreeViewModal({
             } catch {}
             return next;
         });
+    };
+
+    const toggleArchiveProject = (projectId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const isCurrentlyArchived = archivedProjectIds.includes(projectId);
+        let nextArchived: string[];
+        if (isCurrentlyArchived) {
+            nextArchived = archivedProjectIds.filter((id) => id !== projectId);
+        } else {
+            nextArchived = [...archivedProjectIds, projectId];
+            // Automatically unpin the project when archived
+            if (pinnedProjectIds.includes(projectId)) {
+                const nextPinned = pinnedProjectIds.filter((id) => id !== projectId);
+                setPinnedProjectIds(nextPinned);
+                try {
+                    localStorage.setItem(`agm_pinned_projects_${instanceId || 'default'}`, JSON.stringify(nextPinned));
+                } catch {}
+            }
+        }
+        setArchivedProjectIds(nextArchived);
+        setArchivedProjectsForInstance(instanceId, nextArchived);
     };
 
     const handleRefreshSingleProject = async (projectId: string, e: React.MouseEvent) => {
@@ -623,13 +679,133 @@ export default function PromptTreeViewModal({
         setShowAllWords(false);
     }, []);
 
-    const loadTree = async () => {
-        setIsLoading(true);
+    // Auto-selection algorithm on modal open
+    const performAutoSelection = useCallback(
+        (data: AgmProjectTreeNode[], currentArchivedIds: string[], currentPinnedIds: string[]) => {
+            if (data.length === 0) {
+                setSelectedProject(null);
+                setSelectedConversation(null);
+                return;
+            }
+
+            // Target non-archived projects in prioritized order
+            const nonArchived = data.filter((p) => !currentArchivedIds.includes(p.project_id));
+            const targetPool = nonArchived.length > 0 ? nonArchived : data;
+
+            const prioritized = [...targetPool].sort((a, b) => {
+                const aPinned = currentPinnedIds.includes(a.project_id);
+                const bPinned = currentPinnedIds.includes(b.project_id);
+                if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+                const aRunning = a.is_running || a.conversations.some((c) => c.is_running || c.status === 'RUNNING');
+                const bRunning = b.is_running || b.conversations.some((c) => c.is_running || c.status === 'RUNNING');
+                if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+                const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+                const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+                if (bLatest !== aLatest) return bLatest - aLatest;
+
+                return a.repo_name.localeCompare(b.repo_name);
+            });
+
+            // 1. Look for actively running conversation across non-archived projects
+            interface RunningCand {
+                conv: AgmConversationNode;
+                proj: AgmProjectTreeNode;
+                timestamp: number;
+            }
+            const runningCandidates: RunningCand[] = [];
+            for (const proj of prioritized) {
+                for (const conv of proj.conversations) {
+                    if (conv.is_running === true || conv.status === 'RUNNING') {
+                        runningCandidates.push({
+                            conv,
+                            proj,
+                            timestamp: new Date(conv.last_modified).getTime() || 0,
+                        });
+                    }
+                }
+            }
+
+            if (runningCandidates.length > 0) {
+                // Pick newest running conversation
+                runningCandidates.sort((a, b) => b.timestamp - a.timestamp);
+                const winning = runningCandidates[0];
+                setExpandedProjects({ [winning.proj.project_id]: true });
+                setExpandedConversations({ [winning.conv.conversation_id]: true });
+                selectConversation(winning.conv, winning.proj, Math.max(winning.conv.step_count || 1, 1));
+                if (isStaleOrEmptyConversation(winning.conv)) {
+                    setExpandedStaleGroups({ [winning.proj.project_id]: true });
+                } else {
+                    setExpandedStaleGroups({});
+                }
+                return;
+            }
+
+            // 2. If no conversation is running, check if any non-archived project has p.is_running === true
+            const runningProj = prioritized.find((p) => p.is_running === true && p.conversations.length > 0);
+            if (runningProj) {
+                const sortedConvs = [...runningProj.conversations].sort((a, b) => {
+                    const aTime = new Date(a.last_modified).getTime() || 0;
+                    const bTime = new Date(b.last_modified).getTime() || 0;
+                    return bTime - aTime;
+                });
+                const winningConv = sortedConvs[0];
+                setExpandedProjects({ [runningProj.project_id]: true });
+                setExpandedConversations({ [winningConv.conversation_id]: true });
+                selectConversation(winningConv, runningProj, Math.max(winningConv.step_count || 1, 1));
+                if (isStaleOrEmptyConversation(winningConv)) {
+                    setExpandedStaleGroups({ [runningProj.project_id]: true });
+                } else {
+                    setExpandedStaleGroups({});
+                }
+                return;
+            }
+
+            // 3. Fallback: Auto-expand the first non-archived project in prioritized order and select its newest conversation
+            const firstProj = prioritized[0];
+            if (firstProj) {
+                setExpandedProjects({ [firstProj.project_id]: true });
+                if (firstProj.conversations.length > 0) {
+                    const sortedConvs = [...firstProj.conversations].sort((a, b) => {
+                        const aTime = new Date(a.last_modified).getTime() || 0;
+                        const bTime = new Date(b.last_modified).getTime() || 0;
+                        return bTime - aTime;
+                    });
+                    const winningConv = sortedConvs[0];
+                    setExpandedConversations({ [winningConv.conversation_id]: true });
+                    selectConversation(winningConv, firstProj, Math.max(winningConv.step_count || 1, 1));
+                    if (isStaleOrEmptyConversation(winningConv)) {
+                        setExpandedStaleGroups({ [firstProj.project_id]: true });
+                    } else {
+                        setExpandedStaleGroups({});
+                    }
+                } else {
+                    setSelectedProject(firstProj);
+                    setSelectedConversation(null);
+                }
+            }
+        },
+        [selectConversation]
+    );
+
+    const loadTree = async (
+        isInitialLoad: boolean = true,
+        isForce: boolean = false,
+        overrideArchivedIds?: string[],
+        overridePinnedIds?: string[]
+    ) => {
+        if (isInitialLoad) {
+            setIsLoading(true);
+        } else {
+            setIsAutoSyncing(true);
+        }
         setError(null);
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                 maxWords: 300,
                 onlyRunning: false,
+                force: isForce,
             });
             const relevant = instanceId
                 ? data.filter(
@@ -642,34 +818,91 @@ export default function PromptTreeViewModal({
             const finalData = relevant.length > 0 ? relevant : data;
             setTreeData(finalData);
 
-            // Auto-expand projects
-            const initialExpanded: Record<string, boolean> = {};
-            finalData.forEach((p) => {
-                initialExpanded[p.project_id] = true;
-            });
-            setExpandedProjects(initialExpanded);
+            if (isInitialLoad) {
+                const targetArchived = overrideArchivedIds || archivedProjectIds;
+                const targetPinned = overridePinnedIds || pinnedProjectIds;
+                performAutoSelection(finalData, targetArchived, targetPinned);
+            } else {
+                // Background sync: match existing selected conversation and turn in place
+                const currentConv = selectedConversationRef.current;
+                const currentProj = selectedProjectRef.current;
+                const currentTurn = selectedTurnNumberRef.current;
+                const currentActiveText = activePromptTextRef.current;
 
-            if (finalData.length > 0) {
-                const firstProj = finalData[0];
-                setSelectedProject(firstProj);
-                if (firstProj.conversations.length > 0) {
-                    const firstConv = firstProj.conversations[0];
-                    selectConversation(firstConv, firstProj);
-                    setExpandedConversations({ [firstConv.conversation_id]: true });
+                if (currentConv && currentProj) {
+                    const updatedProj = finalData.find((p) => p.project_id === currentProj.project_id);
+                    if (updatedProj) {
+                        setSelectedProject(updatedProj);
+                        const updatedConv = updatedProj.conversations.find(
+                            (c) => c.conversation_id === currentConv.conversation_id
+                        );
+                        if (updatedConv) {
+                            setSelectedConversation(updatedConv);
+                            const turns = getPromptTurns(updatedConv);
+                            const activeTurn =
+                                turns.find((t) => t.turnNumber === currentTurn) ||
+                                turns[turns.length - 1] ||
+                                turns[0];
+                            const freshText = activeTurn?.text || updatedConv.prompt_preview_200w || '';
+                            setActivePromptText(freshText);
+                            // Do not clobber user's dirty textarea edits
+                            setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
+                        }
+                    }
                 }
             }
         } catch (err: any) {
-            setError(err?.toString() || 'Failed to load project and conversation tree');
+            if (isInitialLoad) {
+                setError(err?.toString() || 'Failed to load project and conversation tree');
+            } else {
+                console.warn('Background auto-sync failed:', err);
+            }
         } finally {
-            setIsLoading(false);
+            if (isInitialLoad) {
+                setIsLoading(false);
+            } else {
+                setIsAutoSyncing(false);
+            }
         }
     };
 
+    // Modal open effect
     useEffect(() => {
         if (isOpen) {
-            loadTree();
+            const latestArchived = getArchivedProjectsForInstance(instanceId);
+            const latestPinned = (() => {
+                try {
+                    const stored = localStorage.getItem(`agm_pinned_projects_${instanceId || 'default'}`);
+                    return stored ? JSON.parse(stored) : [];
+                } catch {
+                    return [];
+                }
+            })();
+            setArchivedProjectIds(latestArchived);
+            setPinnedProjectIds(latestPinned);
+            loadTree(true, false, latestArchived, latestPinned);
         }
     }, [isOpen, instanceId]);
+
+    // Configurable auto-sync interval timer (minimum 15s floor)
+    useEffect(() => {
+        if (!isOpen || syncInterval === 'off') return;
+
+        let intervalMs = 30000;
+        if (syncInterval === '15s') intervalMs = 15000;
+        else if (syncInterval === '30s') intervalMs = 30000;
+        else if (syncInterval === '1m') intervalMs = 60000;
+        else if (syncInterval === '2m') intervalMs = 120000;
+
+        const safeIntervalMs = Math.max(intervalMs, 15000);
+
+        const timer = setInterval(() => {
+            loadTree(false, true);
+        }, safeIntervalMs);
+
+        return () => clearInterval(timer);
+    }, [isOpen, syncInterval, instanceId]);
+
 
     // Handle Backup Prompts
     const handleBackup = async () => {
@@ -888,8 +1121,12 @@ export default function PromptTreeViewModal({
         });
     };
 
-    // Search filter & multi-tier sorting across projects
-    const filteredProjects = useMemo(() => {
+    const archivedCount = useMemo(() => {
+        return treeData.filter((p) => archivedProjectIds.includes(p.project_id)).length;
+    }, [treeData, archivedProjectIds]);
+
+    // Search filter & multi-tier sorting across projects, partitioned into active & archived
+    const { activeProjects, archivedProjects } = useMemo(() => {
         let list = [...treeData];
 
         // 1. Search filter
@@ -910,24 +1147,26 @@ export default function PromptTreeViewModal({
 
         // 2. Filter Pills
         if (activeFilter === 'running') {
-            list = list.filter((p) => p.is_running || p.conversations.some((c) => c.is_running));
+            list = list.filter((p) => p.is_running || p.conversations.some((c) => c.is_running || c.status === 'RUNNING'));
         } else if (activeFilter === 'pinned') {
             list = list.filter((p) => pinnedProjectIds.includes(p.project_id));
         } else if (activeFilter === 'latest_conv') {
             list = list.filter((p) => p.conversations.length > 0);
         } else if (activeFilter === 'latest_prompt') {
             list = list.filter((p) => p.conversations.some((c) => c.step_count > 0 || Boolean(c.prompt_preview_200w)));
+        } else if (activeFilter === 'archived') {
+            list = list.filter((p) => archivedProjectIds.includes(p.project_id));
         }
 
         // 3. Multi-Tier Prioritization:
         // Pinned first -> Actively running projects -> Recent activity (last_modified) -> Alphabetical
-        list.sort((a, b) => {
+        const sortFn = (a: AgmProjectTreeNode, b: AgmProjectTreeNode) => {
             const aPinned = pinnedProjectIds.includes(a.project_id);
             const bPinned = pinnedProjectIds.includes(b.project_id);
             if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-            const aRunning = a.is_running || a.conversations.some((c) => c.is_running);
-            const bRunning = b.is_running || b.conversations.some((c) => c.is_running);
+            const aRunning = a.is_running || a.conversations.some((c) => c.is_running || c.status === 'RUNNING');
+            const bRunning = b.is_running || b.conversations.some((c) => c.is_running || c.status === 'RUNNING');
             if (aRunning !== bRunning) return aRunning ? -1 : 1;
 
             const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
@@ -935,21 +1174,36 @@ export default function PromptTreeViewModal({
             if (bLatest !== aLatest) return bLatest - aLatest;
 
             return a.repo_name.localeCompare(b.repo_name);
-        });
+        };
 
-        return list;
-    }, [treeData, searchQuery, activeFilter, pinnedProjectIds]);
+        if (activeFilter === 'archived') {
+            return {
+                activeProjects: [],
+                archivedProjects: [...list].sort(sortFn),
+            };
+        }
+
+        const activeList = list.filter((p) => !archivedProjectIds.includes(p.project_id)).sort(sortFn);
+        const archivedList = list.filter((p) => archivedProjectIds.includes(p.project_id)).sort(sortFn);
+
+        return {
+            activeProjects: activeList,
+            archivedProjects: archivedList,
+        };
+    }, [treeData, searchQuery, activeFilter, pinnedProjectIds, archivedProjectIds]);
 
     // Sort conversations inside each project: Running at top -> Descending by last_modified
     const sortConversations = useCallback(
         (convs: AgmConversationNode[]) => {
             let sorted = [...convs];
             if (activeFilter === 'running') {
-                sorted = sorted.filter((c) => c.is_running);
+                sorted = sorted.filter((c) => c.is_running || c.status === 'RUNNING');
             }
             return sorted.sort((a, b) => {
-                if (a.is_running !== b.is_running) {
-                    return a.is_running ? -1 : 1;
+                const aRunning = a.is_running || a.status === 'RUNNING';
+                const bRunning = b.is_running || b.status === 'RUNNING';
+                if (aRunning !== bRunning) {
+                    return aRunning ? -1 : 1;
                 }
                 const aTime = new Date(a.last_modified).getTime() || 0;
                 const bTime = new Date(b.last_modified).getTime() || 0;
@@ -966,6 +1220,260 @@ export default function PromptTreeViewModal({
 
     const displayedMarkdown = showAllWords || !isTruncated ? activePromptText : previewDisplayText;
     const activeWordCount = totalWords || countWords(activePromptText);
+
+    const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
+        const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
+        const isConvExpanded = Boolean(expandedConversations[conv.conversation_id]);
+        const promptTurns = getPromptTurns(conv);
+        const isRunning = conv.is_running || conv.status === 'RUNNING';
+
+        return (
+            <div key={conv.conversation_id} className="space-y-0.5">
+                {/* Conversation Row */}
+                <div
+                    onClick={() => {
+                        selectConversation(conv, project, 1);
+                        setExpandedConversations((prev) => ({
+                            ...prev,
+                            [conv.conversation_id]: !isConvExpanded,
+                        }));
+                    }}
+                    onDoubleClick={() => openInspector(conv, project.repo_path)}
+                    className={cn(
+                        'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
+                        isConvSelected
+                            ? 'bg-blue-600 text-white font-medium shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
+                    )}
+                    title="Click to view prompts; double-click for Full inspector"
+                >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        {isConvExpanded ? (
+                            <ChevronDown className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
+                        ) : (
+                            <ChevronRight className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
+                        )}
+                        <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-blue-500 opacity-70')} />
+                        <span className="truncate text-[11px]">
+                            {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <span
+                            className={cn(
+                                'text-[9px] font-mono px-1 rounded-[3px]',
+                                isConvSelected
+                                    ? 'bg-blue-700/80 text-white'
+                                    : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
+                            )}
+                        >
+                            {conv.step_count || 1} stp
+                        </span>
+                        {isRunning && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                RUNNING
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Layer 3: Prompts Inside Conversation */}
+                {isConvExpanded && (
+                    <div className="ml-5 pl-2 border-l border-slate-200 dark:border-[#15334d]/50 space-y-0.5 py-0.5">
+                        {promptTurns.map((turn) => {
+                            const isTurnSelected =
+                                selectedConversation?.conversation_id === conv.conversation_id &&
+                                selectedTurnNumber === turn.turnNumber;
+
+                            return (
+                                <div
+                                    key={turn.turnNumber}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        selectPromptTurn(turn, conv, project);
+                                    }}
+                                    className={cn(
+                                        'group flex items-center justify-between rounded-[5px] px-2 py-1 text-[11px] cursor-pointer transition-colors',
+                                        isTurnSelected
+                                            ? 'bg-cyan-600 text-white font-semibold shadow-2xs'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]'
+                                    )}
+                                    title={`Click to load ${turn.title} (${turn.wordCount} words)`}
+                                >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                                        <span className="truncate">{turn.title}</span>
+                                    </div>
+                                    <span
+                                        className={cn(
+                                            'text-[10px] font-mono shrink-0 px-1 rounded-[3px]',
+                                            isTurnSelected
+                                                ? 'text-cyan-100'
+                                                : 'text-slate-400 dark:text-slate-500'
+                                        )}
+                                    >
+                                        {turn.wordCount}w
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderProjectNode = (project: AgmProjectTreeNode) => {
+        const isProjectExpanded = Boolean(expandedProjects[project.project_id]);
+        const isProjectSelected = selectedProject?.project_id === project.project_id;
+        const isPinned = pinnedProjectIds.includes(project.project_id);
+        const isArchived = archivedProjectIds.includes(project.project_id);
+
+        const totalProjectPrompts = project.conversations.reduce(
+            (sum, c) => sum + (c.step_count > 0 ? c.step_count : 1),
+            0
+        );
+
+        const sortedConvs = sortConversations(project.conversations);
+        const activeConversations: AgmConversationNode[] = [];
+        const staleConversations: AgmConversationNode[] = [];
+
+        sortedConvs.forEach((conv) => {
+            if (isStaleOrEmptyConversation(conv)) {
+                staleConversations.push(conv);
+            } else {
+                activeConversations.push(conv);
+            }
+        });
+
+        const isStaleGroupExpanded = Boolean(expandedStaleGroups[project.project_id]);
+
+        return (
+            <div key={project.project_id} className="space-y-0.5">
+                {/* Layer 1: Project Row */}
+                <div
+                    onClick={() => {
+                        setSelectedProject(project);
+                        setExpandedProjects((prev) => ({
+                            ...prev,
+                            [project.project_id]: !isProjectExpanded,
+                        }));
+                    }}
+                    className={cn(
+                        'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
+                        isProjectSelected
+                            ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
+                    )}
+                    title={`Project: ${project.repo_name} (${totalProjectPrompts} prompts total)`}
+                >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        {isProjectExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        )}
+                        <Folder className="h-4 w-4 text-amber-500 shrink-0" />
+                        <span className="truncate">{project.repo_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            type="button"
+                            onClick={(e) => handleRefreshSingleProject(project.project_id, e)}
+                            disabled={refreshingProjectId === project.project_id}
+                            className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            title="Refresh this project"
+                        >
+                            <RotateCw className={cn("w-3 h-3", refreshingProjectId === project.project_id && "animate-spin text-blue-500")} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => togglePinProject(project.project_id, e)}
+                            className={cn(
+                                "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                isPinned
+                                    ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                            )}
+                            title={isPinned ? "Unpin project" : "Pin project to top"}
+                        >
+                            <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => toggleArchiveProject(project.project_id, e)}
+                            className={cn(
+                                "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                isArchived
+                                    ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
+                                    : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                            )}
+                            title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
+                        >
+                            {isArchived ? (
+                                <ArchiveRestore className="w-3 h-3 text-rose-500" />
+                            ) : (
+                                <Archive className="w-3 h-3" />
+                            )}
+                        </button>
+                        <span
+                            className="rounded-[5px] bg-slate-200 dark:bg-[#15334d] px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300"
+                            title={`${totalProjectPrompts} total prompt(s)`}
+                        >
+                            {totalProjectPrompts} prompts
+                        </span>
+                    </div>
+                </div>
+
+                {/* Layer 2: Conversations List */}
+                {isProjectExpanded && (
+                    <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
+                        {/* Active Conversations */}
+                        {activeConversations.map((conv) => renderConversationNode(conv, project))}
+
+                        {/* Collapsible Stale / Empty Prompts Node */}
+                        {staleConversations.length > 0 && (
+                            <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/40">
+                                <div
+                                    onClick={() => {
+                                        setExpandedStaleGroups((prev) => ({
+                                            ...prev,
+                                            [project.project_id]: !isStaleGroupExpanded,
+                                        }));
+                                    }}
+                                    className="group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438] cursor-pointer transition-colors"
+                                    title="Toggle Archived / Stale Prompts"
+                                >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        {isStaleGroupExpanded ? (
+                                            <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+                                        ) : (
+                                            <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
+                                        )}
+                                        <Folder className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                        <span className="truncate">
+                                            Archived / Stale Prompts ({staleConversations.length})
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-400">
+                                        {staleConversations.length}
+                                    </span>
+                                </div>
+
+                                {isStaleGroupExpanded && (
+                                    <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
+                                        {staleConversations.map((conv) => renderConversationNode(conv, project))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
 
     if (!isOpen) return null;
 
@@ -1028,7 +1536,7 @@ export default function PromptTreeViewModal({
                             </button>
                             <button
                                 type="button"
-                                onClick={loadTree}
+                                onClick={() => loadTree(true, true)}
                                 disabled={isLoading}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
                                 title="Refresh Tree"
@@ -1036,6 +1544,26 @@ export default function PromptTreeViewModal({
                                 <RefreshCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
                                 <span>Refresh</span>
                             </button>
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                <Clock className={cn("w-3.5 h-3.5 text-cyan-500", isAutoSyncing && "animate-spin")} />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">Sync:</span>
+                                <select
+                                    value={syncInterval}
+                                    onChange={(e) => {
+                                        const val = e.target.value as SyncInterval;
+                                        setSyncInterval(val);
+                                        setPromptTreeSyncInterval(val);
+                                    }}
+                                    className="rounded-[5px] bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
+                                    title="Auto-sync interval"
+                                >
+                                    <option value="15s">15s</option>
+                                    <option value="30s">30s</option>
+                                    <option value="1m">1m</option>
+                                    <option value="2m">2m</option>
+                                    <option value="off">Off</option>
+                                </select>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setIsFullscreen(!isFullscreen)}
@@ -1106,6 +1634,7 @@ export default function PromptTreeViewModal({
                                         { id: 'latest_conv', label: 'Latest Conv' },
                                         { id: 'latest_prompt', label: 'Latest Prompt' },
                                         { id: 'pinned', label: 'Pinned' },
+                                        { id: 'archived', label: `Archived (${archivedCount})` },
                                     ] as const
                                 ).map((pill) => {
                                     const isActive = activeFilter === pill.id;
@@ -1130,337 +1659,56 @@ export default function PromptTreeViewModal({
 
                         {/* Tree Items List */}
                         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                            {filteredProjects.length === 0 ? (
-                                <div className="py-12 text-center text-xs text-slate-400">
-                                    No projects or conversations found.
-                                </div>
+                            {activeFilter === 'archived' ? (
+                                archivedProjects.length === 0 ? (
+                                    <div className="py-12 text-center text-xs text-slate-400">
+                                        No archived projects found.
+                                    </div>
+                                ) : (
+                                    archivedProjects.map((project) => renderProjectNode(project))
+                                )
                             ) : (
-                                filteredProjects.map((project) => {
-                                    const isProjectExpanded = Boolean(expandedProjects[project.project_id]);
-                                    const isProjectSelected = selectedProject?.project_id === project.project_id;
-                                    const isPinned = pinnedProjectIds.includes(project.project_id);
+                                <>
+                                    {activeProjects.length === 0 && archivedProjects.length === 0 ? (
+                                        <div className="py-12 text-center text-xs text-slate-400">
+                                            No projects or conversations found.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {activeProjects.map((project) => renderProjectNode(project))}
 
-                                    // Calculate total prompt count for Layer 1
-                                    const totalProjectPrompts = project.conversations.reduce(
-                                        (sum, c) => sum + (c.step_count > 0 ? c.step_count : 1),
-                                        0
-                                    );
-
-                                    // Sort conversations inside project: Running at top -> Descending by last_modified
-                                    const sortedConvs = sortConversations(project.conversations);
-                                    const normalConversations: AgmConversationNode[] = [];
-                                    const untitledConversations: AgmConversationNode[] = [];
-
-                                    sortedConvs.forEach((conv) => {
-                                        if (isUntitledOrEmpty(conv)) {
-                                            untitledConversations.push(conv);
-                                        } else {
-                                            normalConversations.push(conv);
-                                        }
-                                    });
-
-                                    const isUntitledGroupExpanded = Boolean(expandedUntitledGroups[project.project_id]);
-
-                                    return (
-                                        <div key={project.project_id} className="space-y-0.5">
-                                            {/* Layer 1: Project Row */}
-                                            <div
-                                                onClick={() => {
-                                                    setSelectedProject(project);
-                                                    setExpandedProjects((prev) => ({
-                                                        ...prev,
-                                                        [project.project_id]: !isProjectExpanded,
-                                                    }));
-                                                }}
-                                                className={cn(
-                                                    'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
-                                                    isProjectSelected
-                                                        ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
-                                                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
-                                                )}
-                                                title={`Project: ${project.repo_name} (${totalProjectPrompts} prompts total)`}
-                                            >
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    {isProjectExpanded ? (
-                                                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                    ) : (
-                                                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                    )}
-                                                    <Folder className="h-4 w-4 text-amber-500 shrink-0" />
-                                                    <span className="truncate">{project.repo_name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => handleRefreshSingleProject(project.project_id, e)}
-                                                        disabled={refreshingProjectId === project.project_id}
-                                                        className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                                                        title="Refresh this project"
+                                            {/* Collapsed at bottom: Archived Projects */}
+                                            {archivedProjects.length > 0 && (
+                                                <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#15334d]">
+                                                    <div
+                                                        onClick={() => setIsArchivedProjectsExpanded(!isArchivedProjectsExpanded)}
+                                                        className="group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438] cursor-pointer transition-colors"
+                                                        title="Toggle Archived Projects"
                                                     >
-                                                        <RotateCw className={cn("w-3 h-3", refreshingProjectId === project.project_id && "animate-spin text-blue-500")} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => togglePinProject(project.project_id, e)}
-                                                        className={cn(
-                                                            "p-1 rounded-[5px] transition-colors cursor-pointer",
-                                                            isPinned
-                                                                ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
-                                                                : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
-                                                        )}
-                                                        title={isPinned ? "Unpin project" : "Pin project to top"}
-                                                    >
-                                                        <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
-                                                    </button>
-                                                    <span
-                                                        className="rounded-[5px] bg-slate-200 dark:bg-[#15334d] px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300"
-                                                        title={`${totalProjectPrompts} total prompt(s)`}
-                                                    >
-                                                        {totalProjectPrompts} prompts
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Layer 2: Conversations List */}
-                                            {isProjectExpanded && (
-                                                <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
-                                                    {/* Normal Conversations */}
-                                                    {normalConversations.map((conv) => {
-                                                        const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-                                                        const isConvExpanded = Boolean(expandedConversations[conv.conversation_id]);
-                                                        const promptTurns = getPromptTurns(conv);
-
-                                                        return (
-                                                            <div key={conv.conversation_id} className="space-y-0.5">
-                                                                {/* Conversation Row */}
-                                                                <div
-                                                                    onClick={() => {
-                                                                        selectConversation(conv, project, 1);
-                                                                        setExpandedConversations((prev) => ({
-                                                                            ...prev,
-                                                                            [conv.conversation_id]: !isConvExpanded,
-                                                                        }));
-                                                                    }}
-                                                                    onDoubleClick={() => openInspector(conv, project.repo_path)}
-                                                                    className={cn(
-                                                                        'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
-                                                                        isConvSelected
-                                                                            ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                                                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
-                                                                    )}
-                                                                    title="Click to view prompts; double-click for Full inspector"
-                                                                >
-                                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                                        {isConvExpanded ? (
-                                                                            <ChevronDown className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                                                                        ) : (
-                                                                            <ChevronRight className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                                                                        )}
-                                                                        <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-blue-500 opacity-70')} />
-                                                                        <span className="truncate text-[11px]">
-                                                                            {conv.title || conv.short_id}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                                        <span
-                                                                            className={cn(
-                                                                                'text-[9px] font-mono px-1 rounded-[3px]',
-                                                                                isConvSelected
-                                                                                    ? 'bg-blue-700/80 text-white'
-                                                                                    : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
-                                                                            )}
-                                                                        >
-                                                                            {conv.step_count || 1} stp
-                                                                        </span>
-                                                                        {conv.is_running && (
-                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
-                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                                                                RUNNING
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Layer 3: Prompts Inside Conversation */}
-                                                                {isConvExpanded && (
-                                                                    <div className="ml-5 pl-2 border-l border-slate-200 dark:border-[#15334d]/50 space-y-0.5 py-0.5">
-                                                                        {promptTurns.map((turn) => {
-                                                                            const isTurnSelected =
-                                                                                selectedConversation?.conversation_id === conv.conversation_id &&
-                                                                                selectedTurnNumber === turn.turnNumber;
-
-                                                                            return (
-                                                                                <div
-                                                                                    key={turn.turnNumber}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        selectPromptTurn(turn, conv, project);
-                                                                                    }}
-                                                                                    className={cn(
-                                                                                        'group flex items-center justify-between rounded-[5px] px-2 py-1 text-[11px] cursor-pointer transition-colors',
-                                                                                        isTurnSelected
-                                                                                            ? 'bg-cyan-600 text-white font-semibold shadow-2xs'
-                                                                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]'
-                                                                                    )}
-                                                                                    title={`Click to load ${turn.title} (${turn.wordCount} words)`}
-                                                                                >
-                                                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                                                        <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                                        <span className="truncate">{turn.title}</span>
-                                                                                    </div>
-                                                                                    <span
-                                                                                        className={cn(
-                                                                                            'text-[10px] font-mono shrink-0 px-1 rounded-[3px]',
-                                                                                            isTurnSelected
-                                                                                                ? 'text-cyan-100'
-                                                                                                : 'text-slate-400 dark:text-slate-500'
-                                                                                        )}
-                                                                                    >
-                                                                                        {turn.wordCount}w
-                                                                                    </span>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-
-                                                    {/* Group Untitled & Empty Conversations Under Collapsible Node */}
-                                                    {untitledConversations.length > 0 && (
-                                                        <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/40">
-                                                            <div
-                                                                onClick={() => {
-                                                                    setExpandedUntitledGroups((prev) => ({
-                                                                        ...prev,
-                                                                        [project.project_id]: !isUntitledGroupExpanded,
-                                                                    }));
-                                                                }}
-                                                                className="group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438] cursor-pointer transition-colors"
-                                                                title="Toggle Untitled Conversations"
-                                                            >
-                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                    {isUntitledGroupExpanded ? (
-                                                                        <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
-                                                                    ) : (
-                                                                        <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
-                                                                    )}
-                                                                    <Folder className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                                    <span className="truncate">
-                                                                        Untitled Conversations ({untitledConversations.length})
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-[10px] font-mono text-slate-400">
-                                                                    {untitledConversations.length}
-                                                                </span>
-                                                            </div>
-
-                                                            {/* Untitled Conversations Sublist */}
-                                                            {isUntitledGroupExpanded && (
-                                                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
-                                                                    {untitledConversations.map((conv) => {
-                                                                        const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-                                                                        const isConvExpanded = Boolean(expandedConversations[conv.conversation_id]);
-                                                                        const promptTurns = getPromptTurns(conv);
-
-                                                                        return (
-                                                                            <div key={conv.conversation_id} className="space-y-0.5">
-                                                                                <div
-                                                                                    onClick={() => {
-                                                                                        selectConversation(conv, project, 1);
-                                                                                        setExpandedConversations((prev) => ({
-                                                                                            ...prev,
-                                                                                            [conv.conversation_id]: !isConvExpanded,
-                                                                                        }));
-                                                                                    }}
-                                                                                    onDoubleClick={() => openInspector(conv, project.repo_path)}
-                                                                                    className={cn(
-                                                                                        'group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors',
-                                                                                        isConvSelected
-                                                                                            ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                                                                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
-                                                                                    )}
-                                                                                    title="Click to view prompts; double click for Full inspector"
-                                                                                >
-                                                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                                                        {isConvExpanded ? (
-                                                                                            <ChevronDown className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                                                                                        ) : (
-                                                                                            <ChevronRight className={cn('h-3 w-3 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                                                                                        )}
-                                                                                        <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-slate-400')} />
-                                                                                        <span className="truncate text-[11px]">
-                                                                                            {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                                                        <span className="text-[9px] font-mono opacity-70">
-                                                                                            {conv.step_count || 1} stp
-                                                                                        </span>
-                                                                                        {conv.is_running && (
-                                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                                                                                RUNNING
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-
-                                                                                {/* Layer 3 Prompts for Untitled Conversation */}
-                                                                                {isConvExpanded && (
-                                                                                    <div className="ml-5 pl-2 border-l border-slate-200 dark:border-[#15334d]/50 space-y-0.5 py-0.5">
-                                                                                        {promptTurns.map((turn) => {
-                                                                                            const isTurnSelected =
-                                                                                                selectedConversation?.conversation_id === conv.conversation_id &&
-                                                                                                selectedTurnNumber === turn.turnNumber;
-
-                                                                                            return (
-                                                                                                <div
-                                                                                                    key={turn.turnNumber}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        selectPromptTurn(turn, conv, project);
-                                                                                                    }}
-                                                                                                    className={cn(
-                                                                                                        'group flex items-center justify-between rounded-[5px] px-2 py-1 text-[11px] cursor-pointer transition-colors',
-                                                                                                        isTurnSelected
-                                                                                                            ? 'bg-cyan-600 text-white font-semibold shadow-2xs'
-                                                                                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]'
-                                                                                                    )}
-                                                                                                    title={`Click to load ${turn.title} (${turn.wordCount} words)`}
-                                                                                                >
-                                                                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                                                                        <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                                                        <span className="truncate">{turn.title}</span>
-                                                                                                    </div>
-                                                                                                    <span
-                                                                                                        className={cn(
-                                                                                                            'text-[10px] font-mono shrink-0 px-1 rounded-[3px]',
-                                                                                                            isTurnSelected
-                                                                                                                ? 'text-cyan-100'
-                                                                                                                : 'text-slate-400 dark:text-slate-500'
-                                                                                                        )}
-                                                                                                    >
-                                                                                                        {turn.wordCount}w
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            );
-                                                                                        })}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            {isArchivedProjectsExpanded ? (
+                                                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                            ) : (
+                                                                <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                                                             )}
+                                                            <Archive className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                            <span className="truncate">Archived Projects ({archivedProjects.length})</span>
+                                                        </div>
+                                                        <span className="text-[10px] font-mono text-slate-400">
+                                                            {archivedProjects.length}
+                                                        </span>
+                                                    </div>
+
+                                                    {isArchivedProjectsExpanded && (
+                                                        <div className="space-y-0.5 pl-1">
+                                                            {archivedProjects.map((project) => renderProjectNode(project))}
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
-                                        </div>
-                                    );
-                                })
+                                        </>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
