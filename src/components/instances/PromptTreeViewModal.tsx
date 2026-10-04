@@ -586,19 +586,22 @@ export default function PromptTreeViewModal({
         setRefreshingProjectId(projectId);
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
+                instanceId: instanceId || undefined,
                 maxWords: 300,
                 onlyRunning: false,
                 force: true,
             });
+            const isTargetDefault = instanceId === 'default' || instanceId === '__default__';
             const relevant = instanceId
-                ? data.filter(
-                      (p) =>
-                          !p.instance_id ||
-                          p.instance_id === instanceId ||
-                          (p.instance_id === 'default' && instanceId === 'default')
-                  )
+                ? data.filter((p) => {
+                      if (p.instance_id === instanceId) return true;
+                      if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
+                          return true;
+                      }
+                      return false;
+                  })
                 : data;
-            const finalData = relevant.length > 0 ? relevant : data;
+            const finalData = relevant;
             setTreeData(finalData);
 
             const updatedProject = finalData.find((p) => p.project_id === projectId);
@@ -791,19 +794,22 @@ export default function PromptTreeViewModal({
         setError(null);
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
+                instanceId: instanceId || undefined,
                 maxWords: 300,
                 onlyRunning: false,
                 force: isForce,
             });
+            const isTargetDefault = instanceId === 'default' || instanceId === '__default__';
             const relevant = instanceId
-                ? data.filter(
-                      (p) =>
-                          !p.instance_id ||
-                          p.instance_id === instanceId ||
-                          (p.instance_id === 'default' && instanceId === 'default')
-                  )
+                ? data.filter((p) => {
+                      if (p.instance_id === instanceId) return true;
+                      if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
+                          return true;
+                      }
+                      return false;
+                  })
                 : data;
-            const finalData = relevant.length > 0 ? relevant : data;
+            const finalData = relevant;
             setTreeData(finalData);
 
             if (isInitialLoad) {
