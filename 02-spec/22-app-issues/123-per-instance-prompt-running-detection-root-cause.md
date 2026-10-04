@@ -94,21 +94,27 @@ Despite physical process and folder separation on disk:
 3. **Cross-Instance State Bleed**: Submitting a prompt on `8159` caused the `default` instance card for that project to suddenly flip to running. Submitting a prompt on `default` caused `8159` to report running.
 4. **Prompt Dispatch Theft Across Instances**: Background schedulers (`resend_running_commands_for_instance`, `dispatch_running_prompts`) took prompts queued for `default` and dispatched them into `8159` simply because `8159` shared cloned workspace folders for the same repository path.
 5. **Cold-Boot Phantom Resurrections**: Launching an instance immediately rendered projects as running before any new prompt was submitted, resurrecting ancient unclosed turns from cloned profile databases.
+6. **Stranded Legacy Rows & Ghost Projects**: Hundreds of legacy non-composite rows with `is_running = 1` remained stranded in `running_projects` because the migration cleanup query used a broken SQL `LIKE` wildcard matching pattern.
+7. **Prompt Submission Corrupting Storage Paths**: Any newly queued or saved prompt inserted a row into `running_projects` with hardcoded `is_running = 1` and `workspace_storage_path = NULL` without composite keys, corrupting project workspace mapping.
+8. **Multi-Workspace Conversation Blindness**: Projects with conversations beyond the first 40 entries were truncated by an arbitrary query limit, returning 0 conversation nodes and falsely falling back to stale DB prompt rows.
 
 ---
 
-## Part 2: Root Cause Analysis (Deep Dive into 5 Structural Defect Mechanisms)
+## Part 2: Root Cause Analysis (Deep Dive into 8 Structural Defect Mechanisms)
 
-A forensic investigation of `src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/logger.rs`, and `src/pages/Instances.tsx` uncovered five distinct, compounding architectural defects:
+A forensic investigation of `src-tauri/src/modules/repo_db.rs`, `src-tauri/src/modules/logger.rs`, and `src/pages/Instances.tsx` uncovered eight distinct, compounding architectural defects:
 
 ```mermaid
 flowchart TD
-    subgraph Defects ["5 Compounding Defect Mechanisms"]
+    subgraph Defects ["8 Compounding Defect Mechanisms"]
         D1["Defect 1: Path-Only Matching in Dispatchers<br/>(Prompts stolen across instances via repo_path)"]
         D2["Defect 2: Permissive has_active_prompt Fallback<br/>(Overrides verified idle conversation nodes)"]
         D3["Defect 3: 'queued' Prompts Treated as Live Running<br/>(Sets is_running=true for waiting prompts)"]
         D4["Defect 4: Shorthand '8159' Resolution Omission<br/>(Fails to resolve to 'default-copy-8159')"]
         D5["Defect 5: Permissive Frontend OR Logic & Unpartitioned Filter<br/>(!node.instance_id adoption & any conv running)"]
+        D6["Defect 6: SQL Wildcard Bug in DELETE WHERE id NOT LIKE '%__%'<br/>(_ matches any char; leaves legacy is_running=1 rows stranded)"]
+        D7["Defect 7: save_or_requeue_prompt Unconditional Pollution<br/>(Inserts is_running=1 and workspace_storage_path=NULL)"]
+        D8["Defect 8: Arbitrary LIMIT 40 Truncation in Tree Building<br/>(Truncates summaries, forcing empty fallback)"]
     end
 
     subgraph Impacts ["Production Impact & State Contamination"]
@@ -117,6 +123,9 @@ flowchart TD
         I3["Waiting FIFO queue illuminates running badge"]
         I4["Instance 8159 discovery crashes or drops out"]
         I5["Default card adopts all untagged secondary projects"]
+        I6["Hundreds of legacy is_running=1 rows stranded in SQLite"]
+        I7["Queued/backed_up prompts pollute running_projects with is_running=1"]
+        I8["Legitimate on-disk idle conversations omitted by LIMIT 40"]
     end
 
     D1 --> I1
@@ -124,12 +133,18 @@ flowchart TD
     D3 --> I3
     D4 --> I4
     D5 --> I5
+    D6 --> I6
+    D7 --> I7
+    D8 --> I8
 
     I1 --> DefectManifestation["Cross-Instance Running Bleed & False Badges on All Cards"]
     I2 --> DefectManifestation
     I3 --> DefectManifestation
     I4 --> DefectManifestation
     I5 --> DefectManifestation
+    I6 --> DefectManifestation
+    I7 --> DefectManifestation
+    I8 --> DefectManifestation
 ```
 
 ---
@@ -324,6 +339,94 @@ const isProjRunning =
 
 ---
 
+### Defect 6: SQL Wildcard Bug in `DELETE WHERE id NOT LIKE '%__%'`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs` -> `detect_running_projects` (lines ~576–578)
+
+#### Flawed Implementation
+```rust
+if let Ok(conn) = connect_db() {
+    let _ = conn.execute("DELETE FROM running_projects WHERE id NOT LIKE '%__%'", []);
+    for p in &projects {
+        ...
+```
+
+#### Forensic Analysis & Failure Mechanism
+1. The cleanup routine was introduced to delete legacy rows in `running_projects` that used old non-composite keys (e.g. `antigravity-manager-4f1a2b...` lacking the `__` composite delimiter).
+2. However, in standard SQL and SQLite, `_` in a `LIKE` pattern is a **single-character wildcard** that matches any character.
+3. Consequently, the pattern `'%__%'` did **NOT** match two underscore characters; it matched any string with two or more characters (`length >= 2`)!
+4. The negation `WHERE id NOT LIKE '%__%'` therefore only evaluated to true for strings containing 0 or 1 character (`length < 2`).
+5. Because every legacy project ID was a long string (20+ characters), `id NOT LIKE '%__%'` was `false` for 100% of legacy rows.
+6. The query deleted **zero** legacy non-composite rows, leaving hundreds of obsolete legacy rows with `is_running = 1` permanently stranded in SQLite.
+7. These stranded rows caused projects to continually report as running and corrupted instance card calculations.
+8. **Remediation**: In SQLite, to test for the literal occurrence of `__`, the `instr()` function must be used:
+   ```sql
+   DELETE FROM running_projects WHERE instr(id, '__') = 0;
+   ```
+   Additionally, orphaned workspace pruning must be performed to clean up projects whose workspace storage folders no longer exist on disk.
+
+---
+
+### Defect 7: `save_or_requeue_prompt` Unconditionally Polluting `running_projects`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs` -> `save_or_requeue_prompt` (lines 2586–2591)
+
+#### Flawed Implementation
+```rust
+pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let clean_repo_name = Path::new(&prompt.repo_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| prompt.project_id.clone());
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?, ?, ?, ?, NULL, 1, ?, ?)",
+        params![&prompt.project_id, &prompt.instance_id, &clean_repo_name, &prompt.repo_path, now, now],
+    );
+    ...
+```
+
+#### Forensic Analysis & Failure Mechanism
+1. Whenever any prompt was saved, enqueued, or backed up, `save_or_requeue_prompt` was invoked.
+2. The function unconditionally executed `INSERT OR REPLACE INTO running_projects` with hardcoded `is_running = 1` and `workspace_storage_path = NULL`.
+3. This was executed even when the prompt's status was `'queued'` or `'backed_up'`, immediately marking the project as running before execution even began.
+4. Furthermore, `prompt.project_id` was inserted directly as the primary key `id` without composite namespacing (`{base}__{canonical_instance_id}`).
+5. Overwriting the row with `workspace_storage_path = NULL` stripped the existing workspace folder association, breaking subsequent conversation tree generation for that project.
+6. **Remediation**: `save_or_requeue_prompt` must never insert un-namespaced rows with `is_running = 1`. If `running_projects` is updated, it must only set `is_running = 1` if `prompt.status == "running"`, must resolve canonical instance IDs, must format composite keys, and must never erase `workspace_storage_path`.
+
+---
+
+### Defect 8: Arbitrary `LIMIT 40` Truncation in `compute_project_conversation_tree`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs` -> `compute_project_conversation_tree` (lines 3858–3863)
+
+#### Flawed Implementation
+```rust
+if let Ok(mut stmt) = s_conn.prepare(
+    "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+     FROM conversation_summaries 
+     ORDER BY last_modified_time DESC 
+     LIMIT 40",
+) {
+```
+
+#### Forensic Analysis & Failure Mechanism
+1. In `compute_project_conversation_tree`, the query to discover conversations in `conversation_summaries.db` had a hardcoded `LIMIT 40`.
+2. In real-world environments where an instance hosts multiple workspaces or projects with extensive conversation history, recent conversations from active projects easily exceeded 40 records.
+3. Older or concurrent workspaces (such as `SpecBuilder` or cloned projects) had their conversation records truncated out of the result set.
+4. Because no records were returned for the target project, `conv_nodes.is_empty()` evaluated to `true`.
+5. Under Defect 2's fallback logic, `conv_nodes.is_empty()` triggered the empty workspace fallback `is_prompt_running_for_project`, which read stale rows from `active_prompts` and marked the project running!
+6. The system completely missed verified idle conversations on disk simply because they were pushed past the arbitrary 40-record query boundary.
+7. **Remediation**: Remove arbitrary `LIMIT 40` truncation when inspecting conversations, or query conversations partitioned by target workspace URI. This ensures all relevant conversations on disk are evaluated, establishing true epistemic idle state without false fallbacks.
+
+---
+
 ## Part 3: Corrective Actions & Architectural Remediation
 
 To permanently eliminate cross-instance bleed and false running states, the following architectural remediations are specified and enforced:
@@ -354,11 +457,28 @@ flowchart LR
         F9["Rely on backend proj.is_running verdict"]
     end
 
+    subgraph DBMigrationFix ["6. SQL Literal Delimiter Fix"]
+        F10["DELETE WHERE instr(id, '__') = 0<br/>(Literal substring match)"]
+        F11["Orphaned workspace pruning"]
+    end
+
+    subgraph PromptPersistenceFix ["7. Non-Polluting Prompt Persistence"]
+        F12["No hardcoded is_running=1 in save_or_requeue<br/>Preserve workspace_storage_path"]
+        F13["Composite key namespacing in prompts"]
+    end
+
+    subgraph TreeLimitFix ["8. Full-Breadth Conversation Discovery"]
+        F14["Remove arbitrary LIMIT 40 truncation<br/>Partition queries by workspace"]
+    end
+
     SchedFix --> UnifiedState["Strict Runtime Isolation"]
     TreeFix --> UnifiedState
     QueueFix --> UnifiedState
     SuffixFix --> UnifiedState
     UIFix --> UnifiedState
+    DBMigrationFix --> UnifiedState
+    PromptPersistenceFix --> UnifiedState
+    TreeLimitFix --> UnifiedState
 ```
 
 ---
@@ -483,6 +603,95 @@ In `src/pages/Instances.tsx`:
 
 ---
 
+### 3.6 Literal Delimiter Migration via `instr(id, '__') = 0` & Orphaned Workspace Pruning
+
+In `detect_running_projects` and repository database hygiene routines:
+- **Strict Rule**: Delimiter checks for composite primary keys must use literal string functions rather than unescaped SQL `LIKE` wildcards.
+- **Removed Code**: `DELETE FROM running_projects WHERE id NOT LIKE '%__%'` is **PERMANENTLY REMOVED**.
+- **Remediated Logic**:
+  ```rust
+  // Clean up legacy non-composite keys using literal substring search
+  let _ = conn.execute("DELETE FROM running_projects WHERE instr(id, '__') = 0", []);
+  ```
+- **Orphaned Workspace Pruning**:
+  In addition to cleaning non-composite keys, prune stranded rows whose recorded `workspace_storage_path` no longer exists on disk or belongs to a different instance data directory:
+  ```rust
+  let _ = conn.execute(
+      "DELETE FROM running_projects 
+       WHERE instance_id = ?1 
+         AND workspace_storage_path IS NOT NULL 
+         AND id NOT IN (SELECT ?2)", // active discovered IDs
+      params![target_id, ...],
+  );
+  ```
+
+---
+
+### 3.7 Non-Polluting Prompt Persistence in `save_or_requeue_prompt`
+
+In `save_or_requeue_prompt`:
+- **Strict Rule**: Saving or enqueueing a prompt must NEVER unconditionally mark a project as running or overwrite `workspace_storage_path` with `NULL`.
+- **Remediated Logic**:
+  ```rust
+  pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
+      let conn = connect_db()?;
+      let now = Utc::now().timestamp();
+      let norm_inst = crate::modules::instance::resolve_instance_id(&prompt.instance_id)
+          .unwrap_or_else(|_| {
+              if prompt.instance_id == "__default__" || prompt.instance_id.is_empty() {
+                  "default".to_string()
+              } else {
+                  prompt.instance_id.clone()
+              }
+          });
+      
+      // Determine running flag strictly by status: only "running" is marked active (1)
+      let is_running_int = if prompt.status == "running" { 1 } else { 0 };
+
+      // Ensure composite ID namespacing if upserting into running_projects
+      let base_id = if prompt.project_id.contains("__") {
+          prompt.project_id.split("__").next().unwrap_or(&prompt.project_id).to_string()
+      } else {
+          prompt.project_id.clone()
+      };
+      let composite_id = format!("{}__{}", base_id, norm_inst);
+
+      // Only update running_projects if the project already exists or if prompt is truly running
+      // Never overwrite existing workspace_storage_path with NULL
+      let _ = conn.execute(
+          "INSERT INTO running_projects 
+           (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?6)
+           ON CONFLICT(id) DO UPDATE SET
+              is_running = CASE WHEN ?5 = 1 THEN 1 ELSE running_projects.is_running END,
+              updated_at = ?6",
+          params![&composite_id, &norm_inst, &clean_repo_name, &prompt.repo_path, is_running_int, now],
+      );
+
+      // Persist to active_prompts table...
+  ```
+
+---
+
+### 3.8 Full-Breadth Conversation Discovery (Elimination of `LIMIT 40` Truncation)
+
+In `compute_project_conversation_tree`:
+- **Strict Rule**: When reading `conversation_summaries.db`, queries must not prematurely truncate results with an arbitrary global limit that starves secondary or older workspaces.
+- **Removed Code**: `LIMIT 40` is **PERMANENTLY REMOVED** from the workspace conversation summary scan.
+- **Remediated Logic**:
+  ```rust
+  // Query all conversation summaries or partition by workspace URI
+  if let Ok(mut stmt) = s_conn.prepare(
+      "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+       FROM conversation_summaries 
+       ORDER BY last_modified_time DESC",
+  ) {
+      // Process all entries so every project's conversation state on disk is evaluated
+  ```
+- By inspecting all conversation records, projects with older conversations accurately populate `conv_nodes` and are evaluated as verified idle on disk rather than hitting the empty-workspace fallback.
+
+---
+
 ## Part 4: Verification, Prevention & Guidelines for Future AI
 
 ### 4.1 Verification Matrix (`per_instance_prompt_liveness_test.rs`)
@@ -520,6 +729,18 @@ Future AI contributors modifying liveness detection or multi-instance orchestrat
 > **Defect 4 Fallacy: "Instance IDs in internal APIs are always canonical."**  
 > Calling code, CLI arguments, and IPC messages frequently pass shortened instance identifiers (e.g. `"8159"`). Omitting `resolve_instance_id` caused silent lookup failures and unhandled errors that broke background project discovery.
 
+> [!CAUTION]
+> **Defect 6 Fallacy: "Using SQL LIKE '%__%' matches literal double underscores."**  
+> In SQLite and ANSI SQL, `_` in `LIKE` is a single-character wildcard, not a literal underscore! `'%__%'` matched any string with 2 or more characters. Negating it (`NOT LIKE '%__%'`) matched only strings of length 0 or 1, completely failing to delete any legacy non-composite keys (length 20+). Hundreds of obsolete rows with `is_running = 1` remained stranded forever. Literal substring checks must ALWAYS use `instr(id, '__') = 0` or escape the wildcards.
+
+> [!IMPORTANT]
+> **Defect 7 Fallacy: "Persisting an active prompt should immediately register the project as running."**  
+> Prompts may be saved in `'queued'` or `'backed_up'` states. Unconditionally inserting `is_running = 1` and `workspace_storage_path = NULL` in `save_or_requeue_prompt` pollutes `running_projects`, turns on false running badges before dispatch, and strips workspace path associations needed for tree discovery.
+
+> [!WARNING]
+> **Defect 8 Fallacy: "A fixed LIMIT 40 on conversation summaries is sufficient for tree generation."**  
+> Multi-workspace instances accumulate hundreds of conversation summaries across active and inactive projects. An arbitrary `LIMIT 40` truncates older projects out of the query results. When a project receives 0 conversation nodes, the engine mistakenly assumes the project is brand new on disk and falls back to stale database records, resurrecting dead running states.
+
 ---
 
 ### 4.3 Non-Negotiable Architectural Invariants for Future AI
@@ -536,3 +757,9 @@ Future AI contributors modifying liveness detection or multi-instance orchestrat
    Any conversation turn with `not_fully_idle > 0` but age greater than 900 seconds (15 minutes) is considered abandoned and forced idle (`rationale = "TURN_STALE_TTL_EXPIRED"`).
 6. **Mandatory Structured Telemetry**:
    Every boolean liveness evaluation must emit a log via `crate::modules::logger::log_instance_prompt_audit` with valid criteria and rationale codes.
+7. **Literal Delimiter Matching Invariant**:
+   Never use unescaped `LIKE '%__%'` to detect double-underscore delimiters in SQLite. Always use `instr(id, '__') = 0` (non-composite) or `instr(id, '__') > 0` (composite).
+8. **Prompt Storage Non-Pollution Invariant**:
+   Saving or queueing prompts must never mutate `running_projects` with hardcoded `is_running = 1` or erase `workspace_storage_path`.
+9. **Full-Breadth Conversation Discovery Invariant**:
+   Workspace conversation tree generation must never arbitrarily truncate records with global limits like `LIMIT 40` that starve secondary or older workspaces.

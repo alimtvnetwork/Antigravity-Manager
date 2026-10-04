@@ -112,16 +112,19 @@ The system must satisfy and maintain the following authoritative state at all ti
 
 ---
 
-## 3. Forensic Analysis: The 5 Compounding Root Causes
+## 3. Forensic Analysis: The 8 Compounding Root Causes
 
 ```mermaid
 flowchart TD
-    subgraph RootCauses ["5 Compounding Root Causes Discovered by Research 01"]
+    subgraph RootCauses ["8 Compounding Root Causes"]
         RC1["Root Cause 1: Cross-Instance Prompt Bleed<br/>Loose path matching in dispatch_running_prompts<br/>and resend_running_commands_for_instance"]
         RC2["Root Cause 2: Shorthand Resolution Omission & Key Hijacking<br/>Missing resolve_instance_id in detect_running_projects<br/>and non-composite primary keys in running_projects"]
         RC3["Root Cause 3: 'queued' Status Treated as Running<br/>get_live_project_execution_info sets entry.0 = true<br/>for waiting FIFO queue prompts"]
         RC4["Root Cause 4: Permissive has_active_prompt Fallback<br/>compute_project_conversation_tree falls back to SQLite<br/>overriding verified idle conversation nodes on disk"]
         RC5["Root Cause 5: Loose Frontend Filtering in Instances.tsx<br/>!node.instance_id fallback adopting secondary projects<br/>and disjunctive conversation running checks"]
+        RC6["Root Cause 6: SQL Wildcard Bug in Migration<br/>DELETE WHERE id NOT LIKE '%__%' failed to delete non-composite rows<br/>(_ matches any character; leaves legacy rows stranded)"]
+        RC7["Root Cause 7: save_or_requeue_prompt Pollution<br/>Inserts is_running=1 and workspace_storage_path=NULL<br/>unconditionally for queued/backed_up prompts"]
+        RC8["Root Cause 8: Arbitrary LIMIT 40 Truncation<br/>compute_project_conversation_tree truncates summaries<br/>forcing false empty workspace fallback to stale DB"]
     end
 
     subgraph Failures ["Observed Production Breakages"]
@@ -130,6 +133,9 @@ flowchart TD
         F3["Enqueued waiting prompts trigger pulsating<br/>green badges as if active on CPU"]
         F4["SpecBuilder and coding-guidelines on default<br/>falsely marked running from stale DB records"]
         F5["Default card displays all secondary projects<br/>and ignores backend authoritative is_running verdict"]
+        F6["Hundreds of legacy is_running=1 rows stranded in SQLite"]
+        F7["Queued prompts pollute running_projects with is_running=1<br/>and erase workspace folder associations"]
+        F8["Multi-workspace projects return 0 conversations<br/>and falsely fall back to stale active_prompts"]
     end
 
     RC1 --> F1
@@ -137,6 +143,9 @@ flowchart TD
     RC3 --> F3
     RC4 --> F4
     RC5 --> F5
+    RC6 --> F6
+    RC7 --> F7
+    RC8 --> F8
 ```
 
 ### 3.1 Root Cause 1: Cross-Instance Prompt Bleed via Loose Path Matching
@@ -270,6 +279,74 @@ const isProjRunning =
 1. `!node.instance_id` caused the `default` instance card to adopt every node that had an empty or undefined `instance_id`.
 2. Cloned instances with shorthand IDs (e.g. `"8159"` vs `"default-copy-8159"`) failed exact equality `node.instance_id === inst.config.id` unless sequence number or suffix matching was performed.
 3. The frontend recalculated `isNodeRunning` using a client-side disjunctive check `proj.conversations?.some(c => c.is_running)` rather than trusting the backend's authoritative `proj.is_running` verdict, resurrecting ancient unclosed conversation turns.
+
+### 3.6 Root Cause 6: SQL Wildcard Bug in `DELETE WHERE id NOT LIKE '%__%'`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs`: `detect_running_projects` (lines ~576–578)
+
+#### Flawed Pattern
+```rust
+// FLAW IN detect_running_projects migration:
+if let Ok(conn) = connect_db() {
+    let _ = conn.execute("DELETE FROM running_projects WHERE id NOT LIKE '%__%'", []);
+    // ...
+```
+
+#### Forensic Explanation
+1. In SQLite and standard SQL, `_` inside a `LIKE` pattern is a single-character wildcard (matching any character), rather than a literal underscore character.
+2. Therefore, `'%__%'` matches any string that contains two or more characters (`length >= 2`).
+3. Negating this with `NOT LIKE '%__%'` matches only strings whose length is 0 or 1.
+4. Because legacy primary key IDs in `running_projects` were long hash identifiers (e.g. `antigravity-manager-4f1a2b3c...` with length >= 20), `id NOT LIKE '%__%'` was `false` for every single row.
+5. The migration statement deleted **zero** legacy non-composite rows, leaving hundreds of obsolete legacy rows with `is_running = 1` permanently stranded in `running_projects`.
+6. These stranded rows corrupted instance tree generation and caused dormant projects to continually report as running.
+7. Remediation requires using SQLite's literal substring function: `WHERE instr(id, '__') = 0`, accompanied by orphaned workspace pruning for non-existent workspace storage directories.
+
+### 3.7 Root Cause 7: `save_or_requeue_prompt` Unconditionally Polluting `running_projects`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs`: `save_or_requeue_prompt` (lines 2586–2591)
+
+#### Flawed Pattern
+```rust
+// FLAW IN save_or_requeue_prompt:
+let _ = conn.execute(
+    "INSERT OR REPLACE INTO running_projects 
+     (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+     VALUES (?, ?, ?, ?, NULL, 1, ?, ?)",
+    params![&prompt.project_id, &prompt.instance_id, &clean_repo_name, &prompt.repo_path, now, now],
+);
+```
+
+#### Forensic Explanation
+1. Whenever a prompt was saved or requeued—even when its status was `'queued'` or `'backed_up'`—`save_or_requeue_prompt` unconditionally executed `INSERT OR REPLACE INTO running_projects` with hardcoded `is_running = 1` and `workspace_storage_path = NULL`.
+2. This marked the target project as actively executing on CPU before the prompt was ever dispatched.
+3. Furthermore, `prompt.project_id` was inserted directly as the primary key without composite namespacing (`{base}__{canonical_instance_id}`).
+4. Overwriting `workspace_storage_path` with `NULL` stripped the project's folder association, breaking subsequent conversation discovery in `compute_project_conversation_tree`.
+
+### 3.8 Root Cause 8: Arbitrary `LIMIT 40` Truncation in `compute_project_conversation_tree`
+
+#### Code Location
+- `src-tauri/src/modules/repo_db.rs`: `compute_project_conversation_tree` (lines 3858–3863)
+
+#### Flawed Pattern
+```rust
+// FLAW IN compute_project_conversation_tree:
+if let Ok(mut stmt) = s_conn.prepare(
+    "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+     FROM conversation_summaries 
+     ORDER BY last_modified_time DESC 
+     LIMIT 40",
+) {
+```
+
+#### Forensic Explanation
+1. When querying `conversation_summaries.db`, `compute_project_conversation_tree` imposed a hardcoded `LIMIT 40`.
+2. In instances hosting multiple workspaces or having extensive turn histories, recent activity from active projects easily flooded the top 40 records.
+3. Secondary or older workspaces (such as `SpecBuilder` or dormant clones) had their conversation records truncated out of the result set.
+4. Because no conversation summaries were returned for those projects, `conv_nodes.is_empty()` evaluated to `true`.
+5. Under Root Cause 4's logic, `conv_nodes.is_empty()` triggered the empty workspace fallback `is_prompt_running_for_project`, which read stale rows from `active_prompts` and falsely marked the project running!
+6. Verified idle conversations on disk were completely bypassed because of the arbitrary 40-record truncation.
 
 ---
 
@@ -539,12 +616,27 @@ CREATE INDEX IF NOT EXISTS idx_prompt_tree_cache_instance ON prompt_tree_cache(i
 
 ### 5.2 Schema Migration & Cache Invalidation
 
-1. **Non-Composite Row Pruning Migration**:
-   On database initialization or migration, prune legacy non-composite rows in `running_projects`:
+1. **Non-Composite Row Pruning Migration (`instr(id, '__') = 0`)**:
+   On database initialization or migration, prune legacy non-composite rows in `running_projects`.
+   > [!CAUTION]
+   > **SQL Wildcard Trap**: Do NOT use `DELETE FROM running_projects WHERE id NOT LIKE '%__%'`. In SQLite, `_` in `LIKE` matches any single character, so `'%__%'` matched any string with 2+ characters! `NOT LIKE '%__%'` only matched strings of length 0 or 1, completely failing to delete non-composite rows (`length >= 2`). This left hundreds of legacy rows with `is_running = 1` permanently stranded in `running_projects`.
+   
+   The authoritative query using literal substring matching is:
    ```sql
-   DELETE FROM running_projects WHERE id NOT LIKE '%__%';
+   DELETE FROM running_projects WHERE instr(id, '__') = 0;
    ```
-2. **Immediate Cache Invalidation (`invalidate_prompt_tree_cache`)**:
+
+2. **Orphaned Workspace Pruning**:
+   Prune stranded records in `running_projects` where recorded workspace storage paths no longer exist on disk or do not belong to the active instance data directory:
+   ```sql
+   -- Prune orphaned or unreferenced workspace rows during instance scan
+   DELETE FROM running_projects 
+   WHERE instance_id = ?1 
+     AND workspace_storage_path IS NOT NULL 
+     AND id NOT IN (SELECT ?2); -- Discovered active composite IDs
+   ```
+
+3. **Immediate Cache Invalidation (`invalidate_prompt_tree_cache`)**:
    Whenever a prompt is created, backed up, dispatched, or completed:
    ```rust
    pub fn invalidate_prompt_tree_cache(instance_id: Option<&str>) {

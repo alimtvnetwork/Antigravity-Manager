@@ -42,7 +42,7 @@ The Google Antigravity ecosystem manages multiple parallel instances:
 
 ---
 
-## 2. Six Root Causes Discovered
+## 2. Nine Root Causes Discovered
 
 1. **Cross-Instance Prompt Bleed via Path Matching**:
    In `resend_running_commands_for_instance` (`repo_db.rs:2981-2984`) and `dispatch_running_prompts` (`repo_db.rs:1404-1406`), backed-up prompts from `default` were matched against `default-copy-8159` simply because `default-copy-8159` had cloned workspace storage folders matching the repository paths. Prompts belonging to `default` were erroneously dispatched to `8159`, setting `is_running = 1` in `running_projects`.
@@ -56,6 +56,12 @@ The Google Antigravity ecosystem manages multiple parallel instances:
    The cache entry `tree:300:false` cached corrupted trees across instances for 60 seconds without immediate invalidation when projects or instances update.
 6. **Missing Audit Logging in Production Tree Evaluation**:
    `compute_project_conversation_tree` did not emit structured audit logs (`log_instance_prompt_audit`) explaining each project's running verdict and each directory scanned.
+7. **SQL Wildcard Bug in `DELETE WHERE id NOT LIKE '%__%'`**:
+   In SQLite, `_` in `LIKE` matches any single character, so `'%__%'` matched any string with 2+ characters! `NOT LIKE '%__%'` only matched strings of length 0 or 1, completely failing to delete non-composite rows (`length >= 2`). This left hundreds of legacy rows with `is_running = 1` permanently stranded in `running_projects`. Fixed with `WHERE instr(id, '__') = 0` and orphaned workspace pruning.
+8. **`save_or_requeue_prompt` Polluting `running_projects`**:
+   Unconditionally executed `INSERT OR REPLACE INTO running_projects ... VALUES (..., NULL, 1, ...)`, persisting `is_running = 1` and `workspace_storage_path = NULL` even for `queued` or `backed_up` prompts, and without composite ID namespacing.
+9. **`compute_project_conversation_tree` Arbitrary `LIMIT 40` Truncation**:
+   Caused older or multi-workspace projects to return 0 conversation nodes, triggering the empty workspace fallback rather than reading actual on-disk idle state.
 
 ---
 
@@ -65,7 +71,9 @@ The Google Antigravity ecosystem manages multiple parallel instances:
 - File: `src-tauri/src/modules/repo_db.rs`
 - Eliminate cross-instance prompt bleed in `resend_running_commands_for_instance` and `dispatch_running_prompts`. Prompts must match `p.instance_id == target_inst` (with canonical resolution).
 - Universal canonical instance normalization: wrap `instance_id` with `resolve_instance_id` across `detect_running_projects`, `gemini_dirs_tagged`, and `compute_project_conversation_tree`.
-- Database hygiene migration: Prune and repair non-composite IDs in `running_projects`, ensuring composite key `{repo-hash}__{canonical_instance_id}`.
+- Database hygiene migration: Prune and repair non-composite IDs in `running_projects` using `instr(id, '__') = 0` (fixing the SQLite `LIKE` wildcard defect) and prune orphaned workspace entries.
+- Sanitize `save_or_requeue_prompt`: Ensure prompts with `status = 'queued'` or `'backed_up'` never insert `is_running = 1` or null out `workspace_storage_path`, and namespace primary keys with composite IDs.
+- Remove arbitrary `LIMIT 40` truncation in `compute_project_conversation_tree` so multi-workspace projects receive complete conversation summaries from disk.
 - Invalidate `prompt_tree_cache` upon prompt state or instance state changes.
 - Ensure `get_live_project_execution_info` differentiates `running` from `queued`.
 

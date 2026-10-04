@@ -573,7 +573,34 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
 
     // Persist discovered projects into repo database
     if let Ok(conn) = connect_db() {
-        let _ = conn.execute("DELETE FROM running_projects WHERE id NOT LIKE '%__%'", []);
+        let _ = conn.execute("DELETE FROM running_projects WHERE instr(id, '__') = 0", []);
+        let _ = conn.execute(
+            "DELETE FROM running_projects WHERE workspace_storage_path IS NULL",
+            [],
+        );
+
+        let discovered_ids: std::collections::HashSet<String> =
+            projects.iter().map(|p| p.id.clone()).collect();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, workspace_storage_path FROM running_projects WHERE instance_id = ?1",
+        ) {
+            let existing_rows: Vec<(String, Option<String>)> = stmt
+                .query_map(params![target_id], |r| Ok((r.get(0)?, r.get(1)?)))
+                .map(|iter| iter.flatten().collect())
+                .unwrap_or_default();
+            for (old_id, wspath_opt) in existing_rows {
+                let path_exists = wspath_opt
+                    .as_deref()
+                    .map(|p| Path::new(p).exists())
+                    .unwrap_or(false);
+                if !discovered_ids.contains(&old_id) || !path_exists {
+                    let _ = conn.execute(
+                        "DELETE FROM running_projects WHERE id = ?1",
+                        params![&old_id],
+                    );
+                }
+            }
+        }
         for p in &projects {
             let running_int = if p.is_running { 1 } else { 0 };
             let _ = conn.execute(
@@ -2583,11 +2610,39 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| prompt.project_id.clone());
+
+    let canonical_inst = crate::modules::instance::resolve_instance_id(&prompt.instance_id)
+        .unwrap_or_else(|_| {
+            if prompt.instance_id == "__default__" || prompt.instance_id.is_empty() {
+                "default".to_string()
+            } else {
+                prompt.instance_id.clone()
+            }
+        });
+    let base_proj_id = prompt
+        .project_id
+        .split("__")
+        .next()
+        .unwrap_or(&prompt.project_id);
+    let composite_proj_id = format!("{}__{}", base_proj_id, canonical_inst);
+    let is_running_int = if prompt.status == "running" { 1 } else { 0 };
+
     let _ = conn.execute(
-        "INSERT OR REPLACE INTO running_projects 
+        "INSERT INTO running_projects 
          (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-         VALUES (?, ?, ?, ?, NULL, 1, ?, ?)",
-        params![&prompt.project_id, &prompt.instance_id, &clean_repo_name, &prompt.repo_path, now, now],
+         VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+            is_running = excluded.is_running,
+            updated_at = excluded.updated_at",
+        params![
+            &composite_proj_id,
+            &canonical_inst,
+            &clean_repo_name,
+            &prompt.repo_path,
+            is_running_int,
+            now,
+            now
+        ],
     );
 
     conn.execute(
@@ -3143,10 +3198,12 @@ pub fn resend_running_commands_for_instance(
             "UPDATE active_prompts SET status = 'dispatched', updated_at = ?, image_payload = ? WHERE id = ?",
             rusqlite::params![now, &prompt.image_payload, &prompt.id],
         );
-        let _ = conn.execute(
-            "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?",
-            rusqlite::params![now, now, &prompt.project_id],
-        );
+        if prompt.status == "running" {
+            let _ = conn.execute(
+                "UPDATE running_projects SET is_running = 1, last_detected_at = ?, updated_at = ? WHERE id = ?",
+                rusqlite::params![now, now, &prompt.project_id],
+            );
+        }
 
         prompt.status = "dispatched".to_string();
         prompt.updated_at = now;
@@ -3729,7 +3786,16 @@ fn compute_project_conversation_tree(
         .flatten()
         .map(|a| a.email);
 
-    let all_projects = list_running_projects().unwrap_or_default();
+    let all_projects: Vec<RunningProject> = list_running_projects()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|p| {
+            p.workspace_storage_path
+                .as_deref()
+                .map(|path| Path::new(path).exists())
+                .unwrap_or(false)
+        })
+        .collect();
     let projects: Vec<RunningProject> = if let Some(target_id) = target {
         if target_id == "default" || target_id == "__default__" {
             all_projects
@@ -3859,7 +3925,7 @@ fn compute_project_conversation_tree(
                     "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
                      FROM conversation_summaries 
                      ORDER BY last_modified_time DESC 
-                     LIMIT 40",
+                     LIMIT 200",
                 ) {
                     if let Ok(rows) = stmt.query_map([], |row| {
                         Ok((
@@ -5145,7 +5211,15 @@ pub(crate) fn clone_repo_rows_on(
 
     let mut copied = 0usize;
     for (id, name, path, storage, _running, detected, updated) in projects {
-        let new_id = format!("{}__{}", id, target_id);
+        let Some(ref storage_path) = storage else {
+            continue;
+        };
+        if !Path::new(storage_path).exists() {
+            continue;
+        }
+
+        let base_id = id.split("__").next().unwrap_or(&id);
+        let new_id = format!("{}__{}", base_id, target_id);
         conn.execute(
             "INSERT OR IGNORE INTO running_projects
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
