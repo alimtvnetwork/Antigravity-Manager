@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.148.0] - 2026-10-04
+
+### Fixed
+- **集成测试异步调用类型对齐与 CI 门禁通过 (Integration Test Async Invocation Fix & CI Test Target Gate Pass)**: 修复 `src-tauri/tests/per_instance_prompt_liveness_test.rs` 中 `test_case_antigravity_cli_discovery` 对已被 `#[tokio::test]` 包装的返回单元值 `()` 错误使用 `.await` 导致的 `() is not a future`（E0277）构建中断问题；规范测试调用形式，确保跨平台 CI 测试目标编译与执行零阻断。 (Thanks to @aukgit)
+
+---
+
 ## [v4.147.0] - 2026-10-04
 
 ### Fixed
@@ -515,6 +522,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.148.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.147.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

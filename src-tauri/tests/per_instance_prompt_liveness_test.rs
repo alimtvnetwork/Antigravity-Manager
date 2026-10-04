@@ -1510,9 +1510,9 @@ async fn test_case_antigravity_cli_discovery_isolation() {
     assert!(audit_line.contains("rationale='CONVERSATION_SUMMARY_ACTIVE_TURN'"));
 }
 
-#[tokio::test]
-async fn test_case_antigravity_cli_discovery() {
-    test_case_antigravity_cli_discovery_isolation().await;
+#[test]
+fn test_case_antigravity_cli_discovery() {
+    test_case_antigravity_cli_discovery_isolation();
 }
 
 // ----------------------------------------------------------------------------

@@ -3,6 +3,9 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.148.0 (2026-10-04)**:
+        -   **[CI Test Targets Gate] Integration Test Async Invocation Correction**: Resolved the remaining E0277 compiler error in test target compilation reported by `gitmap pe` on CI runners. Corrected `test_case_antigravity_cli_discovery` in `src-tauri/tests/per_instance_prompt_liveness_test.rs` which was erroneously calling `.await` on a non-future return type `()`, ensuring clean integration test target compilation across all platforms. (Thanks to @aukgit)
+
     *   **v4.147.0 (2026-10-04)**:
         -   **[Build & Compilation Gates] Comprehensive Backend Fixes & PID Visibility**: Resolved all 7 remote compilation errors flagged by `gitmap pe`. Declared timestamp `now` at the top level of `compute_project_conversation_tree` in `src-tauri/src/modules/repo_db.rs`, resolving E0425 scope errors in turn TTL checks. Promoted `get_antigravity_pids` to `pub(crate)` in `src-tauri/src/modules/process.rs` and aligned caller invocations with `Option<&str>` arguments, fixing private function visibility (E0603) and argument count (E0061) compile failures across macOS, Linux, and Windows CI runners. (Thanks to @aukgit)
 
