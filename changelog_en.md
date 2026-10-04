@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.136.0 (2026-10-04)**:
+        -   **[UI & Components] Fluid Water-Drain Progress Bar & Milestone Checkpoints**:
+            -   **Description**: Implemented an aesthetic, fluid water-drain styled progress bar component (`WaterDrainProgressBar`) featuring dual-stop gradient tones (`#1af18d` leading hue to `#12b27d` peak hue), inline milestone checkmark nodes (`[25, 50, 75, 100]`), smooth fluid shimmer, and a compact 18px height footprint without bloated padding. Integrated across account quota badges (`QuotaItem`), instance cards, and list tables (`InstanceTable`). (Thanks to @aukgit)
+        -   **[Top Header & Navigation] Navbar Preferences Segmented Capsule & 3 Direct Icons**:
+            -   **Description**: Reorganized `NavSettings` preferences into a single 3-segment pill capsule (`[Quick Clean] | [Theme Switcher] | [Language]`), eliminating disjointed floating buttons. Restructured `NavMenu` into 3 direct route icon buttons side-by-side (`Accounts`, `Instances`, `Settings`) followed by a compact hamburger dropdown containing remaining navigation paths without duplicating the 3 direct routes. (Thanks to @aukgit)
+        -   **[Instance Management] Deep Settings & Workspace Replication with Buffer Persistence**:
+            -   **Description**: Added a single combined "Copy Both (Settings & Workspaces)" action button and a split "Paste Both / Paste Settings Only / Paste Workspaces Only" dropdown button to `InstanceSettingsModal`. Persisted clipboard copy buffer (`agm_instance_clipboard_buffer`) into `localStorage` across project views. Formatted Target Profile dropdown with sequence numbers, profile names, and `antigravity-{id}` suffixes. (Thanks to @aukgit)
+        -   **[Prompt Inspector] Prompt Tree View 3-Layer Hierarchy, Markdown Preview & SQLite Caching**:
+            -   **Description**: Resolved modal heading overlap bug (`z-[200]` and top margin offset). Built a 3-layer collapsible tree view (`Project -> Conversation -> Prompt`) with intelligent grouping of untitled/empty conversations (`Untitled Conversations ({count})`). Added Markdown Preview (500-word truncation with "Show All" toggle), Raw View, and direct Textarea Edit mode. Renamed inspector action button to "Full" with tooltip, added direct "Resend" and "Enqueue" actions, and integrated high-speed SQLite split-DB caching (`prompt_tree_cache`) in `repo_prompts.db` with 60s TTL. (Thanks to @aukgit)
+        -   **[Prompt Engine & Lifecycle] FIFO Ordering & Multi-Task Queue Safeguard**:
+            -   **Description**: Enforced strict FIFO ordering (`ORDER BY created_at ASC LIMIT 1`) in `check_and_dispatch_enqueued_prompts`. Fixed prompt drop bug in `resend_running_commands_for_instance` when workspaces have multiple queued prompts by retaining subsequent prompts in `queued` status. Added dynamic process detection and terminal state bypass in `is_prompt_running_for_project` to eliminate false 120-second cooldown blocks. (Thanks to @aukgit)
+        -   **[CLI & Parity] Theme Setting & Instance Settings Sync Commands**:
+            -   **Description**: Added `agm theme set <theme-id> [--instance <id>|--all]` and `agm instance sync-settings <src> <target>` in `agm.rs` for parity across GUI and CLI binaries. (Thanks to @aukgit)
+
     *   **v4.135.0 (2026-10-04)**:
         -   **[Theming & Visual Design] WP-Exam Themes & Colors Ingestion (18 Themes Total)**:
             -   **Description**: Ingested 8 rich, production-grade themes from WP-Exam into `THEME_PALETTES` (bringing total catalogue themes to 18): `Green Choice` (Emerald eco-luxury light), `Green Choice Dark` (botanical dark), `Clean Wide` (vivid indigo and deep slate light), `Riseup Gold` (warm gold and midnight navy dark), `Antigravity Dracula` (neon green & deep purple dark), `Letterly Purple` (electric indigo & violet dark), `Obsidian Cyan` (VS Code obsidian slate & cyan neon dark), and `Navy Gold` (dark navy gold). (Thanks to @aukgit)

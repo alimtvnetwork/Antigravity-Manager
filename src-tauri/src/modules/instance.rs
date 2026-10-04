@@ -2003,6 +2003,7 @@ pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Resul
 }
 
 /// Wait until the instance process exists, then give the prompt channel a moment to accept a send.
+/// Uses adaptive retry logic up to 15s with exponential backoff rather than a hard timeout.
 pub fn wait_for_instance_prompt_channel(instance_id: &str) {
     let registry = match load_registry() {
         Ok(reg) => reg,
@@ -2025,28 +2026,34 @@ pub fn wait_for_instance_prompt_channel(instance_id: &str) {
         ));
         return;
     };
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
+    let start_time = std::time::Instant::now();
+    let max_wait_duration = std::time::Duration::from_secs(15);
+    let mut current_interval_ms = 100u64;
+    let max_interval_ms = 1000u64;
+
     loop {
         let pids = find_pids_for_data_dir(&inst.data_dir, inst.is_default);
         let running = !pids.is_empty()
             || (inst.is_default && crate::modules::process::is_antigravity_running(None));
         if running {
             crate::modules::logger::log_info(&format!(
-                "[Instance] Prompt channel ready for '{}' ({} pids); allowing 6s stabilization window before inject",
+                "[Instance] Prompt channel ready for '{}' ({} pids after {:?}); allowing 6s stabilization window before inject",
                 instance_id,
-                pids.len()
+                pids.len(),
+                start_time.elapsed()
             ));
             std::thread::sleep(std::time::Duration::from_millis(6000));
             return;
         }
-        if std::time::Instant::now() >= deadline {
+        if start_time.elapsed() >= max_wait_duration {
             crate::modules::logger::log_warn(&format!(
-                "[Instance] Prompt channel wait timed out for '{}'; injecting anyway",
+                "[Instance] Prompt channel wait timed out after 15s for '{}'; injecting anyway",
                 instance_id
             ));
             return;
         }
-        std::thread::sleep(std::time::Duration::from_millis(250));
+        std::thread::sleep(std::time::Duration::from_millis(current_interval_ms));
+        current_interval_ms = (current_interval_ms * 3 / 2).min(max_interval_ms);
     }
 }
 
@@ -4925,6 +4932,78 @@ pub fn set_instance_plan_review(
         updated += 1;
     }
     Ok(updated)
+}
+
+/// Sets workbench.colorTheme in User/settings.json for target or all instances.
+pub fn set_instance_theme(target_instance: Option<&str>, theme_id: &str) -> Result<usize, String> {
+    let registry = load_registry()?;
+    let targets: Vec<InstanceConfig> = if let Some(spec) = target_instance {
+        let resolved = resolve_instance_id(spec)?;
+        registry
+            .instances
+            .into_iter()
+            .filter(|i| i.id == resolved)
+            .collect()
+    } else {
+        registry.instances
+    };
+
+    let mut updated = 0usize;
+    for inst in &targets {
+        let paths = get_instance_settings_targets(inst);
+        for path in paths {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let mut json_val: serde_json::Value = if path.exists() {
+                fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_else(|| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+            if !json_val.is_object() {
+                json_val = serde_json::json!({});
+            }
+            if let serde_json::Value::Object(ref mut map) = json_val {
+                map.insert(
+                    "workbench.colorTheme".to_string(),
+                    serde_json::Value::String(theme_id.to_string()),
+                );
+                if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
+                    let _ = fs::write(&path, pretty);
+                }
+            }
+        }
+        updated += 1;
+    }
+    Ok(updated)
+}
+
+/// Reads workbench.colorTheme from target instance User/settings.json.
+pub fn get_instance_theme(instance_id: &str) -> Result<Option<String>, String> {
+    let resolved_id = resolve_instance_id(instance_id)?;
+    let registry = load_registry()?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id)
+        .ok_or_else(|| format!("Instance '{}' not found", instance_id))?;
+
+    if let Some(settings_path) = find_instance_settings_path(inst) {
+        if let Ok(content) = fs::read_to_string(&settings_path) {
+            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(theme) = json_val
+                    .get("workbench.colorTheme")
+                    .and_then(|v| v.as_str())
+                {
+                    return Ok(Some(theme.to_string()));
+                }
+            }
+        }
+    }
+    Ok(None)
 }
 
 /// Reads User/settings.json and returns formatted JSON string with metadata envelope.

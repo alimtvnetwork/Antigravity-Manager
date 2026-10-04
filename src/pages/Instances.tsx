@@ -45,6 +45,7 @@ import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 import { showToast } from '../components/common/ToastContainer';
+import { WaterDrainProgressBar } from '../components/common/WaterDrainProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';
@@ -939,11 +940,6 @@ export default function Instances() {
                                         <div className="mb-2.5">
                                             {geminiModel ? (() => {
                                                 const pct = Math.min(100, Math.max(0, geminiModel.percentage));
-                                                const getGradient = (percentage: number) => {
-                                                    if (percentage >= 50) return 'from-teal-500 via-cyan-500 to-sky-500 shadow-[0_0_6px_rgba(20,184,166,0.25)]';
-                                                    if (percentage >= 20) return 'from-amber-500 to-orange-500 shadow-[0_0_6px_rgba(245,158,11,0.25)]';
-                                                    return 'from-rose-500 to-red-500 shadow-[0_0_6px_rgba(244,63,94,0.25)]';
-                                                };
                                                 const getTextClass = (percentage: number) => {
                                                     if (percentage >= 50) return 'text-teal-600 dark:text-cyan-400';
                                                     if (percentage >= 20) return 'text-amber-600 dark:text-amber-400';
@@ -972,16 +968,8 @@ export default function Instances() {
                                                             </div>
                                                         </div>
 
-                                                        {/* Progress bar height h-2 rounded-full */}
-                                                        <div className="h-2 w-full bg-slate-100 dark:bg-[#071a27] border border-slate-200/60 dark:border-[#15334d]/60 rounded-full overflow-hidden relative shadow-inner">
-                                                            <div
-                                                                className={cn(
-                                                                    "h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out shadow-xs",
-                                                                    getGradient(pct)
-                                                                )}
-                                                                style={{ width: `${pct}%` }}
-                                                            />
-                                                        </div>
+                                                        {/* Stepper Progress Bar */}
+                                                        <WaterDrainProgressBar percentage={pct} />
                                                     </div>
                                                 );
                                             })() : boundAccount ? (

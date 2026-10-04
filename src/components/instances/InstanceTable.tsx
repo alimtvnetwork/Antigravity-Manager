@@ -18,6 +18,7 @@ import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
 import type { InstanceStatus } from '../../services/instanceService';
 import { useAccountStore } from '../../stores/useAccountStore';
+import { WaterDrainProgressBar } from '../common/WaterDrainProgressBar';
 
 interface InstanceTableProps {
     instances: InstanceStatus[];
@@ -235,19 +236,7 @@ export default function InstanceTable({
                                                         {percentage}%
                                                     </span>
                                                 </div>
-                                                <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-[#071a27] overflow-hidden border border-slate-200/50 dark:border-[#15334d]">
-                                                    <div
-                                                        className={cn(
-                                                            "h-full rounded-full transition-all duration-500",
-                                                            percentage > 50
-                                                                ? "bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500 shadow-[0_0_6px_rgba(20,184,166,0.25)]"
-                                                                : percentage >= 20
-                                                                ? "bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_0_6px_rgba(245,158,11,0.25)]"
-                                                                : "bg-gradient-to-r from-rose-500 to-red-500 shadow-[0_0_6px_rgba(244,63,94,0.25)]"
-                                                        )}
-                                                        style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
-                                                    />
-                                                </div>
+                                                <WaterDrainProgressBar percentage={percentage} />
                                             </div>
                                         ) : (
                                             <span className="text-slate-400 italic text-[11px]">—</span>

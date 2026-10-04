@@ -14,6 +14,7 @@ import {
     FileCode,
     SlidersHorizontal,
     Sparkles,
+    ChevronDown,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../../utils/env';
@@ -21,6 +22,14 @@ import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
 import * as instanceService from '../../services/instanceService';
 import type { InstanceStatus } from '../../services/instanceService';
+
+interface InstanceClipboardBuffer {
+    sourceId: string;
+    sourceName: string;
+    hasSettings: boolean;
+    hasWorkspaces: boolean;
+    copiedAt: number;
+}
 
 interface InstanceSettingsModalProps {
     isOpen: boolean;
@@ -42,6 +51,17 @@ export function InstanceSettingsModal({
     const [selectedTargetId, setSelectedTargetId] = useState<string>('default');
     const [copySettingsSourceId, setCopySettingsSourceId] = useState<string>('');
     const [copyProjectsSourceId, setCopyProjectsSourceId] = useState<string>('');
+    const [replicationSourceId, setReplicationSourceId] = useState<string>('');
+    const [clipboardBuffer, setClipboardBuffer] = useState<InstanceClipboardBuffer | null>(() => {
+        try {
+            const raw = localStorage.getItem('agm_instance_clipboard_buffer');
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [isPasteMenuOpen, setIsPasteMenuOpen] = useState<boolean>(false);
+    const pasteMenuRef = useRef<HTMLDivElement>(null);
 
     // Settings state
     const [isTurboMode, setIsTurboMode] = useState<boolean>(true);
@@ -59,6 +79,16 @@ export function InstanceSettingsModal({
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (pasteMenuRef.current && !pasteMenuRef.current.contains(e.target as Node)) {
+                setIsPasteMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // Sync selected target when modal opens or targetInstance changes
     useEffect(() => {
         if (isOpen) {
@@ -70,10 +100,20 @@ export function InstanceSettingsModal({
             if (otherInstances.length > 0) {
                 setCopySettingsSourceId(otherInstances[0].config.id);
                 setCopyProjectsSourceId(otherInstances[0].config.id);
+                setReplicationSourceId(otherInstances[0].config.id);
             } else {
                 setCopySettingsSourceId('');
                 setCopyProjectsSourceId('');
+                setReplicationSourceId('');
             }
+
+            // Sync clipboard buffer from localStorage
+            try {
+                const raw = localStorage.getItem('agm_instance_clipboard_buffer');
+                if (raw) {
+                    setClipboardBuffer(JSON.parse(raw));
+                }
+            } catch {}
 
             loadSettings(initialId);
         }
@@ -139,6 +179,9 @@ export function InstanceSettingsModal({
             }
             if (copyProjectsSourceId === newTargetId) {
                 setCopyProjectsSourceId(otherInstances[0].config.id);
+            }
+            if (replicationSourceId === newTargetId) {
+                setReplicationSourceId(otherInstances[0].config.id);
             }
         }
         loadSettings(newTargetId);
@@ -216,6 +259,20 @@ export function InstanceSettingsModal({
         setIsOperating(true);
         try {
             await instanceService.copyInstanceSettings(copySettingsSourceId, selectedTargetId);
+            const src = instances.find(i => i.config.id === copySettingsSourceId);
+            if (src) {
+                const buf: InstanceClipboardBuffer = {
+                    sourceId: src.config.id,
+                    sourceName: src.config.name,
+                    hasSettings: true,
+                    hasWorkspaces: false,
+                    copiedAt: Date.now(),
+                };
+                try {
+                    localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
+                    setClipboardBuffer(buf);
+                } catch {}
+            }
             showToast(`Settings synchronized from source to ${selectedTargetId}`, 'success');
             await loadSettings(selectedTargetId);
             onInstancesUpdated?.();
@@ -232,10 +289,91 @@ export function InstanceSettingsModal({
         setIsOperating(true);
         try {
             const copiedCount = await instanceService.copyInstanceProjects(copyProjectsSourceId, selectedTargetId);
+            const src = instances.find(i => i.config.id === copyProjectsSourceId);
+            if (src) {
+                const buf: InstanceClipboardBuffer = {
+                    sourceId: src.config.id,
+                    sourceName: src.config.name,
+                    hasSettings: false,
+                    hasWorkspaces: true,
+                    copiedAt: Date.now(),
+                };
+                try {
+                    localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
+                    setClipboardBuffer(buf);
+                } catch {}
+            }
             showToast(`Successfully copied ${copiedCount} workspace folder(s) & project states`, 'success');
             onInstancesUpdated?.();
         } catch (err: any) {
             showToast(`Failed to copy projects: ${err?.message || err}`, 'error');
+        } finally {
+            setIsOperating(false);
+        }
+    };
+
+    // Copy Both Settings & Workspaces to Target and persist in localStorage buffer
+    const handleCopyBothDirect = async (sourceId: string) => {
+        if (!sourceId || !selectedTargetId) return;
+        if (sourceId === selectedTargetId) {
+            showToast('Source and target profiles are identical', 'warning');
+            return;
+        }
+        setIsOperating(true);
+        try {
+            const src = instances.find(i => i.config.id === sourceId);
+            if (src) {
+                const buf: InstanceClipboardBuffer = {
+                    sourceId: src.config.id,
+                    sourceName: src.config.name,
+                    hasSettings: true,
+                    hasWorkspaces: true,
+                    copiedAt: Date.now(),
+                };
+                try {
+                    localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
+                    setClipboardBuffer(buf);
+                } catch {}
+            }
+
+            const { projectsCount } = await instanceService.copyInstanceBoth(sourceId, selectedTargetId);
+            showToast(`Successfully copied settings & ${projectsCount} workspace folder(s) to target profile`, 'success');
+            await loadSettings(selectedTargetId);
+            onInstancesUpdated?.();
+        } catch (err: any) {
+            showToast(`Failed to copy both: ${err?.message || err}`, 'error');
+        } finally {
+            setIsOperating(false);
+        }
+    };
+
+    // Split paste from buffer
+    const handlePasteFromBuffer = async (mode: 'both' | 'settings' | 'workspaces') => {
+        if (!clipboardBuffer || !selectedTargetId) {
+            showToast('Replication buffer is empty', 'warning');
+            return;
+        }
+        if (clipboardBuffer.sourceId === selectedTargetId) {
+            showToast('Source and target profiles are identical', 'warning');
+            return;
+        }
+        setIsOperating(true);
+        setIsPasteMenuOpen(false);
+        try {
+            let msg = '';
+            if (mode === 'both' || mode === 'settings') {
+                await instanceService.copyInstanceSettings(clipboardBuffer.sourceId, selectedTargetId);
+                msg += 'Settings applied. ';
+            }
+            if (mode === 'both' || mode === 'workspaces') {
+                const count = await instanceService.copyInstanceProjects(clipboardBuffer.sourceId, selectedTargetId);
+                msg += `${count} workspace folder(s) replicated.`;
+            }
+            showToast(msg || 'Pasted from replication buffer successfully', 'success');
+            await loadSettings(selectedTargetId);
+            onInstancesUpdated?.();
+        } catch (err: any) {
+            showToast(`Paste failed: ${err?.message || err}`, 'error');
         } finally {
             setIsOperating(false);
         }
@@ -445,11 +583,18 @@ export function InstanceSettingsModal({
                             onChange={(e) => handleTargetChange(e.target.value)}
                             className="bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                         >
-                            {instances.map((inst, idx) => (
-                                <option key={inst.config.id} value={inst.config.id}>
-                                    #{idx + 1} {inst.config.name} {inst.config.is_default ? '(Default)' : ''}
-                                </option>
-                            ))}
+                            {instances.map((inst, idx) => {
+                                const seq = inst.config.seq_num ?? idx + 1;
+                                const idSuffix = inst.config.id.startsWith('antigravity-')
+                                    ? inst.config.id
+                                    : `antigravity-${inst.config.id}`;
+                                const isDefault = inst.config.is_default || inst.config.id === 'default';
+                                return (
+                                    <option key={inst.config.id} value={inst.config.id}>
+                                        #{seq} {inst.config.name} ({idSuffix}){isDefault ? ' [Default]' : ''}
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
 
@@ -608,10 +753,130 @@ export function InstanceSettingsModal({
                     </div>
 
                     {/* 2. Cross-Instance Synchronization */}
-                    <div>
-                        <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                            Cross-Instance Replication
-                        </span>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                Cross-Instance Replication
+                            </span>
+
+                            {/* Buffer status indicator */}
+                            {clipboardBuffer ? (
+                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span>
+                                        Buffer: {clipboardBuffer.sourceName} (
+                                        {clipboardBuffer.hasSettings && clipboardBuffer.hasWorkspaces
+                                            ? 'Both'
+                                            : clipboardBuffer.hasSettings
+                                            ? 'Settings'
+                                            : 'Workspaces'}
+                                        )
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-[10px] text-gray-400 italic font-mono">
+                                    Buffer empty
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Master Replication Bar */}
+                        <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-blue-50/30 dark:bg-[#071a27]/80 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">Source:</span>
+                                <select
+                                    value={replicationSourceId}
+                                    onChange={(e) => setReplicationSourceId(e.target.value)}
+                                    className="flex-1 bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-cyan-300 focus:outline-none"
+                                >
+                                    {candidateSources.map((inst, idx) => {
+                                        const seq = inst.config.seq_num ?? idx + 1;
+                                        const idSuffix = inst.config.id.startsWith('antigravity-')
+                                            ? inst.config.id
+                                            : `antigravity-${inst.config.id}`;
+                                        return (
+                                            <option key={inst.config.id} value={inst.config.id}>
+                                                #{seq} {inst.config.name} ({idSuffix})
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                {/* Copy Both Action Button */}
+                                <button
+                                    type="button"
+                                    disabled={isOperating || !replicationSourceId}
+                                    onClick={() => handleCopyBothDirect(replicationSourceId)}
+                                    className="px-3 py-1.5 rounded-[5px] text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                    title="Copy both settings and workspaces directly into the target profile and update buffer"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copy Both (Settings & Workspaces)</span>
+                                </button>
+
+                                {/* Split Paste Button */}
+                                <div className="relative" ref={pasteMenuRef}>
+                                    <div className="inline-flex rounded-[5px] shadow-xs">
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !clipboardBuffer}
+                                            onClick={() => handlePasteFromBuffer('both')}
+                                            className="px-3 py-1.5 rounded-l-[5px] text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                            title="Paste both settings & workspaces from buffer into target"
+                                        >
+                                            <ClipboardPaste className="w-3.5 h-3.5" />
+                                            <span>Paste Both</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !clipboardBuffer}
+                                            onClick={() => setIsPasteMenuOpen(!isPasteMenuOpen)}
+                                            className="px-1.5 py-1.5 rounded-r-[5px] text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white border-l border-emerald-500/50 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
+                                            title="Paste Options"
+                                        >
+                                            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isPasteMenuOpen && "rotate-180")} />
+                                        </button>
+                                    </div>
+
+                                    {/* Split Paste Dropdown Menu */}
+                                    {isPasteMenuOpen && (
+                                        <div className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-[9999] text-xs animate-in fade-in zoom-in-95">
+                                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-slate-800 mb-1">
+                                                Replication Paste
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePasteFromBuffer('both')}
+                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
+                                            >
+                                                <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                                <span>Paste Both</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePasteFromBuffer('settings')}
+                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
+                                            >
+                                                <Sliders className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                <span>Paste Settings Only</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePasteFromBuffer('workspaces')}
+                                                className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
+                                            >
+                                                <FolderSync className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                                                <span>Paste Workspaces Only</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Individual Cards for Settings and Workspaces */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/* Copy Settings Card */}
                             <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 space-y-2.5">
@@ -630,17 +895,23 @@ export function InstanceSettingsModal({
                                         onChange={(e) => setCopySettingsSourceId(e.target.value)}
                                         className="flex-1 bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2 py-1 text-xs text-gray-800 dark:text-gray-200 focus:outline-none"
                                     >
-                                        {candidateSources.map((inst, idx) => (
-                                            <option key={inst.config.id} value={inst.config.id}>
-                                                From #{idx + 1} {inst.config.name}
-                                            </option>
-                                        ))}
+                                        {candidateSources.map((inst, idx) => {
+                                            const seq = inst.config.seq_num ?? idx + 1;
+                                            const idSuffix = inst.config.id.startsWith('antigravity-')
+                                                ? inst.config.id
+                                                : `antigravity-${inst.config.id}`;
+                                            return (
+                                                <option key={inst.config.id} value={inst.config.id}>
+                                                    #{seq} {inst.config.name} ({idSuffix})
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     <button
                                         type="button"
                                         disabled={isOperating || !copySettingsSourceId}
                                         onClick={handleCopySettings}
-                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                                        className="px-3 py-1 rounded-[5px] text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                                     >
                                         Copy Now
                                     </button>
@@ -664,17 +935,23 @@ export function InstanceSettingsModal({
                                         onChange={(e) => setCopyProjectsSourceId(e.target.value)}
                                         className="flex-1 bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2 py-1 text-xs text-gray-800 dark:text-gray-200 focus:outline-none"
                                     >
-                                        {candidateSources.map((inst, idx) => (
-                                            <option key={inst.config.id} value={inst.config.id}>
-                                                From #{idx + 1} {inst.config.name}
-                                            </option>
-                                        ))}
+                                        {candidateSources.map((inst, idx) => {
+                                            const seq = inst.config.seq_num ?? idx + 1;
+                                            const idSuffix = inst.config.id.startsWith('antigravity-')
+                                                ? inst.config.id
+                                                : `antigravity-${inst.config.id}`;
+                                            return (
+                                                <option key={inst.config.id} value={inst.config.id}>
+                                                    #{seq} {inst.config.name} ({idSuffix})
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     <button
                                         type="button"
                                         disabled={isOperating || !copyProjectsSourceId}
                                         onClick={handleCopyProjects}
-                                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                                        className="px-3 py-1 rounded-[5px] text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                                     >
                                         Copy Folders
                                     </button>

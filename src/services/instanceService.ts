@@ -83,6 +83,22 @@ export async function copyInstanceSettings(fromId: string, toId: string): Promis
     }
 }
 
+export async function copyInstanceBoth(fromId: string, toId: string): Promise<{ projectsCount: number }> {
+    try {
+        await copyInstanceSettings(fromId, toId);
+        const projectsCount = await copyInstanceProjects(fromId, toId);
+        return { projectsCount };
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.copyInstanceBoth',
+            endpoint: 'copy_instance_both',
+            triggerAction: 'copy_instance_both',
+            context: { fromId, toId },
+        });
+        throw e;
+    }
+}
+
 export async function enforceDefaultSettings(targetInstance?: string): Promise<number> {
     try {
         return await invoke('enforce_default_settings', {

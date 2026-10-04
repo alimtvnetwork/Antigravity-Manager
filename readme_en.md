@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.135.0)
+> Professional AI Account Management & Protocol Proxy System (v4.136.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.135.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.136.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.135.0**: Ingested 8 rich themes from WP-Exam into `THEME_PALETTES` (bringing total catalogue themes to 18) including Green Choice, Clean Wide, Riseup Gold, Dracula, and Obsidian Cyan. Added a sleek top-level header theme switcher (`ThemeSwitcherDropdown`) directly beside the route menu dropdown (`NavMenu`) for millisecond-level instant on-the-fly theme switching, updated global CSS palette mapping in `src/App.css`, and scaled settings `ThemePicker` to a responsive 6-column layout with 5–6px (`rounded-[5px]`) standard button geometry. (Thanks to @aukgit)
+> Latest version **v4.136.0**: Implemented an aesthetic fluid water-drain styled progress bar (`WaterDrainProgressBar`) with milestone checkmark nodes across QuotaItem, InstanceTable, and Instances. Reorganized navbar into a 3-segment preferences capsule (`[Quick Clean] | [Theme Switcher] | [Language]`) and 3 direct route quick-access icons (`Accounts`, `Instances`, `Settings`) plus overflow hamburger menu. Added combined "Copy Both" and split "Paste" replication with `localStorage` buffer persistence in InstanceSettingsModal. Overhauled PromptTreeViewModal with fixed header positioning, 3-layer collapsible hierarchy (`Project -> Conversation -> Prompt`), untitled conversation grouping, Markdown preview/raw/edit modes, Full inspector button, Resend/Enqueue prompt triggers, and SQLite split-DB caching (`prompt_tree_cache`) in `repo_prompts.db`. Enforced prompt queue FIFO scheduling and terminal state bypass in backend. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

@@ -242,6 +242,20 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
         [],
     );
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS prompt_tree_cache (
+            cache_key TEXT PRIMARY KEY,
+            instance_id TEXT NOT NULL,
+            tree_json TEXT NOT NULL,
+            project_count INTEGER NOT NULL,
+            conversation_count INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            ttl_seconds INTEGER NOT NULL DEFAULT 60
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create prompt_tree_cache table: {}", e))?;
+
     Ok(())
 }
 
@@ -1365,6 +1379,61 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
     let now = Utc::now().timestamp();
 
+    // 0. Dynamic process activity check: If no Antigravity process is actively running for this instance, prompt cannot be executing
+    let has_active_process = if instance_id.is_empty() || instance_id == "all" {
+        crate::modules::process::is_antigravity_running(None)
+    } else if let Ok(registry) = crate::modules::instance::load_registry() {
+        if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+        } else if instance_id == "default" || instance_id == "__default__" {
+            crate::modules::process::is_antigravity_running(None)
+        } else {
+            false
+        }
+    } else if instance_id == "default" || instance_id == "__default__" {
+        crate::modules::process::is_antigravity_running(None)
+    } else {
+        false
+    };
+
+    if !has_active_process {
+        return false;
+    }
+
+    // Check if the prompt has already transitioned to a terminal status ('completed' / 'failed')
+    let in_memory_terminal = if let Ok(map) = get_memory_prompts_map().lock() {
+        map.values().any(|p| {
+            let matches_inst = instance_id.is_empty()
+                || instance_id == "all"
+                || p.instance_id == instance_id
+                || ((instance_id == "default" || instance_id == "__default__")
+                    && (p.instance_id == "default"
+                        || p.instance_id == "__default__"
+                        || p.instance_id.is_empty()));
+            matches_inst
+                && (p.project_id == project_id || p.repo_path == project_id)
+                && (p.status == "completed" || p.status == "failed")
+        })
+    } else {
+        false
+    };
+
+    let db_terminal = if let Ok(conn) = connect_db() {
+        conn.query_row(
+            "SELECT status FROM active_prompts 
+             WHERE (project_id = ?1 OR repo_path = ?1) 
+             ORDER BY updated_at DESC, created_at DESC LIMIT 1",
+            params![project_id],
+            |r| r.get::<_, String>(0),
+        )
+        .map(|s| s == "completed" || s == "failed")
+        .unwrap_or(false)
+    } else {
+        false
+    };
+
+    let has_terminal_transition = in_memory_terminal || db_terminal;
+
     // 1. Check in-memory active prompts map
     if let Ok(map) = get_memory_prompts_map().lock() {
         for p in map.values() {
@@ -1376,7 +1445,10 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         || p.instance_id == "__default__"
                         || p.instance_id.is_empty()));
             if matches_inst && (p.project_id == project_id || p.repo_path == project_id) {
-                if p.status == "running" || (p.status == "dispatched" && p.updated_at >= now - 120)
+                if p.status == "running" {
+                    return true;
+                }
+                if p.status == "dispatched" && p.updated_at >= now - 120 && !has_terminal_transition
                 {
                     return true;
                 }
@@ -1393,17 +1465,27 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         }
     }
 
-    // 3. Check SQLite active_prompts for 'running' or recently 'dispatched'
+    // 3. Check SQLite active_prompts for 'running' or recently 'dispatched' (do not block on 120s cooldown if terminal)
     if let Ok(conn) = connect_db() {
-        let running_count: usize = conn
-            .query_row(
+        let running_count: usize = if has_terminal_transition {
+            conn.query_row(
+                "SELECT COUNT(*) FROM active_prompts 
+                 WHERE (project_id = ?1 OR repo_path = ?1) 
+                   AND status = 'running'",
+                params![project_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
+        } else {
+            conn.query_row(
                 "SELECT COUNT(*) FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1) 
                    AND (status = 'running' OR (status = 'dispatched' AND updated_at >= ?2))",
                 params![project_id, now - 120],
                 |r| r.get(0),
             )
-            .unwrap_or(0);
+            .unwrap_or(0)
+        };
         if running_count > 0 {
             return true;
         }
@@ -2556,12 +2638,12 @@ pub fn resend_running_commands_for_instance(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
              WHERE status IN ('backed_up', 'queued', 'pending', 'running')
-             ORDER BY updated_at DESC LIMIT ?",
+             ORDER BY created_at ASC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 
     let all_prompts = stmt
-        .query_map([limit.saturating_mul(2).max(20)], |row| {
+        .query_map([limit.saturating_mul(4).max(50)], |row| {
             Ok(ActivePrompt {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
@@ -2604,28 +2686,37 @@ pub fn resend_running_commands_for_instance(
                     || instance_repo_paths.contains(&normalize_path_for_compare(&p.repo_path))
             }
         })
-        .take(limit)
         .collect();
 
     let mut resent = Vec::new();
     let mut dispatched_repos = HashSet::new();
 
     for mut prompt in prompts {
-        if prompt.status == "queued" {
-            continue;
-        }
         let clean_path = prompt.repo_path.trim().to_lowercase().replace('\\', "/");
         if dispatched_repos.contains(&clean_path) {
             crate::modules::logger::log_info(&format!(
-                "[RepoDB] Skipping older prompt '{}' for repo '{}', already dispatched latest prompt for this workspace",
+                "[RepoDB] Preserving subsequent prompt '{}' for repo '{}' in FIFO queue",
                 prompt.id, prompt.repo_path
             ));
-            let _ = conn.execute(
-                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
-                rusqlite::params![now, &prompt.id],
-            );
+            if prompt.status != "queued" {
+                let _ = conn.execute(
+                    "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
+                    rusqlite::params![now, &prompt.id],
+                );
+            }
             continue;
         }
+
+        if resent.len() >= limit {
+            if prompt.status != "queued" {
+                let _ = conn.execute(
+                    "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
+                    rusqlite::params![now, &prompt.id],
+                );
+            }
+            continue;
+        }
+
         dispatched_repos.insert(clean_path);
 
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
@@ -3156,7 +3247,73 @@ fn inspect_conversation_transcript(
 
 /// Build the AGM Project -> Conversation -> 200-Word Prompt Tree across ALL registered instances
 /// and persist Dual AGM (`P001`/`C001`) + GitMap (`GM:#1`/`GM:<short_id>`) Sequence IDs in `repo_prompts.db`.
+/// Checks `prompt_tree_cache` first. If cache is valid (within TTL and not forced), returns cached JSON.
 pub fn get_project_conversation_tree(
+    max_words: usize,
+    only_running: bool,
+) -> Vec<AgmProjectTreeNode> {
+    get_project_conversation_tree_cached(max_words, only_running, false)
+}
+
+/// Retrieve project conversation tree with cache control
+pub fn get_project_conversation_tree_cached(
+    max_words: usize,
+    only_running: bool,
+    force: bool,
+) -> Vec<AgmProjectTreeNode> {
+    let cache_key = format!("tree:{}:{}", max_words, only_running);
+    let now = Utc::now().timestamp();
+
+    if !force {
+        if let Ok(conn) = connect_db() {
+            let cached: Result<(String, i64, i64), _> = conn.query_row(
+                "SELECT tree_json, updated_at, ttl_seconds FROM prompt_tree_cache WHERE cache_key = ?1",
+                params![&cache_key],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            );
+            if let Ok((tree_json, updated_at, ttl_seconds)) = cached {
+                if now - updated_at < ttl_seconds {
+                    if let Ok(nodes) = serde_json::from_str::<Vec<AgmProjectTreeNode>>(&tree_json) {
+                        return nodes;
+                    }
+                }
+            }
+        }
+    }
+
+    let tree_nodes = compute_project_conversation_tree(max_words, only_running);
+
+    let project_count = tree_nodes.len();
+    let conversation_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
+    if let Ok(json_str) = serde_json::to_string(&tree_nodes) {
+        if let Ok(conn) = connect_db() {
+            let _ = conn.execute(
+                "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 60)
+                 ON CONFLICT(cache_key) DO UPDATE SET
+                    instance_id = excluded.instance_id,
+                    tree_json = excluded.tree_json,
+                    project_count = excluded.project_count,
+                    conversation_count = excluded.conversation_count,
+                    updated_at = excluded.updated_at,
+                    ttl_seconds = excluded.ttl_seconds",
+                params![
+                    &cache_key,
+                    "all",
+                    &json_str,
+                    project_count as i64,
+                    conversation_count as i64,
+                    now,
+                ],
+            );
+        }
+    }
+
+    tree_nodes
+}
+
+/// Core computation of project conversation tree across instances and summaries
+fn compute_project_conversation_tree(
     max_words: usize,
     only_running: bool,
 ) -> Vec<AgmProjectTreeNode> {

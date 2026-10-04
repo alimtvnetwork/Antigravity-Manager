@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
 import type { LiveLimitStatus } from '../../types/account';
 import { formatCompactDuration, getLiveLimitState } from '../../utils/liveLimit';
+import { WaterDrainProgressBar } from '../common/WaterDrainProgressBar';
 
 interface QuotaItemProps {
     label: string;
@@ -37,15 +38,6 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
             liveLimit.message ? `Message: ${liveLimit.message}` : null,
         ].filter(Boolean).join(' ')
         : label;
-    const getBgGradientClass = (p: number) => {
-        if (p >= 50) {
-            return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500';
-        }
-        if (p >= 20) {
-            return 'bg-gradient-to-r from-amber-500 to-amber-400';
-        }
-        return 'bg-gradient-to-r from-rose-500 to-rose-400';
-    };
 
     const getTextColorClass = (p: number) => {
         if (p >= 50) return 'text-cyan-600 dark:text-cyan-400';
@@ -66,29 +58,18 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
     return (
         <div className="min-w-0">
         <div className={cn(
-            "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-slate-200 dark:bg-slate-800/80 group/quota",
+            "relative h-[22px] flex items-center px-1.5 rounded-md border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/90 dark:bg-[#071a27]/90 group/quota gap-1.5",
             showLiveIssue && "border-amber-400/70 dark:border-amber-500/70 bg-amber-50/80 dark:bg-amber-950/30 ring-1 ring-amber-400/30",
             isUnavailable && "border-rose-400/70 dark:border-rose-500/70 bg-rose-50/80 dark:bg-rose-950/30 ring-rose-400/30",
             className
         )}
             title={showLiveIssue ? liveLimitTitle : label}
         >
-            {/* Background Progress Bar with modern multi-stop vibrant glowing gradient */}
-            <div
-                className={cn(
-                    "absolute inset-y-0 left-0 transition-all duration-700 ease-out opacity-25 dark:opacity-35 shadow-xs",
-                    showLiveIssue
-                        ? (isUnavailable ? "bg-gradient-to-r from-rose-500 to-rose-400" : "bg-gradient-to-r from-amber-500 to-amber-400")
-                        : getBgGradientClass(percentage)
-                )}
-                style={{ width: `${percentage}%` }}
-            />
-
             {/* Content */}
-            <div className="relative z-10 w-full flex items-center text-[10px] font-mono leading-none gap-1">
+            <div className="relative z-10 w-full flex items-center text-[10px] font-mono leading-none gap-1.5">
                 {/* Model Name */}
                 <span className={cn(
-                    "flex-1 min-w-0 text-gray-800 dark:text-slate-100 font-bold truncate text-left flex items-center gap-1",
+                    "min-w-0 text-gray-800 dark:text-slate-100 font-bold truncate text-left flex items-center gap-1 shrink-0 max-w-[70px]",
                     showLiveIssue && "text-amber-700 dark:text-amber-300",
                     isUnavailable && "text-rose-700 dark:text-rose-300"
                 )} title={showLiveIssue ? liveLimitTitle : label}>
@@ -102,11 +83,16 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, liveLimit
                         />
                     )}
                     {Icon && <Icon size={12} className="shrink-0" />}
-                    {label}
+                    <span className="truncate">{label}</span>
                 </span>
 
+                {/* Inline WaterDrainProgressBar */}
+                <div className="flex-1 min-w-[36px] flex items-center">
+                    <WaterDrainProgressBar percentage={percentage} />
+                </div>
+
                 {/* Reset Time */}
-                <div className="w-[62px] flex justify-start shrink-0">
+                <div className="w-[52px] sm:w-[58px] flex justify-start shrink-0">
                     {resetTime ? (
                         <span className={cn("flex items-center gap-0.5 font-medium transition-colors truncate", getTimeColorClass(resetTime))}>
                             <Clock className="w-2.5 h-2.5 shrink-0" />

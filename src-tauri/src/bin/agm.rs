@@ -73,11 +73,12 @@ fn main() {
             forward_args.extend(cmd_args);
             cmd_instances(&forward_args);
         }
-        "copy-settings" | "copy_settings" => {
-            let mut forward_args = vec!["copy-settings".to_string()];
+        "copy-settings" | "copy_settings" | "sync-settings" | "sync_settings" => {
+            let mut forward_args = vec!["sync-settings".to_string()];
             forward_args.extend(cmd_args);
             cmd_instances(&forward_args);
         }
+        "theme" | "profile-theme" => cmd_theme(&cmd_args),
         "settings" | "instance-settings" => {
             let mut forward_args = vec!["settings".to_string()];
             forward_args.extend(cmd_args);
@@ -9364,7 +9365,10 @@ fn cmd_instance_copy_settings(args: &[String]) {
         let start_idx = if non_flag_args
             .first()
             .map(|s| {
-                s.eq_ignore_ascii_case("copy-settings") || s.eq_ignore_ascii_case("copy_settings")
+                s.eq_ignore_ascii_case("copy-settings")
+                    || s.eq_ignore_ascii_case("copy_settings")
+                    || s.eq_ignore_ascii_case("sync-settings")
+                    || s.eq_ignore_ascii_case("sync_settings")
             })
             .unwrap_or(false)
         {
@@ -9579,6 +9583,150 @@ fn cmd_instance_settings(args: &[String]) {
     }
 }
 
+fn cmd_theme(args: &[String]) {
+    let non_flag_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with('-'))
+        .cloned()
+        .collect();
+
+    let start_idx = if non_flag_args
+        .first()
+        .map(|s| s.eq_ignore_ascii_case("theme") || s.eq_ignore_ascii_case("profile-theme"))
+        .unwrap_or(false)
+    {
+        1
+    } else {
+        0
+    };
+
+    let mut target_instance: Option<String> = None;
+    let is_all = args.iter().any(|a| a.eq_ignore_ascii_case("--all"));
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg_lower = args[i].to_lowercase();
+        if (arg_lower == "--instance" || arg_lower == "-i" || arg_lower == "--inst")
+            && i + 1 < args.len()
+        {
+            target_instance = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    let subaction = non_flag_args.get(start_idx).map(|s| s.to_lowercase());
+
+    match subaction.as_deref() {
+        Some("set") => {
+            let theme_id = match non_flag_args.get(start_idx + 1) {
+                Some(t) => t.clone(),
+                None => {
+                    eprintln!("Usage: agm theme set <theme-id> [--instance <id> | --all]");
+                    eprintln!("       agm profile-theme set <theme-id> [--instance <id> | --all]");
+                    std::process::exit(1);
+                }
+            };
+
+            if target_instance.is_none() && !is_all {
+                if let Some(inst) = non_flag_args.get(start_idx + 2) {
+                    target_instance = Some(inst.clone());
+                }
+            }
+
+            let resolved_target: Option<String> = if is_all {
+                None
+            } else if let Some(ref inst) = target_instance {
+                Some(instance::resolve_instance_id(inst).unwrap_or_else(|_| inst.clone()))
+            } else {
+                match instance::get_active_instance_id() {
+                    Ok(id) => Some(id),
+                    Err(_) => Some("default".to_string()),
+                }
+            };
+
+            match instance::set_instance_theme(resolved_target.as_deref(), &theme_id) {
+                Ok(count) => {
+                    if let Some(ref inst) = resolved_target {
+                        println!(
+                            "[SUCCESS] Set workbench.colorTheme = '{}' for instance '{}'.",
+                            theme_id, inst
+                        );
+                    } else {
+                        println!(
+                            "[SUCCESS] Set workbench.colorTheme = '{}' across {} instance(s).",
+                            theme_id, count
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set theme: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("get") => {
+            let target = target_instance
+                .as_deref()
+                .or_else(|| non_flag_args.get(start_idx + 1).map(|s| s.as_str()))
+                .unwrap_or("default");
+            match instance::get_instance_theme(target) {
+                Ok(Some(t)) => println!("Instance '{}' workbench.colorTheme: {}", target, t),
+                Ok(None) => {
+                    println!(
+                        "Instance '{}' has no custom workbench.colorTheme configured",
+                        target
+                    )
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to get theme: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            if let Some(theme_id) = non_flag_args.get(start_idx) {
+                let resolved_target: Option<String> = if is_all {
+                    None
+                } else if let Some(ref inst) = target_instance {
+                    Some(instance::resolve_instance_id(inst).unwrap_or_else(|_| inst.clone()))
+                } else {
+                    match instance::get_active_instance_id() {
+                        Ok(id) => Some(id),
+                        Err(_) => Some("default".to_string()),
+                    }
+                };
+
+                match instance::set_instance_theme(resolved_target.as_deref(), theme_id) {
+                    Ok(count) => {
+                        if let Some(ref inst) = resolved_target {
+                            println!(
+                                "[SUCCESS] Set workbench.colorTheme = '{}' for instance '{}'.",
+                                theme_id, inst
+                            );
+                        } else {
+                            println!(
+                                "[SUCCESS] Set workbench.colorTheme = '{}' across {} instance(s).",
+                                theme_id, count
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to set theme: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                println!("AGM Theme CLI:");
+                println!("  agm theme set <theme-id> [--instance <id> | --all]");
+                println!("  agm profile-theme set <theme-id> [--instance <id> | --all]");
+                println!("  agm theme get [--instance <id>]");
+            }
+        }
+    }
+}
+
 fn cmd_instances(args: &[String]) {
     let non_flag_args: Vec<String> = args
         .iter()
@@ -9731,6 +9879,8 @@ fn cmd_instances(args: &[String]) {
         println!("  count [--json]                    Display summary of total, active, and running instance counts");
         println!("  copy-projects --from <s> --to <d> Copy workspace projects and recent paths between instances");
         println!("  copy-settings --from <s> --to <d> Deep-merge theme, Antigravity, and policy settings");
+        println!("  sync-settings <src> <dst>         Synchronize and deep-merge settings between instances");
+        println!("  theme set <theme-id> [options]    Set workbench.colorTheme for active or specified instance");
         println!("  settings <action> [options]       Configure defaults, turboMode, planReview, export, or import");
         println!("  switch, use <inst> <account>      Switch an instance profile's bound account credentials directly");
         println!("  ff, rotate [inst]                 Fast-forward / smart-rotate account for an instance (or all)");
@@ -9804,12 +9954,23 @@ fn cmd_instances(args: &[String]) {
         return;
     }
 
-    // Subcommand: agm instances copy-settings
+    // Subcommand: agm instances copy-settings / sync-settings
     if !non_flag_args.is_empty()
         && (non_flag_args[0].eq_ignore_ascii_case("copy-settings")
-            || non_flag_args[0].eq_ignore_ascii_case("copy_settings"))
+            || non_flag_args[0].eq_ignore_ascii_case("copy_settings")
+            || non_flag_args[0].eq_ignore_ascii_case("sync-settings")
+            || non_flag_args[0].eq_ignore_ascii_case("sync_settings"))
     {
         cmd_instance_copy_settings(args);
+        return;
+    }
+
+    // Subcommand: agm instances theme / profile-theme
+    if !non_flag_args.is_empty()
+        && (non_flag_args[0].eq_ignore_ascii_case("theme")
+            || non_flag_args[0].eq_ignore_ascii_case("profile-theme"))
+    {
+        cmd_theme(args);
         return;
     }
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.136.0] - 2026-10-04
+
+### Added
+- **水流泄压进度条与里程碑节点 (Fluid Water-Drain Progress Bar)**: 实现了受水流泄压灵感启发的全新紧凑型进度条组件（`WaterDrainProgressBar`），采用 `#1af18d` 前驱色至 `#12b27d` 峰值色的平滑双阶渐变与流光动画，内嵌 `[25, 50, 75, 100]` 里程碑检查点徽标；总高度精准压缩至 18px，全面接入账号配额项（`QuotaItem`）、实例卡片及列表视图（`InstanceTable`），兼具轻量视觉与直观进度反馈。 (Thanks to @aukgit)
+- **顶栏导航与偏好设置三段式胶囊重构 (Navbar & Capsule Reorganization)**: 将偏好设置重构为一体化三段式药丸胶囊（`[快速清理] | [主题切换] | [语言选择]`），彻底移除导航栏中间松散的主题按钮；中心导航区直列暴露 `Accounts`（账号）、`Instances`（实例）、`Settings`（设置）三大核心路由快捷图标，其余页面收拢至紧凑汉堡菜单且严格避免重复展示。 (Thanks to @aukgit)
+- **多实例配置与工作区深度复制/剪贴板持久化 (Instance Deep Replication & Buffer)**: 实例设置弹窗中新增“Copy Both (Settings & Workspaces)”一键深度复制与“Paste Both / Paste Settings Only / Paste Workspaces Only”拆分粘贴能力；引入 `localStorage` 持久化复制缓冲区（`agm_instance_clipboard_buffer`），彻底解决切换目标或切换页面时数据丢失问题；目标实例下拉列表标准化展示序号、名称与 `antigravity-{id}` 后缀。 (Thanks to @aukgit)
+- **提示词三层树形视图重构与 Markdown 多模式预览 (Prompt Tree View Overhaul)**: 修复弹窗标题栏被顶栏遮挡问题（升阶至 `z-[200]` 并优化上边距）；实现“项目 → 会话 → 提示词”三层折叠树，并将无标题/空会话智能归拢为折叠计数节点（`Untitled Conversations ({count})`）；新增 Markdown 富文本预览（默认 500 词截断并支持全文展开）、Raw 纯文本及直接编辑模式；增加一键 Resend 重发与 Enqueue 入队调度动作。 (Thanks to @aukgit)
+- **提示词树 SQLite 分库分表缓存 (Split-DB Prompt Tree Caching)**: 在 `repo_prompts.db` 中建立 `prompt_tree_cache` 缓存表与 60 秒 TTL 机制，避免反复解析磁盘 LevelDB 与 SQLite 原始文件，极大提升树形视图交互性能与系统响应速度。 (Thanks to @aukgit)
+- **CLI 命令行能力扩展 (CLI Parity)**: 新增 `agm theme set <theme-id> [--instance <id>|--all]` 终端主题设置命令与 `agm instance sync-settings <src> <target>` 跨实例配置同步命令。 (Thanks to @aukgit)
+
+### Fixed
+- **提示词队列 FIFO 顺序保障与多任务防丢失 (Prompt Queue FIFO & Invariant Safeguard)**: 在 `repo_db.rs` 的 `check_and_dispatch_enqueued_prompts` 中强制执行严格 FIFO 调度（`ORDER BY created_at ASC LIMIT 1`）；在 `resend_running_commands_for_instance` 中彻底修复多提示词工作区只恢复首个并丢弃后续任务的漏洞，确保后续任务持续保留在 `queued` 状态等待调度；在 `is_prompt_running_for_project` 中增加进程实时活跃检测与终端状态旁路，彻底消除 120 秒假死冷却锁。 (Thanks to @aukgit)
+
+---
+
 ## [v4.135.0] - 2026-10-04
 
 ### Added
@@ -371,6 +386,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.136.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.135.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
