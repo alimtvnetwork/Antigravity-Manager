@@ -57,9 +57,7 @@ import { findQuotaModel } from '../config/modelConfig';
 import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
-import { showToast } from '../components/common/ToastContainer';
 import { WaterDrainProgressBar } from '../components/common/WaterDrainProgressBar';
-import { QuotaProgressBar } from '../components/accounts/QuotaProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';
@@ -1039,7 +1037,6 @@ export default function Instances() {
                         const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
                         const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
                         const geminiModel = geminiPro || geminiFlash;
-                        const weeklyQuota = boundAccount?.quota?.weekly;
 
                         const hasActiveTask = Boolean(inst.is_running) && runningTreeNodes.some((node) => {
                             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
@@ -1244,43 +1241,42 @@ export default function Instances() {
                                             })() : null}
                                         </div>
 
-                                        {/* Colorful Gemini Quota Progress Bar: VS Code cyan-teal palette */}
+                                        {/* Colorful Gemini Quota & Weekly Progress Bar */}
                                         <div className="mb-2.5">
-                                            {geminiModel ? (() => {
-                                                const pct = Math.min(100, Math.max(0, geminiModel.percentage));
-                                                const getTextClass = (percentage: number) => {
-                                                    if (percentage >= 50) return 'text-teal-600 dark:text-cyan-400';
-                                                    if (percentage >= 20) return 'text-amber-600 dark:text-amber-400';
-                                                    return 'text-rose-600 dark:text-rose-400';
-                                                };
-
-                                                return (
-                                                    <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-1.5">
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
-                                                                    {geminiModel.display_name || 'Gemini 3.1 Pro'}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                                {geminiModel.reset_time ? (
-                                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 font-mono" title={`Resets in ${formatTimeRemaining(geminiModel.reset_time)}`}>
-                                                                        <Clock className="w-2.5 h-2.5 text-gray-400" />
-                                                                        {formatTimeRemaining(geminiModel.reset_time)}
+                                            {(geminiModel || weeklyQuota) ? (
+                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
+                                                    {geminiModel && (
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                    <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
+                                                                    <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
+                                                                        {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
                                                                     </span>
-                                                                ) : null}
-                                                                <span className={cn("font-mono font-bold text-[11px] px-1.5 py-0.5 rounded-md bg-white dark:bg-[#081a2b] shadow-2xs border border-gray-200 dark:border-[#15334d]", getTextClass(pct))}>
-                                                                    {pct}%
+                                                                </div>
+                                                            </div>
+                                                            <QuotaProgressBar
+                                                                percentage={geminiModel.percentage}
+                                                                resetTime={geminiModel.reset_time}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {weeklyQuota && (
+                                                        <div className={cn("space-y-1", geminiModel && "pt-1.5 border-t border-gray-200/60 dark:border-[#15334d]/60")}>
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                                                                    Weekly Quota
                                                                 </span>
                                                             </div>
+                                                            <QuotaProgressBar
+                                                                isWeekly
+                                                                percentage={weeklyQuota.percentage}
+                                                                resetTime={weeklyQuota.resetTime}
+                                                            />
                                                         </div>
-
-                                                        {/* Stepper Progress Bar */}
-                                                        <WaterDrainProgressBar percentage={pct} />
-                                                    </div>
-                                                );
-                                            })() : boundAccount ? (
+                                                    )}
+                                                </div>
+                                            ) : boundAccount ? (
                                                 <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
                                                     <div className="flex items-center gap-1.5">
                                                         <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />

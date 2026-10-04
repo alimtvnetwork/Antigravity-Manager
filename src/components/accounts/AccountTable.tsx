@@ -60,6 +60,7 @@ import { Gemini, Claude } from '@lobehub/icons';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import { QuotaItem } from './QuotaItem';
+import { QuotaProgressBar } from './QuotaProgressBar';
 import { categorizeModel, getModelProtectionKey, findQuotaModel } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 import { getLiveLimitForModel } from '../../utils/liveLimit';
@@ -746,27 +747,24 @@ function AccountRowContent({
                         </button>
                     </div>
                 ) : (
-                    <QuotaItem
-                        label=""
+                    <QuotaProgressBar
                         percentage={fourHourModel?.percentage ?? 0}
                         resetTime={fourHourModel?.resetTime}
                         isProtected={fourHourModel?.isProtected}
                         liveLimit={fourHourModel?.liveLimit}
-                        Icon={fourHourModel?.Icon || (modelFilter === 'claude' ? Claude.Color : Gemini.Color)}
                     />
                 )}
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2 py-0.5 align-middle">
+            <td className="px-2 py-0.5 align-middle min-w-[200px]">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
-                    <QuotaItem
-                        label=""
+                    <QuotaProgressBar
+                        isWeekly
                         percentage={weeklyCell.percentage}
                         resetTime={weeklyCell.resetTime}
-                        Icon={modelFilter === 'claude' ? Claude.Color : Gemini.Color}
                     />
                 )}
             </td>
