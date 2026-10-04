@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.144.0] - 2026-10-04
+
+### Added
+- **macOS Gatekeeper 深度加固与递归隔离属性清除 (Deep macOS Gatekeeper Hardening & Recursive Quarantine Purge)**: 彻底攻克 macOS 13 (Ventura)、14 (Sonoma) 与 15 (Sequoia) 系统下安装运行报“已损坏，移到废纸篓”的深层根因。`install.sh` 重构镜像挂载输出解析，由易受格式污染的正则提取升级为确定性 `awk` 字段分词；引入 `sw_vers -productVersion` 动态获取 macOS 主版本；采用 `find "$target_app" -exec xattr -d com.apple.quarantine {} +` 递归清除应用包内所有嵌套二进制与框架的隔离属性；在 macOS 13+ 系统上自动调用 `spctl --add "$target_app"` 将应用主动登记至 Gatekeeper 白名单。针对 macOS 15+ 严格校验环境，精准绕开被 AMFI 拦截的自签名指令，全面确保跨 macOS 版本的原生可执行性。 (Thanks to @aukgit)
+- **首次安装 Antigravity IDE 探测与回显 (First-Time Installation IDE Discovery & Echo)**: 在 `install.sh` 脚本执行完成阶段新增 `detect_ide_path()` 探测逻辑，通过 Spotlight `mdfind`（匹配 Bundle Identifier）及 `/Applications/` 与 `$HOME/Applications/` 标准路径，即时检索并回显当前系统中 Antigravity IDE 的安装路径；若未发现则给出清晰的首启自动探测提示。 (Thanks to @aukgit)
+- **跨平台用户应用目录支持与磁盘调用栈日志 (User-Level Applications Path Parity & Disk Backtrace Log)**: 在 `src-tauri/src/modules/process.rs` 与 `src-tauri/src/modules/instance.rs` 中全面扩充 macOS 候选查找与启动路径，覆盖 `$HOME/Applications/` 用户自定义应用程序目录；在探测失败或多实例启动异常路径中，自动将捕获的完整 `std::backtrace::Backtrace` 与排查路径序列化为 JSON 写入 `~/.local/share/antigravity/ide-discovery.log` 本地磁盘日志，彻底满足排错与技术支持对调用堆栈留痕的严格诉求。 (Thanks to @aukgit)
+- **DMG 修复工具与打包脚本递归加固 (Bilingual Fix Utility & DMG Packaging Hardening)**: 同步重构 `scripts/Fix_Damaged.command`，引入 macOS 版本探测、`find ... xattr -d` 递归清除以及 `spctl --add` 登记指令；更新 `scripts/package_dmg.sh` 确保修复脚本赋予可执行权限并在打包前后清除镜像本身的隔离属性。 (Thanks to @aukgit)
+
+---
+
 ## [v4.143.0] - 2026-10-04
 
 ### Added
@@ -480,6 +490,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.144.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.143.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

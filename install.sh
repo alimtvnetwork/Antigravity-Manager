@@ -38,13 +38,13 @@ warn()    { echo -e "${INDENT}${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${INDENT}${RED}[ERROR]${NC} $1" >&2; exit 1; }
 step()    { echo -e "\n${INDENT}${CYAN}==>${NC} ${BOLD}$1${NC}"; }
 
-# POSIX error stack trace trap
+# Error stack trace trap
 report_error_stack() {
     local exit_code="$?"
     local line_no="${1:-$LINENO}"
     local bash_cmd="${2:-${BASH_COMMAND:-unknown}}"
     if [[ "$exit_code" -ne 0 ]]; then
-        echo -e "\n${INDENT}${RED}[ERROR]${NC} Command '${bash_cmd}' failed with exit code ${exit_code} at line ${line_no}." >&2
+        echo -e "\n${INDENT}${RED}[ERROR] Command: ${bash_cmd} | Exit: ${exit_code} | Line: ${line_no} | Stack: ${FUNCNAME[*]}${NC}" >&2
         if [[ ${#FUNCNAME[@]} -gt 1 ]]; then
             echo -e "${INDENT}${YELLOW}[STACK TRACE]${NC}" >&2
             for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
@@ -1286,9 +1286,43 @@ EOF
     success "${FULL_NAME} installed successfully!"
 }
 
+# Detect Antigravity IDE installation
+detect_ide_path() {
+    info "Detecting Antigravity IDE installation..."
+    local ide_path=""
+    if command -v mdfind &>/dev/null; then
+        ide_path=$(mdfind 'kMDItemCFBundleIdentifier == "com.google.antigravity"' 2>/dev/null | head -n1)
+        if [[ -z "$ide_path" ]]; then
+            ide_path=$(mdfind "kMDItemCFBundleIdentifier == 'com.antigravity.ide'" 2>/dev/null | head -n1)
+        fi
+    fi
+    if [[ -z "$ide_path" ]]; then
+        local candidates=(
+            "/Applications/Antigravity.app"
+            "${HOME}/Applications/Antigravity.app"
+        )
+        for candidate in "${candidates[@]}"; do
+            if [[ -d "$candidate" ]]; then
+                ide_path="$candidate"
+                break
+            fi
+        done
+    fi
+    if [[ -n "$ide_path" ]]; then
+        success "Detected Antigravity IDE: $ide_path"
+    else
+        info "Antigravity IDE not found in standard paths (will be detected on first launch)."
+    fi
+}
+
 # Install on macOS
 install_macos() {
     step "Installing ${APP_NAME}..."
+
+    local macos_major=0
+    if command -v sw_vers &>/dev/null; then
+        macos_major=$(sw_vers -productVersion | cut -d. -f1)
+    fi
 
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
         info "[DRY-RUN] Clearing quarantine attributes from DMG: $DOWNLOAD_PATH"
@@ -1298,8 +1332,14 @@ install_macos() {
         run cp -R "<mount>/*.app" /Applications/
         run hdiutil detach "<mount>" -force -quiet
         run xattr -cr "/Applications/${APP_NAME}.app"
-        run xattr -r -d com.apple.quarantine "/Applications/${APP_NAME}.app"
-        run codesign --force --deep --sign - "/Applications/${APP_NAME}.app"
+        run xattr -d com.apple.quarantine "/Applications/${APP_NAME}.app"
+        run find "/Applications/${APP_NAME}.app" -exec xattr -d com.apple.quarantine {} +
+        if [[ "$macos_major" -ge 13 ]]; then
+            run spctl --add "/Applications/${APP_NAME}.app"
+        fi
+        if [[ "$macos_major" -lt 15 ]]; then
+            run codesign --force --deep --sign - "/Applications/${APP_NAME}.app"
+        fi
         run ln -sf "/Applications/${APP_NAME}.app/Contents/MacOS/agm" "${HOME}/.local/bin/agm"
         run ln -sf "/Applications/${APP_NAME}.app/Contents/MacOS/agm-alim" "${HOME}/.local/bin/agm-alim"
         return 0
@@ -1314,7 +1354,7 @@ install_macos() {
     info "Mounting disk image..."
     local mount_output mount_point
     mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen 2>&1)
-    mount_point=$(echo "$mount_output" | grep -o '/Volumes/.*' | head -n1 | sed -e 's/[[:space:]]*$//')
+    mount_point=$(echo "$mount_output" | awk '/\/Volumes\// { for(i=1;i<=NF;i++) if($i ~ /^\/Volumes\//) { print $i; exit } }')
 
     if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
         error "Failed to mount DMG. Output: $mount_output"
@@ -1386,15 +1426,23 @@ install_macos() {
     # 8. Strip Gatekeeper quarantine on target app without requiring sudo
     info "Stripping Gatekeeper quarantine attributes from $target_app..."
     xattr -cr "$target_app" 2>/dev/null || true
-    xattr -r -d com.apple.quarantine "$target_app" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$target_app" 2>/dev/null || true
+    # Recursively remove quarantine from all nested executables and frameworks
+    find "$target_app" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
 
-    # 9. Apply ad-hoc local code signature if codesign is present
-    if command -v codesign &>/dev/null; then
+    # 9. Register with Gatekeeper assessment subsystem (spctl) on macOS 13+ (Ventura+)
+    if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
+        info "Registering application with Gatekeeper assessment subsystem (spctl)..."
+        spctl --add "$target_app" 2>/dev/null || true
+    fi
+
+    # 10. Apply ad-hoc local code signature if codesign is present (skipped on macOS 15+ Sequoia where ad-hoc signing is rejected by AMFI)
+    if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
         info "Applying ad-hoc code signature..."
         codesign --force --deep --sign - "$target_app" 2>/dev/null || true
     fi
 
-    # 10. CLI symlink: Check for agm or agm-alim binary inside Contents/MacOS/
+    # 11. CLI symlink: Check for agm or agm-alim binary inside Contents/MacOS/
     local macos_bin_dir="${target_app}/Contents/MacOS"
     local cli_bin=""
     if [[ -d "$macos_bin_dir" ]]; then
@@ -1445,12 +1493,14 @@ install_macos() {
         fi
     fi
 
-    # 11. Success report with clear next steps
+    # 12. Success report with clear next steps
     success "${APP_NAME} installed to ${target_app}!"
     echo ""
     info "Next steps:"
     info "  1. You can launch '${app_bundle_name%.app}' from ${dest_dir}"
     info "  2. Or run 'agm' / 'agm-alim' in terminal"
+
+    detect_ide_path
 }
 
 # Post-install cleanup: guarantees temporary download files and directory removal

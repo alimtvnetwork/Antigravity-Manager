@@ -372,8 +372,8 @@ pub fn get_default_antigravity_data_dir() -> PathBuf {
 
     #[cfg(target_os = "macos")]
     {
-        if let Ok(home) = std::env::var("HOME") {
-            let path = PathBuf::from(home)
+        if let Some(home) = dirs::home_dir() {
+            let path = home
                 .join("Library")
                 .join("Application Support")
                 .join("Antigravity");
@@ -2663,6 +2663,23 @@ fn launch_instance_inner(
     launch_instance_inner_with_extra_workspaces(instance_id, reinject_prompts, None)
 }
 
+/// Helper to construct candidate search paths for macOS instance launch.
+pub(crate) fn get_macos_candidate_paths() -> Vec<PathBuf> {
+    let mut candidates = vec![
+        PathBuf::from("/Applications/Antigravity.app"),
+        PathBuf::from("/Applications/Antigravity.app/Contents/MacOS/Antigravity"),
+    ];
+
+    if let Some(home) = dirs::home_dir() {
+        let user_app = home.join("Applications").join("Antigravity.app");
+        candidates.push(user_app.clone());
+        let user_macos_bin = user_app.join("Contents").join("MacOS").join("Antigravity");
+        candidates.push(user_macos_bin);
+    }
+
+    candidates
+}
+
 fn launch_instance_inner_with_extra_workspaces(
     instance_id: &str,
     reinject_prompts: bool,
@@ -2898,6 +2915,30 @@ fn launch_instance_inner_with_extra_workspaces(
 
     #[cfg(target_os = "macos")]
     {
+        // Ensure candidate executable paths for Antigravity also check user-level $HOME/Applications/Antigravity.app:
+        // If exe_str is not found at /Applications/Antigravity.app, check $HOME/Applications/Antigravity.app.
+        let mut exe_str = exe_str;
+        if !Path::new(&exe_str).exists() {
+            if exe_str == "/Applications/Antigravity.app"
+                || exe_str.starts_with("/Applications/Antigravity.app")
+            {
+                if let Some(home) = dirs::home_dir() {
+                    let user_app = home.join("Applications").join("Antigravity.app");
+                    if user_app.exists() {
+                        exe_str = user_app.to_string_lossy().to_string();
+                    }
+                }
+            }
+            if !Path::new(&exe_str).exists() {
+                for candidate in get_macos_candidate_paths() {
+                    if candidate.exists() {
+                        exe_str = candidate.to_string_lossy().to_string();
+                        break;
+                    }
+                }
+            }
+        }
+
         let is_app_bundle = exe_str.ends_with(".app") || Path::new(&exe_str).is_dir();
 
         let mut app_args = Vec::new();
@@ -2992,12 +3033,23 @@ fn launch_instance_inner_with_extra_workspaces(
             }
         }
 
+        cmd.env("RUST_BACKTRACE", "1");
+
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
 
         let child = cmd.spawn().map_err(|e| {
             let trace = std::backtrace::Backtrace::capture();
+            let trace_str = format!("{}. Backtrace:\n{:?}", e, trace);
+            crate::modules::process::append_ide_discovery_log(
+                false,
+                Some("FAILED"),
+                &exe_str,
+                "launch_attempt",
+                None,
+                &trace_str,
+            );
             crate::modules::logger::log_error(&format!(
                 "[Instance] Failed to spawn macOS instance process (exe: {}, is_app_bundle: {}): {}. Backtrace:\n{:?}",
                 exe_str, is_app_bundle, e, trace
@@ -3033,6 +3085,7 @@ fn launch_instance_inner_with_extra_workspaces(
     #[cfg(not(target_os = "macos"))]
     {
         let mut cmd = Command::new(&exe_str);
+        cmd.env("RUST_BACKTRACE", "1");
 
         let has_custom_data = !is_default;
         if has_custom_data {
@@ -6921,5 +6974,19 @@ mod clone_tree_tests {
         assert_eq!(status, "IDLE");
 
         let _ = fs::remove_dir_all(instances_dir.join(&test_inst_id));
+    }
+
+    #[test]
+    fn test_get_macos_candidate_paths_includes_user_applications() {
+        let paths = get_macos_candidate_paths();
+        assert!(paths
+            .iter()
+            .any(|p| p == &PathBuf::from("/Applications/Antigravity.app")));
+        if let Some(home) = dirs::home_dir() {
+            let user_app = home.join("Applications").join("Antigravity.app");
+            let user_macos_bin = user_app.join("Contents").join("MacOS").join("Antigravity");
+            assert!(paths.contains(&user_app));
+            assert!(paths.contains(&user_macos_bin));
+        }
     }
 }

@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.143.0-3B82F6?style=flat-square" alt="Version v4.143.0">
+    <img src="https://img.shields.io/badge/Version-v4.144.0-3B82F6?style=flat-square" alt="Version v4.144.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.143.0)**
+**Bar 2: Version-Based Installation (v4.144.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.143.0**: Fixed a critical cross-instance running prompt state bleed where prompts running in one instance (e.g. Coding Guidelines on 8159) incorrectly appeared as `RUNNING` on another instance card (e.g. Default); overhauled `get_project_conversation_tree` with `instance_id` partitioning and strict OS process liveness gating, eliminating the blind 10-minute recency assumption and adding `[PROMPT_LIVENESS_PROBE]` audit logs; enforced strict per-instance scoping in instance cards and `PromptTreeViewModal`; completely overhauled the deep clone engine to copy user settings, keybindings, security presets, `state.vscdb`, and all workspace storage via `safe_clone_sqlite_db`; implemented card and table row-level glass mutex overlays with animated spinners blocking duplicate actions; replaced native `window.confirm` delete dialogs with custom in-app dark-glass modals; and redesigned the Instance Settings Modal with Lucide icon capsules and fixed horizontal overflow. (Thanks to @aukgit)
+> Latest version **v4.144.0**: Resolved macOS "damaged app, move to Trash" installation failures across macOS 13 (Ventura), 14 (Sonoma), and 15 (Sequoia) by refactoring DMG mount extraction to robust `awk` parsing, adding dynamic `sw_vers` OS version detection, applying recursive `find -exec xattr -d com.apple.quarantine` attribute removal, automatically registering Gatekeeper assessment via `spctl --add`, skipping rejected ad-hoc signatures on macOS 15+, and adding real-time Spotlight/filesystem IDE discovery during installation; expanded macOS IDE candidate and launch paths in `process.rs` and `instance.rs` to include user-level `$HOME/Applications/`, and persisted diagnostic `Backtrace` telemetry to `ide-discovery.log`. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

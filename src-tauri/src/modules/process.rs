@@ -1443,6 +1443,7 @@ pub fn start_antigravity_with_fallback_path(
                 // macOS: if .app directory, use open
                 if path_str.ends_with(".app") || path.is_dir() {
                     let mut cmd = Command::new("open");
+                    cmd.env("RUST_BACKTRACE", "1");
                     let open_args = format_macos_open_args(&path_str, args.as_deref(), true);
                     cmd.args(&open_args);
 
@@ -1450,6 +1451,7 @@ pub fn start_antigravity_with_fallback_path(
                         .map_err(|e| format!("Startup failed (open): {}", e))?;
                 } else {
                     let mut cmd = Command::new(&path_str);
+                    cmd.env("RUST_BACKTRACE", "1");
 
                     // Add startup arguments
                     if let Some(ref args) = args {
@@ -1467,6 +1469,7 @@ pub fn start_antigravity_with_fallback_path(
             #[cfg(not(target_os = "macos"))]
             {
                 let mut cmd = Command::new(&path_str);
+                cmd.env("RUST_BACKTRACE", "1");
 
                 if let Some(parent) = path.parent() {
                     cmd.current_dir(parent);
@@ -1521,6 +1524,7 @@ pub fn start_antigravity_with_fallback_path(
                 };
 
                 let mut cmd = Command::new("open");
+                cmd.env("RUST_BACKTRACE", "1");
                 let open_args = format_macos_open_args(app_target, args.as_deref(), false);
                 cmd.args(&open_args);
 
@@ -1540,6 +1544,7 @@ pub fn start_antigravity_with_fallback_path(
             #[cfg(not(target_os = "macos"))]
             {
                 let mut cmd = Command::new(pref_path);
+                cmd.env("RUST_BACKTRACE", "1");
 
                 if let Some(parent) = pref_path.parent() {
                     cmd.current_dir(parent);
@@ -1578,6 +1583,7 @@ pub fn start_antigravity_with_fallback_path(
     {
         // Improvement: Use output() to wait for open command completion and capture "app not found" error
         let mut cmd = Command::new("open");
+        cmd.env("RUST_BACKTRACE", "1");
         let app_name = if target_ide == Some("ide") {
             "Antigravity IDE"
         } else {
@@ -1604,6 +1610,7 @@ pub fn start_antigravity_with_fallback_path(
         match detect_antigravity_with_diagnostics(target_ide) {
             Ok(detected_path) => {
                 let mut cmd = Command::new(&detected_path);
+                cmd.env("RUST_BACKTRACE", "1");
 
                 if let Some(parent) = detected_path.parent() {
                     cmd.current_dir(parent);
@@ -1993,6 +2000,83 @@ pub fn get_antigravity_executable_path(target_ide: Option<&str>) -> Option<std::
     detect_antigravity_with_diagnostics(target_ide).ok()
 }
 
+/// Resolve the platform-specific path to the IDE discovery log:
+/// `{data_local_dir}/antigravity/ide-discovery.log`
+pub fn get_ide_discovery_log_path() -> Option<std::path::PathBuf> {
+    dirs::data_local_dir().map(|d| d.join("antigravity").join("ide-discovery.log"))
+}
+
+/// Append a structured JSON diagnostic entry to `{data_local_dir}/antigravity/ide-discovery.log`.
+/// Never propagates I/O errors, only logging failures via `tracing::warn!`.
+pub fn append_ide_discovery_log(
+    found: bool,
+    status: Option<&str>,
+    path: &str,
+    method: &str,
+    checked_paths: Option<&[String]>,
+    backtrace: &str,
+) {
+    let log_path = match get_ide_discovery_log_path() {
+        Some(p) => p,
+        None => return,
+    };
+
+    if let Some(parent) = log_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!(
+                "[IDE Discovery] Failed to create log directory {:?}: {}",
+                parent,
+                e
+            );
+            return;
+        }
+    }
+
+    let mut entry = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "found": found,
+        "status": status.unwrap_or(if found { "SUCCESS" } else { "FAILED" }),
+        "path": path,
+        "method": method,
+        "backtrace": backtrace,
+    });
+    if let Some(paths) = checked_paths {
+        entry["checked_paths"] = serde_json::json!(paths);
+    }
+
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        Ok(mut file) => {
+            use std::io::Write;
+            let mut line = match serde_json::to_string(&entry) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!("[IDE Discovery] Failed to serialize discovery log: {}", e);
+                    return;
+                }
+            };
+            line.push('\n');
+            if let Err(e) = file.write_all(line.as_bytes()) {
+                tracing::warn!(
+                    "[IDE Discovery] Failed to write to log file {:?}: {}",
+                    log_path,
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "[IDE Discovery] Failed to open log file {:?}: {}",
+                log_path,
+                e
+            );
+        }
+    }
+}
+
 /// Discover Antigravity IDE on first-time startup or when unconfigured,
 /// persisting the located executable into gui_config.json.
 pub fn discover_and_persist_initial_ide_info() -> Option<std::path::PathBuf> {
@@ -2006,6 +2090,14 @@ pub fn discover_and_persist_initial_ide_info() -> Option<std::path::PathBuf> {
                     "[IDE Discovery] Configured Antigravity IDE executable already exists: {:?}",
                     path
                 ));
+                append_ide_discovery_log(
+                    true,
+                    Some("SUCCESS"),
+                    exe_str,
+                    "existing_config",
+                    None,
+                    "",
+                );
                 return Some(path);
             }
         }
@@ -2014,7 +2106,7 @@ pub fn discover_and_persist_initial_ide_info() -> Option<std::path::PathBuf> {
     match detect_antigravity_with_diagnostics(None) {
         Ok(path) => {
             let path_str = path.to_string_lossy().to_string();
-            config.antigravity_executable = Some(path_str);
+            config.antigravity_executable = Some(path_str.clone());
             if let Err(e) = crate::modules::config::save_app_config(&config) {
                 crate::modules::logger::log_warn(&format!(
                     "[IDE Discovery] Failed to persist discovered IDE to config: {}",
@@ -2025,22 +2117,44 @@ pub fn discover_and_persist_initial_ide_info() -> Option<std::path::PathBuf> {
                 "[IDE Discovery] First-time startup located Antigravity IDE: {:?}",
                 path
             ));
+            append_ide_discovery_log(
+                true,
+                Some("SUCCESS"),
+                &path_str,
+                "initial_discovery",
+                None,
+                "",
+            );
             Some(path)
         }
         Err(err) => {
             let trace = std::backtrace::Backtrace::capture();
-            let (diagnostics, original_stack) = match err {
+            let (diagnostics, original_stack, searched) = match err {
                 crate::error::AppError::IdeNotFound {
                     ref diagnostics,
                     ref stack_trace,
+                    ref searched_locations,
                     ..
-                } => (diagnostics.as_str(), stack_trace.as_str()),
-                _ => ("No detailed diagnostics available", ""),
+                } => (
+                    diagnostics.as_str(),
+                    stack_trace.as_str(),
+                    Some(searched_locations.as_slice()),
+                ),
+                _ => ("No detailed diagnostics available", "", None),
             };
             crate::modules::logger::log_warn(&format!(
                 "[IDE Discovery] No Antigravity IDE detected during initial discovery.\nDiagnostics:\n{}\nStack trace:\n{:?}\nOriginal Stack:\n{}",
                 diagnostics, trace, original_stack
             ));
+            let trace_str = format!("{:?}\nOriginal Stack:\n{}", trace, original_stack);
+            append_ide_discovery_log(
+                false,
+                Some("FAILED"),
+                "",
+                "initial_discovery",
+                searched,
+                &trace_str,
+            );
             None
         }
     }
@@ -2064,7 +2178,12 @@ pub(crate) fn get_macos_candidate_paths(
         format!("/Applications/{}.app/Contents/MacOS/Electron", folder_name),
     ];
 
-    if let Some(home) = home_dir {
+    let resolved_home: Option<std::path::PathBuf> = match home_dir {
+        Some(h) => Some(h.to_path_buf()),
+        None => dirs::home_dir(),
+    };
+
+    if let Some(home) = resolved_home {
         let home_str = home.to_string_lossy().replace('\\', "/");
         let home_clean = home_str.trim_end_matches('/');
         let user_app = format!("{}/Applications/{}.app", home_clean, folder_name);
@@ -2109,7 +2228,11 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
         for folder_name in folder_names {
             let query = format!("kMDItemFSName == '{}.app'", folder_name);
             checked.push(format!("mdfind: {}", query));
-            if let Ok(output) = std::process::Command::new("mdfind").arg(&query).output() {
+            if let Ok(output) = std::process::Command::new("mdfind")
+                .env("RUST_BACKTRACE", "1")
+                .arg(&query)
+                .output()
+            {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stdout.lines() {
@@ -2817,5 +2940,17 @@ mod tests {
     #[test]
     fn test_discover_and_persist_initial_ide_info_runs_without_panic() {
         let _ = discover_and_persist_initial_ide_info();
+    }
+
+    #[test]
+    fn test_append_ide_discovery_log_runs_without_panic() {
+        append_ide_discovery_log(
+            false,
+            Some("FAILED"),
+            "/path/to/test",
+            "test_method",
+            Some(&["/checked/1".to_string(), "/checked/2".to_string()]),
+            "test_trace",
+        );
     }
 }

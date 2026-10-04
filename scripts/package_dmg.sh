@@ -66,17 +66,19 @@ TARGET_BUNDLE="$DIST_DIR/$(basename "$SRC_APP_PATH")"
 # Strip quarantine and apply ad-hoc code signature to bundle in staging directory
 echo "Stripping quarantine and applying ad-hoc signature to bundle..."
 xattr -cr "$TARGET_BUNDLE" 2>/dev/null || true
-xattr -r -d com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
+xattr -d com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
+find "$TARGET_BUNDLE" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
 if command -v codesign &>/dev/null; then
     codesign --force --deep --sign - "$TARGET_BUNDLE" 2>/dev/null || true
 fi
 
 # 4. Copy and configure Fix_Damaged.command
 echo "Including Fix_Damaged.command in DMG..."
+chmod +x "scripts/Fix_Damaged.command"
 cp "scripts/Fix_Damaged.command" "$DIST_DIR/"
 chmod +x "$DIST_DIR/Fix_Damaged.command"
 xattr -cr "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
-xattr -r -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
+xattr -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
 
 # 5. Create /Applications symlink for drag-and-drop install
 ln -s /Applications "$DIST_DIR/Applications"
@@ -85,6 +87,11 @@ ln -s /Applications "$DIST_DIR/Applications"
 echo "Creating DMG image ($DMG_NAME)..."
 rm -f "$DMG_NAME"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$DMG_NAME"
+
+# 7. Strip quarantine from DMG itself
+echo "Stripping quarantine attributes from output DMG..."
+xattr -d com.apple.quarantine "$DMG_NAME" 2>/dev/null || true
+xattr -cr "$DMG_NAME" 2>/dev/null || true
 
 echo "✅ DMG Packaging complete!"
 echo "Artifact location: $PWD/$DMG_NAME"

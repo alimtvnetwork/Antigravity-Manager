@@ -64,26 +64,38 @@ fi
 if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
     TARGET_NAME=$(basename "$APP_PATH" .app)
     echo -e "📍 发现应用 / Discovered app: ${BLUE}$APP_PATH${NC}"
-    echo "🔑 正在清除 Gatekeeper 隔离属性并重署签名..."
-    echo "🔑 Clearing Gatekeeper quarantine attributes & applying ad-hoc signature..."
-    echo ""
 
+    macos_major=0
+    if command -v sw_vers &>/dev/null; then
+        macos_major=$(sw_vers -productVersion | cut -d. -f1)
+    fi
+
+    echo "🔧 Clearing quarantine attributes... / 正在清除隔离属性..."
     # 先尝试用户级清除隔离属性 (无需 sudo)
     xattr -cr "$APP_PATH" 2>/dev/null || true
-    xattr -r -d com.apple.quarantine "$APP_PATH" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$APP_PATH" 2>/dev/null || true
+    find "$APP_PATH" -exec xattr -d com.apple.quarantine {} \; 2>/dev/null || true
 
     # 检查是否仍有隔离属性，若有则使用 sudo
     if xattr -r "$APP_PATH" 2>/dev/null | grep -q "com.apple.quarantine"; then
         echo "提示: 当前目录权限受限，请输入开机密码授权 (输入时不显示):"
         echo "Note: Permissions restricted. Please enter login password (keystrokes hidden):"
         sudo xattr -cr "$APP_PATH" 2>/dev/null || true
-        sudo xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
+        sudo xattr -d com.apple.quarantine "$APP_PATH" 2>/dev/null || true
+        sudo find "$APP_PATH" -exec xattr -d com.apple.quarantine {} \; 2>/dev/null || true
+    fi
+    echo "✅ Quarantine cleared. / 隔离属性已清除。"
+
+    # 向 Gatekeeper 注册 (macOS 13+ Ventura / Sonoma / Sequoia)
+    if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
+        echo "🔐 Registering app with Gatekeeper... / 正在向看门人注册应用..."
+        spctl --add "$APP_PATH" 2>/dev/null || sudo spctl --add "$APP_PATH" 2>/dev/null || true
+        echo "✅ Gatekeeper registration done. / 看门人注册完成。"
     fi
 
-    # 应用本地临时签名
-    if command -v codesign &>/dev/null; then
-        echo "正在应用本地自签名 (codesign)..."
-        echo "Applying local ad-hoc codesign..."
+    # 应用本地临时自签名 (macOS 15+ Sequoia 会拦截 ad-hoc 签名，仅在 15 以前版本应用)
+    if [[ "$macos_major" -lt 15 ]] && command -v codesign &>/dev/null; then
+        echo "正在应用本地自签名 (codesign)... / Applying local ad-hoc codesign..."
         codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || sudo codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
     fi
 
