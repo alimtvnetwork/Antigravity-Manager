@@ -15,6 +15,7 @@ export interface QuotaProgressBarProps {
     checkpoints?: number[];
     showCheckpoints?: boolean;
     Icon?: React.ComponentType<{ size?: number; className?: string }>;
+    liveLimit?: any;
 }
 
 export function QuotaProgressBar({

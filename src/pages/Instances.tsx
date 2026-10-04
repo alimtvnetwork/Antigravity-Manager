@@ -15,7 +15,6 @@ import {
     Pencil,
     FastForward,
     Mail,
-    Clock,
     Gem,
     Diamond,
     Circle,
@@ -54,10 +53,10 @@ import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/inst
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
 import ModalDialog from '../components/common/ModalDialog';
 import { findQuotaModel } from '../config/modelConfig';
-import { formatTimeRemaining } from '../utils/format';
 import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
-import { WaterDrainProgressBar } from '../components/common/WaterDrainProgressBar';
+import { showToast } from '../components/common/ToastContainer';
+import { QuotaProgressBar } from '../components/accounts/QuotaProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';
@@ -1037,6 +1036,21 @@ export default function Instances() {
                         const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
                         const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
                         const geminiModel = geminiPro || geminiFlash;
+
+                        const weeklyBucket = (boundAccount?.quota?.quota_groups || [])
+                            .find((item) => {
+                                const name = (item.display_name || '').toLowerCase();
+                                return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+                            })
+                            ?.buckets?.find((item) =>
+                                (item.window || '').toLowerCase().includes('week') ||
+                                (item.bucket_id || '').toLowerCase().includes('week')
+                            );
+
+                        const weeklyQuota = weeklyBucket ? {
+                            percentage: Math.round((weeklyBucket.remaining_fraction || 0) * 100),
+                            resetTime: weeklyBucket.reset_time,
+                        } : ((boundAccount?.quota as any)?.weekly || null);
 
                         const hasActiveTask = Boolean(inst.is_running) && runningTreeNodes.some((node) => {
                             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
