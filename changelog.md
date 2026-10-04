@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.141.0] - 2026-10-04
+
+### Added
+- **macOS 安装器与隔离属性清除 (macOS Installer & Gatekeeper Quarantine Bypass)**: 彻底解决 macOS 系统下安装报错“Antigravity Manager Tools 已损坏，您应该将它移到废纸篓”的致命问题。安装脚本 `install.sh` 在挂载 DMG 镜像前后均执行隔离属性清除（`xattr -cr` 与 `xattr -r -d com.apple.quarantine`）；支持在挂载卷中动态检索 `.app` 包；当系统 `/Applications` 不可写时无缝降级安装至用户目录 `$HOME/Applications/`，杜绝管道执行时因无 TTY 导致 `sudo` 静默失败；自动调用 `codesign --force --deep --sign -` 施加本地 ad-hoc 签名以满足 macOS 12–15+ AMFI 完整性校验；自动创建 `agm` 与 `agm-alim` 命令行软链接至 `$HOME/.local/bin/`。 (Thanks to @aukgit)
+- **POSIX 错误调用栈追踪捕获 (POSIX Error Stack Trace Trap & Diagnostics)**: 在 `install.sh` 脚本中引入系统级 `ERR` 信号拦截处理函数（`report_error_stack`），在任意命令异常退出时精准捕获触发命令、退出码、行号及函数调用堆栈，为自动化运维与排错提供完整透明的日志追踪。 (Thanks to @aukgit)
+- **首次启动 IDE 探测与持久化配置 (First-Time Startup IDE Discovery & Auto-Persistence)**: 新增 `discover_and_persist_initial_ide_info()` 探测逻辑并注入 Tauri `setup()` 生命周期，在首次启动或配置缺失时，通过进程表、标准目录、用户应用程序及 Spotlight `mdfind` 检索 Antigravity IDE 可执行文件，自动持久化至 `gui_config.json`；若未检索到则输出详尽的路径排查清单与调用栈。安装脚本也在安装阶段同步探测并回显检测到的 IDE 路径。 (Thanks to @aukgit)
+- **DMG 修复脚本集成与双语输出 (Repair Utility & DMG Packaging Overhaul)**: 重构 `scripts/Fix_Damaged.command`，提供中英双语界面，支持动态定位本地及系统安装的应用程序包，优先以当前用户权限清除隔离属性，并提供自签名与 AppleScript 通知。更新 `scripts/package_dmg.sh` 将修复脚本直接打包进 DMG 镜像。 (Thanks to @aukgit)
+
+### Fixed
+- **macOS 启动参数与窗口指令顺序修复 (Fix macOS open Argument Ordering & Missing --args)**: 彻底修复 `src-tauri/src/modules/process.rs` 中使用 `/usr/bin/open` 启动 Antigravity 时，因 `--new-window` 未紧随 `--args` 导致 `open: unrecognized option '--new-window'` 启动失败的缺陷；抽离 `format_macos_open_args` 统一构造参数列表，确保所有用户自定义参数与窗口控制指令严格置于 `--args` 之后；扩充 macOS 候选查找路径覆盖 `Contents/MacOS/` 真实二进制并集成 Spotlight `mdfind` 兜底。 (Thanks to @aukgit)
+- **macOS 实例切换与独立脚本执行对齐 (macOS Instance Switching & Launcher Script Parity)**: 在 `src-tauri/src/modules/instance.rs` 中重构多实例启动逻辑，精准识别 `.app` 应用包目录（通过 `open -n -a`）与克隆实例启动脚本/二进制（直接通过 `Command::new` 并赋予 `0o755` 权限），彻底消除 `open -a` 拒绝执行 shell 脚本的致命缺陷；在 macOS 平台上完整补齐 `.gemini/antigravity-ide`、`.gemini/antigravity` 初始化及 `app_storage.json`（注入 `ide-install-wizard-shown: true` 及绑定账号）同步逻辑，实现与 Windows/Linux 平台 100% 行为对齐，并在异常路径捕获并记录 Rust `Backtrace`。 (Thanks to @aukgit)
+
+---
+
 ## [v4.140.0] - 2026-10-04
 
 ### Added
@@ -436,6 +450,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.141.0 (2026-10-04)**:
+        -   **[macOS Installer & Gatekeeper Quarantine]**: Resolved macOS installation failure where downloaded packages or apps were blocked by Gatekeeper with "Antigravity Manager Tools is damaged and can't be opened. You should move it to the Trash". Piped shell installer `install.sh` now clears quarantine attributes before and after mounting (`xattr -cr`), dynamically discovers `.app` bundles inside DMG volumes, falls back to user-writable `$HOME/Applications/` without requiring `sudo`, applies local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`) to satisfy AMFI validation, symlinks `agm` and `agm-alim` to `$HOME/.local/bin/`, and automatically reports detected Antigravity IDE information during first-time installation. (Thanks to @aukgit)
+        -   **[POSIX Stack Trace Trap & Diagnostics]**: Added a comprehensive POSIX `ERR` trap handler to `install.sh` that captures command name, exit code, line number, and function call stack traces upon any unexpected failure, providing transparent troubleshooting telemetry. (Thanks to @aukgit)
+        -   **[macOS Process Execution & Argument Ordering]**: Fixed argument ordering in `src-tauri/src/modules/process.rs` where `--new-window` was previously passed to `/usr/bin/open` before `--args`, triggering `open: unrecognized option '--new-window'`. Centralized arguments via `format_macos_open_args`, ensuring application parameters and window options strictly follow `--args`. Enhanced discovery to probe `Contents/MacOS/` binaries and integrated macOS Spotlight `mdfind` query fallback. (Thanks to @aukgit)
+        -   **[macOS Instance Switching & Launcher Parity]**: Enhanced `launch_instance_inner_with_extra_workspaces` in `src-tauri/src/modules/instance.rs` to distinguish between `.app` application bundles and launcher shell scripts (`Command::new`), ensuring cloned instances launch reliably without `open -a` rejection. Achieved full parity with Windows/Linux by initializing `.gemini` home folders, writing keyring bypass markers, and pre-seeding `app_storage.json` (`ide-install-wizard-shown: true` and account binding) on macOS, while logging backtraces on process failures. (Thanks to @aukgit)
+        -   **[First-Time IDE Discovery & Startup Integration]**: Implemented `discover_and_persist_initial_ide_info()` and integrated it into the application `setup()` hook in `src-tauri/src/lib.rs`, proactively detecting Antigravity IDE across running processes, standard paths, user applications, and Spotlight on first startup, persisting the verified path to `gui_config.json` with rich diagnostic logging and stack traces. (Thanks to @aukgit)
+        -   **[Repair Utility & DMG Packaging]**: Overhauled `scripts/Fix_Damaged.command` with bilingual output, dynamic bundle discovery across local and system paths, user-level quarantine stripping with graceful `sudo` fallback, and ad-hoc codesigning. Updated `scripts/package_dmg.sh` to package the repair utility directly inside distributable DMGs. (Thanks to @aukgit)
+
+
     *   **v4.140.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

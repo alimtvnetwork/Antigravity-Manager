@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.140.0-3B82F6?style=flat-square" alt="Version v4.140.0">
+    <img src="https://img.shields.io/badge/Version-v4.141.0-3B82F6?style=flat-square" alt="Version v4.141.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.140.0)**
+**Bar 2: Version-Based Installation (v4.141.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.140.0**: Resolved multi-instance auto-switcher failover where accounts with depleted quotas (e.g. Gemini 3.1 Pro at 6%) were skipped when period reset boundaries elapsed; implemented dedicated candidate quota evaluation (`calculate_candidate_quota`) preventing false candidate disqualification from secondary exhausted models; enforced in-place rotation on depleted instances; accelerated daemon startup to 3 seconds and shortened ticker emissions to 5 seconds for smooth real-time countdown synchronization (`[⏱ {countdown}s Next Check]`); unified universal asynchronous 5-second post-launch prompt restoration across all switch routes; and extended the isolated local E2E test suite. (Thanks to @aukgit)
+> Latest version **v4.141.0**: Resolved macOS installation failure ("damaged app, move to Trash") by clearing Gatekeeper quarantine attributes before and after mounting DMG (`xattr -cr`), dynamically discovering `.app` bundles, gracefully falling back to user `$HOME/Applications/` without requiring `sudo`, applying local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`), and symlinking `agm` CLI to `~/.local/bin/`; added system-level POSIX `ERR` trap capturing line numbers, commands, and call stack traces in `install.sh`; fixed macOS `/usr/bin/open` argument sequence ensuring application parameters and window options strictly follow `--args`; branched macOS instance launching between `.app` bundles and shell scripts with full `.gemini` home folders and `app_storage.json` parity; proactively discovered and persisted Antigravity IDE information on first-time startup via `discover_and_persist_initial_ide_info()` with rich backtraces; and overhauled `Fix_Damaged.command` repair script. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

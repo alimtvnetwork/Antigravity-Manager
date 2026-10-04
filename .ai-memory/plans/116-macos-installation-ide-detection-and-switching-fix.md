@@ -1,6 +1,6 @@
 # Plan 116: macOS Installation, Gatekeeper Quarantine, and IDE Switching Resilience
 
-## Status: IN_PLANNING
+## Status: COMPLETED
 ## Parent Task: 116-macos-installation-ide-detection-and-switching-fix
 
 ---
@@ -33,13 +33,13 @@ at the end make sure you release with a minor bump and change log and don't incl
 
 ## Subtask Breakdown
 
-- [ ] **Task-01**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/001-installer-quarantine-codesign-and-error-traps.md`
+- [x] **Task-01**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/001-installer-quarantine-codesign-and-error-traps.md`
   - Overhaul `install.sh` for macOS: strip quarantine before/after mount, dynamic `.app` discovery, user `$HOME/Applications/` fallback, ad-hoc codesigning (`codesign --sign -`), CLI symlinking (`~/.local/bin/agm`), and POSIX error stack trace trap.
-- [ ] **Task-02**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/002-backend-macos-process-ide-detection-and-arg-fix.md`
+- [x] **Task-02**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/002-backend-macos-process-ide-detection-and-arg-fix.md`
   - Fix macOS process launching and IDE detection in `src-tauri/src/modules/process.rs`: correct argument order with `--args` before application flags, eliminate unrecognized `--new-window` flag error to `open`, add Spotlight `mdfind` lookup, and expand search to `Contents/MacOS/` binaries.
-- [ ] **Task-03**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/003-backend-macos-instance-launch-and-app-storage-parity.md`
+- [x] **Task-03**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/003-backend-macos-instance-launch-and-app-storage-parity.md`
   - Fix `launch_instance_inner_with_extra_workspaces` and `clone_instance_executable` in `src-tauri/src/modules/instance.rs`: branch between `.app` bundles (`open -n -a`) and launcher shell scripts (`Command::new`), and implement missing `.gemini` home and `app_storage.json` setup.
-- [ ] **Task-04**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/004-first-time-ide-gathering-and-stack-trace-telemetry.md`
+- [x] **Task-04**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/004-first-time-ide-gathering-and-stack-trace-telemetry.md`
   - Implement first-time IDE information gathering and automatic configuration persistence at startup with rich stack traces and structured diagnostic logging.
-- [ ] **Task-05**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/005-verification-minor-release-and-changelog.md`
+- [x] **Task-05**: `subtasks/116-macos-installation-ide-detection-and-switching-fix/005-verification-minor-release-and-changelog.md`
   - Execute pre-flight checks (`cargo fmt`, `cargo clippy`, `npm run build`), targeted unit tests, minor version bump, changelog update attributing `@aukgit` `(Thanks to @aukgit)`, README synchronization, and atomic GitMap commit.

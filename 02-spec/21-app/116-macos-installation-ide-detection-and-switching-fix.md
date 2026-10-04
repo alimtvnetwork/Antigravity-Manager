@@ -28,12 +28,12 @@ at the end make sure you release with a minor bump and change log and don't incl
 
 ## 1. Acceptance Criteria
 
-- [ ] **AC-01 (Installation Resilience)**: `install.sh` on macOS mounts the DMG, dynamically discovers `.app` bundles, falls back to `$HOME/Applications/` if `/Applications/` is read-only, clears quarantine via `xattr -cr`, applies local ad-hoc code-signing via `codesign --sign -`, and symlinks `agm` CLI to `$HOME/.local/bin/agm`.
-- [ ] **AC-02 (Error Traps & Stack Traces in Shell)**: `install.sh` handles errors with an explicit `ERR` trap and prints detailed failure line numbers and commands.
-- [ ] **AC-03 (macOS IDE Detection & Arguments Parity)**: `src-tauri/src/modules/process.rs` correctly passes `--args` before any flags when calling `open`, supports Spotlight `mdfind` searches, and detects executables within `.app/Contents/MacOS/`.
-- [ ] **AC-04 (macOS Instance Launching & Script Execution)**: `src-tauri/src/modules/instance.rs` executes shell scripts directly via `Command::new` rather than passing them to `open -a`, and initializes `.gemini` home folders and `app_storage.json`.
-- [ ] **AC-05 (First-Time IDE Discovery & Auto-Persistence)**: Probes and persists detected IDE paths on first run, logging structured diagnostics and stack traces.
-- [ ] **AC-06 (Release Discipline)**: Minor version bump, changelog updating attributing `@aukgit` `(Thanks to @aukgit)`, synchronized README files, and zero absolute paths.
+- [x] **AC-01 (Installation Resilience)**: `install.sh` on macOS mounts the DMG, dynamically discovers `.app` bundles, falls back to `$HOME/Applications/` if `/Applications/` is read-only, clears quarantine via `xattr -cr`, applies local ad-hoc code-signing via `codesign --sign -`, and symlinks `agm` CLI to `$HOME/.local/bin/agm`.
+- [x] **AC-02 (Error Traps & Stack Traces in Shell)**: `install.sh` handles errors with an explicit `ERR` trap and prints detailed failure line numbers and commands.
+- [x] **AC-03 (macOS IDE Detection & Arguments Parity)**: `src-tauri/src/modules/process.rs` correctly passes `--args` before any flags when calling `open`, supports Spotlight `mdfind` searches, and detects executables within `.app/Contents/MacOS/`.
+- [x] **AC-04 (macOS Instance Launching & Script Execution)**: `src-tauri/src/modules/instance.rs` executes shell scripts directly via `Command::new` rather than passing them to `open -a`, and initializes `.gemini` home folders and `app_storage.json`.
+- [x] **AC-05 (First-Time IDE Discovery & Auto-Persistence)**: Probes and persists detected IDE paths on first run, logging structured diagnostics and stack traces.
+- [x] **AC-06 (Release Discipline)**: Minor version bump, changelog updating attributing `@aukgit` `(Thanks to @aukgit)`, synchronized README files, and zero absolute paths.
 
 ---
 
