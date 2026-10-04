@@ -17,7 +17,7 @@ write_success() { echo -e "  ${GREEN}[OK] $1${NC}"; }
 write_warn() { echo -e "  ${YELLOW}[!] $1${NC}"; }
 write_err() { echo -e "  ${RED}[ERROR] $1${NC}"; }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 # Intercept CLI subcommands (agy, ccko, cckf, undo, cache-clear, help)

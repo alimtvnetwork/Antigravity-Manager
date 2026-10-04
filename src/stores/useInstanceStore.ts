@@ -168,13 +168,25 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     },
 
     deleteInstance: async (instanceId: string) => {
-        set({ isLoading: true, error: null });
+        // Optimistically remove the instance immediately to prevent duplicate UI clicks
+        set((state) => ({
+            instances: state.instances.filter((i) => i.config.id !== instanceId),
+            isLoading: true,
+            error: null,
+        }));
         try {
             await instanceService.deleteInstance(instanceId);
             await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
-            set({ isLoading: false, error: err?.toString() || 'Failed to delete instance' });
+            const errStr = err?.toString() || '';
+            // If already deleted or not found, reconcile store gracefully without throwing fatal error
+            if (errStr.toLowerCase().includes('not found')) {
+                await get().fetchInstances(true);
+                set({ isLoading: false });
+                return;
+            }
+            set({ isLoading: false, error: errStr || 'Failed to delete instance' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.deleteInstance' });
             throw err;
         }

@@ -431,10 +431,12 @@ parse_releases_manifest() {
 probe_cdn_manifest() {
     local key
     key=$(get_manifest_asset_key)
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local script_dir=""
+    if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null || true)"
+    fi
     local urls=()
-    if [[ -f "${script_dir}/releases-manifest.json" ]]; then
+    if [[ -n "$script_dir" && -f "${script_dir}/releases-manifest.json" ]]; then
         urls+=("file://${script_dir}/releases-manifest.json")
     fi
     urls+=(
@@ -1502,6 +1504,6 @@ main() {
     echo ""
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
     main "$@"
 fi

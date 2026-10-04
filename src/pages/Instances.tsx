@@ -170,6 +170,7 @@ export default function Instances() {
     const [editTargetId, setEditTargetId] = useState<string | null>(null);
     const [editInstanceName, setEditInstanceName] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isSyncingAll, setIsSyncingAll] = useState(false);
     const [syncingInstanceIds, setSyncingInstanceIds] = useState<Record<string, boolean>>({});
     const [auditModalInstance, setAuditModalInstance] = useState<{ id: string; name: string; sequence_name?: string } | null>(null);
@@ -385,12 +386,16 @@ export default function Instances() {
     };
 
     const handleDelete = async (id: string) => {
+        if (deletingId) return;
         setActionError(null);
         if (window.confirm(t('instances.confirm_delete', 'Are you sure you want to delete this profile?'))) {
             try {
+                setDeletingId(id);
                 await deleteInstance(id);
             } catch (e: any) {
                 setActionError(e?.toString() || 'Failed to delete instance');
+            } finally {
+                setDeletingId(null);
             }
         }
     };
@@ -1035,7 +1040,7 @@ export default function Instances() {
                                                 {!inst.config.is_default && (
                                                     <button
                                                         onClick={() => handleDelete(inst.config.id)}
-                                                        disabled={inst.is_running}
+                                                        disabled={inst.is_running || deletingId === inst.config.id}
                                                         className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 cursor-pointer"
                                                         title="Delete profile"
                                                     >
@@ -1477,7 +1482,7 @@ export default function Instances() {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(inst.config.id)}
-                                                    disabled={inst.is_running}
+                                                    disabled={inst.is_running || deletingId === inst.config.id}
                                                     className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Delete Profile"
                                                 >

@@ -1687,11 +1687,20 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     let mut registry = load_registry()?;
-    let pos = registry
-        .instances
-        .iter()
-        .position(|i| i.id == instance_id)
-        .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+    let pos = match registry.instances.iter().position(|i| i.id == instance_id) {
+        Some(p) => p,
+        None => {
+            // Idempotent: If instance is already deleted or not found in registry,
+            // clean up any lingering directory and return Ok
+            if let Ok(instances_root) = get_instances_dir() {
+                let instance_folder = instances_root.join(instance_id);
+                if instance_folder.exists() {
+                    let _ = fs::remove_dir_all(&instance_folder);
+                }
+            }
+            return Ok(());
+        }
+    };
 
     if registry.instances[pos].is_default {
         return Err("Cannot delete the default instance".to_string());
