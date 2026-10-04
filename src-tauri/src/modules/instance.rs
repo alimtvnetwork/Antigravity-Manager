@@ -2682,7 +2682,7 @@ fn launch_instance_inner_with_extra_workspaces(
 
     #[cfg(target_os = "macos")]
     {
-        let is_app_bundle = exe_str.ends_with(".app") || exe_path.is_dir();
+        let is_app_bundle = exe_str.ends_with(".app") || Path::new(&exe_str).is_dir();
         let mut cmd = if is_app_bundle {
             let mut c = Command::new("open");
             // -n flag guarantees a new separate instance is spawned even if another is already running
@@ -2701,7 +2701,11 @@ fn launch_instance_inner_with_extra_workspaces(
                     let _ = std::fs::set_permissions(&exe_path, permissions);
                 }
             }
-            Command::new(&exe_str)
+            let mut c = Command::new(&exe_str);
+            if let Some(parent) = exe_path.parent() {
+                c.current_dir(parent);
+            }
+            c
         };
 
         let has_custom_data = !is_default;

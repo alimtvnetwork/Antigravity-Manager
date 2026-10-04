@@ -444,8 +444,10 @@ pub fn run() {
             let proxy_state = commands::proxy::ProxyServiceState::new();
             let cf_state = Arc::new(commands::cloudflared::CloudflaredState::new());
 
-            // Discover and persist initial IDE information on first run
-            let _ = crate::modules::process::discover_and_persist_initial_ide_info();
+            // Discover and persist initial IDE information on first run in background
+            std::thread::spawn(|| {
+                crate::modules::process::discover_and_persist_initial_ide_info();
+            });
 
             // Load config
             match modules::config::load_app_config() {
@@ -691,6 +693,11 @@ pub fn run() {
                     crate::utils::win_shortcut::heal_shortcuts_native();
                 });
             }
+
+            // Discover and persist initial IDE information on first run in background
+            std::thread::spawn(|| {
+                crate::modules::process::discover_and_persist_initial_ide_info();
+            });
 
             // Immediately start management server (8045) for Web access
             let handle = app.handle().clone();

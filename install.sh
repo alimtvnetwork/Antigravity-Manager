@@ -42,7 +42,7 @@ step()    { echo -e "\n${INDENT}${CYAN}==>${NC} ${BOLD}$1${NC}"; }
 report_error_stack() {
     local exit_code="$?"
     local line_no="${1:-$LINENO}"
-    local bash_cmd="${BASH_COMMAND:-unknown}"
+    local bash_cmd="${2:-${BASH_COMMAND:-unknown}}"
     if [[ "$exit_code" -ne 0 ]]; then
         echo -e "\n${INDENT}${RED}[ERROR]${NC} Command '${bash_cmd}' failed with exit code ${exit_code} at line ${line_no}." >&2
         if [[ ${#FUNCNAME[@]} -gt 1 ]]; then
@@ -56,6 +56,7 @@ report_error_stack() {
         fi
     fi
 }
+trap 'report_error_stack "$LINENO"' ERR
 
 run() {
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -213,6 +214,8 @@ detect_current_version() {
             "${HOME}/Applications/Antigravity Tools.app/Contents/Info.plist"
             "/Applications/Anti-Gravity Tools.app/Contents/Info.plist"
             "${HOME}/Applications/Anti-Gravity Tools.app/Contents/Info.plist"
+            "/Applications/agm-alim.app/Contents/Info.plist"
+            "${HOME}/Applications/agm-alim.app/Contents/Info.plist"
         )
         for p in "${plist_paths[@]}"; do
             if [[ -f "$p" ]]; then
@@ -787,6 +790,7 @@ build_candidate_download_urls() {
                 "${base_url}/Antigravity.Manager.Tools_${ver}_${mac_arch}.dmg"
                 "${base_url}/Antigravity.Tools_${ver}_${mac_arch}.dmg"
                 "${base_url}/agm-alim_${ver}_${mac_arch}.dmg"
+                "${base_url}/Antigravity_Manager_Tools_${ver}_ManualFix.dmg"
                 "${base_url}/Antigravity.Manager.Tools_universal.app.tar.gz"
             )
             ;;
@@ -1293,9 +1297,11 @@ install_macos() {
         run hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen
         run cp -R "<mount>/*.app" /Applications/
         run hdiutil detach "<mount>" -force -quiet
-        run xattr -r -d com.apple.quarantine "/Applications/${APP_NAME}.app"
         run xattr -cr "/Applications/${APP_NAME}.app"
+        run xattr -r -d com.apple.quarantine "/Applications/${APP_NAME}.app"
         run codesign --force --deep --sign - "/Applications/${APP_NAME}.app"
+        run ln -sf "/Applications/${APP_NAME}.app/Contents/MacOS/agm" "${HOME}/.local/bin/agm"
+        run ln -sf "/Applications/${APP_NAME}.app/Contents/MacOS/agm-alim" "${HOME}/.local/bin/agm-alim"
         return 0
     fi
 
@@ -1328,7 +1334,11 @@ install_macos() {
 
     # 4. Destination permissions: Try /Applications/, fall back to $HOME/Applications/
     local dest_dir="/Applications"
-    if [[ ! -w "$dest_dir" ]]; then
+    if [[ ! -w "$dest_dir" ]] && ! mkdir -p "$dest_dir" 2>/dev/null; then
+        info "/Applications is not writable; falling back to ${HOME}/Applications..."
+        dest_dir="${HOME}/Applications"
+        mkdir -p "$dest_dir" 2>/dev/null || true
+    elif [[ ! -w "$dest_dir" ]]; then
         info "/Applications is not writable; falling back to ${HOME}/Applications..."
         dest_dir="${HOME}/Applications"
         mkdir -p "$dest_dir" 2>/dev/null || true
@@ -1343,7 +1353,7 @@ install_macos() {
     fi
 
     # Also clean up any legacy application bundle names in target destination
-    for legacy_name in "Antigravity Tools.app" "Anti-Gravity Tools.app"; do
+    for legacy_name in "Antigravity Tools.app" "Anti-Gravity Tools.app" "agm-alim.app"; do
         local legacy_path="${dest_dir}/${legacy_name}"
         if [[ -d "$legacy_path" && "$legacy_path" != "$target_app" ]]; then
             info "Removing legacy bundle at $legacy_path..."
@@ -1353,7 +1363,18 @@ install_macos() {
 
     # 6. Copy discovered .app bundle to destination directory
     info "Copying $app_bundle_name to $dest_dir..."
-    cp -R "$source_app" "$dest_dir/"
+    if ! cp -R "$source_app" "$dest_dir/" 2>/dev/null; then
+        if [[ "$dest_dir" != "${HOME}/Applications" ]]; then
+            warn "Permission denied copying to $dest_dir. Falling back to ${HOME}/Applications..."
+            dest_dir="${HOME}/Applications"
+            mkdir -p "$dest_dir" 2>/dev/null || true
+            target_app="${dest_dir}/${app_bundle_name}"
+            rm -rf "$target_app" 2>/dev/null || true
+            cp -R "$source_app" "$dest_dir/"
+        else
+            error "Failed to copy $source_app to $dest_dir"
+        fi
+    fi
 
     # 7. Unmount DMG volume cleanly
     info "Unmounting disk image..."
@@ -1361,8 +1382,8 @@ install_macos() {
 
     # 8. Strip Gatekeeper quarantine on target app without requiring sudo
     info "Stripping Gatekeeper quarantine attributes from $target_app..."
-    xattr -r -d com.apple.quarantine "$target_app" 2>/dev/null || true
     xattr -cr "$target_app" 2>/dev/null || true
+    xattr -r -d com.apple.quarantine "$target_app" 2>/dev/null || true
 
     # 9. Apply ad-hoc local code signature if codesign is present
     if command -v codesign &>/dev/null; then
@@ -1382,7 +1403,12 @@ install_macos() {
         done
         # Fallback to main app binary if specific name not found
         if [[ -z "$cli_bin" ]]; then
-            cli_bin=$(find "$macos_bin_dir" -type f -perm +111 2>/dev/null | head -n1)
+            for f in "${macos_bin_dir}"/*; do
+                if [[ -f "$f" && -x "$f" ]]; then
+                    cli_bin="$f"
+                    break
+                fi
+            done
         fi
     fi
 
@@ -1393,11 +1419,11 @@ install_macos() {
         ln -sf "$cli_bin" "${user_bin}/agm-alim" 2>/dev/null || true
         info "CLI binary symlinked to ${user_bin}/agm and ${user_bin}/agm-alim"
 
-        # Ensure $HOME/.local/bin is in PATH in shell config
+        # Ensure $HOME/.local/bin is in PATH in shell config (.zshrc / .bashrc)
         if [[ ":$PATH:" != *":${user_bin}:"* ]]; then
             local shell_rcs=()
-            [[ -f "$HOME/.zshrc" || "${SHELL:-}" == *"zsh"* ]] && shell_rcs+=("$HOME/.zshrc")
-            [[ -f "$HOME/.bashrc" || "${SHELL:-}" == *"bash"* ]] && shell_rcs+=("$HOME/.bashrc")
+            [[ -f "$HOME/.zshrc" ]] && shell_rcs+=("$HOME/.zshrc")
+            [[ -f "$HOME/.bashrc" ]] && shell_rcs+=("$HOME/.bashrc")
             [[ -f "$HOME/.bash_profile" ]] && shell_rcs+=("$HOME/.bash_profile")
             if [[ ${#shell_rcs[@]} -eq 0 ]]; then
                 shell_rcs+=("$HOME/.zshrc")

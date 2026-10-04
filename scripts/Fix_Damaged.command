@@ -24,6 +24,8 @@ if [ -d "$DIR/${APP_NAME}.app" ]; then
     APP_PATH="$DIR/${APP_NAME}.app"
 elif [ -d "$DIR/Antigravity Tools.app" ]; then
     APP_PATH="$DIR/Antigravity Tools.app"
+elif [ -d "$DIR/agm-alim.app" ]; then
+    APP_PATH="$DIR/agm-alim.app"
 else
     LOCAL_APP=$(find "$DIR" -maxdepth 2 -name "*.app" -type d 2>/dev/null | head -n 1)
     if [ -n "$LOCAL_APP" ] && [ -d "$LOCAL_APP" ]; then
@@ -40,6 +42,8 @@ if [ -z "$APP_PATH" ]; then
         "$HOME/Applications/Antigravity Tools.app"
         "/Applications/Anti-Gravity Tools.app"
         "$HOME/Applications/Anti-Gravity Tools.app"
+        "/Applications/agm-alim.app"
+        "$HOME/Applications/agm-alim.app"
     )
     for candidate in "${CANDIDATES[@]}"; do
         if [ -d "$candidate" ]; then
@@ -51,7 +55,7 @@ fi
 
 # 3. 兜底模糊匹配 Applications 目录下的相关应用
 if [ -z "$APP_PATH" ]; then
-    SEARCH_APP=$(find /Applications "$HOME/Applications" -maxdepth 2 -iname "*antigravity*.app" -type d 2>/dev/null | head -n 1)
+    SEARCH_APP=$(find /Applications "$HOME/Applications" -maxdepth 2 \( -iname "*antigravity*.app" -o -iname "*agm*.app" \) -type d 2>/dev/null | head -n 1)
     if [ -n "$SEARCH_APP" ] && [ -d "$SEARCH_APP" ]; then
         APP_PATH="$SEARCH_APP"
     fi
@@ -59,17 +63,19 @@ fi
 
 if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
     TARGET_NAME=$(basename "$APP_PATH" .app)
-    echo -e "📍 发现应用: ${BLUE}$APP_PATH${NC}"
+    echo -e "📍 发现应用 / Discovered app: ${BLUE}$APP_PATH${NC}"
     echo "🔑 正在清除 Gatekeeper 隔离属性并重署签名..."
+    echo "🔑 Clearing Gatekeeper quarantine attributes & applying ad-hoc signature..."
     echo ""
 
     # 先尝试用户级清除隔离属性 (无需 sudo)
-    xattr -cr "$APP_PATH" 2>/dev/null
-    xattr -r -d com.apple.quarantine "$APP_PATH" 2>/dev/null
+    xattr -cr "$APP_PATH" 2>/dev/null || true
+    xattr -r -d com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 
     # 检查是否仍有隔离属性，若有则使用 sudo
     if xattr -r "$APP_PATH" 2>/dev/null | grep -q "com.apple.quarantine"; then
         echo "提示: 当前目录权限受限，请输入开机密码授权 (输入时不显示):"
+        echo "Note: Permissions restricted. Please enter login password (keystrokes hidden):"
         sudo xattr -cr "$APP_PATH" 2>/dev/null || true
         sudo xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
     fi
@@ -77,7 +83,26 @@ if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
     # 应用本地临时签名
     if command -v codesign &>/dev/null; then
         echo "正在应用本地自签名 (codesign)..."
+        echo "Applying local ad-hoc codesign..."
         codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || sudo codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
+    fi
+
+    # 检查并创建 CLI 软链接
+    MACOS_BIN_DIR="${APP_PATH}/Contents/MacOS"
+    if [ -d "$MACOS_BIN_DIR" ]; then
+        CLI_BIN=""
+        for candidate_name in "agm" "agm-alim" "antigravity-tools"; do
+            if [ -x "${MACOS_BIN_DIR}/${candidate_name}" ]; then
+                CLI_BIN="${MACOS_BIN_DIR}/${candidate_name}"
+                break
+            fi
+        done
+        if [ -n "$CLI_BIN" ]; then
+            USER_BIN="$HOME/.local/bin"
+            mkdir -p "$USER_BIN" 2>/dev/null || true
+            ln -sf "$CLI_BIN" "${USER_BIN}/agm" 2>/dev/null || true
+            ln -sf "$CLI_BIN" "${USER_BIN}/agm-alim" 2>/dev/null || true
+        fi
     fi
 
     echo ""

@@ -1,12 +1,31 @@
 #!/bin/bash
 set -euo pipefail
 
+# Error stack trace trap
+report_error_stack() {
+    local exit_code="$?"
+    local line_no="${1:-$LINENO}"
+    local cmd="${BASH_COMMAND:-unknown}"
+    if [ "$exit_code" -ne 0 ]; then
+        echo "❌ [ERROR] Command '$cmd' failed at line $line_no with exit code $exit_code" >&2
+    fi
+}
+trap 'report_error_stack "$LINENO"' ERR
+
+# Resolve script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
 # Configuration
 APP_NAME="Antigravity Manager Tools"
 VERSION=$(grep '"version":' package.json | head -n 1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
 DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
 SRC_APP_PATH="src-tauri/target/release/bundle/macos/${APP_NAME}.app"
 DIST_DIR="dist_dmg"
+
+# Staging cleanup trap
+trap 'rm -rf "$DIST_DIR"' EXIT
 
 echo "📦 Starting DMG package build (with quarantine fix script)..."
 echo "Version: $VERSION"
@@ -25,27 +44,39 @@ if [ ! -d "$SRC_APP_PATH" ]; then
     fi
 fi
 
-# 2. Prepare temporary directory
+# 2. Prepare temporary distribution directory
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-# 3. Copy files
-echo "Checking source app..."
+# 3. Copy application bundle
+echo "Checking and copying source app ($APP_NAME)..."
 cp -R "$SRC_APP_PATH" "$DIST_DIR/"
-echo "Copying fix script..."
+
+TARGET_BUNDLE="$DIST_DIR/$(basename "$SRC_APP_PATH")"
+
+# Strip quarantine and apply ad-hoc code signature to bundle in staging directory
+echo "Stripping quarantine and applying ad-hoc signature to bundle..."
+xattr -cr "$TARGET_BUNDLE" 2>/dev/null || true
+xattr -r -d com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
+if command -v codesign &>/dev/null; then
+    codesign --force --deep --sign - "$TARGET_BUNDLE" 2>/dev/null || true
+fi
+
+# 4. Copy and configure Fix_Damaged.command
+echo "Including Fix_Damaged.command in DMG..."
 cp "scripts/Fix_Damaged.command" "$DIST_DIR/"
 chmod +x "$DIST_DIR/Fix_Damaged.command"
+xattr -cr "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
+xattr -r -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
 
-# 4. Create /Applications symlink
+# 5. Create /Applications symlink for drag-and-drop install
 ln -s /Applications "$DIST_DIR/Applications"
 
-# 5. Build DMG
-echo "Creating DMG..."
+# 6. Build DMG with hdiutil
+echo "Creating DMG image ($DMG_NAME)..."
 rm -f "$DMG_NAME"
 hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$DMG_NAME"
 
-# 6. Cleanup
-rm -rf "$DIST_DIR"
-
 echo "✅ DMG Packaging complete!"
 echo "Artifact location: $PWD/$DMG_NAME"
+
