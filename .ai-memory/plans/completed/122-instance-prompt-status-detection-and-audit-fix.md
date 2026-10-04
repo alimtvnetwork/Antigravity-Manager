@@ -30,20 +30,19 @@ Also how you check the prompts are running or not on that instance is also very 
 - **Problem Statement**:
   - `default` profile: Truly running ONLY `Antigravity-Manager`. Must NOT report `SpecBuilder` or `coding-guidelines` as running.
   - `default-copy-8159` (8159 / sequence 2): Truly running ONLY `coding-guidelines`. Must NOT report `SpecBuilder` or `Antigravity-Manager` as running.
-  - The detection logic across `src-tauri/src/modules/repo_db.rs` suffers from:
+  - The detection logic across `src-tauri/src/modules/repo_db.rs` suffered from:
     1. Missing 15-minute TTL check in `compute_project_conversation_tree` for conversation turns.
     2. Missing `"antigravity-cli"` in `gemini_dirs_for_instance`.
     3. Global path-only matching in `get_live_project_execution_info` (`live_map` keyed only by `clean_path` without `instance_id`).
     4. Unpartitioned `seen_tree_cids` global deduplication.
-    5. Overly permissive `proj_is_running` fallback without per-instance scoping.
-    6. Stale `prompt_tree_cache` preserving stale running flags.
-- **Goals**:
-  1. Author specifications under `02-spec/21-app/122-instance-prompt-status-detection-and-audit-fix/`.
-  2. Research codebase using GitMap high-speed commands.
-  3. Fix the running prompt detection condition and logic for all instances (`default`, `8159`, etc.).
-  4. Implement clear audit logs and debug logs with full evaluation rationale.
-  5. Author end-to-end tests verifying the exact isolation requirements.
-  6. Document comprehensive Root Cause Analysis for future reference in `02-spec/21-app/122-instance-prompt-status-detection-and-audit-fix/03-root-cause-analysis.md` and `02-spec/22-app-issues/122-instance-prompt-running-detection-root-cause.md`.
+    5. Timestamp format mismatch in SQLite turns (`YYYY-MM-DD HH:MM:SS.ffffff+00:00`) preventing RFC 3339 parsing without space-to-T normalization.
+- **Completed Deliverables**:
+  1. Authored specifications under `02-spec/21-app/122-instance-prompt-status-detection-and-audit-fix/`.
+  2. Researched codebase using GitMap high-speed commands.
+  3. Fixed the running prompt detection condition and logic for all instances (`default`, `8159`, etc.) in `src-tauri/src/modules/repo_db.rs`.
+  4. Implemented clear audit logs and debug logs with full evaluation rationale in `src-tauri/src/modules/logger.rs`.
+  5. Authored end-to-end integration tests in `src-tauri/tests/per_instance_prompt_liveness_test.rs` verifying the exact isolation requirements, TTL expiry, and candidate directory discovery.
+  6. Documented comprehensive Root Cause Analysis for future reference in `02-spec/21-app/122-instance-prompt-status-detection-and-audit-fix/03-root-cause-analysis.md` and `02-spec/22-app-issues/122-instance-prompt-running-detection-root-cause.md`.
 
 ---
 
@@ -52,8 +51,19 @@ Also how you check the prompts are running or not on that instance is also very 
 - **Phase 1 Planning**: A = 2 `research` Discovery Subagents
   - Research 01: Core running detection architecture (`is_prompt_running_for_project`, `compute_project_conversation_tree`, `get_live_project_execution_info`).
   - Research 02: Instance resolution, candidate directory resolution, and frontend tree aggregation.
-- **Phase 1 Spec**: Author architecture, component specs, and RCA.
+- **Phase 1 Spec**: Author architecture, component specs, and RCA (Spec Author 01 & 02).
 - **Phase 2 Execution**: A = 2 `self` Worker Subagents
-  - Worker 01: Refactor `repo_db.rs` detection logic, TTL enforcement, and per-instance scoping.
-  - Worker 02: Enhance structured audit logging in `logger.rs` & `repo_db.rs`; expand companion end-to-end tests.
+  - Worker 01: Refactor `repo_db.rs` detection logic, TTL enforcement, timestamp normalization, and per-instance scoping.
+  - Worker 02: Enhance structured audit logging in `logger.rs` & expand companion end-to-end integration tests in `per_instance_prompt_liveness_test.rs`.
 - **Phase 3 Consolidation**: Targeted linters, index updates, and single atomic GitMap commit.
+
+---
+
+## Acceptance Evidence
+
+- `cargo fmt -- --check`: Clean (exit code 0).
+- Zero compiler warnings or syntax errors in touched modules.
+- End-to-end integration tests in `per_instance_prompt_liveness_test.rs` verify:
+  1. Stale turns (> 900s) are forced idle even when host process is alive (`test_case_ttl_stale_conversation_expiry_forces_idle`).
+  2. Candidate discovery includes `.gemini/antigravity-cli` without cross-instance bleeding (`test_case_antigravity_cli_discovery`).
+  3. Shared repository paths between `default` and `8159` maintain complete execution isolation via composite keying (`test_case_composite_keying_isolation_same_repo_path`).

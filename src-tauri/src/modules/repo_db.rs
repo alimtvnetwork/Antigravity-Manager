@@ -722,7 +722,7 @@ pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
     };
     let mut dirs = Vec::new();
     if let Some(home) = home {
-        for sub in ["antigravity", "antigravity-ide"] {
+        for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
             let path = home.join(".gemini").join(sub);
             if path.exists() {
                 dirs.push(path);
@@ -1742,19 +1742,20 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
                         // 15-Minute TTL: Parse _last_time_str or check turn age. If older than 900 seconds, treat as stale
-                        let is_recent = chrono::DateTime::parse_from_rfc3339(&_last_time_str)
+                        let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
+                        let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
                             .map(|dt| dt.timestamp() >= now - 900)
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
-                                    &_last_time_str,
-                                    "%Y-%m-%d %H:%M:%S",
+                                    &norm_time,
+                                    "%Y-%m-%dT%H:%M:%S",
                                 )
                                 .map(|dt| dt.and_utc().timestamp() >= now - 900)
                             })
                             .or_else(|_| {
                                 chrono::NaiveDateTime::parse_from_str(
                                     &_last_time_str,
-                                    "%Y-%m-%dT%H:%M:%S",
+                                    "%Y-%m-%d %H:%M:%S",
                                 )
                                 .map(|dt| dt.and_utc().timestamp() >= now - 900)
                             })
@@ -2228,94 +2229,124 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     let mut results: Vec<ProjectExecutionInfo> = Vec::new();
     let now = Utc::now().timestamp();
 
-    // Map of normalized repo path -> (is_running, active_prompt_snippet, last_time)
-    let mut live_map: std::collections::HashMap<String, (bool, Option<String>, i64)> =
+    // Map of (instance_id, normalized repo path) -> (is_running, active_prompt_snippet, last_time)
+    let mut live_map: std::collections::HashMap<(String, String), (bool, Option<String>, i64)> =
         std::collections::HashMap::new();
-    let mut active_conv_prefixes: Vec<(String, Option<String>, i64)> = Vec::new();
+    let mut active_conv_prefixes: Vec<(String, String, Option<String>, i64)> = Vec::new();
 
     // 1. Inspect Antigravity conversation_summaries.db
-    let base_dir = crate::modules::agy_cleaner::get_gemini_base_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")));
-    if let Some(base_dir) = base_dir {
+    let candidate_dirs = gemini_dirs_tagged(None);
+    for (owning_inst_id, base_dir) in &candidate_dirs {
         let summaries_db = base_dir.join("conversation_summaries.db");
-        if summaries_db.exists() {
-            let conn = Connection::open_with_flags(
-                &summaries_db,
+        if !summaries_db.exists() {
+            continue;
+        }
+        let conn = Connection::open_with_flags(
+            &summaries_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )
+        .or_else(|_| {
+            let uri = format!(
+                "file:{}?immutable=1",
+                summaries_db.to_string_lossy().replace('\\', "/")
+            );
+            Connection::open_with_flags(
+                &uri,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
             )
-            .or_else(|_| {
-                let uri = format!(
-                    "file:{}?immutable=1",
-                    summaries_db.to_string_lossy().replace('\\', "/")
-                );
-                Connection::open_with_flags(
-                    &uri,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                )
-            });
+        });
 
-            if let Ok(conn) = conn {
-                let _ = conn.pragma_update(None, "busy_timeout", 3000);
-                if let Ok(mut stmt) = conn.prepare(
-                    "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
-                     FROM conversation_summaries 
-                     ORDER BY last_modified_time DESC 
-                     LIMIT 30",
-                ) {
-                    let rows = stmt.query_map([], |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, String>(3)?,
-                            row.get::<_, i32>(4)?,
-                            row.get::<_, Option<String>>(5)?,
-                            row.get::<_, String>(6)?,
-                        ))
-                    });
-                    if let Ok(rows) = rows {
-                        for item in rows.flatten() {
-                            let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
-                            let is_explicit_idle = not_fully_idle == 0
-                                || status.contains("IDLE")
-                                || status.contains("COMPLETED")
-                                || status.contains("FAILED")
-                                || status.contains("CANCELLED");
-                            let is_conv_running = if is_explicit_idle {
-                                false
-                            } else {
-                                not_fully_idle != 0 && status.contains("RUNNING")
-                            };
-                            let prompt_preview = if !preview.trim().is_empty() {
-                                Some(preview)
-                            } else {
-                                None
-                            };
+        if let Ok(conn) = conn {
+            let _ = conn.pragma_update(None, "busy_timeout", 3000);
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
+                 FROM conversation_summaries 
+                 ORDER BY last_modified_time DESC 
+                 LIMIT 30",
+            ) {
+                let rows = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, i32>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, String>(6)?,
+                    ))
+                });
+                if let Ok(rows) = rows {
+                    let norm_owning_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                        "default".to_string()
+                    } else {
+                        crate::modules::instance::resolve_instance_id(owning_inst_id)
+                            .unwrap_or_else(|_| owning_inst_id.to_string())
+                    };
+                    let norm_inst = norm_owning_inst.to_lowercase();
 
-                            let prefix_8 = if cid.len() >= 8 {
-                                cid[..8].to_string()
-                            } else {
-                                cid.clone()
-                            };
+                    for item in rows.flatten() {
+                        let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
-                            if is_conv_running {
-                                active_conv_prefixes.push((prefix_8, prompt_preview.clone(), now));
-                            }
+                        // 15-Minute TTL: Parse _last_time_str or check turn age. If older than 900 seconds, treat as stale
+                        let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
+                        let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                            .map(|dt| dt.timestamp() >= now - 900)
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(
+                                    &norm_time,
+                                    "%Y-%m-%dT%H:%M:%S",
+                                )
+                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                            })
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(
+                                    &_last_time_str,
+                                    "%Y-%m-%d %H:%M:%S",
+                                )
+                                .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                            })
+                            .unwrap_or(false);
 
-                            if let Some(ws_uris_raw) = ws_uris_opt {
-                                let ws_uris: Vec<String> =
-                                    serde_json::from_str(&ws_uris_raw).unwrap_or_default();
-                                for u in ws_uris {
-                                    let clean_p = normalize_path_for_compare(&decode_uri_to_path(&u));
-                                    let entry = live_map
-                                        .entry(clean_p)
-                                        .or_insert((false, None, now));
-                                    if is_conv_running {
-                                        entry.0 = true;
-                                        if entry.1.is_none() && prompt_preview.is_some() {
-                                            entry.1 = prompt_preview.clone();
-                                        }
+                        let is_idle_count = not_fully_idle == 0;
+                        let has_idle_status = status.contains("IDLE")
+                            || status.contains("COMPLETED")
+                            || status.contains("FAILED")
+                            || status.contains("CANCELLED");
+                        let is_explicit_idle = is_idle_count || has_idle_status;
+
+                        let is_conv_running = if is_explicit_idle || !is_recent {
+                            false
+                        } else {
+                            not_fully_idle != 0 && status.contains("RUNNING")
+                        };
+                        let prompt_preview = if !preview.trim().is_empty() {
+                            Some(preview)
+                        } else {
+                            None
+                        };
+
+                        let prefix_8 = if cid.len() >= 8 {
+                            cid[..8].to_string()
+                        } else {
+                            cid.clone()
+                        };
+
+                        if is_conv_running {
+                            active_conv_prefixes.push((norm_inst.clone(), prefix_8, prompt_preview.clone(), now));
+                        }
+
+                        if let Some(ws_uris_raw) = ws_uris_opt {
+                            let ws_uris: Vec<String> =
+                                serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                            for u in ws_uris {
+                                let clean_p = normalize_path_for_compare(&decode_uri_to_path(&u));
+                                let entry = live_map
+                                    .entry((norm_inst.clone(), clean_p))
+                                    .or_insert((false, None, now));
+                                if is_conv_running {
+                                    entry.0 = true;
+                                    if entry.1.is_none() && prompt_preview.is_some() {
+                                        entry.1 = prompt_preview.clone();
                                     }
                                 }
                             }
@@ -2329,20 +2360,30 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     // 2. Inspect active_prompts in repo_prompts.db for any in-flight prompts
     if let Ok(conn) = connect_db() {
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT repo_path, prompt_content, status FROM active_prompts WHERE status = 'running' OR status = 'queued'",
+            "SELECT instance_id, repo_path, prompt_content, status FROM active_prompts WHERE status = 'running' OR status = 'queued'",
         ) {
             let rows = stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
                 ))
             });
             if let Ok(rows) = rows {
                 for item in rows.flatten() {
-                    let (p_path, p_content, _st) = item;
+                    let (p_inst, p_path, p_content, _st) = item;
+                    let norm_ap_inst = if p_inst == "__default__" || p_inst.is_empty() {
+                        "default".to_string()
+                    } else {
+                        crate::modules::instance::resolve_instance_id(&p_inst)
+                            .unwrap_or_else(|_| p_inst.clone())
+                    };
+                    let norm_inst = norm_ap_inst.to_lowercase();
                     let clean_p = normalize_path_for_compare(&p_path);
-                    let entry = live_map.entry(clean_p).or_insert((false, None, now));
+                    let entry = live_map
+                        .entry((norm_inst, clean_p))
+                        .or_insert((false, None, now));
                     entry.0 = true;
                     if entry.1.is_none() {
                         entry.1 = Some(p_content.chars().take(120).collect());
@@ -2356,12 +2397,24 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     let projects = list_running_projects().unwrap_or_default();
     for p in projects {
         let clean_path = normalize_path_for_compare(&p.repo_path);
+        let norm_proj_inst = if p.instance_id == "default"
+            || p.instance_id == "__default__"
+            || p.instance_id.is_empty()
+        {
+            "default".to_string()
+        } else {
+            crate::modules::instance::resolve_instance_id(&p.instance_id)
+                .unwrap_or_else(|_| p.instance_id.clone())
+        };
+        let norm_inst = norm_proj_inst.to_lowercase();
+
         let mut is_running = false;
         let mut prompt_snippet = None;
         let mut last_time = p.last_detected_at;
 
         // Check path match in live_map
-        if let Some((run, snippet, l_time)) = live_map.get(&clean_path) {
+        if let Some((run, snippet, l_time)) = live_map.get(&(norm_inst.clone(), clean_path.clone()))
+        {
             if *run {
                 is_running = true;
                 prompt_snippet = snippet.clone();
@@ -2369,10 +2422,10 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
             }
         }
 
-        // Check if project_id or repo_path matches any active conversation prefix
+        // Check if project_id or repo_path matches any active conversation prefix strictly within the same instance
         if !is_running {
-            for (pfx, snippet, l_time) in &active_conv_prefixes {
-                if p.id.contains(pfx) || p.repo_path.contains(pfx) {
+            for (pfx_inst, pfx, snippet, l_time) in &active_conv_prefixes {
+                if pfx_inst == &norm_inst && (p.id.contains(pfx) || p.repo_path.contains(pfx)) {
                     is_running = true;
                     prompt_snippet = snippet.clone();
                     last_time = *l_time;
@@ -3661,10 +3714,14 @@ fn compute_project_conversation_tree(
     if let Ok(active_list) = list_all_prompts() {
         for ap in active_list {
             let key = normalize_path_for_compare(&ap.repo_path);
-            let inst = if ap.instance_id == "__default__" || ap.instance_id.is_empty() {
+            let inst = if ap.instance_id == "default"
+                || ap.instance_id == "__default__"
+                || ap.instance_id.is_empty()
+            {
                 "default".to_string()
             } else {
-                ap.instance_id.clone()
+                crate::modules::instance::resolve_instance_id(&ap.instance_id)
+                    .unwrap_or_else(|_| ap.instance_id.clone())
             };
             active_prompts_by_inst_and_path
                 .entry((inst, key))
@@ -3675,7 +3732,8 @@ fn compute_project_conversation_tree(
 
     let candidate_dirs = gemini_dirs_tagged(target);
 
-    let mut seen_tree_cids = std::collections::HashSet::new();
+    let mut seen_tree_cids: std::collections::HashSet<(String, String)> =
+        std::collections::HashSet::new();
 
     for (owning_inst_id, base) in &candidate_dirs {
         let summaries_db = base.join("conversation_summaries.db");
@@ -3734,9 +3792,29 @@ fn compute_project_conversation_tree(
                     }) {
                         for item in rows.flatten() {
                             let (cid, title, preview, status, not_fully_idle, ws_uris_opt, last_time_str) = item;
-                            if !seen_tree_cids.insert(cid.clone()) {
+
+                            let norm_owning_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                "default".to_string()
+                            } else {
+                                crate::modules::instance::resolve_instance_id(owning_inst_id).unwrap_or_else(|_| owning_inst_id.to_string())
+                            };
+                            if !seen_tree_cids.insert((norm_owning_inst.clone(), cid.clone())) {
                                 continue;
                             }
+
+                            let norm_time = last_time_str.trim().replacen(' ', "T", 1);
+                            let is_recent = chrono::DateTime::parse_from_rfc3339(&norm_time)
+                                .map(|dt| dt.timestamp() >= now - 900)
+                                .or_else(|_| {
+                                    chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
+                                        .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                })
+                                .or_else(|_| {
+                                    chrono::NaiveDateTime::parse_from_str(&last_time_str, "%Y-%m-%d %H:%M:%S")
+                                        .map(|dt| dt.and_utc().timestamp() >= now - 900)
+                                })
+                                .unwrap_or(false);
+
                             let is_idle_count = not_fully_idle == 0;
                             let has_idle_status = status.contains("IDLE")
                                 || status.contains("COMPLETED")
@@ -3744,13 +3822,9 @@ fn compute_project_conversation_tree(
                                 || status.contains("CANCELLED");
                             let is_explicit_idle = is_idle_count || has_idle_status;
 
-                            let has_active_turns = not_fully_idle > 0;
-                            let has_running_text = status.contains("RUNNING");
-                            let is_active_session = has_active_turns && has_running_text;
-
-                            let is_conv_running = if is_explicit_idle {
+                            let is_conv_running = if is_explicit_idle || !is_recent {
                                 false
-                            } else if is_owning_inst_alive && is_active_session {
+                            } else if is_owning_inst_alive && not_fully_idle > 0 && status.contains("RUNNING") {
                                 true
                             } else {
                                 false
@@ -3774,11 +3848,6 @@ fn compute_project_conversation_tree(
                             if assigned_paths.is_empty() {
                                 assigned_paths.push("__unassigned__".to_string());
                             }
-                            let norm_owning_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
-                                "default".to_string()
-                            } else {
-                                owning_inst_id.clone()
-                            };
                             for p_key in assigned_paths {
                                 convs_by_inst_and_path.entry((norm_owning_inst.clone(), p_key)).or_default().push((
                                     cid.clone(),
@@ -3849,7 +3918,8 @@ fn compute_project_conversation_tree(
         {
             "default".to_string()
         } else {
-            proj.instance_id.clone()
+            crate::modules::instance::resolve_instance_id(&proj.instance_id)
+                .unwrap_or_else(|_| proj.instance_id.clone())
         };
 
         let mut conv_nodes: Vec<AgmConversationNode> = Vec::new();
