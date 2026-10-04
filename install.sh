@@ -31,6 +31,16 @@ GITHUB_API="https://api.github.com/repos/${REPO}/releases"
 FALLBACK_STABLE_VERSION="4.7.6"
 PINNED_VERSION="__PINNED_VERSION__"
 
+# Candidate queues — must be declared at global scope so that set -u never
+# sees them as unbound when helper functions like is_version_in_candidates()
+# expand "${CANDIDATE_VERSIONS[@]}" before init_candidate_queues() runs.
+CANDIDATE_VERSIONS=()
+CANDIDATE_TAG_URLS=()
+CANDIDATE_ASSET_URLS=()
+IS_PINNED=0
+CLEAN_PINNED=""
+MANIFEST_LOADED=0
+
 # Helper functions with left indentation
 info()    { echo -e "${INDENT}${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${INDENT}${GREEN}[OK]${NC} $1"; }
