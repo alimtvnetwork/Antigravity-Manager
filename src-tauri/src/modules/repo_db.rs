@@ -1931,6 +1931,21 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             let is_match = norm_target == "all"
                 || norm_inst == norm_target
                 || (is_target_default && is_inst_default);
+            crate::modules::logger::log_instance_prompt_audit(
+                &norm_target,
+                "check_and_dispatch_enqueued_prompts",
+                &project_id,
+                &repo_path,
+                "",
+                None,
+                "PromptDispatcher:InstanceMatching",
+                is_match,
+                if is_match {
+                    "PROMPT_DISPATCH_MATCHED"
+                } else {
+                    "PROMPT_DISPATCH_REJECTED"
+                },
+            );
             if !is_match {
                 continue;
             }
